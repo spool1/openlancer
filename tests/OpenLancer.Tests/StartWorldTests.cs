@@ -880,6 +880,65 @@ public sealed class StartWorldTests
             triggers: again.Replace("{LINES}", "Act_Destroy = ol_local\nAct_SpawnShip = ol_local")));
         Assert.DoesNotContain(destroyed.LeftOut, l => l.Object == "ol_local");
         Assert.Contains("Act_SpawnShip = ol_local", WorldLines(destroyed));
+        Assert.Contains(destroyed.Companions, c => c.Object == "ol_local");
+    }
+
+    /// <summary>A trigger of the start that destroys an object of the setup, and does not spawn it again, makes it leave
+    /// soon after the start. So the object is no companion and keeps its point, but the setup makes it. The destroy then
+    /// runs in the play, so a trigger that waits for the end of the object still runs (fix of the review of
+    /// 2026-10-28).</summary>
+    [Fact]
+    public void AnObjectThatATriggerOfTheStartDestroysIsNoCompanion()
+    {
+        var plan = Plan(Script(jump: "Act_GiveObjList = ol_local, ol_follow", triggers: """
+            Act_ActTrig = t_end
+            Act_ActTrig = t_local_dies
+
+            [Trigger]
+            nickname = t_end
+            Cnd_Timer = 2
+            Act_Destroy = ol_local, SILENT
+
+            [Trigger]
+            nickname = t_local_dies
+            Cnd_Destroyed = ol_local
+            """));
+
+        Assert.DoesNotContain(plan.Companions, c => c.Object == "ol_local");
+        Assert.DoesNotContain(plan.LeftOut, l => l.Object == "ol_local");
+        Assert.Equal(["Act_SpawnShip = ol_local", "Act_GiveObjList = ol_local, ol_follow"],
+            WorldLines(plan).Where(l => l.Contains("ol_local")));
+        Assert.DoesNotContain(plan.Warnings, w => w.Contains("t_local_dies", StringComparison.Ordinal));
+    }
+
+    /// <summary>An old timer of the start that leads to a trigger that ran in the replay does not make its objects
+    /// again. The first run made them, so the setup keeps them. A trigger that did not run in the replay still makes
+    /// its objects again (fix of the review of 2026-10-28).</summary>
+    [Theory]
+    [InlineData("Act_ActTrig = t_help\nAct_ActTrig = t_clock", false)]
+    [InlineData("Act_SpawnShip = ol_help\nAct_ActTrig = t_clock", true)]
+    public void AnOldTimerDoesNotMakeTheObjectsOfARunAgain(string jump, bool again)
+    {
+        var plan = Plan(Script(jump: jump, records: """
+            [MsnShip]
+            nickname = ol_help
+            position = 12000, 0, 12000
+            """, triggers: """
+
+            [Trigger]
+            nickname = t_help
+            Cnd_True = no_params
+            Act_SpawnShip = ol_help
+
+            [Trigger]
+            nickname = t_clock
+            Cnd_Timer = 1
+            Act_ActTrig = t_help
+            """));
+
+        Assert.Contains("t_clock", plan.ActiveSet);
+        Assert.Equal(again, plan.LeftOut.Any(l => l.Object == "ol_help" && l.MadeAgainBy == "t_help"));
+        Assert.Equal(!again, WorldLines(plan).Contains("Act_SpawnShip = ol_help"));
     }
 
     /// <summary>A start in space spawns the player with a launch, so a launch trigger of the start spawns again, as at a

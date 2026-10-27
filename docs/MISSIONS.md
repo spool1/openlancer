@@ -280,6 +280,8 @@ The setup leaves out each object that is in another system at the trigger. It al
 
 A trigger that runs at the start can spawn an object of the setup again. Such triggers wait for nothing, for the launch, for the entry to space or for a timer. For a base start, they can also wait for the end of the launch or for the base. The scripts spawn an object again only after the first object left space. So the setup leaves out the old object, and the page names the trigger that makes it again.
 
+Such a trigger can also destroy an object of the setup and not spawn it again. That object does not travel with the player, because it leaves soon after the start. An old timer of the start does not make the objects of a trigger again when the path already ran that trigger. The editor runs the path without time, so it keeps timers that the game ran long before.
+
 A ship or a formation of the start system travels with the player when one of these is true. The path must not make it hostile to the player.
 
 - Its last orders follow, trail or dock with the player, or with another ship that travels with the player.

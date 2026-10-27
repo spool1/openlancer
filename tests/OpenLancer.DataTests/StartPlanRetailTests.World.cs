@@ -288,12 +288,71 @@ public sealed partial class StartPlanRetailTests
                     var twin = ships.FirstOrDefault(s => s.TrimEnd("0123456789".ToCharArray()) is var stem && stem != s &&
                                                          ships.Contains(stem));
                     Assert.True(twin == null, $"{what}: {twin} and the old ship of its character start together.");
+                    // Two ships of one character with two NPC records never start together either, for example juni
+                    // and Juni_mactan. Wing pilots can share a name, but not also the voice and the costume.
+                    var character = ships.Select(s => (Ship: s, Npc: Npc(index, s))).Where(s => s.Npc != null)
+                        .GroupBy(s => Character(index, s.Npc!)).FirstOrDefault(g => g.Key != null &&
+                            g.Select(s => s.Npc).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1);
+                    Assert.True(character == null,
+                        $"{what}: {string.Join(" and ", character?.Select(s => s.Ship) ?? [])} are one character.");
                 }
             }
             output.WriteLine($"{set}: {plans} approximate plans, {leftOut} left-out objects, {fuses} removed fuse lines, " +
                              $"{companions} companions ({moved} moved), {withoutSystem} plans without a start system.");
         }
         output.WriteLine($"Time: {watch.Elapsed.TotalSeconds:0} s.");
+    }
+
+    /// <summary>The NPC record of a ship of the script, or null.</summary>
+    private static string? Npc(MissionIndex index, string ship) => Value(index.Item(MissionSectionKind.Ship, ship), "npc");
+
+    /// <summary>The character of an NPC record: its name, its voice and its costume, or null without a name.</summary>
+    private static string? Character(MissionIndex index, string npc)
+    {
+        var record = index.Item(MissionSectionKind.Npc, npc);
+        if (Value(record, "individual_name") is not { } name)
+            return null;
+        var costume = record!.Section.FirstOrDefault(e => MissionIndex.Is(e.Name, "space_costume"))?.Select(MissionIndex.Text);
+        return $"{name}|{Value(record, "voice")}|{string.Join(",", costume ?? [])}";
+    }
+
+    private static string? Value(MissionSection? section, string key) =>
+        section?.Section.FirstOrDefault(e => MissionIndex.Is(e.Name, key) && e.Count > 0) is { } entry
+            ? MissionIndex.Text(entry[0])
+            : null;
+
+    /// <summary>The rows of the second review of 2026-10-28 in both games. M11 first_player_launch starts in space, and
+    /// the world trigger waits for the launch, so the chosen trigger starts after the world and still gets the launch.
+    /// M04 juni_mactan_tether: destroy_juni_hack removes the old Juni soon after the start, so only Juni_mactan travels
+    /// with the player. M01a com_0420: an old timer leads to spawn_lsf_help, which ran at the restore of the
+    /// checkpoint, so the setup keeps the reinforcements.</summary>
+    [Fact]
+    public void TheSecondReviewRowsGetTheirStart()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var launch = Plan(Slot(scripts, "M11"), "first_player_launch");
+            Assert.True(launch.CanStart, $"{set}: {launch.Reason}");
+            Assert.Equal(StartPlaceKind.Space, launch.Place.Kind);
+            Assert.Equal(["ol_play_world"], Starts(launch, 0));
+            Assert.Equal(("Cnd_PlayerLaunch", "no_params"), (launch.Setup[1].Lines[0].Key, launch.Setup[1].Lines[0].Values[0]));
+            Assert.Contains("first_player_launch", Starts(launch, 1));
+
+            var tether = Plan(Slot(scripts, "M04"), "juni_mactan_tether");
+            Assert.True(tether.CanStart, $"{set}: {tether.Reason}");
+            Assert.Equal(["Juni_mactan"], tether.Companions.Select(c => c.Object));
+            Assert.Contains("destroy_juni_hack", tether.ActiveSet);
+            Assert.Contains(World(tether), l => l.Key == "Act_SpawnShip" && l.Values[0] == "juni");
+
+            var help = Plan(Slot(scripts, "M01a"), "com_0420");
+            Assert.True(help.CanStart, $"{set}: {help.Reason}");
+            Assert.Contains("tm_o_attack_cam", help.ActiveSet);
+            foreach (var ship in new[] { "lsf_reinforce1", "lsf_reinforce2", "lsf_reinforce3", "lsf_reinforce4" })
+            {
+                Assert.DoesNotContain(help.LeftOut, l => l.Object == ship);
+                Assert.Contains(World(help), l => l.Key == "Act_SpawnShip" && l.Values[0] == ship);
+            }
+        }
     }
 
     /// <summary>The rows of the review of 2026-10-28 in both games. M11 com_1500: the newest list of the player names

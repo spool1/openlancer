@@ -259,6 +259,10 @@ internal static class StartWorld
         /// <summary>The trigger of the start that makes the object again, or null.</summary>
         public MissionTrigger? Again { get; set; }
 
+        /// <summary>The trigger of the start that destroys the object, when no trigger of the start makes it again, or
+        /// null.</summary>
+        public MissionTrigger? Leaves { get; set; }
+
         /// <summary>The order list of its last own orders, and the index of the line that gave them, or -1 for the spawn
         /// line or the record.</summary>
         public (string List, int At)? Orders { get; set; }
@@ -488,53 +492,83 @@ internal static class StartWorld
             unit.Members.Append(unit.Name).Any(m => jumpers.TryGetValue(m, out var on) ? on : IsTrue(Text(ItemOf(m), "jumper")));
 
         /// <summary>
-        /// A trigger that runs at the start can spawn an object of the setup again. The scripts spawn an object again only
+        /// The rules of the triggers of the start. These are the triggers of the active set that run at the start or soon
+        /// after it (<see cref="RunsAtStart"/>), with the triggers that they start with such a condition.
+        /// <list type="bullet">
+        /// <item>A trigger of the start can spawn an object of the setup again. The scripts spawn an object again only
         /// after the first one left space, for example after it docked. So the setup leaves out the old object, as rule 4
-        /// does for two spawn lines of the path. The triggers of the start are the triggers of the active set that run at
-        /// the start or soon after it (<see cref="RunsAtStart"/>), with the triggers that they start with such a
-        /// condition. An <c>Act_Destroy</c> of the object before the spawn keeps the old object, because the trigger
-        /// removes it itself.
+        /// does for two spawn lines of the path. An <c>Act_Destroy</c> of the object before the spawn keeps the old
+        /// object, because the trigger removes it itself.</item>
+        /// <item>A trigger of the start can destroy an object of the setup, and no trigger of the start spawns it again.
+        /// That object leaves soon after the start, so it does not travel with the player. It keeps its point, and the
+        /// destroy still runs, so the triggers that wait for its end still run.</item>
+        /// <item>A trigger that ran in the replay does not count when the triggers of the start reach it only through a
+        /// timer. Its first run made its objects, so they exist at the chosen trigger in the game too. The timer can run
+        /// it a second time only later. The replay also keeps an old timer that the game ran long before, because the
+        /// replay has no time.</item>
+        /// </list>
         /// </summary>
         private void MadeAgain()
         {
-            var chain = new List<MissionTrigger>();
-            var queue = new Queue<MissionTrigger>();
-            void Add(MissionTrigger? trigger)
-            {
-                if (trigger is { IsDuplicate: false } && !chain.Contains(trigger))
-                {
-                    chain.Add(trigger);
-                    queue.Enqueue(trigger);
-                }
-            }
-            foreach (var trigger in replay.ActiveSet.Where(RunsAtStart))
-                Add(trigger);
-            while (queue.Count > 0)
-            {
-                foreach (var start in queue.Dequeue().Actions.Where(a => MissionIndex.Is(a.Key, "Act_ActTrig")))
-                {
-                    if (start.Value(0) is { } name && index.Trigger(name) is { } next && RunsAtStart(next))
-                        Add(next);
-                }
-            }
+            var ran = replay.Changes.Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger).ToHashSet();
+            var soon = Reach(t => RunsAtStart(t) && !t.ConditionIs("Cnd_Timer")).ToHashSet();
             var destroyed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var trigger in chain)
+            foreach (var trigger in Reach(RunsAtStart).Where(t => soon.Contains(t) || !ran.Contains(t)))
             {
                 foreach (var action in trigger.Actions)
                 {
                     if (action.Value(0) is not { } name)
                         continue;
                     var members = Members(name).Append(name.Trim()).ToList();
+                    var targets = units.Where(u => !u.Destroyed && u.Again == null && InStart(u.System) &&
+                                                   u.Members.Append(u.Name).Any(members.Contains)).ToList();
                     if (MissionIndex.Is(action.Key, "Act_Destroy"))
-                        destroyed.UnionWith(members);
-                    else if (SpawnKeys.Any(k => MissionIndex.Is(action.Key, k)) && !members.Any(destroyed.Contains))
                     {
-                        foreach (var unit in units.Where(u => !u.Destroyed && u.Again == null && InStart(u.System) &&
-                                                              u.Members.Append(u.Name).Any(members.Contains)))
-                            unit.Again = trigger;
+                        destroyed.UnionWith(members);
+                        foreach (var unit in targets)
+                            unit.Leaves ??= trigger;
+                    }
+                    else if (SpawnKeys.Any(k => MissionIndex.Is(action.Key, k)))
+                    {
+                        var replaced = !members.Any(destroyed.Contains);
+                        foreach (var unit in targets)
+                        {
+                            // A trigger of the start that destroys the object and spawns it again replaces it itself.
+                            unit.Leaves = null;
+                            if (replaced)
+                                unit.Again = trigger;
+                        }
                     }
                 }
             }
+        }
+
+        /// <summary>The triggers of the active set whose condition matches, and the triggers that they start with such a
+        /// condition, in the order of a search in width.</summary>
+        private List<MissionTrigger> Reach(Func<MissionTrigger, bool> matches)
+        {
+            var found = new List<MissionTrigger>();
+            var seen = new HashSet<MissionTrigger>();
+            var queue = new Queue<MissionTrigger>();
+            void Add(MissionTrigger? trigger)
+            {
+                if (trigger is { IsDuplicate: false } && matches(trigger) && seen.Add(trigger))
+                {
+                    found.Add(trigger);
+                    queue.Enqueue(trigger);
+                }
+            }
+            foreach (var trigger in replay.ActiveSet)
+                Add(trigger);
+            while (queue.Count > 0)
+            {
+                foreach (var start in queue.Dequeue().Actions.Where(a => MissionIndex.Is(a.Key, "Act_ActTrig")))
+                {
+                    if (start.Value(0) is { } name)
+                        Add(index.Trigger(name));
+                }
+            }
+            return found;
         }
 
         /// <summary>True for a condition that is true at the start or soon after it: Cnd_True, the launch, Cnd_SpaceEnter
@@ -554,7 +588,7 @@ internal static class StartWorld
         private List<(Unit Unit, CompanionSigns Signs)> Companions()
         {
             var candidates = units.Where(u => !u.Destroyed && u.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&
-                                              InStart(u.System) && u.Again == null &&
+                                              InStart(u.System) && u.Again == null && u.Leaves == null &&
                                               !u.Members.Append(u.Name).Any(facts.Hostile.Contains))
                 .ToList();
             var signs = new Dictionary<Unit, CompanionSigns>();
