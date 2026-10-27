@@ -328,12 +328,13 @@ internal static class StartSetup
     /// <param name="taken">Names that other setup triggers of the plan take.</param>
     internal static string FreeName(MissionIndex index, string wanted, IReadOnlyCollection<string> taken)
     {
-        var names = index.Triggers.Select(t => t.Nickname).Concat(taken).ToList();
-        var ids = names.Select(FLHash.CreateID).ToHashSet();
+        var graph = StartGraph.Of(index);
+        var takenIds = taken.Select(FLHash.CreateID).ToHashSet();
         for (var n = 1;; n++)
         {
             var name = n == 1 ? wanted : $"{wanted}_{n.ToString(CultureInfo.InvariantCulture)}";
-            if (!names.Contains(name, StringComparer.OrdinalIgnoreCase) && !ids.Contains(FLHash.CreateID(name)))
+            if (!graph.IsTaken(name) && !taken.Contains(name, StringComparer.OrdinalIgnoreCase) &&
+                !takenIds.Contains(FLHash.CreateID(name)))
                 return name;
         }
     }

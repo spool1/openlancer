@@ -242,9 +242,8 @@ internal static class StartPlaces
         private readonly MissionTrigger? chosen;
         private readonly List<MissionTrigger> timeline;
         private readonly HashSet<MissionTrigger> onTimeline;
-        private readonly HashSet<MissionTrigger> checkpoints;
+        private readonly StartGraph graph;
         private readonly ILookup<MissionTrigger, MissionTrigger> starts;
-        private Dictionary<MissionTrigger, int>? depths;
         private Dictionary<string, bool>? attitudes;
 
         public Walk(MissionIndex index, StartReplay replay)
@@ -254,8 +253,8 @@ internal static class StartPlaces
             chosen = replay.Chosen;
             timeline = Timeline(index, replay);
             onTimeline = [.. timeline];
-            checkpoints = [.. DryRun.Checkpoints(index)];
-            starts = StartPlan.Next(index, MissionLinkKind.Start);
+            graph = StartGraph.Of(index);
+            starts = graph.Starts;
         }
 
         /// <summary>The number of earlier triggers of the timeline. The chosen trigger is the last trigger. The mission
@@ -395,7 +394,7 @@ internal static class StartPlaces
             if (!WaitsToArrive(condition) && trigger.Actions.LastOrDefault(IsPlaceLine) is { } line &&
                 PlaceFact(trigger, line, at) is { } own)
                 yield return own;
-            if (checkpoints.Contains(trigger))
+            if (graph.IsCheckpoint(trigger))
             {
                 foreach (var step in starts[trigger].Distinct().Where(t => t.ConditionIs("Cnd_True")))
                 {
@@ -490,8 +489,8 @@ internal static class StartPlaces
         private IEnumerable<Fact> JumpsTo(MissionTrigger target, int at) =>
             index.StartsOf(target).Select(l => l.Source).Distinct()
                 .Where(j => j != target && !j.IsDuplicate && !onTimeline.Contains(j) &&
-                            (checkpoints.Contains(j) || index.NothingStarts(j)) && IsLatestStep(j, target))
-                .OrderBy(j => checkpoints.Contains(j) ? 0 : 1)
+                            (graph.IsCheckpoint(j) || index.NothingStarts(j)) && IsLatestStep(j, target))
+                .OrderBy(j => graph.IsCheckpoint(j) ? 0 : 1)
                 .Select(j => j.Actions.LastOrDefault(IsPlaceLine) is { } line ? PlaceFact(j, line, at, target) : null)
                 .OfType<Fact>();
 
@@ -501,31 +500,7 @@ internal static class StartPlaces
             starts[jump].All(t => Depth(t) <= Depth(target));
 
         /// <summary>The length of the story path of a trigger, or -1 when no start trigger reaches it.</summary>
-        private int Depth(MissionTrigger trigger) => (depths ??= Depths()).GetValueOrDefault(trigger, -1);
-
-        /// <summary>The length of the story path of each trigger that a start trigger reaches. The search uses the links
-        /// of <see cref="StartPlan.StoryPath"/>, so each length is the length of that path.</summary>
-        private Dictionary<MissionTrigger, int> Depths()
-        {
-            var next = StartPlan.Next(index, MissionLinkKind.Start, MissionLinkKind.Load);
-            var depth = new Dictionary<MissionTrigger, int>();
-            var queue = new Queue<MissionTrigger>();
-            foreach (var root in index.StartTriggers.Where(r => !r.IsDuplicate))
-            {
-                if (depth.TryAdd(root, 0))
-                    queue.Enqueue(root);
-            }
-            while (queue.Count > 0)
-            {
-                var trigger = queue.Dequeue();
-                foreach (var child in next[trigger])
-                {
-                    if (depth.TryAdd(child, depth[trigger] + 1))
-                        queue.Enqueue(child);
-                }
-            }
-            return depth;
-        }
+        private int Depth(MissionTrigger trigger) => graph.Depth(trigger);
 
         /// <summary>
         /// The system of a place line (rule 5), and the line of another trigger that gives it. The order is:

@@ -279,7 +279,7 @@ public sealed record StartPlan
     /// <summary>The kind of a start at a trigger of a script with a story slot.</summary>
     internal static StartKind KindOf(MissionIndex index, MissionTrigger trigger) =>
         index.StartTriggers.Contains(trigger) ? StartKind.MissionStart
-        : DryRun.Checkpoints(index).Contains(trigger) ? StartKind.Checkpoint
+        : StartGraph.Of(index).IsCheckpoint(trigger) ? StartKind.Checkpoint
         : StartKind.Approximate;
 
     /// <summary>
@@ -348,51 +348,7 @@ public sealed record StartPlan
     /// trigger, and only the start trigger for a start trigger.
     /// </summary>
     internal static IReadOnlyList<MissionTrigger> StoryPath(MissionIndex index, MissionTrigger? chosen) =>
-        chosen == null ? [] : ShortestPath(index, index.StartTriggers, chosen, MissionLinkKind.Start, MissionLinkKind.Load);
-
-    /// <summary>The triggers that each trigger reaches through links of some kinds. A duplicate trigger has no link. A
-    /// start that a stop after it cancels in the same trigger is not a link, because the game does not start its target
-    /// (TR9).</summary>
-    internal static ILookup<MissionTrigger, MissionTrigger> Next(MissionIndex index, params MissionLinkKind[] kinds)
-    {
-        var cancelled = index.Cancels.Where(c => c.Target != null).Select(c => (c.Source, c.Target!)).ToHashSet();
-        return index.Links.Where(l => kinds.Contains(l.Kind) && l.Target is { IsDuplicate: false } && !l.Source.IsDuplicate &&
-                                      !(l.Kind == MissionLinkKind.Start && cancelled.Contains((l.Source, l.Target))))
-            .ToLookup(l => l.Source, l => l.Target!);
-    }
-
-    /// <summary>The shortest path of links of some kinds (see <see cref="Next"/>) from the first root that reaches the
-    /// target, in the order of the roots. Empty when no root reaches it.</summary>
-    internal static IReadOnlyList<MissionTrigger> ShortestPath(MissionIndex index, IEnumerable<MissionTrigger> roots,
-        MissionTrigger target, params MissionLinkKind[] kinds)
-    {
-        var next = Next(index, kinds);
-        var parent = new Dictionary<MissionTrigger, MissionTrigger?>();
-        var queue = new Queue<MissionTrigger>();
-        foreach (var root in roots.Where(r => !r.IsDuplicate))
-        {
-            if (parent.TryAdd(root, null))
-                queue.Enqueue(root);
-        }
-        while (queue.Count > 0)
-        {
-            var trigger = queue.Dequeue();
-            if (trigger == target)
-            {
-                var path = new List<MissionTrigger>();
-                for (MissionTrigger? at = trigger; at != null; at = parent[at])
-                    path.Add(at);
-                path.Reverse();
-                return path;
-            }
-            foreach (var child in next[trigger])
-            {
-                if (parent.TryAdd(child, trigger))
-                    queue.Enqueue(child);
-            }
-        }
-        return [];
-    }
+        chosen == null ? [] : StartGraph.Of(index).StoryPath(chosen);
 
     /// <summary>True for a trigger whose condition waits for the accept of the mission
     /// (<c>Cnd_MsnResponse = accept</c>).</summary>
@@ -458,8 +414,7 @@ internal sealed record StartReplay
             return new StartReplay { Refusal = StartRefusal.NoTrigger, Reason = StartPlan.NoTriggerReason(name) };
         if (StartPlan.KindOf(index, chosen) is var kind and not StartKind.Approximate)
             return Exact(index, chosen, kind);
-        var roots = index.StartTriggers.Concat(DryRun.Checkpoints(index));
-        var path = StartPlan.ShortestPath(index, roots, chosen, MissionLinkKind.Start);
+        var path = StartGraph.Of(index).ReplayPath(chosen);
         if (path.Count == 0)
             return new StartReplay
             {
@@ -702,7 +657,7 @@ internal sealed record StartReplay
         /// trigger.</summary>
         private List<MissionTrigger>? Chain(string objective, IReadOnlyList<MissionTrigger> rest)
         {
-            var next = StartPlan.Next(index, MissionLinkKind.Start);
+            var next = StartGraph.Of(index).Starts;
             var parent = new Dictionary<MissionTrigger, MissionTrigger?>();
             var queue = new Queue<MissionTrigger>();
             foreach (var trigger in Machine.Active.Concat(Machine.Pending).Where(t => Free(t, rest)))

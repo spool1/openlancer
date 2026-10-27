@@ -873,6 +873,31 @@ public sealed class StartPlanTests
         Assert.Equal(a.Start, b.Start);
     }
 
+    /// <summary>The plans of one index share one graph of its links and its trigger names. So the Play buttons of the
+    /// graph view do not read all links again for each trigger (fix of the review of 2026-10-28). A new index gets a new
+    /// graph.</summary>
+    [Fact]
+    public void ThePlansOfOneIndexShareOneGraphOfTheLinks()
+    {
+        var index = Index(Script);
+        var graph = StartGraph.Of(index);
+        IEnumerable<string> Names(IReadOnlyList<MissionTrigger> path) => path.Select(t => t.Nickname);
+
+        Assert.Same(graph, StartGraph.Of(index));
+        Assert.NotSame(graph, StartGraph.Of(Index(Script)));
+        Assert.Equal(["t_start", "t_offer", "t_accept", "t_launch", "t_kill", "t_scene", "t_chosen"],
+            Names(graph.StoryPath(index.Trigger("t_chosen")!)));
+        Assert.Equal(6, graph.Depth(index.Trigger("t_chosen")!));
+        Assert.Equal(-1, graph.Depth(index.Trigger("t_orphan")!));
+        // The story path reaches t_fail from the start. The replay path starts at the restore trigger, a nearer root.
+        Assert.Equal(["t_start", "t_offer", "t_accept", "t_launch", "t_fail"], Names(graph.StoryPath(index.Trigger("t_fail")!)));
+        Assert.Equal(["t_restore", "t_fail"], Names(graph.ReplayPath(index.Trigger("t_fail")!)));
+        Assert.Empty(graph.ReplayPath(index.Trigger("t_orphan")!));
+        Assert.True(graph.IsCheckpoint(index.Trigger("t_restore")!));
+        Assert.True(graph.IsTaken("T_CHOSEN"));
+        Assert.False(graph.IsTaken("ol_free"));
+    }
+
     [Fact]
     public void AStartPointFollowsARenameWithoutLetterCase()
     {
