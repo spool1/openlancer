@@ -508,6 +508,10 @@ public sealed partial class EditSession : IDisposable
     internal void ApplyInTransaction(ChangeSet change, EditCommand command)
     {
         text = change.Undo(FileAt) ?? text;
+        // The restore changes W, so the caches must not keep the state of the step before. The command of a step of the
+        // command layer makes its plan when it runs, and the plan reads the caches (review finding R2 of MCP1-2).
+        CacheRevision++;
+        NoteWorld(change);
         try
         {
             Run(change, command);

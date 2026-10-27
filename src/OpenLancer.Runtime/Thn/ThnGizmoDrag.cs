@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
 using OpenLancer.Runtime.Scene;
 
@@ -193,8 +194,11 @@ public sealed class ThnGizmoTarget : IGizmoTarget
         return Matrix4x4.CreateFromQuaternion(Pose.Rotation) * Matrix4x4.CreateTranslation(Pose.Position);
     }
 
-    public IGizmoDrag Begin(EditSession session, GizmoTool tool, GizmoSpace space, string? noEditReason) =>
-        ThnGizmoDrag.Begin(session, this, tool, space, noEditReason);
+    /// <inheritdoc/>
+    public string DragLabel(GizmoTool tool) => $"{tool} {Label}";
+
+    public IGizmoDrag Begin(CommandTransaction gesture, GizmoTool tool, GizmoSpace space, string? noEditReason) =>
+        ThnGizmoDrag.Begin(gesture, this, tool, space, noEditReason);
 
     /// <summary>The command that gives the item a pose. A move writes the position, and a rotate the rotation.</summary>
     internal EditCommand Write(GizmoTool tool, ThnPoseValue pose)
@@ -248,8 +252,9 @@ public sealed class ThnGizmoTarget : IGizmoTarget
 }
 
 /// <summary>
-/// One drag of the gizmo of the Cutscene view as one entry of the edit history (the pattern of <see cref="GizmoDrag"/>).
-/// It has no ImGui call, so a test can script it with matrices.
+/// One drag of the gizmo of the Cutscene view as one entry of the edit history: a gesture of the command layer (the
+/// pattern of <see cref="GizmoDrag"/>). Each step runs the cutscene edit of the frame as a <see cref="CommandPlan"/>. It
+/// has no ImGui call, so a test can script it with matrices.
 /// </summary>
 /// <remarks>
 /// The drag starts from the pose of W. Each frame gives the raw matrix of the gizmo, and the drag writes the new pose
@@ -262,31 +267,34 @@ public sealed class ThnGizmoDrag : IGizmoDrag
     private readonly ThnGizmoTarget target;
     private readonly GizmoTool tool;
     private readonly GizmoSpace space;
-    private readonly EditTransaction transaction;
+    private readonly CommandTransaction gesture;
     private ThnPoseValue applied;
     private bool ended;
 
-    private ThnGizmoDrag(ThnGizmoTarget target, GizmoTool tool, GizmoSpace space, EditTransaction transaction)
+    private ThnGizmoDrag(ThnGizmoTarget target, GizmoTool tool, GizmoSpace space, CommandTransaction gesture)
     {
         this.target = target;
         this.tool = tool;
         this.space = space;
-        this.transaction = transaction;
+        this.gesture = gesture;
         applied = target.Pose;
     }
 
-    /// <summary>Reads the target from W again, and opens a transaction with the label of the tool and the item, for
-    /// example <c>Move Cam_A</c>.</summary>
-    /// <exception cref="InvalidOperationException">The editor or the session takes no edits, a transaction is open, the
-    /// gizmo cannot change the item now, or the item does not take the tool. Nothing changes.</exception>
-    public static ThnGizmoDrag Begin(EditSession session, ThnGizmoTarget target, GizmoTool tool, GizmoSpace space,
-        string? noEditReason)
+    /// <summary>Reads the target from W again, and starts a drag in a gesture. The gesture gets the label of the tool and
+    /// the item of W now, for example <c>Move Cam_A</c>. The drag owns the gesture after the start.</summary>
+    /// <param name="gesture">The open gesture of the drag. When the drag cannot start, the gesture stays open, and the
+    /// caller cancels it.</param>
+    /// <exception cref="InvalidOperationException">The editor or the session takes no edits, the gizmo cannot change the
+    /// item now, or the item does not take the tool. Nothing changes.</exception>
+    public static ThnGizmoDrag Begin(CommandTransaction gesture, ThnGizmoTarget target, GizmoTool tool,
+        GizmoSpace space, string? noEditReason)
     {
-        var now = ThnGizmoTarget.Of(session, target.Key, noEditReason, out var reason) ??
+        var now = ThnGizmoTarget.Of(gesture.Session, target.Key, noEditReason, out var reason) ??
                   throw new InvalidOperationException(reason);
         if (now.Tools[tool] is { } disabled)
             throw new InvalidOperationException(disabled);
-        return new ThnGizmoDrag(now, tool, space, session.Begin($"{tool} {now.Label}"));
+        gesture.Label = now.DragLabel(tool);
+        return new ThnGizmoDrag(now, tool, space, gesture);
     }
 
     /// <summary>The pose that the edit view holds now.</summary>
@@ -319,7 +327,15 @@ public sealed class ThnGizmoDrag : IGizmoDrag
         }
         if (pose == applied)
             return;
-        transaction.Apply(pose == start ? EditCommand.Group("", []) : target.Write(tool, pose));
+        if (pose == start)
+        {
+            gesture.Reset();
+        }
+        else if (gesture.Apply(_ => new CommandPlan(target.Write(tool, pose))) is { Status: EditStatus.Refused } refused)
+        {
+            applied = start;
+            throw new InvalidOperationException(refused.Errors[0].Message);
+        }
         applied = pose;
     }
 
@@ -327,7 +343,7 @@ public sealed class ThnGizmoDrag : IGizmoDrag
     {
         ThrowIfEnded();
         ended = true;
-        transaction.Commit();
+        gesture.Commit();
     }
 
     public void Cancel()
@@ -335,7 +351,7 @@ public sealed class ThnGizmoDrag : IGizmoDrag
         if (ended)
             return;
         ended = true;
-        transaction.Cancel();
+        gesture.Cancel();
     }
 
     public void Dispose() => Cancel();

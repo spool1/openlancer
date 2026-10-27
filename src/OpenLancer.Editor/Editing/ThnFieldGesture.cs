@@ -1,5 +1,6 @@
 using System;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
 using OpenLancer.Studio.Commands;
 

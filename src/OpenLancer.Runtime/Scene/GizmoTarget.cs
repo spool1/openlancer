@@ -4,6 +4,7 @@ using System.Numerics;
 using LibreLancer.Data.GameData.World;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 
 namespace OpenLancer.Runtime.Scene;
 
@@ -39,10 +40,19 @@ public interface IGizmoTarget
     /// <exception cref="InvalidOperationException">The item does not take the tool.</exception>
     Matrix4x4 Matrix(GizmoTool tool);
 
-    /// <summary>Starts a drag of the item: one transaction of the edit history.</summary>
+    /// <summary>The label of the history entry of a drag of the item with a tool, for example <c>Move Li01_14</c>. The
+    /// editor opens the gesture of the drag with it.</summary>
+    string DragLabel(GizmoTool tool);
+
+    /// <summary>
+    /// Starts a drag of the item in a gesture of the command layer: one entry of the edit history. The drag owns the
+    /// gesture: its end commits the gesture, and its cancel cancels it. When the drag cannot start, the gesture stays
+    /// open, and the caller cancels it.
+    /// </summary>
+    /// <param name="gesture">The open gesture of the drag, with the label of <see cref="DragLabel"/>.</param>
     /// <param name="noEditReason">Why the editor takes no edits now, or null.</param>
     /// <exception cref="InvalidOperationException">The drag cannot start. Nothing changes.</exception>
-    IGizmoDrag Begin(EditSession session, GizmoTool tool, GizmoSpace space, string? noEditReason);
+    IGizmoDrag Begin(CommandTransaction gesture, GizmoTool tool, GizmoSpace space, string? noEditReason);
 }
 
 /// <summary>One drag of the gizmo as one entry of the edit history.</summary>
@@ -132,8 +142,11 @@ public sealed class GizmoTarget : IGizmoTarget
 
     object IGizmoTarget.Key => Section;
 
-    IGizmoDrag IGizmoTarget.Begin(EditSession session, GizmoTool tool, GizmoSpace space, string? noEditReason) =>
-        GizmoDrag.Begin(session, this, tool, space, noEditReason);
+    /// <inheritdoc/>
+    public string DragLabel(GizmoTool tool) => TransformPlans.Label(tool, Section);
+
+    IGizmoDrag IGizmoTarget.Begin(CommandTransaction gesture, GizmoTool tool, GizmoSpace space, string? noEditReason) =>
+        GizmoDrag.Begin(gesture, this, tool, space, noEditReason);
 
     /// <summary><see cref="SceneSection.Object"/>, <see cref="SceneSection.Zone"/> or
     /// <see cref="SceneSection.LightSource"/>.</summary>

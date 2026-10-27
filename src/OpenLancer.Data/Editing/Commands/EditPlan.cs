@@ -24,6 +24,9 @@ public abstract class EditPlan
     /// <summary>The session command, or null when the plan has a refusal.</summary>
     public EditCommand? Command { get; protected internal set; }
 
+    /// <summary>True when the plan has a session command, so it can run. A plan with a refusal cannot run.</summary>
+    public bool CanRun => Command != null;
+
     /// <summary>The sections that the command adds, in order.</summary>
     public IReadOnlyList<SectionRef> Adds { get; protected internal set; } = [];
 

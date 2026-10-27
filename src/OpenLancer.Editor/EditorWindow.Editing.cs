@@ -23,7 +23,7 @@ namespace OpenLancer.Editor;
 
 /// <summary>The edits of the active mod: the Edit and Mod menus, File > Save, their keys and their dialogs, and the save
 /// prompt when the window closes.</summary>
-internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost
+internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost, ICommandHost
 {
     private const string ModsTooltip =
         "Show the mods of the profile and the workspace, with their publish settings, checks and exports.";
@@ -39,6 +39,14 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost
     // close request asks again.
     private readonly ChoiceDialog closeDialog = new();
     private readonly ClosePrompt closePrompt;
+
+    /// <summary>Runs the commands, the batches and the gestures of the command layer for the edits of the user (section
+    /// 5.2, item 5 of the MCP1 design).</summary>
+    public CommandRunner Commands { get; }
+
+    EditSession? ICommandHost.Session => Session?.Edits;
+
+    string? ICommandHost.NoEditReason => Session?.NoEditReason;
 
     void IClosePromptHost.EndEdits() => EndOpenEdits();
 

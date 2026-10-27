@@ -5,6 +5,7 @@ using System.Linq;
 using ImGuiNET;
 using LibreLancer.Thn;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Cutscene;
 using OpenLancer.Editor.Editing;

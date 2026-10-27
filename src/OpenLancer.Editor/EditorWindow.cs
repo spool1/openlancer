@@ -111,6 +111,7 @@ internal sealed partial class EditorWindow : Game
         Cutscenes = new CutsceneWorkspace(this);
         Missions = new MissionWorkspace(this);
         centerSelections = new CenterSelections(OwnerOf);
+        Commands = new CommandRunner(this);
         Edits = new EditController(this);
         SceneEdits = new SceneEdits(this);
         AssetDrag = new AssetDrag(this);

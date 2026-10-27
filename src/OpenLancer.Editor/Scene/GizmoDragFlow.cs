@@ -1,11 +1,11 @@
 using System;
 using System.Numerics;
 using LibreLancer.ImUI;
-using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Runtime.Scene;
-using OpenLancer.Studio.Commands;
 
 namespace OpenLancer.Editor.Scene;
 
@@ -14,8 +14,9 @@ namespace OpenLancer.Editor.Scene;
 internal sealed record GizmoProblem(ConsoleSeverity Severity, string Message, object Target);
 
 /// <summary>
-/// The drag of the gizmo from frame to frame (sections 10.2 and 10.4 of the design). It opens the drag of its target
-/// (<see cref="IGizmoTarget.Begin"/>) when ImGuizmo starts to drag, gives it the raw matrix of each frame, and ends it
+/// The drag of the gizmo from frame to frame (sections 10.2 and 10.4 of the design). It opens a gesture of the command
+/// layer (see <see cref="CommandRunner.Gesture"/>) and the drag of its target in it (<see cref="IGizmoTarget.Begin"/>)
+/// when ImGuizmo starts to drag, gives the drag the raw matrix of each frame, and ends it
 /// on the release of the left button, on Esc or the right button, or when its item is not the selection any more. The
 /// Scene drags a section, and the Cutscene view drags an element of a cutscene. It has no ImGui call, so a test can
 /// script the frames. <see cref="TransformGizmo"/> gives it what ImGui and ImGuizmo report in each frame, and clears
@@ -118,23 +119,28 @@ internal sealed class GizmoDragFlow
     /// state of ImGuizmo.
     /// </summary>
     /// <param name="isUsing"><c>ImGuizmo.IsUsing()</c> after the <c>Manipulate</c> call.</param>
-    /// <param name="noEditReason">Why the editor takes no edits now, or null.</param>
+    /// <param name="commands">Opens the gesture of a drag. It refuses the gesture when the editor takes no edits
+    /// now.</param>
     /// <param name="snap">The snap of this frame, with Ctrl (see <see cref="GizmoSnap.WithCtrl"/>).</param>
     /// <param name="problem">Why a drag did not open or stopped, or null.</param>
-    public bool After(bool isUsing, bool leftDown, EditSession session, string? noEditReason, GizmoSnap snap,
-        out GizmoProblem? problem)
+    public bool After(bool isUsing, bool leftDown, CommandRunner commands, GizmoSnap snap, out GizmoProblem? problem)
     {
         problem = null;
         switch (GizmoInput.After(State, isUsing, leftDown))
         {
             case GizmoAfter.Begin when prepared is { } gizmo:
                 var (target, tool, space) = gizmo;
+                CommandTransaction? gesture = null;
                 try
                 {
-                    drag = target.Begin(session, tool, GizmoInput.SpaceOf(tool, space), noEditReason);
+                    gesture = commands.Gesture(target.DragLabel(tool));
+                    // The runner refused the gesture when the editor takes no edits.
+                    drag = target.Begin(gesture, tool, GizmoInput.SpaceOf(tool, space), noEditReason: null);
                 }
                 catch (InvalidOperationException e)
                 {
+                    // No gesture stays open when the drag cannot start.
+                    gesture?.Cancel();
                     problem = new GizmoProblem(ConsoleSeverity.Warning, $"The gizmo did not start a drag: {e.Message}",
                         target.Key);
                     return true;

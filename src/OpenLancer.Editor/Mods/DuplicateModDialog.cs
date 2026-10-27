@@ -1,12 +1,12 @@
 using System;
 using System.IO;
 using ImGuiNET;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Publishing;
 using OpenLancer.Editor.Dialogs;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Ui;
-using OpenLancer.Studio.Commands;
 
 namespace OpenLancer.Editor.Mods;
 

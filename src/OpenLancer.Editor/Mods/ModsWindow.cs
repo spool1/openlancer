@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using ImGuiNET;
 using LibreLancer.ImUI;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Export;
 using OpenLancer.Data.Games;
 using OpenLancer.Data.Mods;
@@ -14,7 +15,6 @@ using OpenLancer.Editor.Dialogs;
 using OpenLancer.Editor.Export;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Ui;
-using OpenLancer.Studio.Commands;
 
 namespace OpenLancer.Editor.Mods;
 

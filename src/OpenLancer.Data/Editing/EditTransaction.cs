@@ -23,6 +23,14 @@ public sealed class EditTransaction : IDisposable
         this.change = change;
     }
 
+    /// <summary>The label of the entry. A gesture of the command layer can change it until the commit (see
+    /// <see cref="Commands.CommandTransaction.Label"/>).</summary>
+    internal string Label
+    {
+        get => change.Label;
+        set => change.Label = value;
+    }
+
     /// <summary>
     /// Puts back the edit view as it was before the transaction, then runs <paramref name="command"/>. When the command
     /// throws, the edit view stays as it was before the transaction.

@@ -7,6 +7,7 @@ using ImGuiNET;
 using LibreLancer.ImUI;
 using LibreLancer.ImUI.ImPlot;
 using LibreLancer.Thn;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Cutscene;
 using OpenLancer.Editor.Editing;

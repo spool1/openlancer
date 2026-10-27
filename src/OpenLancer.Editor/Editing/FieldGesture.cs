@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Runtime.Scene;
 using OpenLancer.Studio.Commands;

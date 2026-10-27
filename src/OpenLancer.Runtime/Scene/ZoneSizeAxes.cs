@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using LibreLancer.Data.GameData.World;
 using LibreLancer.Data.Ini;
@@ -69,6 +70,41 @@ public sealed record ZoneSizeAxes
             ? new ZoneSizeAxes(shape, used, false, "The size has a value of 0 or less on an axis that the shape uses.")
             : axes;
     }
+
+    /// <summary>The number of values of the <c>size</c> line that the shape uses: one for a sphere, two for a cylinder
+    /// (radius, height), and three for the other shapes.</summary>
+    public int LineCount => shape switch
+    {
+        ShapeKind.Sphere => 1,
+        ShapeKind.Cylinder => 2,
+        _ => 3,
+    };
+
+    /// <summary>
+    /// The scale of the gizmo for the values of a <c>size</c> line in the order of the line, as the engine reads them
+    /// (see <see cref="SceneBuild.ZoneSize"/>). The axes that the shape does not use have the scale 1, as in
+    /// <see cref="GizmoScale"/>.
+    /// </summary>
+    public Vector3 ScaleOf(IReadOnlyList<float> values)
+    {
+        var size = SceneBuild.ZoneSize(values.Select(v => (ValueBase)new SingleValue(v, null)).ToList(), shape);
+        return shape switch
+        {
+            ShapeKind.Sphere => new Vector3(size.X, 1, 1),
+            ShapeKind.Cylinder => size with { Z = 1 },
+            _ => size,
+        };
+    }
+
+    /// <summary>The values of a <c>size</c> line in the order of the line for a scale of the gizmo, one for each value
+    /// that the shape uses (see <see cref="LineCount"/>). It is the reverse of <see cref="ScaleOf"/>.</summary>
+    public IReadOnlyList<float> LineValues(Vector3 scale) => shape switch
+    {
+        ShapeKind.Sphere => [scale.X],
+        ShapeKind.Cylinder => [scale.X, scale.Y],
+        ShapeKind.Ring => [scale.X, scale.Z, scale.Y],
+        _ => [scale.X, scale.Y, scale.Z],
+    };
 
     /// <summary>
     /// The values of the <c>size</c> line after a scale. When no free axis changed, the result is the start line, or

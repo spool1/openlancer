@@ -86,7 +86,7 @@ public sealed class GizmoDragTests
             var target = GizmoSystem.Target(session, section);
             foreach (var tool in tools)
             {
-                using var drag = GizmoDrag.Begin(session, target, tool, GizmoSpace.World, null);
+                using var drag = TestGestures.Drag(session, target, tool, GizmoSpace.World, null);
                 Assert.Equal(target.Matrix(tool), drag.Start);
             }
         }
@@ -173,7 +173,7 @@ public sealed class GizmoDragTests
         var session = ws.Session("act");
         var target = GizmoSystem.Target(session, Depot);
 
-        var drag = GizmoDrag.Begin(session, target, GizmoTool.Move, GizmoSpace.World, null);
+        var drag = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null);
         drag.Update(ImGuizmoResults.Move(drag.Start, new Vector3(250, 0, 0)), Off);
         drag.Cancel();
 
@@ -184,7 +184,7 @@ public sealed class GizmoDragTests
         Assert.Throws<InvalidOperationException>(() => drag.End());
         drag.Dispose();
 
-        using (var disposed = GizmoDrag.Begin(session, target, GizmoTool.Move, GizmoSpace.World, null))
+        using (var disposed = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null))
             disposed.Update(ImGuizmoResults.Move(disposed.Start, new Vector3(0, 0, 900)), Off);
         Assert.Equal([DepotStart], Lines(session, Depot, "pos"));
         Assert.False(session.CanUndo);
@@ -232,7 +232,7 @@ public sealed class GizmoDragTests
             [[new Int32Value(-38000), new Int32Value(0), new Int32Value(-27705)]]));
         var now = Values(session, Depot, "pos");
 
-        using var drag = GizmoDrag.Begin(session, old, GizmoTool.Move, GizmoSpace.World, null);
+        using var drag = TestGestures.Drag(session, old, GizmoTool.Move, GizmoSpace.World, null);
         Assert.Equal(Matrix4x4.CreateTranslation(-38000, 0, -27705), drag.Start);
         drag.Update(ImGuizmoResults.Move(drag.Start, new Vector3(10, 0, 0)), Off);
         drag.End();
@@ -272,11 +272,11 @@ public sealed class GizmoDragTests
         using (session.Begin("Set pos"))
         {
             Assert.Throws<InvalidOperationException>(() =>
-                GizmoDrag.Begin(session, target, GizmoTool.Move, GizmoSpace.World, null));
+                TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null));
         }
 
         Assert.False(session.CanUndo);
-        using var drag = GizmoDrag.Begin(session, target, GizmoTool.Move, GizmoSpace.World, null);
+        using var drag = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null);
         drag.Update(ImGuizmoResults.Move(drag.Start, new Vector3(10, 0, 0)), Off);
         drag.End();
         Assert.Equal(["-38665, 0, -27705"], Lines(session, Depot, "pos"));
@@ -315,7 +315,7 @@ public sealed class GizmoDragTests
         var target = GizmoSystem.Target(session, Gate);
         var start = Values(session, Gate, "rotate");
 
-        using (var world = GizmoDrag.Begin(session, target, GizmoTool.Rotate, GizmoSpace.World, null))
+        using (var world = TestGestures.Drag(session, target, GizmoTool.Rotate, GizmoSpace.World, null))
         {
             world.Update(ImGuizmoResults.WorldTurn(target.Matrix(GizmoTool.Rotate), Vector3.UnitY, 17), On);
             world.End();
@@ -328,7 +328,7 @@ public sealed class GizmoDragTests
         Assert.Equal(["80632, 0, 12299"], Lines(session, Gate, "pos"));
         session.Undo();
 
-        using (var local = GizmoDrag.Begin(session, target, GizmoTool.Rotate, GizmoSpace.Local, null))
+        using (var local = TestGestures.Drag(session, target, GizmoTool.Rotate, GizmoSpace.Local, null))
         {
             local.Update(ImGuizmoResults.LocalTurn(target.Matrix(GizmoTool.Rotate), Vector3.UnitX, -38), On);
             local.End();
@@ -350,7 +350,7 @@ public sealed class GizmoDragTests
         var session = ws.Session("act");
         var target = GizmoSystem.Target(session, Cylinder);
 
-        using (var drag = GizmoDrag.Begin(session, target, GizmoTool.Rotate, GizmoSpace.World, null))
+        using (var drag = TestGestures.Drag(session, target, GizmoTool.Rotate, GizmoSpace.World, null))
         {
             drag.Update(ImGuizmoResults.WorldTurn(target.Matrix(GizmoTool.Rotate), Vector3.UnitY, 17), On);
             drag.End();
@@ -393,7 +393,7 @@ public sealed class GizmoDragTests
         var click = target.Matrix(GizmoTool.Move);
         var row = new Vector3(click.M11, click.M12, click.M13);
 
-        using (var drag = GizmoDrag.Begin(session, target, GizmoTool.Move, GizmoSpace.Local, null))
+        using (var drag = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.Local, null))
         {
             drag.Update(ImGuizmoResults.Move(click, row * 130), On);
             drag.End();
@@ -479,7 +479,7 @@ public sealed class GizmoDragTests
     {
         var target = GizmoSystem.Target(session, zone);
         var click = target.Matrix(GizmoTool.Scale);
-        using var drag = GizmoDrag.Begin(session, target, GizmoTool.Scale, GizmoSpace.Local, null);
+        using var drag = TestGestures.Drag(session, target, GizmoTool.Scale, GizmoSpace.Local, null);
         Assert.Equal(click, drag.Start);
         drag.Update(ImGuizmoResults.Scale(click, click, factor), snap);
         drag.End();
@@ -487,14 +487,14 @@ public sealed class GizmoDragTests
 
     /// <summary>Begins a drag of a section that the gizmo can change, while the editor takes edits.</summary>
     private static GizmoDrag Begin(EditSession session, SectionRef section, GizmoTool tool, GizmoSpace space) =>
-        GizmoDrag.Begin(session, GizmoSystem.Target(session, section), tool, space, null);
+        TestGestures.Drag(session, GizmoSystem.Target(session, section), tool, space, null);
 
     private static void AssertBeginThrows(EditSession session, GizmoTarget target, GizmoTool tool, string? noEditReason,
         string reason)
     {
         var undo = session.UndoLabel;
         var error = Assert.Throws<InvalidOperationException>(() =>
-            GizmoDrag.Begin(session, target, tool, GizmoSpace.World, noEditReason));
+            TestGestures.Drag(session, target, tool, GizmoSpace.World, noEditReason));
         Assert.Equal(reason, error.Message);
         Assert.Equal(undo, session.UndoLabel);
     }

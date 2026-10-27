@@ -149,7 +149,7 @@ public sealed class SceneMoveRetailTests(ITestOutputHelper output)
         Assert.True(target != null, reason);
         var click = target.Matrix(tool);
 
-        using (var drag = GizmoDrag.Begin(session, target, tool, space, null))
+        using (var drag = TestGestures.Drag(session, target, tool, space, null))
         {
             Assert.Equal(click, drag.Start);
             foreach (var frame in frames(click))

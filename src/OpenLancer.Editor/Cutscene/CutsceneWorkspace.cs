@@ -9,6 +9,7 @@ using LibreLancer;
 using LibreLancer.Data.IO;
 using LibreLancer.Thn;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Logs;

@@ -14,6 +14,7 @@ using OpenLancer.Editor.Inspector;
 using OpenLancer.Runtime.Scene;
 using OpenLancer.Runtime.Thn;
 using OpenLancer.Studio.Commands;
+using OpenLancer.Tests;
 using Xunit;
 
 namespace OpenLancer.DataTests;
@@ -322,7 +323,7 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         {
             var target = ThnGizmoTarget.Of(session, new ThnGizmoKey(element), null, out var reason) ??
                          throw new InvalidOperationException(reason);
-            using var drag = ThnGizmoDrag.Begin(session, target, tool, GizmoSpace.World, null);
+            using var drag = TestGestures.Drag(session, target, tool, GizmoSpace.World, null);
             drag.Update(target.Matrix(tool) * change, Off);
             drag.End();
         }

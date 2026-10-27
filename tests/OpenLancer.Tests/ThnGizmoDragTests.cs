@@ -64,7 +64,7 @@ public sealed class ThnGizmoDragTests
         var target = Target(session, cam);
         Assert.Equal((ThnGizmoPart.StartPose, Vector3.Zero), (target.Part, target.Pose.Position));
 
-        using (var drag = ThnGizmoDrag.Begin(session, target, GizmoTool.Move, GizmoSpace.World, null))
+        using (var drag = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null))
         {
             for (var i = 1; i < 100; i++)
                 drag.Update(target.Matrix(GizmoTool.Move) * Matrix4x4.CreateTranslation(i * 0.01f, 0, i * -0.02f), Off);
@@ -91,7 +91,7 @@ public sealed class ThnGizmoDragTests
         var pos = Value(session, cam, "spatialprops.pos");
         var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2);
 
-        using (var drag = ThnGizmoDrag.Begin(session, Target(session, cam), GizmoTool.Rotate, GizmoSpace.Local, null))
+        using (var drag = TestGestures.Drag(session, Target(session, cam), GizmoTool.Rotate, GizmoSpace.Local, null))
         {
             drag.Update(Matrix4x4.CreateFromQuaternion(turn), Off);
             drag.End();
@@ -113,11 +113,11 @@ public sealed class ThnGizmoDragTests
         var session = ws.Session("act");
         var target = Target(session, Entity(session, "Mk_B"));
 
-        var move = ThnGizmoDrag.Begin(session, target, GizmoTool.Move, GizmoSpace.World, null);
+        var move = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null);
         move.Update(target.Matrix(GizmoTool.Move) * Matrix4x4.CreateTranslation(3, 0, 0), Off);
         move.Update(target.Matrix(GizmoTool.Move), Off);
         move.End();
-        var rotate = ThnGizmoDrag.Begin(session, target, GizmoTool.Rotate, GizmoSpace.World, null);
+        var rotate = TestGestures.Drag(session, target, GizmoTool.Rotate, GizmoSpace.World, null);
         var noise = Quaternion.Normalize(new Quaternion(1e-7f, -1e-7f, 1e-7f, 1));
         rotate.Update(Matrix4x4.CreateFromQuaternion(noise) * Matrix4x4.CreateTranslation(5, 0, 0), Off);
         rotate.End();
@@ -140,10 +140,10 @@ public sealed class ThnGizmoDragTests
         Assert.Equal((ThnGizmoPart.EventPose, new Vector3(1, 2, 3)), (target.Part, target.Pose.Position));
         var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitX, 0.5f);
 
-        var move = ThnGizmoDrag.Begin(session, target, GizmoTool.Move, GizmoSpace.World, null);
+        var move = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null);
         move.Update(target.Matrix(GizmoTool.Move) * Matrix4x4.CreateTranslation(0, 0, 1), Off);
         move.End();
-        var rotate = ThnGizmoDrag.Begin(session, Target(session, anim), GizmoTool.Rotate, GizmoSpace.World, null);
+        var rotate = TestGestures.Drag(session, Target(session, anim), GizmoTool.Rotate, GizmoSpace.World, null);
         rotate.Update(Matrix4x4.CreateFromQuaternion(turn) * Matrix4x4.CreateTranslation(1, 2, 4), Off);
         var applied = rotate.Applied.Rotation;
         rotate.End();
@@ -192,7 +192,7 @@ public sealed class ThnGizmoDragTests
         Assert.Equal(ThnGizmoPart.PathKey, target.Part);
         Assert.True(Vector3.Distance(new Vector3(10, 0, -1), target.Pose.Position) < 1e-6f, target.Pose.Position.ToString());
 
-        var drag = ThnGizmoDrag.Begin(session, target, GizmoTool.Move, GizmoSpace.World, null);
+        var drag = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null);
         drag.Update(Matrix4x4.CreateTranslation(10, 1, -1), Off);
         drag.End();
 
@@ -231,7 +231,7 @@ public sealed class ThnGizmoDragTests
         Assert.True(SameRotation(frame, target.Pose.Rotation), target.Pose.Rotation.ToString());
         var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitX, 0.5f);
 
-        using (var drag = ThnGizmoDrag.Begin(session, target, GizmoTool.Rotate, GizmoSpace.World, null))
+        using (var drag = TestGestures.Drag(session, target, GizmoTool.Rotate, GizmoSpace.World, null))
         {
             drag.Update(Matrix4x4.CreateFromQuaternion(turn) * Matrix4x4.CreateTranslation(target.Pose.Position), Off);
             drag.End();
@@ -304,7 +304,7 @@ public sealed class ThnGizmoDragTests
         Assert.Equal(Quaternion.Identity, target.Pose.Rotation);
         var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, 0.25f);
 
-        using (var drag = ThnGizmoDrag.Begin(session, target, GizmoTool.Rotate, GizmoSpace.World, null))
+        using (var drag = TestGestures.Drag(session, target, GizmoTool.Rotate, GizmoSpace.World, null))
         {
             drag.Update(Matrix4x4.CreateFromQuaternion(turn), Off);
             drag.End();
@@ -325,7 +325,7 @@ public sealed class ThnGizmoDragTests
         var key = new ThnGizmoKey(Entity(session, "Mk_B"));
         var target = Target(session, key.Element);
 
-        using var drag = ThnGizmoDrag.Begin(session, target, GizmoTool.Move, GizmoSpace.World, null);
+        using var drag = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null);
         drag.Update(target.Matrix(GizmoTool.Move) * Matrix4x4.CreateTranslation(0, 2, 0), Off);
 
         Assert.Equal(new Vector3(5, 2, 0), ThnGizmoTarget.Of(session, key, null, out _)!.Pose.Position);

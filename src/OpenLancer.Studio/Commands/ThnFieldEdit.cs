@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Text;
 using LibreLancer;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
 using OpenLancer.Runtime.Scene;
 

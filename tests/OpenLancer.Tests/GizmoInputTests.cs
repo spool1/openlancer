@@ -248,7 +248,7 @@ public sealed class GizmoInputTests
         Assert.Equal(GizmoDragState.None, flow.State);
         Assert.True(flow.Prepare(GizmoSystem.Target(session, Depot), GizmoTool.Move, GizmoSpace.World));
         flow.Shadow = flow.Shadow * Matrix4x4.CreateTranslation(500, 0, 0);
-        Assert.False(flow.After(isUsing: false, leftDown: false, session, null, Off, out _));
+        Assert.False(flow.After(isUsing: false, leftDown: false, FakeCommandHost.Runner(session), Off, out _));
 
         Assert.Equal(["-37675, 0, -27705"], Lines(session, Depot));
         Assert.Equal("Move Li01_depot", session.UndoLabel);
@@ -373,8 +373,8 @@ public sealed class GizmoInputTests
         var depot = GizmoSystem.Target(session, Depot);
 
         Assert.True(flow.Prepare(depot, GizmoTool.Move, GizmoSpace.World));
-        Assert.True(flow.After(isUsing: true, leftDown: true, session, "The editor waits for a confirmation.", Off,
-            out var refused));
+        Assert.True(flow.After(isUsing: true, leftDown: true,
+            FakeCommandHost.Runner(session, "The editor waits for a confirmation."), Off, out var refused));
         Assert.Equal(new GizmoProblem(ConsoleSeverity.Warning,
             "The gizmo did not start a drag: The editor waits for a confirmation.", Depot), refused);
         Assert.Equal(GizmoDragState.None, flow.State);
@@ -382,7 +382,7 @@ public sealed class GizmoInputTests
         using (session.Begin("Set pos"))
         {
             Assert.True(flow.Prepare(depot, GizmoTool.Move, GizmoSpace.World));
-            Assert.True(flow.After(isUsing: true, leftDown: true, session, null, Off, out var busy));
+            Assert.True(flow.After(isUsing: true, leftDown: true, FakeCommandHost.Runner(session), Off, out var busy));
             Assert.Equal(ConsoleSeverity.Warning, busy!.Severity);
             Assert.StartsWith("The gizmo did not start a drag: ", busy.Message);
         }
@@ -408,8 +408,8 @@ public sealed class GizmoInputTests
         Assert.True(flow.Prepare(depot, GizmoTool.Move, GizmoSpace.World));
         flow.Shadow = ImGuizmoResults.Move(flow.Shadow, new Vector3(50, 0, 0));
         // A snap step of 0 makes GizmoDrag.Update throw.
-        Assert.True(flow.After(isUsing: true, leftDown: true, session, null, Off with { On = true, Move = 0 },
-            out var problem));
+        Assert.True(flow.After(isUsing: true, leftDown: true, FakeCommandHost.Runner(session),
+            Off with { On = true, Move = 0 }, out var problem));
 
         Assert.Equal(ConsoleSeverity.Error, problem!.Severity);
         Assert.StartsWith("The drag of the gizmo stopped: ", problem.Message);
@@ -460,7 +460,7 @@ public sealed class GizmoInputTests
         Assert.Equal(GuizmoOperation.TRANSLATE, flow.Operation);
         Assert.Equal(GuizmoMode.WORLD, flow.Mode);
         flow.Shadow = flow.Shadow * Matrix4x4.CreateTranslation(10, 0, 0);
-        Assert.False(flow.After(isUsing: true, leftDown: true, session, null, Off, out _));
+        Assert.False(flow.After(isUsing: true, leftDown: true, FakeCommandHost.Runner(session), Off, out _));
         Assert.Equal(["80642, 0, 12299"], Lines(session, Gate));
         Assert.Equal(["0, 105, 0"], session.Get(Gate)!.Lines("rotate").Select(Text).ToArray());
     }
@@ -496,7 +496,7 @@ public sealed class GizmoInputTests
             flow.Shadow = ImGuizmoResults.Move(flow.Shadow, move);
         }
 
-        reset |= flow.After(usingAfter ?? isUsing, leftDown, session, null, Off, out var problem);
+        reset |= flow.After(usingAfter ?? isUsing, leftDown, FakeCommandHost.Runner(session), Off, out var problem);
         Assert.Null(problem);
         return reset;
     }

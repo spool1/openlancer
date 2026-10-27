@@ -188,7 +188,7 @@ internal sealed class TransformGizmo
     {
         shown = null;
         var settings = window.Settings;
-        if (!available || window.Session is not { } session || !flow.Prepare(current, settings.Tool, settings.Space))
+        if (!available || window.Session == null || !flow.Prepare(current, settings.Tool, settings.Space))
         {
             return;
         }
@@ -204,8 +204,8 @@ internal sealed class TransformGizmo
             shown = flow.Key;
         }
 
-        if (flow.After(ImGuizmo.IsUsing(), ImGui.IsMouseDown(ImGuiMouseButton.Left), session.Edits,
-                session.NoEditReason, Snap, out var problem))
+        if (flow.After(ImGuizmo.IsUsing(), ImGui.IsMouseDown(ImGuiMouseButton.Left), window.Commands, Snap,
+                out var problem))
         {
             Reset();
         }

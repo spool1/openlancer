@@ -1,6 +1,6 @@
 using System;
 
-namespace OpenLancer.Studio.Commands;
+namespace OpenLancer.Data.Editing.Commands;
 
 /// <summary>
 /// The text of an exception for a user (decision D130 of the M8b design). The data layer throws its refusals with the
@@ -8,7 +8,7 @@ namespace OpenLancer.Studio.Commands;
 /// the message, and for an <see cref="ArgumentOutOfRangeException"/> also a line with the actual value. A user does not
 /// need that text.
 /// </summary>
-internal static class ErrorText
+public static class ErrorText
 {
     /// <summary>The message of an exception for a user, without the parameter text that .NET adds.</summary>
     public static string Of(Exception e)

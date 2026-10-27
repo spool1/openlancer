@@ -4,11 +4,11 @@ using System.IO;
 using System.Linq;
 using ImGuiNET;
 using LibreLancer.ImUI;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Games;
 using OpenLancer.Data.Mods;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Ui;
-using OpenLancer.Studio.Commands;
 
 namespace OpenLancer.Editor.Games;
 
