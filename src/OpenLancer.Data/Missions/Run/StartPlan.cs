@@ -216,6 +216,14 @@ public sealed record StartPlan
     /// <summary>The warnings of the Play start page.</summary>
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
+    /// <summary>The objects that the setup of the world leaves out, because they are in another system at the chosen
+    /// trigger, and the fuse lines that it removes.</summary>
+    public IReadOnlyList<LeftOutObject> LeftOut { get; init; } = [];
+
+    /// <summary>The ships and formations that travel with the player at the chosen trigger, in the order of the setup
+    /// lines.</summary>
+    public IReadOnlyList<StartCompanion> Companions { get; init; } = [];
+
     /// <summary>The name of the start in the UI texts (section 8.1 of the M6c design): "Mission start", "Checkpoint
     /// {trigger}", "{trigger} (approximate)" or "Test script".</summary>
     public string StartName => NameOf(Kind, Start);
@@ -279,8 +287,12 @@ public sealed record StartPlan
     /// <param name="checkSetup">False skips the mission checks of the setup triggers (section 5.3, step 11). They build
     /// the index again for each plan, so the Play buttons of the graph make their plans without them. Play makes the
     /// full plan.</param>
+    /// <param name="play">The place of the play after the start check, or null. The setup of the world makes the objects
+    /// of its system and puts the companions next to it. Without it, a start at the Scene camera keeps each world line of
+    /// the path.</param>
     public static StartPlan Make(MissionIndex index, StorySlot? slot, MissionStartPoint start,
-        StartPlaceChoice place = StartPlaceChoice.Suggested, string? placeBase = null, bool checkSetup = true)
+        StartPlaceChoice place = StartPlaceChoice.Suggested, string? placeBase = null, bool checkSetup = true,
+        StartSavePlace? play = null)
     {
         var plan = new StartPlan { Script = index.Document.Path, Start = start, Slot = slot };
         if (slot == null)
@@ -321,7 +333,7 @@ public sealed record StartPlan
             Place = suggestion.Place,
             Suggested = suggestion.Suggested,
         };
-        return StartSetup.Apply(plan, index, replay, story, checkSetup);
+        return StartSetup.Apply(plan, index, replay, story, checkSetup, StartAnchor.Of(index, plan.Place, play));
     }
 
     /// <summary>
@@ -406,8 +418,25 @@ internal sealed record StartReplay
     /// starts.</summary>
     public IReadOnlyList<MissionTrigger> ActiveSet { get; init; } = [];
 
-    /// <summary>The actions without flow of the replay, in the order of the game.</summary>
-    public IReadOnlyList<(MissionTrigger Trigger, MissionLine Line)> Effects { get; init; } = [];
+    private readonly IReadOnlyList<MachineChange> changes = [];
+
+    /// <summary>The runs and the actions without flow of the replay, in the order of the game (the Ran and the Effect
+    /// changes of its passes). A run without an effect still marks the time of its condition, for example an
+    /// arrival.</summary>
+    public IReadOnlyList<MachineChange> Changes
+    {
+        get => changes;
+        init
+        {
+            changes = value;
+            Effects = value.Where(c => c is { Kind: MachineChangeKind.Effect, Line: not null })
+                .Select(c => (c.Trigger, c.Line!)).ToList();
+        }
+    }
+
+    /// <summary>The actions without flow of the replay, in the order of the game. <see cref="Changes"/> gives
+    /// them.</summary>
+    public IReadOnlyList<(MissionTrigger Trigger, MissionLine Line)> Effects { get; private init; } = [];
 
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
@@ -441,12 +470,8 @@ internal sealed record StartReplay
     /// triggers that run at once, for the start place.</summary>
     private static StartReplay Exact(MissionIndex index, MissionTrigger? chosen, StartKind kind)
     {
-        var world = new ReplayWorld();
-        var machine = new TriggerMachine(index, world);
-        if (kind == StartKind.Checkpoint)
-            machine.Load([chosen!]);
-        else
-            machine.StartMission();
+        var machine = new TriggerMachine(index, new ReplayWorld());
+        var pass = kind == StartKind.Checkpoint ? machine.Load([chosen!]) : machine.StartMission();
         var replay = new StartReplay
         {
             Kind = kind,
@@ -454,7 +479,7 @@ internal sealed record StartReplay
             Root = chosen,
             Path = chosen == null ? [] : [chosen],
             ActiveSet = [.. machine.Active, .. machine.Pending.Where(t => !machine.Active.Contains(t))],
-            Effects = world.Effects,
+            Changes = Kept(pass.Changes).ToList(),
         };
         return machine.Halt is { } halt ? replay with { Refusal = RefusalOf(halt, chosen), Reason = ReasonOf(halt, chosen) } : replay;
     }
@@ -463,13 +488,9 @@ internal sealed record StartReplay
     /// the path in order, until the chosen trigger starts.</summary>
     private static StartReplay Approximate(MissionIndex index, MissionTrigger chosen, IReadOnlyList<MissionTrigger> path)
     {
-        var world = new ReplayWorld();
-        var machine = new TriggerMachine(index, world, new MachineOptions { StopBefore = chosen });
+        var machine = new TriggerMachine(index, new ReplayWorld(), new MachineOptions { StopBefore = chosen });
         var root = path[0];
-        if (root.StartsActive)
-            machine.StartMission();
-        else
-            machine.Load([root]);
+        var changes = new List<MachineChange>(Kept((root.StartsActive ? machine.StartMission() : machine.Load([root])).Changes));
         var replay = new StartReplay { Kind = StartKind.Approximate, Chosen = chosen, Root = root, Path = path };
         // Each trigger of the path runs in order: a trigger that ran goes on, a pending trigger starts at the next
         // heartbeat, and an active trigger runs as if its condition is met now.
@@ -494,9 +515,9 @@ internal sealed record StartReplay
                 if (step >= StepsPerTrigger)
                     return NotActive(replay, trigger, chosen);
                 if (machine.Pending.Contains(trigger))
-                    machine.Heartbeat();
+                    changes.AddRange(Kept(machine.Heartbeat().Changes));
                 else if (trigger != chosen && state.Status == TriggerStatus.Active && machine.Active.Contains(trigger))
-                    machine.Force(trigger);
+                    changes.AddRange(Kept(machine.Force(trigger).Changes));
                 else
                     return NotActive(replay, trigger, chosen);
             }
@@ -508,8 +529,12 @@ internal sealed record StartReplay
         // The game starts the rest of the start set or of the drain in the same pass as the chosen trigger.
         var active = new List<MissionTrigger>(machine.Active) { chosen };
         active.AddRange(machine.Pending.Where(t => !active.Contains(t)));
-        return replay with { ActiveSet = active, Effects = world.Effects };
+        return replay with { ActiveSet = active, Changes = changes };
     }
+
+    /// <summary>The Ran and the Effect changes of a pass, in order.</summary>
+    private static IEnumerable<MachineChange> Kept(IReadOnlyList<MachineChange> changes) =>
+        changes.Where(c => c.Kind is MachineChangeKind.Ran or MachineChangeKind.Effect);
 
     /// <summary>The refusal of a trigger of the path that does not start or run at its point (section 8.4 of the M6c
     /// design). The chosen trigger gets its own text, so the text does not name it twice.</summary>
@@ -536,12 +561,10 @@ internal sealed record StartReplay
             : halt.Message;
     }
 
-    /// <summary>The world of a replay: no event and no fact comes, and the player is in space. It records each action
-    /// without flow in order.</summary>
+    /// <summary>The world of a replay: no event and no fact comes, and the player is in space. The passes of the machine
+    /// record the actions.</summary>
     private sealed class ReplayWorld : ITriggerWorld
     {
-        public List<(MissionTrigger Trigger, MissionLine Line)> Effects { get; } = [];
-
         public bool InSpace => true;
 
         public bool Matches(MissionTrigger trigger, MissionLine condition, WorldEvent worldEvent) => false;
@@ -550,6 +573,8 @@ internal sealed record StartReplay
 
         public bool TestAtStart(MissionTrigger trigger, MissionLine condition) => false;
 
-        public void Effect(MissionTrigger trigger, MissionLine action) => Effects.Add((trigger, action));
+        public void Effect(MissionTrigger trigger, MissionLine action)
+        {
+        }
     }
 }

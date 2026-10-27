@@ -620,7 +620,10 @@ public sealed class StartPlanTests
         var replay = StartReplay.Run(index, start);
         var other = Index(Script.Replace("Act_SetNNObj = ol_obj_1", "Act_SetNNObj = ol_obj_none"));
         var bad = other.Lines.Single(l => MissionIndex.Is(l.Key, "Act_SetNNObj"));
-        var broken = replay with { Effects = [.. replay.Effects, (replay.Chosen!, bad)] };
+        var broken = replay with
+        {
+            Changes = [.. replay.Changes, new MachineChange(MachineChangeKind.Effect, replay.Chosen!, bad)],
+        };
         var plan = StartPlan.Make(index, Slot, start, checkSetup: false);
         var story = StartPlan.StoryPath(index, replay.Chosen);
 

@@ -38,8 +38,10 @@ internal static class StartSetup
     /// triggers.</summary>
     /// <param name="story">The story path of the chosen trigger.</param>
     /// <param name="check">False gives the plan without the mission checks of the setup triggers.</param>
+    /// <param name="anchor">The start system and the start anchor, or null when the start system is not known. Then the
+    /// setup of the world keeps each world line of the path.</param>
     public static StartPlan Apply(StartPlan plan, MissionIndex index, StartReplay replay, IReadOnlyList<MissionTrigger> story,
-        bool check = true)
+        bool check = true, StartAnchor? anchor = null)
     {
         switch (plan.Kind)
         {
@@ -58,10 +60,16 @@ internal static class StartSetup
         }
 
         var forced = replay.Path.Where(t => t != replay.Chosen).ToList();
-        var lines = Filter(index, replay.Effects.Select(e => e.Line).ToList(), forced);
+        var effects = replay.Effects.Select(e => e.Line).ToList();
+        var keep = Keep(index, effects, forced);
+        var lines = effects.Where((_, i) => keep[i]).ToList();
         var setupName = FreeName(index, SetupName, []);
         var worldName = FreeName(index, WorldName, [setupName]);
-        var world = lines.Where(l => l.Name!.Start == StartRole.World).Select(Copy).ToList();
+        // The world of the start system only, with the companions next to the player (D748, changed on 2026-10-28).
+        var built = anchor != null ? StartWorld.Build(index, replay, keep, anchor) : null;
+        var world = built?.Lines.ToList() ?? lines.Where(l => l.Name!.Start == StartRole.World).Select(Copy).ToList();
+        var worldWarnings = built?.Warnings ??
+                            (plan.Place.Kind == StartPlaceKind.Camera && world.Count > 0 ? [StartWorld.CameraWarning] : []);
         var setup = new List<(string Key, IReadOnlyList<string> Values)> { Line("Cnd_True", "no_params") };
         setup.AddRange(lines.Where(l => l.Name!.Start == StartRole.State).Select(Copy));
         if (world.Count > 0)
@@ -84,6 +92,9 @@ internal static class StartSetup
             Setup = triggers,
             SavedTriggers = [setupName],
             State = state,
+            LeftOut = built?.LeftOut ?? [],
+            Companions = built?.Companions ?? [],
+            Warnings = [.. plan.Warnings, .. worldWarnings],
         };
         return check ? Check(made, index) : made;
     }
@@ -116,6 +127,13 @@ internal static class StartSetup
     /// takes.</param>
     internal static IReadOnlyList<MissionLine> Filter(MissionIndex index, IReadOnlyList<MissionLine> lines,
         IReadOnlyList<MissionTrigger> forced)
+    {
+        var keep = Keep(index, lines, forced);
+        return lines.Where((_, i) => keep[i]).ToList();
+    }
+
+    /// <summary>For each line of the replay, true when <see cref="Filter"/> keeps it.</summary>
+    internal static bool[] Keep(MissionIndex index, IReadOnlyList<MissionLine> lines, IReadOnlyList<MissionTrigger> forced)
     {
         var gone = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var condition in forced.Select(t => t.Condition).OfType<MissionLine>())
@@ -152,7 +170,7 @@ internal static class StartSetup
         }
         KeepLast(lines, keep, l => Is(l, "Act_PlayMusic"), _ => false);
         KeepLast(lines, keep, l => Objectives.Any(o => Is(l, o)), l => ObjectiveChanges.Any(o => Is(l, o)));
-        return lines.Where((_, i) => keep[i]).ToList();
+        return keep;
     }
 
     /// <summary>Keeps only the last line of a kind, and drops the lines of a second kind before it.</summary>

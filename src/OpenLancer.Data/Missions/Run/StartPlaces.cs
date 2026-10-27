@@ -48,6 +48,20 @@ internal static class StartPlaces
     /// the place of the start.</summary>
     public sealed record Suggestion(StartPlace Suggested, StartPlace Place, IReadOnlyList<string> Warnings);
 
+    /// <summary>The facts of the walk that the setup of the world reads (the note of 2026-10-28 after step 7 of section
+    /// 5.3 of the M6c design).</summary>
+    /// <param name="Systems">The system of the player at each change of the replay, or null when no line tells
+    /// it.</param>
+    /// <param name="Hostile">The objects that the path makes hostile to the player, by the nicknames of the
+    /// ships.</param>
+    /// <param name="JumpHere">The jump-here triggers of the walk, the newest first, with the point of the player that
+    /// each one gives.</param>
+    public sealed record WorldFacts(IReadOnlyList<string?> Systems, IReadOnlySet<string> Hostile,
+        IReadOnlyList<(MissionTrigger Trigger, Vector3 Point)> JumpHere);
+
+    /// <summary>The facts of the walk for the setup of the world of a replay.</summary>
+    public static WorldFacts World(MissionIndex index, StartReplay replay) => new Walk(index, replay).World();
+
     /// <summary>The suggested place of the start of a replay, and the warnings about the place that the user picked, or
     /// about the suggested place.</summary>
     /// <param name="picked">The base or the Scene camera that the user picked, or null for the suggested place.</param>
@@ -230,6 +244,50 @@ internal static class StartPlaces
             var suggested = PlaceOf(facts);
             var place = picked ?? suggested;
             return new Suggestion(suggested, place, Warnings(facts, place));
+        }
+
+        /// <summary>
+        /// The facts for the setup of the world. The system of the player at a run is the system of the condition of
+        /// its trigger: an arrival, Cnd_SpaceEnter, or the base of a base condition. Else it is the system hint of the
+        /// trigger. Else the player stays in the system of the run before. The first run of a restore trigger at the
+        /// root takes the system of its place line (rule 5), and the story path to it gives the system before it.
+        /// </summary>
+        public WorldFacts World()
+        {
+            var changes = replay.Changes;
+            var systems = new string?[changes.Count];
+            var root = replay.Path.Count > 0 ? replay.Path[0] : null;
+            var restore = root is { StartsActive: false } ? root : null;
+            string? current = null;
+            foreach (var trigger in timeline.TakeWhile(t => t != root))
+                current = RunSystem(trigger) ?? current;
+            for (var i = 0; i < changes.Count; i++)
+            {
+                if (changes[i] is { Kind: MachineChangeKind.Ran, Trigger: var trigger })
+                {
+                    var own = trigger == restore ? PlaceSystem(trigger, null).System ?? RunSystem(trigger) : RunSystem(trigger);
+                    if (trigger == restore)
+                        restore = null;
+                    current = own ?? current;
+                }
+                systems[i] = current;
+            }
+            var jumps = Facts().Where(f => f is { Jump: true, Point: not null }).Select(f => (f.Trigger, f.Point!.Value))
+                .Distinct().ToList();
+            var hostile = Attitudes.Where(p => p.Value).Select(p => p.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return new WorldFacts(systems, hostile, jumps);
+        }
+
+        /// <summary>The system of the player when a trigger runs: the system of its condition, else its system hint, or
+        /// null.</summary>
+        private string? RunSystem(MissionTrigger trigger)
+        {
+            var condition = trigger.Condition;
+            var exit = condition != null && MissionIndex.Is(condition.Key, "Cnd_BaseExit") &&
+                       Named(condition, "base", MissionValueKind.Base) is { } dock
+                ? BaseSystemOf(dock)
+                : null;
+            return ConditionSystem(condition) ?? BaseSystem(condition) ?? exit ?? Hint(trigger);
         }
 
         /// <summary>The warnings about the place of the start, also for a place that the user picked. A base start
