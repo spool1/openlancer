@@ -193,10 +193,13 @@ public sealed class AgentItemToolTests
         var (ws, session, host) = Scene(SceneWorkspace.Li01Text + "\n" + Outpost);
         using var _ = ws;
 
+        var preview = Ok(host, "duplicate_items",
+            """{ "refs": ["obj:Li01_outpost", "light:Li01/Li01_lamp"], "offset": [1000, 0, -5], "preview": true }""");
         var result = Ok(host, "duplicate_items", """{ "refs": ["obj:Li01_outpost", "light:Li01/Li01_lamp"], "offset": [1000, 0, -5] }""");
 
         var adds = Texts(result["adds"]);
         Assert.Equal(3, adds.Length);
+        Assert.Equal(adds, Texts(preview["adds"]));
         Assert.Empty(result["changes"]!.AsArray());
         Assert.Equal("Agent: Duplicate Li01_outpost and 2 more", (string?)result["undo_label"]);
         var copies = adds.Select(a => ItemRefs.ResolveSection(session, ItemRefs.Parse(a))).ToList();

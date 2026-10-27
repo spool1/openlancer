@@ -161,6 +161,22 @@ public sealed class AgentEditToolTests
         Assert.Equal([("set_fields", EditErrorKind.Paused)], host.Refusals.Select(r => (r.Tool, r.Error.Kind)));
     }
 
+    /// <summary>An edit call while a gesture of the user is open gives busy. The editor host waits for the end of the
+    /// gesture first, so the error comes only from a host without such a wait.</summary>
+    [Fact]
+    public void AnEditWhileAGestureOfTheUserIsOpenGivesBusy()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+        using var gesture = session.Begin("Move Li01_01");
+
+        var busy = Error(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""");
+
+        Assert.Equal(("busy", "Busy"), (busy.Code, busy.Detail));
+        Assert.True(session.InTransaction);
+        Assert.Null(session.OpenBatch);
+    }
+
     /// <summary>A refused preview and a query do not go to the Console of the host (section 8.5 of the MCP1
     /// design).</summary>
     [Fact]

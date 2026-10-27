@@ -35,6 +35,33 @@ public sealed class AgentUndoTests
         Assert.Equal(EditOrigin.Agent, session.UndoOrigin);
     }
 
+    /// <summary>The observable result of step 3 of MCP1-2. A preview of a delete gives the cascade and keeps the
+    /// revision. The delete with confirm: true gives one entry "Agent: Delete ...". The agent can undo and redo it. After
+    /// a Ctrl+Z of the user, the agent cannot redo it.</summary>
+    [Fact]
+    public void ADeleteOfTheAgentIsOneEntryThatTheAgentCanUndoAndRedo()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+
+        var preview = Ok(host, "delete_items", """{ "refs": ["obj:Li01_01"], "preview": true }""");
+        Assert.Contains(preview["deletes"]!.AsArray(), d => (string?)d!["why"] == "cascade");
+        Assert.Equal(0, session.Revision);
+        var delete = Ok(host, "delete_items", """{ "refs": ["obj:Li01_01"], "confirm": true }""");
+        var label = (string)delete["undo_label"]!;
+        Assert.StartsWith("Agent: Delete Li01_01", label);
+        Assert.Equal(label, session.UndoLabel);
+
+        Assert.Equal(label, (string?)Ok(host, "undo")["label"]);
+        Assert.NotNull(session.Get(Station));
+        Assert.Equal(label, (string?)Ok(host, "redo")["label"]);
+        Assert.Null(session.Get(Station));
+
+        session.Undo();
+        Assert.Equal(("not_agent_entry", "UserUndid"), (Error(host, "redo").Code, Error(host, "redo").Detail));
+        Assert.NotNull(session.Get(Station));
+    }
+
     [Fact]
     public void UndoRefusesAnEditOfTheUserAtTheTop()
     {
