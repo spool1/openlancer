@@ -157,7 +157,7 @@ These tools change the data of the active mod. They work in the editor host. The
 
 Each edit is one Undo step. The Edit menu shows its label with "Agent: " before it, for example "Undo Agent: Delete my_station_1". You can undo and redo each agent edit, as each of your own edits. `undo` undoes only an agent edit at the top of the history. `redo` redoes only an agent edit that the agent undid. So the agent never undoes your edit, and never redoes an edit that you undid with Ctrl+Z.
 
-The edit tools change only items of INI files. A mission script and a cutscene give the error `not_available`. The mission tools and the cutscene tools come with a later version. `delete_items` and `duplicate_items` take items of a system only: objects, zones, lights, nebulae and asteroid fields.
+The edit tools change only items of INI files. A mission script and a cutscene give the error `not_available`. The mission tools and the cutscene tools come with a later version. `delete_items` takes items of a system only: objects, zones, lights, nebulae and asteroid fields. `duplicate_items` takes objects, zones and lights of a system.
 
 #### Values of set_fields
 
@@ -187,7 +187,9 @@ The result of an edit gives the new items (`adds`), the changed items (`changes`
 
 #### Batches
 
-`edit_batch` takes a list of steps. Each step names an edit tool and its arguments. All steps are one Undo step with the label of the batch. Each step sees the result of the steps before it, so a later step can name an item that an earlier step made or renamed. When one step fails, the error `step_failed` gives its index and its error, and the batch changes nothing. A step that needs a confirmation fails unless its arguments have `confirm: true`. `undo`, `redo`, `edit_batch` and the read tools cannot be steps.
+`edit_batch` takes a list of steps. Each step names an edit tool and its arguments. All steps are one Undo step with the label of the batch. Each step sees the result of the steps before it, so a later step can name an item that an earlier step made or renamed.
+
+When one step fails, the error `step_failed` gives its index and its error, and the batch changes nothing. A step that needs a confirmation fails unless its arguments have `confirm: true`. `undo`, `redo`, `edit_batch`, the read tools and the tools of the editor cannot be steps.
 
 #### Limits and pauses
 
