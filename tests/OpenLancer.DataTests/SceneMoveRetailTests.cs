@@ -130,6 +130,45 @@ public sealed class SceneMoveRetailTests(ITestOutputHelper output)
     }
 
     /// <summary>
+    /// A frame of a drag of <c>Li01_14_depot_water</c> uses only a small part of one frame of the editor at 60 frames
+    /// each second. A step of the gesture does not make the report of its plan. The report reads the names of all
+    /// systems again after each change. That took about 12 ms for each frame (review finding of MCP1-2 step 1). The
+    /// gate takes the mean of 300 frames as one try.
+    /// </summary>
+    [Fact]
+    [Trait(Timing.Category, Timing.Performance)]
+    public void AFrameOfADragFitsTheGate()
+    {
+        const int frames = 300;
+        var limit = TimeSpan.FromMilliseconds(5);
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "dragframe");
+        var session = workspace.Open();
+        var section = new SectionRef(session.SystemPath("Li01")!, new SectionIdentity("Object", "Li01_14_depot_water"));
+        var target = GizmoTarget.Of(session, section, null, out var reason);
+        Assert.True(target != null, reason);
+        var click = target.Matrix(GizmoTool.Move);
+
+        TimeSpan Frame()
+        {
+            using var drag = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World);
+            var time = Timing.Measure(() =>
+            {
+                for (var i = 1; i <= frames; i++)
+                    drag.Update(click * Matrix4x4.CreateTranslation(i, 0, 0), Off);
+            });
+            drag.Cancel();
+            return time / frames;
+        }
+
+        Frame();
+        var frame = new TimingGates().Gate(limit, Frame, tries: 3);
+        output.WriteLine($"{frame.TotalMilliseconds:0.000} ms for each frame of a drag");
+        Assert.True(frame < limit, $"{frame.TotalMilliseconds:0.000} ms for each frame of a drag");
+        Assert.False(session.CanUndo);
+        Assert.False(session.IsDirty);
+    }
+
+    /// <summary>
     /// Drags a section of a retail system through <see cref="GizmoDrag"/> as one entry, then saves. The patch file has
     /// the letter case of the base file (rule P8). It holds the section header as the base file spells it, the nickname
     /// and the new line, with CRLF. The base file does not change.

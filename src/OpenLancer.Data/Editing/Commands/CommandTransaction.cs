@@ -54,9 +54,14 @@ public sealed class CommandTransaction : IDisposable
     /// leave the state before the gesture. The gesture then stays open, and the result has the status
     /// <see cref="EditStatus.Refused"/> with the reason.
     /// </summary>
+    /// <remarks>A step that runs does not make the report of its plan. A drag runs a step in each frame, and the report
+    /// can read the names of all systems again after each change. The gesture keeps only its last step, so
+    /// <see cref="Commit"/> makes the report of that step one time, as <see cref="Missions.Editing.MissionTransaction"/>
+    /// does.</remarks>
     /// <param name="step">Makes the plan of the step from the session, after the restore of the state before the
     /// gesture.</param>
-    /// <returns>The report of the plan of the step (see <see cref="EditPlan.Report"/>).</returns>
+    /// <returns>The status <see cref="EditStatus.Applied"/> with the label of the plan and the revision, or the report
+    /// of a plan that refuses (see <see cref="EditPlan.Report"/>).</returns>
     /// <exception cref="InvalidOperationException">The gesture has ended.</exception>
     public EditResult Apply(Func<EditSession, EditPlan> step)
     {
@@ -76,9 +81,10 @@ public sealed class CommandTransaction : IDisposable
             return Refused(new EditError(EditErrorKind.Refused, EditPlan.PlanRefused, ErrorText.Of(e)));
         }
         var made = command.Plan!;
-        if (made.CanRun)
-            plan = made;
-        return made.Report(Session) with { Revision = Session.Revision };
+        if (!made.CanRun)
+            return made.Report(Session) with { Revision = Session.Revision };
+        plan = made;
+        return new EditResult(EditStatus.Applied) { Label = made.Label, Revision = Session.Revision };
     }
 
     /// <summary>Puts back the state before the gesture, for example when a drag goes back to its start. The gesture

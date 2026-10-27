@@ -135,6 +135,26 @@ public sealed class CommandTransactionTests
         Assert.Throws<InvalidOperationException>(() => gesture.Commit());
     }
 
+    /// <summary>A step that runs gives the status, the label of its plan and the revision, without the report of the
+    /// plan. A drag runs a step in each frame, and the report can read the names of all systems again (review finding
+    /// of MCP1-2 step 1). The commit gives the report of the last step.</summary>
+    [Fact]
+    public void OnlyTheCommitGivesTheReportOfThePlan()
+    {
+        using var ws = SystemWorkspace.Create();
+        var session = ws.Session("act");
+        using var gesture = CommandTransaction.Begin(session, "Move Li01_depot");
+
+        var step = gesture.Apply(_ => SetPos(10));
+
+        Assert.Equal(EditStatus.Applied, step.Status);
+        Assert.Equal("Set pos", step.Label);
+        Assert.Equal(session.Revision, step.Revision);
+        Assert.Empty(step.Changes);
+        var commit = gesture.Commit();
+        Assert.Equal(["obj:Li01_depot"], commit.Changes);
+    }
+
     /// <summary>A cancel after a step puts back the exact states and raises one change with the undo change, so the
     /// views go back. A cancel without a step raises nothing. A dispose without a commit cancels.</summary>
     [Fact]
@@ -182,17 +202,22 @@ public sealed class CommandTransactionTests
         var session = ws.Session("act");
         using var gesture = CommandTransaction.Begin(session, "Create");
 
-        EditPlan Create(EditSession s) =>
-            ScenePlans.Create(s, "li01", SceneTemplate.Zone, null, Vector3.Zero, null);
+        var plans = new List<EditPlan>();
+        EditPlan Create(EditSession s)
+        {
+            plans.Add(ScenePlans.Create(s, "li01", SceneTemplate.Zone, null, Vector3.Zero, null));
+            return plans[^1];
+        }
 
-        var first = gesture.Apply(Create);
-        var added = Assert.Single(first.Adds);
-        Assert.NotNull(session.Nicknames.Taken(added["zone:".Length..]));
-        var second = gesture.Apply(Create);
+        Assert.Equal(EditStatus.Applied, gesture.Apply(Create).Status);
+        var added = Assert.Single(plans[0].Adds);
+        Assert.NotNull(session.Nicknames.Taken(added.Id.Key!));
+        Assert.Equal(EditStatus.Applied, gesture.Apply(Create).Status);
 
-        Assert.Equal([added], second.Adds);
-        gesture.Commit();
-        Assert.Single(session.Sections(SystemWorkspace.Li01Path), s => s.Id.Key == added["zone:".Length..]);
+        Assert.Equal([added], plans[1].Adds);
+        var commit = gesture.Commit();
+        Assert.Equal(["zone:" + added.Id.Key], commit.Adds);
+        Assert.Single(session.Sections(SystemWorkspace.Li01Path), s => s.Id.Key == added.Id.Key);
     }
 
     [Fact]
