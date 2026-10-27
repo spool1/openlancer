@@ -180,6 +180,34 @@ The Inspector shows the selected entity or event, the selected events, or the cu
 - A SOUND entity has the row **Preview**. Play plays the sound of its template once from its start, in 2D, with the voice rule of the preview. Stop stops it.
 - The cutscene page has the section **Problems** when the script has errors that the lower cutscene does not have. The game crashes when it plays such a script, so these errors stop Save and Play. A click on an error selects its element. The state of a new cutscene says "OpenLancer only until the M11 check".
 
+### The animation of a character
+
+When the first target of a START_MOTION event is a character (a DEFORMABLE entity), the `animation` row has a list of the animation clips. The clips are the scripts of the `.anm` files that the `[Animations]` lines of bodyparts.ini name. For a name that two files have, the list has the clip of the last file. The game also plays the clip of the last file.
+
+A COMPOUND plays the scripts of its own model, so the row of a COMPOUND keeps its text field. A target that names no entity of the script also keeps the text field. When the editor cannot read the clips, the row keeps its text field, and the note of the row gives the reason.
+
+The list shows the clips of the skeletons of the costume of the target first, under "Skeletons of" and the name of the target. The other clips follow under "Other skeletons". The skeletons come from the `[PetalAnimations]` and `[Skeleton]` sections of bodyparts.ini. A clip name that two files have belongs to the skeletons of both files.
+
+The search finds a clip by its name or by its label. **Body part** shows only the clips of the body, the head or the hand skeletons. Its value "Other" shows the clips of the files that no skeleton lists.
+
+A label, for example "Walk", comes from a word in the clip name. A word counts only at the start of a part of the name in capitals, so a label can be missing or wrong. Look at each clip in the clip preview before you use it.
+
+The clip preview at the right of the list plays a clip in a loop. It plays the last clip that the mouse was on, or the clip that Up or Down selected. The character is a copy of a character of the cutscene preview, so the clip preview needs the cutscene preview. **Preview on** selects the character. At first, it selects the target of the event. A head or a hand clip plays over a standing idle of the body, so the body does not keep its bind pose.
+
+The clip preview has the controls of the Unity animation preview. A drag with the left or the middle mouse button pans the view. A drag with the right mouse button, or Alt with a left drag, orbits the view. The wheel, or Alt with a right drag, zooms. Shift makes the orbit and the zoom faster. F puts back the pan and the zoom, and **Reset view** also puts back the orbit.
+
+To change the animation of a character:
+
+1. Select the START_MOTION event.
+2. Click the `animation` field. The list opens, and the search field is active.
+3. To see a clip in the clip preview, put the mouse on it.
+4. Click a clip, or press Up or Down. The event gets the clip at once, and the cutscene preview shows it.
+5. To keep the clip, press Enter or click outside the list. To put back the clip of the opening, press Esc.
+
+One opening of the list is one entry of the edit history. A click on the current clip makes no change. While **Body part** or **Preview on** is open, Esc closes only that dropdown. **Preview** plays the cutscene preview from the time of the event. It also works when the row is read-only.
+
+When the event names a clip that the game does not have, the field shows "Missing (Animation)" in the warning color. The warning below the field says: "The game has no animation with this name. The character does not move."
+
 ## Edit a cutscene
 
 1. Click Mod, then click the mod that gets the edits. The editor writes only into this mod.
@@ -206,6 +234,12 @@ The patch holds only the values that the edits change. A save keeps the bytes of
 | Esc | During a drag on the Timeline or of the gizmo | Cancel the drag. |
 | Drag a label, with Shift or Ctrl | X, Y or Z label of a row of the Inspector | Change the value: normal, fine or large steps. Esc or the right mouse button cancels the drag. |
 | Esc | Color picker of the Inspector | Put back the color of the opening of the picker. |
+| Up, Down, Enter, Esc | Clip list of the `animation` row | Set the previous or the next clip, keep the clip and close the list, or put back the clip of the opening. |
+| Drag, middle drag | Clip preview | Pan the view. |
+| Right drag, Alt+drag | Clip preview | Orbit the view. |
+| Wheel, Alt+right drag | Clip preview | Zoom the view. |
+| Shift | Clip preview, during an orbit or a zoom | Orbit 3 times faster, or zoom 4 times faster. |
+| F | Clip preview, when the mouse is on it and no text field is active | Put back the pan and the zoom. The orbit stays. |
 | Right mouse button with W, A, S, D, Q and E | Cutscene tab, Free mode | Fly the free camera. |
 | W, E, X | Cutscene tab, Free mode | Select the move or the rotate tool of the gizmo, and change between Local and World axes. |
 | Ctrl+Z, Ctrl+Y, Ctrl+S | Each panel | Undo, redo and save. |

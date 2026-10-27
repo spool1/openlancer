@@ -41,6 +41,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
 
     private readonly ThnCurveEditor curves = new(window, grid);
     private readonly ThnPathKeysEditor pathKeys = new(window, grid);
+    private readonly ThnAnimationPicker animations = new(window, grid);
 
     // The text of the time shift of a set of events.
     private string shift = "0";
@@ -48,12 +49,23 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
     /// <summary>True while a drag of a curve point is open.</summary>
     public bool IsDragging => curves.IsDragging;
 
-    /// <summary>Ends a drag of a curve point on the release of the left button. Call it once in each frame, before the
-    /// page draws.</summary>
-    public void Frame() => curves.Frame();
+    /// <summary>Ends a drag of a curve point on the release of the left button, and frees the clip preview after the list
+    /// closes. Call it once in each frame, before the page draws.</summary>
+    public void Frame()
+    {
+        curves.Frame();
+        animations.Frame();
+    }
 
     /// <summary>Ends an open drag of a curve point, for example when the window closes.</summary>
     public void EndDrag() => curves.End();
+
+    /// <summary>Forgets the game data of the session and frees the clip preview. Call it when the profile
+    /// closes.</summary>
+    public void Reset() => animations.Reset();
+
+    /// <summary>Frees the clip preview.</summary>
+    public void Dispose() => animations.Dispose();
 
     private static IReadOnlyDictionary<string, ThnSymbolInfo> Symbols => CutsceneWorkspace.Symbols;
 
@@ -593,6 +605,16 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         if (kind == ThnElementKind.Entity && IsIn(row.Path, TransformRecord) && ThnFlags.IsReference(table, Symbols))
         {
             note = note == null ? ThnPose.ReferencePoseNote : $"{ThnPose.ReferencePoseNote}\n\n{note}";
+        }
+
+        // The animation of a START_MOTION event on a character gets the clip picker. A COMPOUND plays the scripts of its
+        // model, so its row keeps the text field.
+        if (kind == ThnElementKind.Event && path.Text == ThnAnimationPicker.AnimationPath &&
+            workspace.Timeline?.Event(target.Id) is { } info &&
+            ThnAnimationPicker.Applies(info.Kind, path.Text, workspace.Working, info.Targets))
+        {
+            animations.Draw(workspace, label, field, info, note, Parser(row.Kind));
+            return;
         }
 
         switch (row.Kind)

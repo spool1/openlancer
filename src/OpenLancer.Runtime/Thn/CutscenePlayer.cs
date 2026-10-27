@@ -15,6 +15,7 @@ using LibreLancer.Render;
 using LibreLancer.Resources;
 using LibreLancer.Thn;
 using LibreLancer.Utf.Anm;
+using LibreLancer.Utf.Dfm;
 using LibreLancer.World;
 using OpenLancer.Runtime.Play;
 
@@ -47,6 +48,23 @@ public sealed class PreviewMeter
 /// <param name="Path">The points of a motion path in the scene, from its start to its end, or null.</param>
 public sealed record PreviewObject(string Name, EntityTypes Type, Transform3D Pose, float? FovH, Color3f? LightColor,
     IReadOnlyList<Vector3>? Path);
+
+/// <summary>
+/// The models of a character of a scene, for a preview that makes its own copy of the character, for example the clip
+/// preview of the editor.
+/// </summary>
+/// <remarks>The models are the live objects of the scene, and the scene and the resource cache share them. A caller must
+/// not change them.</remarks>
+public sealed record CharacterModels(DfmFile Body, DfmFile? Head, DfmFile? LeftHand, DfmFile? RightHand,
+    Accessory? Accessory, RigidModel? AccessoryModel)
+{
+    /// <summary>The models of the character of an object, or null when the object is not a character.</summary>
+    public static CharacterModels? Of(GameObject? obj) =>
+        obj?.RenderComponent is CharacterRenderer { Skeleton: var skeleton } character
+            ? new CharacterModels(skeleton.Body, skeleton.Head, skeleton.LeftHand, skeleton.RightHand,
+                character.Accessory, character.AccessoryModel)
+            : null;
+}
 
 /// <summary>The pose and the lens of the active THN camera, as <c>ThnCamera</c> reads them (ThnCamera.cs:85).</summary>
 /// <param name="FovH">Half the horizontal angle for a 4:3 screen, in degrees.</param>
@@ -326,6 +344,17 @@ public sealed class CutscenePlayer : ICutscenePlayer
         // The projection of the THN camera is made in each step. ThnCamera.Update only reads the pose and the lens.
         ((ThnCamera)cutscene.CameraHandle).Update();
         cutscene.Draw(stepSeconds, viewport.Width, viewport.Height, overrideCamera);
+    }
+
+    /// <summary>
+    /// The models of the character of the scene object with a name, or null when the scene has no such object or the
+    /// object is not a character. The names compare without letter case. The models are live objects of the scene, so a
+    /// caller must not change them.
+    /// </summary>
+    public CharacterModels? CharacterOf(string name)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        return CharacterModels.Of(cutscene.GetObject(name)?.Object);
     }
 
     /// <summary>

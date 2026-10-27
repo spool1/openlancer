@@ -107,6 +107,7 @@ internal sealed class InspectorPanel : IDisposable
         starSystemPage.Reset();
         fieldPage.Reset();
         missionPage.Reset();
+        thnPage.Reset();
     }
 
     /// <summary>Frees the native editors of the pages.</summary>
@@ -114,6 +115,7 @@ internal sealed class InspectorPanel : IDisposable
     {
         missionPage.Dispose();
         playStartPage.Dispose();
+        thnPage.Dispose();
     }
 
     public void Draw(object? item)
