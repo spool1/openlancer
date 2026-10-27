@@ -1,12 +1,12 @@
 using System;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using ImGuiNET;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Assets;
 using OpenLancer.Editor.Dialogs;
 using OpenLancer.Editor.Ui;
+using OpenLancer.Studio.Commands;
 
 namespace OpenLancer.Editor.Assets;
 
@@ -148,16 +148,15 @@ internal sealed class PropGroupDialog : ModalDialog
         Problem(writeError);
         if (Button("Save", primary: true, enabled: problem == null && nameProblem == null))
         {
-            try
+            var write = PropGroupCommands.Save(session, draft, nickname.Trim(), name.Trim());
+            if (write.Error is { } error)
             {
-                var group = PropGroups.Write(session, draft, nickname.Trim(), name.Trim());
-                Close();
-                done?.Invoke(group);
+                writeError = $"The editor could not write the prop group: {error.Message}";
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or
-                                           InvalidOperationException)
+            else
             {
-                writeError = $"The editor could not write the prop group: {e.Message}";
+                Close();
+                done?.Invoke(write.Group!);
             }
 
             return;
@@ -185,16 +184,15 @@ internal sealed class PropGroupDialog : ModalDialog
         Problem(writeError);
         if (Button("Rename", primary: true, enabled: problem == null))
         {
-            try
+            var rename = PropGroupCommands.Rename(edits, group, trimmed);
+            if (rename.Error is { } error)
             {
-                var renamed = PropGroups.Rename(edits, group, trimmed);
-                Close();
-                done?.Invoke(renamed);
+                writeError = $"The editor could not rename the prop group: {error.Message}";
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or
-                                           InvalidOperationException)
+            else
             {
-                writeError = $"The editor could not rename the prop group: {e.Message}";
+                Close();
+                done?.Invoke(rename.Group!);
             }
 
             return;

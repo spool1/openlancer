@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Linq;
 using System.Numerics;
 using ImGuiNET;
@@ -8,20 +7,23 @@ using LibreLancer.Data.GameData.World;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Assets;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Editor.Assets;
 using OpenLancer.Editor.Dialogs;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Ui;
+using OpenLancer.Studio.Commands;
 using ZoneShape = LibreLancer.Data.Schema.Universe.ZoneShape;
 
 namespace OpenLancer.Editor.Editing;
 
 /// <summary>
 /// The actions on the items of the open system (milestone M3): Create, Duplicate, Rename and Delete. Each action makes a
-/// plan (see <see cref="ScenePlans"/>) and runs its command as one entry of the edit history. The Hierarchy, the Scene,
-/// the Inspector and the Edit menu start them, with the keys of Unity: F2 Rename, Ctrl+D Duplicate and Delete.
+/// plan through a command of the command layer (see <see cref="SceneCommands"/>) and runs it through the command runner
+/// as one entry of the edit history. The Hierarchy, the Scene, the Inspector and the Edit menu start them, with the keys
+/// of Unity: F2 Rename, Ctrl+D Duplicate and Delete.
 /// </summary>
 /// <remarks>
 /// <para>Create of an object opens the picker of the archetypes of its template, and a station then opens the picker of
@@ -208,15 +210,10 @@ internal sealed class SceneEdits(EditorWindow window)
         [
             new Choice("Delete", () =>
             {
-                try
-                {
-                    PropGroups.Delete(session.Edits, group);
+                if (PropGroupCommands.Delete(session.Edits, group).Error is { } error)
+                    window.Log.Add(ConsoleSeverity.Error, Source, $"The prop group {group.Name} was not deleted: {error.Message}");
+                else
                     window.Log.Add(ConsoleSeverity.Info, Source, $"Deleted the prop group {group.Name}.");
-                }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
-                {
-                    window.Log.Add(ConsoleSeverity.Error, Source, $"The prop group {group.Name} was not deleted: {e.Message}");
-                }
             }),
             new Choice("Cancel", () => { }),
         ]);
@@ -265,14 +262,13 @@ internal sealed class SceneEdits(EditorWindow window)
     {
         var edits = session.Edits;
         // An archetype without a template gives the reason of the plan.
-        var template = ScenePlans.TemplateFor(edits, archetype) ?? SceneTemplate.Solar;
-        if (!ScenePlans.AsksForBase(edits, template, archetype))
+        if (!SceneCommands.SpawnAsksForBase(edits, archetype))
         {
-            Run(ScenePlans.Create(edits, system, template, archetype, point, parent));
+            Run(SceneCommands.SpawnAsset(edits, system, new AssetRef(AssetKind.SolarArchetype, archetype), point, parent));
             return;
         }
 
-        PickBase(session, system, template, archetype, point, parent);
+        PickBase(session, system, SceneCommands.SpawnTemplate(edits, archetype), archetype, point, parent);
     }
 
     /// <summary>
@@ -289,7 +285,6 @@ internal sealed class SceneEdits(EditorWindow window)
             return;
         }
 
-        var stem = row.Asset.Kind == AssetKind.Model ? Path.GetFileNameWithoutExtension(row.Asset.Id) : row.Asset.Id;
         var name = row.Asset.Section != null && session.SectionName(row.Asset.Section) is { Length: > 0 } text
             ? text
             : row.Nickname;
@@ -305,7 +300,7 @@ internal sealed class SceneEdits(EditorWindow window)
             picked => SpawnArchetype(session, system, picked.Value, point, parent),
             "Cancel", null,
             "New static prop archetype",
-            () => Run(ScenePlans.CreateProp(edits, system, source, stem, point, parent)));
+            () => Run(SceneCommands.SpawnAsset(edits, system, row.Asset, point, parent)));
     }
 
     /// <summary>The menu item "New static prop archetype" of a tile: a new <c>[Solar]</c> of the model of a ship, an
@@ -320,14 +315,13 @@ internal sealed class SceneEdits(EditorWindow window)
             return;
         }
 
-        if (session.Edits.Assets.ModelOf(row.Asset) is not { } source)
+        if (session.Edits.Assets.ModelOf(row.Asset) == null)
         {
             window.Log.Add(ConsoleSeverity.Warning, Source, row.NotPlaceable ?? $"{row.Nickname} has no model.");
             return;
         }
 
-        var stem = row.Asset.Kind == AssetKind.Model ? Path.GetFileNameWithoutExtension(row.Asset.Id) : row.Asset.Id;
-        Run(ScenePlans.CreateProp(session.Edits, system.Nickname, source, stem, point, null));
+        Run(SceneCommands.SpawnAsset(session.Edits, system.Nickname, row.Asset, point));
     }
 
     /// <summary>
@@ -343,8 +337,8 @@ internal sealed class SceneEdits(EditorWindow window)
             return;
         }
 
-        var plan = PropGroups.Place(edits, system, group, point, parent);
-        if (plan.Command != null || plan.PlacementErrors.Count == 0)
+        var plan = PropGroupCommands.Place(edits, system, group, point, parent);
+        if (plan.CanRun || plan.PlacementErrors.Count == 0)
         {
             Run(plan);
             return;
@@ -354,7 +348,8 @@ internal sealed class SceneEdits(EditorWindow window)
                       "the mod:\n\n" + string.Join("\n", plan.PlacementErrors.Select(e => $"{e.Member}: {e.Message}"));
         window.Choice.Show($"Place {group.Name}", message,
         [
-            new Choice("Place without these lines", () => Run(PropGroups.Place(edits, system, group, point, parent, true))),
+            new Choice("Place without these lines",
+                () => Run(PropGroupCommands.Place(edits, system, group, point, parent, leaveOutErrorLines: true))),
             new Choice("Cancel", () => { }),
         ]);
     }
@@ -363,14 +358,8 @@ internal sealed class SceneEdits(EditorWindow window)
     /// Sets the loadout or the faction of a dropped tile on an object (decision D281 of the M23 design), as one entry of
     /// the edit history "Set loadout of &lt;object&gt;". It also replaces a present line (review finding R18).
     /// </summary>
-    public void SetComponent(SectionRef section, AssetRow row)
-    {
-        var (kind, what) = row.Asset.Kind == AssetKind.Loadout
-            ? (ObjectComponent.LoadoutUser, "loadout")
-            : (ObjectComponent.FactionMember, "faction");
-        window.Commands.Execute(() => EditCommand.Group($"Set {what} of {section.Id.Key}",
-            [ObjectComponents.Add(section, kind, row.Asset.Id)]));
-    }
+    public void SetComponent(SectionRef section, AssetRow row) =>
+        window.Commands.Run(edits => SceneCommands.DropAsset(edits, section, row.Asset));
 
     private bool MenuItem(char icon, string label, string shortcut, SceneAction action, object? item)
     {
@@ -395,7 +384,7 @@ internal sealed class SceneEdits(EditorWindow window)
         var position = parent != null && window.Scene.ItemOf(parent) is SystemObject obj ? obj.Position : window.Scene.Pivot;
         if (template is SceneTemplate.Zone or SceneTemplate.Light)
         {
-            Run(ScenePlans.Create(edits, system.Nickname, template, null, position, null, shape: shape));
+            Run(SceneCommands.Create(edits, system.Nickname, template, null, position, shape: shape));
             return;
         }
 
@@ -407,7 +396,7 @@ internal sealed class SceneEdits(EditorWindow window)
             {
                 if (!ScenePlans.AsksForBase(edits, template))
                 {
-                    Run(ScenePlans.Create(edits, system.Nickname, template, archetype.Value, position, parent));
+                    Run(SceneCommands.Create(edits, system.Nickname, template, archetype.Value, position, parent));
                     return;
                 }
 
@@ -425,9 +414,9 @@ internal sealed class SceneEdits(EditorWindow window)
         picker.Show("Create: base", $"Pick the base that {archetype} docks with. Esc makes the station without a base.",
             ObjectKinds.Station,
             bases.Select(b => (b, BaseName(b), BaseSystem(edits, b))).ToList(),
-            picked => Run(ScenePlans.Create(edits, system, template, archetype, position, parent, picked.Value)),
+            picked => Run(SceneCommands.Create(edits, system, template, archetype, position, parent, picked.Value)),
             "No base",
-            () => Run(ScenePlans.Create(edits, system, template, archetype, position, parent)));
+            () => Run(SceneCommands.Create(edits, system, template, archetype, position, parent)));
 
         string BaseName(ListEntry entry) =>
             entry.Section != null && session.ItemName(entry.Section) is { Length: > 0 } name ? name : entry.Value;
@@ -449,12 +438,12 @@ internal sealed class SceneEdits(EditorWindow window)
         picker.Show($"Add {ObjectComponents.Name(kind)}", $"Pick the {list} of {section.Id.Key}.", ObjectKinds.OfList(list),
             entries.Select(e => (e, e.Section != null && session.ItemName(e.Section) is { Length: > 0 } name ? name : e.Value,
                 list == "base" ? BaseSystem(edits, e) : e.Detail)).ToList(),
-            picked => window.Commands.Execute(ObjectComponents.Add(section, kind, picked.Value)));
+            picked => window.Commands.Run(s => SceneCommands.SetComponent(s, section, kind, picked.Value)));
     }
 
     /// <summary>Removes a component of an object (decision D244). One remove is one entry of the edit history.</summary>
     public void RemoveComponent(SectionRef section, ObjectComponent kind) =>
-        window.Commands.Execute(() => ObjectComponents.Remove(section, kind));
+        window.Commands.Run(edits => SceneCommands.SetComponent(edits, section, kind, null));
 
     /// <summary>Copies an item with its children (decisions D241 and D262). Unity does not ask, so the warnings go to the
     /// Console.</summary>
@@ -462,7 +451,7 @@ internal sealed class SceneEdits(EditorWindow window)
     {
         if (window.Session is not { } session)
             return;
-        Run(ScenePlans.Duplicate(session.Edits, [section]));
+        Run(SceneCommands.Duplicate(session.Edits, [section]));
     }
 
     /// <summary>Deletes an item (decisions D81 and D238): at once when nothing else changes, else after the dialog. A
@@ -471,8 +460,8 @@ internal sealed class SceneEdits(EditorWindow window)
     {
         if (window.Session is not { } session)
             return;
-        var plan = ScenePlans.Delete(session.Edits, [section]);
-        if (plan.Command == null || plan.NeedsConfirmation)
+        var plan = SceneCommands.Delete(session.Edits, [section]);
+        if (!plan.CanRun || plan.NeedsConfirmation)
         {
             dialog.Show(plan, () => Run(plan));
             return;
@@ -521,35 +510,19 @@ internal sealed class SceneEdits(EditorWindow window)
         var target = ScenePlans.RenameTarget(session.Edits, section);
         if (string.Equals(target.Id.Key, RenameText.Trim(), StringComparison.Ordinal))
             return;
-        var plan = ScenePlans.Rename(session.Edits, section, RenameText);
-        if (plan.Command == null)
-        {
-            foreach (var refusal in plan.Refusals)
-                window.Log.Add(ConsoleSeverity.Error, Source, refusal.Message, refusal.Target);
-            return;
-        }
-
-        if (plan.NeedsConfirmation)
+        var plan = SceneCommands.Rename(session.Edits, section, RenameText);
+        if (plan.CanRun && plan.NeedsConfirmation)
             dialog.Show(plan, () => Run(plan));
         else
             Run(plan);
     }
 
-    /// <summary>Runs the command of a plan, or tells why it cannot run. The warnings go to the Console. The selection
-    /// follows Unity (decision D249).</summary>
+    /// <summary>Runs a plan through the command runner, which tells why it cannot run and gives its warnings to the
+    /// Console. After the run, the selection follows Unity (decision D249).</summary>
     private void Run(ScenePlan plan)
     {
-        if (plan.Command == null)
-        {
-            foreach (var refusal in plan.Refusals)
-                window.Log.Add(ConsoleSeverity.Error, Source, refusal.Message, refusal.Target);
+        if (window.Commands.Run(plan).Status is not (EditStatus.Applied or EditStatus.NoChange))
             return;
-        }
-
-        if (!window.Commands.Execute(plan.Command))
-            return;
-        foreach (var warning in plan.Warnings)
-            window.Log.Add(ConsoleSeverity.Warning, Source, warning.Message, warning.Target);
         switch (plan.Action)
         {
             case SceneAction.Delete:

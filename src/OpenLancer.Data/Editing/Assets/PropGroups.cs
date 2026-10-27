@@ -116,7 +116,8 @@ public static class PropGroups
         return result.Length > 0 && char.IsAsciiLetterLower(result[0]) ? result : "g" + result;
     }
 
-    private static bool IsValidNickname(string nickname) =>
+    /// <summary>True when a text has the form of a nickname of a group (see <see cref="NicknameProblem"/>).</summary>
+    internal static bool IsValidNickname(string nickname) =>
         nickname.Length > 0 && char.IsAsciiLetterLower(nickname[0]) &&
         nickname.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c is '-' or '_');
 
