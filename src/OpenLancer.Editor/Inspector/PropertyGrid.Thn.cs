@@ -124,6 +124,24 @@ internal sealed partial class PropertyGrid
         });
     }
 
+    /// <summary>
+    /// The popup of the list picker for a cutscene value. Call it after <see cref="PickerField"/>. One opening is one
+    /// field edit, so one entry of the edit history (section 12.1 of the M8b design). A click and an arrow key set the
+    /// value at once, and Esc puts back the value of the opening. A click on the current row makes no change.
+    /// </summary>
+    /// <param name="open">Opens the popup in this frame, for example after a click on the field.</param>
+    /// <param name="model">Makes the rows when the popup opens.</param>
+    /// <param name="kind">The kind of the entries, for their glyph.</param>
+    /// <param name="parse">Gives the value of the text of a row.</param>
+    /// <param name="pane">The side pane of the popup, or null for the footer.</param>
+    public void ThnListPopup(ThnFieldState field, bool open, Func<ListPickerModel> model, ObjectKind kind,
+        Func<string, ThnFieldParse> parse, ListPickerPane? pane = null) =>
+        listPicker.Draw("##thnlist", open, model, kind, _ => 0, fieldEdits.IsOpenFor, (popup, events, selected) =>
+        {
+            picked = selected;
+            RouteEvents(popup, field.Key, events, () => ThnBegin(field, parse), _ => picked);
+        }, pane);
+
     /// <summary>The labels X, Y and Z, in the axis colors.</summary>
     internal static IReadOnlyList<ComponentLabel> Axes => AxisLabels;
 

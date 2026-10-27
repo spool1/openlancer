@@ -384,6 +384,9 @@ internal static class ObjectKinds
         /// <summary>A cutscene script.</summary>
         public static readonly ObjectKind Script = new("Cutscene", EditorIcons.Film, EditorTheme.Text);
 
+        /// <summary>An animation clip of a character, in the list of the animation of a START_MOTION event.</summary>
+        public static readonly ObjectKind Clip = new("Animation", EditorIcons.User, EditorTheme.Text);
+
         /// <summary>A cutscene script that no INI line names. Its glyph is dim (decision D613 of the cutscene categories
         /// design).</summary>
         public static readonly ObjectKind UnusedScript = new("Unused cutscene", EditorIcons.Film, EditorTheme.TextDim);

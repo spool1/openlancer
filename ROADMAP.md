@@ -24,7 +24,7 @@ Each milestone goes through four steps: design, adversarial review, build and ve
 | GA1 | Gap audit, static part | engine | done | A list of what the engine does, does differently or does not do, compared with the retail game. Each row tells how to repeat it. |
 | M20 | Inspector field helpers | editor | done | Drag the X, Y or Z label to change a value. Color pickers keep the value form of each key. |
 | M21 | Data lists and pickers | 1 | done | A field that names other data gets a list from the data, so mods can extend it. Each Inspector page has a raw INI block. The save gate stops a save that makes the game crash. |
-| M8b | Cutscene editor, part 2 | 1 | done | Sound in the preview, new cutscenes, warnings and Convert to patch. |
+| M8b | Cutscene editor, part 2 | 1 | done | Sound in the preview, new cutscenes, and room lines that start a new cutscene. A cutscene error blocks Save and Play. |
 | M25 | Mod format version 2 | 1, 2 | done | `mod.json` gives the tier and the target games. Key rules for the nebula and asteroid field files. |
 | M11a | Game link and first-run setup | editor | done | At the first start, the editor asks for your game folder. It finds the game and its version, makes the profile and shows the link status. |
 | M22 | Nebula and asteroid field picking | editor | done | Select nebulae and asteroid fields in the Scene, also from inside them. |
@@ -36,6 +36,7 @@ Each milestone goes through four steps: design, adversarial review, build and ve
 | M6b | Mission editing | 1 | done | Edit missions as a graph of triggers, conditions and actions, with behavior prefabs, overrides and prefab mode. See docs/MISSIONS.md. |
 | MCP1-1 | Agent server, read-only | editor | done | An MCP server in the editor and in `oltool mcp serve`. An agent reads the systems, data lists, assets, missions, cutscenes, raw INI and problems. In the editor, it also opens views, selects items and gets images. See docs/MCP.md. |
 | R1 | First release, v0.1.0 (preview) | none | done | One zip with the editor, Play and oltool. It holds no game files. Published on 2026-10-22. |
+| M8c | Cutscene editor, part 3 | 1 | in progress | Pick the animation of a character event from a list of the game clips, with a preview of each clip on the character. Warnings for cutscene problems, and Convert to patch. |
 | M6c | Play from a trigger | editor | in progress | A dry run runs the triggers of a mission in the editor without the game (M6c-1, done). "Play from here" starts the game at a trigger, and a live view in the graph shows which triggers ran and which wait (M6c-2, done). Next: a start save that HD Edition and vanilla 1.1 load (M6c-3). |
 | MCP1-2 | Agent scene and data edits | editor | next | Agents edit the Scene and the data through the edit session, checks, save gate and undo of the editor. They also save, export and start Play. The editor shows each agent edit. |
 | MCP1-3 | Agent mission edits | editor | next | Agents edit missions with the commands of the mission studio. They also run the dry run and the mission play. |
