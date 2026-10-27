@@ -94,6 +94,47 @@ public sealed class EditBatchToolTests
         Assert.Null(session.Get(SceneWorkspace.Object("Li01_dock_new")));
     }
 
+    /// <summary>
+    /// A step renames an existing zone, and a later step creates a zone that takes its old free nickname. The result
+    /// keeps the rename and gives the new zone as an add. A rename changes an add only when the add came before it
+    /// (review finding of MCP1-2, step 4).
+    /// </summary>
+    [Fact]
+    public void ARenameBeforeAnAddWithTheOldNicknameStaysARename()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+        Ok(host, "scene_create_zone", """{ "system": "Li01", "position": [0, 0, 0] }""");
+
+        var result = Ok(host, "edit_batch", """
+            {
+              "steps": [
+                { "tool": "rename_item", "arguments": { "ref": "zone:li01_zone_1", "new_name": "patrol_a" } },
+                { "tool": "scene_create_zone", "arguments": { "system": "Li01", "position": [0, 0, 100] } }
+              ]
+            }
+            """);
+        var later = Ok(host, "edit_batch", """
+            {
+              "steps": [
+                { "tool": "scene_create_zone", "arguments": { "system": "Li01", "position": [0, 0, 200] } },
+                { "tool": "rename_item", "arguments": { "ref": "zone:li01_zone_2", "new_name": "patrol_b" } }
+              ]
+            }
+            """);
+
+        Assert.Equal(["zone:li01_zone_1"], Texts(result["adds"]));
+        var rename = Assert.Single(result["renames"]!.AsArray())!;
+        Assert.Equal(("zone:li01_zone_1", "zone:patrol_a"), ((string?)rename["from"], (string?)rename["to"]));
+        Assert.DoesNotContain("zone:li01_zone_1", Texts(result["changes"]));
+        Assert.Equal(["zone:li01_zone_1"], Texts(result["steps"]![1]!["adds"]));
+        Assert.NotNull(session.Get(SceneWorkspace.Zone("patrol_a")));
+        Assert.Equal("0, 0, 100", Line(session, SceneWorkspace.Zone("li01_zone_1"), "pos"));
+        // An add before the rename is one new item with its last nickname.
+        Assert.Equal(["zone:patrol_b"], Texts(later["adds"]));
+        Assert.Empty(later["renames"]!.AsArray());
+    }
+
     /// <summary>A step that needs a confirmation fails unless its arguments have confirm: true.</summary>
     [Fact]
     public void AStepThatNeedsAConfirmationFailsWithoutConfirm()

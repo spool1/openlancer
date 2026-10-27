@@ -19,7 +19,10 @@ namespace OpenLancer.Studio.Agent;
 internal sealed class EditScope
 {
     private readonly EditChecks checks;
-    private readonly List<EditResult> stepParts = [];
+
+    /// <summary>The index in the parts of the batch of the first part of the step.</summary>
+    private int stepStart;
+
     private readonly List<string> stepConfirmations = [];
 
     internal EditScope(EditSession session, EditBatch batch, AgentLimits limits)
@@ -42,12 +45,20 @@ internal sealed class EditScope
     /// step of <c>edit_batch</c> has one step.</summary>
     internal void StartStep()
     {
-        stepParts.Clear();
+        stepStart = Batch.Parts.Count;
         stepConfirmations.Clear();
     }
 
     /// <summary>The result of the commands of the step until now.</summary>
-    internal EditResult StepResult() => EditTools.Shaped(EditResult.Merge(EditStatus.Applied, stepParts));
+    internal EditResult StepResult()
+    {
+        var step = Batch.Parts.Skip(stepStart).ToList();
+        return EditTools.Shaped(EditResult.Merge(EditStatus.Applied, step), step);
+    }
+
+    /// <summary>The net result of all commands of the call: a result of the batch with the adds, the renames and the
+    /// changes of its parts in their order (see <see cref="EditTools.Shaped"/>).</summary>
+    internal EditResult CallResult(EditResult batchResult) => EditTools.Shaped(batchResult, Batch.Parts);
 
     /// <summary>
     /// Runs the session command of a plan in the batch, on top of the commands before it. Then it reports the part of
@@ -83,11 +94,7 @@ internal sealed class EditScope
 
 
     /// <summary>Adds a part of the result, for example the warnings of a text that other sections share.</summary>
-    public void Report(EditResult part)
-    {
-        Batch.Report(part);
-        stepParts.Add(part);
-    }
+    public void Report(EditResult part) => Batch.Report(part);
 }
 
 /// <summary>
@@ -200,7 +207,7 @@ internal static class EditTools
             if (confirmations.Count > 0 && !confirm && !preview)
                 throw new EditException(NeedsConfirmation(confirmations));
             var patch = withPatch ? batch.PatchTexts() : null;
-            EditResult Final(EditResult result) => Shaped(result) with
+            EditResult Final(EditResult result) => scope.CallResult(result) with
             {
                 NeedsConfirmation = result.NeedsConfirmation || confirmations.Count > 0,
                 Patch = patch ?? result.Patch,
@@ -244,21 +251,35 @@ internal static class EditTools
     /// is one new item with its last reference, and no rename. An example is a new object with the nickname of its
     /// request.
     /// </summary>
-    internal static EditResult Shaped(EditResult result)
+    /// <remarks>The walk reads the parts in order. A rename changes an add only when the add came before it. So an
+    /// existing item that a step renames stays a rename, also when a later step adds an item with its old nickname
+    /// (review finding of MCP1-2, step 4). The renames of a part apply before its adds, because they name the items
+    /// before the part.</remarks>
+    /// <param name="result">The merged result of the parts, with the lists of the other kinds.</param>
+    /// <param name="parts">The parts of the commands, in order.</param>
+    internal static EditResult Shaped(EditResult result, IReadOnlyList<EditResult> parts)
     {
-        var adds = result.Adds.ToList();
+        var adds = new List<string>();
         var renames = new List<ResultRename>();
         var renamedAdds = new List<string>();
-        foreach (var rename in result.Renames)
+        foreach (var part in parts)
         {
-            var at = adds.IndexOf(rename.From);
-            if (at < 0)
+            foreach (var rename in part.Renames)
             {
-                renames.Add(rename);
-                continue;
+                var at = adds.IndexOf(rename.From);
+                if (at < 0)
+                {
+                    renames.Add(rename);
+                    continue;
+                }
+                adds[at] = rename.To;
+                renamedAdds.Add(rename.From);
             }
-            adds[at] = rename.To;
-            renamedAdds.Add(rename.From);
+            foreach (var add in part.Adds)
+            {
+                if (!adds.Contains(add))
+                    adds.Add(add);
+            }
         }
         return result with
         {

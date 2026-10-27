@@ -231,6 +231,10 @@ public sealed class EditBatch : IDisposable
     /// order.</summary>
     internal IReadOnlyList<(SectionRef From, SectionRef To)> Renames => change.Renames;
 
+    /// <summary>The parts that the members reported until now, in order. The agent tools read the order of the adds and
+    /// the renames from them (section 8.3 of the MCP1 design).</summary>
+    internal IReadOnlyList<EditResult> Parts => parts;
+
     /// <summary>
     /// The text that a save writes now for each INI file that the steps changed, by install path. The text is the patch
     /// of the file, or the text of a whole file of the mod (<c>with_patch</c>, section 7.0 of the MCP1 design). It holds
