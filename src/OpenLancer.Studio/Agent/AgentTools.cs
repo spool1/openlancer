@@ -110,6 +110,8 @@ public static class AgentTools
         Edit("duplicate_items", ToolHints.Adding,
             EditTools.Input(false, new TextListParam("refs", true), new PointParam("offset", false)),
             ItemEditTools.DuplicateItems),
+        SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
+        SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),
         View("open_view", ToolGroup.Studio, ToolHints.View, new ToolInput(Text("system"), Text("mission"), Text("cutscene")),
             typeof(OpenedView), ViewTools.OpenView),
         View("select_items", ToolGroup.Studio, ToolHints.View,
@@ -244,6 +246,12 @@ public static class AgentTools
     /// <summary>A view tool (section 7.7 of the MCP1 design). Only the editor host has the views.</summary>
     private static StudioTool View(string name, ToolGroup group, ToolHints hints, ToolInput input, Type output,
         Func<ToolCall, ToolStep> run) => new(name, ToolKind.View, group, ToolHosts.Editor, hints, input, output, run);
+
+    /// <summary>A tool of the session as a whole, of the group Studio (section 7.6 of the MCP1 design), for example
+    /// <c>undo</c>. It cannot be a step of <c>edit_batch</c>.</summary>
+    private static StudioTool SessionTool(string name, ToolHints hints, ToolInput input, Type output,
+        Func<ToolCall, ToolStep> run) =>
+        new(name, ToolKind.Session, ToolGroup.Studio, ToolHosts.Both, hints, input, output, run);
 
     /// <summary>An edit tool of the group Studio (section 7.2 of the MCP1 design). Its result is the result of the
     /// command layer, and it can be a step of <c>edit_batch</c>.</summary>

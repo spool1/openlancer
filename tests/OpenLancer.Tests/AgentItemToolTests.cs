@@ -15,8 +15,8 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// The tools <c>rename_item</c>, <c>delete_items</c> and <c>duplicate_items</c> (section 7.2 of the MCP1 design). The
-/// tests cover one entry with the edit origin Agent, the confirmation of a delete and a rename, the limit of the items,
-/// and the refusals of the plans.
+/// tests cover one entry with the edit origin Agent and the confirmation of a delete and a rename. They also cover the
+/// limit of the items and the refusals of the plans.
 /// </summary>
 public sealed class AgentItemToolTests
 {

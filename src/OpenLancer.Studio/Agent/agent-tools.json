@@ -223,6 +223,14 @@
         "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. Without it, each copy is at the place of its item."
       }
     },
+    "undo": {
+      "title": "Undo the last edit of the agent",
+      "description": "Undoes the last edit of the agent. The tool does not undo an edit of the user."
+    },
+    "redo": {
+      "title": "Redo the last edit that the agent undid",
+      "description": "Redoes the last edit that the agent undid. The tool does not redo an edit that the user undid."
+    },
     "open_view": {
       "title": "Open a view of the editor",
       "description": "Opens a system in the Scene, a mission script in the Mission tab or a cutscene in the Cutscene tab. Give one of the three. The tool changes what the user sees, not the data. Only the editor host has this tool.",
@@ -360,7 +368,12 @@
     "edit_previewed": "The preview changed nothing. Call the tool again without preview to apply the edit.",
     "edit_no_change": "The data has these values already, so the edit changed nothing.",
     "text_shared": "{ref} shows the same text and keeps the old text. To change it too, call set_text on {ref} with the field {key}.",
-    "limit_items": "One call can name at most {max} items in refs. Split the call."
+    "limit_items": "One call can name at most {max} items in refs. Split the call.",
+    "undo_nothing": "The history has no step to undo.",
+    "redo_nothing": "The history has no step to redo.",
+    "undo_user_entry": "The last edit is an edit of the user: {label}. The agent can undo only its own edits.",
+    "redo_user_entry": "The next step to redo is an edit of the user: {label}. The agent can redo only its own edits.",
+    "redo_user_undid": "The user undid this edit: {label}. The agent cannot redo it."
   },
   "resources": {
     "openlancer://catalog/lists": {
@@ -882,6 +895,7 @@
     "ResultMissing.blocks_save": "True when the line stops the save until a fix.",
     "NamedMention.nickname": "The nickname that the file names as text.",
     "NamedMention.path": "The install path of the file.",
-    "NamedMention.count": "How often the file names the nickname."
+    "NamedMention.count": "How often the file names the nickname.",
+    "HistoryStepView.label": "The label of the step that the tool undid or did again, for example Agent: Delete my_station_1."
   }
 }

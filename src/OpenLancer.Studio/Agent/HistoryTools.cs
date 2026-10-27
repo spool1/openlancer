@@ -1,0 +1,67 @@
+using System;
+using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
+
+namespace OpenLancer.Studio.Agent;
+
+/// <summary>The result of <c>undo</c> and <c>redo</c>: the step of the history that the tool took back or did
+/// again.</summary>
+/// <param name="Label">The label of the step, for example "Agent: Delete my_station_1".</param>
+internal sealed record HistoryStepView(string Label);
+
+/// <summary>
+/// The tools <c>undo</c> and <c>redo</c> of section 7.6 of the MCP1 design (decision D709). The agent undoes only an
+/// entry with the edit origin Agent at the top of the history. It redoes only an agent entry that it undid itself. So
+/// the agent never takes back an edit of the user, and never does again an edit that the user undid with Ctrl+Z. The
+/// user can undo and redo each agent entry, as each other entry.
+/// </summary>
+internal static class HistoryTools
+{
+    public static ToolStep Undo(ToolCall call)
+    {
+        var session = call.Session;
+        EditTools.ReadOnlyGuard(call);
+        if (session.UndoOrigin is not { } origin)
+            throw Refused("NothingToUndo", "undo_nothing");
+        if (origin != EditOrigin.Agent)
+            throw NotAgentEntry("UserEntry", "undo_user_entry", session.UndoLabel!);
+        var label = session.UndoLabel!;
+        Step(() => session.Undo(EditOrigin.Agent));
+        return ToolResult.Of(new HistoryStepView(label));
+    }
+
+    public static ToolStep Redo(ToolCall call)
+    {
+        var session = call.Session;
+        EditTools.ReadOnlyGuard(call);
+        if (session.RedoOrigin is not { } origin)
+            throw Refused("NothingToRedo", "redo_nothing");
+        if (origin != EditOrigin.Agent)
+            throw NotAgentEntry("UserEntry", "redo_user_entry", session.RedoLabel!);
+        if (session.RedoUndoneBy != EditOrigin.Agent)
+            throw NotAgentEntry("UserUndid", "redo_user_undid", session.RedoLabel!);
+        var label = session.RedoLabel!;
+        Step(session.Redo);
+        return ToolResult.Of(new HistoryStepView(label));
+    }
+
+    /// <summary>Runs an undo or a redo. The session refuses it while a batch or a transaction is open.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.Busy"/> with the reason of the session.</exception>
+    private static void Step(Action step)
+    {
+        try
+        {
+            step();
+        }
+        catch (InvalidOperationException e)
+        {
+            throw new EditException(new EditError(EditErrorKind.Busy, Data.Missions.Editing.MissionErrors.Busy, e.Message));
+        }
+    }
+
+    private static EditException Refused(string detail, string text) =>
+        new(new EditError(EditErrorKind.Refused, detail, AgentTexts.Error(text)));
+
+    private static EditException NotAgentEntry(string detail, string text, string label) =>
+        new(new EditError(EditErrorKind.NotAgentEntry, detail, AgentTexts.Error(text, ("label", label))));
+}
