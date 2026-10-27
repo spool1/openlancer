@@ -65,9 +65,9 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
             var reason = session.CanEdit && MarketEdits.CanChange(session.Edits, line)
                 ? null
                 : session.NoEditReason ?? LowerLineReason;
-            grid.Row(line.Base, () => Values(session, line, reason));
+            grid.Row(line.Base, () => Values(line, reason));
             grid.SetNextNote(TransactionTip);
-            grid.Row(TransactionLabel, () => Transaction(session, line, reason));
+            grid.Row(TransactionLabel, () => Transaction(line, reason));
         }
 
         grid.Row("Add to base", () => AddToBase(session, good));
@@ -79,7 +79,7 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
     /// with a lock. Each field edits only its own value, so each value keeps its place in the line.
     /// </summary>
     /// <param name="reason">Why the line cannot change, or null when it can.</param>
-    private void Values(EditorSession session, MarketLine line, string? reason)
+    private void Values(MarketLine line, string? reason)
     {
         var spacing = ImGui.GetStyle().ItemInnerSpacing.X;
         var texts = MarketEdits.Fields.Select(f => MarketEdits.FieldText(line, f)).ToArray();
@@ -121,7 +121,7 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
 
     /// <summary>The transaction type of a line: a dropdown with the three types, or a read-only field.</summary>
     /// <param name="reason">Why the line cannot change, or null when it can.</param>
-    private void Transaction(EditorSession session, MarketLine line, string? reason)
+    private void Transaction(MarketLine line, string? reason)
     {
         var text = TransactionText(line);
         if (reason != null)
