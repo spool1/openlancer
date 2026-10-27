@@ -214,6 +214,15 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
             "The most pixels on each side of an image of a system or of a cutscene. A larger panel capture becomes " +
             "smaller. A large image takes more time in a frame of the editor.", limits.RenderPixels,
             AgentLimits.RenderPixelsRange, v => limits = limits with { RenderPixels = v });
+        changed |= RangeField("Items of one edit",
+            "The most items that one agent call deletes or copies. A larger change is not one gesture.", limits.EditItems,
+            AgentLimits.EditItemsRange, v => limits = limits with { EditItems = v });
+        changed |= RangeField("Sections of one edit",
+            "The most sections that one agent edit changes, adds or removes. A larger edit changes nothing and gives the " +
+            "agent an error.", limits.EditSections, AgentLimits.EditSectionsRange, v => limits = limits with { EditSections = v });
+        changed |= RangeField("Steps of one batch",
+            "The most steps of one agent batch. The editor runs a batch in one frame.", limits.BatchSteps,
+            AgentLimits.BatchStepsRange, v => limits = limits with { BatchSteps = v });
         if (changed)
         {
             settings.Limits = limits.Clamped();

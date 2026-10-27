@@ -62,6 +62,13 @@ internal sealed class ChangeSet(string label, EditOrigin origin = EditOrigin.Use
     /// <summary>True when the change set recorded no file and no text.</summary>
     public bool IsEmpty => files.Count == 0 && text == null;
 
+    /// <summary>The number of different sections that the commands of the change set changed, added or
+    /// removed.</summary>
+    public int SectionCount => sections.Distinct().Count();
+
+    /// <summary>Each section that got a new key, with its old and its new reference, in order.</summary>
+    public IReadOnlyList<(SectionRef From, SectionRef To)> Renames => renames;
+
     /// <summary>
     /// True when a state after the change differs from its state before. Before <see cref="Finish"/>, it is false.
     /// </summary>

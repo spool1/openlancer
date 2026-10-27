@@ -122,8 +122,10 @@ public sealed class OltoolMcpTests
                 cancellationToken: Token);
             await using (client)
             {
+                // The server opens the profile only to read, so it lists only the read-only tools.
                 var tools = await client.ListToolsAsync(cancellationToken: Token);
-                Assert.Equal(AgentTools.All.Count, tools.Count);
+                Assert.Equal(AgentTools.ReadOnly.Select(t => t.Name), tools.Select(t => t.Name));
+                Assert.EndsWith("This server only reads the data. It changes no file.", client.ServerInstructions);
 
                 async Task<JsonElement> Call(string tool, Dictionary<string, object?> arguments)
                 {

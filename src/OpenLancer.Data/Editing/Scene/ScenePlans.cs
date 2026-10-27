@@ -673,6 +673,8 @@ public static partial class ScenePlans
     private static Diagnostic? Refusal(EditSession session, SectionRef item, string name)
     {
         Diagnostic Error(string message) => Diagnostic.Error(item.Path, message) with { Target = item };
+        // A nickname that another section has gives the rule of the command layer, so an agent gets name_taken.
+        Diagnostic Taken(string message) => Error(message) with { Rule = Missions.Editing.MissionErrors.NameTaken };
         if (SceneSections.KindOf(session, item) is not { } kind || kind is SceneKind.Nebula or SceneKind.Asteroids ||
             session.Get(item) is not { } view || item.Id.Key is not { } old)
             return Error($"{item.Id}: the Scene can rename only an object, a zone or a light of a system file.");
@@ -691,14 +693,14 @@ public static partial class ScenePlans
         if (kind == SceneKind.Light)
         {
             if (session.Nicknames.LightTaken(item.Path, name, item) is not null)
-                return Error($"Another light of {SceneSections.FileName(item.Path)} has the nickname {name}.");
+                return Taken($"Another light of {SceneSections.FileName(item.Path)} has the nickname {name}.");
         }
         else if (session.Nicknames.Taken(name, item) is { } taken)
-            return Error(TakenMessage(session, name, taken));
+            return Taken(TakenMessage(session, name, taken));
         var before = session.OpenDocument(item.Path)?.BaseIdOf(item.Id);
         if (!string.Equals(before?.Key, name, StringComparison.OrdinalIgnoreCase) &&
             session.BaseHasKey(item.Path, item.Id.Type, name))
-            return Error($"A section of the lower layer of {SceneSections.FileName(item.Path)} has the nickname {name}. A " +
+            return Taken($"A section of the lower layer of {SceneSections.FileName(item.Path)} has the nickname {name}. A " +
                          "patch would then find two sections with it.");
         return null;
     }

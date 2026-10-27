@@ -11,7 +11,7 @@ namespace OpenLancer.Studio.Agent;
 
 /// <summary>
 /// The limits of one agent call (section 8.4 of the MCP1 design). They are settings of the editor, with these defaults
-/// (decision D724). The limits of the edits come with the edit tools.
+/// (decision D724).
 /// </summary>
 public sealed record AgentLimits
 {
@@ -42,6 +42,17 @@ public sealed record AgentLimits
     /// editor. A larger panel of <c>capture_panel</c> gives a smaller image.</summary>
     public int RenderPixels { get; init; } = 2048;
 
+    /// <summary>The most items that one call of <c>delete_items</c> or <c>duplicate_items</c> names. A larger change is
+    /// not one gesture.</summary>
+    public int EditItems { get; init; } = 200;
+
+    /// <summary>The most sections that one edit call changes, adds or removes. A call that changes more refuses with
+    /// the error <c>limit</c> and changes nothing.</summary>
+    public int EditSections { get; init; } = 2000;
+
+    /// <summary>The most steps of one <c>edit_batch</c> call. A batch runs in one frame of the editor.</summary>
+    public int BatchSteps { get; init; } = 100;
+
     /// <summary>The allowed range of <see cref="MaxListRows"/>. <see cref="ListRows"/> goes from 1 to
     /// <see cref="MaxListRows"/>.</summary>
     public static readonly (int Min, int Max) MaxListRowsRange = (1, 1000);
@@ -65,6 +76,15 @@ public sealed record AgentLimits
     /// <remarks>Decision D722 of the MCP1 design allows at most 2048 pixels on each side.</remarks>
     public static readonly (int Min, int Max) RenderPixelsRange = (256, 2048);
 
+    /// <summary>The allowed range of <see cref="EditItems"/>.</summary>
+    public static readonly (int Min, int Max) EditItemsRange = (1, 1000);
+
+    /// <summary>The allowed range of <see cref="EditSections"/>.</summary>
+    public static readonly (int Min, int Max) EditSectionsRange = (1, 20000);
+
+    /// <summary>The allowed range of <see cref="BatchSteps"/>.</summary>
+    public static readonly (int Min, int Max) BatchStepsRange = (1, 1000);
+
     /// <summary>The limits with each value in its allowed range: from the smallest useful value to the largest value
     /// that keeps the editor responsive and the result small enough for a model. The settings file can hold any
     /// value.</summary>
@@ -81,6 +101,9 @@ public sealed record AgentLimits
             TailSeconds = Clamp(TailSeconds, TailSecondsRange),
             RequestMegabytes = Clamp(RequestMegabytes, RequestMegabytesRange),
             RenderPixels = Clamp(RenderPixels, RenderPixelsRange),
+            EditItems = Clamp(EditItems, EditItemsRange),
+            EditSections = Clamp(EditSections, EditSectionsRange),
+            BatchSteps = Clamp(BatchSteps, BatchStepsRange),
         };
     }
 
@@ -143,6 +166,29 @@ public abstract class AgentHost
 
     /// <summary>The groups that the user hides (decision D725).</summary>
     public virtual IReadOnlySet<ToolGroup> HiddenGroups => new HashSet<ToolGroup>();
+
+    /// <summary>
+    /// The tools of the host, in the order of the tool table. A host that only reads has only the read-only tools
+    /// (section 6.2 of the MCP1 design), and the other hosts have all tools. <c>tools/list</c> gives this set, and a
+    /// call of another tool is a protocol error, as a call of an unknown tool is. The set does not change while the
+    /// host runs, so each thread can read it.
+    /// </summary>
+    public virtual IReadOnlyList<StudioTool> Tools => AgentTools.All;
+
+    /// <summary>Tells the host that an edit call of the agent changed the data (section 8.5 of the MCP1 design). It runs
+    /// after the commit, on the thread that owns the session. A preview and a call without a change do not call
+    /// it.</summary>
+    /// <param name="tool">The name of the tool, for example <c>delete_items</c>.</param>
+    /// <param name="result">The result of the commit, with the label of the history entry.</param>
+    public virtual void Edited(string tool, EditResult result)
+    {
+    }
+
+    /// <summary>Tells the host that a call of a tool that changes data gave an error, for example
+    /// <c>needs_confirmation</c> (section 8.5 of the MCP1 design). A preview and a query do not call it.</summary>
+    public virtual void Refused(string tool, EditError error)
+    {
+    }
 
     /// <summary>True while the user pauses the agent edits (decision D734).</summary>
     public virtual bool Paused => false;

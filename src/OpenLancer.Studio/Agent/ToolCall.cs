@@ -18,11 +18,14 @@ internal sealed record Page<T>(IReadOnlyList<T> Rows, int Total, string? NextCur
 /// The context of the session part of one call: the host, the session and the checked arguments. It runs on the
 /// thread that owns the session.
 /// </summary>
-internal sealed class ToolCall(AgentHost host, ToolArgs args)
+internal sealed class ToolCall(AgentHost host, string tool, ToolArgs args)
 {
     private ItemTexts? texts;
 
     public AgentHost Host { get; } = host;
+
+    /// <summary>The name of the tool, for example <c>set_fields</c>.</summary>
+    public string Tool { get; } = tool;
 
     /// <summary>The session of the open profile.</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.NotAvailable"/> while no profile is open.</exception>
@@ -30,6 +33,10 @@ internal sealed class ToolCall(AgentHost host, ToolArgs args)
         "NoProfile", AgentTexts.Error("no_profile")));
 
     public ToolArgs Args { get; } = args;
+
+    /// <summary>The batch of the <c>edit_batch</c> call whose step this call is, or null for a call of the agent. A step
+    /// runs its commands in that batch (section 7.6 of the MCP1 design).</summary>
+    public EditScope? Scope { get; init; }
 
     public AgentLimits Limits => Host.Limits;
 

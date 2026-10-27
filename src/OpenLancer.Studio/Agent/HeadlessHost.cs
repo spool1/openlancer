@@ -21,9 +21,9 @@ namespace OpenLancer.Studio.Agent;
 /// The host of <c>oltool mcp serve</c> (section 6.2 of the MCP1 design): its own session on a profile, opened on the
 /// session thread, and no window. It has no Console and no view, so the editor tools give <c>not_available</c>.
 /// </summary>
-/// <remarks>In this build, the server only reads (<c>--read-only</c>): the session takes no lock and writes no file.
-/// A mod in the OpenLancer repo stays read-only also with the edit tools, because the host cannot ask the user
-/// (decision D738).</remarks>
+/// <remarks>In this build, the server only reads (<c>--read-only</c>): the session takes no lock and writes no file, and
+/// the host has only the read-only tools. A mod in the OpenLancer repo stays read-only also with the edit tools, because
+/// the host cannot ask the user (decision D738).</remarks>
 public sealed class HeadlessHost : AgentHost, IDisposable
 {
     private readonly Lazy<InfocardManager?> texts;
@@ -43,6 +43,9 @@ public sealed class HeadlessHost : AgentHost, IDisposable
     public override AgentLimits Limits { get; } = new();
 
     public override string? NoEditReason => Session.ReadOnlyReason ?? RepoReason;
+
+    /// <summary>The read-only tools: the host opens the profile only to read (section 6.2 of the MCP1 design).</summary>
+    public override IReadOnlyList<StudioTool> Tools => AgentTools.ReadOnly;
 
     /// <summary>Why the host never edits the active mod, or null: the mod is in the OpenLancer repo.</summary>
     public string? RepoReason { get; }

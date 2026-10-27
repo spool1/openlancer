@@ -22,6 +22,21 @@ public sealed partial class EditSession
     private string? textHash;
 
     /// <summary>
+    /// The text that a save writes now for an INI file that the session opened. The text is the patch of the file, or
+    /// the text of a whole file of the mod. Null when a save does not write the file, or cannot write it. A patch
+    /// without sections gives an empty text, because the save then deletes the patch file.
+    /// </summary>
+    /// <param name="path">An install path in normal form.</param>
+    internal string? SaveText(string path)
+    {
+        if (!documents.TryGetValue(path, out var document))
+            return null;
+        if (document.IsWholeFile)
+            return document.ChangedWholeFile() is { Bytes: { } bytes } ? IniDocument.TextEncoding.GetString(bytes) : null;
+        return document.ChangedPatch() is { Succeeded: true } patch ? patch.Text : null;
+    }
+
+    /// <summary>
     /// Writes the edits as patch files and the text as strings.json of the active mod. The save writes all files
     /// or none (review finding F1).
     /// </summary>

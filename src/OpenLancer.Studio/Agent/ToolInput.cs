@@ -31,9 +31,10 @@ internal abstract class ToolParam(string name, bool required)
 }
 
 /// <summary>A text, optionally one of a fixed set of words. A free text has at most <see cref="MaxLength"/>
-/// characters.</summary>
-internal sealed class TextParam(string name, bool required, IReadOnlyList<string>? choices, string? fallback)
-    : ToolParam(name, required)
+/// characters, or the length that the argument gives.</summary>
+/// <param name="length">The most characters of a free text, for example of the text of an infocard.</param>
+internal sealed class TextParam(string name, bool required, IReadOnlyList<string>? choices, string? fallback,
+    int length = TextParam.MaxLength) : ToolParam(name, required)
 {
     /// <summary>The most characters of a free text. A reference, a name or a filter of the data is much shorter. The
     /// limit keeps the work of one call on the thread of the session small, for example the search for the closest
@@ -55,7 +56,7 @@ internal sealed class TextParam(string name, bool required, IReadOnlyList<string
         else
         {
             schema["minLength"] = 1;
-            schema["maxLength"] = MaxLength;
+            schema["maxLength"] = length;
         }
         if (Default != null)
             schema["default"] = Default;
@@ -63,12 +64,12 @@ internal sealed class TextParam(string name, bool required, IReadOnlyList<string
     }
 
     public override string Expected => Choices == null
-        ? $"a text of 1 to {MaxLength} characters"
+        ? $"a text of 1 to {length} characters"
         : "one of: " + string.Join(", ", Choices);
 
     public override bool Fits(JsonNode value) =>
         value.GetValueKind() == JsonValueKind.String && value.GetValue<string>() is { Length: > 0 } text &&
-        (Choices == null ? text.Length <= MaxLength : Choices.Contains(text, StringComparer.Ordinal));
+        (Choices == null ? text.Length <= length : Choices.Contains(text, StringComparer.Ordinal));
 }
 
 /// <summary>A whole number from a minimum.</summary>
@@ -249,6 +250,17 @@ internal sealed class ObjectsParam(string name, bool required, IReadOnlyCollecti
     public override string Expected => "a list of objects, each with a kind";
 
     public override bool Fits(JsonNode value) => value is JsonArray array && array.All(item => item is JsonObject);
+}
+
+/// <summary>An object of field values by INI key, with at least one field, for example the fields of
+/// <c>set_fields</c>. The command of the tool checks each value, so the schema takes each JSON value.</summary>
+internal sealed class FieldsParam(string name, bool required) : ToolParam(name, required)
+{
+    public override JsonObject Schema(string tool) => new() { ["type"] = "object", ["minProperties"] = 1 };
+
+    public override string Expected => "an object with at least one field";
+
+    public override bool Fits(JsonNode value) => value is JsonObject { Count: > 0 };
 }
 
 /// <summary>An object with arguments of its own.</summary>

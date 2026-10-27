@@ -18,7 +18,25 @@ internal sealed class TestAgentHost(EditSession? session, AgentHostKind kind = A
 
     public override EditSession? Session { get; } = session;
 
-    public override string? NoEditReason => Session?.ReadOnlyReason;
+    public override string? NoEditReason => Session?.ReadOnlyReason ?? Reason;
+
+    /// <summary>Why the host takes no edits beside the reason of the session, for example the rule of the mods in the
+    /// OpenLancer repo, or null.</summary>
+    public string? Reason { get; set; }
+
+    public bool TestPaused { get; set; }
+
+    public override bool Paused => TestPaused;
+
+    /// <summary>Each edit that the host learned, with its tool.</summary>
+    public List<(string Tool, OpenLancer.Data.Editing.Commands.EditResult Result)> Edits { get; } = [];
+
+    /// <summary>Each refusal that the host learned, with its tool.</summary>
+    public List<(string Tool, OpenLancer.Data.Editing.Commands.EditError Error)> Refusals { get; } = [];
+
+    public override void Edited(string tool, OpenLancer.Data.Editing.Commands.EditResult result) => Edits.Add((tool, result));
+
+    public override void Refused(string tool, OpenLancer.Data.Editing.Commands.EditError error) => Refusals.Add((tool, error));
 
     public AgentLimits TestLimits { get; set; } = new();
 

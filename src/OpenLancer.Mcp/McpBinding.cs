@@ -26,8 +26,11 @@ public static class McpBinding
     /// <summary>The name of the server for the client.</summary>
     public const string ServerName = "openlancer";
 
-    /// <summary>The tool list of <c>tools/list</c>, in the order of the tool table.</summary>
-    public static ListToolsResult ToolList() => new() { Tools = AgentTools.All.Select(Protocol).ToList() };
+    /// <summary>The tool list of the whole tool table, in its order, for <c>oltool mcp tools</c>.</summary>
+    public static ListToolsResult ToolList() => ToolList(AgentTools.All);
+
+    /// <summary>The tool list of <c>tools/list</c>: the tools of a host, in the order of the tool table.</summary>
+    public static ListToolsResult ToolList(IEnumerable<StudioTool> tools) => new() { Tools = tools.Select(Protocol).ToList() };
 
     /// <summary>The resources of <c>resources/list</c>.</summary>
     public static ListResourcesResult ResourceList() => new()
@@ -48,20 +51,22 @@ public static class McpBinding
 
     /// <summary>
     /// Sets the server information, the instructions, the capabilities and the handlers of the tools and the resources.
-    /// A call of a tool that the table does not have is a protocol error, as the specification says.
+    /// The tool list and the instructions follow the tools of the host. A call of a tool that the host does not have is
+    /// a protocol error, as a call of an unknown tool is. Review finding R10 of MCP1-2 asks for this rule.
     /// </summary>
     /// <param name="queue">The queue of the host. Each tool call waits in it for the thread of the session.</param>
     public static void Configure(McpServerOptions options, ToolQueue queue)
     {
+        var tools = queue.Host.Tools;
         options.ServerInfo = new Implementation { Name = ServerName, Title = Product.Name, Version = Version };
-        options.ServerInstructions = AgentResources.Instructions;
+        options.ServerInstructions = AgentResources.InstructionsFor(tools);
         options.Capabilities = new ServerCapabilities
         {
             Tools = new ToolsCapability { ListChanged = false },
             Resources = new ResourcesCapability { ListChanged = false, Subscribe = false },
         };
-        options.Handlers.ListToolsHandler = (_, _) => ValueTask.FromResult(ToolList());
-        options.Handlers.CallToolHandler = (request, cancel) => Call(queue, request, cancel);
+        options.Handlers.ListToolsHandler = (_, _) => ValueTask.FromResult(ToolList(tools));
+        options.Handlers.CallToolHandler = (request, cancel) => Call(queue, tools, request, cancel);
         options.Handlers.ListResourcesHandler = (_, _) => ValueTask.FromResult(ResourceList());
         options.Handlers.ReadResourceHandler = (request, _) => ValueTask.FromResult(Read(request.Params?.Uri));
     }
@@ -79,11 +84,11 @@ public static class McpBinding
         IsError = result.IsError,
     };
 
-    private static async ValueTask<CallToolResult> Call(ToolQueue queue, RequestContext<CallToolRequestParams> request,
-        CancellationToken cancel)
+    private static async ValueTask<CallToolResult> Call(ToolQueue queue, IReadOnlyList<StudioTool> tools,
+        RequestContext<CallToolRequestParams> request, CancellationToken cancel)
     {
         var name = request.Params?.Name ?? "";
-        if (AgentTools.Find(name) == null)
+        if (tools.All(t => t.Name != name))
             throw new McpProtocolException($"The server has no tool '{name}'.", McpErrorCode.InvalidParams);
         JsonObject? arguments = null;
         if (request.Params?.Arguments is { } given)

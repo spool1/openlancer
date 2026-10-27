@@ -109,6 +109,51 @@ public sealed class McpServerTests
         await Assert.ThrowsAsync<McpProtocolException>(() => client.CallToolAsync("launch_rocket", cancellationToken: Token).AsTask());
     }
 
+    /// <summary>A host that only reads lists only the read-only tools and gets the instruction that the server only
+    /// reads (section 6.2 of the MCP1 design). A call of an edit tool is then a protocol error, as a call of an unknown
+    /// tool is (review finding R10 of MCP1-2).</summary>
+    [Fact]
+    public async Task AHostThatOnlyReadsDoesNotListAnEditToolAndRefusesItsCall()
+    {
+        using var ws = SceneWorkspace.Create();
+        await using var connection = new Connection(HeadlessHost.OpenReadOnly(ws.ProfilePath, "act"));
+        var client = await connection.Client();
+
+        var tools = await client.ListToolsAsync(cancellationToken: Token);
+
+        Assert.DoesNotContain(tools, t => t.Name == "set_fields");
+        Assert.Equal(AgentTools.ReadOnly.Select(t => t.Name), tools.Select(t => t.Name));
+        Assert.EndsWith("This server only reads the data. It changes no file.", client.ServerInstructions);
+        await Assert.ThrowsAsync<McpProtocolException>(() => client.CallToolAsync("set_fields",
+            new Dictionary<string, object?> { ["ref"] = "obj:Li01_01", ["fields"] = new Dictionary<string, object?> { ["pos"] = 1 } },
+            cancellationToken: Token).AsTask());
+    }
+
+    /// <summary>A host with edit tools lists them and gets the instructions of the edits. An edit call gives the result
+    /// of the command layer as structured content.</summary>
+    [Fact]
+    public async Task AnEditCallGivesTheResultOfTheCommandLayer()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        await using var connection = new Connection(new TestAgentHost(session));
+        var client = await connection.Client();
+
+        var tools = await client.ListToolsAsync(cancellationToken: Token);
+        var result = await client.CallToolAsync("set_fields", new Dictionary<string, object?>
+        {
+            ["ref"] = "obj:Li01_01",
+            ["fields"] = new Dictionary<string, object?> { ["pos"] = new[] { 1, 2, 3 } },
+        }, cancellationToken: Token);
+
+        Assert.Contains(tools, t => t.Name == "set_fields" && t.ProtocolTool.Annotations!.DestructiveHint == true);
+        Assert.Contains("Use preview: true for a large edit or a delete.", client.ServerInstructions);
+        Assert.DoesNotContain("only reads", client.ServerInstructions);
+        Assert.NotEqual(true, result.IsError);
+        Assert.Equal("applied", result.StructuredContent!.Value.GetProperty("status").GetString());
+        Assert.Equal("Agent: Set pos", result.StructuredContent.Value.GetProperty("undo_label").GetString());
+    }
+
     [Fact]
     public async Task TheResourcesGiveTheListsAndTheGuides()
     {

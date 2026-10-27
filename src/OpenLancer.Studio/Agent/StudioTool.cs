@@ -47,6 +47,35 @@ public enum ToolGroup
     Cutscenes,
 }
 
+/// <summary>
+/// What a tool does with the session (review finding R8 of MCP1-2). Pause, the steps of <c>edit_batch</c>, the tool set
+/// of a host that only reads, the Console hooks of the editor and the hints read it.
+/// </summary>
+public enum ToolKind
+{
+    /// <summary>The tool reads and changes nothing, for example <c>list_items</c>.</summary>
+    Query,
+
+    /// <summary>The tool changes what the editor shows or gives an image, and changes no data, for example
+    /// <c>open_view</c>.</summary>
+    View,
+
+    /// <summary>The tool changes the data in one entry of the edit history, for example <c>set_fields</c>. Only such a
+    /// tool can be a step of <c>edit_batch</c>.</summary>
+    Edit,
+
+    /// <summary>The tool writes files at once, outside the edit history, for example the save of a prop
+    /// group.</summary>
+    AssetWrite,
+
+    /// <summary>The tool works on the session as a whole: the save, the undo, the redo, the batch, the export and the
+    /// publish checklist.</summary>
+    Session,
+
+    /// <summary>The tool starts or stops a play.</summary>
+    Play,
+}
+
 /// <summary>The hints of a tool for the client (section 7.0 of the MCP1 design). No tool reaches outside the profile,
 /// so the hint "open world" is always false.</summary>
 /// <param name="ReadOnly">True when the tool changes nothing.</param>
@@ -60,6 +89,16 @@ public sealed record ToolHints(bool ReadOnly, bool Destructive, bool Idempotent)
     /// <summary>The hints of a tool that changes what the editor shows and changes no data, for example
     /// <c>open_view</c>.</summary>
     public static readonly ToolHints View = new(false, false, true);
+
+    /// <summary>The hints of a tool that can change or remove data, for example <c>set_fields</c>. A second call with
+    /// the same arguments changes nothing more.</summary>
+    public static readonly ToolHints ChangingIdempotent = new(false, true, true);
+
+    /// <summary>The hints of a tool that can change or remove data.</summary>
+    public static readonly ToolHints Changing = new(false, true, false);
+
+    /// <summary>The hints of a tool that only adds data.</summary>
+    public static readonly ToolHints Adding = new(false, false, false);
 }
 
 /// <summary>
@@ -74,10 +113,11 @@ public sealed class StudioTool
 
     /// <param name="output">The type of the structured result. The output schema comes from it.</param>
     /// <param name="run">The session part of a call. It runs on the thread that owns the session.</param>
-    internal StudioTool(string name, ToolGroup group, ToolHosts hosts, ToolHints hints, ToolInput input, Type output,
-        Func<ToolCall, ToolStep> run)
+    internal StudioTool(string name, ToolKind kind, ToolGroup group, ToolHosts hosts, ToolHints hints, ToolInput input,
+        Type output, Func<ToolCall, ToolStep> run)
     {
         Name = name;
+        Kind = kind;
         Group = group;
         Hosts = hosts;
         Hints = hints;
@@ -88,6 +128,16 @@ public sealed class StudioTool
 
     /// <summary>The name, for example <c>list_items</c>. The client adds its own prefix.</summary>
     public string Name { get; }
+
+    public ToolKind Kind { get; }
+
+    /// <summary>True when Pause refuses the tool (decision D734 of the MCP1 design): a tool that changes the data, writes
+    /// files or starts a play. A query and a view tool still run.</summary>
+    public bool Pausable => Kind is ToolKind.Edit or ToolKind.AssetWrite or ToolKind.Session or ToolKind.Play;
+
+    /// <summary>True when the tool changes the data or the files of the mod, or starts a play. The Console of the
+    /// editor shows each refusal of such a tool.</summary>
+    public bool Changes => Kind is not (ToolKind.Query or ToolKind.View);
 
     public ToolGroup Group { get; }
 

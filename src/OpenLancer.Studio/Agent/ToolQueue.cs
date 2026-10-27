@@ -40,6 +40,9 @@ public sealed class ToolQueue : IDisposable
         this.audit = audit;
     }
 
+    /// <summary>The host whose session runs the calls.</summary>
+    public AgentHost Host => host;
+
     /// <summary>The name of the client of the last call, as the client gives it, or null.</summary>
     public string? LastClient { get; private set; }
 

@@ -18,14 +18,17 @@ namespace OpenLancer.Tests;
 /// </summary>
 public sealed class AgentToolTableTests
 {
+    /// <summary>The order follows the sections of the design. The query tools of section 7.1 come first. Then come the
+    /// edit tools of section 7.2, the tools of section 7.6 and the view tools of section 7.7.</summary>
     [Fact]
-    public void TheToolsHaveTheFixedOrderOfTheQueryToolsThenTheViewTools()
+    public void TheToolsHaveTheFixedOrderOfTheSectionsOfTheDesign()
     {
         Assert.Equal(
         [
             "studio_status", "list_systems", "get_system", "list_items", "get_item", "find_references", "list_values",
             "search_assets", "list_prop_groups", "list_missions", "get_mission", "get_trigger", "describe_mission_name",
             "mission_dry_run", "list_cutscenes", "get_cutscene", "get_raw_ini", "check", "get_console",
+            .. EditTools,
             "open_view", "select_items", "render_scene", "render_cutscene", "capture_panel",
         ], AgentTools.All.Select(t => t.Name));
     }
@@ -52,21 +55,40 @@ public sealed class AgentToolTableTests
         }
     }
 
-    /// <summary>No tool of this build changes the data (section 7.0 of the MCP1 design). <c>open_view</c> and
-    /// <c>select_items</c> change what the user sees, so they are not read-only. The Console and the view tools need the
-    /// window of the editor.</summary>
+    /// <summary>The kind and the hints of each tool (section 7.0 of the MCP1 design, review finding R7 of MCP1-2). A
+    /// query changes nothing. <c>open_view</c> and <c>select_items</c> change what the user sees, so they are not
+    /// read-only. An edit that can change or remove data is destructive, and only <c>set_fields</c> is idempotent,
+    /// because MCP has one hint for each tool. The Console and the view tools need the window of the editor.</summary>
     [Fact]
-    public void NoToolOfThisBuildChangesTheDataAndTheViewToolsNeedTheEditor()
+    public void EachToolHasTheKindAndTheHintsOfWhatItChanges()
     {
-        string[] views = ["open_view", "select_items"];
-        string[] editor = ["get_console", "open_view", "select_items", "render_scene", "render_cutscene", "capture_panel"];
+        string[] views = ["open_view", "select_items", "render_scene", "render_cutscene", "capture_panel"];
+        string[] editor = ["get_console", .. views];
+        var query = new ToolHints(ReadOnly: true, Destructive: false, Idempotent: true);
 
-        Assert.All(AgentTools.All.Where(t => !views.Contains(t.Name)),
-            t => Assert.Equal(new ToolHints(ReadOnly: true, Destructive: false, Idempotent: true), t.Hints));
-        Assert.All(views.Select(n => AgentTools.Find(n)!),
-            t => Assert.Equal(new ToolHints(ReadOnly: false, Destructive: false, Idempotent: true), t.Hints));
-        Assert.All(editor.Select(n => AgentTools.Find(n)!), t => Assert.Equal(ToolHosts.Editor, t.Hosts));
-        Assert.All(AgentTools.All.Where(t => !editor.Contains(t.Name)), t => Assert.Equal(ToolHosts.Both, t.Hosts));
+        foreach (var tool in AgentTools.All)
+        {
+            var (kind, hints) = tool.Name switch
+            {
+                "open_view" or "select_items" => (ToolKind.View, new ToolHints(false, false, true)),
+                "render_scene" or "render_cutscene" or "capture_panel" => (ToolKind.View, query),
+                _ when Edits.TryGetValue(tool.Name, out var edit) => edit,
+                _ => (ToolKind.Query, query),
+            };
+            Assert.Equal((kind, hints), (tool.Kind, tool.Hints));
+            Assert.Equal(editor.Contains(tool.Name) ? ToolHosts.Editor : ToolHosts.Both, tool.Hosts);
+            Assert.Equal(kind is not (ToolKind.Query or ToolKind.View), tool.Pausable);
+        }
+    }
+
+    /// <summary>A host that only reads has the read-only tools (section 6.2 of the MCP1 design). The editor tools among
+    /// them stay, and give not_available in the host without a window.</summary>
+    [Fact]
+    public void AHostThatOnlyReadsHasTheReadOnlyTools()
+    {
+        Assert.Equal(AgentTools.All.Where(t => !Edits.ContainsKey(t.Name) && t.Name is not ("open_view" or "select_items")),
+            AgentTools.ReadOnly);
+        Assert.Equal(AgentTools.All, new TestAgentHost(null).Tools);
     }
 
     [Fact]
@@ -78,7 +100,8 @@ public sealed class AgentToolTableTests
     [Fact]
     public void EachTextPassesTheSteLint()
     {
-        var problems = AgentTexts.Instructions.SelectMany(t => Problems("instruction", t, SteLint.InstructionWords))
+        var problems = AgentTexts.Instructions.Values.SelectMany(i => i)
+            .SelectMany(t => Problems("instruction", t, SteLint.InstructionWords))
             .Concat(AgentTexts.SharedFields.SelectMany(f => Problems($"field {f.Key}", f.Value)))
             .Concat(AgentTexts.Tools.SelectMany(t => Problems($"{t.Key} title", t.Value.Title)
                 .Concat(Problems($"{t.Key} description", t.Value.Description))
@@ -151,13 +174,32 @@ public sealed class AgentToolTableTests
         }
     }
 
+    /// <summary>The server instructions follow the tools of the host (section 9.2 of the MCP1 design, review finding R10
+    /// of MCP1-2). A host without edit tools tells that the server only reads.</summary>
     [Fact]
-    public void TheServerInstructionsAreShortSteps()
+    public void TheServerInstructionsAreShortStepsForTheToolsOfTheHost()
     {
-        Assert.InRange(AgentTexts.Instructions.Count, 3, 10);
-        Assert.StartsWith("Call studio_status first.", AgentTexts.Instructions[0]);
-        Assert.Equal(string.Join("\n", AgentTexts.Instructions), AgentResources.Instructions);
+        var edits = AgentTexts.InstructionsFor(edits: true);
+        var reads = AgentTexts.InstructionsFor(edits: false);
+
+        Assert.InRange(edits.Count, 3, 12);
+        Assert.StartsWith("Call studio_status first.", edits[0]);
+        Assert.StartsWith("Call studio_status first.", reads[0]);
+        Assert.Equal(string.Join("\n", edits), AgentResources.InstructionsFor(AgentTools.All));
+        Assert.Equal(string.Join("\n", reads), AgentResources.InstructionsFor(AgentTools.ReadOnly));
+        Assert.Equal("This server only reads the data. It changes no file.", reads[^1]);
+        Assert.DoesNotContain(edits, i => i.Contains("only reads"));
+        Assert.Contains("Use preview: true for a large edit or a delete.", edits);
     }
+
+    /// <summary>The edit tools of this build in the order of the table, with their kinds and hints.</summary>
+    private static readonly Dictionary<string, (ToolKind Kind, ToolHints Hints)> Edits = new()
+    {
+        ["set_fields"] = (ToolKind.Edit, new ToolHints(false, true, true)),
+        ["set_text"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+    };
+
+    private static IEnumerable<string> EditTools => Edits.Keys;
 
     private static string[] Problems(string where, string text, int words = SteLint.DescriptionWords) =>
         SteLint.Problems(text, words).Select(p => $"{where}: {p}: {text}").ToArray();

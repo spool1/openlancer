@@ -1,0 +1,452 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using OpenLancer.Data;
+using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.Ini;
+using OpenLancer.Data.Missions.Editing;
+
+namespace OpenLancer.Studio.Agent;
+
+/// <summary>
+/// The batch of one edit call of an agent, or of one <c>edit_batch</c> call with all its steps (section 8.3 of the MCP1
+/// design). Each command of the call runs its plan in the batch. So all commands give one entry of the edit history,
+/// with the edit origin Agent.
+/// </summary>
+internal sealed class EditScope
+{
+    private readonly EditChecks checks;
+    private readonly List<EditResult> stepParts = [];
+    private readonly List<string> stepConfirmations = [];
+
+    internal EditScope(EditSession session, EditBatch batch, AgentLimits limits)
+    {
+        Session = session;
+        Batch = batch;
+        checks = new EditChecks(session, batch, limits.EditSections);
+        batch.AddCommitCheck(checks);
+    }
+
+    public EditSession Session { get; }
+
+    public EditBatch Batch { get; }
+
+    /// <summary>Why the commands of the step until now need <c>confirm: true</c>, one text for each plan that
+    /// asks.</summary>
+    public IReadOnlyList<string> Confirmations => stepConfirmations;
+
+    /// <summary>Starts a step: the parts and the confirmations of the next commands belong to it. A call that is not a
+    /// step of <c>edit_batch</c> has one step.</summary>
+    internal void StartStep()
+    {
+        stepParts.Clear();
+        stepConfirmations.Clear();
+    }
+
+    /// <summary>The result of the commands of the step until now.</summary>
+    internal EditResult StepResult() => EditTools.Shaped(EditResult.Merge(EditStatus.Applied, stepParts));
+
+    /// <summary>
+    /// Runs the session command of a plan in the batch, on top of the commands before it. Then it reports the part of
+    /// the result that the plan gives. A plan that refuses throws its refusal, and the caller cancels the batch.
+    /// </summary>
+    /// <param name="targets">The sections that the request names, for the problems before and after the
+    /// edit.</param>
+    /// <exception cref="EditException">The plan refuses, or its session command does not apply. A command that does not
+    /// apply ends the batch, and the states before the batch come back.</exception>
+    public void Run(EditPlan plan, IEnumerable<SectionRef>? targets = null)
+    {
+        if (!plan.CanRun)
+            throw new EditException(EditTools.RefusalOf(Session, plan));
+        checks.Before(plan, targets ?? []);
+        Batch.Label ??= plan.Label;
+        try
+        {
+            Batch.Run(plan.Command!);
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException)
+        {
+            throw new EditException(new EditError(EditErrorKind.Refused, EditPlan.PlanRefused, ErrorText.Of(e)));
+        }
+        checks.After(plan);
+        Report(plan.Report(Session));
+        if (EditTools.ConfirmationOf(Session, plan) is { } reason)
+            stepConfirmations.Add(reason);
+    }
+
+    /// <summary>Adds a part of the result, for example the warnings of a text that other sections share.</summary>
+    public void Report(EditResult part)
+    {
+        Batch.Report(part);
+        stepParts.Add(part);
+    }
+}
+
+/// <summary>
+/// The shared edit call of the agent tools (section 12.4, items 2 and 3 of the MCP1 design). Each edit tool calls
+/// <see cref="Apply"/> with the commands of the request. The call runs these checks in order. The tool table checks
+/// Pause. Then come the reason why the host takes no edits (<c>read_only</c>) and the revision guard of
+/// <c>if_revision</c>. Then the call opens a batch with the edit origin Agent, or joins the batch of
+/// <c>edit_batch</c>. It runs the commands, and gives a preview or commits.
+/// </summary>
+/// <remarks>
+/// <para>A call with no net change gives <c>no_change</c> and no history entry. Some plans give
+/// <c>needs_confirmation</c> until the call has <c>confirm: true</c> (decision D712 of the MCP1 design). These are a
+/// plan that the editor asks about, and a delete or a rename that leaves "Missing" lines (section 4.0.5 of the M6b
+/// design).</para>
+/// <para>The call cancels its batch at each exception, so no batch stays open. An open batch would block each edit,
+/// undo and save of the user too (review finding R9 of MCP1-2).</para>
+/// </remarks>
+internal static class EditTools
+{
+    /// <summary>The detail code of a plan that needs <c>confirm: true</c>.</summary>
+    public const string ConfirmChanges = "ConfirmChanges";
+
+    /// <summary>The detail code of a reference of a mission item before the mission tools.</summary>
+    public const string MissionEdits = "MissionEdits";
+
+    /// <summary>The detail code of a reference of a cutscene before the cutscene tools.</summary>
+    public const string CutsceneEdits = "CutsceneEdits";
+
+    /// <summary>The most references that the text of a confirmation names for each kind of change.</summary>
+    private const int ShownRefs = 3;
+
+    public static readonly ToolParam Preview = new FlagParam("preview");
+
+    public static readonly ToolParam IfRevision = new TextParam("if_revision", false, null, null);
+
+    public static readonly ToolParam WithPatch = new FlagParam("with_patch");
+
+    public static readonly ToolParam Confirm = new FlagParam("confirm");
+
+    /// <summary>The arguments of an edit tool: its own arguments, then the common arguments of section 7.0 of the MCP1
+    /// design. These are <c>preview</c>, <c>if_revision</c> and <c>with_patch</c>, and <c>confirm</c> for a tool that
+    /// can ask.</summary>
+    public static ToolInput Input(bool confirm, params ToolParam[] own) =>
+        new([.. own, Preview, IfRevision, WithPatch, .. confirm ? new[] { Confirm } : []]);
+
+    /// <summary>
+    /// Runs the commands of an edit call. A call of the agent gets its own batch, and a step of <c>edit_batch</c> joins
+    /// the batch of the call. The result of a step is the part of its commands, and the batch commits after its last
+    /// step.
+    /// </summary>
+    /// <param name="body">Runs the commands of the request in the scope.</param>
+    /// <exception cref="EditException">A check or a command refuses. Nothing changed.</exception>
+    public static EditResult Apply(ToolCall call, Action<EditScope> body)
+    {
+        var args = call.Args;
+        if (call.Scope is { } batch)
+        {
+            // edit_batch checks Pause and the reason why the host takes no edits for all steps.
+            foreach (var name in new[] { "preview", "with_patch" }.Where(args.Has))
+                throw ToolInput.Bad(name, AgentTexts.Error("step_preview", ("name", name)));
+            Guard(call);
+            batch.StartStep();
+            body(batch);
+            if (batch.Confirmations.Count > 0 && !args.Flag("confirm"))
+                throw new EditException(NeedsConfirmation(batch.Confirmations));
+            return batch.StepResult();
+        }
+        var preview = args.Flag("preview");
+        var withPatch = args.Flag("with_patch");
+        if (withPatch && !preview)
+            throw ToolInput.Bad("with_patch", AgentTexts.Error("with_patch_preview"));
+        ReadOnlyGuard(call);
+        Guard(call);
+        return Commit(call, null, preview, withPatch, args.Flag("confirm"), body);
+    }
+
+    /// <summary>
+    /// Opens a batch with the edit origin Agent, runs the commands, and gives a preview or commits. A batch that needs a
+    /// confirmation without <paramref name="confirm"/> cancels and refuses. A preview gives
+    /// <c>needs_confirmation: true</c> in its result instead.
+    /// </summary>
+    /// <param name="label">The label of the request, or null for the label of the first command.</param>
+    /// <exception cref="EditException">A check or a command refuses, or a commit check refuses. Nothing
+    /// changed.</exception>
+    internal static EditResult Commit(ToolCall call, string? label, bool preview, bool withPatch, bool confirm,
+        Action<EditScope> body)
+    {
+        var session = call.Session;
+        EditBatch batch;
+        try
+        {
+            batch = session.BeginBatch(label, EditOrigin.Agent);
+        }
+        catch (InvalidOperationException e)
+        {
+            throw new EditException(new EditError(EditErrorKind.Busy, MissionErrors.Busy, e.Message));
+        }
+        using (batch)
+        {
+            var scope = new EditScope(session, batch, call.Limits);
+            scope.StartStep();
+            body(scope);
+            var confirmations = scope.Confirmations;
+            if (confirmations.Count > 0 && !confirm && !preview)
+                throw new EditException(NeedsConfirmation(confirmations));
+            var patch = withPatch ? batch.PatchTexts() : null;
+            var result = preview ? batch.Preview() : batch.Commit();
+            if (result.Status == EditStatus.Refused)
+                throw new EditException(result.Errors[0]);
+            result = Shaped(result) with
+            {
+                NeedsConfirmation = result.NeedsConfirmation || confirmations.Count > 0,
+                Patch = patch ?? result.Patch,
+                Summary = result.Status switch
+                {
+                    EditStatus.Applied => AgentTexts.Error("edit_applied", ("label", result.UndoLabel ?? "")),
+                    EditStatus.Previewed => AgentTexts.Error("edit_previewed"),
+                    _ => AgentTexts.Error("edit_no_change"),
+                },
+            };
+            if (result.Status == EditStatus.Applied)
+                call.Host.Edited(call.Tool, result);
+            return result;
+        }
+    }
+
+    /// <summary>A result whose changes leave out the items that it adds. A step can add an item and a later step can
+    /// change it, for example the move of a copy.</summary>
+    internal static EditResult Shaped(EditResult result) =>
+        result with { Changes = result.Changes.Except(result.Adds).ToList() };
+
+    /// <summary>
+    /// The section of a reference argument of an edit tool. The edit tools of this version change sections of INI
+    /// files that are not mission scripts. A reference of a mission item gives <c>not_available</c> until the mission
+    /// tools (MCP1-3), and a reference of a cutscene until the cutscene tools (MCP1-4). An item of a tool group that the
+    /// user hides gives <c>not_available</c> too (decision D725).
+    /// </summary>
+    /// <param name="field">The argument, for the error.</param>
+    /// <exception cref="EditException">The reference is not valid, does not resolve, or names an item that the tools
+    /// cannot change now.</exception>
+    public static SectionRef Section(ToolCall call, string text, string field)
+    {
+        var session = call.Session;
+        try
+        {
+            var reference = ItemRefs.Parse(text);
+            switch (reference.Kind)
+            {
+                case ItemRefKind.Script or ItemRefKind.Trigger or ItemRefKind.Line or ItemRefKind.Label
+                    or ItemRefKind.Instance or ItemRefKind.Act or ItemRefKind.Prefab:
+                    throw Later(MissionEdits, "edit_missions_later", text);
+                case ItemRefKind.Cutscene or ItemRefKind.CutsceneEntity or ItemRefKind.CutsceneEvent:
+                    throw Later(CutsceneEdits, "edit_cutscenes_later", text);
+            }
+            var section = ItemRefs.ResolveSection(session, reference);
+            if (SectionKeys.IsMissionFile(section.Path))
+                throw Later(MissionEdits, "edit_missions_later", text);
+            if (GroupOf(session, section) is { } group && call.Host.HiddenGroups.Contains(group))
+                throw new EditException(AgentTools.GroupHidden(group) with { Target = text });
+            return section;
+        }
+        catch (EditException e) when (e.Error.Field == null)
+        {
+            throw new EditException(e.Error with { Field = field });
+        }
+    }
+
+    /// <summary>The tool group of a section, or null for a section of no group, for example a loadout. A section of a
+    /// system file and the <c>[system]</c> sections of <c>universe.ini</c> are in the group Scene.</summary>
+    internal static ToolGroup? GroupOf(EditSession session, SectionRef section) =>
+        session.IsSystemFile(section.Path) ||
+        session.UniversePath is { } universe && OpenLancer.Data.IO.VfsPath.Comparer.Equals(universe, section.Path) &&
+        section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase)
+            ? ToolGroup.Scene
+            : null;
+
+    /// <summary>The error of a plan that refuses: the kind of its first refusal, with the reasons of all refusals. A
+    /// refusal of a nickname that another section has gives <c>name_taken</c>, and a value that a field cannot hold
+    /// gives <c>invalid_value</c>.</summary>
+    internal static EditError RefusalOf(EditSession session, EditPlan plan)
+    {
+        var errors = plan.Report(session).Errors;
+        var first = errors[0];
+        var kind = first.Detail switch
+        {
+            MissionErrors.NameTaken => EditErrorKind.NameTaken,
+            MissionErrors.ItemNotFound => EditErrorKind.NotFound,
+            MissionErrors.FieldValue => EditErrorKind.InvalidValue,
+            MissionErrors.NotTextId => EditErrorKind.InvalidArgument,
+            _ => EditErrorKind.Refused,
+        };
+        return first with { Kind = kind, Message = string.Join(" ", errors.Select(e => e.Message).Distinct()) };
+    }
+
+    /// <summary>
+    /// Why a plan needs <c>confirm: true</c> from an agent, or null. The editor asks about the plan (decisions D238 and
+    /// D242), or the plan leaves "Missing" lines, also mission lines (section 4.0.5 of the M6b design, item 6). The
+    /// text names what the plan changes beside its targets.
+    /// </summary>
+    internal static string? ConfirmationOf(EditSession session, EditPlan plan)
+    {
+        if (!plan.NeedsConfirmation && plan.Missing.Count == 0 && plan.MissionMissing.Count == 0)
+            return null;
+        string Ref(SectionRef section) => ItemRefs.Canonical(session, section);
+        var parts = new List<string> { AgentTexts.Error("confirm_intro", ("label", plan.Label)) };
+        var cascade = plan.Deletes.Where(d => d.Why == DeleteReason.Cascade)
+            .Select(d => Ref(d.Section)).ToList();
+        if (cascade.Count > 0)
+            parts.Add(AgentTexts.Error("confirm_cascade", ("refs", Shown(cascade))));
+        if (plan.Fixes.Count > 0)
+            parts.Add(AgentTexts.Error("confirm_fixes", ("refs", Shown(plan.Fixes.Select(f => Ref(f.Section)).Distinct().ToList()))));
+        var missing = plan.Missing.Select(m => Ref(m.Reference.Section)).Concat(plan.MissionMissing.Select(m => m.Ref))
+            .Distinct().ToList();
+        if (missing.Count > 0)
+            parts.Add(AgentTexts.Error("confirm_missing", ("refs", Shown(missing))));
+        if (plan.Mentions.Count > 0)
+            parts.Add(AgentTexts.Error("confirm_mentions", ("files", Shown(plan.Mentions.Select(m => m.Path).Distinct().ToList()))));
+        parts.AddRange(plan.Warnings.Select(w => w.Message).Distinct());
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>The error of a call whose plans need <c>confirm: true</c>: the reason of each plan, and how to
+    /// confirm.</summary>
+    internal static EditError NeedsConfirmation(IEnumerable<string> reasons) =>
+        new(EditErrorKind.NeedsConfirmation, ConfirmChanges,
+            string.Join(" ", reasons.Append(AgentTexts.Error("confirm_end"))));
+
+    /// <summary>Refuses an edit while the host takes no edits, with the reason of the host (section 8.2 of the MCP1
+    /// design). The reason is the reason of the session, for example the lock or a profile in a game folder. It can
+    /// also be the rule of the mods in the OpenLancer repo.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.ReadOnly"/>.</exception>
+    internal static void ReadOnlyGuard(ToolCall call)
+    {
+        if (call.Host.NoEditReason is { } reason)
+            throw new EditException(new EditError(EditErrorKind.ReadOnly, MissionErrors.NotEditable, reason));
+        _ = call.Session;
+    }
+
+    /// <summary>The refusal of a reference of a mission item or of a cutscene: the edit tools of this version do not
+    /// change them.</summary>
+    private static EditException Later(string detail, string text, string reference) =>
+        new(new EditError(EditErrorKind.NotAvailable, detail, AgentTexts.Error(text)) { Target = reference });
+
+    /// <summary>The revision guard of <c>if_revision</c> (decision D723 of the MCP1 design). Inside a batch, the
+    /// revision is the revision before the batch, because the batch changes it only at its commit.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a text that is not a whole
+    /// number, and <see cref="EditErrorKind.StaleRevision"/> for a revision that changed.</exception>
+    private static void Guard(ToolCall call)
+    {
+        if (call.Args.Text("if_revision") is not { } text)
+            return;
+        if (!long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var revision))
+            throw ToolInput.Bad("if_revision", AgentTexts.Error("if_revision_bad"));
+        if (call.Session.RevisionGuard(revision) is { } stale)
+            throw new EditException(stale with { Field = "if_revision" });
+    }
+
+    /// <summary>The first references of a list, and the number of the others.</summary>
+    private static string Shown(IReadOnlyList<string> refs) =>
+        refs.Count <= ShownRefs
+            ? string.Join(", ", refs)
+            : string.Join(", ", refs.Take(ShownRefs)) + AgentTexts.Error("confirm_more", ("count", refs.Count - ShownRefs));
+}
+
+/// <summary>
+/// The commit checks of an agent batch. They check the limit of the sections of one call. They also give the problems
+/// that the batch adds and removes (section 4.0.5 of the M6b design, item 2). The problems are the field checks and the
+/// list checks of the sections that the commands name, before and after the batch. They are data, not errors. So the
+/// edit applies, as an edit of the user applies.
+/// </summary>
+/// <remarks>The problems of a section that the batch removes do not count as fixed. A renamed section compares its
+/// problems with the problems of the section before the rename.</remarks>
+internal sealed class EditChecks(EditSession session, EditBatch batch, int sectionLimit) : IBatchCheck
+{
+    private readonly Dictionary<SectionRef, IReadOnlyList<Diagnostic>> before = [];
+    private readonly HashSet<SectionRef> added = [];
+    private readonly List<SectionRef> touched = [];
+    private readonly HashSet<SectionRef> seen = [];
+
+    /// <summary>Notes the sections of a plan before its command runs, and their problems now.</summary>
+    /// <param name="targets">The sections that the request names.</param>
+    public void Before(EditPlan plan, IEnumerable<SectionRef> targets)
+    {
+        var sections = targets.Concat(plan.Changes).Concat(plan.Deletes.Select(d => d.Section))
+            .Concat(plan.Fixes.Select(f => f.Section)).Concat(plan.Missing.Select(m => m.Reference.Section));
+        foreach (var section in sections)
+        {
+            Touch(section);
+            if (!added.Contains(section) && !before.ContainsKey(section) && session.Get(section) != null)
+                before[section] = AgentRows.DiagnosticsOf(session, section);
+        }
+    }
+
+    /// <summary>Notes the sections that a plan added and selects, after its command ran.</summary>
+    public void After(EditPlan plan)
+    {
+        foreach (var section in plan.Adds)
+        {
+            added.Add(section);
+            Touch(section);
+        }
+        if (plan.SelectAfter is { } selected)
+            Touch(selected);
+    }
+
+    public EditResult Check(EditBatch checkedBatch)
+    {
+        var count = batch.SectionCount;
+        if (count > sectionLimit)
+        {
+            return new EditResult(EditStatus.Applied)
+            {
+                Errors =
+                [
+                    new EditError(EditErrorKind.Limit, "EditSections",
+                        AgentTexts.Error("limit_sections", ("count", count), ("max", sectionLimit))),
+                ],
+            };
+        }
+        // A section that a command renamed has its problems before under its old reference.
+        var renamedFrom = new Dictionary<SectionRef, SectionRef>();
+        foreach (var (from, to) in batch.Renames)
+        {
+            renamedFrom[to] = renamedFrom.Remove(from, out var first) ? first : from;
+            Touch(to);
+        }
+        var newProblems = new List<Problem>();
+        var fixedProblems = new List<Problem>();
+        foreach (var section in touched)
+        {
+            if (session.Get(section) == null)
+                continue;
+            var after = AgentRows.DiagnosticsOf(session, section);
+            var was = before.GetValueOrDefault(section) ?? [];
+            string? newKey = null;
+            string? oldKey = null;
+            if (!before.ContainsKey(section) && renamedFrom.TryGetValue(section, out var old) &&
+                before.TryGetValue(old, out var oldProblems))
+            {
+                was = oldProblems;
+                (newKey, oldKey) = (section.Id.Key, old.Id.Key);
+            }
+            var left = was.Select(Key).ToList();
+            foreach (var problem in after)
+            {
+                var key = Key(problem);
+                // A message can name the section, so the compare reads the new key as the old key.
+                if (newKey != null && oldKey != null)
+                    key = (key.Severity, key.Key, key.Rule, key.Message.Replace(newKey, oldKey, StringComparison.OrdinalIgnoreCase));
+                if (!left.Remove(key))
+                    newProblems.Add(AgentRows.ProblemOf(session, problem));
+            }
+            foreach (var problem in was.Where(p => left.Remove(Key(p))))
+                fixedProblems.Add(AgentRows.ProblemOf(session, problem));
+        }
+        return new EditResult(EditStatus.Applied) { NewProblems = newProblems, FixedProblems = fixedProblems };
+    }
+
+    private void Touch(SectionRef section)
+    {
+        if (seen.Add(section))
+            touched.Add(section);
+    }
+
+    private static (DiagnosticSeverity Severity, string? Key, string? Rule, string Message) Key(Diagnostic problem) =>
+        (problem.Severity, problem.Key, problem.Rule, problem.Message);
+}

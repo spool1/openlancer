@@ -29,8 +29,11 @@ public static class AgentResources
             r.Key == Lists ? "application/json" : "text/plain",
             r.Key == Lists ? ListCatalog : () => string.Join("\n", r.Value.Text))).ToList();
 
-    /// <summary>The server instructions: one step on each line.</summary>
-    public static string Instructions => string.Join("\n", AgentTexts.Instructions);
+    /// <summary>The server instructions of a host with a tool set, one step on each line (section 9.2 of the MCP1
+    /// design). A host with edit tools gets the steps of the edits. A host without them gets the step that the server
+    /// only reads.</summary>
+    public static string InstructionsFor(IEnumerable<StudioTool> tools) =>
+        string.Join("\n", AgentTexts.InstructionsFor(tools.Any(t => t.Kind == ToolKind.Edit)));
 
     /// <summary>The resource with a URI, or null.</summary>
     public static AgentResource? Find(string uri) => All.FirstOrDefault(r => r.Uri == uri);

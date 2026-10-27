@@ -19,6 +19,7 @@ internal static class SchemaCheck
     [
         "type", "properties", "additionalProperties", "required", "items", "enum", "minimum", "maximum", "minLength",
         "maxLength", "minItems", "maxItems", "uniqueItems", "default", "description", "$ref", "anyOf", "pattern", "$schema",
+        "minProperties",
     ];
 
     private static readonly HashSet<string> Types = ["object", "array", "string", "integer", "number", "boolean", "null"];
@@ -105,6 +106,8 @@ internal static class SchemaCheck
         }
         if (value is JsonObject o)
         {
+            if (obj["minProperties"] is { } fewest && o.Count < (int)fewest)
+                problems.Add($"{path}: the object has fewer than {(int)fewest} properties.");
             var properties = obj["properties"]?.AsObject();
             foreach (var name in obj["required"]?.AsArray().Select(r => (string)r!) ?? [])
             {

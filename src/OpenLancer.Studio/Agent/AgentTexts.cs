@@ -26,12 +26,20 @@ internal static class AgentTexts
 
     private static readonly Lazy<Data> Loaded = new(Load);
 
-    private sealed record Data(IReadOnlyList<string> Instructions, IReadOnlyDictionary<string, string> Fields,
+    private sealed record Data(IReadOnlyDictionary<string, IReadOnlyList<string>> Instructions,
+        IReadOnlyDictionary<string, string> Fields,
         IReadOnlyDictionary<string, ToolTexts> Tools, IReadOnlyDictionary<string, string> Errors,
         IReadOnlyDictionary<string, ResourceTexts> Resources, IReadOnlyDictionary<string, string> Results);
 
-    /// <summary>The server instructions: the order of work in short STE steps (section 9.2 of the MCP1 design).</summary>
-    public static IReadOnlyList<string> Instructions => Loaded.Value.Instructions;
+    /// <summary>The server instructions: the order of work in short STE steps (section 9.2 of the MCP1 design). The
+    /// group <c>all</c> is for each host, <c>edit</c> for a host with edit tools, and <c>read_only</c> for a host
+    /// without them.</summary>
+    public static IReadOnlyDictionary<string, IReadOnlyList<string>> Instructions => Loaded.Value.Instructions;
+
+    /// <summary>The server instructions of a host, in order.</summary>
+    /// <param name="edits">True for a host with edit tools.</param>
+    public static IReadOnlyList<string> InstructionsFor(bool edits) =>
+        [.. Instructions["all"], .. Instructions[edits ? "edit" : "read_only"]];
 
     /// <summary>The help of the arguments that many tools share, by argument name.</summary>
     public static IReadOnlyDictionary<string, string> SharedFields => Loaded.Value.Fields;
@@ -94,7 +102,8 @@ internal static class AgentTexts
         using var json = JsonDocument.Parse(reader.ReadToEnd());
         var root = json.RootElement;
         return new Data(
-            root.GetProperty("instructions").EnumerateArray().Select(e => e.GetString()!).ToList(),
+            root.GetProperty("instructions").EnumerateObject().ToDictionary(p => p.Name,
+                p => (IReadOnlyList<string>)p.Value.EnumerateArray().Select(e => e.GetString()!).ToList()),
             Strings(root.GetProperty("fields")),
             root.GetProperty("tools").EnumerateObject().ToDictionary(p => p.Name, p => new ToolTexts(
                 p.Value.GetProperty("title").GetString()!,

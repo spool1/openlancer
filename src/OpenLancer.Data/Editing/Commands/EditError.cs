@@ -83,6 +83,10 @@ public sealed record EditError(
     /// <summary>The field or the argument that the error is about, or null.</summary>
     public string? Field { get; init; }
 
+    /// <summary>For the kind <see cref="EditErrorKind.StepFailed"/>: the kind of the error of the step that failed.
+    /// Else null.</summary>
+    public EditErrorKind? StepCode { get; init; }
+
     public override string ToString() => Message;
 }
 

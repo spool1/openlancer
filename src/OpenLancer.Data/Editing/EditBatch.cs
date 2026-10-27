@@ -223,6 +223,32 @@ public sealed class EditBatch : IDisposable
     /// form.</summary>
     public IReadOnlyCollection<string> Paths => change.Paths.Where(p => !ModFileDocument.IsKey(p)).ToList();
 
+    /// <summary>The number of different sections that the steps changed, added or removed until now. The agent tools
+    /// compare it with the limit of one call (section 8.4 of the MCP1 design).</summary>
+    internal int SectionCount => change.SectionCount;
+
+    /// <summary>Each section that a step gave a new key until now, with its old and its new reference, in
+    /// order.</summary>
+    internal IReadOnlyList<(SectionRef From, SectionRef To)> Renames => change.Renames;
+
+    /// <summary>
+    /// The text that a save writes now for each INI file that the steps changed, by install path. The text is the patch
+    /// of the file, or the text of a whole file of the mod (<c>with_patch</c>, section 7.0 of the MCP1 design). It holds
+    /// the unsaved edits before the batch too. A file that a save does not write, or cannot write, has no text.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The batch has ended.</exception>
+    internal IReadOnlyDictionary<string, string> PatchTexts()
+    {
+        ThrowIfEnded();
+        var texts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in Paths.Order(StringComparer.OrdinalIgnoreCase))
+        {
+            if (session.SaveText(path) is { } text)
+                texts[path] = text;
+        }
+        return texts;
+    }
+
     private void End()
     {
         IsOpen = false;

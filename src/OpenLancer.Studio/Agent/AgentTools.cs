@@ -17,9 +17,10 @@ namespace OpenLancer.Studio.Agent;
 /// <c>tools/list</c>. Both hosts serve this table, so a tool behaves the same in both (decision D700). A tool that waits
 /// for another milestone is not in the table of this build (section 7.9).
 /// </summary>
-/// <remarks>This build has the query tools of section 7.1 (milestone MCP1-1a), the dry run query of M6c-1 and the view
-/// tools of section 7.7 (milestone MCP1-1b). No tool changes the data. The view tools are tools of the editor
-/// host.</remarks>
+/// <remarks>This build has the query tools of section 7.1 (milestone MCP1-1a) and the dry run query of M6c-1. It also
+/// has the edit tools of sections 7.2 and 7.6 (milestone MCP1-2) and the view tools of section 7.7 (milestone MCP1-1b).
+/// The order of the rows follows the sections of the design, so a later part puts its tools at the place of its
+/// section. The view tools are tools of the editor host.</remarks>
 public static class AgentTools
 {
     private static readonly ToolParam Cursor = new TextParam("cursor", false, null, null);
@@ -97,6 +98,11 @@ public static class AgentTools
                 new WholeParam("since", 0),
                 Limit),
             typeof(ConsoleView), CheckQueries.Console, ToolHosts.Editor),
+        Edit("set_fields", ToolHints.ChangingIdempotent,
+            EditTools.Input(false, Text("ref", true), new FieldsParam("fields", true)), ItemEditTools.SetFields),
+        Edit("set_text", ToolHints.Changing, EditTools.Input(false,
+                Text("ref", true), Text("field", true), new TextParam("text", true, null, null, ItemEditTools.MaxText)),
+            ItemEditTools.SetText),
         View("open_view", ToolGroup.Studio, ToolHints.View, new ToolInput(Text("system"), Text("mission"), Text("cutscene")),
             typeof(OpenedView), ViewTools.OpenView),
         View("select_items", ToolGroup.Studio, ToolHints.View,
@@ -124,32 +130,42 @@ public static class AgentTools
     /// <summary>The tool with a name, or null.</summary>
     public static StudioTool? Find(string name) => All.FirstOrDefault(t => t.Name == name);
 
+    /// <summary>The tools of a host that only reads: each tool that changes nothing (section 6.2 of the MCP1 design).
+    /// An editor tool stays in the list and gives <c>not_available</c> in the host without a window.</summary>
+    public static IReadOnlyList<StudioTool> ReadOnly { get; } = All.Where(t => t.Hints.ReadOnly).ToList();
+
     /// <summary>
     /// Runs the session part of a call on the thread that owns the session: the host and the group checks, the check
     /// of the arguments, and the handler. A refusal is a tool error with its kind and its detail code. A result gives
     /// the revision of the session part (section 8.6, item 3 of the MCP1 design).
     /// </summary>
-    /// <remarks>An exception of a handler or of a tail that is not a refusal is a fault of the server. The call then
-    /// gives the error <c>step_failed</c> with the detail <c>ToolFailed</c>, so the agent reads a code and the audit log
-    /// has the call. A tool of this build changes nothing, so nothing changed.</remarks>
+    /// <remarks>
+    /// <para>An exception of a handler or of a tail that is not a refusal is a fault of the server. The call then gives
+    /// the error <c>step_failed</c> with the detail <c>ToolFailed</c>, so the agent reads a code and the audit log has
+    /// the call. An edit tool runs its commands in a batch, and the batch cancels at the exception. So nothing
+    /// changed.</para>
+    /// <para>Pause refuses each tool that changes the data (decision D734). The host gets each refusal of such a tool,
+    /// except of a preview, for its Console (section 8.5 of the MCP1 design).</para>
+    /// </remarks>
     /// <exception cref="ArgumentException">The table has no tool with the name. The SDK binding refuses an unknown
     /// tool before it queues the call.</exception>
     public static ToolStep Run(AgentHost host, string name, JsonObject? arguments)
     {
         var tool = Find(name) ?? throw new ArgumentException($"The tool table has no tool {name}.", nameof(name));
-        var hosts = host.Kind == AgentHostKind.Editor ? ToolHosts.Editor : ToolHosts.Headless;
-        if ((tool.Hosts & hosts) == 0)
-            return ToolResult.Failure(EditErrorKind.NotAvailable, "EditorOnly", AgentTexts.Error("editor_only", ("tool", name)));
-        if (host.HiddenGroups.Contains(tool.Group))
-            return ToolResult.Failure(GroupHidden(tool.Group));
+        if (Unavailable(host, tool) is { } unavailable)
+            return Refuse(host, tool, unavailable, false);
+        if (host.Paused && tool.Pausable)
+            return Refuse(host, tool, new EditError(EditErrorKind.Paused, "Paused", AgentTexts.Error("paused")), false);
         ToolStep step;
+        ToolArgs? args = null;
         try
         {
-            step = tool.Run(new ToolCall(host, tool.Input.Read(name, arguments)));
+            args = tool.Input.Read(name, arguments);
+            step = tool.Run(new ToolCall(host, name, args));
         }
         catch (EditException e)
         {
-            return ToolResult.Failure(e.Error);
+            return Refuse(host, tool, e.Error, args?.Flag("preview") == true);
         }
         catch (Exception e) when (e is not OutOfMemoryException)
         {
@@ -176,8 +192,27 @@ public static class AgentTools
         });
     }
 
-    /// <summary>The error of a tool of a group that the user hides (decision D725 of the MCP1 design). A view tool also
-    /// gives it for an item of such a group.</summary>
+    /// <summary>The error of a tool that the host does not have, or of a tool of a group that the user hides, or
+    /// null.</summary>
+    internal static EditError? Unavailable(AgentHost host, StudioTool tool)
+    {
+        var hosts = host.Kind == AgentHostKind.Editor ? ToolHosts.Editor : ToolHosts.Headless;
+        if ((tool.Hosts & hosts) == 0)
+            return new EditError(EditErrorKind.NotAvailable, "EditorOnly", AgentTexts.Error("editor_only", ("tool", tool.Name)));
+        return host.HiddenGroups.Contains(tool.Group) ? GroupHidden(tool.Group) : null;
+    }
+
+    /// <summary>The tool error of a refusal. The host gets the refusal of a tool that changes data, except of a preview,
+    /// for its Console.</summary>
+    private static ToolResult Refuse(AgentHost host, StudioTool tool, EditError error, bool preview)
+    {
+        if (tool.Changes && !preview)
+            host.Refused(tool.Name, error);
+        return ToolResult.Failure(error);
+    }
+
+    /// <summary>The error of a tool of a group that the user hides (decision D725 of the MCP1 design). A view tool and
+    /// an edit tool also give it for an item of such a group.</summary>
     internal static EditError GroupHidden(ToolGroup group) => new(EditErrorKind.NotAvailable, "GroupHidden",
         AgentTexts.Error("group_hidden", ("group", Snake(group.ToString()))));
 
@@ -197,9 +232,14 @@ public static class AgentTools
     private static TextParam Text(string name, bool required = false) => new(name, required, null, null);
 
     private static StudioTool Query(string name, ToolGroup group, ToolInput input, Type output, Func<ToolCall, ToolStep> run,
-        ToolHosts hosts = ToolHosts.Both) => new(name, group, hosts, ToolHints.Query, input, output, run);
+        ToolHosts hosts = ToolHosts.Both) => new(name, ToolKind.Query, group, hosts, ToolHints.Query, input, output, run);
 
     /// <summary>A view tool (section 7.7 of the MCP1 design). Only the editor host has the views.</summary>
     private static StudioTool View(string name, ToolGroup group, ToolHints hints, ToolInput input, Type output,
-        Func<ToolCall, ToolStep> run) => new(name, group, ToolHosts.Editor, hints, input, output, run);
+        Func<ToolCall, ToolStep> run) => new(name, ToolKind.View, group, ToolHosts.Editor, hints, input, output, run);
+
+    /// <summary>An edit tool of the group Studio (section 7.2 of the MCP1 design). Its result is the result of the
+    /// command layer, and it can be a step of <c>edit_batch</c>.</summary>
+    private static StudioTool Edit(string name, ToolHints hints, ToolInput input, Func<ToolCall, ToolStep> run) =>
+        new(name, ToolKind.Edit, ToolGroup.Studio, ToolHosts.Both, hints, input, typeof(EditResult), run);
 }
