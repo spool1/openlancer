@@ -65,15 +65,21 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
 
     /// <summary>The text of the start place choice: "Suggested: {place}", "At base {base}" or "At the Scene
     /// camera".</summary>
-    public string PlaceText => Setting.PlaceChoice.Place switch
-    {
-        StartPlaceChoice.Base => $"At base {Setting.PlaceChoice.Base}",
-        StartPlaceChoice.Camera => "At the Scene camera",
-        _ => $"Suggested: {SuggestedText}",
-    };
+    public string PlaceText => PlaceTextOf(Setting, Plan);
 
     /// <summary>The suggested place in words.</summary>
-    public string SuggestedText => Plan.CanStart ? Plan.Place.Text : "none";
+    public string SuggestedText => SuggestedTextOf(Plan);
+
+    /// <summary>The text of the start place choice of a play start and its plan. The Play start page and the tooltip of
+    /// the Play button of a trigger card show it.</summary>
+    public static string PlaceTextOf(PlayStartSetting setting, StartPlan plan) => setting.PlaceChoice.Place switch
+    {
+        StartPlaceChoice.Base => $"At base {setting.PlaceChoice.Base}",
+        StartPlaceChoice.Camera => "At the Scene camera",
+        _ => $"Suggested: {SuggestedTextOf(plan)}",
+    };
+
+    private static string SuggestedTextOf(StartPlan plan) => plan.CanStart ? plan.Place.Text : "none";
 
     /// <summary>The story stage: its name and its number.</summary>
     public string StageText =>

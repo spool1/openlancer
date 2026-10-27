@@ -79,6 +79,10 @@ internal sealed class MissionWorkspace
     /// <summary>The mission play request and the play starts of the scripts.</summary>
     public MissionPlay Plays { get; }
 
+    /// <summary>The Play buttons of the trigger cards of the open mission (note of 2026-10-27 in section 8.1 of the M6c
+    /// design).</summary>
+    public PlayFromHereStates PlayHere { get; } = new();
+
     /// <summary>The live trace of the mission of the OpenLancer game.</summary>
     public MissionLive Live { get; }
 
@@ -920,6 +924,7 @@ internal sealed class MissionWorkspace
         acts.Clear();
         DryRuns.Clear();
         Live.Clear();
+        PlayHere.Clear();
         latestRun = 0;
         rawTexts.Clear();
         marks.Clear();

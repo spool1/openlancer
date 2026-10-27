@@ -90,6 +90,26 @@ public sealed class MissionPlayTests : IDisposable
         Assert.Equal((MissionStartPoint.At("t_kill"), StartPlaceChoice.Camera), (start.Request.Start, start.Request.Place));
     }
 
+    /// <summary>The Play button of a card (note of 2026-10-27 in section 8.1 of the M6c design) calls "Play from here".
+    /// The request of a click plays the start that the state of the button shows: the trigger, at the place of the
+    /// state.</summary>
+    [Fact]
+    public void AClickOnAPlayButtonPlaysTheStartOfItsState()
+    {
+        plays.SetPlayStart(ScriptPath, new PlayStartSetting("t_restore", "base:ol_base_a"));
+        var states = PlayFromHereStates.Make(editor.Index, editor.Slot, plays.PlayStartOf(ScriptPath),
+            System.Threading.CancellationToken.None);
+        var state = states["t_kill"];
+
+        plays.PlayFromHere(ScriptPath, "t_kill");
+
+        var start = Assert.IsType<MissionPlayStart>(Assert.Single(editor.Requests));
+        var plan = StartPlan.Make(editor.Index, editor.Slot, start.Request.Start, start.Request.Place, start.Request.PlaceBase);
+        Assert.Equal(MissionStartPoint.At("t_kill"), start.Request.Start);
+        Assert.Equal((state.CanStart, state.Place), (plan.CanStart, plan.Place));
+        Assert.Equal(StartPlaceKind.Base, state.Place.Kind);
+    }
+
     /// <summary>The agent play rule: with unsaved edits, the editor asks. Cancel gives refused with the reason, and no
     /// play starts. "Save and continue" asks Play for the play, and Play saves first.</summary>
     [Fact]
