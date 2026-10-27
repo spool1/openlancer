@@ -128,8 +128,8 @@ public sealed class DatabaseCommandsTests
         Assert.False(DatabaseCommands.Rename(session, Gun("gun2"), "bad name;").CanRun);
     }
 
-    /// <summary>An item of the lower layer, and a nickname that differs only in letter case, refuse in the plan with
-    /// the reason of the session command. Through the runner, nothing changes.</summary>
+    /// <summary>An item of the lower layer refuses in the plan, and so does a nickname that differs only in letter
+    /// case. The reason is the reason of the session command. Through the runner, nothing changes.</summary>
     [Fact]
     public void ARenameOfALowerItemOrToTheSameNicknameRefusesInThePlan()
     {

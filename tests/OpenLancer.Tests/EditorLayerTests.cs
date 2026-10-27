@@ -72,8 +72,8 @@ public sealed class EditorLayerTests
             Assert.True(calls.Any(entry.Covers), $"The allow-list entry '{entry.Name}' has no edit call. Remove it.");
     }
 
-    /// <summary>The walker finds a direct call, a call in a lambda, a method group, a call in a local function and a
-    /// delegate that makes a session command. It gives each one to the type that holds it.</summary>
+    /// <summary>The walker finds each form of an edit call of <see cref="RawEditSample"/>, and gives each one to the
+    /// type that holds it.</summary>
     [Fact]
     public void TheWalkerFindsEachFormOfAnEditCall()
     {
@@ -153,9 +153,9 @@ public sealed class EditorLayerTests
 }
 
 /// <summary>
-/// A type that makes the edit calls of the editor rule in each form. The forms are a direct call, a call in a lambda, a
-/// method group, a call in a local function and a delegate that makes a session command. The test of the walker reads
-/// it.
+/// A type that makes the edit calls of the editor rule in each form. The forms are a direct call, a call in a lambda
+/// and a method group. The other forms are a call in a local function and a delegate that makes a session command. The
+/// test of the walker reads it.
 /// </summary>
 internal static class RawEditSample
 {

@@ -39,8 +39,8 @@ public static class ItemEdits
     /// Gives an item that the active mod adds a new nickname, as
     /// <see cref="Rename(EditSession, SectionRef, string, List{Diagnostic})"/> does.
     /// </summary>
-    /// <param name="changes">Gets each section that the edit changes and keeps, with its identity after the edit: the
-    /// sections that it renames and the sections whose lines name the item. Null drops them.</param>
+    /// <param name="changes">Gets each section that the edit changes and keeps, with its identity after the edit.
+    /// These are the sections that it renames and the sections whose lines name the item. Null drops them.</param>
     internal static EditCommand Rename(EditSession session, SectionRef item, string newNickname,
         List<Diagnostic>? warnings, List<SectionRef>? changes)
     {

@@ -106,7 +106,7 @@ public sealed class FieldCommandsTests
         Assert.Equal(["100"], Firsts(session, Ship("s1"), "mass"));
     }
 
-    /// <summary>A revert of a [system] whose file the active mod sets refuses with the lock of the row, because it
+    /// <summary>A revert of a [system] whose file the active mod sets refuses with the lock of the row. Such a revert
     /// would move the system to another file. Through the runner, nothing changes.</summary>
     [Fact]
     public void ARevertOfASystemWhoseFileTheModSetsRefuses()
@@ -270,9 +270,9 @@ public sealed class FieldCommandsTests
     }
 
     /// <summary>
-    /// A value that a patch line cannot hold refuses before the edit runs: a ';', a character that is not ASCII, and a
-    /// control character such as a tab. The plan of the field command refuses with the detail FieldValue, and the
-    /// request of an agent throws the error invalid_value. Nothing changes.
+    /// A value that a patch line cannot hold refuses before the edit runs. Examples are a ';', a character that is not
+    /// ASCII and a control character such as a tab. The plan of the field command refuses with the detail FieldValue.
+    /// The request of an agent throws the error invalid_value. Nothing changes.
     /// </summary>
     [Fact]
     public void AValueThatAPatchLineCannotHoldRefusesInThePlan()
