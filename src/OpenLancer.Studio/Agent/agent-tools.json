@@ -200,6 +200,29 @@
         "text": "The plain text. An infocard gets one paragraph for each line."
       }
     },
+    "rename_item": {
+      "title": "Rename an item",
+      "description": "Gives an item a new nickname and changes each line that names it. The tool makes one Undo step. When the rename warns or other files name the item as text, the tool asks for confirm: true.",
+      "fields": {
+        "ref": "The reference of the item, for example obj:my_station_1. A data item must be an item that the active mod adds.",
+        "new_name": "The new nickname. A refusal tells why a nickname is not valid."
+      }
+    },
+    "delete_items": {
+      "title": "Delete items",
+      "description": "Deletes items with their children. Other lines that name them show 'Missing'. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true.",
+      "fields": {
+        "refs": "The references of the items, for example obj:my_station_1. The tool deletes objects, zones, lights, nebulae and asteroid fields of a system. studio_status gives the most items of one call."
+      }
+    },
+    "duplicate_items": {
+      "title": "Copy items",
+      "description": "Copies items of a system with their children. Each copy gets the next free nickname. The tool makes one Undo step. The result gives the references of the copies.",
+      "fields": {
+        "refs": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. studio_status gives the most items of one call.",
+        "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. Without it, each copy is at the place of its item."
+      }
+    },
     "open_view": {
       "title": "Open a view of the editor",
       "description": "Opens a system in the Scene, a mission script in the Mission tab or a cutscene in the Cutscene tab. Give one of the three. The tool changes what the user sees, not the data. Only the editor host has this tool.",
@@ -336,7 +359,8 @@
     "edit_applied": "The editor applied the edit as one Undo step: {label}.",
     "edit_previewed": "The preview changed nothing. Call the tool again without preview to apply the edit.",
     "edit_no_change": "The data has these values already, so the edit changed nothing.",
-    "text_shared": "{ref} shows the same text and keeps the old text. To change it too, call set_text on {ref} with the field {key}."
+    "text_shared": "{ref} shows the same text and keeps the old text. To change it too, call set_text on {ref} with the field {key}.",
+    "limit_items": "One call can name at most {max} items in refs. Split the call."
   },
   "resources": {
     "openlancer://catalog/lists": {

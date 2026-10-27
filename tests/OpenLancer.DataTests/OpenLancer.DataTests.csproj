@@ -30,6 +30,8 @@
     <Compile Include="..\OpenLancer.Tests\FakeCommandHost.cs" Link="FakeCommandHost.cs" />
     <!-- The retail tests of the agent tools check each result with the schema check of the unit tests. -->
     <Compile Include="..\OpenLancer.Tests\SchemaCheck.cs" Link="SchemaCheck.cs" />
+    <!-- The retail tests of the agent edit tools run each call on a test host of an edit session. -->
+    <Compile Include="..\OpenLancer.Tests\AgentTestKit.cs" Link="AgentTestKit.cs" />
   </ItemGroup>
 
   <ItemGroup>

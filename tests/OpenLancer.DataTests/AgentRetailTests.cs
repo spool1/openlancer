@@ -146,6 +146,48 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
             t => Assert.True(t.Median < FrameMilliseconds, $"{t.Call}: {t.Median:0.00} ms"));
     }
 
+    /// <summary>
+    /// A preview of a delete of a retail station gives the plan of the Scene delete (section 13.3, retail variant, of
+    /// the MCP1 design). The plan has the targets, the cascade, the fixes and the "Missing" lines. The preview changes
+    /// nothing. The station is the first object of the largest system that has a cascade.
+    /// </summary>
+    [Fact]
+    public void APreviewDeleteOfARetailStationGivesThePlanOfTheSceneDelete()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "mcp1delete");
+        var session = workspace.Open();
+        var host = new OpenLancer.Tests.TestAgentHost(session);
+        var systems = session.Systems.Files.OrderByDescending(f => session.Sections(f).Count).ToList();
+        var station = systems.SelectMany(f => session.Sections(f))
+            .Where(s => OpenLancer.Data.Editing.Scene.SceneSections.KindOf(session, s) ==
+                        OpenLancer.Data.Editing.Scene.SceneKind.Object && s.Id.Key != null)
+            .First(s => OpenLancer.Data.Editing.Scene.ScenePlans.Delete(session, [s]) is { CanRun: true } plan &&
+                        plan.Deletes.Count > 1);
+        var expected = OpenLancer.Data.Editing.Scene.ScenePlans.Delete(session, [station]);
+        string Ref(OpenLancer.Data.Editing.SectionRef section) =>
+            OpenLancer.Data.Editing.Commands.ItemRefs.Canonical(session, section);
+
+        var step = AgentTools.Run(host, "delete_items", new JsonObject
+        {
+            ["refs"] = new JsonArray(Ref(station)),
+            ["preview"] = true,
+        });
+
+        var result = step.Result!;
+        Assert.False(result.IsError, result.Text);
+        Assert.Equal("previewed", (string?)result.Content["status"]);
+        Assert.Equal("0", (string?)result.Content["rev"]);
+        Assert.Equal(expected.Deletes.Select(d => Ref(d.Section)),
+            result.Content["deletes"]!.AsArray().Select(d => (string)d!["ref"]!));
+        Assert.Equal(expected.Fixes.Count, result.Content["fixes"]!.AsArray().Count);
+        Assert.Equal(expected.Missing.Count + expected.MissionMissing.Count, result.Content["missing"]!.AsArray().Count);
+        Assert.Equal(expected.NeedsConfirmation, (bool)result.Content["needs_confirmation"]!);
+        Assert.False(session.CanUndo);
+        Assert.Null(session.OpenBatch);
+        output.WriteLine($"{Ref(station)}: {expected.Deletes.Count} deletes, {expected.Fixes.Count} fixes, " +
+                         $"{expected.Missing.Count + expected.MissionMissing.Count} missing lines");
+    }
+
     /// <summary>A page of the triggers of each retail script, also with the lines, fits the size limit of a result
     /// (section 8.4 of the MCP1 design). So the agent can read each script in pages.</summary>
     [Fact]
