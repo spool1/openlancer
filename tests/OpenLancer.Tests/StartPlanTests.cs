@@ -311,6 +311,203 @@ public sealed class StartPlanTests
                                                   e.Line.Value(0) == "r_obj_fly");
     }
 
+    /// <summary>
+    /// A path with a jump from j_sys_a to j_sys_b (fix of issue 45). The launch starts a fail watcher of a point in
+    /// j_sys_a, a trigger near the gate that starts the stop of the watcher at the exit, a log at the exit, and
+    /// triggers that wait for other exits and entries. {LAUNCH} and {TRIGGERS} add lines.
+    /// </summary>
+    private const string Jump = """
+        [Trigger]
+        nickname = j_start
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_ActTrig = j_launch
+
+        [Trigger]
+        nickname = j_launch
+        system = j_sys_a
+        Cnd_SpaceEnter = j_sys_a
+        Act_ActTrig = j_too_far
+        Act_ActTrig = j_near_gate
+        Act_ActTrig = j_log
+        Act_ActTrig = j_other_exit
+        Act_ActTrig = j_entry
+        Act_ActTrig = j_other_entry
+        Act_ActTrig = j_jump_end
+        Act_ActTrig = j_arrive
+        {LAUNCH}
+
+        [Trigger]
+        nickname = j_too_far
+        system = j_sys_a
+        Cnd_DistVec = outside, Player, 0, 0, 0, 12000
+        Act_ChangeState = FAIL, 1
+
+        [Trigger]
+        nickname = j_near_gate
+        system = j_sys_a
+        Cnd_DistVec = inside, Player, 5000, 0, 0, 800
+        Act_LockDock = Player, j_gate, unlock
+        Act_ActTrig = j_leave
+
+        [Trigger]
+        nickname = j_leave
+        system = j_sys_a
+        Cnd_SystemExit = j_sys_a
+        Act_DeactTrig = j_too_far
+
+        [Trigger]
+        nickname = j_log
+        Cnd_SystemExit = j_sys_a, j_sys_b
+        Act_NNIds = 7, HISTORY
+
+        [Trigger]
+        nickname = j_other_exit
+        Cnd_SystemExit = j_sys_a, j_sys_c
+        Act_NNIds = 8, HISTORY
+
+        [Trigger]
+        nickname = j_entry
+        Cnd_SystemEnter = j_sys_b, j_sys_a
+        Act_SpawnSolar = j_buoy
+
+        [Trigger]
+        nickname = j_other_entry
+        Cnd_SystemEnter = j_sys_c
+        Act_SpawnSolar = j_tower
+
+        [Trigger]
+        nickname = j_jump_end
+        Cnd_JumpInComplete = j_sys_b
+        Act_SpawnSolar = j_scene
+
+        [Trigger]
+        nickname = j_arrive
+        system = j_sys_b
+        Cnd_SystemEnter = j_sys_b
+        Act_ActTrig = j_chosen
+
+        [Trigger]
+        nickname = j_chosen
+        system = j_sys_b
+        Cnd_Timer = 5
+
+        {TRIGGERS}
+        """;
+
+    private static StartReplay JumpReplay(string trigger, string launch = "", string triggers = "") =>
+        StartReplay.Run(Index(Jump.Replace("{LAUNCH}", launch).Replace("{TRIGGERS}", triggers)),
+            MissionStartPoint.At(trigger));
+
+    private static List<string> Names(IEnumerable<MissionTrigger> triggers) => triggers.Select(t => t.Nickname).ToList();
+
+    /// <summary>A waiting Cnd_DistVec fail watcher of a point in the old system and a Cnd_SystemExit trigger that stops
+    /// it wait before a jump of the path. The path shows the player in the new system, so the game sent the exit, and the
+    /// stop ran. The watcher does not wait at the start, and the play does not fail at the spawn (issue 45).</summary>
+    [Fact]
+    public void TheExitOfASystemRunsTheTriggerThatStopsAWatcherOfThatSystem()
+    {
+        var replay = JumpReplay("j_chosen", launch: "Act_ActTrig = j_leave");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.DoesNotContain("j_too_far", Names(replay.ActiveSet));
+        Assert.DoesNotContain("j_leave", Names(replay.ActiveSet));
+        var ran = Names(replay.Changes.Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger));
+        Assert.True(ran.IndexOf("j_leave") < ran.IndexOf("j_arrive"), string.Join(" ", ran));
+        Assert.DoesNotContain("j_too_far", ran);
+    }
+
+    /// <summary>A waiting trigger near the gate starts the stop of the watcher. The jump shows that it ran before the
+    /// exit, so the replay runs it, then the stop. The exit runs the triggers that wait for the exit to the new system and
+    /// the entry from the old system. Triggers of other exits and entries, and a trigger that waits for the end of the
+    /// jump, still wait.</summary>
+    [Fact]
+    public void TheExitRunsTheChainToItsTriggersAndTheEntryRunsItsTriggers()
+    {
+        var replay = JumpReplay("j_chosen");
+
+        var ran = Names(replay.Changes.Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger));
+        Assert.Equal(["j_start", "j_launch", "j_near_gate", "j_leave", "j_log", "j_entry", "j_arrive"], ran);
+        Assert.Equal(["j_chosen", "j_jump_end", "j_other_entry", "j_other_exit"],
+            Names(replay.ActiveSet).OrderBy(n => n != "j_chosen").ThenBy(n => n, StringComparer.Ordinal));
+
+        var plan = StartPlan.Make(Index(Jump.Replace("{LAUNCH}", "").Replace("{TRIGGERS}", "")), Slot,
+            MissionStartPoint.At("j_chosen"));
+        Assert.True(plan.CanStart, plan.Reason);
+        Assert.Contains("Act_LockDock = Player, j_gate, unlock", Lines(plan, 0));
+        Assert.Contains("Act_SpawnSolar = j_buoy", Lines(plan, 1));
+        Assert.DoesNotContain(Lines(plan, 1), l => l.Contains("j_too_far", StringComparison.Ordinal));
+    }
+
+    /// <summary>A chosen trigger that waits for the jump starts before the jump, so nothing of the exit runs. A trigger
+    /// of the exit that would stop the trigger of the jump on the path does not run, and it waits at the
+    /// start.</summary>
+    [Fact]
+    public void TheExitRunsNothingBeforeTheJumpOrAgainstThePath()
+    {
+        var before = JumpReplay("j_arrive");
+        Assert.Contains("j_too_far", Names(before.ActiveSet));
+        Assert.Contains("j_near_gate", Names(before.ActiveSet));
+        Assert.Contains("j_log", Names(before.ActiveSet));
+
+        var against = JumpReplay("j_chosen", launch: "Act_ActTrig = j_bad_exit", triggers: """
+            [Trigger]
+            nickname = j_bad_exit
+            Cnd_SystemExit = ANY
+            Act_DeactTrig = j_arrive
+            """);
+        Assert.Equal(StartRefusal.None, against.Refusal);
+        Assert.Contains("j_bad_exit", Names(against.ActiveSet));
+        Assert.Contains("j_chosen", Names(against.ActiveSet));
+    }
+
+    /// <summary>Only a condition shows a change of the system. A system key after the first condition with a system
+    /// does not show a jump. Before that condition, the newest system key gives the old system.</summary>
+    [Fact]
+    public void TheSystemKeyGivesOnlyTheOldSystemBeforeTheFirstCondition()
+    {
+        const string text = """
+            [Trigger]
+            nickname = k_start
+            system = k_sys_a
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = k_leave
+            Act_ActTrig = k_arrive
+
+            [Trigger]
+            nickname = k_leave
+            Cnd_SystemExit = k_sys_a
+            Act_NNIds = 7, HISTORY
+
+            [Trigger]
+            nickname = k_arrive
+            Cnd_SystemEnter = k_sys_b
+            Act_ActTrig = k_wrong_key
+            Act_ActTrig = k_leave_b
+
+            [Trigger]
+            nickname = k_leave_b
+            Cnd_SystemExit = k_sys_b
+            Act_NNIds = 8, HISTORY
+
+            [Trigger]
+            nickname = k_wrong_key
+            system = k_sys_a
+            Cnd_True = no_params
+            Act_ActTrig = k_chosen
+
+            [Trigger]
+            nickname = k_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = StartReplay.Run(Index(text), MissionStartPoint.At("k_chosen"));
+
+        Assert.Equal(["k_chosen", "k_leave_b"], Names(replay.ActiveSet).OrderBy(n => n, StringComparer.Ordinal));
+        Assert.Contains(replay.Changes, c => c.Kind == MachineChangeKind.Ran && c.Trigger.Nickname == "k_leave");
+    }
+
     [Fact]
     public void AStartTriggerGivesAMissionStartWithoutATriggerSave()
     {

@@ -462,6 +462,7 @@ internal sealed record StartReplay
             var rest = path.Skip(k).Append(chosen).ToList();
             run.Objectives(trigger, rest);
             run.BeforeInSpace(trigger, rest);
+            run.Systems(trigger, rest);
             run.Launch(trigger, rest);
             switch (run.Reach(trigger))
             {
@@ -515,6 +516,15 @@ internal sealed record StartReplay
     /// <item>A trigger of the path that completes an objective shows that the objective was active. When no line of the
     /// replay made it active, the waiting trigger that makes it active ran before. The replay runs that trigger, and the
     /// triggers that it starts on the way to the objective.</item>
+    /// <item>A condition of the path can show the player in another system than the condition before it: an arrival,
+    /// Cnd_SpaceEnter, or a base condition. Then the player left the old system. The game sends the exit from the old
+    /// system, then the entry into the new system. So each trigger that waited for that exit (Cnd_SystemExit) ran. A
+    /// waiting trigger that starts such a trigger ran before it, for example a trigger near the jump gate. Each trigger
+    /// that waited for the entry (Cnd_SystemEnter) also ran. A trigger that waits for the end of the jump
+    /// (Cnd_JumpInComplete) does not run, because it can start a scene of the arrival, and the path does not show the
+    /// end of that scene. Only a condition shows a change, because the system key of a trigger can name another system
+    /// than the system where it runs. Before the first condition that names a system, the newest system key of the path
+    /// gives the old system.</item>
     /// </list>
     /// Such a run must not stop the replay, end the mission, run or stop a trigger of the rest of the path, or start the
     /// chosen trigger. Else the replay goes back to the state before it. A repeatable trigger does not run in this way.
@@ -530,6 +540,13 @@ internal sealed record StartReplay
         /// <summary>True while the path shows the player in space, false while docked, null when no line tells.</summary>
         private bool? inSpace;
 
+        /// <summary>The system where the conditions of the path show the player, or null when no condition tells.</summary>
+        private string? system;
+
+        /// <summary>The newest system key of the path before the first condition that names a system, or null. It gives
+        /// the old system of the first change.</summary>
+        private string? hinted;
+
         public Replayer(MissionIndex index, MissionTrigger chosen, MissionTrigger root)
         {
             this.index = index;
@@ -537,6 +554,7 @@ internal sealed record StartReplay
             Machine = new TriggerMachine(index, world, new MachineOptions { StopBefore = chosen });
             Changes.AddRange(Kept((root.StartsActive ? Machine.StartMission() : Machine.Load([root])).Changes));
             inSpace = root.StartsActive ? null : StartPlaces.InSpaceAt(root.Condition);
+            system = StartPlaces.SystemAt(index, root.Condition);
         }
 
         public TriggerMachine Machine { get; private set; }
@@ -582,7 +600,7 @@ internal sealed record StartReplay
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             foreach (var objective in completed)
             {
-                if (Chain(objective, rest) is { } chain)
+                if (Chain(t => Activates(t, objective), rest) is { } chain)
                     TryRun(chain, rest);
                 Note();
             }
@@ -599,6 +617,62 @@ internal sealed record StartReplay
                          .Where(t => Free(t, rest) && SameLaunch(trigger, t.Condition!)).ToList())
                 TryRun([peer], rest);
         }
+
+        /// <summary>The system rule, before a trigger of the path runs. The chosen trigger counts only with a base
+        /// condition, because the play starts docked at that base. A chosen trigger that waits for a launch or a jump
+        /// starts before that event.</summary>
+        /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
+        public void Systems(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
+        {
+            var next = trigger == chosen
+                ? StartPlaces.DockedSystemAt(index, trigger.Condition)
+                : StartPlaces.SystemAt(index, trigger.Condition);
+            if (next == null)
+            {
+                hinted = StartPlaces.Hint(index, trigger) ?? hinted;
+                return;
+            }
+            var old = system ?? hinted;
+            system = next;
+            if (old == null || MissionIndex.Is(old, next))
+                return;
+            // The triggers on the way to a trigger of the exit ran before the jump, for example near the jump gate.
+            var tried = new HashSet<MissionTrigger>();
+            while (Chain(t => !tried.Contains(t) && !Alive(t) && t.Condition is { } c && Exits(c, old, next), rest) is
+                   { } chain)
+            {
+                tried.Add(chain[^1]);
+                TryRun(chain, rest);
+            }
+            // Then the exit ran each trigger that waited for it, and the entry did the same.
+            RunWaiting(c => Exits(c, old, next), rest);
+            RunWaiting(c => Enters(c, next, old), rest);
+        }
+
+        /// <summary>Runs each waiting trigger that a rule can run and whose condition matches, in the order of the
+        /// game.</summary>
+        private void RunWaiting(Func<MissionLine, bool> matches, IReadOnlyList<MissionTrigger> rest)
+        {
+            foreach (var peer in Machine.Active.Concat(Machine.Pending).Distinct()
+                         .Where(t => Free(t, rest) && matches(t.Condition!)).ToList())
+                TryRun([peer], rest);
+        }
+
+        /// <summary>True when a condition waits for the exit of the player from a system to another system:
+        /// Cnd_SystemExit with that system or ANY, and with no second system, with ANY or with the other system.</summary>
+        private static bool Exits(MissionLine condition, string from, string to) =>
+            MissionIndex.Is(condition.Key, "Cnd_SystemExit") && Names(condition.Value(0), from) &&
+            Names(condition.Value(1), to);
+
+        /// <summary>True when a condition waits for the entry of the player into a system: Cnd_SystemEnter with that
+        /// system or ANY, and with no system before it, with ANY or with the old system.</summary>
+        private static bool Enters(MissionLine condition, string to, string from) =>
+            MissionIndex.Is(condition.Key, "Cnd_SystemEnter") && Names(condition.Value(0), to) &&
+            Names(condition.Value(1), from);
+
+        /// <summary>True when a system value of a line names a system: the same name, ANY, or no value.</summary>
+        private static bool Names(string? value, string system) =>
+            value?.Trim() is not { Length: > 0 } name || MissionIndex.Is(name, "ANY") || MissionIndex.Is(name, system);
 
         /// <summary>The Cnd_InSpace rule, before a trigger of the path runs. When no line told the place of the player
         /// yet, a dock shows that the player was in space before it, and a launch shows that the player was docked
@@ -652,10 +726,9 @@ internal sealed record StartReplay
             return true;
         }
 
-        /// <summary>The shortest chain of starts from an active trigger to a trigger that makes an objective active, or
-        /// null. The chain does not pass the chosen trigger, a trigger of the rest of the path or a repeatable
-        /// trigger.</summary>
-        private List<MissionTrigger>? Chain(string objective, IReadOnlyList<MissionTrigger> rest)
+        /// <summary>The shortest chain of starts from a waiting trigger to a trigger of a goal, or null. The chain does not
+        /// pass the chosen trigger, a trigger of the rest of the path or a repeatable trigger.</summary>
+        private List<MissionTrigger>? Chain(Func<MissionTrigger, bool> goal, IReadOnlyList<MissionTrigger> rest)
         {
             var next = StartGraph.Of(index).Starts;
             var parent = new Dictionary<MissionTrigger, MissionTrigger?>();
@@ -668,7 +741,7 @@ internal sealed record StartReplay
             while (queue.Count > 0)
             {
                 var trigger = queue.Dequeue();
-                if (Activates(trigger, objective))
+                if (goal(trigger))
                 {
                     var chain = new List<MissionTrigger>();
                     for (var at = trigger; at != null; at = parent[at])

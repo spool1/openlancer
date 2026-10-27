@@ -355,6 +355,35 @@ public sealed partial class StartPlanRetailTests
         }
     }
 
+    /// <summary>The row of issue 45 in both games. M04 juni_mactan_tether starts in Iw03, after the jump from Li01. The
+    /// game sent the exit from Li01 at the jump, so leaving_liberty_01 stopped the fail watcher too_far_from_magellan_dock
+    /// of a point in Li01. arrive_at_jumpgate starts leaving_liberty_01, so it ran before the jump. A start at
+    /// miner_encounter_sysen waits for that jump, so the watcher still waits there.</summary>
+    [Fact]
+    public void TheExitOfLi01StopsItsWatcherInM04()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var m04 = Slot(scripts, "M04");
+            var tether = Plan(m04, "juni_mactan_tether");
+            Assert.True(tether.CanStart, $"{set}: {tether.Reason}");
+            Assert.Equal("Iw03", tether.StartSystem);
+            foreach (var trigger in new[] { "too_far_from_magellan_dock", "arrive_at_jumpgate", "write_log_Li01_sys_exit" })
+                Assert.DoesNotContain(trigger, tether.ActiveSet);
+
+            var ran = StartReplay.Run(m04.Index, MissionStartPoint.At("juni_mactan_tether")).Changes
+                .Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger.Nickname).ToList();
+            Assert.True(ran.IndexOf("arrive_at_jumpgate") >= 0 &&
+                        ran.IndexOf("arrive_at_jumpgate") < ran.IndexOf("leaving_liberty_01") &&
+                        ran.IndexOf("leaving_liberty_01") < ran.IndexOf("miner_encounter_sysen"), $"{set}: {string.Join(" ", ran)}");
+            Assert.DoesNotContain("too_far_from_magellan_dock", ran);
+
+            var before = Plan(m04, "miner_encounter_sysen");
+            Assert.True(before.CanStart, $"{set}: {before.Reason}");
+            Assert.Contains("too_far_from_magellan_dock", before.ActiveSet);
+        }
+    }
+
     /// <summary>The rows of the review of 2026-10-28 in both games. M11 com_1500: the newest list of the player names
     /// juni2 and king2, so the old juni and king are no companions. M05 chase_player and M08 ku04_init start the active
     /// set after the world. M11 bse_Li0112: postBuff_init makes King and Juni again after the launch, so the setup leaves
