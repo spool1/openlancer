@@ -324,8 +324,8 @@ public sealed class StartPlanTests
         Assert.Equal((4, false), (Plan(Script, "t_accept").Stage, Plan(Script, "t_accept").Accepted));
     }
 
-    /// <summary>The launch gives the system, and the first spawn after the launch gives the point (section 5.3, step 7
-    /// of the M6c design, fix of 2026-10-27).</summary>
+    /// <summary>The launch gives the system, and the first spawn after the launch gives the point. Section 5.3, step 7
+    /// of the M6c design has the rule (fix of 2026-10-27).</summary>
     [Fact]
     public void TheLaunchOfTheStoryPathGivesASpaceStartNearTheFirstSpawnAfterIt()
     {

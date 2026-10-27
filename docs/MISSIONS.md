@@ -211,11 +211,11 @@ Two warnings are about the suggested place. A trigger that waits for the end of 
 The suggestion is where the player is at the trigger in the game. The editor reads the path to the trigger from the newest trigger back. The newest line that tells where the player is gives the kind of the start:
 
 - A bar visit, a base entry or a forced landing docks the player at that base.
-- A launch, a jump into a system, a line that moves the player, or a condition about the player in space puts the player in space.
+- A launch, a jump, a line that moves the player, or a condition about the player in space puts the player in space.
 - A trigger that waits at a base for the launch, or for the end of the launch, starts docked at the base of the launch. The launch then runs it.
 - A trigger that waits for a jump starts before the jump, so the jump runs it.
 
-The point of a start in space comes from a line that moves the player, a checkpoint, or a debug trigger of the script that moves the player to the same step. Else it comes from a point where a condition waits for the player, or it is 1,000 units from a ship that the path spawns. The system comes from the same lines, the base of the launch or a system hint. When no line gives a point after a launch, the start is docked at the base of the launch. When no line gives a point after a jump, the start is at the Scene camera in that system. Open that system in the Scene, or pick a base.
+The point of a start in space comes from a line that moves the player or from a checkpoint. A debug trigger of the script that moves the player to the same step can also give it. Else it comes from a point where a condition waits for the player, or it is 1,000 units from a ship that the path spawns. The system comes from the same lines, the base of the launch or a system hint. When no line gives a point after a launch, the start is docked at the base of the launch. When no line gives a point after a jump, the start is at the Scene camera in that system. Open that system in the Scene, or pick a base.
 
 The section "Play a mission" of [PLAY.md](PLAY.md) tells what Play does with the start. It tells about the save, the start save, the test layer and the restart after a save.
 

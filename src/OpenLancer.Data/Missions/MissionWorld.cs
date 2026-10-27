@@ -5,9 +5,9 @@ using System.Linq;
 namespace OpenLancer.Data.Missions;
 
 /// <summary>
-/// The names of the game data outside the mission scripts, the system of each base, and the files of the edit view
-/// (section 12.3 of the M6a design). The UI thread makes it from the data lists of the edit view. The worker of the
-/// checks reads it only, so it holds plain sets and no session.
+/// The names of the game data outside the mission scripts, the system of each base, and the files of the edit view.
+/// Section 12.3 of the M6a design tells about it. The UI thread makes it from the data lists of the edit view. The worker
+/// of the checks reads it only, so it holds plain sets and no session.
 /// </summary>
 /// <remarks>The world of a base-game run (decision D551) also holds the names that a mod removes or renames (see
 /// <see cref="WithRemoved"/>). A line that names such a name has a problem only with the mods. So the problem shows also

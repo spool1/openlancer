@@ -16,9 +16,10 @@ namespace OpenLancer.Tests;
 public sealed class StartPlacesTests
 {
     /// <summary>
-    /// A story in the shape of the report of 2026-10-27: a bar visit at a base, the accept, a launch that waits for
-    /// Cnd_SpaceEnter without a system, a step in space with a spawn, a point near a gate, and a jump into a second
-    /// system. A watcher waits for the end of the launch. The bar and the launch triggers have no system hint.
+    /// A story in the shape of the report of 2026-10-27. It has a bar visit at a base, the accept, and a launch that
+    /// waits for Cnd_SpaceEnter without a system. Then a step in space spawns a ship, a point waits near a gate, and a jump
+    /// goes into a second system. A watcher waits for the end of the launch. The bar and the launch triggers have no
+    /// system hint.
     /// </summary>
     private const string Story = """
         [MsnShip]
@@ -204,8 +205,8 @@ public sealed class StartPlacesTests
         Assert.Contains(StartPlaces.LaunchWatcherWarning("p_launched"), plan.Warnings);
     }
 
-    /// <summary>Review fix: the triggers that wait for the end of the launch of the timeline do not run after a start in
-    /// space, also after a later jump. The page warns about them.</summary>
+    /// <summary>Review fix: after a start in space, the triggers that wait for the end of the launch do not run. That is
+    /// also true after a later jump. The page warns about them.</summary>
     [Fact]
     public void AStartInSpaceWarnsAboutTheTriggersThatWaitForTheEndOfTheLaunch()
     {
@@ -236,8 +237,8 @@ public sealed class StartPlacesTests
         Assert.Equal(("ol_sys_a", new Vector3(1000, 0, 3000)), (systemEnter.System, systemEnter.Position));
     }
 
-    /// <summary>An arrival on the path that is newer than each other fact is the same jump as the one that the chosen
-    /// trigger waits for, so the start is before it.</summary>
+    /// <summary>An arrival on the path that is newer than each other fact is the jump that the chosen trigger waits
+    /// for. So the start is before it.</summary>
     [Fact]
     public void AnArrivalOfTheSameJumpOnThePathDoesNotPutTheStartAfterTheJump()
     {
@@ -390,9 +391,9 @@ public sealed class StartPlacesTests
 
     // Checkpoints and place lines.
 
-    /// <summary>The setup of a checkpoint in two stages: the first stage waits for the launch and sets the pose, the
-    /// second stage waits for the space entry in a system. The place takes the system of the second stage, and the heading
-    /// of the pose (w, x, y, z).</summary>
+    /// <summary>A checkpoint in two stages. The first stage waits for the launch and sets the pose. The second stage
+    /// waits for the space entry in a system. The place takes the system of the second stage and the heading of the
+    /// pose (w, x, y, z).</summary>
     [Fact]
     public void ATwoStageCheckpointTakesTheSystemOfItsSecondStageAndItsHeading()
     {
@@ -501,7 +502,7 @@ public sealed class StartPlacesTests
         Assert.Equal((StartPlaceKind.Camera, "No line of the path gives a place."), (none.Kind, none.Source));
     }
 
-    /// <summary>Review fix: a launch without a point in its system starts at the base of the launch, whose dock is the
+    /// <summary>Review fix: a launch without a point in its system starts at the base of the launch. Its dock is the
     /// point of the launch in the game. The center of a system is never a start point.</summary>
     [Fact]
     public void ALaunchWithoutAPointStartsAtTheBaseOfTheLaunch()

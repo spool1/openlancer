@@ -9,11 +9,11 @@ namespace OpenLancer.Data.Missions.Run;
 /// <summary>
 /// The rules of the suggested start place (section 5.3, step 7 of the M6c design, with the fix of 2026-10-27 and its
 /// reviews). The suggestion is where the player is at the chosen trigger in the retail game. A walk reads the place
-/// facts of the timeline from the newest to the oldest. The newest fact gives the kind of the start: a base fact gives
-/// a base start, and a launch, an arrival or a space fact gives a space start. A chosen trigger that waits at a base for
-/// the launch starts docked, and a chosen trigger that waits for a jump starts before the jump. The facts of the
-/// segment give the system and the point. The segment is the part of the walk in one place in space, back to the base
-/// of the launch or to the arrival. The center of a system is never a start point, because most suns are there.
+/// facts of the timeline from the newest to the oldest. The newest fact gives the kind of the start. A base fact gives a
+/// base start. A launch, an arrival or a space fact gives a space start. A chosen trigger that waits at a base for the
+/// launch starts docked. A chosen trigger that waits for a jump starts before the jump. The facts of the segment give
+/// the system and the point. The segment is the part of the walk in one place in space, back to the base of the launch
+/// or to the arrival. The center of a system is never a start point, because most suns are there.
 /// </summary>
 internal static class StartPlaces
 {
@@ -85,9 +85,8 @@ internal static class StartPlaces
             ? new Vector3(p[0], p[1], p[2] + Offset)
             : null;
 
-    /// <summary>True when the chosen trigger waits until the player gets to another place: an arrival in a system, or
-    /// a place of the player in space. Its own lines then tell where the player will be, not where the player
-    /// is.</summary>
+    /// <summary>True when the chosen trigger waits for the player at another place: an arrival in a system, or a place
+    /// in space. Its own lines then tell where the player will be, not where the player is.</summary>
     private static bool WaitsToArrive(MissionLine? condition) =>
         IsArrival(condition) || condition != null && IsAny(condition.Key, SpaceConditions) && NamesPlayer(condition);
 
@@ -215,9 +214,8 @@ internal static class StartPlaces
             return new Suggestion(place, [.. own, .. LaunchWatchers(facts), .. OtherSystem(place)]);
         }
 
-        /// <summary>The warning of a chosen trigger that waits for the player to enter space in another system than the
-        /// system of the start (Cnd_SpaceEnter with a system). Retail compares the system, and OpenLancer does
-        /// not.</summary>
+        /// <summary>The warning of a chosen trigger whose Cnd_SpaceEnter names another system than the system of the
+        /// start. Retail compares the system, and OpenLancer does not.</summary>
         private IEnumerable<string> OtherSystem(StartPlace place)
         {
             var at = place.System ?? (place.Base is { } dock ? BaseSystemOf(dock) : null);
@@ -262,10 +260,14 @@ internal static class StartPlaces
         }
 
         /// <summary>
-        /// The facts of the chosen trigger (rule 2): its place line, the place line of a Cnd_True trigger that a restore
-        /// trigger starts (both run at the load), and a base of Cnd_BaseEnter, Cnd_LocEnter, Cnd_CharSelect or
-        /// Cnd_BaseExit. A trigger that waits for an arrival or for a place of the player moves the player only after it
-        /// gets there, so its place line gives no fact.
+        /// The facts of the chosen trigger (rule 2):
+        /// <list type="bullet">
+        /// <item>its place line</item>
+        /// <item>for a restore trigger, the place line of a Cnd_True trigger that it starts (both run at the load)</item>
+        /// <item>the base of Cnd_BaseEnter, Cnd_LocEnter, Cnd_CharSelect or Cnd_BaseExit</item>
+        /// </list>
+        /// A trigger that waits for an arrival or for a place of the player moves the player only after that. So its
+        /// place line gives no fact.
         /// </summary>
         private IEnumerable<Fact> OwnFacts(int at)
         {
@@ -382,11 +384,15 @@ internal static class StartPlaces
         }
 
         /// <summary>
-        /// The system of a place line (rule 5), and the line of another trigger that gives it: the system of the
-        /// condition of its trigger, then the Cnd_SpaceEnter system of a trigger that it starts (the second stage of a
-        /// checkpoint), then its system hint. Retail never runs the condition of a trigger that no trigger starts, so its
-        /// hint comes first. Last comes the system of the story at a step that it starts: the target first, then the step
-        /// with the longest story path.
+        /// The system of a place line (rule 5), and the line of another trigger that gives it. The order is:
+        /// <list type="number">
+        /// <item>the system of the condition of its trigger</item>
+        /// <item>the Cnd_SpaceEnter system of a trigger that it starts (the second stage of a checkpoint)</item>
+        /// <item>its system hint</item>
+        /// <item>the system of the story at a step that it starts, the target first, then the deepest step</item>
+        /// </list>
+        /// Retail never runs the condition of a trigger that no trigger starts. So for such a trigger, the hint comes
+        /// first.
         /// </summary>
         private (string? System, string? From) PlaceSystem(MissionTrigger trigger, MissionTrigger? target)
         {
@@ -403,10 +409,10 @@ internal static class StartPlaces
         }
 
         /// <summary>
-        /// The system of the story at a step that a place line starts, and its line: the newest system of the story path
-        /// of the step, from the step back. Each trigger of the path gives the system of its condition (Cnd_SpaceEnter,
-        /// an arrival, or the base of a base condition), else its system hint. A step that waits for an arrival names the
-        /// next system, so its own lines do not count.
+        /// The system of the story at a step that a place line starts, and its line. It is the newest system of the
+        /// story path of the step, from the step back. Each trigger of the path gives the system of its condition, else
+        /// its system hint. The condition can be Cnd_SpaceEnter, an arrival or a base condition. A step that waits for an
+        /// arrival names the next system, so its own lines do not count.
         /// </summary>
         private (string? System, string? From) StepSystem(MissionTrigger step)
         {
@@ -532,14 +538,14 @@ internal static class StartPlaces
                 Trigger = fact.Trigger.Nickname,
             };
 
-        /// <summary>True when a point of a fact can be in the system: its system or the system hint of its trigger is
-        /// that system, or it has none.</summary>
+        /// <summary>True when the point of a fact can be in the system. The fact, else the system hint of its trigger,
+        /// names that system or no system.</summary>
         private bool InSystem(Fact fact, string system) =>
             (fact.System ?? Hint(fact.Trigger)) is not { } own || MissionIndex.Is(own, system);
 
-        /// <summary>The trigger of the nearest system hint (rule 4): the trigger of the fact, then each trigger from the
-        /// chosen trigger back to the start of the segment. A chosen trigger that waits for an arrival has the hint of the
-        /// next system, so it does not count.</summary>
+        /// <summary>The trigger of the nearest system hint (rule 4). The trigger of the fact comes first. Then each
+        /// trigger from the chosen trigger back to the start of the segment comes. A chosen trigger that waits for an
+        /// arrival has the hint of the next system, so it does not count.</summary>
         private MissionTrigger? HintOf(Fact decide, int from)
         {
             if (Hint(decide.Trigger) != null)
@@ -553,9 +559,9 @@ internal static class StartPlaces
             return null;
         }
 
-        /// <summary>The first spawn in the system with a position (rule 6): of the segment before the chosen trigger,
-        /// then of the chosen trigger, then the last one of the replay. A move of a ship that exists is no spawn, because
-        /// scripts also park ships with it.</summary>
+        /// <summary>The first spawn in the system with a position (rule 6). The spawns of the segment before the chosen
+        /// trigger come first, then the spawns of the chosen trigger, then the last spawn of the replay. A move of a ship
+        /// that exists is no spawn, because scripts also park ships with it.</summary>
         private (Vector3 Point, string Ship)? SpawnIn(string system, int from)
         {
             var lines = timeline.Skip(from).Take(Math.Max(0, Earlier - from)).SelectMany(t => t.Actions.Select(l => (t, l)))

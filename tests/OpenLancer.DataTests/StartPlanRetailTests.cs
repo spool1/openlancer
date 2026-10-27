@@ -187,9 +187,9 @@ public sealed class StartPlanRetailTests(ITestOutputHelper output)
 
     /// <summary>
     /// The suggested place of each story trigger of the base game starts where the player is in the retail game (fix
-    /// of 2026-10-27). The bug was a base start after the path had left the base. A base start or a Scene camera start is
-    /// suspect when a trigger of the story path after the place has a launch, an arrival or a space condition. Only the
-    /// named rows below can be suspect.
+    /// of 2026-10-27). The bug was a base start after the path had left the base. A base or camera start is suspect when
+    /// a later trigger of the story path has a launch, an arrival or a space condition. Only the named rows below can be
+    /// suspect.
     /// </summary>
     [Fact]
     public void EachStoryTriggerOfTheBaseGameStartsWhereThePlayerIs() =>
@@ -368,9 +368,9 @@ public sealed class StartPlanRetailTests(ITestOutputHelper output)
         Assert.Equal(suspects, allowed.Count);
     }
 
-    /// <summary>The rule of the survey of 2026-10-27: a trigger of the story path after the trigger of the place, or
-    /// after the start of the path for a Scene camera, has a launch, an arrival or a space condition with the player.
-    /// The chosen trigger does not count.</summary>
+    /// <summary>The rule of the survey of 2026-10-27. A trigger of the story path after the trigger of the place has a
+    /// launch, an arrival or a space condition with the player. For a Scene camera, the check starts at the start of the
+    /// path. The chosen trigger does not count.</summary>
     private static bool SpaceAfterThePlace(IReadOnlyList<MissionTrigger> story, MissionTrigger chosen, StartPlace place)
     {
         var from = place is { Kind: StartPlaceKind.Base, Trigger: { } at }
@@ -436,7 +436,7 @@ public sealed class StartPlanRetailTests(ITestOutputHelper output)
     ];
 
     /// <summary>
-    /// No line of the path gives a point in the system, and no line names a base of a launch: the path comes after a
+    /// No line of the path gives a point in the system, and no line names a base of a launch. The path comes after a
     /// jump, or after a launch from a base that the mission does not name. The start is at the Scene camera in that
     /// system. Only the game data knows the arrival gate or hole of a jump (open point (c) of the design).
     /// </summary>
