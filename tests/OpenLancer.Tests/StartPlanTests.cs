@@ -116,6 +116,163 @@ public sealed class StartPlanTests
     private static List<string> Lines(StartPlan plan, int setup) =>
         plan.Setup[setup].Lines.Select(l => $"{l.Key} = {string.Join(", ", l.Values)}").ToList();
 
+    /// <summary>
+    /// A path with a launch and a dock, and waiting triggers that the path shows ran: a launch watcher, a Cnd_InSpace
+    /// trigger, and a timer that leads to the objective that the dock completes. A watcher of a launch in another system,
+    /// and a watcher that the launch itself starts, wait for a later launch.
+    /// </summary>
+    private const string Waiting = """
+        [Trigger]
+        nickname = r_start
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_SetNNObj = r_obj_land
+        Act_ActTrig = r_draw
+        Act_ActTrig = r_plch
+        Act_ActTrig = r_other_launch
+        Act_ActTrig = r_launch
+        {START}
+
+        [Trigger]
+        nickname = r_draw
+        Cnd_InSpace = true
+        Act_NNPath = 1, 1, r_base, r_sys_a
+
+        [Trigger]
+        nickname = r_plch
+        Cnd_PlayerLaunch = no_params
+        Act_SpawnSolar = r_station
+
+        [Trigger]
+        nickname = r_other_launch
+        Cnd_SpaceEnter = r_sys_b
+        Act_SpawnSolar = r_tower
+
+        [Trigger]
+        nickname = r_launch
+        system = r_sys_a
+        Cnd_SpaceEnter = no_params
+        Act_SetNNObj = r_obj_fly
+        Act_ActTrig = r_delay
+        Act_ActTrig = r_after_launch
+        Act_ActTrig = r_dock
+
+        [Trigger]
+        nickname = r_after_launch
+        Cnd_PlayerLaunch = no_params
+
+        [Trigger]
+        nickname = r_delay
+        Cnd_Timer = 3
+        Act_ActTrig = r_switch
+
+        [Trigger]
+        nickname = r_switch
+        Cnd_DistShip = outside, Player, r_ring, 8000
+        Act_SetNNState = r_obj_fly, COMPLETE
+        Act_SetNNObj = r_obj_dock
+
+        [Trigger]
+        nickname = r_dock
+        Cnd_BaseEnter = r_base
+        Act_SetNNState = r_obj_dock, COMPLETE
+        Act_SetNNObj = r_obj_bar
+        Act_ActTrig = r_chosen
+
+        [Trigger]
+        nickname = r_chosen
+        Cnd_Timer = 5
+
+        {TRIGGERS}
+        """;
+
+    /// <summary>The replay runs the waiting triggers that the path shows ran in the game (fix of the review of
+    /// 2026-10-28). The launch runs its watcher, the player in space runs the Cnd_InSpace trigger, and the dock that
+    /// completes an objective runs the timer and the trigger that made the objective active. So the last objective of the
+    /// path is the objective of the dock, and none of these triggers waits at the start.</summary>
+    [Fact]
+    public void TheReplayRunsTheWaitingTriggersThatThePathShowsRan()
+    {
+        var text = Waiting.Replace("{START}", "").Replace("{TRIGGERS}", "");
+        var replay = StartReplay.Run(Index(text), MissionStartPoint.At("r_chosen"));
+
+        Assert.Equal(
+        [
+            "Act_SetNNObj = r_obj_land", "Act_SpawnSolar = r_station", "Act_SetNNObj = r_obj_fly",
+            "Act_NNPath = 1, 1, r_base, r_sys_a", "Act_SetNNState = r_obj_fly, COMPLETE", "Act_SetNNObj = r_obj_dock",
+            "Act_SetNNState = r_obj_dock, COMPLETE", "Act_SetNNObj = r_obj_bar",
+        ], replay.Effects.Select(e => $"{e.Line.Key.Trim()} = {string.Join(", ", e.Line.Line.Select(OpenLancer.Data.Export.RetailText.Of))}"));
+        Assert.Equal(["r_after_launch", "r_other_launch", "r_chosen"],
+            replay.ActiveSet.Select(t => t.Nickname).OrderBy(n => n == "r_chosen").ThenBy(n => n, StringComparer.Ordinal));
+
+        var plan = Plan(text, "r_chosen");
+        Assert.True(plan.CanStart, plan.Reason);
+        Assert.Contains("Act_SetNNObj = r_obj_bar", Lines(plan, 0));
+        Assert.DoesNotContain(Lines(plan, 0), l => l.Contains("r_obj_dock", StringComparison.Ordinal) ||
+                                                   l.Contains("r_obj_fly", StringComparison.Ordinal));
+    }
+
+    /// <summary>A log line after the last objective line does not remove that objective. Only the last log line
+    /// stays.</summary>
+    [Fact]
+    public void ALogLineDoesNotRemoveTheLastObjective()
+    {
+        var text = Waiting.Replace("{START}", "").Replace("{TRIGGERS}", "").Replace("Act_SetNNObj = r_obj_bar",
+            "Act_SetNNObj = r_obj_bar" + "\n" + "Act_NNIds = 7, HISTORY" + "\n" + "Act_NNIds = 8, HISTORY");
+
+        var lines = Lines(Plan(text, "r_chosen"), 0);
+
+        Assert.Contains("Act_SetNNObj = r_obj_bar", lines);
+        Assert.Equal(["Act_NNIds = 8, HISTORY"], lines.Where(l => l.StartsWith("Act_NNIds", StringComparison.Ordinal)));
+    }
+
+    /// <summary>A waiting trigger that the objective rule runs can wait for a kill. Its condition shows that the ship
+    /// died, so the setup does not spawn the ship.</summary>
+    [Fact]
+    public void AWaitingKillThatThePathShowsRanRemovesTheSpawn()
+    {
+        var text = Waiting.Replace("{START}", "Act_SpawnShip = r_ship\nAct_ActTrig = r_kill").Replace("{TRIGGERS}", """
+            [MsnShip]
+            nickname = r_ship
+            position = 100, 0, 100
+
+            [Trigger]
+            nickname = r_kill
+            Cnd_Destroyed = r_ship
+            Act_SetNNObj = r_obj_kill
+            """).Replace("Act_SetNNState = r_obj_dock, COMPLETE", "Act_SetNNState = r_obj_dock, COMPLETE\nAct_SetNNState = r_obj_kill, COMPLETE");
+
+        var plan = Plan(text, "r_chosen");
+
+        Assert.True(plan.CanStart, plan.Reason);
+        Assert.DoesNotContain("r_kill", plan.ActiveSet);
+        Assert.DoesNotContain(plan.Setup.SelectMany(t => t.Lines), l => l.Values.Contains("r_ship"));
+    }
+
+    /// <summary>A waiting trigger whose run would stop a trigger of the rest of the path does not run. The replay goes
+    /// back to the state before it, and the trigger waits at the start. A line of the replay that already made the
+    /// objective active means that no waiting trigger has to run for it.</summary>
+    [Fact]
+    public void TheReplayDoesNotRunAWaitingTriggerThatBreaksThePath()
+    {
+        var breaker = Waiting.Replace("{START}", "Act_ActTrig = r_breaker").Replace("{TRIGGERS}", """
+            [Trigger]
+            nickname = r_breaker
+            Cnd_PlayerLaunch = no_params
+            Act_DeactTrig = r_launch
+            """);
+        var replay = StartReplay.Run(Index(breaker), MissionStartPoint.At("r_chosen"));
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Contains(replay.ActiveSet, t => t.Nickname == "r_breaker");
+        Assert.Contains(replay.ActiveSet, t => t.Nickname == "r_chosen");
+
+        var known = Waiting.Replace("{START}", "Act_SetNNObj = r_obj_dock").Replace("{TRIGGERS}", "");
+        var plain = StartReplay.Run(Index(known), MissionStartPoint.At("r_chosen"));
+        Assert.Contains(plain.ActiveSet, t => t.Nickname == "r_delay");
+        Assert.DoesNotContain(plain.Effects, e => MissionIndex.Is(e.Line.Key, "Act_SetNNState") &&
+                                                  e.Line.Value(0) == "r_obj_fly");
+    }
+
     [Fact]
     public void AStartTriggerGivesAMissionStartWithoutATriggerSave()
     {

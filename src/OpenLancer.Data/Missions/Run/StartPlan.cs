@@ -490,51 +490,273 @@ internal sealed record StartReplay
     }
 
     /// <summary>The replay of an approximate start (D748): the start set or the load of the root, then each trigger of
-    /// the path in order, until the chosen trigger starts.</summary>
+    /// the path in order, until the chosen trigger starts. The replay also runs the waiting triggers that the path shows
+    /// ran in the game (<see cref="Replayer"/>).</summary>
     private static StartReplay Approximate(MissionIndex index, MissionTrigger chosen, IReadOnlyList<MissionTrigger> path)
     {
-        var machine = new TriggerMachine(index, new ReplayWorld(), new MachineOptions { StopBefore = chosen });
         var root = path[0];
-        var changes = new List<MachineChange>(Kept((root.StartsActive ? machine.StartMission() : machine.Load([root])).Changes));
+        var run = new Replayer(index, chosen, root);
         var replay = new StartReplay { Kind = StartKind.Approximate, Chosen = chosen, Root = root, Path = path };
         // Each trigger of the path runs in order: a trigger that ran goes on, a pending trigger starts at the next
         // heartbeat, and an active trigger runs as if its condition is met now.
-        foreach (var trigger in path)
+        for (var k = 0; k < path.Count; k++)
         {
-            for (var step = 0; ; step++)
+            var trigger = path[k];
+            if (run.Machine.Halt is { Kind: MachineHaltKind.StopPoint })
+                break;
+            var rest = path.Skip(k).Append(chosen).ToList();
+            run.Objectives(trigger, rest);
+            run.Launch(trigger, rest);
+            switch (run.Reach(trigger))
             {
-                if (machine.Halt is { Kind: MachineHaltKind.StopPoint })
-                    break;
-                if (machine.Halt is { } halt)
-                    return replay with { Refusal = RefusalOf(halt, chosen), Reason = ReasonOf(halt, chosen) };
-                if (machine.End is { } end)
+                case Reached.Halt:
+                    return replay with { Refusal = RefusalOf(run.Machine.Halt!, chosen), Reason = ReasonOf(run.Machine.Halt!, chosen) };
+                case Reached.End:
                     return replay with
                     {
                         Refusal = StartRefusal.RunStops,
-                        Reason = $"The mission ends at trigger '{end.Trigger.Nickname}' before trigger '{chosen.Nickname}' " +
-                                 "starts. Pick another trigger.",
+                        Reason = $"The mission ends at trigger '{run.Machine.End!.Trigger.Nickname}' before trigger " +
+                                 $"'{chosen.Nickname}' starts. Pick another trigger.",
                     };
-                var state = machine.StateOf(trigger);
-                if (trigger != chosen && state.Runs > 0)
-                    break;
-                if (step >= StepsPerTrigger)
-                    return NotActive(replay, trigger, chosen);
-                if (machine.Pending.Contains(trigger))
-                    changes.AddRange(Kept(machine.Heartbeat().Changes));
-                else if (trigger != chosen && state.Status == TriggerStatus.Active && machine.Active.Contains(trigger))
-                    changes.AddRange(Kept(machine.Force(trigger).Changes));
-                else
+                case Reached.NotActive:
                     return NotActive(replay, trigger, chosen);
             }
-            if (machine.Halt is { Kind: MachineHaltKind.StopPoint })
+            if (run.Machine.Halt is { Kind: MachineHaltKind.StopPoint })
                 break;
+            run.InSpace(trigger, path.Skip(k + 1).Append(chosen).ToList());
         }
+        var machine = run.Machine;
         if (machine.Halt is not { Kind: MachineHaltKind.StopPoint })
             return NotActive(replay, chosen, chosen);
         // The game starts the rest of the start set or of the drain in the same pass as the chosen trigger.
         var active = new List<MissionTrigger>(machine.Active) { chosen };
         active.AddRange(machine.Pending.Where(t => !active.Contains(t)));
-        return replay with { ActiveSet = active, Changes = changes };
+        return replay with { ActiveSet = active, Changes = run.Changes };
+    }
+
+    /// <summary>How a run of one trigger of the path ends.</summary>
+    private enum Reached
+    {
+        Ran,
+        Halt,
+        End,
+        NotActive,
+    }
+
+    /// <summary>
+    /// The machine of an approximate replay, with the waiting triggers that the path shows ran in the game (fix of the
+    /// review of 2026-10-28). The replay has no world, so a trigger that waits for the world stays active, also when the
+    /// game ran it long before the chosen trigger. These rules run such a trigger at the point where the path shows its
+    /// event:
+    /// <list type="bullet">
+    /// <item>A launch of the path ran each trigger that waited for that launch: Cnd_PlayerLaunch, Cnd_SpaceEnter without
+    /// a system or with the system of the launch, Cnd_LaunchComplete of the player, and Cnd_BaseExit without a base or
+    /// with the base of the launch.</item>
+    /// <item>The game tests Cnd_InSpace at each heartbeat. When the path shows the player in space, each trigger that
+    /// waits for Cnd_InSpace = true ran. When the path shows the player docked, each trigger that waits for
+    /// Cnd_InSpace = false ran.</item>
+    /// <item>A trigger of the path that completes an objective shows that the objective was active. When no line of the
+    /// replay made it active, the waiting trigger that makes it active ran before. The replay runs that trigger, and the
+    /// triggers that it starts on the way to the objective.</item>
+    /// </list>
+    /// Such a run must not stop the replay, end the mission, run or stop a trigger of the rest of the path, or start the
+    /// chosen trigger. Else the replay goes back to the state before it. A repeatable trigger does not run in this way.
+    /// </summary>
+    private sealed class Replayer
+    {
+        private readonly MissionIndex index;
+        private readonly MissionTrigger chosen;
+        private readonly ReplayWorld world = new();
+        private readonly HashSet<string> activated = new(StringComparer.OrdinalIgnoreCase);
+        private int read;
+
+        /// <summary>True while the path shows the player in space, false while docked, null when no line tells.</summary>
+        private bool? inSpace;
+
+        public Replayer(MissionIndex index, MissionTrigger chosen, MissionTrigger root)
+        {
+            this.index = index;
+            this.chosen = chosen;
+            Machine = new TriggerMachine(index, world, new MachineOptions { StopBefore = chosen });
+            Changes.AddRange(Kept((root.StartsActive ? Machine.StartMission() : Machine.Load([root])).Changes));
+            inSpace = root.StartsActive ? null : StartPlaces.InSpaceAt(root.Condition);
+        }
+
+        public TriggerMachine Machine { get; private set; }
+
+        public List<MachineChange> Changes { get; } = [];
+
+        /// <summary>Runs one trigger: a pending trigger starts at the next heartbeat, and an active trigger runs as if its
+        /// condition is met now. The chosen trigger only starts.</summary>
+        /// <param name="again">True for a waiting trigger that must run now, also when it ran before.</param>
+        public Reached Reach(MissionTrigger trigger, bool again = false)
+        {
+            var runs = Machine.StateOf(trigger).Runs;
+            for (var step = 0; ; step++)
+            {
+                if (Machine.Halt is { Kind: MachineHaltKind.StopPoint })
+                    return Reached.Ran;
+                if (Machine.Halt != null)
+                    return Reached.Halt;
+                if (Machine.End != null)
+                    return Reached.End;
+                var state = Machine.StateOf(trigger);
+                if (trigger != chosen && (state.Runs > runs || !again && state.Runs > 0))
+                    return Reached.Ran;
+                if (step >= StepsPerTrigger)
+                    return Reached.NotActive;
+                if (Machine.Pending.Contains(trigger))
+                    Changes.AddRange(Kept(Machine.Heartbeat().Changes));
+                else if (trigger != chosen && state.Status == TriggerStatus.Active && Machine.Active.Contains(trigger))
+                    Changes.AddRange(Kept(Machine.Force(trigger).Changes));
+                else
+                    return Reached.NotActive;
+            }
+        }
+
+        /// <summary>The objective rule, before a trigger of the path runs.</summary>
+        /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
+        public void Objectives(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
+        {
+            Note();
+            var completed = trigger.Actions.Where(a => MissionIndex.Is(a.Key, "Act_SetNNState") &&
+                                                       MissionIndex.Is(a.Value(1), "COMPLETE"))
+                .Select(a => a.Value(0)?.Trim()).OfType<string>().Where(o => o.Length > 0 && !activated.Contains(o))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            foreach (var objective in completed)
+            {
+                if (Chain(objective, rest) is { } chain)
+                    TryRun(chain, rest);
+                Note();
+            }
+        }
+
+        /// <summary>The launch rule, before a trigger of the path with a launch condition runs. The game gives the launch
+        /// to each trigger that waits for it in the same pass.</summary>
+        /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
+        public void Launch(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
+        {
+            if (!StartPlaces.IsLaunch(trigger.Condition))
+                return;
+            foreach (var peer in Machine.Active.Concat(Machine.Pending).Distinct()
+                         .Where(t => Free(t, rest) && SameLaunch(trigger, t.Condition!)).ToList())
+                TryRun([peer], rest);
+        }
+
+        /// <summary>The Cnd_InSpace rule, after a trigger of the path ran.</summary>
+        /// <param name="rest">The rest of the path, with the chosen trigger.</param>
+        public void InSpace(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
+        {
+            inSpace = StartPlaces.InSpaceAt(trigger.Condition) ?? inSpace;
+            if (inSpace is not { } space)
+                return;
+            foreach (var peer in Machine.Active.Where(t => Free(t, rest) && t.ConditionIs("Cnd_InSpace") &&
+                                                           StartPlaces.InSpaceAt(t.Condition) == space).ToList())
+                TryRun([peer], rest);
+        }
+
+        /// <summary>True for a waiting trigger that the rules can run: active or pending, not the chosen trigger, not a
+        /// trigger of the rest of the path, and not repeatable.</summary>
+        private bool Free(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest) =>
+            trigger != chosen && !trigger.Repeats && !rest.Contains(trigger) && trigger.Condition != null && Alive(trigger);
+
+        /// <summary>True when a waiting launch condition matches the launch of a trigger of the path.</summary>
+        private static bool SameLaunch(MissionTrigger launch, MissionLine waits)
+        {
+            if (!StartPlaces.IsLaunch(waits))
+                return false;
+            var own = launch.Condition!;
+            if (MissionIndex.Is(waits.Key, "Cnd_SpaceEnter") && Word(waits, "system") is { } system)
+            {
+                var launchSystem = (MissionIndex.Is(own.Key, "Cnd_SpaceEnter") ? Word(own, "system") : null) ??
+                                   Word(launch.SystemHint);
+                return MissionIndex.Is(launchSystem, system);
+            }
+            if (MissionIndex.Is(waits.Key, "Cnd_BaseExit") && Word(waits, "base") is { } dock)
+                return MissionIndex.Is(own.Key, "Cnd_BaseExit") && MissionIndex.Is(Word(own, "base"), dock);
+            return true;
+        }
+
+        /// <summary>The shortest chain of starts from an active trigger to a trigger that makes an objective active, or
+        /// null. The chain does not pass the chosen trigger, a trigger of the rest of the path or a repeatable
+        /// trigger.</summary>
+        private List<MissionTrigger>? Chain(string objective, IReadOnlyList<MissionTrigger> rest)
+        {
+            var next = StartPlan.Next(index, MissionLinkKind.Start);
+            var parent = new Dictionary<MissionTrigger, MissionTrigger?>();
+            var queue = new Queue<MissionTrigger>();
+            foreach (var trigger in Machine.Active.Concat(Machine.Pending).Where(t => Free(t, rest)))
+            {
+                if (parent.TryAdd(trigger, null))
+                    queue.Enqueue(trigger);
+            }
+            while (queue.Count > 0)
+            {
+                var trigger = queue.Dequeue();
+                if (Activates(trigger, objective))
+                {
+                    var chain = new List<MissionTrigger>();
+                    for (var at = trigger; at != null; at = parent[at])
+                        chain.Add(at);
+                    chain.Reverse();
+                    return chain;
+                }
+                foreach (var child in next[trigger].Where(c => c != chosen && !c.Repeats && !rest.Contains(c)))
+                {
+                    if (parent.TryAdd(child, trigger))
+                        queue.Enqueue(child);
+                }
+            }
+            return null;
+        }
+
+        /// <summary>True when a line of a trigger makes an objective active: Act_SetNNObj, or Act_SetNNState with
+        /// ACTIVE.</summary>
+        private static bool Activates(MissionTrigger trigger, string objective) =>
+            trigger.Actions.Any(a => MissionIndex.Is(a.Value(0), objective) && MakesActive(a));
+
+        private static bool MakesActive(MissionLine line) =>
+            MissionIndex.Is(line.Key, "Act_SetNNObj") ||
+            MissionIndex.Is(line.Key, "Act_SetNNState") && MissionIndex.Is(line.Value(1), "ACTIVE");
+
+        /// <summary>Reads the objectives that the new effects of the replay make active.</summary>
+        private void Note()
+        {
+            for (; read < Changes.Count; read++)
+            {
+                if (Changes[read] is { Kind: MachineChangeKind.Effect, Line: { } line } && MakesActive(line) &&
+                    line.Value(0)?.Trim() is { Length: > 0 } name)
+                    activated.Add(name);
+            }
+        }
+
+        /// <summary>Runs a chain of waiting triggers in order. When a run breaks a rule of <see cref="Replayer"/>, the
+        /// replay goes back to the state before the chain.</summary>
+        private void TryRun(IReadOnlyList<MissionTrigger> chain, IReadOnlyList<MissionTrigger> rest)
+        {
+            var state = Machine.Snapshot();
+            var count = Changes.Count;
+            var before = rest.Distinct().Select(t => (Trigger: t, Alive: Alive(t), Machine.StateOf(t).Runs)).ToList();
+            var ok = chain.All(t => Reach(t, again: true) == Reached.Ran && Machine.Halt == null && Machine.End == null) &&
+                     before.All(b => Machine.StateOf(b.Trigger).Runs == b.Runs && (!b.Alive || Alive(b.Trigger)));
+            if (ok)
+                return;
+            Machine = TriggerMachine.From(state, index, world);
+            Changes.RemoveRange(count, Changes.Count - count);
+            read = Math.Min(read, count);
+        }
+
+        private bool Alive(MissionTrigger trigger) => Machine.Active.Contains(trigger) || Machine.Pending.Contains(trigger);
+
+        /// <summary>The name of a value of a line, or null for an empty value or a word such as no_params, ANY or
+        /// ALL.</summary>
+        private static string? Word(MissionLine line, string value) => Word(line.ValueOf(value));
+
+        private static string? Word(string? text) =>
+            text?.Trim() is { Length: > 0 } name && !MissionIndex.Is(name, "no_params") && !MissionIndex.Is(name, "ANY") &&
+            !MissionIndex.Is(name, "ALL")
+                ? name
+                : null;
     }
 
     /// <summary>The Ran and the Effect changes of a pass, in order.</summary>

@@ -49,7 +49,8 @@ public sealed partial class StartPlanRetailTests
     {
         var index = analysis.Index;
         var replay = StartReplay.Run(index, MissionStartPoint.At(trigger));
-        var forced = replay.Path.Where(t => t != replay.Chosen).ToList();
+        var forced = replay.Path.Concat(replay.Changes.Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger))
+            .Where(t => t != replay.Chosen).Distinct().ToList();
         var lines = replay.Effects.Select(e => e.Line).ToList();
         var keep = StartSetup.Keep(index, lines, forced);
         return lines.Where((l, i) => keep[i] && l.Name?.Start == StartRole.World)
@@ -328,6 +329,62 @@ public sealed partial class StartPlanRetailTests
             Assert.DoesNotContain(World(buffalo), l => l.Values.Count > 0 && l.Values[0] is "king" or "juni");
             // A base start starts the base trigger at the load, so it runs while the player is docked.
             Assert.Contains("bse_Li0112", Starts(buffalo, 0));
+        }
+    }
+
+    /// <summary>The objective 3 seconds after the spawn of the play: the last objective line of the setup, then the
+    /// objective lines of the triggers that the start runs in that time. These are the triggers of the active set with
+    /// Cnd_True, Cnd_InSpace = true or a timer of at most 3 seconds, and the triggers that they start with such a
+    /// condition.</summary>
+    private static string Objective(MissionIndex index, StartPlan plan)
+    {
+        static bool IsObjective(string key) => MissionIndex.Is(key, "Act_SetNNObj") || MissionIndex.Is(key, "Act_NNPath");
+        static bool Soon(MissionTrigger trigger) =>
+            trigger.ConditionIs("Cnd_True") ||
+            trigger.ConditionIs("Cnd_InSpace") && !MissionIndex.Is(trigger.Condition!.Value(0), "false") ||
+            trigger.ConditionIs("Cnd_Timer") && float.TryParse(trigger.Condition!.Value(0), NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var time) && time <= 3;
+        var objective = plan.Setup[0].Lines.LastOrDefault(l => IsObjective(l.Key)) is var (key, values) && key != null
+            ? $"{key} = {string.Join(", ", values)}"
+            : "none";
+        var queue = new Queue<MissionTrigger>(plan.ActiveSet.Select(n => index.Trigger(n)!).Where(Soon));
+        var seen = new HashSet<MissionTrigger>();
+        while (queue.Count > 0)
+        {
+            var trigger = queue.Dequeue();
+            if (!seen.Add(trigger))
+                continue;
+            foreach (var line in trigger.Actions)
+            {
+                if (IsObjective(line.Key))
+                    objective = $"{line.Key.Trim()} = {string.Join(", ", line.Line.Select(RetailText.Of))}";
+                else if (MissionIndex.Is(line.Key, "Act_ActTrig") && line.Value(0) is { } name &&
+                         index.Trigger(name) is { } next && Soon(next))
+                    queue.Enqueue(next);
+            }
+        }
+        return objective;
+    }
+
+    /// <summary>The objective of the user's report of far waypoints. M10 sye_Rh04again: the replay runs the timer and
+    /// the trigger that set the objective of the dock ring, because the path completes that objective. M08 ku04_init: the
+    /// replay runs the Cnd_InSpace trigger of the path to Ku01_05 at the launch in Ku01. So 3 seconds after the spawn,
+    /// the objective is that of the path, not a waypoint far away.</summary>
+    [Fact]
+    public void TheObjectiveAfterTheSpawnIsThatOfThePath()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var m10 = Slot(scripts, "M10");
+            var rh04 = Plan(m10, "sye_Rh04again");
+            Assert.DoesNotContain("delay_switch_23840_to_23845", rh04.ActiveSet);
+            Assert.DoesNotContain("switch_23840_to_23845", rh04.ActiveSet);
+            Assert.Equal("Act_SetNNObj = nn_blank, OBJECTIVE_HISTORY", Objective(m10.Index, rh04));
+
+            var m08 = Slot(scripts, "M08");
+            var ku04 = Plan(m08, "ku04_init");
+            Assert.DoesNotContain("draw_path_to_newtoyko", ku04.ActiveSet);
+            Assert.Equal("Act_SetNNObj = search", Objective(m08.Index, ku04));
         }
     }
 

@@ -255,6 +255,14 @@ The section "Play a mission" of [PLAY.md](PLAY.md) tells what Play does with the
 
 An approximate start has two setup triggers. The first runs at the load. It sets the state of the path, for example the objective, the reputations and the locks. The second makes the world when the player enters space, or at the launch for a base start. Then it starts the triggers that wait at the start, so their lines find the ships of the world. For a base start, only a waiting trigger that runs at once with lines on ships starts at the launch. The other triggers start at the load, so a trigger of the base or of a room runs while the player is docked.
 
+The editor runs the path without a game world. So a trigger that waits for an event of the world stays active in the run, also when the game ran it long before the trigger of the start. The editor runs such a trigger when the path shows its event:
+
+- A launch of the path runs each trigger that waits for that launch. Examples are Cnd_PlayerLaunch, and Cnd_SpaceEnter without a system or with the system of the launch.
+- When the path shows the player in space, each trigger that waits for Cnd_InSpace = true runs. When the path shows the player docked, each trigger that waits for Cnd_InSpace = false runs.
+- A trigger of the path can complete an objective that no earlier line made active. Then the trigger that makes the objective active ran before. The editor runs it, with the triggers that start it, for example a timer.
+
+Such a run must not stop or run a later trigger of the path. Else the editor does not do it, and the trigger waits at the start. The setup keeps the last objective line of the run. A log line (Act_NNIds) after it does not remove it.
+
 The setup trigger of the world rebuilds the world of the path. In the game, the objects of an earlier system stay in that system when the player jumps. So the setup makes only the objects of the start system. That is the system of the start place. For a base start, it is the system of the base. For a start at the Scene camera, it is the system of the camera when the play starts.
 
 The editor follows each object along the path:

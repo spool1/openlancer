@@ -28,8 +28,9 @@ internal static class StartSetup
     private static readonly string[] Spawns =
         ["Act_SpawnShip", "Act_SpawnShipRel", "Act_SpawnFormation", "Act_SpawnSolar", "Act_SpawnLoot"];
 
-    /// <summary>The objective lines: only the last one counts.</summary>
-    private static readonly string[] Objectives = ["Act_SetNNObj", "Act_NNIds", "Act_NNPath"];
+    /// <summary>The objective lines: only the last one counts. <c>Act_NNIds</c> adds a text to the log and does not
+    /// change the objective, so it has its own last line.</summary>
+    private static readonly string[] Objectives = ["Act_SetNNObj", "Act_NNPath"];
 
     /// <summary>The lines that change the objective of the last objective line. They stay after it.</summary>
     private static readonly string[] ObjectiveChanges = ["Act_SetNNState", "Act_SetNNHidden", "Act_GiveNNObjs"];
@@ -59,7 +60,10 @@ internal static class StartSetup
                 return check ? Check(single, index) : single;
         }
 
-        var forced = replay.Path.Where(t => t != replay.Chosen).ToList();
+        // The triggers that ran in the replay: the path, and the waiting triggers that the path shows ran. Their
+        // conditions name what the path destroyed, took and played.
+        var forced = replay.Path.Concat(replay.Changes.Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger))
+            .Where(t => t != replay.Chosen).Distinct().ToList();
         var effects = replay.Effects.Select(e => e.Line).ToList();
         var keep = Keep(index, effects, forced);
         var lines = effects.Where((_, i) => keep[i]).ToList();
@@ -155,7 +159,8 @@ internal static class StartSetup
     /// <item>A spawn whose objects a later <c>Act_Destroy</c> of the replay removes, or a <c>Cnd_Destroyed</c> or a
     /// <c>Cnd_LootAcquired</c> line of the path names. An <c>Act_Destroy</c> of only such objects goes too.</item>
     /// <item>Each music line but the last.</item>
-    /// <item>Each objective line but the last, and the changes of the objective before it.</item>
+    /// <item>Each objective line but the last, and the changes of the objective before it. The log lines
+    /// (<c>Act_NNIds</c>) keep their own last line.</item>
     /// </list>
     /// </summary>
     /// <param name="forced">The triggers of the path that ran: their conditions name what the path destroys and
@@ -205,6 +210,7 @@ internal static class StartSetup
         }
         KeepLast(lines, keep, l => Is(l, "Act_PlayMusic"), _ => false);
         KeepLast(lines, keep, l => Objectives.Any(o => Is(l, o)), l => ObjectiveChanges.Any(o => Is(l, o)));
+        KeepLast(lines, keep, l => Is(l, "Act_NNIds"), _ => false);
         return keep;
     }
 

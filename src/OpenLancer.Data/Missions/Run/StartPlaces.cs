@@ -93,6 +93,30 @@ internal static class StartPlaces
     internal static (Vector3 Point, Quaternion Turn) InFront(WorldObject item) =>
         (item.Position + Vector3.Transform(new Vector3(0, 0, Offset), item.Rotation), item.Rotation);
 
+    /// <summary>True when the condition of a trigger of the path shows the player in space when the trigger runs: a
+    /// launch, an arrival, <c>Cnd_InSpace = true</c>, or a condition about the player that retail tests only in space.
+    /// False when it shows the player docked: a base condition, <c>Cnd_SpaceExit</c> or <c>Cnd_InSpace = false</c>. Null
+    /// for another condition.</summary>
+    internal static bool? InSpaceAt(MissionLine? condition)
+    {
+        if (condition == null)
+            return null;
+        var key = condition.Key;
+        if (IsAny(key, BaseConditions) || MissionIndex.Is(key, "Cnd_SpaceExit"))
+            return false;
+        if (MissionIndex.Is(key, "Cnd_InSpace"))
+            return !(MissionIndex.Is(condition.Value(0), "false") || condition.Value(0)?.Trim() == "0");
+        if (IsLaunch(condition) || IsAny(key, ArrivalConditions))
+            return true;
+        return IsAny(key, SpaceConditions) && NamesPlayer(condition) ? true : null;
+    }
+
+    /// <summary>True for a condition of a launch of the player: <c>Cnd_PlayerLaunch</c>, <c>Cnd_SpaceEnter</c>,
+    /// <c>Cnd_BaseExit</c>, and <c>Cnd_LaunchComplete</c> of the player.</summary>
+    internal static bool IsLaunch(MissionLine? condition) =>
+        condition != null && IsAny(condition.Key, LaunchConditions) &&
+        (!MissionIndex.Is(condition.Key, "Cnd_LaunchComplete") || NamesPlayer(condition));
+
     /// <summary>True for <c>Act_RelocateShip</c> of the player. Retail scripts move the player with it, for example after
     /// a scene in space. It is a place line, so the setup triggers do not copy it.</summary>
     internal static bool IsPlayerMove(MissionLine line) =>
