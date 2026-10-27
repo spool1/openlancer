@@ -1,4 +1,6 @@
 using System.Linq;
+using System.Text.Json.Nodes;
+using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Studio.Agent;
@@ -169,6 +171,47 @@ public sealed class EditBatchToolTests
         Assert.Equal(("limit", "EditSections"), (limit.Code, limit.Detail));
         Assert.False(session.CanUndo);
         Assert.Equal(0, session.Revision);
+    }
+
+    /// <summary>
+    /// A batch whose result is larger than the size limit of a result gives limit and changes nothing. Its preview gives
+    /// the same error. Through the queue, a batch whose result fits applies, and the queue keeps its result (review
+    /// finding of MCP1-2, step 3).
+    /// </summary>
+    [Fact]
+    public async Task ABatchWhoseResultIsAboveTheSizeLimitChangesNothing()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+        host.TestLimits = new AgentLimits { ResultKilobytes = 16 };
+        var hundred = Enumerable.Range(0, 100).Select(i => Move("obj:Li01_01", i)).ToArray();
+        using var queue = new ToolQueue(host);
+
+        async Task<ToolResult> Queued(string arguments)
+        {
+            var call = queue.CallAsync("edit_batch", JsonNode.Parse(arguments)!.AsObject(), null,
+                TestContext.Current.CancellationToken);
+            Assert.True(queue.RunNext());
+            return await call;
+        }
+
+        var large = await Queued(Batch(hundred));
+        var preview = await Queued($$"""{ "steps": [{{string.Join(", ", hundred)}}], "preview": true }""");
+        Assert.False(session.CanUndo);
+        Assert.Equal(0, session.Revision);
+        Assert.Empty(host.Edits);
+        var small = await Queued(Batch(hundred[..10]));
+
+        foreach (var refused in new[] { large, preview })
+        {
+            Assert.True(refused.IsError);
+            Assert.Equal(("limit", ToolResult.ResultSize),
+                ((string?)refused.Content["code"], (string?)refused.Content["detail"]));
+            Assert.Contains("The edit changed nothing. Split the edit into smaller calls.", (string?)refused.Content["message"]);
+        }
+        Assert.False(small.IsError, small.Text);
+        Assert.Equal(("applied", "1"), ((string?)small.Content["status"], (string?)small.Content["rev"]));
+        Assert.Equal("9, 0, 0", Line(session, Station, "pos"));
     }
 
     [Fact]

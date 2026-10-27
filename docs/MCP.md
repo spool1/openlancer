@@ -85,7 +85,7 @@ When another program uses the port, the server does not start. The status bar th
 | Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions and Cutscenes. `render_scene` is in the group Scene, and `render_cutscene` is in the group Cutscenes. These tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check`, `get_console`, the edit tools, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene. |
 | Rows of a page without a limit | 50 | The rows of a list result when the agent gives no limit. |
 | Largest page limit | 200 | The largest limit that the agent can ask for in one list result. |
-| Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. |
+| Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
 | Calls each second | 10 | The most calls that the server takes in one second. |
 | Wait for the editor (s) | 30 | How long a call waits while you edit a field or a dialog is open. |
 | Time of a check or an image (s) | 60 | How long a check of a retail target or an image can take. |
@@ -191,7 +191,7 @@ The result of an edit gives the new items (`adds`), the changed items (`changes`
 
 #### Limits and pauses
 
-One call names at most 200 items and changes at most 2000 sections. One batch has at most 100 steps. **Agent > Agent settings > Advanced** changes these limits. A call above a limit gives the error `limit` and changes nothing.
+One call names at most 200 items and changes at most 2000 sections. One batch has at most 100 steps. **Agent > Agent settings > Advanced** changes these limits. A call above a limit gives the error `limit` and changes nothing. The size limit of a result applies to an edit too. The edit checks the size of its result before it applies, so a larger edit also changes nothing.
 
 While you pause the agent edits, each edit tool gives the error `paused`, and the read tools still work. A later version adds **Pause agent edits** to the Agent menu.
 

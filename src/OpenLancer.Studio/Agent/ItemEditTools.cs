@@ -28,19 +28,19 @@ internal static class ItemEditTools
     /// characters.</summary>
     public const int MaxText = 32768;
 
-    public static ToolStep SetFields(ToolCall call) => ToolResult.Of(EditTools.Apply(call, scope =>
+    public static ToolStep SetFields(ToolCall call) => EditTools.Apply(call, scope =>
     {
         var section = EditTools.Section(call, call.Args.Text("ref")!, "ref");
         var fields = call.Args.Node("fields")!.AsObject().Select(f => KeyValuePair.Create(f.Key, f.Value)).ToList();
         scope.Run(FieldCommands.SetFields(scope.Session, section, fields), [section]);
-    }));
+    });
 
     /// <summary>
     /// Sets the text of a text key of a section. Only the named section gets the new text, as the Inspector does when it
     /// does not ask. The result warns about each other section of the item that shows the same text, so the agent can
     /// call the tool on it too.
     /// </summary>
-    public static ToolStep SetText(ToolCall call) => ToolResult.Of(EditTools.Apply(call, scope =>
+    public static ToolStep SetText(ToolCall call) => EditTools.Apply(call, scope =>
     {
         var session = scope.Session;
         var section = EditTools.Section(call, call.Args.Text("ref")!, "ref");
@@ -64,14 +64,14 @@ internal static class ItemEditTools
                 Ref = ItemRefs.Canonical(session, s),
             }).ToList(),
         });
-    }));
+    });
 
     /// <summary>
     /// Gives an item a new nickname with each line that names it. An item of a system calls the rename of the Scene
     /// (decisions D12, D231 and D257). Another item calls the rename of the Database, which changes only an item that the
     /// active mod adds (review finding R4 of MCP1-2). The result gives the old and the new reference.
     /// </summary>
-    public static ToolStep RenameItem(ToolCall call) => ToolResult.Of(EditTools.Apply(call, scope =>
+    public static ToolStep RenameItem(ToolCall call) => EditTools.Apply(call, scope =>
     {
         var session = scope.Session;
         var section = EditTools.Section(call, call.Args.Text("ref")!, "ref");
@@ -86,25 +86,25 @@ internal static class ItemEditTools
         {
             Renames = [new ResultRename(from, ItemRefs.Canonical(session, renamed))],
         });
-    }));
+    });
 
     /// <summary>
     /// Deletes items of a system with the cascade of decision D81: the children, and the lines that a rule removes. The
     /// other lines that name them show "Missing". The editor has no delete of a data item, so such a reference refuses
     /// (review finding R4 of MCP1-2).
     /// </summary>
-    public static ToolStep DeleteItems(ToolCall call) => ToolResult.Of(EditTools.Apply(call, scope =>
+    public static ToolStep DeleteItems(ToolCall call) => EditTools.Apply(call, scope =>
     {
         var targets = Targets(call);
         scope.Run(SceneCommands.Delete(scope.Session, targets), targets);
-    }));
+    });
 
     /// <summary>
     /// Copies items of a system with their children (decisions D241 and D259 to D262). The copies are at the place of
     /// their items. With an offset, the same batch moves each copy and each copy of a child by the offset (review finding
     /// R6 of MCP1-2). A copy without a position stays as it is.
     /// </summary>
-    public static ToolStep DuplicateItems(ToolCall call) => ToolResult.Of(EditTools.Apply(call, scope =>
+    public static ToolStep DuplicateItems(ToolCall call) => EditTools.Apply(call, scope =>
     {
         var session = scope.Session;
         var targets = Targets(call);
@@ -116,7 +116,7 @@ internal static class ItemEditTools
             .Select(s => new TransformMove(s, new TransformChange(Position: offset))).ToList();
         if (moves.Count > 0)
             scope.Run(SceneCommands.Transform(session, moves, TransformMode.Relative), moves.Select(m => m.Item));
-    }));
+    });
 
     /// <summary>The sections of the argument <c>refs</c>, each one time. A call names at most the item limit of the
     /// host.</summary>

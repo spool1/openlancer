@@ -101,17 +101,25 @@ public sealed class ToolResult
         return new ToolResult(content, false, Images);
     }
 
-    /// <summary>The result, or the error <c>limit</c> when its text is larger than the limit of a result (section 8.4
-    /// of the MCP1 design). Both hosts and <c>oltool mcp replay</c> apply it.</summary>
-    internal ToolResult Limited(AgentLimits limits)
+    /// <summary>The detail code of the error <c>limit</c> for a result that is too large.</summary>
+    internal const string ResultSize = "ResultSize";
+
+    /// <summary>The size of the text in whole KB, or null. The size is null when the text fits the limit of a result
+    /// (section 8.4 of the MCP1 design).</summary>
+    internal int? SizeAboveLimit(AgentLimits limits)
     {
-        var kilobytes = limits.ResultKilobytes;
         var bytes = Bytes;
-        return bytes <= kilobytes * 1024
-            ? this
-            : Failure(EditErrorKind.Limit, "ResultSize",
-                AgentTexts.Error("limit_result", ("size", (bytes + 1023) / 1024), ("max", kilobytes)));
+        return bytes <= limits.ResultKilobytes * 1024 ? null : (bytes + 1023) / 1024;
     }
+
+    /// <summary>The result, or the error <c>limit</c> when its text is larger than the limit of a result (section 8.4
+    /// of the MCP1 design). Both hosts and <c>oltool mcp replay</c> apply it. An edit checks the size before its
+    /// commit, so this error never hides an edit that applied.</summary>
+    internal ToolResult Limited(AgentLimits limits) =>
+        SizeAboveLimit(limits) is { } size
+            ? Failure(EditErrorKind.Limit, ResultSize,
+                AgentTexts.Error("limit_result", ("size", size), ("max", limits.ResultKilobytes)))
+            : this;
 }
 
 /// <summary>

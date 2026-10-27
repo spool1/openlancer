@@ -134,8 +134,9 @@ internal static class EditTools
     /// step.
     /// </summary>
     /// <param name="body">Runs the commands of the request in the scope.</param>
-    /// <exception cref="EditException">A check or a command refuses. Nothing changed.</exception>
-    public static EditResult Apply(ToolCall call, Action<EditScope> body)
+    /// <exception cref="EditException">A check or a command refuses, or the result is too large. Nothing
+    /// changed.</exception>
+    public static ToolResult Apply(ToolCall call, Action<EditScope> body)
     {
         var args = call.Args;
         if (call.Scope is { } batch)
@@ -148,7 +149,7 @@ internal static class EditTools
             body(batch);
             if (batch.Confirmations.Count > 0 && !args.Flag("confirm"))
                 throw new EditException(NeedsConfirmation(batch.Confirmations));
-            return batch.StepResult();
+            return ToolResult.Of(batch.StepResult());
         }
         var preview = args.Flag("preview");
         var withPatch = args.Flag("with_patch");
@@ -156,7 +157,7 @@ internal static class EditTools
             throw ToolInput.Bad("with_patch", AgentTexts.Error("with_patch_preview"));
         ReadOnlyGuard(call);
         Guard(call);
-        return Commit(call, null, preview, withPatch, args.Flag("confirm"), body);
+        return Commit(call, null, preview, withPatch, args.Flag("confirm"), body, result => ToolResult.Of(result));
     }
 
     /// <summary>
@@ -164,11 +165,16 @@ internal static class EditTools
     /// confirmation without <paramref name="confirm"/> cancels and refuses. A preview gives
     /// <c>needs_confirmation: true</c> in its result instead.
     /// </summary>
+    /// <remarks>The batch commits only when the result of the tool fits the size limit of a result (section 8.4 of the
+    /// MCP1 design). The queue replaces a larger result with the error <c>limit</c>. That error must not hide an edit
+    /// that applied, so a larger edit cancels with <c>limit</c> before its commit.</remarks>
     /// <param name="label">The label of the request, or null for the label of the first command.</param>
-    /// <exception cref="EditException">A check or a command refuses, or a commit check refuses. Nothing
-    /// changed.</exception>
-    internal static EditResult Commit(ToolCall call, string? label, bool preview, bool withPatch, bool confirm,
-        Action<EditScope> body)
+    /// <param name="output">Makes the result of the tool from the result of the batch, for example with the result of
+    /// each step of <c>edit_batch</c>.</param>
+    /// <exception cref="EditException">A check or a command refuses, a commit check refuses, or the result is too
+    /// large. Nothing changed.</exception>
+    internal static ToolResult Commit(ToolCall call, string? label, bool preview, bool withPatch, bool confirm,
+        Action<EditScope> body, Func<EditResult, ToolResult> output)
     {
         var session = call.Session;
         EditBatch batch;
@@ -189,10 +195,7 @@ internal static class EditTools
             if (confirmations.Count > 0 && !confirm && !preview)
                 throw new EditException(NeedsConfirmation(confirmations));
             var patch = withPatch ? batch.PatchTexts() : null;
-            var result = preview ? batch.Preview() : batch.Commit();
-            if (result.Status == EditStatus.Refused)
-                throw new EditException(result.Errors[0]);
-            result = Shaped(result) with
+            EditResult Final(EditResult result) => Shaped(result) with
             {
                 NeedsConfirmation = result.NeedsConfirmation || confirmations.Count > 0,
                 Patch = patch ?? result.Patch,
@@ -203,9 +206,30 @@ internal static class EditTools
                     _ => AgentTexts.Error("edit_no_change"),
                 },
             };
+
+            ToolResult Fitted(EditResult result)
+            {
+                var text = output(result);
+                if (text.SizeAboveLimit(call.Limits) is { } size)
+                {
+                    throw new EditException(new EditError(EditErrorKind.Limit, ToolResult.ResultSize,
+                        AgentTexts.Error("limit_edit_result", ("size", size), ("max", call.Limits.ResultKilobytes))));
+                }
+                return text;
+            }
+
+            var finished = batch.Finish();
+            if (finished.Status == EditStatus.Refused)
+                throw new EditException(finished.Errors[0]);
+            if (preview)
+                return Fitted(Final(batch.Preview()));
+            // The revision after the commit is not known yet. The longest revision gives the longest text, so the
+            // result of the commit is never larger than this result.
+            Fitted(Final(finished with { UndoLabel = batch.UndoLabel, Revision = long.MaxValue }));
+            var result = Final(batch.Commit());
             if (result.Status == EditStatus.Applied)
                 call.Host.Edited(call.Tool, result);
-            return result;
+            return output(result);
         }
     }
 

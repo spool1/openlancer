@@ -55,7 +55,7 @@ internal static class BatchTool
         EditTools.ReadOnlyGuard(call);
         var results = new List<EditResult>();
         // Each step asks for its own confirmation, so the batch itself needs none.
-        var result = EditTools.Commit(call, args.Text("label"), preview, withPatch, confirm: true, scope =>
+        return EditTools.Commit(call, args.Text("label"), preview, withPatch, confirm: true, scope =>
         {
             for (var i = 0; i < parsed.Count; i++)
             {
@@ -75,8 +75,8 @@ internal static class BatchTool
                     throw Failed(i, JsonSerializer.Deserialize<EditError>(error.Content, EditJson.Options)!);
                 results.Add(scope.StepResult());
             }
-        });
-        return ToolResult.Of(new BatchResult(result, results.Select(r => r with { Status = result.Status }).ToList()));
+        }, result => ToolResult.Of(new BatchResult(result,
+            results.Select(r => r with { Status = result.Status }).ToList())));
     }
 
     /// <summary>The tool and the arguments of a step, after the checks that need no session.</summary>
