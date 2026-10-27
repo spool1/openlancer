@@ -9088,7 +9088,7 @@
             },
             "minItems": 3,
             "maxItems": 3,
-            "description": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. Without it, each copy is at the place of its item."
+            "description": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position does not move, and the result warns about it. Without it, each copy is at the place of its item."
           },
           "preview": {
             "type": "boolean",

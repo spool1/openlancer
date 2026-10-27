@@ -102,7 +102,8 @@ internal static class ItemEditTools
     /// <summary>
     /// Copies items of a system with their children (decisions D241 and D259 to D262). The copies are at the place of
     /// their items. With an offset, the same batch moves each copy and each copy of a child by the offset (review finding
-    /// R6 of MCP1-2). A copy without a position stays as it is.
+    /// R6 of MCP1-2). A copy without a position does not move, and the result warns about it. So the result tells the
+    /// agent each copy that is not at the offset.
     /// </summary>
     public static ToolStep DuplicateItems(ToolCall call) => EditTools.Apply(call, scope =>
     {
@@ -112,10 +113,18 @@ internal static class ItemEditTools
         scope.Run(plan, targets);
         if (call.Args.Point("offset") is not { } offset || offset == Vector3.Zero)
             return;
-        var moves = plan.Adds.Where(s => session.Get(s)?.Lines("pos").Count > 0)
-            .Select(s => new TransformMove(s, new TransformChange(Position: offset))).ToList();
+        var placed = plan.Adds.ToLookup(s => session.Get(s)?.Lines("pos").Count > 0);
+        var moves = placed[true].Select(s => new TransformMove(s, new TransformChange(Position: offset))).ToList();
         if (moves.Count > 0)
             scope.Run(SceneCommands.Transform(session, moves, TransformMode.Relative), moves.Select(m => m.Item));
+        if (!placed[false].Any())
+            return;
+        scope.Report(new EditResult(EditStatus.Applied)
+        {
+            Warnings = placed[false].Select(s => ItemRefs.Canonical(session, s)).Select(copy =>
+                new Problem(DiagnosticSeverity.Warning, AgentTexts.Error("copy_not_moved", ("ref", copy))) { Ref = copy })
+                .ToList(),
+        });
     });
 
     /// <summary>The sections of the argument <c>refs</c>, each one time. A call names at most the item limit of the

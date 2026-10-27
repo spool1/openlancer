@@ -271,6 +271,26 @@ public sealed class AgentItemToolTests
         Assert.All(copies, c => Assert.Null(session.Get(c)));
     }
 
+    /// <summary>A copy without a position does not move by the offset. The result warns about it, so the agent knows
+    /// that the copy is not at the offset (review finding of MCP1-2, step 3).</summary>
+    [Fact]
+    public void ADuplicateWithAnOffsetWarnsAboutACopyWithoutAPosition()
+    {
+        var (ws, session, host) = Scene(SceneWorkspace.Li01Text + "\n" + Outpost);
+        using var _ = ws;
+
+        var result = Ok(host, "duplicate_items", """{ "refs": ["obj:Li01_dock", "light:Li01/Li01_lamp"], "offset": [100, 0, 0] }""");
+
+        var adds = Texts(result["adds"]);
+        var copies = adds.Select(a => ItemRefs.ResolveSection(session, ItemRefs.Parse(a))).ToList();
+        Assert.Equal([null, "100, 0, 0"], copies.Select(c => Line(session, c, "pos")));
+        var warning = Assert.Single(result["warnings"]!.AsArray())!;
+        Assert.Equal(adds[0], (string?)warning["ref"]);
+        Assert.Equal($"The copy {adds[0]} has no position, so the offset did not move it. To move it, give it a pos " +
+                     "with set_fields.", (string?)warning["message"]);
+        Assert.Equal(1, session.Revision);
+    }
+
     [Fact]
     public void ADuplicateWithoutAnOffsetKeepsThePlaceAndAGateRefuses()
     {

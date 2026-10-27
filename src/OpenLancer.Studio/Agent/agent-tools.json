@@ -221,7 +221,7 @@
       "description": "Copies items of a system with their children. Each copy gets the next free nickname. The tool makes one Undo step. The result gives the references of the copies.",
       "fields": {
         "refs": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. studio_status gives the most items of one call.",
-        "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. Without it, each copy is at the place of its item."
+        "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position does not move, and the result warns about it. Without it, each copy is at the place of its item."
       }
     },
     "undo": {
@@ -383,6 +383,7 @@
     "text_shared": "{ref} shows the same text and keeps the old text. To change it too, call set_text on {ref} with the field {key}.",
     "limit_items": "One call can name at most {max} items in refs. Split the call.",
     "repo_mod_editor": "Allow edits of this mod in the editor first.",
+    "copy_not_moved": "The copy {ref} has no position, so the offset did not move it. To move it, give it a pos with set_fields.",
     "limit_edit_result": "The result of the edit has {size} KB of text, and one result can have at most {max} KB. The edit changed nothing. Split the edit into smaller calls.",
     "undo_nothing": "The history has no step to undo.",
     "redo_nothing": "The history has no step to redo.",
