@@ -46,6 +46,9 @@ public sealed class DataLists
     private readonly Dictionary<string, RemovedPart> removedParts = new(VfsPath.Comparer);
     private int checksRevision = int.MinValue;
 
+    /// <summary>The last <see cref="ReferencePart.Id"/>.</summary>
+    private long partIds;
+
     // The files of the edit view of each files list source: its extensions, its folder and its class. The edit view
     // changes only with a save.
     private readonly Dictionary<(string Extensions, string? Folder, string? FileClass), (ModOverlay View, List<string> Paths)>
@@ -797,7 +800,12 @@ public sealed class DataLists
         }
     }
 
-    /// <summary>The merged reverse index of a list, built from the parts of its referrer files.</summary>
+    /// <summary>
+    /// The merged reverse index of a list, built from the parts of its referrer files. The files can stay the same
+    /// while one part changes. Then only the values that the part names, or named, get their references again, in the
+    /// order of the files. So a create in a large system does not merge the parts of all files again. A batch of
+    /// creates then runs in one frame of the editor (section 13.4 of the MCP1 design).
+    /// </summary>
     private Dictionary<(string? Scope, string Value), List<ListReference>> Merged(string list)
     {
         if (!merged.TryGetValue(list, out var cached))
@@ -809,12 +817,35 @@ public sealed class DataLists
             .Select(r => r.Role).Distinct(StringComparer.OrdinalIgnoreCase);
         var paths = roles.SelectMany(Files.Paths).Distinct(VfsPath.Comparer).ToList();
         var fileParts = paths.Select(Part).ToArray();
-        if (cached.Parts != null && cached.Parts.Length == fileParts.Length &&
-            cached.Parts.Zip(fileParts).All(p => ReferenceEquals(p.First, p.Second)))
-            return cached.Map;
-        cached.Parts = fileParts;
-        var map = new Dictionary<(string?, string), List<ListReference>>();
         var lower = list.ToLowerInvariant();
+        if (cached.Parts != null && cached.Paths.SequenceEqual(paths, VfsPath.Comparer))
+        {
+            var changed = Enumerable.Range(0, fileParts.Length)
+                .Where(i => !ReferenceEquals(cached.Parts[i], fileParts[i])).ToList();
+            if (changed.Count == 0)
+                return cached.Map;
+            if (changed.Count == 1)
+            {
+                var at = changed[0];
+                var keys = fileParts[at] is { FromId: > 0 } made && made.FromId == cached.Parts[at]?.Id
+                    ? made.ChangedKeys.Where(k => k.List == lower).Select(k => (k.Scope, k.Value)).ToList()
+                    : ChangedKeys(lower, cached.Parts[at], fileParts[at]);
+                cached.Parts = fileParts;
+                foreach (var key in keys)
+                {
+                    var references = fileParts.OfType<ReferencePart>()
+                        .SelectMany(p => p.Map.GetValueOrDefault((lower, key.Scope, key.Value)) ?? []).ToList();
+                    if (references.Count == 0)
+                        cached.Map.Remove(key);
+                    else
+                        cached.Map[key] = references;
+                }
+                return cached.Map;
+            }
+        }
+        cached.Parts = fileParts;
+        cached.Paths = paths;
+        var map = new Dictionary<(string?, string), List<ListReference>>();
         foreach (var part in fileParts.OfType<ReferencePart>())
         {
             foreach (var ((id, scope, value), references) in part.Map)
@@ -828,6 +859,27 @@ public sealed class DataLists
         }
         cached.Map = map;
         return map;
+    }
+
+    /// <summary>The keys of a list whose references differ between the old and the new part of one file.</summary>
+    /// <param name="list">The id of the list in lowercase.</param>
+    private static List<(string? Scope, string Value)> ChangedKeys(string list, ReferencePart? old, ReferencePart? made)
+    {
+        var keys = new List<(string?, string)>();
+        foreach (var ((id, scope, value), references) in old?.Map ?? [])
+        {
+            if (id == list && (made?.Map.GetValueOrDefault((id, scope, value)) is not { } now ||
+                               !references.SequenceEqual(now)))
+                keys.Add((scope, value));
+        }
+        if (made == null)
+            return keys;
+        foreach (var (id, scope, value) in made.Map.Keys)
+        {
+            if (id == list && old?.Map.ContainsKey((id, scope, value)) != true)
+                keys.Add((scope, value));
+        }
+        return keys;
     }
 
     /// <summary>The reverse index part of one referrer file, built again only when W of the file changes, or when W of
@@ -848,62 +900,111 @@ public sealed class DataLists
             (!part.UsesSystems || ReferenceEquals(part.Universe, universe)) &&
             (!part.UsesOwners || ReferenceEquals(part.Owners, owners)))
             return part;
-        part = BuildPart(table, universe, owners);
+        part = BuildPart(table, universe, owners, part);
         parts[path] = part;
         return part;
     }
 
     /// <param name="owners">The state of the nebula and field files when the part is built (milestone M3). A part with
     /// <c>owner</c> references is built again when it changes.</param>
-    private ReferencePart BuildPart(FileTable table, FileTable? universe, object owners)
+    /// <param name="old">The part of an older W state of the file, or null. The old state can have a section at the same
+    /// place with the same identity. While universe.ini and the owners stay the same, that section names the same
+    /// values. So it takes its references from the old part, and a create in a large system reads only the new
+    /// section.</param>
+    private ReferencePart BuildPart(FileTable table, FileTable? universe, object owners, ReferencePart? old)
     {
         var map = new Dictionary<(string, string?, string), List<ListReference>>();
         var usesSystems = false;
         var usesOwners = false;
         var roles = Files.RolesOf(table.Path);
+        var reuse = old != null && ReferenceEquals(old.Universe, universe) && ReferenceEquals(old.Owners, owners);
+        // The rules of each section type, by key. A system file has hundreds of sections of a few types.
+        var rulesOfType = new Dictionary<string, Dictionary<string, List<ListRule>>>(StringComparer.OrdinalIgnoreCase);
+        var sections = new SectionReferences[table.Working.Count];
+        var kept = new bool[reuse ? old!.Sections.Length : 0];
+        var changed = new HashSet<(string, string?, string)>();
         for (var i = 0; i < table.Working.Count; i++)
         {
             var section = table.Working[i];
-            var byKey = roles.SelectMany(r => rules.ByRoleAndSection.GetValueOrDefault((r.ToLowerInvariant(),
-                    section.Name.ToLowerInvariant())) ?? [])
-                .GroupBy(r => r.Key, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
-            if (byKey.Count == 0)
-                continue;
-            var target = table.Ref(i);
-            var lineOfKey = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in section)
+            SectionReferences own;
+            if (reuse && i < old!.Sections.Length && ReferenceEquals(old.Table.Working[i], section) &&
+                old.Table.Ids[i].Equals(table.Ids[i]))
             {
-                if (!byKey.TryGetValue(entry.Name, out var keyRules))
-                    continue;
-                var line = lineOfKey.GetValueOrDefault(entry.Name);
-                lineOfKey[entry.Name] = line + 1;
-                foreach (var rule in keyRules)
+                own = old.Sections[i];
+                kept[i] = true;
+            }
+            else
+            {
+                if (!rulesOfType.TryGetValue(section.Name, out var byKey))
                 {
-                    if (rule.IndexIn(entry) is not (>= 0 and var at) ||
-                        entry[at].ToString().Trim() is not { Length: > 0 } value)
-                        continue;
-                    usesSystems |= rule.SystemValue >= 0;
-                    usesOwners |= rule.OwnerScope;
-                    if (!ScopeOf(rule, table.Path, entry.ToList(), out var scope))
-                        continue;
-                    var reference = new ListReference(target, entry.Name, line, at, rule);
-                    // A line of a file with more than one owner names a zone of each owner.
-                    var files = scope == null ? new string?[] { null } : ScopeFiles(scope);
-                    foreach (var list in rule.Lists)
-                    {
-                        foreach (var file in files)
-                        {
-                            var key = (list.ToLowerInvariant(), file?.ToLowerInvariant(), ValueKey(list, value));
-                            if (!map.TryGetValue(key, out var all))
-                                map[key] = all = [];
-                            all.Add(reference);
-                        }
-                    }
+                    rulesOfType[section.Name] = byKey = roles.SelectMany(r => rules.ByRoleAndSection.GetValueOrDefault((
+                            r.ToLowerInvariant(), section.Name.ToLowerInvariant())) ?? [])
+                        .GroupBy(r => r.Key, StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+                }
+                own = byKey.Count == 0 ? SectionReferences.None : References(table, i, byKey);
+                changed.UnionWith(own.References.Select(r => r.Key));
+            }
+            sections[i] = own;
+            usesSystems |= own.UsesSystems;
+            usesOwners |= own.UsesOwners;
+            foreach (var (key, reference) in own.References)
+            {
+                if (!map.TryGetValue(key, out var all))
+                    map[key] = all = [];
+                all.Add(reference);
+            }
+        }
+        for (var i = 0; i < kept.Length; i++)
+        {
+            if (!kept[i])
+                changed.UnionWith(old!.Sections[i].References.Select(r => r.Key));
+        }
+        return new ReferencePart(table, universe, usesSystems, map, sections)
+        {
+            Owners = owners,
+            UsesOwners = usesOwners,
+            Id = ++partIds,
+            FromId = reuse ? old!.Id : 0,
+            ChangedKeys = changed,
+        };
+    }
+
+    /// <summary>The line values of one section that name entries of lists, with the keys of the reverse index.</summary>
+    /// <param name="byKey">The rules of the type of the section, by key.</param>
+    private SectionReferences References(FileTable table, int index, Dictionary<string, List<ListRule>> byKey)
+    {
+        var result = new List<((string, string?, string) Key, ListReference Reference)>();
+        var usesSystems = false;
+        var usesOwners = false;
+        var target = table.Ref(index);
+        var lineOfKey = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in table.Working[index])
+        {
+            if (!byKey.TryGetValue(entry.Name, out var keyRules))
+                continue;
+            var line = lineOfKey.GetValueOrDefault(entry.Name);
+            lineOfKey[entry.Name] = line + 1;
+            foreach (var rule in keyRules)
+            {
+                if (rule.IndexIn(entry) is not (>= 0 and var at) ||
+                    entry[at].ToString().Trim() is not { Length: > 0 } value)
+                    continue;
+                usesSystems |= rule.SystemValue >= 0;
+                usesOwners |= rule.OwnerScope;
+                if (!ScopeOf(rule, table.Path, entry.ToList(), out var scope))
+                    continue;
+                var reference = new ListReference(target, entry.Name, line, at, rule);
+                // A line of a file with more than one owner names a zone of each owner.
+                var files = scope == null ? new string?[] { null } : ScopeFiles(scope);
+                foreach (var list in rule.Lists)
+                {
+                    foreach (var file in files)
+                        result.Add(((list.ToLowerInvariant(), file?.ToLowerInvariant(), ValueKey(list, value)), reference));
                 }
             }
         }
-        return new ReferencePart(table, universe, usesSystems, map) { Owners = owners, UsesOwners = usesOwners };
+        return new SectionReferences(result, usesSystems, usesOwners);
     }
 
     private static bool Is(string? a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
@@ -918,10 +1019,25 @@ public sealed class DataLists
         public ListView? View;
     }
 
+    /// <summary>The line values of one section that name entries of lists, with the keys of the reverse index.</summary>
+    /// <param name="UsesSystems">True when a line of the section has a <c>systemOf</c> scope.</param>
+    /// <param name="UsesOwners">True when a line of the section has an <c>owner</c> scope.</param>
+    private sealed record SectionReferences(
+        IReadOnlyList<((string List, string? Scope, string Value) Key, ListReference Reference)> References,
+        bool UsesSystems, bool UsesOwners)
+    {
+        /// <summary>A section without references.</summary>
+        public static readonly SectionReferences None = new([], false, false);
+    }
+
     private sealed class MergedReferences
     {
         public int Revision = int.MinValue;
         public ReferencePart?[]? Parts;
+
+        /// <summary>The referrer files of the list when the map was merged, in the order of <see cref="Parts"/>.</summary>
+        public List<string> Paths = [];
+
         public Dictionary<(string? Scope, string Value), List<ListReference>> Map = [];
     }
 
@@ -936,8 +1052,9 @@ public sealed class DataLists
     /// <param name="Universe">The table of universe.ini when the part was built.</param>
     /// <param name="UsesSystems">True when a line of the file has a <c>systemOf</c> scope, so the part depends on
     /// universe.ini.</param>
+    /// <param name="Sections">The references of each section of the table, by index.</param>
     private sealed record ReferencePart(FileTable Table, FileTable? Universe, bool UsesSystems,
-        Dictionary<(string List, string? Scope, string Value), List<ListReference>> Map)
+        Dictionary<(string List, string? Scope, string Value), List<ListReference>> Map, SectionReferences[] Sections)
     {
         /// <summary>The state of the nebula and field files when the part was built.</summary>
         public object? Owners { get; init; }
@@ -945,5 +1062,17 @@ public sealed class DataLists
         /// <summary>True when a line of the file has an <c>owner</c> scope, so the part depends on the owners of the
         /// file.</summary>
         public bool UsesOwners { get; init; }
+
+        /// <summary>A number of the part that no other part of the session has.</summary>
+        public long Id { get; init; }
+
+        /// <summary>The <see cref="Id"/> of the part of the older W state that this part reused, or 0. The part keeps
+        /// the number, not the old part, so the old parts do not stay in memory.</summary>
+        public long FromId { get; init; }
+
+        /// <summary>The keys whose references can differ from the part of <see cref="FromId"/>: the keys of each
+        /// section that the part did not reuse.</summary>
+        public IReadOnlySet<(string List, string? Scope, string Value)> ChangedKeys { get; init; } =
+            new HashSet<(string, string?, string)>();
     }
 }

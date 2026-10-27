@@ -26,15 +26,22 @@ internal sealed record SceneName(string Name, uint Hash, SectionRef Section)
 /// <para>The system files are the files of <c>universe.ini</c>, so a file that <c>universe.ini</c> does not name does not
 /// count. The index builds one part for each file and builds a part again only when the W state of its file changes.
 /// The first use opens the system files that the session did not open.</para>
+/// <para>A change of a part changes only the names of the index that the part gives or gave. So a create in a large
+/// system does not build the index of all systems again. A batch of creates runs in one frame of the editor (section
+/// 13.4 of the MCP1 design).</para>
 /// <para>A light nickname must be unique in its file only (see <see cref="LightTaken"/>).</para>
 /// </remarks>
 internal sealed class Nicknames(EditSession session)
 {
-    private readonly Dictionary<string, (FileTable Table, List<SceneName> Names)> parts = new(VfsPath.Comparer);
+    private readonly Dictionary<string, Part> parts = new(VfsPath.Comparer);
+    private string[] files = [];
     private int revision = int.MinValue;
-    private List<SceneName> all = [];
-    private Dictionary<string, List<SceneName>> byName = new(StringComparer.OrdinalIgnoreCase);
-    private Dictionary<uint, List<SceneName>> byHash = [];
+    private List<SceneName>? all;
+    private readonly Dictionary<string, List<SceneName>> byName = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<uint, List<SceneName>> byHash = [];
+
+    /// <summary>The last <see cref="Part.Id"/>.</summary>
+    private long partIds;
 
     /// <summary>The objects and zones of all system files, in the order of the files.</summary>
     public IReadOnlyList<SceneName> All
@@ -42,7 +49,7 @@ internal sealed class Nicknames(EditSession session)
         get
         {
             Refresh();
-            return all;
+            return all ??= files.Where(parts.ContainsKey).SelectMany(p => parts[p].Names).ToList();
         }
     }
 
@@ -102,13 +109,13 @@ internal sealed class Nicknames(EditSession session)
     /// <param name="zones">True for the zones, false for the objects.</param>
     public IReadOnlyList<IReadOnlyList<SceneName>> Collisions(bool zones)
     {
-        Refresh();
+        var names = All;
         // The Inspector asks in each frame, so the groups stay until the names change.
-        if (collisions.TryGetValue(zones, out var known) && ReferenceEquals(known.All, all))
+        if (collisions.TryGetValue(zones, out var known) && ReferenceEquals(known.All, names))
             return known.Groups;
         var result = new List<IReadOnlyList<SceneName>>();
         var seen = new HashSet<SectionRef>();
-        foreach (var name in all.Where(n => n.IsZone == zones))
+        foreach (var name in names.Where(n => n.IsZone == zones))
         {
             if (seen.Contains(name.Section))
                 continue;
@@ -119,11 +126,12 @@ internal sealed class Nicknames(EditSession session)
             seen.UnionWith(group.Select(g => g.Section));
             result.Add(group);
         }
-        collisions[zones] = (all, result);
+        collisions[zones] = (names, result);
         return result;
     }
 
-    private readonly Dictionary<bool, (List<SceneName> All, IReadOnlyList<IReadOnlyList<SceneName>> Groups)> collisions = [];
+    private readonly Dictionary<bool, (IReadOnlyList<SceneName> All, IReadOnlyList<IReadOnlyList<SceneName>> Groups)>
+        collisions = [];
 
     /// <summary>
     /// The lines of a system file that name a name as an object or a zone, when no section of the file has the name
@@ -140,47 +148,182 @@ internal sealed class Nicknames(EditSession session)
             .ToList();
     }
 
+    /// <summary>
+    /// Builds again the part of each system file whose W state changed. A part that changed gives the names of the
+    /// index that it gives or gave. Only these names get their sections again, in the order of the files. A new list of
+    /// files, or a change of more than one part, builds the whole index again.
+    /// </summary>
     private void Refresh()
     {
         if (revision == session.CacheRevision)
             return;
         revision = session.CacheRevision;
-        var changed = false;
-        var files = session.Systems.Files;
-        foreach (var path in files)
+        var now = session.Systems.Files;
+        var changed = new List<(Part? Old, Part? New)>();
+        foreach (var path in now)
         {
             if (session.Table.File(path) is not { } table)
                 continue;
             if (parts.TryGetValue(path, out var part) && ReferenceEquals(part.Table, table))
                 continue;
-            parts[path] = (table, Names(table));
-            changed = true;
+            var next = new Part(table, part, ++partIds);
+            parts[path] = next;
+            changed.Add((part, next));
         }
-        foreach (var gone in parts.Keys.Where(p => !files.Contains(p, VfsPath.Comparer)).ToList())
+        foreach (var gone in parts.Keys.Where(p => !now.Contains(p, VfsPath.Comparer)).ToList())
         {
+            changed.Add((parts[gone], null));
             parts.Remove(gone);
-            changed = true;
         }
-        if (!changed && all.Count > 0)
+        var sameFiles = now.SequenceEqual(files, VfsPath.Comparer);
+        if (changed.Count == 0 && sameFiles)
             return;
-        all = files.Where(parts.ContainsKey).SelectMany(p => parts[p].Names).ToList();
-        byName = all.GroupBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
-        byHash = all.GroupBy(n => n.Hash).ToDictionary(g => g.Key, g => g.ToList());
+        files = [.. now];
+        all = null;
+        if (!sameFiles || changed.Count > 1)
+        {
+            byName.Clear();
+            byHash.Clear();
+            foreach (var name in All)
+            {
+                Add(byName, name.Name, name);
+                Add(byHash, name.Hash, name);
+            }
+            return;
+        }
+        var (old, made) = changed[0];
+        var built = made != null && old != null && made.FromId == old.Id;
+        IEnumerable<string> names = built ? made!.ChangedNames : Changed(old?.ByName, made?.ByName);
+        IEnumerable<uint> hashes = built ? made!.ChangedHashes : Changed(old?.ByHash, made?.ByHash);
+        foreach (var key in names)
+            Set(byName, key, files.Where(parts.ContainsKey).SelectMany(p => parts[p].ByName.GetValueOrDefault(key) ?? []));
+        foreach (var key in hashes)
+            Set(byHash, key, files.Where(parts.ContainsKey).SelectMany(p => parts[p].ByHash.GetValueOrDefault(key) ?? []));
     }
 
-    private static List<SceneName> Names(FileTable table)
+    /// <summary>
+    /// The object or zone that has the name, without letter case, in the order of the files, or null. Only the name
+    /// counts, not its FLHash. An item reference resolves with it (see <see cref="Commands.ItemRefs"/>).
+    /// </summary>
+    /// <param name="zone">True for a zone, false for an object.</param>
+    public SceneName? Find(string name, bool zone)
     {
-        var result = new List<SceneName>();
-        foreach (var type in new[] { "Object", "zone" })
+        Refresh();
+        return byName.GetValueOrDefault(name)?.FirstOrDefault(n => n.IsZone == zone);
+    }
+
+    /// <summary>The keys whose names differ between the old and the new map of a part.</summary>
+    private static List<TKey> Changed<TKey>(Dictionary<TKey, List<SceneName>>? old,
+        Dictionary<TKey, List<SceneName>>? made) where TKey : notnull
+    {
+        var keys = new List<TKey>();
+        foreach (var (key, names) in old ?? [])
         {
-            foreach (var index in table.OfType(type))
+            if (made?.GetValueOrDefault(key) is not { } now || !names.SequenceEqual(now))
+                keys.Add(key);
+        }
+        keys.AddRange((made ?? []).Keys.Where(k => old?.ContainsKey(k) != true));
+        return keys;
+    }
+
+    private static void Add<TKey>(Dictionary<TKey, List<SceneName>> map, TKey key, SceneName name) where TKey : notnull
+    {
+        if (!map.TryGetValue(key, out var list))
+            map[key] = list = [];
+        list.Add(name);
+    }
+
+    /// <summary>Gives a key of the index its names, or removes the key without names.</summary>
+    private static void Set<TKey>(Dictionary<TKey, List<SceneName>> map, TKey key, IEnumerable<SceneName> names)
+        where TKey : notnull
+    {
+        var list = names.ToList();
+        if (list.Count == 0)
+            map.Remove(key);
+        else
+            map[key] = list;
+    }
+
+    /// <summary>
+    /// The names of one W state of a system file. A section that the part of the older state has at the same place with
+    /// the same identity keeps its name. So a create in a large system reads only the new section, and the part knows
+    /// the names that changed.
+    /// </summary>
+    private sealed class Part
+    {
+        /// <param name="old">The part of an older W state of the file, or null.</param>
+        /// <param name="id">A number that no other part of the index has.</param>
+        public Part(FileTable table, Part? old, long id)
+        {
+            Table = table;
+            Id = id;
+            FromId = old?.Id ?? 0;
+            At = new SceneName?[table.Working.Count];
+            var kept = new bool[old?.At.Length ?? 0];
+            foreach (var type in new[] { "Object", "zone" })
             {
-                if (SectionIdentity.KeyOf(table.Working[index]) is { Length: > 0 } key)
-                    result.Add(new SceneName(key, FLHash.CreateID(key), table.Ref(index)));
+                foreach (var index in table.OfType(type))
+                {
+                    SceneName? name;
+                    if (old != null && index < old.At.Length && ReferenceEquals(old.Table.Working[index], table.Working[index]) &&
+                        old.Table.Ids[index].Equals(table.Ids[index]))
+                    {
+                        name = old.At[index];
+                        kept[index] = true;
+                    }
+                    else
+                    {
+                        name = SectionIdentity.KeyOf(table.Working[index]) is { Length: > 0 } key
+                            ? new SceneName(key, FLHash.CreateID(key), table.Ref(index))
+                            : null;
+                        Note(name);
+                    }
+                    At[index] = name;
+                    if (name == null)
+                        continue;
+                    Names.Add(name);
+                    Add(ByName, name.Name, name);
+                    Add(ByHash, name.Hash, name);
+                }
+            }
+            for (var index = 0; index < kept.Length; index++)
+            {
+                if (!kept[index])
+                    Note(old!.At[index]);
             }
         }
-        return result;
+
+        public FileTable Table { get; }
+
+        public long Id { get; }
+
+        /// <summary>The <see cref="Id"/> of the part that this part was built from, or 0. The part keeps the number, not
+        /// the old part, so the old parts do not stay in memory.</summary>
+        public long FromId { get; }
+
+        /// <summary>The name of the section at each index of the table, or null.</summary>
+        public SceneName?[] At { get; }
+
+        /// <summary>The objects and zones of the file in file order, the objects first.</summary>
+        public List<SceneName> Names { get; } = [];
+
+        public Dictionary<string, List<SceneName>> ByName { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public Dictionary<uint, List<SceneName>> ByHash { get; } = [];
+
+        /// <summary>The names that differ from the part of <see cref="FromId"/>.</summary>
+        public HashSet<string> ChangedNames { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The hashes that differ from the part of <see cref="FromId"/>.</summary>
+        public HashSet<uint> ChangedHashes { get; } = [];
+
+        private void Note(SceneName? name)
+        {
+            if (name == null)
+                return;
+            ChangedNames.Add(name.Name);
+            ChangedHashes.Add(name.Hash);
+        }
     }
 
     private static bool Is(string a, string b) => a.Equals(b, StringComparison.OrdinalIgnoreCase);

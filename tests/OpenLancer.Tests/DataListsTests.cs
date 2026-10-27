@@ -6,6 +6,7 @@ using LibreLancer.Data.Ini;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Lists;
+using OpenLancer.Data.Editing.Scene;
 using Xunit;
 
 namespace OpenLancer.Tests;
@@ -507,6 +508,59 @@ public sealed class ReferencesToTests
         Assert.Single(lists.ReferencesTo("voice", "pilot_f"));
         // Each reference carries its rule, so M3 can read its effect.
         Assert.Equal(RuleEffect.Degrade, loadout[0].Rule.Effect);
+    }
+
+    /// <summary>
+    /// A change of one referrer file changes only the keys of its part in the merged index. A part takes the references
+    /// of each section that did not change from its older part. After each edit, undo and redo, the index of the
+    /// session gives the references of an index that a new build makes.
+    /// </summary>
+    [Fact]
+    public void TheMergedIndexAfterEachEditIsTheIndexOfANewBuild()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var edits = new Action[]
+        {
+            () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li01Path, "Object",
+                [ListWorkspace.Line("nickname", "new_one"), ListWorkspace.Line("parent", "Li01_01"),
+                    ListWorkspace.Line("loadout", "lo_station")])),
+            () => session.Execute(EditCommand.SetLinesFromText(SceneWorkspace.Object("Li01_child"), "parent", ["Li01_dock"])),
+            () => session.Execute(EditCommand.SetLinesFromText(SceneWorkspace.Object("Li01_01"), "loadout", ["lo_other"])),
+            () => session.Execute(ScenePlans.Delete(session, [SceneWorkspace.Object("Li01_grandchild")]).Command!),
+            () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li02Path, "zone", [ListWorkspace.Line("nickname", "z2")])),
+            () => session.Undo(),
+            () => session.Undo(),
+            () => session.Redo(),
+        };
+
+        AssertSameAsANewBuild(session);
+        foreach (var edit in edits)
+        {
+            edit();
+            AssertSameAsANewBuild(session);
+        }
+    }
+
+    /// <summary>The reverse index of the session and a new index of the same W give the same references.</summary>
+    private static void AssertSameAsANewBuild(EditSession session)
+    {
+        var lists = session.Lists;
+        var fresh = new DataLists(session, lists.RuleData);
+        foreach (var path in new[] { SceneWorkspace.Li01Path, SceneWorkspace.Li02Path })
+        {
+            foreach (var name in session.Sections(path).Select(s => s.Id.Key).OfType<string>().Append("new_one").Append("z2"))
+            {
+                foreach (var list in new[] { "object_of_system", "zone_of_system" })
+                    Assert.Equal(fresh.ReferencesTo(list, name, path), lists.ReferencesTo(list, name, path));
+            }
+        }
+        foreach (var (list, value) in new[] { ("loadout", "lo_station"), ("loadout", "lo_other"), ("faction", "li_n_grp"),
+                     ("system", "Li02"), ("object_of_system", "Li01_01") })
+        {
+            Assert.Equal(fresh.ReferencesTo(list, value).OrderBy(r => r.Section.ToString()).ThenBy(r => r.Key),
+                lists.ReferencesTo(list, value).OrderBy(r => r.Section.ToString()).ThenBy(r => r.Key));
+        }
     }
 
     /// <summary>A scoped reference resolves its scope, so the exit object of a jump gate finds the partner

@@ -188,6 +188,100 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
                          $"{expected.Missing.Count + expected.MissionMissing.Count} missing lines");
     }
 
+    /// <summary>
+    /// The gate of section 13.4 of the MCP1 design. An edit_batch of 100 scene_create_zone steps in the largest retail
+    /// system takes less than 500 ms, because the batch runs in one frame of the editor. Each try undoes its batch, so
+    /// the next try makes the same zones. A first try warms up the code and the caches, and the gate does not measure
+    /// it.
+    /// </summary>
+    [Fact]
+    [Trait(Timing.Category, Timing.Performance)]
+    public void ABatchOfAHundredZonesInTheLargestSystemFitsTheGate()
+    {
+        const double limit = 500;
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "mcp1zones");
+        var session = workspace.Open();
+        var host = new OpenLancer.Tests.TestAgentHost(session);
+        var largest = session.Systems.Files.MaxBy(f => session.Sections(f).Count)!;
+        var system = session.SystemNicknameOf(largest)!;
+        // The arguments come from JSON text, as the arguments of a client do.
+        var batch = JsonNode.Parse("{ \"steps\": [" + string.Join(", ", Enumerable.Range(0, 100).Select(i =>
+            $$"""{ "tool": "scene_create_zone", "arguments": { "system": {{JsonSerializer.Serialize(system)}}, "position": [{{i * 1000}}, 0, 250000] } }""")) +
+                                    "] }")!.AsObject();
+
+        TimeSpan Try()
+        {
+            var start = Stopwatch.GetTimestamp();
+            var result = AgentTools.Run(host, "edit_batch", (JsonObject)batch.DeepClone()).Result!;
+            var time = Stopwatch.GetElapsedTime(start);
+            Assert.False(result.IsError, result.Text);
+            Assert.Equal(100, result.Content["adds"]!.AsArray().Count);
+            session.Undo();
+            return time;
+        }
+
+        var first = Try();
+        var best = new TimingGates().Gate(TimeSpan.FromMilliseconds(limit), Try, 3);
+        output.WriteLine($"{system} ({session.Sections(largest).Count} sections): first batch {first.TotalMilliseconds:0} ms, " +
+                         $"best batch {best.TotalMilliseconds:0} ms");
+        Assert.True(best.TotalMilliseconds < limit, $"{best.TotalMilliseconds:0.0} ms");
+        Assert.False(session.CanUndo);
+    }
+
+    /// <summary>
+    /// Workflow 1 of section 9.5 of the MCP1 design, steps 3, 5 and 6, in the largest retail system with one of its
+    /// bases. The agent finds a station archetype with a docking sphere, previews the station, then creates it and a
+    /// planet. Each create is one Undo step, and the data gets no new error.
+    /// </summary>
+    [Fact]
+    public void TheCreatesOfWorkflowOneRunInARetailSystem()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "mcp1outpost");
+        var session = workspace.Open();
+        var host = new OpenLancer.Tests.TestAgentHost(session);
+        static string Json(string text) => JsonSerializer.Serialize(text);
+        JsonObject Ok(string tool, string arguments)
+        {
+            var result = AgentTools.Run(host, tool, JsonNode.Parse(arguments)!.AsObject()).Result!;
+            Assert.False(result.IsError, $"{tool}: {result.Text}");
+            return result.Content;
+        }
+
+        var largest = session.Systems.Files.MaxBy(f => session.Sections(f).Count)!;
+        var system = session.SystemNicknameOf(largest)!;
+        var baseRef = (string)Ok("get_system", $$"""{ "system": {{Json(system)}} }""")["bases"]![0]!;
+        var archetype = Ok("list_values", """{ "list": "solar_archetype", "text": "STATION", "limit": 200 }""")["rows"]!
+            .AsArray().Select(r => (string)r!["value"]!)
+            .First(a => OpenLancer.Data.Editing.Scene.ScenePlans.AsksForBase(session,
+                OpenLancer.Data.Editing.Scene.SceneTemplate.Station, a));
+        var create = $$"""
+            { "system": {{Json(system)}}, "template": "station", "archetype": {{Json(archetype)}}, "position": [0, 0, 300000],
+              "nickname": "ol_test_station_1", "name": "Test Station", "base": {{Json(baseRef)}}
+            """;
+
+        var preview = Ok("scene_create_object", create + """, "preview": true }""");
+        var made = Ok("scene_create_object", create + "}");
+        var planet = Ok("scene_create_object", $$"""
+            { "system": {{Json(system)}}, "template": "planet", "archetype": {{Json(PlanetArchetype(session))}},
+              "position": [20000, 0, 300000], "nickname": "ol_test_planet_1" }
+            """);
+
+        Assert.Equal(["obj:ol_test_station_1"], preview["adds"]!.AsArray().Select(a => (string)a!));
+        Assert.Equal("Agent: Create ol_test_station_1", (string?)made["undo_label"]);
+        Assert.Empty(made["new_problems"]!.AsArray());
+        Assert.Equal("Agent: Create ol_test_planet_1", (string?)planet["undo_label"]);
+        Assert.Equal(2, session.Revision);
+        session.Undo();
+        session.Undo();
+        Assert.False(session.CanUndo);
+        output.WriteLine($"{system}: a station of {archetype} with the base {baseRef}");
+    }
+
+    /// <summary>The first archetype of the planet template in the list of the solar archetypes.</summary>
+    private static string PlanetArchetype(OpenLancer.Data.Editing.EditSession session) =>
+        OpenLancer.Data.Editing.Scene.ScenePlans.Archetypes(session, OpenLancer.Data.Editing.Scene.SceneTemplate.Planet)[0]
+            .Nickname;
+
     /// <summary>A page of the triggers of each retail script, also with the lines, fits the size limit of a result
     /// (section 8.4 of the MCP1 design). So the agent can read each script in pages.</summary>
     [Fact]

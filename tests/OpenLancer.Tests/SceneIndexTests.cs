@@ -171,6 +171,56 @@ public sealed class NicknamesTests
         Assert.Equal("li02_zone_3", names.CopyName("li02_zone_1", new System.Collections.Generic.HashSet<string> { "li02_zone_2" }));
     }
 
+    /// <summary>
+    /// The index changes only the names of the part of the file that an edit changes. After each edit, undo and redo,
+    /// it gives the names, the taken names and the collisions of an index that a new session builds. The edits are a
+    /// create, a rename, a change of a line and a delete. A new name has the FLHash of another name. Then come undos and
+    /// a redo.
+    /// </summary>
+    [Fact]
+    public void TheIndexAfterEachEditIsTheIndexOfANewBuild()
+    {
+        var (first, second) = DataListsTests.FlHashPair();
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var edits = new Action[]
+        {
+            () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li01Path, "Object",
+                [ListWorkspace.Line("nickname", "new_one"), ListWorkspace.Line("parent", "Li01_01")])),
+            () => session.Execute(ScenePlans.Rename(session, SceneWorkspace.Object("Li01_dock"), "Li01_dock2").Command!),
+            () => session.Execute(EditCommand.SetLinesFromText(SceneWorkspace.Object("Li01_child"), "parent", ["Li01_dock2"])),
+            () => session.Execute(ScenePlans.Delete(session, [SceneWorkspace.Object("Li01_grandchild")]).Command!),
+            () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li02Path, "zone", [ListWorkspace.Line("nickname", first)])),
+            () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li01Path, "zone", [ListWorkspace.Line("nickname", second)])),
+            () => session.Undo(),
+            () => session.Undo(),
+            () => session.Redo(),
+        };
+
+        AssertSameAsANewBuild(session, first, second);
+        foreach (var edit in edits)
+        {
+            edit();
+            AssertSameAsANewBuild(session, first, second);
+        }
+    }
+
+    /// <summary>The index of the session and a new index of the same W give the same answers.</summary>
+    private static void AssertSameAsANewBuild(EditSession session, params string[] more)
+    {
+        var index = session.Nicknames;
+        var fresh = new Nicknames(session);
+        Assert.Equal(fresh.All, index.All);
+        foreach (var name in fresh.All.Select(n => n.Name).Concat(more).Append("Li01_dock").Append("no_such_name"))
+        {
+            Assert.Equal(fresh.Taken(name), index.Taken(name));
+            Assert.Equal(fresh.Find(name, true), index.Find(name, true));
+            Assert.Equal(fresh.Find(name, false), index.Find(name, false));
+        }
+        foreach (var zones in new[] { true, false })
+            Assert.Equal(fresh.Collisions(zones).Select(g => g.ToList()), index.Collisions(zones).Select(g => g.ToList()));
+    }
+
     /// <summary>A line that names a name that no section has adopts a new item with the name (review finding
     /// R29).</summary>
     [Fact]

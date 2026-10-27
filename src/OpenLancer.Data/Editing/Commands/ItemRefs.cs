@@ -275,10 +275,9 @@ public static class ItemRefs
             case ItemRefKind.Object or ItemRefKind.Zone:
             {
                 var zone = reference.Kind == ItemRefKind.Zone;
-                var names = session.Nicknames.All.Where(n => n.IsZone == zone).ToList();
-                return names.FirstOrDefault(n => n.Name.Equals(reference.Name, StringComparison.OrdinalIgnoreCase))
-                           ?.Section ??
-                       throw Missing(text, zone ? "zone" : "object", reference.Name, names.Select(n => n.Name));
+                return session.Nicknames.Find(reference.Name, zone)?.Section ??
+                       throw Missing(text, zone ? "zone" : "object", reference.Name,
+                           session.Nicknames.All.Where(n => n.IsZone == zone).Select(n => n.Name));
             }
             case ItemRefKind.Light:
             {
@@ -442,10 +441,7 @@ public static class ItemRefs
     {
         if (session.Get(section) == null)
             return true;
-        var zone = kind == ItemRefKind.Zone;
-        return session.Nicknames.All.FirstOrDefault(n => n.IsZone == zone &&
-                                                          n.Name.Equals(key, StringComparison.OrdinalIgnoreCase))
-            ?.Section.Equals(section) == true;
+        return session.Nicknames.Find(key, kind == ItemRefKind.Zone)?.Section.Equals(section) == true;
     }
 
     /// <summary>The section of W with a type and a key in a file, in the form that the session stores, or
