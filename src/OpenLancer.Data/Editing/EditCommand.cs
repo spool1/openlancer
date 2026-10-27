@@ -140,7 +140,7 @@ public abstract class EditCommand
     /// Sets the lines of a group of names as one block, in the order of <paramref name="lines"/>. The block takes the
     /// place of the first line of any of the names, or goes at the end of the section. The other lines keep their
     /// order. An example is the encounter lines of a zone with their faction lines (see
-    /// <see cref="SectionKeys.LinkedGroups"/>): the engine gives each faction line to the encounter line before it, so
+    /// <see cref="SectionKeys.LinkedGroups"/>). The engine gives each faction line to the encounter line before it. So
     /// one name alone cannot keep the order. An empty block removes the names.
     /// </summary>
     /// <param name="names">The names that the block replaces. Each line of the block has one of them.</param>
@@ -485,7 +485,7 @@ internal static class SectionEdits
 
     /// <summary>
     /// A copy of <paramref name="old"/> in which <paramref name="lines"/> take the place of the lines of each of
-    /// <paramref name="names"/>, as one block: at the first line of any of the names, or at the end.
+    /// <paramref name="names"/>, as one block. The block goes to the first line of any of the names, or to the end.
     /// </summary>
     public static Section WithBlock(Section old, IReadOnlyList<string> names, IReadOnlyList<EntryView> lines)
     {

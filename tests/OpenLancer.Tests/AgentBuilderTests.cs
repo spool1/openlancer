@@ -35,9 +35,9 @@ public sealed class AgentBuilderTests
         return (ws, session, new TestAgentHost(session));
     }
 
-    /// <summary>A wreck is one entry: a new loadout with the ship archetype, the equip rows and the cargo rows, and a
-    /// new object with the archetype, the loadout line, the lines of the wreck rule, its name and its infocard. The
-    /// preview gives the same adds and changes nothing.</summary>
+    /// <summary>A wreck is one entry. The entry adds a new loadout with the ship archetype, the equip rows and the cargo
+    /// rows. It also adds a new object with the archetype, the loadout line, the lines of the wreck rule, its name and
+    /// its infocard. The preview gives the same adds and changes nothing.</summary>
     [Fact]
     public void AWreckIsOneEntryWithOneLoadoutOfTheShipAndOneObject()
     {
@@ -77,8 +77,8 @@ public sealed class AgentBuilderTests
         Assert.False(session.CanUndo);
     }
 
-    /// <summary>The values of a wreck: an archetype of another type gives invalid_value with NotAWreck, each row whose
-    /// list does not have its value gives invalid_value with the row, and a nickname in use gives name_taken. A wreck
+    /// <summary>The values of a wreck. An archetype of another type gives invalid_value with NotAWreck. Each row whose
+    /// list does not have its value gives invalid_value with the row. A nickname in use gives name_taken. A wreck
     /// without a name gets the name of the wreck rule.</summary>
     [Fact]
     public void TheValuesOfAWreckComeFromTheirListsAndTheRuleData()
@@ -190,8 +190,8 @@ public sealed class AgentBuilderTests
     }
 
     /// <summary>
-    /// The encounters of a zone (decision D732 of the MCP1 design): each faction_weight and density_restriction line
-    /// comes before the first encounter line, and each faction line comes after its encounter line. An encounter that
+    /// The encounters of a zone (decision D732 of the MCP1 design). Each faction_weight and density_restriction line
+    /// comes before the first encounter line. Each faction line comes after its encounter line. An encounter that
     /// only another system has adds a copy of its [EncounterParameters] section, as a fix of the plan.
     /// </summary>
     [Fact]
@@ -351,7 +351,8 @@ public sealed class AgentBuilderTests
 
     /// <summary>
     /// Workflow 2 of section 9.5 of the MCP1 design, steps 1 to 7, on a synthetic profile. The agent finds a free area,
-    /// a faction and an encounter, places a patrol route, finds a wreck archetype and a ship, and places a wreck. Each
+    /// a faction and an encounter, and places a patrol route. Then it finds a wreck archetype and a ship, and places a
+    /// wreck. Each
     /// edit is one Undo step, and check gives no new error.
     /// </summary>
     [Fact]

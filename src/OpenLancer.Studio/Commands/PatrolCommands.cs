@@ -20,7 +20,7 @@ namespace OpenLancer.Studio.Commands;
 /// with the same path label, one zone for each leg. The agent tool <c>scene_place_patrol_route</c> calls them.
 /// </summary>
 /// <remarks>
-/// Retail has 866 routes with 3,038 leg zones. Each zone has its center at the middle of its leg and its local Y axis
+/// Retail has 866 routes with 3,038 leg zones. Each zone has its center at the middle of its leg. Its local Y axis goes
 /// along the leg, from the start of the leg to its end. Its <c>size</c> is the radius and the length of the leg. Its
 /// <c>path_label</c> is the name of the route and the number of the leg, from 1. The end of a leg is the start of the
 /// next leg.
@@ -32,8 +32,9 @@ public static class PatrolCommands
 
     /// <summary>
     /// Plans a new route in a system, as one entry of the edit history: one cylinder zone for each leg between two next
-    /// points. Each zone gets the lines of the route template of the usage (see <see cref="SceneBuilders"/>), the path
-    /// label with the number of its leg, and the encounter block of the request (see <see cref="EncounterCommands"/>).
+    /// points. Each zone gets the lines of the route template of the usage (see <see cref="SceneBuilders"/>). It also
+    /// gets the path label with the number of its leg, and the encounter block of the request (see
+    /// <see cref="EncounterCommands"/>).
     /// Each zone gets the next free nickname <c>&lt;system&gt;_path_&lt;name&gt;_&lt;n&gt;</c> (decision D235 of the M3
     /// design).
     /// </summary>

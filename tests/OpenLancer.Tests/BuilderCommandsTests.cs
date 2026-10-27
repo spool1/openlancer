@@ -13,8 +13,8 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// A synthetic install for the builders of the agent tools (section 7.3 of the MCP1 design), on top of
-/// <see cref="SceneWorkspace"/>: a wreck archetype, a ship with hardpoint lines, a commodity, encounters of Li01 and
-/// Li02, a zone with encounter lines and a zone of a route.
+/// <see cref="SceneWorkspace"/>. It adds a wreck archetype, a ship with hardpoint lines, a commodity and encounters of
+/// Li01 and Li02. Li01 also gets a zone with encounter lines and a zone of a route.
 /// </summary>
 internal static class BuilderWorkspace
 {
@@ -84,8 +84,8 @@ internal static class BuilderWorkspace
 }
 
 /// <summary>
-/// The builder commands of section 7.3 of the MCP1 design: a new loadout, a wreck, a route and the encounter groups of a
-/// zone (decisions D730, D731 and D732). Each command gives one plan, and the plan is one entry of the edit history.
+/// The builder commands of section 7.3 of the MCP1 design (decisions D730, D731 and D732). They make a new loadout, a
+/// wreck, a route and the encounter groups of a zone. Each command gives one plan, and the plan is one entry of the edit history.
 /// </summary>
 public sealed class BuilderCommandsTests
 {
@@ -137,8 +137,8 @@ public sealed class BuilderCommandsTests
         Assert.False(session.CanUndo);
     }
 
-    /// <summary>The rule data has no list of hardpoints. A hardpoint that the hp_type lines of a ship do not name gives a
-    /// warning, because the model of the ship can have more hardpoints than these lines name.</summary>
+    /// <summary>The rule data has no list of hardpoints. The model of a ship can have more hardpoints than its hp_type
+    /// lines name. So a hardpoint that these lines do not name gives a warning.</summary>
     [Fact]
     public void AHardpointThatTheShipLinesDoNotNameGivesAWarning()
     {
@@ -199,7 +199,7 @@ public sealed class BuilderCommandsTests
         Assert.Equal(MissionErrors.NameTaken, taken.Refusals[0].Rule);
     }
 
-    /// <summary>The zone of a leg has its center at the middle of the leg and its local Y axis along the leg, from the
+    /// <summary>The zone of a leg has its center at the middle of the leg. Its local Y axis goes along the leg, from the
     /// start to the end, as the engine turns it. So the ends of the zone are the points of the leg.</summary>
     [Fact]
     public void TheZoneOfALegHasItsEndsAtThePointsOfTheLeg()
@@ -282,9 +282,9 @@ public sealed class BuilderCommandsTests
         Assert.Equal("name", bad.Error.Field);
     }
 
-    /// <summary>The encounter lines of a zone are one block: the faction weights and the density restrictions before the
-    /// first encounter line, then each encounter line with its faction lines (decision D732). The other lines keep their
-    /// place. A save writes the whole linked group, and a reload gives the same lines.</summary>
+    /// <summary>The encounter lines of a zone are one block (decision D732). The faction weights and the density
+    /// restrictions come before the first encounter line. Then each encounter line comes with its faction lines. The
+    /// other lines keep their place. A save writes the whole linked group, and a reload gives the same lines.</summary>
     [Fact]
     public void TheEncounterGroupsOfAZoneAreOneBlockThatTheSaveKeeps()
     {
@@ -320,9 +320,9 @@ public sealed class BuilderCommandsTests
         Assert.Equal(expected, Lines(reloaded, Pop));
     }
 
-    /// <summary>An encounter that the system does not have and another system has gets a copy of the
-    /// [EncounterParameters] section of that system in the same entry, as a fix of the plan. An encounter of no system
-    /// gives an error with the row.</summary>
+    /// <summary>The system can lack the [EncounterParameters] section of an encounter that another system has. Then the
+    /// same entry adds a copy of the section of that system, as a fix of the plan. An encounter of no system gives an
+    /// error with the row.</summary>
     [Fact]
     public void AnEncounterOfAnotherSystemAddsItsParametersAsAFix()
     {
@@ -362,8 +362,8 @@ public sealed class BuilderCommandsTests
         Assert.Equal("[Object] nickname = Li01_01: only a zone of a system has encounters.", plan.Refusals[0].Message);
     }
 
-    /// <summary>The block command of the edit view: the lines of the names go to the place of the first line of any of
-    /// the names, the other lines keep their order, and an empty block removes the names.</summary>
+    /// <summary>The block command of the edit view. The lines of the names go to the place of the first line of any of
+    /// the names. The other lines keep their order. An empty block removes the names.</summary>
     [Fact]
     public void ABlockOfLinesTakesThePlaceOfTheFirstLineOfItsNames()
     {

@@ -26,11 +26,11 @@ public sealed record LoadoutCargo(string Good, int Count);
 /// <c>create_loadout</c> and <c>scene_place_wreck</c> call them.
 /// </summary>
 /// <remarks>
-/// <para>Each value of a row must be an entry of its list, as a picker of the editor gives it: the archetype, each
-/// equipment and each cargo. The command writes each value as the list spells it. The list checks of the rule data then
-/// run on the new lines, so a line with an error never reaches the edit view (decision D290 of the M23 design). The rule
-/// data has no list of hardpoints. A hardpoint that the <c>hp_type</c> lines of a ship do not name gives a warning,
-/// because a model can have more hardpoints than these lines name.</para>
+/// <para>The archetype, each equipment and each cargo must be an entry of its list, as a picker of the editor gives
+/// it. The command writes each value as the list spells it. Then the list checks of the rule data run on the new lines.
+/// So a line with an error never reaches the edit view (decision D290 of the M23 design).</para>
+/// <para>The rule data has no list of hardpoints. A model can have more hardpoints than the <c>hp_type</c> lines of
+/// its ship name. So a hardpoint that these lines do not name gives a warning.</para>
 /// <para>A value error throws, as the request form of the fields does (see <see cref="FieldCommands.SetFields"/>). A
 /// rule of the edit, for example a nickname that another loadout has, gives a plan that refuses.</para>
 /// </remarks>
@@ -61,8 +61,8 @@ public static class LoadoutCommands
     internal sealed record NewLoadout(EditCommand Command, SectionRef Section, IReadOnlyList<Diagnostic> Warnings);
 
     /// <summary>
-    /// The add of a new loadout, for a builder: the checks of the file, the nickname and the rows, then the list checks
-    /// of the lines. A rule of the edit gives a refusal of the plan and null.
+    /// The add of a new loadout, for a builder. The checks of the file, the nickname and the rows run first, then the
+    /// list checks of the lines. A rule of the edit gives a refusal of the plan and null.
     /// </summary>
     /// <param name="archetypeField">The name of the archetype in the request, for the errors.</param>
     /// <param name="archetypeLists">The lists of the archetype, in order.</param>
@@ -146,8 +146,8 @@ public static class LoadoutCommands
     internal static string? Taken(EditSession session, string nickname) =>
         session.Lists.List("loadout")?.Find(nickname)?.Value;
 
-    /// <summary>The hardpoints that the <c>hp_type</c> lines of a ship name, or null for an archetype that is not a
-    /// ship or a ship without such lines.</summary>
+    /// <summary>The hardpoints that the <c>hp_type</c> lines of a ship name. Null for an archetype that is not a ship,
+    /// and for a ship without such lines.</summary>
     private static HashSet<string>? ShipHardpoints(EditSession session, string archetype)
     {
         if (session.Lists.List("ship")?.Find(archetype)?.Section is not { } ship || session.Get(ship) is not { } view)

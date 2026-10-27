@@ -10,8 +10,8 @@ using OpenLancer.Studio.Commands;
 namespace OpenLancer.Studio.Agent;
 
 /// <summary>
-/// The builder tools of section 7.3 of the MCP1 design: a new loadout, a wreck, a patrol or trade route, and the
-/// encounter groups of a zone (decisions D730, D731 and D732). Each tool calls a builder command of the command layer
+/// The builder tools of section 7.3 of the MCP1 design (decisions D730, D731 and D732). They make a new loadout, a
+/// wreck, a patrol or trade route, and the encounter groups of a zone. Each tool calls a builder command of the command layer
 /// (see <see cref="LoadoutCommands"/>, <see cref="WreckCommands"/>, <see cref="PatrolCommands"/> and
 /// <see cref="EncounterCommands"/>) in the shared edit call of <see cref="EditTools"/>. So each call is one Undo step.
 /// </summary>
@@ -65,8 +65,8 @@ internal static class BuilderTools
     });
 
     /// <summary>
-    /// Places a wreck: a new object of a wreck archetype and a new loadout of the ship that the wreck was (decision D730
-    /// of the MCP1 design). The same batch gives the object its name and its infocard, from the request or from the
+    /// Places a wreck (decision D730 of the MCP1 design). The wreck is a new object of a wreck archetype with a new
+    /// loadout of its ship. The same batch gives the object its name and its infocard, from the request or from the
     /// wreck rule of the rule data.
     /// </summary>
     public static ToolStep PlaceWreck(ToolCall call) => EditTools.Apply(call, scope =>

@@ -14,8 +14,8 @@ using OpenLancer.Runtime.Scene;
 namespace OpenLancer.Studio.Commands;
 
 /// <summary>
-/// The plan of a builder of new items: a loadout, a wreck, the zones of a route, or the encounter groups of a zone
-/// (section 7.3 of the MCP1 design). One plan adds all its sections in one entry of the edit history.
+/// The plan of a builder of new items (section 7.3 of the MCP1 design). The items are a loadout, a wreck, the zones of a
+/// route, or the encounter groups of a zone. One plan adds all its sections in one entry of the edit history.
 /// </summary>
 internal sealed class BuildPlan : EditPlan
 {
@@ -76,8 +76,8 @@ internal sealed class RowValues(EditSession session)
         return null;
     }
 
-    /// <summary>A text that goes into one value of a line, or null with an error: a text that is not empty and that
-    /// has no ',', no ';' and no control character.</summary>
+    /// <summary>A text that goes into one value of a line, or null with an error. The text is not empty. It has no
+    /// comma, no semicolon and no control character.</summary>
     public string? Word(string value, string field)
     {
         var text = value.Trim();
@@ -118,11 +118,11 @@ internal static class BuilderText
     public static List<EntryView>? Entries(EditSession session, string path, IEnumerable<(string Name, string Text)> lines,
         out string? error) => ScenePlans.Entries(lines, session.IsBinaryFile(path), out error);
 
-    /// <summary>The list check errors of the lines of a planned section, with the messages of the checks of the
-    /// editor (decision D290 of the M23 design). The warnings go to <paramref name="warnings"/>.</summary>
+    /// <summary>The list check errors of the lines of a planned section (decision D290 of the M23 design). They have
+    /// the messages of the checks of the editor. The warnings go to <paramref name="warnings"/>.</summary>
     /// <param name="planned">The nicknames of the objects, zones and encounters that the plan adds to the same file.</param>
-    /// <param name="skip">True for a problem that the check of the plan does not count, for example the loadout line of
-    /// a new object that names the new loadout.</param>
+    /// <param name="skip">True for a problem that the check of the plan does not count. An example is the loadout line
+    /// of a new object that names the new loadout.</param>
     public static List<ListProblem> ListErrors(EditSession session, string path, string type, string nickname,
         IReadOnlyList<EntryView> lines, IReadOnlySet<string> planned, List<Diagnostic> warnings,
         Func<ListProblem, bool>? skip = null)

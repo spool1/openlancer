@@ -147,8 +147,8 @@ public static class EncounterCommands
     }
 
     /// <summary>
-    /// The adds of the <c>[EncounterParameters]</c> sections that a plan needs, at the end of the system file: the new
-    /// sections, a fix of the plan for each one, and the commands.
+    /// The adds of the <c>[EncounterParameters]</c> sections that a plan needs, at the end of the system file. The
+    /// result has the new sections, a fix of the plan for each one, and the commands.
     /// </summary>
     internal static (List<SectionRef> Adds, List<PlannedFix> Fixes, List<EditCommand> Commands) Added(EditSession session,
         string path, IReadOnlyList<NewParameters> parameters)

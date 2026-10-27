@@ -23,10 +23,10 @@ public static class WreckCommands
     public const string NotAWreck = "NotAWreck";
 
     /// <summary>
-    /// Plans a new wreck in a system, as one entry of the edit history. The entry adds a new <c>[Loadout]</c> with the
-    /// ship archetype, the equipment rows and the cargo rows, in the first file of the loadouts role (see
-    /// <see cref="LoadoutCommands"/>). It also adds a new object with the archetype, the position, the rotation, the
-    /// <c>loadout</c> line and the lines of the wreck rule of the rule data.
+    /// Plans a new wreck in a system, as one entry of the edit history. The entry adds a new <c>[Loadout]</c> to the
+    /// first file of the loadouts role (see <see cref="LoadoutCommands"/>). The loadout has the ship archetype, the
+    /// equipment rows and the cargo rows. The entry also adds a new object with the archetype, the position and the
+    /// rotation. The object gets the <c>loadout</c> line and the lines of the wreck rule of the rule data.
     /// </summary>
     /// <remarks>
     /// <para>Retail puts each wreck loadout into a ship loadout file, and each one names a ship archetype. A wreck
