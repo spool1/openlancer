@@ -24,7 +24,8 @@ internal sealed class BuildPlan : EditPlan
     }
 
     /// <summary>Gives the plan its command and what the command adds, changes and fixes.</summary>
-    /// <param name="select">The section to select after the command, or null to keep the selection.</param>
+    /// <param name="select">The section to select after the command, or null (see
+    /// <see cref="EditPlan.SelectAfter"/>).</param>
     public BuildPlan Runs(EditCommand command, IReadOnlyList<SectionRef> adds, IReadOnlyList<SectionRef> changes,
         SectionRef? select, IReadOnlyList<Diagnostic> warnings, IReadOnlyList<PlannedFix>? fixes = null)
     {
@@ -63,11 +64,9 @@ internal sealed class RowValues(EditSession session)
     /// closest names.
     /// </summary>
     /// <param name="lists">The lists of the value, in order. The first list that has the value gives it.</param>
-    /// <param name="scope">The install path of the file of a scoped list, or null.</param>
-    public string? Listed(string value, string field, IReadOnlyList<string> lists, string? scope = null)
+    public string? Listed(string value, string field, IReadOnlyList<string> lists)
     {
-        var views = lists.Select(id => scope == null ? session.Lists.List(id) : session.Lists.List(id, scope))
-            .OfType<ListView>().ToList();
+        var views = lists.Select(id => session.Lists.List(id)).OfType<ListView>().ToList();
         if (views.Select(v => v.Find(value)).FirstOrDefault(e => e != null) is { } entry)
             return entry.Value;
         var label = ListChecks.Lower(views.FirstOrDefault()?.Label ?? lists[0]);
