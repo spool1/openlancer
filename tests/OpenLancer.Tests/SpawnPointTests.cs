@@ -272,6 +272,27 @@ public sealed class SpawnPointTests
         Moved(move, new Vector3(0, 0, -10_500), -150, "ring");
     }
 
+    /// <summary>A start point in a system that the Scene does not show gets the check of the zones of the game data
+    /// (fix of 2026-10-27). A death zone around a sun at the center holds a point near the center, so the start moves
+    /// out of it.</summary>
+    [Fact]
+    public void AStartPointInASystemThatTheSceneDoesNotShowGetsTheCheckOfTheZones()
+    {
+        AddZone("sun_death", Vector3.Zero, 4_000, Death);
+        AddZone("field", Vector3.Zero, 10_000, damage: 0);
+        var system = new StarSystem { Nickname = "ol_sys", SourceFile = "" };
+        system.Zones.AddRange(zones);
+
+        var shapes = SpawnPoint.ZoneShapes(system, item => item.Nickname);
+        var check = SpawnPoint.FromPoint(new PlayStart.InSpace("ol_sys", new Vector3(0, 0, 1_000), Quaternion.Identity),
+            shapes);
+
+        Assert.Equal(["sun_death"], shapes.Select(s => s.Name));
+        Near(new Vector3(0, 0, 4_100), check.Start.Position);
+        Assert.Equal((ConsoleSeverity.Info, "Mission play: the start point is inside sun_death. The ship starts 3,100 " +
+                                            "units behind the start point."), Assert.Single(check.Lines));
+    }
+
     private IReadOnlyList<SpawnShape> Shapes() => SpawnPoint.Shapes(objects, zones, item => item.Nickname);
 
     private SpawnMove Clear(Vector3 camera, Vector3 forward) => SpawnPoint.Clear(camera, forward, Shapes());

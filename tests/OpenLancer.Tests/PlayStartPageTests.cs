@@ -65,6 +65,29 @@ public sealed class PlayStartPageTests
         Assert.Equal("At the Scene camera", Model(new PlayStartSetting("t_restore", "camera")).PlaceText);
     }
 
+    /// <summary>The suggested place and the row "Source of the place" (fix of 2026-10-27). The dropdown item of the
+    /// suggestion shows the true suggestion also while the user picked a base or the Scene camera. The row shows only for
+    /// the suggested place.</summary>
+    [Fact]
+    public void TheSuggestionAndItsSourceShowAlsoWhileTheUserPicksAnotherPlace()
+    {
+        var suggested = Model(new PlayStartSetting("t_kill", "suggested"));
+        var atBase = Model(new PlayStartSetting("t_kill", "base:ol_base_b"));
+        var atCamera = Model(new PlayStartSetting("t_kill", "camera"));
+
+        Assert.Equal(suggested.SuggestedText, atBase.SuggestedText);
+        Assert.Equal(suggested.SuggestedText, atCamera.SuggestedText);
+        Assert.StartsWith("In ol_sys_a at ", atBase.SuggestedText);
+        Assert.Equal("At base ol_base_b", atBase.PlaceText);
+        Assert.True(suggested.ShowsSource);
+        Assert.False(atBase.ShowsSource);
+        Assert.False(atCamera.ShowsSource);
+        Assert.Equal("Cnd_SpaceEnter of t_launch. The point is 1,000 units from the spawn of ol_ship_a.",
+            suggested.Plan.Suggested.Source);
+        Assert.Equal("t_launch", suggested.Plan.Suggested.Trigger);
+        Assert.False(Model(new PlayStartSetting("t_none", "suggested")).ShowsSource);
+    }
+
     /// <summary>The UI texts of Play from a trigger pass the STE lint (section 12.2 of the M6c design).</summary>
     [Fact]
     public void TheTextsPassTheSteLint()
@@ -76,7 +99,8 @@ public sealed class PlayStartPageTests
             ("approximate writes", PlayStartPageModel.ApproximateHelp.WhatItWrites),
             ("start", PlayStartPageModel.StartTip), ("slot", PlayStartPageModel.SlotTip),
             ("stage", PlayStartPageModel.StageTip), ("accept", PlayStartPageModel.AcceptTip),
-            ("place", PlayStartPageModel.PlaceTip), ("ship", PlayStartPageModel.ShipTip),
+            ("place", PlayStartPageModel.PlaceTip), ("source", PlayStartPageModel.SourceTip),
+            ("ship", PlayStartPageModel.ShipTip),
             ("wait", PlayStartPageModel.WaitTip), ("setup", PlayStartPageModel.SetupTip),
             ("chip", MissionView.PlayStartTip), ("rules", MissionView.RulesBanner),
             ("rules help", MissionView.RulesHelp.WhatItIs), ("dry run during play", MissionView.DryRunPlayTip),
@@ -95,6 +119,9 @@ public sealed class PlayStartPageTests
             ("no slot banner", MissionView.NoSlotBanner), ("other banner", MissionView.OtherMissionBanner("M02", "M03")),
             ("play banner", MissionView.PlayBannerText("M02", "Checkpoint t_restore")),
             ("no camera", MissionPlay.NoCameraSystem), ("unchecked point", EditorWindow.UncheckedPoint("New York (Li01)")),
+            ("camera system", MissionPlay.CameraSystemReason("Li01")),
+            ("launch watcher", StartPlaces.LaunchWatcherWarning("t_wave")),
+            ("other system", StartPlaces.OtherSystemWarning("t_wave", "Li02", "Li01")),
             ("restart refused", MissionPlayTexts.RestartRefused(new NamedStart(), "The path is refused.", "save 2")),
             ("restart failed", MissionPlayTexts.RestartFailedInGame(new NamedStart(), "The start save does not load.")),
             ("ship", PlayShips.ShipText(null, null).Tooltip), ("ship missing", PlayShips.ShipText(null, "ol_package").Tooltip),

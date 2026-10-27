@@ -78,6 +78,15 @@ internal static class SpawnPoint
     ];
 
     /// <summary>
+    /// The shapes of a system from the game data alone: the volume of each zone with damage. A mission play uses them
+    /// for a start point in a system that the Scene does not show. The pick shapes of the objects need the models of the
+    /// Scene, so planets and stations are not in the list. The death zone of a sun or a planet holds its body, so a start
+    /// outside the death zone is also outside the body.
+    /// </summary>
+    public static IReadOnlyList<SpawnShape> ZoneShapes(StarSystem system, Func<NicknameItem, string> name) =>
+        Shapes(new Dictionary<SystemObject, GameObject>(), system.Zones, name);
+
+    /// <summary>
     /// The start of Play from camera: the camera position, moved out of the blocking shapes along the view axis (see
     /// <see cref="Clear"/>), with the orientation of the camera. The lines tell why the start moved. They warn when a
     /// blocking shape still holds the start, and for each damage zone that holds it.

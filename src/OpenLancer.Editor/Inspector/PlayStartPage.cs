@@ -121,6 +121,12 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
                     Warning(placeProblem);
                 }
 
+                if (model.ShowsSource)
+                {
+                    grid.Help(PlayStartPageModel.SourceTip);
+                    grid.Row("Source of the place", () => PlaceSource(analysis, model));
+                }
+
                 var (ship, shipTip) = PlayShips.ShipText(window.Session, ShipPackage());
                 grid.Help($"{PlayStartPageModel.ShipTip} {shipTip}");
                 grid.Text("Ship", ship);
@@ -254,6 +260,27 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
         {
             plays.SetPlayStart(script, PlayStartSetting.Of(model.Setting.Start, StartPlaceChoice.Base, picked));
         }
+    }
+
+    /// <summary>Where the suggested place comes from, and a link that selects the trigger of its line (UI rule 6).</summary>
+    private void PlaceSource(MissionAnalysis analysis, PlayStartPageModel model)
+    {
+        var place = model.Plan.Suggested;
+        ImGui.PushTextWrapPos(0);
+        ImGui.TextDisabled(place.Source);
+        ImGui.PopTextWrapPos();
+        if (place.Trigger is not { } name || analysis.Index.Trigger(name) is not { } trigger)
+        {
+            return;
+        }
+
+        if (ImGui.Selectable($"Select {RunOverlay.TriggerName(analysis, name)}##place-source"))
+        {
+            window.Selection = new MissionRef(model.Script, MissionItemKind.Trigger, trigger.Section.Ref);
+            window.Missions.PendingGraphFrame = true;
+        }
+
+        ImGui.SetItemTooltip("Selects the trigger of the line in the graph.");
     }
 
     /// <summary>The ship package of the Play menu, or null for the default ship.</summary>

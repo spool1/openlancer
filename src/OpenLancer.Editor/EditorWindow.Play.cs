@@ -144,15 +144,18 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
                 var system = items.Systems.Get(place.System!)!;
                 var point = new PlayStart.InSpace(system.Nickname, place.Position, place.Orientation);
                 // A rule of the plan gives the point, so it can be in a planet or in a death zone. The Scene has the
-                // shapes of the system only while it shows that system.
+                // shapes of the objects only while it shows that system. The zones come from the game data.
                 if (Scene.SpawnShapes(system.Nickname) is { } spaceShapes)
                 {
                     point = Checked(SpawnPoint.FromPoint(point, spaceShapes));
                 }
                 else
                 {
-                    var name = Session.ItemName(system);
-                    Log.Add(ConsoleSeverity.Info, PlayController.Source,
+                    var session = Session;
+                    point = Checked(SpawnPoint.FromPoint(point, SpawnPoint.ZoneShapes(system,
+                        item => session.ItemName(item) is { Length: > 0 } label ? label : item.Nickname)));
+                    var name = session.ItemName(system);
+                    Log.Add(ConsoleSeverity.Warning, PlayController.Source,
                         UncheckedPoint(name.Length > 0 ? $"{name} ({system.Nickname})" : system.Nickname));
                 }
 
@@ -189,13 +192,13 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
     /// <summary>Why a mission play cannot start at a start place now, or null (see
     /// <see cref="MissionPlay.PlaceProblem"/>).</summary>
     internal string? StartPlaceProblem(StartPlace place) =>
-        MissionPlay.PlaceProblem(Session?.GameData?.Items, Scene.System != null, place);
+        MissionPlay.PlaceProblem(Session?.GameData?.Items, Scene.System?.Nickname, place);
 
-    /// <summary>The Console note of a start point in space that Play cannot check, because the Scene does not show its
-    /// system.</summary>
+    /// <summary>The Console warning of a start point in space that Play can check only for the zones, because the Scene
+    /// does not show its system.</summary>
     internal static string UncheckedPoint(string system) =>
-        $"Mission play: the Scene does not show {system}, so Play did not check the start point for planets, stations " +
-        "and death zones. Open the system in the Scene to check it at the next play.";
+        $"Mission play: the Scene does not show {system}, so Play checked the start point only for the zones. A planet " +
+        "or a station can hold it. Open the system in the Scene to check it at the next play.";
 
     string? IMissionPlayEditor.PlayPackage => Session is { } session ? Settings.PlayPackageOf(session.Profile.FilePath) : null;
 
