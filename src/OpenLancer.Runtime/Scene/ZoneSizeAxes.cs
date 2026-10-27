@@ -19,8 +19,9 @@ namespace OpenLancer.Runtime.Scene;
 /// </remarks>
 public sealed record ZoneSizeAxes
 {
-    /// <summary>The smallest size that a drag writes on an axis that it changes.</summary>
-    private const float MinSize = 1;
+    /// <summary>The smallest size that a drag writes on an axis that it changes. A transform request with a smaller
+    /// new value refuses (see <see cref="TransformPlans"/>).</summary>
+    internal const float MinSize = 1;
 
     private readonly ShapeKind shape;
 

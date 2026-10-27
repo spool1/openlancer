@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using LibreLancer.Data.Ini;
@@ -79,6 +80,9 @@ public static class TransformPlans
     /// adds to the value that the engine reads now. A relative size adds each value to the value of the same place in
     /// the line.
     /// </summary>
+    /// <remarks>The values come from a request, so the plan writes each value as the request gives it, or refuses. A
+    /// change without a part refuses. A new size value below <see cref="ZoneSizeAxes.MinSize"/> also refuses. A drag of
+    /// the gizmo writes the smallest size in its place (see <see cref="ZoneSizeAxes.Line"/>).</remarks>
     public static EditPlan Plan(EditSession session, SectionRef section, TransformChange change, TransformMode mode)
     {
         var tools = new List<GizmoTool>();
@@ -89,6 +93,8 @@ public static class TransformPlans
         if (change.Size != null)
             tools.Add(GizmoTool.Scale);
         var label = tools.Count == 1 ? Label(tools[0], section) : $"Transform {section.Id.Key ?? section.Id.ToString()}";
+        if (tools.Count == 0)
+            return CommandPlan.Refused(label, "Give a position, a rotation or a size.", section);
         if (Target(session, section, label, tools, out var target) is { } refused)
             return refused;
         var relative = mode == TransformMode.Relative;
@@ -107,7 +113,15 @@ public static class TransformPlans
                     $"The size of a {target.Shape.ToString()!.ToLowerInvariant()} zone has {count}. Give {count}.",
                     section);
             }
-            var line = relative ? axes.LineValues(axes.GizmoScale).Zip(size, (a, b) => a + b).ToList() : size;
+            var now = axes.LineValues(axes.GizmoScale);
+            var line = relative ? now.Zip(size, (a, b) => a + b).ToList() : size;
+            // A value that the line has now stays, also when it is below the smallest size.
+            if (line.Where((value, i) => value < ZoneSizeAxes.MinSize && value != now[i]).Any())
+            {
+                return CommandPlan.Refused(label,
+                    $"A size value must be {ZoneSizeAxes.MinSize.ToString(CultureInfo.InvariantCulture)} or more.",
+                    section);
+            }
             values.Add((GizmoTool.Scale, axes.ScaleOf(line)));
         }
         return Lines(section, label, target!, values);

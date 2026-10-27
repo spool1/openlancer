@@ -139,6 +139,49 @@ public sealed class TransformPlansTests
         Assert.False(session.CanUndo);
     }
 
+    /// <summary>
+    /// A request writes each value as it gives it, or refuses (review finding of MCP1-2 step 1). A change without a part
+    /// refuses. A new size value below 1 refuses in the absolute and the relative mode, also when the gizmo would write
+    /// 1 in its place. A size of 1 runs. Nothing changes after a refusal.
+    /// </summary>
+    [Fact]
+    public void ARequestRefusesAnEmptyChangeAndASizeBelowTheSmallestSize()
+    {
+        using var ws = SystemWorkspace.Create(SystemText);
+        var session = ws.Session("act");
+        var sphere = SystemWorkspace.Li01Section("Zone", "Zone_sphere");
+        var ring = SystemWorkspace.Li01Section("Zone", "Zone_ring");
+
+        AssertRefused(session, Depot, new TransformChange(), "Give a position, a rotation or a size.");
+        Assert.Equal("Transform Li01_depot",
+            TransformPlans.Plan(session, Depot, new TransformChange(), TransformMode.Absolute).Label);
+        AssertRefused(session, sphere, new TransformChange(Size: [0.5f]), "A size value must be 1 or more.");
+        AssertRefused(session, sphere, new TransformChange(Size: [-10]), "A size value must be 1 or more.");
+        AssertRefused(session, sphere, new TransformChange(Size: [-5000]), "A size value must be 1 or more.",
+            TransformMode.Relative);
+        AssertRefused(session, ring, new TransformChange(Size: [3000, 0, 300]), "A size value must be 1 or more.");
+        Assert.False(session.CanUndo);
+
+        var smallest = TransformPlans.Plan(session, sphere, new TransformChange(Size: [1]), TransformMode.Absolute);
+        session.Execute(smallest.Command!);
+        Assert.Equal(["1"], Lines(session, sphere, "size"));
+    }
+
+    /// <summary>A size value below 1 that the line has now stays, because the request does not change it. Only a new
+    /// value must be 1 or more.</summary>
+    [Fact]
+    public void ASizeValueBelowTheSmallestSizeThatTheLineHasStays()
+    {
+        using var ws = SystemWorkspace.Create(SystemText.Replace("size = 100, 200, 300", "size = 0.5, 200, 300"));
+        var session = ws.Session("act");
+        var box = SystemWorkspace.Li01Section("Zone", "Zone_box");
+
+        var plan = TransformPlans.Plan(session, box, new TransformChange(Size: [0, 0, 50]), TransformMode.Relative);
+        session.Execute(plan.Command!);
+
+        Assert.Equal(["0.5, 200, 350"], Lines(session, box, "size"));
+    }
+
     /// <summary>A transform to the values of W has no line in its plan, so it changes nothing.</summary>
     [Fact]
     public void ATransformToTheValuesOfWChangesNothing()
@@ -170,9 +213,10 @@ public sealed class TransformPlansTests
         Assert.Equal(line, axes.LineValues(new Vector3(x, y, z)));
     }
 
-    private static void AssertRefused(EditSession session, SectionRef section, TransformChange change, string message)
+    private static void AssertRefused(EditSession session, SectionRef section, TransformChange change, string message,
+        TransformMode mode = TransformMode.Absolute)
     {
-        var plan = TransformPlans.Plan(session, section, change, TransformMode.Absolute);
+        var plan = TransformPlans.Plan(session, section, change, mode);
         Assert.False(plan.CanRun);
         Assert.Equal(message, Assert.Single(plan.Refusals).Message);
         Assert.Equal(section, plan.Refusals[0].Target);
