@@ -202,7 +202,7 @@ Play saves the edits of the active mod first, as F5 does. Then the editor makes 
 
 The player starts at the start place of the Play start page. The suggestion is where the player is at that point of the mission in the game. That is a base or a point in space. "How the editor suggests the start place" in [MISSIONS.md](MISSIONS.md) tells the rules.
 
-For an approximate start, the setup triggers make only the world of the start system. The ships that travel with the player start next to the player. "How the setup builds the world" in [MISSIONS.md](MISSIONS.md) tells the rules.
+For an approximate start, the setup triggers make only the world of the start system. The ships that travel with the player start next to the player. The setup starts the triggers that wait at the start after it makes the world. So their lines find the ships of the world. "How the setup builds the world" in [MISSIONS.md](MISSIONS.md) tells the rules.
 
 The Console then names the play, for example "OpenLancer plays M02 from Checkpoint t_restore." For an approximate start, a second line says that setup triggers rebuild the state of the path. When the start cannot start, the Console says why. An example is "Play from here is not available: This mission script has no story slot."
 

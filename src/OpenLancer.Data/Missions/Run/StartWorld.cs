@@ -492,8 +492,8 @@ internal static class StartWorld
         /// after the first one left space, for example after it docked. So the setup leaves out the old object, as rule 4
         /// does for two spawn lines of the path. The triggers of the start are the triggers of the active set that run at
         /// the start or soon after it (<see cref="RunsAtStart"/>), with the triggers that they start with such a
-        /// condition. An <c>Act_Destroy</c> of the object before the spawn keeps
-        /// the old object, because the trigger removes it itself.
+        /// condition. An <c>Act_Destroy</c> of the object before the spawn keeps the old object, because the trigger
+        /// removes it itself.
         /// </summary>
         private void MadeAgain()
         {
