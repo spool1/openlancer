@@ -163,6 +163,21 @@ public sealed class AgentQueryTests
         Assert.Null(plain["used_by"]);
     }
 
+    /// <summary>A key is locked when the field commands cannot change it, as in the Inspector. The file of a system moves
+    /// the contents of the system, so it is locked.</summary>
+    [Fact]
+    public void GetItemLocksTheKeysThatTheFieldCommandsCannotChange()
+    {
+        var (ws, host) = Scene();
+        using var _ = ws;
+
+        var system = Ok(host, "get_item", $$"""{ "ref": {{Json(@"sec:DATA\UNIVERSE\universe.ini#system/Li01")}} }""")
+            ["section"]!["fields"]!.AsArray();
+
+        Assert.True((bool)system.Single(f => (string?)f!["key"] == "file")!["locked"]!);
+        Assert.True((bool)system.Single(f => (string?)f!["key"] == "nickname")!["locked"]!);
+    }
+
     [Fact]
     public void GetItemMarksTheLinesOfAnUnsavedEdit()
     {

@@ -479,7 +479,7 @@
     "FieldRow.lines": "The values of each line of the key, in file order. A number is a number, else a text.",
     "FieldRow.label": "The plain label of the data list that the key names, or none.",
     "FieldRow.origin": "The layer that gives the lines of the key, and if they have an edit that is not saved.",
-    "FieldRow.locked": "True when an edit cannot change the key: the key line, or a section that the editor cannot change.",
+    "FieldRow.locked": "True when an edit cannot change the key. Examples are the key line, a key of linked lines, the file of a system and a read-only section.",
     "FieldRow.problems": "The problems of the lines of the key.",
     "ComponentRow.kind": "The id of the component.",
     "ComponentRow.name": "The plain name of the component.",

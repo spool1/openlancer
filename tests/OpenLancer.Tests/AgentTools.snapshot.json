@@ -563,7 +563,7 @@
                 },
                 "locked": {
                   "type": "boolean",
-                  "description": "True when an edit cannot change the key: the key line, or a section that the editor cannot change."
+                  "description": "True when an edit cannot change the key. Examples are the key line, a key of linked lines, the file of a system and a read-only section."
                 },
                 "problems": {
                   "type": "array",
@@ -1321,7 +1321,7 @@
                     },
                     "locked": {
                       "type": "boolean",
-                      "description": "True when an edit cannot change the key: the key line, or a section that the editor cannot change."
+                      "description": "True when an edit cannot change the key. Examples are the key line, a key of linked lines, the file of a system and a read-only section."
                     },
                     "problems": {
                       "type": "array",
