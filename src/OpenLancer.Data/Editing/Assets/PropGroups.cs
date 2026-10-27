@@ -95,9 +95,12 @@ public static class PropGroups
             return "A nickname uses lowercase letters, digits, '-' and '_', and starts with a letter.";
         return Of(session).Any(g => g.ModId == null && g.File != except?.File &&
                                     g.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase))
-            ? "A prop group with this nickname exists. Type another nickname."
+            ? TakenNickname
             : null;
     }
+
+    /// <summary>The problem of a nickname that a group of the active mod has.</summary>
+    private const string TakenNickname = "A prop group with this nickname exists. Type another nickname.";
 
     /// <summary>Why a text cannot be the name of a group, or null. The name is free ASCII text without <c>;</c>, which
     /// starts a comment, and without a line break.</summary>
@@ -250,7 +253,8 @@ public static class PropGroups
     /// the texts first, then the group file. So a group file never names a text that is not on disk.
     /// </summary>
     /// <exception cref="InvalidOperationException">The session takes no edits, or the draft has a refusal.</exception>
-    /// <exception cref="ArgumentException">The nickname or the name is not valid.</exception>
+    /// <exception cref="ArgumentException">The nickname or the name is not valid, or a file of the folder has the
+    /// nickname.</exception>
     /// <exception cref="IOException">A write failed.</exception>
     public static PropGroup Write(EditSession session, PropGroupDraft draft, string nickname, string name)
     {
@@ -262,6 +266,9 @@ public static class PropGroups
         if (NameProblem(name) is { } nameProblem)
             throw new ArgumentException(nameProblem, nameof(name));
         var file = Path.Combine(mod.Folder, Mod.PropsFolder, nickname + PropGroupFile.Extension);
+        // Another program can write a group file after the last read of the folder. The write never replaces it.
+        if (File.Exists(file))
+            throw new ArgumentException(TakenNickname, nameof(nickname));
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         var textsPath = PropGroupFile.TextsPath(file);
         var texts = PropGroupFile.WriteTexts(textsPath, draft.Texts);
@@ -281,7 +288,7 @@ public static class PropGroups
     /// </summary>
     /// <exception cref="InvalidOperationException">The session takes no edits, or the group is not of the active
     /// mod.</exception>
-    /// <exception cref="ArgumentException">The nickname is not valid.</exception>
+    /// <exception cref="ArgumentException">The nickname is not valid, or another file of the folder has it.</exception>
     /// <exception cref="IOException">A move failed.</exception>
     public static PropGroup Rename(EditSession session, PropGroup group, string nickname)
     {
@@ -294,6 +301,8 @@ public static class PropGroups
         if (NicknameProblem(session, nickname, group) is { } problem)
             throw new ArgumentException(problem, nameof(nickname));
         var file = Path.Combine(mod.Folder, Mod.PropsFolder, nickname + PropGroupFile.Extension);
+        if (!file.Equals(group.File, StringComparison.OrdinalIgnoreCase) && File.Exists(file))
+            throw new ArgumentException(TakenNickname, nameof(nickname));
         var text = IniDocument.TextEncoding.GetString(SharedFile.ReadAllBytes(group.File));
         AtomicFile.WriteAllBytes(file, IniDocument.TextEncoding.GetBytes(WithNickname(text, nickname)));
         if (File.Exists(group.TextsFile))

@@ -151,6 +151,102 @@ public sealed class AgentPropGroupToolTests
         Assert.Equal(("invalid_value", "nickname"), ((string?)bad.Content["code"], (string?)bad.Content["field"]));
     }
 
+    /// <summary>
+    /// An asset write and its preview give the revision of the session. An asset write does not change it, so the agent
+    /// can pass it as if_revision of its next call (section 8.6, item 3 of the MCP1 design, review finding of MCP1-2,
+    /// step 4).
+    /// </summary>
+    [Fact]
+    public void AnAssetWriteGivesTheRevisionOfTheSession()
+    {
+        using var ws = GroupWorkspace.Create();
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        Ok(host, "scene_create_zone", """{ "system": "Li01", "position": [0, 0, 0] }""");
+        const string save = """{ "refs": ["obj:Li01_14"], "nickname": "trio" """;
+
+        var preview = Ok(host, "prop_group_save", save + """, "preview": true }""");
+        var saved = Ok(host, "prop_group_save", save + """, "if_revision": "1", "confirm": true }""");
+        var renamed = Ok(host, "prop_group_rename", """{ "group": "group:trio", "nickname": "quay", "confirm": true }""");
+        var deleted = Ok(host, "prop_group_delete", """{ "group": "group:quay", "confirm": true }""");
+        var next = Ok(host, "scene_create_zone",
+            $$"""{ "system": "Li01", "position": [0, 0, 10], "if_revision": {{Json((string)deleted["rev"]!)}} }""");
+
+        Assert.Equal(["1", "1", "1", "1"],
+            new[] { preview, saved, renamed, deleted }.Select(r => (string?)r["rev"]));
+        Assert.Equal(("applied", "2"), ((string?)next["status"], (string?)next["rev"]));
+    }
+
+    /// <summary>A rename to the nickname that the group has gives no_change and writes nothing. The host learns no
+    /// edit, so the Console gets no entry (addition 10 of the contract of the M6b-1 build). A group of one member tells
+    /// its member with the singular text.</summary>
+    [Fact]
+    public void ARenameToTheNicknameOfTheGroupGivesNoChange()
+    {
+        using var ws = GroupWorkspace.Create();
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        var saved = Ok(host, "prop_group_save", """{ "refs": ["obj:Li01_dock"], "nickname": "dock", "confirm": true }""");
+        var file = Path.Combine(GroupWorkspace.PropsFolder(ws), "dock.ini");
+        var before = File.ReadAllBytes(file);
+
+        var preview = Ok(host, "prop_group_rename", """{ "group": "group:dock", "nickname": "dock", "preview": true }""");
+        var same = Ok(host, "prop_group_rename", """{ "group": "group:dock", "nickname": "dock", "confirm": true }""");
+
+        Assert.Equal("The group has 1 member: dock.", Texts(saved["notes"]).Single());
+        foreach (var result in new[] { preview, same })
+        {
+            Assert.Equal(("no_change", "The data has these values already, so the edit changed nothing."),
+                ((string?)result["status"], (string?)result["summary"]));
+            Assert.Empty(result["renames"]!.AsArray());
+        }
+        Assert.Equal(before, File.ReadAllBytes(file));
+        Assert.Equal(["prop_group_save"], host.Edits.Select(e => e.Tool));
+    }
+
+    /// <summary>
+    /// Another program writes a group file after the tools read the props folder. Each prop group tool reads the folder
+    /// again, as the editor does when it gets the focus. So a save or a rename to the nickname of the file gives
+    /// name_taken and keeps the file, and list_prop_groups and prop_group_place know the group. The write and the rename
+    /// of the data layer also refuse to replace a file of the folder (review finding of MCP1-2, step 4).
+    /// </summary>
+    [Fact]
+    public void AGroupFileThatAnotherProgramWroteIsKnownAndNoWriteReplacesIt()
+    {
+        using var ws = GroupWorkspace.Create();
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        Ok(host, "prop_group_save", """{ "refs": ["obj:Li01_dock"], "nickname": "dock", "confirm": true }""");
+        Assert.Single(Ok(host, "list_prop_groups")["groups"]!.AsArray());
+        string Other(string nickname) => GroupWorkspace.WriteGroup(ws, nickname,
+            $"[PropGroup]\nnickname = {nickname}\nformat = 1\n[Object]\nmember = keepme\narchetype = station1\n");
+        var files = new[] { Other("foo"), Other("bar") };
+        var texts = files.Select(File.ReadAllText).ToList();
+
+        var save = Error(host, "prop_group_save", """{ "refs": ["obj:Li01_14"], "nickname": "foo", "confirm": true }""");
+        var rename = Error(host, "prop_group_rename", """{ "group": "group:dock", "nickname": "bar", "confirm": true }""");
+        var listed = Ok(host, "list_prop_groups");
+        var placed = Ok(host, "prop_group_place", """{ "group": "group:foo", "system": "Li01", "anchor": [0, 0, 0] }""");
+        var draft = PropGroups.Draft(session, [SceneWorkspace.Object("Li01_14")]);
+        var dock = PropGroups.Of(session).Single(g => g.Nickname == "dock");
+        var third = Other("qux");
+        texts.Add(File.ReadAllText(third));
+        var write = Assert.Throws<System.ArgumentException>(() => PropGroups.Write(session, draft, "qux", "Qux"));
+        Assert.Throws<System.ArgumentException>(() => PropGroups.Rename(session, dock, "qux"));
+        var command = PropGroupCommands.Save(session, draft, "qux", "Qux");
+
+        Assert.Equal(("name_taken", PropGroupCommands.NicknameTaken), (save.Code, save.Detail));
+        Assert.Equal(("name_taken", PropGroupCommands.NicknameTaken), (rename.Code, rename.Detail));
+        Assert.Equal(["group:bar", "group:dock", "group:foo"],
+            listed["groups"]!.AsArray().Select(g => (string?)g!["ref"]).Order());
+        Assert.Equal("applied", (string?)placed["status"]);
+        Assert.StartsWith("A prop group with this nickname exists.", write.Message);
+        Assert.Equal((EditErrorKind.NameTaken, PropGroupCommands.NicknameTaken),
+            (command.Error?.Kind, command.Error?.Detail));
+        Assert.Equal(texts, new[] { files[0], files[1], third }.Select(File.ReadAllText));
+        Assert.True(File.Exists(Path.Combine(GroupWorkspace.PropsFolder(ws), "dock.ini")));
+    }
+
     /// <summary>A session that takes no edits gives read_only for an asset write, and Pause gives paused (decision D734
     /// of the MCP1 design). Nothing is written.</summary>
     [Fact]

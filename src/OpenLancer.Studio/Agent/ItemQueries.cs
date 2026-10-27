@@ -318,7 +318,7 @@ internal static class ItemQueries
     {
         var session = call.Session;
         var text = call.Args.Text("text");
-        return ToolResult.Of(new PropGroupsView(PropGroups.Of(session)
+        return ToolResult.Of(new PropGroupsView(Groups(session)
             .Where(g => ToolCall.Matches(text, g.Nickname, g.Name))
             .Select(g => GroupRow(session, g)).ToList()));
     }
@@ -516,13 +516,25 @@ internal static class ItemQueries
     /// <exception cref="EditException"><see cref="EditErrorKind.NotFound"/> with the closest names.</exception>
     internal static PropGroup Group(EditSession session, ItemReference reference)
     {
-        var groups = PropGroups.Of(session);
+        var groups = Groups(session);
         return groups.FirstOrDefault(g => g.Nickname.Equals(reference.Name, StringComparison.OrdinalIgnoreCase) &&
                                           (reference.Scope == null ? g.Editable
                                               : string.Equals(g.ModId, reference.Scope, StringComparison.OrdinalIgnoreCase))) ??
                throw new EditException(new EditError(EditErrorKind.NotFound, ItemRefs.NotFound,
                    AgentTexts.Error("group_none", ("ref", reference)) +
                    ItemRefs.Hint(reference.Name, groups.Select(g => g.Nickname))) { Target = reference.ToString() });
+    }
+
+    /// <summary>
+    /// The prop groups after a new read of their folders when a file changed on disk. The editor reads the folders again
+    /// when its window gets the focus, as Unity refreshes its assets. An agent works while the editor has no focus, and
+    /// the host without a window has no focus. So each tool reads the folders again before it reads the groups (review
+    /// finding of MCP1-2, step 4).
+    /// </summary>
+    private static IReadOnlyList<PropGroup> Groups(EditSession session)
+    {
+        PropGroups.Refresh(session);
+        return PropGroups.Of(session);
     }
 
     /// <summary>The <c>group:</c> reference of a prop group. A group of the active mod has its nickname. A group of a

@@ -65,11 +65,13 @@ public static class PropGroupCommands
             : Write(() => PropGroups.Write(session, draft, nickname, name));
 
     /// <summary>Why <see cref="Save"/> cannot write a draft, or null. A preview of an agent reads it and writes
-    /// nothing.</summary>
+    /// nothing. The check reads the folders of the groups again first, so a file that another program wrote gives
+    /// <see cref="EditErrorKind.NameTaken"/>.</summary>
     public static EditError? SaveProblem(EditSession session, PropGroupDraft draft, string nickname, string name)
     {
         if (Refusal(session) is { } refused)
             return refused;
+        PropGroups.Refresh(session);
         if (draft.Refusals.Count > 0)
             return Error(EditErrorKind.Refused, EditPlan.PlanRefused, draft.Refusals[0].Message);
         if (NicknameRefusal(session, nickname, null) is { } bad)
@@ -86,10 +88,17 @@ public static class PropGroupCommands
             ? new PropGroupWrite(null, problem)
             : Write(() => PropGroups.Rename(session, group, nickname));
 
-    /// <summary>Why <see cref="Rename"/> cannot rename a group, or null.</summary>
-    public static EditError? RenameProblem(EditSession session, PropGroup group, string nickname) =>
-        Refusal(session) ?? OtherModRefusal(group, "rename") ??
-        (nickname.Equals(group.Nickname, StringComparison.Ordinal) ? null : NicknameRefusal(session, nickname, group));
+    /// <summary>Why <see cref="Rename"/> cannot rename a group, or null. The check of the nickname reads the folders of
+    /// the groups again first, as <see cref="SaveProblem"/> does.</summary>
+    public static EditError? RenameProblem(EditSession session, PropGroup group, string nickname)
+    {
+        if ((Refusal(session) ?? OtherModRefusal(group, "rename")) is { } refused)
+            return refused;
+        if (nickname.Equals(group.Nickname, StringComparison.Ordinal))
+            return null;
+        PropGroups.Refresh(session);
+        return NicknameRefusal(session, nickname, group);
+    }
 
     /// <summary>Deletes a group of the active mod (decision D294). The copies in the systems stay. See
     /// <see cref="PropGroups.Delete"/>.</summary>

@@ -50,7 +50,7 @@ internal static class PropGroupTools
                 .Select(d => Problem.From(d, d.Target is { } target ? Ref(target) : null)).ToList(),
             Notes =
             [
-                AgentTexts.Error("group_members", ("count", draft.Members.Count),
+                AgentTexts.Error(draft.Members.Count == 1 ? "group_member" : "group_members", ("count", draft.Members.Count),
                     ("members", string.Join(", ", draft.Members.Select(m => m.Member)))),
             ],
         };
@@ -60,7 +60,8 @@ internal static class PropGroupTools
     }
 
     /// <summary>Gives a prop group of the active mod a new nickname (decision D294 of the M23 design). The file of the
-    /// group gets the new name. The copies in the systems do not change.</summary>
+    /// group gets the new name. The copies in the systems do not change. The nickname that the group has gives
+    /// <c>no_change</c> and writes nothing (addition 10 of the contract of the M6b-1 build).</summary>
     public static ToolStep Rename(ToolCall call)
     {
         var session = Guarded(call);
@@ -68,7 +69,17 @@ internal static class PropGroupTools
         var nickname = call.Args.Text("nickname")!;
         var from = ItemQueries.GroupRef(group);
         var shape = new EditResult(EditStatus.Applied) { Label = $"Rename prop group {group.Nickname} to {nickname}" };
-        return Write(call, PropGroupCommands.RenameProblem(session, group, nickname), shape,
+        var problem = PropGroupCommands.RenameProblem(session, group, nickname);
+        if (problem == null && nickname.Equals(group.Nickname, StringComparison.Ordinal))
+        {
+            return ToolResult.Of(shape with
+            {
+                Status = EditStatus.NoChange,
+                Summary = AgentTexts.Error("edit_no_change"),
+                Revision = session.Revision,
+            });
+        }
+        return Write(call, problem, shape,
             () => PropGroupCommands.Rename(session, group, nickname),
             renamed => shape with
             {
@@ -115,6 +126,9 @@ internal static class PropGroupTools
     {
         if (problem != null)
             throw new EditException(problem);
+        // An asset write does not change the revision of the session, so the result gives the revision now. The agent
+        // can pass it as if_revision of its next call.
+        var revision = call.Session.Revision;
         if (call.Args.Flag("preview"))
         {
             return ToolResult.Of(written(null) with
@@ -122,6 +136,7 @@ internal static class PropGroupTools
                 Status = EditStatus.Previewed,
                 NeedsConfirmation = true,
                 Summary = AgentTexts.Error("asset_write_previewed"),
+                Revision = revision,
             });
         }
         if (!call.Args.Flag("confirm"))
@@ -135,6 +150,7 @@ internal static class PropGroupTools
         var result = written(done.Group) with
         {
             Summary = AgentTexts.Error("asset_write_applied", ("label", shape.Label ?? call.Tool)),
+            Revision = revision,
         };
         call.Host.Edited(call.Tool, result);
         return ToolResult.Of(result);
