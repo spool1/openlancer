@@ -170,7 +170,7 @@ Play from a trigger starts the mission in the OpenLancer game at a point of the 
 |---|---|---|
 | Mission start | The start triggers | The mission starts as a new mission. Exact. |
 | Checkpoint {trigger} | The restore trigger of an `Act_Save` line | The triggers of a saved game at that checkpoint. Exact for the triggers. A saved game also keeps the objective, the dock and lane rules, the reputations and other state from before the save. The start save does not keep them, and the Play start page warns about it. |
-| {trigger} (approximate) | Each other trigger | The triggers that wait at that point, and two setup triggers that rebuild the state of the path. Some state can differ, for example damage or the cargo of a ship. |
+| {trigger} (approximate) | Each other trigger | The triggers that wait at that point, and two setup triggers that rebuild the state of the path. The setup makes only the objects of the start system. The ships that travel with the player start next to the player. Some state can differ, for example damage or the cargo of a ship. |
 
 ### Set the play start and play
 
@@ -207,6 +207,8 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 | Source of the place | The line of the script that gives the suggested place, for example Act_SetInitialPlayerPos of key_save_x. When another line gives the system or the point, the text names that line too. Click "Select {trigger}" to select the trigger of the line in the graph. The row shows only for the suggested place. |
 | Ship | The ship package of the Play menu. |
 | Triggers that wait at the start | The triggers that are active when the play starts. Click a row to select the trigger. |
+| Objects that the setup leaves out ({n}) | A closed list of an approximate start. At this trigger, these objects are in another system, so the setup does not make them. The list also has the fuse lines that the setup removes. Click a row to select the trigger of its spawn line. |
+| Ships that start next to the player ({n}) | A closed list of an approximate start. These ships travel with the player at this trigger, and each row tells why. The setup puts them next to the player. Click a row to select the trigger of its spawn line. |
 | Advanced > Setup lines | The setup triggers of an approximate start, as read-only raw INI with colors. They are in the test layer of the play, not in the mod. |
 | Play from the play start | Plays the mission from this start in OpenLancer, as F5 in the Mission tab does. The button is off while the start or its start place cannot start, and its tooltip gives the reason. |
 
@@ -217,6 +219,13 @@ Three warnings are about the start place. They follow the place that you pick:
 - A trigger that waits for the end of the launch does not run after a start in space or at the Scene camera, so the page names it. Pick a base to run it.
 - A trigger that waits for the player to enter space in another system runs in OpenLancer, but not in the linked game.
 - A trigger that waits for a jump into the system of the start does not run in OpenLancer until the next jump into that system. The path to the trigger already made that jump.
+
+Four warnings are about the world of the setup (see "How the setup builds the world"):
+
+- A trigger that waits for an object that the setup leaves out does not run in the play.
+- A trigger that waits for a label with left-out ships can run before it runs in the game.
+- A start at the Scene camera makes the world of the camera system when the play starts. Until then, the page shows each world line of the path.
+- For a base start without a known dock, the ships that travel with the player keep the points of their lines.
 
 ### How the editor suggests the start place
 
@@ -241,6 +250,36 @@ When no line gives a point, these rules give it:
 When no line of the path gives a place, the start is at the Scene camera in the system that the Scene shows.
 
 The section "Play a mission" of [PLAY.md](PLAY.md) tells what Play does with the start. It tells about the save, the start save, the test layer and the restart after a save.
+
+### How the setup builds the world
+
+An approximate start rebuilds the world of the path in a setup trigger. In the game, the objects of an earlier system stay in that system when the player jumps. So the setup makes only the objects of the start system. That is the system of the start place. For a base start, it is the system of the base. For a start at the Scene camera, it is the system of the camera when the play starts.
+
+The editor follows each object along the path:
+
+- A ship or a formation goes to the system of its record. A record without a system puts it in the system of the player at its spawn line.
+- A solar and a loot always go to the system of the player.
+- A line that moves a ship puts it in the system of the player.
+- When the player jumps, each ship with the jumper flag goes with the player. The flag at the time of the jump counts.
+- An object whose system no line tells stays in the setup.
+
+The setup leaves out each object that is in another system at the trigger. It also removes each line that names such an object, for example orders, attitudes, marks and fuses. A label with a member in the start system keeps its lines. A fuse on an object that no line makes goes too. When the path spawns an object two times, only the last spawn line stays. The lines between the two spawn lines that name the object go too.
+
+A ship or a formation of the start system travels with the player when one of these is true. The path must not make it hostile to the player.
+
+- Its last orders follow, trail or dock with the player, or with another ship that travels with the player.
+- A FollowPlayer list of the player names it.
+- It jumped with the player, and no later line moved it.
+- A nag keeps the player near it, or a waiting trigger watches its tether.
+
+Such a ship starts next to the player. The first rule that applies gives its point:
+
+1. A ship that is already within 2,500 units of the player keeps its point.
+2. A debug trigger or a checkpoint of the script can move the player to this step and place the ship. Then the ship gets the same offset from the player.
+3. A Follow order with an offset gives that offset.
+4. Else the ship starts in a free slot to the left or to the right of the player.
+
+For a base start, these ships start 1,000 units in front of the dock of the base. When the game data does not give the dock, they keep their points, and the page warns. Each other object of the start system keeps the point of its lines. An object that the setup leaves out does not come back when the player flies to its system later.
 
 ## The live view
 
