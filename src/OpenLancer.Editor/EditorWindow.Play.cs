@@ -151,10 +151,8 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
                 }
                 else
                 {
-                    var session = Session;
-                    point = Checked(SpawnPoint.FromPoint(point, SpawnPoint.ZoneShapes(system,
-                        item => session.ItemName(item) is { Length: > 0 } label ? label : item.Nickname)));
-                    var name = session.ItemName(system);
+                    point = Checked(SpawnPoint.FromPoint(point, SpawnPoint.ZoneShapes(system, SpawnPoint.NameOf(Session))));
+                    var name = Session.ItemName(system);
                     Log.Add(ConsoleSeverity.Warning, PlayController.Source,
                         UncheckedPoint(name.Length > 0 ? $"{name} ({system.Nickname})" : system.Nickname));
                 }

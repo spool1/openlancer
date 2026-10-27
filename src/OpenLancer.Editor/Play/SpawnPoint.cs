@@ -86,6 +86,10 @@ internal static class SpawnPoint
     public static IReadOnlyList<SpawnShape> ZoneShapes(StarSystem system, Func<NicknameItem, string> name) =>
         Shapes(new Dictionary<SystemObject, GameObject>(), system.Zones, name);
 
+    /// <summary>The name of an item in the lines of a start check: its name in the game, else its nickname.</summary>
+    public static Func<NicknameItem, string> NameOf(EditorSession? session) =>
+        item => session?.ItemName(item) is { Length: > 0 } name ? name : item.Nickname;
+
     /// <summary>
     /// The start of Play from camera: the camera position, moved out of the blocking shapes along the view axis (see
     /// <see cref="Clear"/>), with the orientation of the camera. The lines tell why the start moved. They warn when a
@@ -98,7 +102,7 @@ internal static class SpawnPoint
 
     /// <summary>
     /// The same check for the start point of a mission play in space (section 5.3, step 7 of the M6c design), for
-    /// example a point near a spawn of the mission or the system center. A rule of the start plan gives the point, so it
+    /// example a point near a spawn of the mission or near a jump gate. A rule of the start plan gives the point, so it
     /// can be inside a planet, a station or a death zone.
     /// </summary>
     /// <param name="start">The system, the point and the heading of the start. The ship looks along the -Z of the

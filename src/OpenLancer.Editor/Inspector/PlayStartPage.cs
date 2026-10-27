@@ -151,8 +151,7 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
                 if (ImGui.Selectable($"{RunOverlay.TriggerName(analysis, name)}##wait-{name}") &&
                     analysis.Index.Trigger(name) is { } trigger)
                 {
-                    window.Selection = new MissionRef(script, MissionItemKind.Trigger, trigger.Section.Ref);
-                    window.Missions.PendingGraphFrame = true;
+                    SelectTrigger(script, trigger);
                 }
             }
 
@@ -276,11 +275,17 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
 
         if (ImGui.Selectable($"Select {RunOverlay.TriggerName(analysis, name)}##place-source"))
         {
-            window.Selection = new MissionRef(model.Script, MissionItemKind.Trigger, trigger.Section.Ref);
-            window.Missions.PendingGraphFrame = true;
+            SelectTrigger(model.Script, trigger);
         }
 
         ImGui.SetItemTooltip("Selects the trigger of the line in the graph.");
+    }
+
+    /// <summary>Selects a trigger of the script and frames it in the graph (UI rule 6).</summary>
+    private void SelectTrigger(string script, MissionTrigger trigger)
+    {
+        window.Selection = new MissionRef(script, MissionItemKind.Trigger, trigger.Section.Ref);
+        window.Missions.PendingGraphFrame = true;
     }
 
     /// <summary>The ship package of the Play menu, or null for the default ship.</summary>

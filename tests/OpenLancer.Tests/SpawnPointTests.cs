@@ -283,7 +283,8 @@ public sealed class SpawnPointTests
         var system = new StarSystem { Nickname = "ol_sys", SourceFile = "" };
         system.Zones.AddRange(zones);
 
-        var shapes = SpawnPoint.ZoneShapes(system, item => item.Nickname);
+        // Without a session, the lines name each item by its nickname.
+        var shapes = SpawnPoint.ZoneShapes(system, SpawnPoint.NameOf(null));
         var check = SpawnPoint.FromPoint(new PlayStart.InSpace("ol_sys", new Vector3(0, 0, 1_000), Quaternion.Identity),
             shapes);
 

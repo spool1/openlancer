@@ -36,8 +36,9 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
     public const string StageTip = "The story stage in the start save. After the accept, it is the accept stage of the slot.";
     public const string AcceptTip = "The start comes after the player accepts the mission.";
     public const string PlaceTip = "Where the player starts. The suggestion is where the player is at this trigger in the " +
-                                   "game: docked at a base, or in space at a point. When no line of the path gives the " +
-                                   "point, the suggestion is the Scene camera.";
+                                   "game: docked at a base, or in space at a point. After a launch without a point, the " +
+                                   "suggestion is the base of the launch. After a jump without a point, it is the jump gate " +
+                                   "or hole of the jump. When no line of the path gives a place, it is the Scene camera.";
     public const string SourceTip = "The line of the script that tells where the player is at this trigger. When that line " +
                                     "gives no system or no point, the text names the line that gives the system or the point.";
     public const string ShipTip = "The ship package of the Play menu.";
