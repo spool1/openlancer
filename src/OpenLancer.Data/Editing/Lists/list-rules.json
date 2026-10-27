@@ -397,5 +397,33 @@
     { "id": "factions", "label": "Factions", "list": "faction" },
     { "id": "models", "label": "Models", "list": "model", "split": "folder" },
     { "id": "prefabs", "label": "Mission prefabs", "kind": "missionPrefabs" }
-  ]
+  ],
+  "// sceneBuilders": "The builders of the agent tools (milestone MCP1-2, decisions D730 and D731). 'wreck' gives a new wreck: the [Solar] types of its archetype, its lines, and its name and info texts. 'routes' gives the zones of a route for each usage, with the default radius and the lines of each zone in their order. A line without a value is a line that the builder fills: path_label and usage. The values follow counts over the retail system files. 146 of the 160 retail wreck objects have visit = 16. 3036 of the 3038 retail route zones have a radius of 750, and the other values are the most frequent values of each usage.",
+  "sceneBuilders": {
+    "wreck": {
+      "help": "A wreck is a solar of the type mission_satellite with a loadout of a ship. The player shoots it to free its cargo.",
+      "types": ["mission_satellite"],
+      "lines": [ { "key": "visit", "value": "16" } ],
+      "name": "Wreck",
+      "info": "The remains of a ship. Shoot the wreck to free its cargo."
+    },
+    "routes": [
+      { "usage": "patrol", "radius": 750,
+        "help": "A patrol route. The encounters of its zones send ships along the legs of the route.",
+        "lines": [
+          { "key": "sort", "value": "99" }, { "key": "toughness", "value": "7" }, { "key": "density", "value": "3" },
+          { "key": "repop_time", "value": "90" }, { "key": "max_battle_size", "value": "4" },
+          { "key": "pop_type", "value": "attack_patrol" }, { "key": "relief_time", "value": "30" },
+          { "key": "path_label" }, { "key": "usage" }, { "key": "mission_eligible", "value": "true" }
+        ] },
+      { "usage": "trade", "radius": 750,
+        "help": "A trade route. The encounters of its zones send traders along the legs of the route.",
+        "lines": [
+          { "key": "sort", "value": "96" }, { "key": "toughness", "value": "12" }, { "key": "density", "value": "5" },
+          { "key": "repop_time", "value": "30" }, { "key": "max_battle_size", "value": "4" },
+          { "key": "pop_type", "value": "trade_path" }, { "key": "relief_time", "value": "20" },
+          { "key": "path_label" }, { "key": "usage" }, { "key": "mission_eligible", "value": "true" }
+        ] }
+    ]
+  }
 }

@@ -307,6 +307,52 @@ public sealed class ListRulesTests
             Assert.Throws<InvalidDataException>(() => ListRules.Parse(With(bad)));
     }
 
+    /// <summary>
+    /// The rule data of the builders of the agent tools (decisions D730 and D731 of the MCP1 design, section 9.3). The
+    /// wreck takes the archetypes of the type mission_satellite, and each route template gives the keys of a zone of the
+    /// engine schema. The texts pass the STE lint, because the agent reads them. A template that gives a line that the
+    /// builder writes, or that has no place for the label or the usage, does not load.
+    /// </summary>
+    [Fact]
+    public void TheBuilderRulesParseAndTheirTextsPassTheSteLint()
+    {
+        var builders = Rules.Builders;
+        var wreck = builders.Wreck!;
+
+        Assert.Equal(["mission_satellite"], wreck.Types);
+        Assert.Equal([new BuilderLine("visit", "16")], wreck.Lines);
+        Assert.Equal(["patrol", "trade"], builders.Routes.Select(r => r.Usage));
+        Assert.All(builders.Routes, r => Assert.Equal(750, r.Radius));
+        Assert.Equal("attack_patrol", builders.Route("PATROL")!.Lines.Single(l => l.Key == "pop_type").Value);
+        Assert.Null(builders.Route("mining"));
+        Assert.All(wreck.Lines, l => Assert.True(Knows("system", "Object", l.Key), l.Key));
+        Assert.All(builders.Routes.SelectMany(r => r.Lines), l => Assert.True(Knows("system", "zone", l.Key), l.Key));
+        var texts = new[] { wreck.Help, wreck.Name, wreck.Info }.Concat(builders.Routes.Select(r => r.Help));
+        Assert.Empty(texts.SelectMany(t => SteLint.Problems(t).Select(p => $"{p}: {t}")));
+
+        string With(string builder) => FilesRules("""{ "files": ".ini" }""", "")[..^1].TrimEnd() +
+                                       $$""", "connectionTypes": ["jump_gate"], "sceneBuilders": {{builder}} }""";
+        const string route = """{ "key": "path_label" }, { "key": "usage" }""";
+        Assert.Equal("trade", Assert.Single(ListRules.Parse(With(
+            $$"""{ "routes": [ { "usage": "trade", "radius": 500, "help": "A route.", "lines": [ {{route}} ] } ] }"""))
+            .Builders.Routes).Usage);
+        Assert.Same(SceneBuilders.None, ListRules.Parse(FilesRules("""{ "files": ".ini" }""", "")).Builders);
+        foreach (var bad in new[]
+                 {
+                     $$"""{ "routes": [ { "usage": "x", "radius": 500, "help": "A.", "lines": [ { "key": "usage" } ] } ] }""",
+                     $$"""{ "routes": [ { "usage": "x", "radius": 0, "help": "A.", "lines": [ {{route}} ] } ] }""",
+                     $$"""{ "routes": [ { "usage": "x", "radius": 5, "help": "A.", "lines": [ {{route}}, { "key": "size", "value": "1" } ] } ] }""",
+                     $$"""{ "routes": [ { "usage": "x", "radius": 5, "help": "A.", "lines": [ {{route}}, { "key": "sort" } ] } ] }""",
+                     $$"""{ "routes": [ { "usage": "x", "radius": 5, "help": "A.", "lines": [ {{route}}, { "key": "sort", "value": "1, 2" } ] } ] }""",
+                     $$"""{ "routes": [ { "usage": "x", "radius": 5, "help": "A.", "lines": [ {{route}} ] }, { "usage": "X", "radius": 5, "help": "A.", "lines": [ {{route}} ] } ] }""",
+                     """{ "wreck": { "help": "A.", "types": [], "name": "W", "info": "I." } }""",
+                     """{ "wreck": { "help": "A.", "types": ["jump_gate"], "name": "W", "info": "I." } }""",
+                     """{ "wreck": { "help": "A.", "types": ["x"], "name": "W", "info": "I.", "lines": [ { "key": "visit" } ] } }""",
+                     """{ "wreck": { "help": "A.", "types": ["x"], "name": "W", "info": "I.", "lines": [ { "key": "loadout", "value": "a" } ] } }""",
+                 })
+            Assert.Throws<InvalidDataException>(() => ListRules.Parse(With(bad)));
+    }
+
     [Fact]
     public void FolderAndFileClassParse()
     {

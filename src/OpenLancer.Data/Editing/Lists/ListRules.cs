@@ -287,12 +287,13 @@ internal sealed class ListRules
 
     private ListRules(IReadOnlyDictionary<string, RoleDefinition> roles, IReadOnlyList<ListDefinition> lists,
         IReadOnlyList<ListRule> rules, IReadOnlyList<string> connectionTypes, IReadOnlyList<SceneTemplateDefinition> templates,
-        IReadOnlyList<AssetCategoryDefinition> assetCategories)
+        IReadOnlyList<AssetCategoryDefinition> assetCategories, SceneBuilders builders)
     {
         Roles = roles;
         ConnectionTypes = connectionTypes;
         SceneTemplates = templates;
         AssetCategories = assetCategories;
+        Builders = builders;
         Lists = lists.ToDictionary(l => l.Id, StringComparer.OrdinalIgnoreCase);
         All = rules;
         byAddress = rules.GroupBy(r => (r.Role.ToLowerInvariant(), r.Section.ToLowerInvariant(), r.Key.ToLowerInvariant()))
@@ -320,6 +321,10 @@ internal sealed class ListRules
 
     /// <summary>The top categories of the Assets panel, in the order of the category tree (milestone M23).</summary>
     public IReadOnlyList<AssetCategoryDefinition> AssetCategories { get; }
+
+    /// <summary>The rules of the builders of the agent tools: the wreck and the route templates (milestone
+    /// MCP1-2).</summary>
+    public SceneBuilders Builders { get; }
 
     /// <summary>The rules of each (role, section type) in lower case.</summary>
     public IReadOnlyDictionary<(string Role, string Section), IReadOnlyList<ListRule>> ByRoleAndSection { get; }
@@ -369,7 +374,10 @@ internal sealed class ListRules
                 ? assets.EnumerateArray().Select(ReadAssetCategory).ToList()
                 : [];
             CheckAssetCategories(categories, lists);
-            return new ListRules(roles, lists, rules, connections, templates, categories);
+            var builders = root.TryGetProperty("sceneBuilders", out var builder)
+                ? SceneBuilders.Read(builder, connections)
+                : SceneBuilders.None;
+            return new ListRules(roles, lists, rules, connections, templates, categories, builders);
         }
         catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or
                                        FormatException or ArgumentException)
