@@ -77,6 +77,28 @@ public sealed class PatchWriterTests
             "faction = f1, 1", "faction_weight = fw1, 2", "encounter = e2, 5, 0.2", "faction = f2, 3"), patch);
     }
 
+    /// <summary>The merge writes the lines of a patch as one block at the first line that they replace. So a patch of a
+    /// linked group also writes each line between the lines of the group, here the density_restriction line of a zone.
+    /// Then a save and a reload keep the order of the lines (milestone MCP1-2).</summary>
+    [Fact]
+    public void AChangeInALinkedGroupAlsoWritesTheLinesBetweenTheLinesOfTheGroup()
+    {
+        const string zone = """
+            [Zone]
+            nickname = z1
+            faction_weight = fw0, 1
+            density_restriction = 2, lawful
+            encounter = e1, 5, 0.4
+            faction = f1, 1
+            toughness = 4
+            """;
+
+        var patch = Patch(zone, zone.Replace("faction = f1, 1", "faction = f1, 3"));
+
+        Assert.Equal(Lines("[Zone]", "nickname = z1", "faction_weight = fw0, 1", "density_restriction = 2, lawful",
+            "encounter = e1, 5, 0.4", "faction = f1, 3"), patch);
+    }
+
     [Fact]
     public void AChangeInAnOrderSensitiveSectionWritesAllLines()
     {

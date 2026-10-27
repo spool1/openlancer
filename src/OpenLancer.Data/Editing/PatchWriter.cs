@@ -156,6 +156,19 @@ internal static class PatchWriter
         }
     }
 
+    /// <summary>The names of the lines between the first and the last line of a group of names (see
+    /// <see cref="SectionKeys.LinkedGroups"/>), without the names of the group.</summary>
+    private static IEnumerable<string> Between(Section section, string[] group)
+    {
+        bool InGroup(Entry e) => group.Contains(e.Name, StringComparer.OrdinalIgnoreCase);
+        var lines = section.ToList();
+        var first = lines.FindIndex(InGroup);
+        var last = lines.FindLastIndex(InGroup);
+        return first < 0
+            ? []
+            : lines.Skip(first).Take(last - first + 1).Where(e => !InGroup(e)).Select(e => e.Name);
+    }
+
     /// <summary>
     /// Null when a patch can find a section of B in B, and in W when the section is kept. Otherwise the reason.
     /// </summary>
@@ -434,7 +447,13 @@ internal static class PatchWriter
             names.UnionWith(pinned);
             names.RemoveWhere(IsKey);
             foreach (var group in SectionKeys.LinkedGroups(edited.Name).Where(g => g.Any(names.Contains)))
+            {
                 names.UnionWith(group.Where(n => before.ContainsKey(n) || after.ContainsKey(n)));
+                // The merge writes the lines of a patch as one block at the first line that they replace. So a line
+                // between the lines of a group moves with the group, or a save and a reload change the order. An
+                // example is a density_restriction line between the faction_weight and the encounter lines of a zone.
+                names.UnionWith(Between(edited, group).Concat(Between(original, group)).Where(n => !IsKey(n)));
+            }
             // The lines of each name can be the same while lines with different names change places. In an
             // order-sensitive section, that is a change too. A new key alone is a rename, not a change of the order.
             var orderSensitive = SectionKeys.IsOrderSensitive(edited.Name, path);
