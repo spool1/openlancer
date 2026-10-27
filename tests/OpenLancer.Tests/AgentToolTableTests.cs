@@ -202,6 +202,7 @@ public sealed class AgentToolTableTests
         ["duplicate_items"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["undo"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["redo"] = (ToolKind.Session, new ToolHints(false, true, false)),
+        ["edit_batch"] = (ToolKind.Session, new ToolHints(false, false, false)),
     };
 
     private static IEnumerable<string> EditTools => Edits.Keys;

@@ -263,6 +263,49 @@ internal sealed class FieldsParam(string name, bool required) : ToolParam(name, 
     public override bool Fits(JsonNode value) => value is JsonObject { Count: > 0 };
 }
 
+/// <summary>
+/// The steps of <c>edit_batch</c>: a list of objects with the name of a tool and its arguments, with at least one step.
+/// The schema names the edit tools. The check takes each tool name, so the handler gives the reason for a tool that
+/// cannot be a step.
+/// </summary>
+/// <param name="tools">The names of the tools that can be steps. The schema reads them at its first use, after the tool
+/// table exists.</param>
+internal sealed class StepsParam(string name, Func<IEnumerable<string>> tools) : ToolParam(name, true)
+{
+    public override JsonObject Schema(string tool) => new()
+    {
+        ["type"] = "array",
+        ["minItems"] = 1,
+        ["items"] = new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JsonObject
+            {
+                ["tool"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray(tools().Select(t => (JsonNode)t).ToArray()),
+                    ["description"] = AgentTexts.Field(tool, "tool"),
+                },
+                ["arguments"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["description"] = AgentTexts.Field(tool, "arguments"),
+                },
+            },
+            ["required"] = new JsonArray("tool"),
+            ["additionalProperties"] = false,
+        },
+    };
+
+    public override string Expected => "a list of steps, each an object with a tool and its arguments";
+
+    public override bool Fits(JsonNode value) =>
+        value is JsonArray { Count: > 0 } array && array.All(item =>
+            item is JsonObject step && step["tool"]?.GetValueKind() == JsonValueKind.String &&
+            step.All(p => p.Key == "tool" || p.Key == "arguments" && p.Value is null or JsonObject));
+}
+
 /// <summary>An object with arguments of its own.</summary>
 internal sealed class GroupParam(string name, IReadOnlyList<ToolParam> members) : ToolParam(name, false)
 {

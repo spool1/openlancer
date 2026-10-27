@@ -12,6 +12,7 @@
       "Before an edit, make sure that can_edit of studio_status is true.",
       "Read the items before you edit them.",
       "Use preview: true for a large edit or a delete.",
+      "Use edit_batch for steps that belong together. The batch is one Undo step.",
       "Give each new item a nickname, so that later steps can name it."
     ],
     "read_only": [
@@ -231,6 +232,18 @@
       "title": "Redo the last edit that the agent undid",
       "description": "Redoes the last edit that the agent undid. The tool does not redo an edit that the user undid."
     },
+    "edit_batch": {
+      "title": "Run edits as one Undo step",
+      "description": "Runs edit steps as one Undo step, all or nothing. Each step sees the result of the steps before it. When one step fails, the batch changes nothing.",
+      "fields": {
+        "label": "The label of the Undo step. Without it, the batch takes the label of its first step.",
+        "steps": "The steps in order. studio_status gives the most steps of one batch. A step that needs confirm: true must have it in its arguments.",
+        "tool": "The name of an edit tool, for example set_fields.",
+        "arguments": "The arguments of the tool. A step cannot have preview or with_patch.",
+        "preview": "Show what the batch does, and change nothing. The revision stays the same.",
+        "with_patch": "With preview: also give the patch text of each INI file that the batch changes."
+      }
+    },
     "open_view": {
       "title": "Open a view of the editor",
       "description": "Opens a system in the Scene, a mission script in the Mission tab or a cutscene in the Cutscene tab. Give one of the three. The tool changes what the user sees, not the data. Only the editor host has this tool.",
@@ -373,7 +386,12 @@
     "redo_nothing": "The history has no step to redo.",
     "undo_user_entry": "The last edit is an edit of the user: {label}. The agent can undo only its own edits.",
     "redo_user_entry": "The next step to redo is an edit of the user: {label}. The agent can redo only its own edits.",
-    "redo_user_undid": "The user undid this edit: {label}. The agent cannot redo it."
+    "redo_user_undid": "The user undid this edit: {label}. The agent cannot redo it.",
+    "limit_steps": "One batch can have at most {max} steps. Split the batch.",
+    "step_unknown": "Step {index}: the server has no tool {tool}.",
+    "step_kind": "Step {index}: {tool} cannot be a step of edit_batch. A step must be an edit tool, for example set_fields.",
+    "step_asset_write": "Step {index}: {tool} writes files at once, outside the Undo history. Call it alone, not in edit_batch.",
+    "step_failed": "Step {index} failed: {message} The batch changed nothing. The first step has the index 0."
   },
   "resources": {
     "openlancer://catalog/lists": {
@@ -896,6 +914,7 @@
     "NamedMention.nickname": "The nickname that the file names as text.",
     "NamedMention.path": "The install path of the file.",
     "NamedMention.count": "How often the file names the nickname.",
-    "HistoryStepView.label": "The label of the step that the tool undid or did again, for example Agent: Delete my_station_1."
+    "HistoryStepView.label": "The label of the step that the tool undid or did again, for example Agent: Delete my_station_1.",
+    "BatchResult.steps": "The result of each step, in order. Each step has the status of the batch."
   }
 }
