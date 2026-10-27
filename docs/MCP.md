@@ -4,7 +4,7 @@ OpenLancer has an agent server. An agent program, for example Claude Code, conne
 
 The agent reads the data as the editor shows it. It reads the systems and their items, the data lists, the assets, the missions and the cutscenes. It also reads the raw INI text and the problems of the checks. In the editor, the agent can also open views, select items, and get images of a system, of a cutscene and of a panel.
 
-The agent can also edit the items of the active mod: set fields and texts, rename, delete and copy items, and undo its own edits. Each agent edit goes through the same commands, checks and Undo history as an edit of the user. An edit changes the edit view of the editor. It is not saved until you save the mod. See "The edit tools".
+The agent can also edit the items of the active mod. It sets fields and texts, renames, deletes and copies items, and undoes its own edits. It creates objects, zones and lights, places assets and prop groups, moves items and makes items from templates. Each agent edit goes through the same commands, checks and Undo history as an edit of the user. An edit changes the edit view of the editor. It is not saved until you save the mod. See "The edit tools" and "The Scene and data tools".
 
 ## The two hosts
 
@@ -82,7 +82,7 @@ When another program uses the port, the server does not start. The status bar th
 |---|---|---|
 | Agent server port | 47815 | The port of the server on this computer. Stop the server to change it. |
 | Auto-save and continue when an MCP agent starts Play | Off | When an agent starts Play and the active mod has unsaved edits, the editor saves them and plays. Off: the editor asks you first. See "Agent Play" in [PLAY.md](PLAY.md). The setting shows only when the agent server has a tool that starts Play. These tools come with a later version. |
-| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions and Cutscenes. `render_scene` is in the group Scene, and `render_cutscene` is in the group Cutscenes. These tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check`, `get_console`, the edit tools, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene. |
+| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions and Cutscenes. The `scene_` tools, the `prop_group_` tools and `render_scene` are in the group Scene. `render_cutscene` is in the group Cutscenes. These tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check`, `get_console`, the edit tools of "The edit tools", `create_from_template`, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene. |
 | Rows of a page without a limit | 50 | The rows of a list result when the agent gives no limit. |
 | Largest page limit | 200 | The largest limit that the agent can ask for in one list result. |
 | Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
@@ -91,7 +91,7 @@ When another program uses the port, the server does not start. The status bar th
 | Time of a check or an image (s) | 60 | How long a check of a retail target or an image can take. |
 | Size of a request (MB) | 4 | The largest request. The change applies at the next start of the server. |
 | Largest side of an image (pixels) | 2048 | The most pixels on each side of an image. A larger panel capture becomes smaller. A `render_scene` or `render_cutscene` call with a larger `width` or `height` gives the error `limit`. |
-| Items of one edit | 200 | The most items that one call of `delete_items` or `duplicate_items` names. |
+| Items of one edit | 200 | The most items that one call of `delete_items`, `duplicate_items` or `prop_group_save` names, and the most moves of one `scene_transform` call. |
 | Sections of one edit | 2000 | The most sections that one edit call changes, adds or removes. A larger edit changes nothing and gives the error `limit`. |
 | Steps of one batch | 100 | The most steps of one `edit_batch` call. |
 
@@ -179,7 +179,7 @@ Each edit tool takes these arguments:
 | `preview` | Runs the edit and gives its result, then changes nothing. The revision, the history and the unsaved state stay the same. The views do not change. |
 | `with_patch` | With `preview`: also gives the patch text of each INI file that the edit changes. |
 | `if_revision` | Refuses the edit with `stale_revision` when the edit view changed after this revision. Each result gives the revision as `rev`. A save does not change it. |
-| `confirm` | `rename_item` and `delete_items`: applies an edit that changes more than its targets. |
+| `confirm` | `rename_item` and `delete_items`: applies an edit that changes more than its targets. The prop group writes: writes the files. |
 
 When you would see a dialog for a delete or a rename, the tool gives `needs_confirmation`, and nothing changes. A delete or a rename that leaves "Missing" lines also needs it. The agent then calls the tool again with `confirm: true`. A preview tells it in `needs_confirmation`.
 
@@ -189,7 +189,7 @@ The result of an edit gives the new items (`adds`), the changed items (`changes`
 
 `edit_batch` takes a list of steps. Each step names an edit tool and its arguments. All steps are one Undo step with the label of the batch. Each step sees the result of the steps before it, so a later step can name an item that an earlier step made or renamed.
 
-When one step fails, the error `step_failed` gives its index and its error, and the batch changes nothing. A step that needs a confirmation fails unless its arguments have `confirm: true`. `undo`, `redo`, `edit_batch`, the read tools and the tools of the editor cannot be steps.
+When one step fails, the error `step_failed` gives its index and its error, and the batch changes nothing. A step that needs a confirmation fails unless its arguments have `confirm: true`. `undo`, `redo`, `edit_batch`, the read tools and the tools of the editor cannot be steps. `prop_group_save`, `prop_group_rename` and `prop_group_delete` cannot be steps either, because they write files at once.
 
 #### Limits and pauses
 
@@ -198,6 +198,38 @@ One call names at most 200 items and changes at most 2000 sections. One batch ha
 While you pause the agent edits, each edit tool gives the error `paused`, and the read tools still work. A later version adds **Pause agent edits** to the Agent menu.
 
 The edit tools refuse with `read_only` when the editor takes no edits, and the message tells the reason. For example, another editor has the mod open, or the profile or the active mod is in the game folder. A mod in the OpenLancer repo also refuses until you allow its edits.
+
+### The Scene and data tools
+
+These tools call the commands of the Scene, the Assets panel and the Database of the editor. Each tool is one Undo step, except the three prop group writes. They work in the editor host.
+
+| Tool | What it does |
+|---|---|
+| `scene_create_object` | Creates a station, a planet, a sun, a satellite or another solar object, as the Create menu of the Scene does. |
+| `scene_create_zone` | Creates a zone with a shape, a size and a rotation. |
+| `scene_create_light` | Creates a point light. |
+| `scene_spawn_asset` | Places an asset of `search_assets` at a point, as a drop on the Scene does. |
+| `scene_transform` | Moves, rotates and sizes objects, zones and lights, as the gizmo does. |
+| `scene_set_component` | Adds a component with its value to an object, or removes a component. |
+| `prop_group_place` | Places the members of a prop group as new items of a system. |
+| `prop_group_save` | Saves items with their children as a new prop group of the active mod. |
+| `prop_group_rename` | Gives a prop group of the active mod a new nickname. |
+| `prop_group_delete` | Deletes a prop group of the active mod. The copies in the systems stay. |
+| `create_from_template` | Makes a new ship or new equipment from a template, as "New from template" of the Database does. |
+
+A create can also give the new item a nickname, a rotation, a size, a name and more fields. These parts go into the same Undo step, and the label is "Create" and the nickname. The result gives the new item with its last reference and selects it. Without a nickname, the item gets the next free nickname, as in the Create menu. The editor rounds a position to whole numbers.
+
+A station archetype with a docking sphere needs a base, because the Create menu asks for one. A station archetype without a docking sphere takes no base. A `parent` must be an object of the same system. An archetype of another template gives `invalid_value` with the reason.
+
+`scene_spawn_asset` takes the template of the type of a solar archetype. A ship, an asteroid or a model makes a new static prop archetype. The Scene shows its object after a save, when the editor loads the new archetype, and the result tells it.
+
+`scene_transform` takes rows with a reference and a position, a rotation or a size. The mode `absolute` sets the values, and `relative` adds each value to the value now. A relative rotation adds the degrees to the values of `rotate`. Each item moves alone, as with the gizmo, so the children do not move. An item without a position refuses. An object and a light have no size.
+
+`scene_set_component` adds only a component that "Add component" of the Inspector offers. For example, Dockable station needs an archetype with a docking sphere. The component Solar cannot go, as Unity keeps a component that another component needs.
+
+`prop_group_place` refuses a group with lines that name entries that this profile does not have. The error lists each such line. With `leave_out_error_lines: true`, the tool places the group without these lines, as "Place without these lines" does.
+
+`prop_group_save`, `prop_group_rename` and `prop_group_delete` write the files of the group in the `props` folder of the active mod at once. Undo cannot take them back, as in the Unity Project window. So each one needs `confirm: true`, and its result tells that the change is not on the undo stack. A preview writes nothing. A group of another mod refuses a rename and a delete.
 
 ## Permission rules for the agent program
 
@@ -266,7 +298,7 @@ Never put a proxy or a tunnel in front of the port of the agent server. A Tailsc
 
 ### The active mod only
 
-The agent works on the open profile with its active mod, as you do in the editor. It reads the data of the base game and of the mods up to the active mod. An edit tool changes only the edit view of the active mod. No tool of this version saves the mod. No tool writes into the game folder or into another mod. No tool takes a path on the disk: each path in a reference is an install path, for example `DATA\SHIPS\loadouts.ini`.
+The agent works on the open profile with its active mod, as you do in the editor. It reads the data of the base game and of the mods up to the active mod. An edit tool changes only the edit view of the active mod. No tool of this version saves the mod. Only the prop group tools write files: the files of a group in the folder of the active mod. No tool writes into the game folder or into another mod. No tool takes a path on the disk: each path in a reference is an install path, for example `DATA\SHIPS\loadouts.ini`.
 
 ### Data that goes to the agent
 
