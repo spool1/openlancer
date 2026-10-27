@@ -175,7 +175,8 @@ public sealed class NicknamesTests
     /// The index changes only the names of the part of the file that an edit changes. After each edit, undo and redo,
     /// it gives the names, the taken names and the collisions of an index that a new session builds. The edits are a
     /// create, a rename, a change of a line and a delete. A new name has the FLHash of another name. Then come undos and
-    /// a redo.
+    /// a redo. Then two zones get one nickname, and the first one gets a new nickname. The second zone does not change,
+    /// but its identity does, so the index must not keep its old reference.
     /// </summary>
     [Fact]
     public void TheIndexAfterEachEditIsTheIndexOfANewBuild()
@@ -193,6 +194,11 @@ public sealed class NicknamesTests
             () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li02Path, "zone", [ListWorkspace.Line("nickname", first)])),
             () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li01Path, "zone", [ListWorkspace.Line("nickname", second)])),
             () => session.Undo(),
+            () => session.Undo(),
+            () => session.Redo(),
+            () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li01Path, "zone", [ListWorkspace.Line("nickname", "twin")])),
+            () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li01Path, "zone", [ListWorkspace.Line("nickname", "twin")])),
+            () => session.Execute(ScenePlans.Rename(session, SceneWorkspace.Zone("twin"), "twin_a").Command!),
             () => session.Undo(),
             () => session.Redo(),
         };

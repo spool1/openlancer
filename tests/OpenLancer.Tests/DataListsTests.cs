@@ -513,7 +513,9 @@ public sealed class ReferencesToTests
     /// <summary>
     /// A change of one referrer file changes only the keys of its part in the merged index. A part takes the references
     /// of each section that did not change from its older part. After each edit, undo and redo, the index of the
-    /// session gives the references of an index that a new build makes.
+    /// session gives the references of an index that a new build makes. Two objects with one nickname name a loadout,
+    /// and the first one gets a new nickname. The second object does not change, but its identity does, so the index
+    /// must not keep its old reference.
     /// </summary>
     [Fact]
     public void TheMergedIndexAfterEachEditIsTheIndexOfANewBuild()
@@ -530,6 +532,13 @@ public sealed class ReferencesToTests
             () => session.Execute(ScenePlans.Delete(session, [SceneWorkspace.Object("Li01_grandchild")]).Command!),
             () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li02Path, "zone", [ListWorkspace.Line("nickname", "z2")])),
             () => session.Undo(),
+            () => session.Undo(),
+            () => session.Redo(),
+            () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li01Path, "Object",
+                [ListWorkspace.Line("nickname", "twin"), ListWorkspace.Line("loadout", "lo_station")])),
+            () => session.Execute(EditCommand.AddSection(SceneWorkspace.Li01Path, "Object",
+                [ListWorkspace.Line("nickname", "twin"), ListWorkspace.Line("loadout", "lo_station")])),
+            () => session.Execute(ScenePlans.Rename(session, SceneWorkspace.Object("twin"), "twin_a").Command!),
             () => session.Undo(),
             () => session.Redo(),
         };
