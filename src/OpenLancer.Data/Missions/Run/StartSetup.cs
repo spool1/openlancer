@@ -87,8 +87,8 @@ internal static class StartSetup
             // OpenLancer send the launch each time the ship of the player enters space, also when a start in space
             // spawns it. OpenLancer sends it before the entry to space. A base start rebuilds the world at the launch
             // from the base. no_params is case-sensitive (TR16). The triggers of the active set start after the world
-            // lines, so their lines find the objects of the world. They still get the launch, because the game gives
-            // the event to each trigger that starts while it handles the event (fixes of the reviews of 2026-10-28).
+            // lines, so their lines find the objects of the world. They still get the launch. The game gives an event
+            // to each trigger that starts while it handles the event (fixes of the reviews of 2026-10-28).
             triggers.Add(new SetupTrigger(worldName,
                 [
                     Line("Cnd_PlayerLaunch", "no_params"), .. world,

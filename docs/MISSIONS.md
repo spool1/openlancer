@@ -256,7 +256,7 @@ The section "Play a mission" of [PLAY.md](PLAY.md) tells what Play does with the
 
 An approximate start has two setup triggers. The first runs at the load. It sets the state of the path, for example the objective, the reputations and the locks. The second makes the world at the launch of the player. The game also sends the launch when a start in space spawns the player, before the entry to space.
 
-After the world lines, the second trigger starts the triggers that wait at the start. So their lines find the ships of the world, and a trigger that waits for the launch or for the entry to space still runs at the spawn. For a base start, only a waiting trigger that runs at once with lines on ships starts at the launch. The other triggers start at the load, so a trigger of the base or of a room runs while the player is docked.
+After the world lines, the second trigger starts the triggers that wait at the start. So their lines find the ships of the world. A trigger that waits for the launch or for the entry to space still runs at the spawn. For a base start, only a waiting trigger that runs at once with lines on ships starts at the launch. The other triggers start at the load, so a trigger of the base or of a room runs while the player is docked.
 
 The editor runs the path without a game world. So a trigger that waits for an event of the world stays active in the run, also when the game ran it long before the trigger of the start. The editor runs such a trigger when the path shows its event:
 
