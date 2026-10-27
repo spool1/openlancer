@@ -212,6 +212,44 @@ public sealed class StartPlanTests
                                                    l.Contains("r_obj_fly", StringComparison.Ordinal));
     }
 
+    /// <summary>When a dock is the first line of the path that tells where the player is, the player was in space
+    /// before it. So the Cnd_InSpace trigger runs before the dock, and the objective of the dock stays the last
+    /// objective.</summary>
+    [Fact]
+    public void ADockShowsThatThePlayerWasInSpaceBefore()
+    {
+        const string text = """
+            [Trigger]
+            nickname = r_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_SetNNObj = r_obj_a
+            Act_ActTrig = r_draw
+            Act_ActTrig = r_dock
+
+            [Trigger]
+            nickname = r_draw
+            Cnd_InSpace = true
+            Act_NNPath = 1, 1, r_base, r_sys_a
+
+            [Trigger]
+            nickname = r_dock
+            Cnd_BaseEnter = r_base
+            Act_SetNNObj = r_obj_b
+            Act_ActTrig = r_chosen
+
+            [Trigger]
+            nickname = r_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = StartReplay.Run(Index(text), MissionStartPoint.At("r_chosen"));
+
+        Assert.Equal(["Act_SetNNObj", "Act_NNPath", "Act_SetNNObj"], replay.Effects.Select(e => e.Line.Key.Trim()));
+        Assert.Contains("Act_SetNNObj = r_obj_b", Lines(Plan(text, "r_chosen"), 0));
+        Assert.DoesNotContain(replay.ActiveSet, t => t.Nickname == "r_draw");
+    }
+
     /// <summary>A log line after the last objective line does not remove that objective. Only the last log line
     /// stays.</summary>
     [Fact]

@@ -506,6 +506,7 @@ internal sealed record StartReplay
                 break;
             var rest = path.Skip(k).Append(chosen).ToList();
             run.Objectives(trigger, rest);
+            run.BeforeInSpace(trigger, rest);
             run.Launch(trigger, rest);
             switch (run.Reach(trigger))
             {
@@ -554,7 +555,8 @@ internal sealed record StartReplay
     /// with the base of the launch.</item>
     /// <item>The game tests Cnd_InSpace at each heartbeat. When the path shows the player in space, each trigger that
     /// waits for Cnd_InSpace = true ran. When the path shows the player docked, each trigger that waits for
-    /// Cnd_InSpace = false ran.</item>
+    /// Cnd_InSpace = false ran. Before the first such line, a dock shows that the player was in space, and a launch
+    /// shows that the player was docked.</item>
     /// <item>A trigger of the path that completes an objective shows that the objective was active. When no line of the
     /// replay made it active, the waiting trigger that makes it active ran before. The replay runs that trigger, and the
     /// triggers that it starts on the way to the objective.</item>
@@ -643,15 +645,33 @@ internal sealed record StartReplay
                 TryRun([peer], rest);
         }
 
+        /// <summary>The Cnd_InSpace rule, before a trigger of the path runs. When no line told the place of the player
+        /// yet, a dock shows that the player was in space before it, and a launch shows that the player was docked
+        /// before it.</summary>
+        /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
+        public void BeforeInSpace(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
+        {
+            if (inSpace != null || StartPlaces.InSpaceAt(trigger.Condition) is not { } next)
+                return;
+            inSpace = !next;
+            RunInSpace(rest);
+        }
+
         /// <summary>The Cnd_InSpace rule, after a trigger of the path ran.</summary>
         /// <param name="rest">The rest of the path, with the chosen trigger.</param>
         public void InSpace(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
         {
             inSpace = StartPlaces.InSpaceAt(trigger.Condition) ?? inSpace;
+            RunInSpace(rest);
+        }
+
+        private void RunInSpace(IReadOnlyList<MissionTrigger> rest)
+        {
             if (inSpace is not { } space)
                 return;
-            foreach (var peer in Machine.Active.Where(t => Free(t, rest) && t.ConditionIs("Cnd_InSpace") &&
-                                                           StartPlaces.InSpaceAt(t.Condition) == space).ToList())
+            foreach (var peer in Machine.Active.Concat(Machine.Pending).Distinct()
+                         .Where(t => Free(t, rest) && t.ConditionIs("Cnd_InSpace") && StartPlaces.InSpaceAt(t.Condition) == space)
+                         .ToList())
                 TryRun([peer], rest);
         }
 

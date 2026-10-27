@@ -259,7 +259,7 @@ An approximate start has two setup triggers. The first runs at the load. It sets
 The editor runs the path without a game world. So a trigger that waits for an event of the world stays active in the run, also when the game ran it long before the trigger of the start. The editor runs such a trigger when the path shows its event:
 
 - A launch of the path runs each trigger that waits for that launch. Examples are Cnd_PlayerLaunch, and Cnd_SpaceEnter without a system or with the system of the launch.
-- When the path shows the player in space, each trigger that waits for Cnd_InSpace = true runs. When the path shows the player docked, each trigger that waits for Cnd_InSpace = false runs.
+- When the path shows the player in space, each trigger that waits for Cnd_InSpace = true runs. When the path shows the player docked, each trigger that waits for Cnd_InSpace = false runs. Before the first line that tells where the player is, a dock shows that the player was in space, and a launch shows that the player was docked.
 - A trigger of the path can complete an objective that no earlier line made active. Then the trigger that makes the objective active ran before. The editor runs it, with the triggers that start it, for example a timer.
 
 Such a run must not stop or run a later trigger of the path. Else the editor does not do it, and the trigger waits at the start. The setup keeps the last objective line of the run. A log line (Act_NNIds) after it does not remove it.
