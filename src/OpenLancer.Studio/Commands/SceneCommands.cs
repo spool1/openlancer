@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -128,16 +127,9 @@ public static class SceneCommands
         var label = $"{(value != null ? "Add" : "Remove")} {ObjectComponents.Name(kind)}";
         if (session.Get(section) == null)
             return CommandPlan.Refused(label, $"The edit view has no section {section.Id}.", section);
-        try
-        {
-            return new CommandPlan(value != null
-                ? ObjectComponents.Add(section, kind, value)
-                : ObjectComponents.Remove(section, kind), [section]);
-        }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException)
-        {
-            return CommandPlan.Refused(label, ErrorText.Of(e), section);
-        }
+        return CommandPlan.Of(label, () => value != null
+            ? ObjectComponents.Add(section, kind, value)
+            : ObjectComponents.Remove(section, kind), [section]);
     }
 
     /// <summary>

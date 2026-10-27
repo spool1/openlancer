@@ -134,7 +134,7 @@ public sealed class PropertyGridTests
         var depot = SystemWorkspace.Li01Section("Object", "Li01_depot");
         var comment = FieldBinding.Create(session, depot, session.Get(depot)!, "comment");
 
-        using (var gesture = new LineGesture(session, comment))
+        using (var gesture = TestGestures.Line(session, comment))
         {
             gesture.Change("");
             Assert.Empty(session.Get(depot)!.Lines("comment"));
@@ -187,7 +187,7 @@ public sealed class PropertyGridTests
         var router = new FieldEditRouter(_ => { });
 
         router.Route(1, pos.FieldKey, new FieldEvents(true, true, false, false, false),
-            () => new NumberLineGesture(session, pos, 3), start => start, 1);
+            () => TestGestures.Number(session, pos, 3), start => start, 1);
         router.Route(1, pos.FieldKey, new FieldEvents(false, true, true, false, false),
             () => throw new InvalidOperationException(), _ => "-37675, 0, -27705", 2);
 

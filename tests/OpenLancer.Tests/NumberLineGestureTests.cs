@@ -66,7 +66,7 @@ public sealed class NumberLineGestureTests
         var session = ws.Session("act");
         var start = Values(session, Depot, "pos");
 
-        var gesture = new NumberLineGesture(session, Bind(session, Depot, "pos"), 3);
+        var gesture = TestGestures.Number(session, Bind(session, Depot, "pos"), 3);
         Assert.Equal("-38675, 0, -27705", gesture.StartText);
         gesture.Change("-37675, 0, -27705");
 
@@ -92,7 +92,7 @@ public sealed class NumberLineGestureTests
         var session = ws.Session("act");
         var start = Values(session, Depot, "pos");
 
-        var gesture = new NumberLineGesture(session, Bind(session, Depot, "pos"), 3);
+        var gesture = TestGestures.Number(session, Bind(session, Depot, "pos"), 3);
         gesture.Change("-38665, 0, -27705");
         gesture.Change("-38675, 0, -27705");
         Assert.Null(gesture.End(keep: true, interactive: true));
@@ -109,7 +109,7 @@ public sealed class NumberLineGestureTests
         var session = ws.Session("act");
         var start = Values(session, Depot, "pos");
 
-        var gesture = new NumberLineGesture(session, Bind(session, Depot, "pos"), 3);
+        var gesture = TestGestures.Number(session, Bind(session, Depot, "pos"), 3);
         gesture.Change("0, 0, 0");
         Assert.Null(gesture.End(keep: false, interactive: true));
 
@@ -125,7 +125,7 @@ public sealed class NumberLineGestureTests
         var session = ws.Session("act");
         Assert.IsType<SingleValue>(Values(session, Float, "pos")[0]);
 
-        var gesture = new NumberLineGesture(session, Bind(session, Float, "pos"), 3);
+        var gesture = TestGestures.Number(session, Bind(session, Float, "pos"), 3);
         gesture.Change(FieldDrag.DragText(DragKind.Position, gesture.StartText, 3, 0, 1));
         Assert.Null(gesture.End(keep: true, interactive: true));
 
@@ -143,7 +143,7 @@ public sealed class NumberLineGestureTests
         var session = ws.Session("act");
         var start = Values(session, Light, "color");
 
-        var gesture = new NumberLineGesture(session, Bind(session, Light, "color"), 3);
+        var gesture = TestGestures.Number(session, Bind(session, Light, "color"), 3);
         Assert.Equal("120, 250, 255", gesture.StartText);
         gesture.Change("255, 128, 0");
         Assert.Null(gesture.End(keep: true, interactive: true));
@@ -164,17 +164,18 @@ public sealed class NumberLineGestureTests
         var session = ws.Session("act");
 
         var text = Assert.Throws<InvalidOperationException>(() =>
-            new NumberLineGesture(session, Bind(session, SystemWorkspace.Li01Section("Object", "Li01_bad"), "pos"), 3));
+            TestGestures.Number(session, Bind(session, SystemWorkspace.Li01Section("Object", "Li01_bad"), "pos"), 3));
         Assert.Contains("Value 1 is not a number", text.Message);
         Assert.Throws<InvalidOperationException>(() =>
-            new NumberLineGesture(session, Bind(session, Depot, "rotate"), 3));
+            TestGestures.Number(session, Bind(session, Depot, "rotate"), 3));
         Assert.Throws<InvalidOperationException>(() =>
-            new NumberLineGesture(session, Bind(session, SystemWorkspace.Li01Section("Object", "Li01_twice"), "pos"), 3));
+            TestGestures.Number(session, Bind(session, SystemWorkspace.Li01Section("Object", "Li01_twice"), "pos"), 3));
+        Assert.False(session.InTransaction);
         // A count above the number of values.
         Assert.Throws<InvalidOperationException>(() =>
-            new NumberLineGesture(session, Bind(session, Light, "pos"), 4));
+            TestGestures.Number(session, Bind(session, Light, "pos"), 4));
 
-        using var next = new NumberLineGesture(session, Bind(session, Depot, "pos"), 3);
+        using var next = TestGestures.Number(session, Bind(session, Depot, "pos"), 3);
         Assert.NotNull(next);
     }
 
@@ -187,7 +188,7 @@ public sealed class NumberLineGestureTests
         var changes = 0;
         session.Changed += _ => changes++;
 
-        using var gesture = new NumberLineGesture(session, Bind(session, Depot, "pos"), 3);
+        using var gesture = TestGestures.Number(session, Bind(session, Depot, "pos"), 3);
         gesture.Change("-38675, 0, -27705");
         Assert.Equal(0, changes);
         gesture.Change("-38665, 0, -27705");
@@ -205,7 +206,7 @@ public sealed class NumberLineGestureTests
         using var ws = SystemWorkspace.Create(Li01, binary: true);
         var session = ws.Session("act");
 
-        var gesture = new NumberLineGesture(session, Bind(session, Depot, "pos"), 3);
+        var gesture = TestGestures.Number(session, Bind(session, Depot, "pos"), 3);
         gesture.Change("1, 2, 3");
         gesture.Change("1, 2");
 

@@ -1,14 +1,17 @@
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Editor.Editing;
 using OpenLancer.Runtime.Scene;
 using OpenLancer.Runtime.Thn;
+using OpenLancer.Studio.Commands;
 
 namespace OpenLancer.Tests;
 
 /// <summary>
 /// Opens a drag of the gizmo as the editor does (see <c>GizmoDragFlow</c>): the gesture of the command layer with the
 /// label of the drag, then the drag in it. When the drag cannot start, the gesture cancels, so no transaction stays
-/// open. The unit tests and the retail tests share this file.
+/// open. It also opens a field edit of the Inspector through the command runner, as the Inspector does. The unit tests
+/// and the retail tests share this file.
 /// </summary>
 internal static class TestGestures
 {
@@ -43,4 +46,13 @@ internal static class TestGestures
             throw;
         }
     }
+
+    /// <summary>A field edit of the lines of a key from the text of a field, as the Inspector opens it.</summary>
+    public static LineGesture Line(EditSession session, FieldBinding binding) =>
+        LineGesture.Open(FakeCommandHost.Runner(session), binding);
+
+    /// <summary>A label drag or a color pick of the first values of the line of a key, as the Inspector opens
+    /// it.</summary>
+    public static NumberLineGesture Number(EditSession session, FieldBinding binding, int count) =>
+        NumberLineGesture.Open(FakeCommandHost.Runner(session), binding, count);
 }

@@ -69,7 +69,7 @@ internal sealed partial class PropertyGrid
             ? FieldDrag.NumbersOf(values, count, out numbers)
             : "The key needs exactly one line.";
         return DragLabel(field.FieldKey, kind, labels[index].Text, reason == null ? numbers : null, reason, index,
-            () => new NumberLineGesture(window.Session!.Edits, field, count), size);
+            () => NumberLineGesture.Open(window.Commands, field, count), size);
     }
 
     /// <summary>
@@ -140,7 +140,7 @@ internal sealed partial class PropertyGrid
             ? ColorForms.ToPicker(values, form)
             : (null, "The key needs exactly one line.");
         ColorSwatch(field.FieldKey, form, color, reason,
-            () => new NumberLineGesture(window.Session!.Edits, field, ColorChannels));
+            () => NumberLineGesture.Open(window.Commands, field, ColorChannels));
         ImGui.SameLine(0, ImGui.GetStyle().ItemInnerSpacing.X);
         TextField(field, 1, hint);
     }

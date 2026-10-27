@@ -99,7 +99,7 @@ internal sealed partial class PropertyGrid
         // A tile of the Assets panel drops on the field, as Unity drops an asset on an object field (decision D281 of the
         // M23 design). The drop sets the value as a pick does.
         window.AssetDrag.Field(rule.Lists, list?.Label ?? "value",
-            dropped => window.Commands.Execute(EditCommand.SetLinesFromText(field.Section, field.Name, [dropped])));
+            dropped => window.Commands.Run(session => FieldCommands.SetLines(session, field.Section, field.Name, [dropped])));
         ListPopup("##list", clicked, field, list, value, !rule.Required, _ => picked, other);
     }
 
@@ -335,7 +335,7 @@ internal sealed partial class PropertyGrid
     private void ListPopup(string id, bool open, FieldBinding field, ListView? list, string value, bool none,
         Func<string, string> text, bool other = false)
     {
-        if (list == null || window.Session is not { } session)
+        if (list == null || window.Session == null)
         {
             return;
         }
@@ -344,7 +344,7 @@ internal sealed partial class PropertyGrid
             ObjectKinds.OfList(list.Kind), UsedBy(list), fieldEdits.IsOpenFor, (popup, events, selected) =>
             {
                 picked = selected;
-                RouteEvents(popup, field.FieldKey, events, () => new LineGesture(session.Edits, field), text);
+                RouteEvents(popup, field.FieldKey, events, () => LineGesture.Open(window.Commands, field), text);
             });
     }
 
@@ -400,7 +400,7 @@ internal sealed partial class PropertyGrid
             ImGui.SameLine();
             if (ImGui.SmallButton("None"))
             {
-                window.Commands.Execute(EditCommand.RemoveName(field.Section, field.Name));
+                window.Commands.Run(edits => FieldCommands.RemoveKey(edits, field.Section, field.Name));
             }
 
             ImGui.SetItemTooltip("Removes the line. The engine then uses its default.");
@@ -411,7 +411,7 @@ internal sealed partial class PropertyGrid
             ImGui.SameLine();
             if (ImGui.SmallButton("Revert"))
             {
-                window.Commands.Execute(field.Revert());
+                window.Commands.Run(edits => FieldCommands.RevertKey(edits, field.Section, field.Name));
             }
 
             ImGui.SetItemTooltip("Puts back the value of the base data and the mods that load before the active mod.");

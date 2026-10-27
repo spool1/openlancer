@@ -53,7 +53,7 @@ public sealed class FieldEditRouterTests
     {
         using var ws = Layers();
         var session = ws.Session("act");
-        session.Execute(Bind(session, Ship("s1"), "steering_torque").Edit("1, 2, 3"));
+        session.Execute(FieldCommands.SetLinesFromText(session, Ship("s1"), "steering_torque", "1, 2, 3").Command!);
         var warnings = new List<string>();
         var router = new FieldEditRouter(warnings.Add);
         FieldBinding Torque() => Bind(session, Ship("s1"), "steering_torque");
@@ -177,7 +177,7 @@ public sealed class FieldEditRouterTests
         Assert.Equal(["custom_key"], before.Unknown);
 
         // An unset key gets a value. The first character adds the key.
-        using (var gesture = new LineGesture(session, Bind(session, ship, "hold_size")))
+        using (var gesture = TestGestures.Line(session, Bind(session, ship, "hold_size")))
         {
             gesture.Change("1");
 
@@ -193,7 +193,7 @@ public sealed class FieldEditRouterTests
         foreach (var name in (string[])["mass", "custom_key"])
         {
             var start = SchemaPage.Layout(session, ship, null);
-            using var gesture = new LineGesture(session, Bind(session, ship, name));
+            using var gesture = TestGestures.Line(session, Bind(session, ship, name));
             gesture.Change("");
             Assert.Empty(session.Get(ship)!.Lines(name));
 
@@ -211,7 +211,7 @@ public sealed class FieldEditRouterTests
         var session = ws.Session("act");
         var ship = Ship("s1");
         session.Execute(EditCommand.SetLinesFromText(ship, "custom_key", ["5"]));
-        using var gesture = new LineGesture(session, Bind(session, ship, "custom_key"));
+        using var gesture = TestGestures.Line(session, Bind(session, ship, "custom_key"));
 
         gesture.Change("");
 
@@ -299,7 +299,7 @@ public sealed class FieldEditRouterTests
         Field(Ended, " ", 6);
 
         Assert.Single(dialogs);
-        Assert.Equal("'ids_name' did not change: a text cannot be empty. To remove the line, use the INI rows of the " +
+        Assert.Equal("'ids_name' did not change: A text cannot be empty. To remove the line, use the INI rows of the " +
                      "section.", Assert.Single(warnings));
         Assert.Equal("Ion Gun", session.Text(new StringPlaceholder(StringKind.String, "gun1")));
     }
@@ -476,7 +476,7 @@ public sealed class FieldEditRouterTests
     {
         using var ws = Layers();
         var session = ws.Session("act");
-        session.Execute(Bind(session, Ship("s1"), "steering_torque").Edit("1, 2, 3"));
+        session.Execute(FieldCommands.SetLinesFromText(session, Ship("s1"), "steering_torque", "1, 2, 3").Command!);
         var warnings = new List<string>();
         var router = new FieldEditRouter(warnings.Add);
         FieldBinding Torque() => Bind(session, Ship("s1"), "steering_torque");
@@ -515,7 +515,7 @@ public sealed class FieldEditRouterTests
     {
         using var ws = Layers();
         var session = ws.Session("act");
-        session.Execute(Bind(session, Ship("s1"), "steering_torque").Edit("1, 2, 3"));
+        session.Execute(FieldCommands.SetLinesFromText(session, Ship("s1"), "steering_torque", "1, 2, 3").Command!);
         var warnings = new List<string>();
         var router = new FieldEditRouter(warnings.Add);
         FieldBinding Torque() => Bind(session, Ship("s1"), "steering_torque");
@@ -537,13 +537,13 @@ public sealed class FieldEditRouterTests
     /// <summary>Routes the events of a label drag of a value of a vector, as the Inspector does.</summary>
     private static void Drag(FieldEditRouter router, EditSession session, uint id, FieldBinding field,
         FieldEvents events, int index, decimal units, int frame) =>
-        router.Route(id, field.FieldKey, events, () => new NumberLineGesture(session, field, 3),
+        router.Route(id, field.FieldKey, events, () => TestGestures.Number(session, field, 3),
             start => FieldDrag.DragText(DragKind.Scaled, start, 3, index, units), frame);
 
     /// <summary>Routes the events of a widget that changes the lines of a bound key, as the Inspector does.</summary>
     private static void Route(FieldEditRouter router, EditSession session, uint id, FieldBinding field,
         FieldEvents events, Func<string, string> text, int frame) =>
-        router.Route(id, field.FieldKey, events, () => new LineGesture(session, field), text, frame);
+        router.Route(id, field.FieldKey, events, () => TestGestures.Line(session, field), text, frame);
 
     /// <summary>Routes the events of a widget whose edit runs when it ends, as <see cref="PropertyGrid.CommitField"/>
     /// does.</summary>
@@ -564,7 +564,7 @@ public sealed class FieldEditRouterTests
     /// <param name="ask">Gets the title, the message and the choices of a dialog.</param>
     private static Func<string, bool, string?> TextKeyCommit(EditSession session, FieldBinding field,
         Action<string, string, IReadOnlyList<Choice>> ask) =>
-        EditController.TextKeyCommit(session, field, StringKind.String, make => session.Execute(make()), ask);
+        EditController.TextKeyCommit(session, field, make => FakeCommandHost.Runner(session).Run(make), ask);
 
     /// <summary>The key lists as one text, so that a failed test shows the lists.</summary>
     private static string Lists(SchemaPage.KeyLists lists) =>

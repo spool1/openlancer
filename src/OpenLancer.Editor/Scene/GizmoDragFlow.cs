@@ -132,18 +132,10 @@ internal sealed class GizmoDragFlow
                 var (target, tool, space) = gizmo;
                 try
                 {
-                    // The runner refuses the gesture when the editor takes no edits.
-                    var gesture = commands.Gesture(target.DragLabel(tool));
-                    try
-                    {
-                        drag = target.Begin(gesture, tool, GizmoInput.SpaceOf(tool, space), noEditReason: null);
-                    }
-                    catch
-                    {
-                        // No gesture stays open when the drag cannot start, also after an exception of another type.
-                        gesture.Cancel();
-                        throw;
-                    }
+                    // The runner refuses the gesture when the editor takes no edits. When the drag cannot start, also
+                    // after an exception of another type, the runner cancels the gesture.
+                    drag = commands.Gesture(target.DragLabel(tool),
+                        gesture => target.Begin(gesture, tool, GizmoInput.SpaceOf(tool, space), noEditReason: null));
                 }
                 catch (InvalidOperationException e)
                 {

@@ -48,21 +48,23 @@ internal abstract class FieldGesture : IDisposable
 }
 
 /// <summary>
-/// The edit of the lines of a bound key as one transaction, with the key and the section as they were at its start.
-/// Each change shows at once in the edit view. While the edit is open, the Inspector lays out the rows of the section
-/// from its start (see <see cref="Inspector.PropertyGrid.LayoutView"/>).
+/// The edit of the lines of a bound key as one gesture of the command layer. The edit keeps the key and the section as
+/// they were at its start. Each change runs a field command in a step of the gesture, so it shows at once in the edit
+/// view. While the edit is open, the Inspector lays out the rows of the section from its start (see
+/// <see cref="Inspector.PropertyGrid.LayoutView"/>).
 /// </summary>
+/// <remarks>The edit gets its gesture from <see cref="CommandRunner.Gesture{T}"/>, and the edit owns it: the end of the
+/// edit commits or cancels the gesture.</remarks>
 internal abstract class LineEditGesture : FieldGesture
 {
-    private readonly EditTransaction transaction;
+    private readonly CommandTransaction gesture;
 
-    /// <exception cref="InvalidOperationException">The session takes no edits, or a transaction is open.</exception>
-    private protected LineEditGesture(EditSession session, FieldBinding binding, string startText)
+    private protected LineEditGesture(CommandTransaction gesture, FieldBinding binding, string startText)
         : base(binding.FieldKey, startText)
     {
+        this.gesture = gesture;
         Binding = binding;
-        StartSection = session.Get(binding.Section);
-        transaction = session.Begin($"Set {binding.Name}");
+        StartSection = gesture.Session.Get(binding.Section);
     }
 
     /// <summary>The key as it was at the start of the edit.</summary>
@@ -72,6 +74,9 @@ internal abstract class LineEditGesture : FieldGesture
     /// it.</summary>
     public SectionView? StartSection { get; }
 
+    /// <summary>The label of the history entry of an edit of a key, for example <c>Set mass</c>.</summary>
+    public static string Label(FieldBinding binding) => $"Set {binding.Name}";
+
     /// <summary>
     /// Ends the edit. When the last change is valid, the edit becomes one entry of the history. Otherwise the edit view
     /// goes back to its state before the edit, and the result is the error.
@@ -80,32 +85,36 @@ internal abstract class LineEditGesture : FieldGesture
     {
         if (!keep || Error != null)
         {
-            transaction.Cancel();
+            gesture.Cancel();
             return keep ? Error : null;
         }
-        transaction.Commit();
+        gesture.Commit();
         return null;
     }
 
-    public override void Dispose() => transaction.Cancel();
+    public override void Dispose() => gesture.Cancel();
 
-    /// <summary>Shows a command in the edit view, in place of the command of the last change. An
-    /// <see cref="ArgumentException"/> or an <see cref="InvalidOperationException"/> of the command sets
-    /// <see cref="FieldGesture.Error"/>, and the edit view goes back to its state before the edit.</summary>
-    /// <returns>True when the command applied.</returns>
-    private protected bool Apply(EditCommand command)
+    /// <summary>Shows a step in the edit view, in place of the step of the last change. A plan of the step that refuses
+    /// sets <see cref="FieldGesture.Error"/>, and the edit view goes back to its state before the edit.</summary>
+    /// <param name="step">Makes the plan of a field command from the session.</param>
+    /// <returns>True when the step applied.</returns>
+    private protected bool Apply(Func<EditSession, EditPlan> step)
     {
-        try
+        var result = gesture.Apply(step);
+        if (result.Status == EditStatus.Refused)
         {
-            transaction.Apply(command);
-            Error = null;
-            return true;
-        }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException)
-        {
-            Error = ErrorText.Of(e);
+            Error = result.Errors.FirstOrDefault()?.Message ?? $"'{Binding.Name}' did not change.";
             return false;
         }
+        Error = null;
+        return true;
+    }
+
+    /// <summary>Puts back the edit view as it was at the start of the edit. The edit stays open.</summary>
+    private protected void Reset()
+    {
+        gesture.Reset();
+        Error = null;
     }
 }
 
@@ -118,21 +127,31 @@ internal abstract class LineEditGesture : FieldGesture
 /// </remarks>
 internal sealed class LineGesture : LineEditGesture
 {
-    /// <exception cref="InvalidOperationException">The session takes no edits, or a transaction is open.</exception>
-    public LineGesture(EditSession session, FieldBinding binding) : base(session, binding, binding.Text)
+    /// <param name="gesture">The gesture of the edit. The edit owns it.</param>
+    public LineGesture(CommandTransaction gesture, FieldBinding binding) : base(gesture, binding, binding.Text)
     {
     }
+
+    /// <summary>Opens the gesture of an edit of the key and starts the edit in it.</summary>
+    /// <exception cref="InvalidOperationException">The editor takes no edits, or a transaction or a batch is
+    /// open.</exception>
+    public static LineGesture Open(CommandRunner commands, FieldBinding binding) =>
+        commands.Gesture(Label(binding), gesture => new LineGesture(gesture, binding));
 
     /// <summary>Shows the text of the field in the edit view, or sets <see cref="FieldGesture.Error"/>.</summary>
     public override void Change(string text)
     {
         var parse = FieldEdit.Parse(Binding.Key, text);
-        if (parse.Lines == null)
+        if (parse.Lines is not { } lines)
         {
             Error = parse.Error;
             return;
         }
-        Apply(Binding.Holds(parse.Lines) ? EditCommand.Group("", []) : Binding.EditLines(parse.Lines));
+
+        if (Binding.Holds(lines))
+            Reset();
+        else
+            Apply(session => FieldCommands.SetLines(session, Binding.Section, Binding.Name, lines));
     }
 }
 
@@ -155,21 +174,31 @@ internal sealed class NumberLineGesture : LineEditGesture
     private readonly float[] startNumbers;
     private float[] applied;
 
-    /// <summary>Starts the edit of the first <paramref name="count"/> values of the line of the key.</summary>
-    /// <exception cref="InvalidOperationException">The key does not have exactly one line, one of the first
-    /// <paramref name="count"/> values is not a finite number (see <see cref="TransformValues.TryNumber"/>), the
-    /// session takes no edits, or a transaction is open. No edit starts.</exception>
-    public NumberLineGesture(EditSession session, FieldBinding binding, int count)
-        : this(session, StartOf(session, binding, count))
+    /// <summary>Starts the edit of the first <paramref name="count"/> values of the line of the key in a
+    /// gesture.</summary>
+    /// <param name="gesture">The gesture of the edit. The edit owns it when it starts.</param>
+    /// <exception cref="InvalidOperationException">The key does not have exactly one line, or one of the first
+    /// <paramref name="count"/> values is not a finite number (see <see cref="TransformValues.TryNumber"/>). The edit
+    /// does not start, and the caller cancels the gesture (see <see cref="CommandRunner.Gesture{T}"/>).</exception>
+    public NumberLineGesture(CommandTransaction gesture, FieldBinding binding, int count)
+        : this(gesture, StartOf(gesture.Session, binding, count))
     {
     }
 
-    private NumberLineGesture(EditSession session, Start at) : base(session, at.Binding, FieldDrag.Text(at.Numbers))
+    private NumberLineGesture(CommandTransaction gesture, Start at)
+        : base(gesture, at.Binding, FieldDrag.Text(at.Numbers))
     {
         start = at.Line;
         startNumbers = at.Numbers;
         applied = at.Numbers;
     }
+
+    /// <summary>Opens the gesture of a drag or a pick of the key and starts the edit in it. When the edit cannot start,
+    /// no gesture stays open.</summary>
+    /// <exception cref="InvalidOperationException">The edit cannot start (the message tells why), the editor takes no
+    /// edits, or a transaction or a batch is open.</exception>
+    public static NumberLineGesture Open(CommandRunner commands, FieldBinding binding, int count) =>
+        commands.Gesture(Label(binding), gesture => new NumberLineGesture(gesture, binding, count));
 
     /// <summary>The number of values that the edit writes.</summary>
     public int Count => startNumbers.Length;
@@ -198,8 +227,14 @@ internal sealed class NumberLineGesture : LineEditGesture
             return;
         }
 
-        var unchanged = line.Count == start.Count && line.Select((v, i) => ReferenceEquals(v, start[i])).All(s => s);
-        applied = Apply(unchanged ? EditCommand.Group("", []) : EditCommand.SetLines(Binding.Section, Binding.Name, [line]))
+        if (line.Count == start.Count && line.Select((v, i) => ReferenceEquals(v, start[i])).All(s => s))
+        {
+            Reset();
+            applied = numbers;
+            return;
+        }
+
+        applied = Apply(session => FieldCommands.SetLine(session, Binding.Section, Binding.Name, line))
             ? numbers
             : startNumbers;
     }

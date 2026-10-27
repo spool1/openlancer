@@ -94,13 +94,13 @@ public sealed class FieldBindingTests
         using var ws = Layers();
         var session = ws.Session("act");
 
-        session.Execute(Bind(session, Good(GoodsPath, "s1_hull"), "price").Edit(" 1200 "));
+        session.Execute(FieldCommands.SetLinesFromText(session, Good(GoodsPath, "s1_hull"), "price", " 1200 ").Command!);
 
         var price = Bind(session, Good(GoodsPath, "s1_hull"), "price");
         Assert.Equal("1200", price.Text);
         Assert.Equal(ValueOrigin.ActiveMod, price.Origin);
         Assert.True(price.CanRevert);
-        session.Execute(price.Revert());
+        session.Execute(FieldCommands.RevertKey(session, price.Section, price.Name).Command!);
         Assert.Equal(("900", ValueOrigin.LowerMod), (Bind(session, Good(GoodsPath, "s1_hull"), "price").Text,
             Bind(session, Good(GoodsPath, "s1_hull"), "price").Origin));
     }
@@ -125,7 +125,7 @@ public sealed class FieldBindingTests
         using var ws = Layers();
         var session = ws.Session("act");
 
-        session.Execute(Bind(session, Ship("s1"), "mass").Edit(""));
+        session.Execute(FieldCommands.SetLinesFromText(session, Ship("s1"), "mass", "").Command!);
 
         Assert.Empty(session.Get(Ship("s1"))!.Lines("mass"));
         Assert.Equal("Remove mass", session.UndoLabel);
@@ -137,9 +137,10 @@ public sealed class FieldBindingTests
         using var ws = Layers();
         var session = ws.Session("act");
 
-        var error = Assert.Throws<ArgumentException>(() => Bind(session, Ship("s1"), "mass").Edit("heavy"));
+        var plan = FieldCommands.SetLinesFromText(session, Ship("s1"), "mass", "heavy");
 
-        Assert.Contains("is not a number", error.Message);
+        Assert.False(plan.CanRun);
+        Assert.Contains("is not a number", Assert.Single(plan.Refusals).Message);
     }
 
     [Fact]
@@ -150,7 +151,7 @@ public sealed class FieldBindingTests
         var changes = 0;
         session.Changed += _ => changes++;
 
-        using (var gesture = new LineGesture(session, Bind(session, Ship("s1"), "mass")))
+        using (var gesture = TestGestures.Line(session, Bind(session, Ship("s1"), "mass")))
         {
             gesture.Change("1");
             Assert.Equal("1", Bind(session, Ship("s1"), "mass").Text);
@@ -173,7 +174,7 @@ public sealed class FieldBindingTests
         using var ws = Layers();
         var session = ws.Session("act");
 
-        var gesture = new LineGesture(session, Bind(session, Ship("s1"), "mass"));
+        var gesture = TestGestures.Line(session, Bind(session, Ship("s1"), "mass"));
         gesture.Change("200");
         gesture.Change("120");
         gesture.End(keep: true, interactive: true);
@@ -192,7 +193,7 @@ public sealed class FieldBindingTests
         using var ws = Layers();
         var session = ws.Session("act");
 
-        var gesture = new LineGesture(session, Bind(session, Ship("s1"), "mass"));
+        var gesture = TestGestures.Line(session, Bind(session, Ship("s1"), "mass"));
         gesture.Change("130");
         gesture.Change("13x");
         Assert.Contains("is not a number", gesture.Error);
@@ -210,7 +211,7 @@ public sealed class FieldBindingTests
         using var ws = Layers();
         var session = ws.Session("act");
 
-        var gesture = new LineGesture(session, Bind(session, Ship("s1"), "mass"));
+        var gesture = TestGestures.Line(session, Bind(session, Ship("s1"), "mass"));
         gesture.Change("130");
 
         Assert.Null(gesture.End(keep: false, interactive: true));
@@ -224,7 +225,7 @@ public sealed class FieldBindingTests
         using var ws = Layers();
         var session = ws.Session("act");
 
-        var gesture = new LineGesture(session, Bind(session, Ship("s1"), "da_archetype"));
+        var gesture = TestGestures.Line(session, Bind(session, Ship("s1"), "da_archetype"));
         gesture.Change(@"ships\s1;old.cmp");
 
         Assert.Contains("';'", gesture.Error);
@@ -244,7 +245,7 @@ public sealed class FieldBindingTests
         Assert.Equal(session.ReadOnlyReason, mass.ReadOnlyReason);
         Assert.NotNull(mass.ReadOnlyReason);
         Assert.False(mass.CanRevert);
-        Assert.Throws<InvalidOperationException>(() => new LineGesture(session, mass));
+        Assert.Throws<InvalidOperationException>(() => TestGestures.Line(session, mass));
     }
 
     [Fact]
@@ -252,7 +253,7 @@ public sealed class FieldBindingTests
     {
         using var ws = Layers();
         var session = ws.Session("act");
-        session.Execute(Bind(session, Good(GoodsPath, "s1_hull"), "price").Edit("1200"));
+        session.Execute(FieldCommands.SetLinesFromText(session, Good(GoodsPath, "s1_hull"), "price", "1200").Command!);
 
         Assert.True(session.Save().Saved);
 

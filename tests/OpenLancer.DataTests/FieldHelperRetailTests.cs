@@ -14,6 +14,7 @@ using OpenLancer.Editor.Editing;
 using OpenLancer.Runtime.Scene;
 using OpenLancer.Runtime.Thn;
 using OpenLancer.Studio.Commands;
+using OpenLancer.Tests;
 using Xunit;
 
 namespace OpenLancer.DataTests;
@@ -43,7 +44,7 @@ public sealed class FieldHelperRetailTests(ITestOutputHelper output)
 
         var field = FieldBinding.Create(session, zone, session.Get(zone)!, "pos");
         Assert.Equal(DragKind.Position, FieldDrag.KindOf(field.Key, zone.Id.Type));
-        using (var drag = new NumberLineGesture(session, field, 3))
+        using (var drag = TestGestures.Number(session, field, 3))
         {
             foreach (var units in new[] { 10m, 55m, 100m })
                 drag.Change(FieldDrag.DragText(DragKind.Position, drag.StartText, 3, 0, units));
@@ -73,7 +74,7 @@ public sealed class FieldHelperRetailTests(ITestOutputHelper output)
         var field = FieldBinding.Create(session, light, session.Get(light)!, "color");
         var form = ColorForms.Of(field.Key)!.Value;
         Assert.Equal(ColorForm.Byte, form);
-        using (var pick = new NumberLineGesture(session, field, 3))
+        using (var pick = TestGestures.Number(session, field, 3))
         {
             Assert.True(FieldDrag.TryParse(pick.StartText, 3, out var start));
             var startColor = ColorForms.ColorOf(start, form);

@@ -33,8 +33,8 @@ public sealed class SaveCommandTests
     {
         var router = new FieldEditRouter(_ => { });
         var price = Bind(session, Good(GoodsPath, "eng1"), "price");
-        router.Route(Field, price.FieldKey, Activated, () => new LineGesture(session, price), _ => "50", 1);
-        router.Route(Field, price.FieldKey, Typed, () => new LineGesture(session, price), _ => "75", 2);
+        router.Route(Field, price.FieldKey, Activated, () => TestGestures.Line(session, price), _ => "50", 1);
+        router.Route(Field, price.FieldKey, Typed, () => TestGestures.Line(session, price), _ => "75", 2);
         return router;
     }
 
@@ -70,7 +70,7 @@ public sealed class SaveCommandTests
         var router = new FieldEditRouter(_ => { });
         var name = Bind(session, Gun("gun1"), "ids_name");
         var asked = new List<string>();
-        var commit = EditController.TextKeyCommit(session, name, StringKind.String, make => session.Execute(make()),
+        var commit = EditController.TextKeyCommit(session, name, make => FakeCommandHost.Runner(session).Run(make),
             (_, message, _) => asked.Add(message));
         FieldGesture Begin() => new CommitGesture(name.FieldKey, "", commit);
         router.Route(Field, name.FieldKey, Activated, Begin, _ => "", 1);
@@ -110,7 +110,7 @@ public sealed class SaveCommandTests
     {
         using var ws = Create();
         var session = ws.Session("act");
-        session.Execute(Bind(session, Good(GoodsPath, "eng1"), "price").Edit("75"));
+        session.Execute(FieldCommands.SetLinesFromText(session, Good(GoodsPath, "eng1"), "price", "75").Command!);
         var host = new Host(session, new FieldEditRouter(_ => { }));
 
         Assert.True(SaveCommand.Run(host));

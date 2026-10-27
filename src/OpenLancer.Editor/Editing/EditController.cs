@@ -6,8 +6,8 @@ using LibreLancer;
 using LibreLancer.Data;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Mods;
-using OpenLancer.Data.Strings;
 using OpenLancer.Editor.Dialogs;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Ui;
@@ -392,28 +392,28 @@ internal sealed class EditController(EditorWindow window) : IDisposable
 
     /// <summary>
     /// The commit of the field of a text key, for example <c>ids_name</c> (see <see cref="CommitGesture"/>). It gives
-    /// the section a new text of the active mod (see <see cref="ItemEdits.SetText"/>). When other sections of the item
-    /// show the same text, for example a gun and its good, a dialog asks first whether they get the new text too
+    /// the section a new text of the active mod through <see cref="FieldCommands.SetText"/>. When other sections of the
+    /// item show the same text, for example a gun and its good, a dialog asks first whether they get the new text too
     /// (review finding F12).
     /// </summary>
     /// <remarks>An end that is not interactive, for example when the window closes, cannot show the dialog. Then only
     /// this section gets the new text, as with the choice "Only this one", which changes the least. The recovery file
-    /// then keeps the edit.</remarks>
-    /// <param name="execute">Makes the edit and runs it, as <see cref="CommandRunner.Execute(Func{EditCommand})"/>
-    /// does.</param>
+    /// then keeps the edit. A text that the command refuses, for example an empty text, ends the field with the reason
+    /// and asks nothing.</remarks>
+    /// <param name="run">Makes the plan of the edit and runs it, as
+    /// <see cref="CommandRunner.Run(Func{EditSession, EditPlan})"/> does.</param>
     /// <param name="ask">Shows a dialog: its title, its message and its choices.</param>
-    internal static Func<string, bool, string?> TextKeyCommit(EditSession edits, FieldBinding field, StringKind kind,
-        Action<Func<EditCommand>> execute, Action<string, string, IReadOnlyList<Choice>> ask) =>
+    internal static Func<string, bool, string?> TextKeyCommit(EditSession edits, FieldBinding field,
+        Action<Func<EditSession, EditPlan>> run, Action<string, string, IReadOnlyList<Choice>> ask) =>
         (text, interactive) =>
         {
-            var value = kind == StringKind.Infocard ? ItemEdits.ToInfocard(text) : text;
-            if (value.Trim().Length == 0)
+            if (FieldCommands.SetText(edits, field.Section, field.Name, text) is { CanRun: false } refused)
             {
-                return "a text cannot be empty. To remove the line, use the INI rows of the section.";
+                return refused.Refusals.FirstOrDefault()?.Message ?? $"'{field.Name}' did not change.";
             }
 
             void Set(IReadOnlyList<SectionRef>? also) =>
-                execute(() => ItemEdits.SetText(edits, field.Section, field.Name, value, also));
+                run(session => FieldCommands.SetText(session, field.Section, field.Name, text, also));
 
             var shared = interactive ? ItemEdits.SharedText(edits, field.Section, field.Name) : [];
             if (shared.Count == 0)

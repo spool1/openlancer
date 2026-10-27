@@ -30,9 +30,9 @@ internal interface ICommandHost
 /// <para>The runner writes each refusal and each problem of an edit to the Console with the source "Edit". A plan that
 /// refuses gives an error for each refusal. When the editor takes no edits, the runner gives a warning with the reason
 /// and runs nothing. After an edit, the warnings of its plan follow.</para>
-/// <para>Some callers still run session commands through <see cref="Execute(EditCommand)"/>: the data fields until
-/// they move to the field commands, and the cutscene callers until milestone MCP1-4 moves them to the cutscene
-/// commands.</para>
+/// <para>Only the cutscene callers still run session commands through <see cref="Execute(EditCommand)"/>, until
+/// milestone MCP1-4 moves them to the cutscene commands. A test of the editor assembly fails when another type makes a
+/// session command or runs one outside this class (<c>EditorLayerTests</c>).</para>
 /// </remarks>
 internal sealed class CommandRunner(ICommandHost host)
 {
@@ -126,6 +126,28 @@ internal sealed class CommandRunner(ICommandHost host)
         if (host.NoEditReason is { } reason)
             throw new InvalidOperationException(reason);
         return CommandTransaction.Begin(session, label);
+    }
+
+    /// <summary>
+    /// Opens a gesture (see <see cref="Gesture(string)"/>) and starts a drag or a field edit in it. When
+    /// <paramref name="start"/> throws, the gesture cancels and the exception goes to the caller, so no transaction stays
+    /// open.
+    /// </summary>
+    /// <param name="start">Starts the drag or the field edit in the gesture. The drag or the edit then owns the
+    /// gesture.</param>
+    /// <exception cref="InvalidOperationException">The gesture cannot open (see <see cref="Gesture(string)"/>).</exception>
+    public T Gesture<T>(string label, Func<CommandTransaction, T> start)
+    {
+        var gesture = Gesture(label);
+        try
+        {
+            return start(gesture);
+        }
+        catch
+        {
+            gesture.Cancel();
+            throw;
+        }
     }
 
     /// <summary>

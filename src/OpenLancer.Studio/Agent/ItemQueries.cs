@@ -21,8 +21,8 @@ namespace OpenLancer.Studio.Agent;
 /// <param name="Label">The plain label of the list that the key names, or null.</param>
 /// <param name="Origin">The layer that gives the lines of the key, and if they have an edit that the session did not
 /// save.</param>
-/// <param name="Locked">True when <c>set_fields</c> cannot change the key: the key line, or a section that the editor
-/// cannot change.</param>
+/// <param name="Locked">True when <c>set_fields</c> cannot change the key (see <see cref="FieldCommands.IsLocked"/>).
+/// Examples are the key line, a key of a group of lines that belong together and the file of a system.</param>
 internal sealed record FieldRow(string Key, IReadOnlyList<JsonArray> Lines, string? Label, ItemOrigin Origin, bool Locked,
     IReadOnlyList<Problem> Problems);
 
@@ -363,7 +363,6 @@ internal static class ItemQueries
     internal static IReadOnlyList<FieldRow> Fields(EditSession session, SectionRef section, SectionView view,
         IReadOnlyList<Diagnostic> diagnostics)
     {
-        var keyEntry = KeyEntry(session, section, view);
         var saved = session.SavedSection(section);
         return view.Entries.GroupBy(e => e.Name, StringComparer.OrdinalIgnoreCase).Select(g =>
         {
@@ -373,7 +372,7 @@ internal static class ItemQueries
             var unsaved = saved == null || !SameLines(saved, view, g.Key);
             return new FieldRow(g.Key, g.Select(e => AgentRows.Values(e.Values)).ToList(), label,
                 new ItemOrigin(origin, mod, unsaved),
-                view.ReadOnlyReason != null || g.Key.Equals(keyEntry, StringComparison.OrdinalIgnoreCase),
+                FieldCommands.IsLocked(session, section, view, g.Key),
                 diagnostics.Where(d => g.Key.Equals(d.Key, StringComparison.OrdinalIgnoreCase))
                     .Select(d => AgentRows.ProblemOf(session, d)).ToList());
         }).ToList();
@@ -390,7 +389,7 @@ internal static class ItemQueries
         var nickname = section.Id.Key;
         var item = new SectionItemView(ItemRefs.Canonical(session, section), view.Type, section.Path,
             call.Texts.TextOf(section, view.Type.Equals("system", StringComparison.OrdinalIgnoreCase) ? "strid_name" : "ids_name"),
-            AgentRows.OriginOf(session, section, view, KeyEntry(session, section, view)))
+            AgentRows.OriginOf(session, section, view, FieldCommands.KeyLine(session, section, view)))
         {
             ReadOnlyReason = view.ReadOnlyReason,
             Fields = Fields(session, section, view, diagnostics),
@@ -422,14 +421,6 @@ internal static class ItemQueries
             Mentions = Mentions(session, nickname),
         };
     }
-
-    /// <summary>The key line of a section, for its origin and its lock.</summary>
-    private static string KeyEntry(EditSession session, SectionRef section, SectionView view) =>
-        session.Schema(section).FirstOrDefault(k => k.IsKeyEntry)?.Name ?? view.Type.ToLowerInvariant() switch
-        {
-            "nebula" or "asteroids" => "zone",
-            _ => "nickname",
-        };
 
     /// <summary>True when a key has the same lines in two sections.</summary>
     private static bool SameLines(Section saved, SectionView view, string key)

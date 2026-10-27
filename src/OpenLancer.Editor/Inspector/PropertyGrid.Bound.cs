@@ -462,7 +462,8 @@ internal sealed partial class PropertyGrid
             : unset == "true";
         if (ImGui.Checkbox("##value", ref value))
         {
-            window.Commands.Execute(field.EditLines([value ? "true" : "false"]));
+            window.Commands.Run(session => FieldCommands.SetLines(session, field.Section, field.Name,
+                [value ? "true" : "false"]));
         }
 
         if (field.Lines.Count == 0)
@@ -503,7 +504,7 @@ internal sealed partial class PropertyGrid
             }
 
             CommitField(field.FieldKey, changed, text, edited, EditController.TextKeyCommit(window.Session!.Edits,
-                field, kind, make => window.Commands.Execute(make),
+                field, make => window.Commands.Run(make),
                 (title, message, choices) => window.Choice.Show(title, message, choices)));
             ImGui.SetItemTooltip("The text of the active mod. A new text gets a key in the strings.json of the mod.");
         }
@@ -552,7 +553,7 @@ internal sealed partial class PropertyGrid
     /// of a bound key (see <see cref="LineGesture"/>).</summary>
     /// <param name="text">Gives the text of the key after a change, from the text at the start of the edit.</param>
     private void Route(FieldBinding field, bool changed, Func<string, string> text) =>
-        Route(field.FieldKey, changed, () => new LineGesture(window.Session!.Edits, field), text);
+        Route(field.FieldKey, changed, () => LineGesture.Open(window.Commands, field), text);
 
     private void Route(FieldKey key, bool changed, Func<FieldGesture> begin, Func<string, string> text)
     {
@@ -644,7 +645,7 @@ internal sealed partial class PropertyGrid
         var canEdit = window.Session?.NoEditReason == null;
         if (Theme.IconMenuItem(EditorIcons.Undo, "Revert to the lower layer", field.CanRevert && canEdit))
         {
-            window.Commands.Execute(field.Revert());
+            window.Commands.Run(session => FieldCommands.RevertKey(session, field.Section, field.Name));
         }
 
         ImGui.SetItemTooltip("Puts back the value of the base data and the mods that load before the active mod.");

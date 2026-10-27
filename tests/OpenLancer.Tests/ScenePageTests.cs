@@ -75,7 +75,7 @@ public sealed class ScenePageTests
 
         // The scene object after the Data effect of the edit.
         var dock = new DockAction { Kind = kind, Target = text.Split(',')[0] };
-        using (var gesture = new LineGesture(session, Bind(session, Depot, key)))
+        using (var gesture = TestGestures.Line(session, Bind(session, Depot, key)))
         {
             gesture.Change(text);
             Assert.Single(session.Get(Depot)!.Lines(key));
@@ -108,7 +108,7 @@ public sealed class ScenePageTests
 
         // The scene light after the Light effect of the edit.
         var curve = Light(LightKind.Point, "known_curve");
-        using (var gesture = new LineGesture(session, Bind(session, Point, "atten_curve")))
+        using (var gesture = TestGestures.Line(session, Bind(session, Point, "atten_curve")))
         {
             gesture.Change("known_curve");
             var open = PropertyGrid.LayoutView(session, Point, gesture)!;

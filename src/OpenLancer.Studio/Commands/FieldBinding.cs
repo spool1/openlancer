@@ -8,7 +8,8 @@ namespace OpenLancer.Studio.Commands;
 
 /// <summary>
 /// One key of one section of the edit view, as a bound Inspector row shows it: its lines, the layer that sets them,
-/// the later mods that change them, and the edits of the row.
+/// the later mods that change them, and why the row cannot change them. The edits of the row are the commands of
+/// <see cref="FieldCommands"/>.
 /// </summary>
 internal sealed class FieldBinding
 {
@@ -129,23 +130,7 @@ internal sealed class FieldBinding
         session.UniversePath is { } universe && VfsPath.Comparer.Equals(section.Path, universe) &&
         section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>The edit that sets the key from the text of a field. Empty text removes the key.</summary>
-    /// <exception cref="ArgumentException">The text is not valid for the key.</exception>
-    public EditCommand Edit(string text)
-    {
-        var parse = FieldEdit.Parse(Key, text);
-        if (parse.Lines == null)
-            throw new ArgumentException(parse.Error);
-        return EditLines(parse.Lines);
-    }
-
-    /// <summary>The edit that sets the lines of the key from their value texts.</summary>
-    public EditCommand EditLines(IReadOnlyList<string> lines) =>
-        lines.Count == 0 ? EditCommand.RemoveName(Section, Name) : EditCommand.SetLinesFromText(Section, Name, lines);
-
     /// <summary>True when the value texts are the lines that the key has now.</summary>
     public bool Holds(IReadOnlyList<string> lines) =>
         lines.SequenceEqual(Lines.Select(l => FieldEdit.FormatLine(l.Values)), StringComparer.Ordinal);
-
-    public EditCommand Revert() => EditCommand.Revert(Section, Name);
 }
