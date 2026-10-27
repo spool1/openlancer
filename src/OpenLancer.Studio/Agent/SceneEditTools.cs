@@ -206,8 +206,8 @@ internal static class SceneEditTools
     /// (RequireComponent).
     /// </summary>
     /// <remarks>The Inspector takes the value of an added component from a picker of the loaded data (Editor UI rule
-    /// 2). So the tool refuses a value that the list of the component does not have, and the line gets the value as the
-    /// list spells it.</remarks>
+    /// 2). So the tool refuses a value that the list of the component does not have. The line gets the value as the list
+    /// spells it.</remarks>
     public static ToolStep SetComponent(ToolCall call) => EditTools.Apply(call, scope =>
     {
         var args = call.Args;

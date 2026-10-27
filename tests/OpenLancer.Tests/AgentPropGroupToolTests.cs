@@ -152,9 +152,8 @@ public sealed class AgentPropGroupToolTests
     }
 
     /// <summary>
-    /// An asset write and its preview give the revision of the session. An asset write does not change it, so the agent
-    /// can pass it as if_revision of its next call (section 8.6, item 3 of the MCP1 design, review finding of MCP1-2,
-    /// step 4).
+    /// An asset write and its preview give the revision of the session. An asset write does not change it. So the agent
+    /// can pass it as if_revision of its next call (section 8.6, item 3 of the MCP1 design).
     /// </summary>
     [Fact]
     public void AnAssetWriteGivesTheRevisionOfTheSession()

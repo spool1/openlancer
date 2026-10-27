@@ -56,8 +56,8 @@ internal sealed class EditScope
         return EditTools.Shaped(EditResult.Merge(EditStatus.Applied, step), step);
     }
 
-    /// <summary>The net result of all commands of the call: a result of the batch with the adds, the renames and the
-    /// changes of its parts in their order (see <see cref="EditTools.Shaped"/>).</summary>
+    /// <summary>The net result of all commands of the call. Its adds, renames and changes come from the parts of the
+    /// batch in their order (see <see cref="EditTools.Shaped"/>).</summary>
     internal EditResult CallResult(EditResult batchResult) => EditTools.Shaped(batchResult, Batch.Parts);
 
     /// <summary>
@@ -252,9 +252,9 @@ internal static class EditTools
     /// request.
     /// </summary>
     /// <remarks>The walk reads the parts in order. A rename changes an add only when the add came before it. So an
-    /// existing item that a step renames stays a rename, also when a later step adds an item with its old nickname
-    /// (review finding of MCP1-2, step 4). The renames of a part apply before its adds, because they name the items
-    /// before the part.</remarks>
+    /// existing item that a step renames stays a rename. This is also true when a later step adds an item with its old
+    /// nickname (review finding of MCP1-2, step 4). The renames of a part apply before its adds, because they name the
+    /// items before the part.</remarks>
     /// <param name="result">The merged result of the parts, with the lists of the other kinds.</param>
     /// <param name="parts">The parts of the commands, in order.</param>
     internal static EditResult Shaped(EditResult result, IReadOnlyList<EditResult> parts)

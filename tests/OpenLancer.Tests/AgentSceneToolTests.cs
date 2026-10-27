@@ -320,8 +320,8 @@ public sealed class AgentSceneToolTests
     /// The components of an object (decisions D243, D244 and D258 of the M3 design). An add sets the line of the
     /// component, and a remove removes its keys. The remove of Solar refuses, as Unity refuses to remove a component that
     /// another component needs (RequireComponent). An add that the Inspector does not offer refuses with its reason. The
-    /// value of an add must be an entry of the list of the component, as in the picker of the Inspector, and the line
-    /// gets the entry as the list spells it.
+    /// value of an add must be an entry of the list of the component, as in the picker of the Inspector. The line gets
+    /// the entry as the list spells it.
     /// </summary>
     [Fact]
     public void AComponentAddsAndRemovesAndSolarCannotGo()
