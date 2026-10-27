@@ -524,6 +524,7 @@
     "component_value": "An add needs the value of the component, for example the nickname of a loadout.",
     "component_no_value": "A remove takes no value.",
     "component_value_text": "The value of a component is one nickname. It cannot hold a comma, a semicolon or a line break.",
+    "component_value_none": "The list {list} has no entry {value}. Get the values from list_values with the list {list}.",
     "place_errors": "Some lines of {group} name entries that this profile does not have. To place the group without these lines, call again with leave_out_error_lines: true. The lines: {lines}",
     "group_members": "The group has {count} members: {members}.",
     "group_member": "The group has 1 member: {members}.",

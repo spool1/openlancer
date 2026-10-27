@@ -205,13 +205,16 @@ internal static class SceneEditTools
     /// design). The remove of Solar refuses, as Unity refuses to remove a component that another component needs
     /// (RequireComponent).
     /// </summary>
+    /// <remarks>The Inspector takes the value of an added component from a picker of the loaded data (Editor UI rule
+    /// 2). So the tool refuses a value that the list of the component does not have, and the line gets the value as the
+    /// list spells it.</remarks>
     public static ToolStep SetComponent(ToolCall call) => EditTools.Apply(call, scope =>
     {
         var args = call.Args;
         var section = EditTools.Section(call, args.Text("ref")!, "ref");
         var kind = Components.First(k => AgentTools.Snake(k.ToString()) == args.Text("component"));
         var add = args.Text("action") == "add";
-        var value = args.Text("value");
+        var value = args.Text("value")?.Trim();
         if (add && value == null)
         {
             throw new EditException(new EditError(EditErrorKind.InvalidArgument, MissionErrors.ValueMissing,
@@ -219,13 +222,27 @@ internal static class SceneEditTools
         }
         if (!add && value != null)
             throw ToolInput.Bad("value", AgentTexts.Error("component_no_value"));
-        if (value != null && (value.Trim().Length == 0 || value.Any(c => c is ',' or ';' || char.IsControl(c))))
+        if (value != null && (value.Length == 0 || value.Any(c => c is ',' or ';' || char.IsControl(c))))
         {
             throw new EditException(new EditError(EditErrorKind.InvalidValue, MissionErrors.FieldValue,
                 AgentTexts.Error("component_value_text")) { Field = "value" });
         }
-        scope.Run(SceneCommands.SetComponent(scope.Session, section, kind, value?.Trim()), [section]);
+        if (value != null && ObjectComponents.IsAddable(kind))
+            value = ListValue(scope.Session, kind, value);
+        scope.Run(SceneCommands.SetComponent(scope.Session, section, kind, value), [section]);
     });
+
+    /// <summary>The value of an added component as the list of the component spells it.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidValue"/> with the closest names when the list
+    /// does not have the value.</exception>
+    private static string ListValue(EditSession session, ObjectComponent kind, string value)
+    {
+        var name = ObjectComponents.ListOf(kind);
+        var list = session.Lists.List(name);
+        return list?.Find(value)?.Value ?? throw new EditException(new EditError(EditErrorKind.InvalidValue,
+            MissionErrors.FieldValue, AgentTexts.Error("component_value_none", ("list", name), ("value", value)) +
+                                      ItemRefs.Hint(value, list?.Entries.Select(e => e.Value) ?? [])) { Field = "value" });
+    }
 
     /// <summary>
     /// Places a prop group in a system (decisions D288 and D290 of the M23 design). A line of a member that names an entry

@@ -74,6 +74,10 @@ public static class ObjectComponents
     /// <summary>The keys that a component owns.</summary>
     public static IReadOnlyList<string> Keys(ObjectComponent kind) => Info[kind].Keys;
 
+    /// <summary>True for a component that "Add component" can offer for an object (decision D244). Such a component has
+    /// a value with a list (see <see cref="ListOf"/>).</summary>
+    public static bool IsAddable(ObjectComponent kind) => Addable.Contains(kind);
+
     /// <summary>The list of the value of an added component, for its picker: <c>loadout</c>, <c>base</c> or
     /// <c>faction</c>.</summary>
     public static string ListOf(ObjectComponent kind) => kind switch

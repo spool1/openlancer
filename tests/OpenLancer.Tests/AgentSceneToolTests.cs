@@ -319,7 +319,9 @@ public sealed class AgentSceneToolTests
     /// <summary>
     /// The components of an object (decisions D243, D244 and D258 of the M3 design). An add sets the line of the
     /// component, and a remove removes its keys. The remove of Solar refuses, as Unity refuses to remove a component that
-    /// another component needs (RequireComponent). An add that the Inspector does not offer refuses with its reason.
+    /// another component needs (RequireComponent). An add that the Inspector does not offer refuses with its reason. The
+    /// value of an add must be an entry of the list of the component, as in the picker of the Inspector, and the line
+    /// gets the entry as the list spells it.
     /// </summary>
     [Fact]
     public void AComponentAddsAndRemovesAndSolarCannotGo()
@@ -337,6 +339,8 @@ public sealed class AgentSceneToolTests
         var noValue = Error(host, "scene_set_component", Set("obj:Li01_outpost", "loadout_user", "add"));
         var removeValue = Error(host, "scene_set_component", Set("obj:Li01_outpost", "loadout_user", "remove", "x"));
         var comma = Error(host, "scene_set_component", Set("obj:Li01_outpost", "loadout_user", "add", "a, b"));
+        var unknown = Error(host, "scene_set_component", Set("obj:Li01_outpost", "loadout_user", "add", "lo_statio"));
+        var faction = Error(host, "scene_set_component", Set("obj:Li01_outpost", "faction_member", "add", "li_x_grp"));
 
         var outpost = SceneWorkspace.Object("Li01_outpost");
         Assert.Equal(("Agent: Add Loadout user", "Agent: Remove Loadout user"),
@@ -349,7 +353,14 @@ public sealed class AgentSceneToolTests
         Assert.Equal(("invalid_argument", "ValueMissing"), (noValue.Code, noValue.Detail));
         Assert.Equal(("invalid_argument", ToolInput.BadArgument), (removeValue.Code, removeValue.Detail));
         Assert.Equal(("invalid_value", "FieldValue"), (comma.Code, comma.Detail));
+        Assert.Equal(("invalid_value", "FieldValue",
+                "The list loadout has no entry lo_statio. Get the values from list_values with the list loadout. " +
+                "The closest names are: lo_station."), unknown);
+        Assert.Equal(("invalid_value", "FieldValue"), (faction.Code, faction.Detail));
+        Assert.StartsWith("The list faction has no entry li_x_grp.", faction.Message);
         Assert.Equal(2, session.Revision);
+        Ok(host, "scene_set_component", Set("obj:Li01_outpost", "loadout_user", "add", "LO_STATION"));
+        Assert.Equal("lo_station", Line(session, outpost, "loadout"));
     }
 
     /// <summary>
