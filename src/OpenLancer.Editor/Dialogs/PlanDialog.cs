@@ -25,7 +25,7 @@ internal sealed class PlanDialog : ModalDialog
     {
         this.plan = plan;
         this.run = run;
-        title = plan.Command == null
+        title = !plan.CanRun
             ? plan.Action == SceneAction.Delete ? "Cannot delete" : "Cannot rename"
             : plan.Label;
         Open();
@@ -38,7 +38,7 @@ internal sealed class PlanDialog : ModalDialog
             return;
         }
 
-        if (plan.Command == null)
+        if (!plan.CanRun)
         {
             foreach (var refusal in plan.Refusals)
             {

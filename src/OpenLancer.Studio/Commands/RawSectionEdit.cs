@@ -7,8 +7,10 @@ using OpenLancer.Data.Missions.Editing;
 
 namespace OpenLancer.Studio.Commands;
 
-/// <summary>The commands of a raw edit, or the problems that stop it. No problem and no command: nothing changed.</summary>
-internal sealed record RawEditPlan(EditCommand? Command, IReadOnlyList<RawProblem> Problems)
+/// <summary>The plan of a raw edit, or the problems that stop it. No problem and no plan: nothing changed.</summary>
+/// <param name="Edit">The plan of the edit of a section that is not in a mission file, or null. It is one entry of the
+/// edit history.</param>
+internal sealed record RawEditPlan(EditPlan? Edit, IReadOnlyList<RawProblem> Problems)
 {
     /// <summary>The batch of a raw edit of a section of a mission file, or null. The mission editor runs it, because it
     /// is the only write path of mission files (decision D660 of the M6b design).</summary>
@@ -26,8 +28,8 @@ internal sealed record RawProblem(int Line, string Message)
 }
 
 /// <summary>
-/// The raw INI block of an Inspector page (section 13 of the M21 design): the text of one section, and the commands
-/// that an edit of the text gives. One raw edit is one entry of the edit history.
+/// The raw INI block of an Inspector page (section 13 of the M21 design). It gives the text of one section, and the
+/// plan of an edit of the text. One raw edit is one entry of the edit history.
 /// </summary>
 /// <remarks>
 /// <para>The text is <c>[Type]</c> and one <c>name = values</c> line for each line of W, in file order. A text that
@@ -120,7 +122,7 @@ internal static class RawSectionEdit
             }
         }
 
-        return new RawEditPlan(EditCommand.Group($"Edit INI of {section.Id}", commands), []);
+        return new RawEditPlan(new CommandPlan(EditCommand.Group($"Edit INI of {section.Id}", commands), [section]), []);
     }
 
     /// <summary>The lines of a text. Empty lines do not count. Adds a problem for each line that is not a line of the

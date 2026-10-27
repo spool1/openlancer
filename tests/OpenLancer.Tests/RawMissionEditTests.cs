@@ -169,7 +169,7 @@ public sealed class RawMissionEditTests
 
         var plan = RawSectionEdit.Plan(m.Session, ship, start, start + "\nradius = 50");
 
-        Assert.Null(plan.Command);
+        Assert.Null(plan.Edit);
         var batch = Assert.IsType<MissionBatch>(plan.Mission);
         Assert.Equal("Edit INI of [MsnShip] nickname = ol_ship_2", batch.Label);
         Assert.Equal(EditStatus.Applied, m.Missions.Apply(batch).Status);

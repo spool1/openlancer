@@ -104,8 +104,8 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
             // The edit runs when the field ends, also when the window closes, as the other text fields do.
             grid.CommitField(MarketEdits.LineKey(line), changed, text, edited, (value, _) =>
             {
-                // Commands.Execute writes a problem of the edit to the Console, so the commit returns no error.
-                window.Commands.Execute(() => MarketEdits.SetValue(session.Edits, line, field, value));
+                // The command runner writes a problem of the edit to the Console, so the commit returns no error.
+                window.Commands.Run(edits => MarketCommands.SetValue(edits, line, field, value));
                 return null;
             });
             ImGui.SetItemTooltip(field.Tip);
@@ -115,7 +115,7 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
         if (ToolbarItems.Button("remove", EditorIcons.TrashAlt,
                 $"Remove the line. Then {line.Base} does not buy or sell the good."))
         {
-            window.Commands.Execute(() => MarketEdits.SetLine(session.Edits, line, null));
+            window.Commands.Run(edits => MarketCommands.SetLine(edits, line, null));
         }
     }
 
@@ -139,7 +139,7 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
                 var selected = type == line.Transaction;
                 if (ImGui.Selectable(Name(type), selected) && !selected)
                 {
-                    window.Commands.Execute(() => MarketEdits.SetTransaction(session.Edits, line, type));
+                    window.Commands.Run(edits => MarketCommands.SetTransaction(edits, line, type));
                 }
             }
 
@@ -210,7 +210,7 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
             {
                 ImGui.CloseCurrentPopup();
                 var values = MarketEdits.DefaultValues(MarketEdits.Category(session.Edits, good));
-                window.Commands.Execute(() => MarketEdits.AddToBase(session.Edits, good, chosen.Item, values));
+                window.Commands.Run(edits => MarketCommands.AddToBase(edits, good, chosen.Item, values));
             }
 
             ImGui.EndCombo();

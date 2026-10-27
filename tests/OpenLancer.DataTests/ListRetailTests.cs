@@ -326,7 +326,7 @@ public sealed class ListRetailTests(ITestOutputHelper output)
             : l);
         var plan = RawSectionEdit.Plan(session, section, start, string.Join("\n", lines));
         Assert.Empty(plan.Problems);
-        session.Execute(plan.Command!);
+        session.Execute(plan.Edit!.Command!);
         Assert.Equal("Edit INI of " + section.Id, session.UndoLabel);
     }
 

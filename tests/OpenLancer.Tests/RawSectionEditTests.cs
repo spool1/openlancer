@@ -1,6 +1,7 @@
 using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Studio.Commands;
 using Xunit;
@@ -29,11 +30,11 @@ public sealed class RawSectionEditTests
         Assert.Equal("[Object]\nnickname = Li01_01\narchetype = station1\nloadout = lo_station\nreputation = li_n_grp\n" +
                      "base = Li01_01_Base\nvoice = pilot_f", text);
         var plan = RawSectionEdit.Plan(session, Station, text, text);
-        Assert.Null(plan.Command);
+        Assert.Null(plan.Edit);
         Assert.Empty(plan.Problems);
         // Empty lines, spaces and the letter case of a name are no change.
         plan = RawSectionEdit.Plan(session, Station, text, text.Replace("loadout = lo_station", "\n  LOADOUT=lo_station  \n"));
-        Assert.Null(plan.Command);
+        Assert.Null(plan.Edit);
         Assert.Empty(plan.Problems);
     }
 
@@ -47,7 +48,7 @@ public sealed class RawSectionEditTests
 
         var plan = RawSectionEdit.Plan(session, Station, start, end);
         Assert.Empty(plan.Problems);
-        session.Execute(plan.Command!);
+        session.Execute(plan.Edit!.Command!);
 
         Assert.Equal("lo_solar", Lines(session, Station, "loadout"));
         Assert.Empty(session.Get(Station)!.Lines("voice"));
@@ -56,6 +57,25 @@ public sealed class RawSectionEditTests
         Assert.Equal("lo_station", Lines(session, Station, "loadout"));
         Assert.Equal("pilot_f", Lines(session, Station, "voice"));
         Assert.False(session.CanUndo);
+    }
+
+    /// <summary>The raw block commits its plan through the command runner, as one entry with the edit origin User. The
+    /// plan names the section that it changes.</summary>
+    [Fact]
+    public void ARawEditRunsThroughTheCommandRunner()
+    {
+        using var ws = Create();
+        var session = ws.Session("act");
+        var start = Text(session, Station);
+
+        var plan = RawSectionEdit.Plan(session, Station, start, start.Replace("voice = pilot_f", "voice = pilot_m"));
+        var result = FakeCommandHost.Runner(session).Run(plan.Edit!);
+
+        Assert.Equal(EditStatus.Applied, result.Status);
+        Assert.Equal([Station], plan.Edit!.Changes);
+        Assert.Equal("pilot_m", Lines(session, Station, "voice"));
+        Assert.Equal("Edit INI of [Object] nickname = Li01_01", session.UndoLabel);
+        Assert.Equal(EditOrigin.User, session.UndoOrigin);
     }
 
     [Theory]
@@ -76,7 +96,7 @@ public sealed class RawSectionEditTests
 
         var plan = RawSectionEdit.Plan(session, Station, start, end);
 
-        Assert.Null(plan.Command);
+        Assert.Null(plan.Edit);
         var problem = Assert.Single(plan.Problems);
         Assert.Equal(line, problem.Line);
         Assert.StartsWith(message, problem.Message);
@@ -104,7 +124,7 @@ public sealed class RawSectionEditTests
         var start = Text(session, Station);
 
         var plan = RawSectionEdit.Plan(session, Station, start, start.Replace("lo_station", "li_no_such_loadout"));
-        session.Execute(plan.Command!);
+        session.Execute(plan.Edit!.Command!);
 
         Assert.Equal("li_no_such_loadout", Lines(session, Station, "loadout"));
         Assert.Equal(DiagnosticSeverity.Error, Assert.Single(session.CheckLists(Station)).Severity);
@@ -122,13 +142,13 @@ public sealed class RawSectionEditTests
 
         session.Execute(EditCommand.SetLinesFromText(Station, "voice", ["other_voice"]));
         var plan = RawSectionEdit.Plan(session, Station, start, end);
-        session.Execute(plan.Command!);
+        session.Execute(plan.Edit!.Command!);
         Assert.Equal("other_voice", Lines(session, Station, "voice"));
         Assert.Equal("lo_solar", Lines(session, Station, "loadout"));
 
         session.Execute(EditCommand.SetLinesFromText(Station, "loadout", ["lo_shared"]));
         plan = RawSectionEdit.Plan(session, Station, start, start.Replace("lo_station", "lo_station2"));
-        Assert.Null(plan.Command);
+        Assert.Null(plan.Edit);
         Assert.Equal("The section changed while you typed. Copy your text, and edit again.",
             Assert.Single(plan.Problems).Message);
     }
@@ -142,7 +162,7 @@ public sealed class RawSectionEditTests
         var start = Text(session, Station);
         var end = start.Replace("\nloadout = lo_station", "") + "\nloadout = lo_station\npos = 1, 2, 3";
 
-        session.Execute(RawSectionEdit.Plan(session, Station, start, end).Command!);
+        session.Execute(RawSectionEdit.Plan(session, Station, start, end).Edit!.Command!);
 
         Assert.Equal(["nickname", "archetype", "loadout", "reputation", "base", "voice", "pos"],
             session.Get(Station)!.Entries.Select(e => e.Name));
