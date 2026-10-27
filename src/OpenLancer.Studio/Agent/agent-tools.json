@@ -203,7 +203,7 @@
     },
     "rename_item": {
       "title": "Rename an item",
-      "description": "Gives an item a new nickname and changes each line that names it. The tool makes one Undo step. When the rename warns or other files name the item as text, the tool asks for confirm: true.",
+      "description": "Gives an item a new nickname and changes each line that names it. The tool makes one Undo step. When the rename warns, cannot change a line that names the item, or other files name it as text, the tool asks for confirm: true.",
       "fields": {
         "ref": "The reference of the item, for example obj:my_station_1. A data item must be an item that the active mod adds.",
         "new_name": "The new nickname. A refusal tells why a nickname is not valid."

@@ -148,7 +148,7 @@ These tools change the data of the active mod. They work in the editor host. The
 |---|---|
 | `set_fields` | Sets fields of one item by their INI keys. |
 | `set_text` | Sets the name, the infocard or another text of one item. The text goes into the `strings.json` of the active mod. |
-| `rename_item` | Gives an item a new nickname, and changes each line that names it. A data item must be an item that the active mod adds. |
+| `rename_item` | Gives an item a new nickname, and changes each line that names it. A line that the active mod cannot change keeps the old nickname and shows "Missing". A data item must be an item that the active mod adds. |
 | `delete_items` | Deletes items of a system with their children. Other lines that name them show "Missing". |
 | `duplicate_items` | Copies items of a system with their children. With `offset`, the copies move by the offset. |
 | `undo` | Undoes the last edit of the agent. |

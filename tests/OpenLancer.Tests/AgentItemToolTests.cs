@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Nodes;
+using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
@@ -112,6 +113,65 @@ public sealed class AgentItemToolTests
         Assert.NotNull(session.Get(ItemWorkspace.Good(ItemWorkspace.WeaponGoodsPath, "gun3")));
         Assert.Equal("refused", lower.Code);
         Assert.Equal(EditOrigin.Agent, session.UndoOrigin);
+    }
+
+    /// <summary>The rename of a data item changes the equip line of a loadout of the mod. The result gives the loadout
+    /// in its changes, and the rename needs no confirmation (review finding of MCP1-2, step 3).</summary>
+    [Fact]
+    public void ARenameOfADataItemChangesTheLoadoutLinesThatNameIt()
+    {
+        using var ws = ItemWorkspace.WithLoadouts("");
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        session.Execute(ItemTemplates.Build(ItemTemplates.Plan(session, ItemWorkspace.Gun("gun1"), "gun2")));
+        session.Execute(EditCommand.AddSection(ItemWorkspace.LoadoutsPath, "Loadout",
+        [
+            ItemWorkspace.Line("nickname", new StringValue("lo_mod")),
+            ItemWorkspace.Line("equip", new StringValue("gun2"), new StringValue("HpWeapon01")),
+        ]));
+        var loadout = ItemWorkspace.Ref(ItemWorkspace.LoadoutsPath, "Loadout", "lo_mod");
+
+        var renamed = Ok(host, "rename_item", $$"""{ "ref": {{Json(ItemRefs.Of(ItemWorkspace.Gun("gun2")))}}, "new_name": "gun3" }""");
+
+        Assert.Equal("applied", (string?)renamed["status"]);
+        Assert.Contains(ItemRefs.Canonical(session, loadout), Texts(renamed["changes"]));
+        Assert.Empty(renamed["missing"]!.AsArray());
+        Assert.Empty(renamed["new_problems"]!.AsArray());
+        Assert.Equal(["gun3"], ItemWorkspace.Firsts(session, loadout, "equip"));
+    }
+
+    /// <summary>A loadout line that the active mod cannot patch keeps the old nickname. The preview gives it in
+    /// <c>missing</c>, and the rename needs confirm: true (section 4.0.5 of the M6b design, item 6).</summary>
+    [Fact]
+    public void ARenameOfADataItemAsksForTheLinesThatItCannotChange()
+    {
+        // Two loadouts with one nickname: a patch cannot find one of them, so the session cannot change them.
+        using var ws = ItemWorkspace.WithLoadouts("""
+            [Loadout]
+            nickname = lo_twin
+            equip = gun2
+
+            [Loadout]
+            nickname = lo_twin
+            equip = gun2
+            """);
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        session.Execute(ItemTemplates.Build(ItemTemplates.Plan(session, ItemWorkspace.Gun("gun1"), "gun2")));
+        var gun = Json(ItemRefs.Of(ItemWorkspace.Gun("gun2")));
+
+        var preview = Ok(host, "rename_item", $$"""{ "ref": {{gun}}, "new_name": "gun3", "preview": true }""");
+        var asks = Error(host, "rename_item", $$"""{ "ref": {{gun}}, "new_name": "gun3" }""");
+        var done = Ok(host, "rename_item", $$"""{ "ref": {{gun}}, "new_name": "gun3", "confirm": true }""");
+
+        Assert.True((bool)preview["needs_confirmation"]!);
+        Assert.Equal(2, preview["missing"]!.AsArray().Count);
+        Assert.Equal(("needs_confirmation", EditTools.ConfirmChanges), (asks.Code, asks.Detail));
+        Assert.Contains("show 'Missing'", asks.Message);
+        Assert.Equal("applied", (string?)done["status"]);
+        Assert.All(done["missing"]!.AsArray(), m => Assert.Equal("equip", (string?)m!["key"]));
+        Assert.Equal(["gun2"],
+            ItemWorkspace.Firsts(session, ItemWorkspace.Ref(ItemWorkspace.LoadoutsPath, "Loadout", "lo_twin"), "equip"));
     }
 
     /// <summary>The preview of a delete gives the cascade, the fixes and the "Missing" lines, and does not change the

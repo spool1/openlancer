@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security;
 using LibreLancer.Data.Ini;
+using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Strings;
@@ -16,8 +17,10 @@ public static class ItemEdits
     /// Gives an item that the active mod adds a new nickname, and changes each line that names the item in the
     /// sections that the active mod can change (review finding F12): the <c>ship</c> of a hull good, the
     /// <c>hull</c> of a package, the <c>equipment</c> and the <c>addon</c> lines of a good, the
-    /// <c>projectile_archetype</c> of a gun and the <c>marketgood</c> lines of a market. Equipment and its good keep
-    /// the same nickname, because the engine finds the equipment of a good by that nickname.
+    /// <c>projectile_archetype</c> of a gun and the <c>marketgood</c> lines of a market. The edit also changes each
+    /// other line that a rule of the data lists maps to the item, for example the <c>equip</c> line of a loadout.
+    /// Equipment and its good keep the same nickname, because the engine finds the equipment of a good by that
+    /// nickname.
     /// </summary>
     /// <remarks>The edit is one entry of the edit history. Run it at once: it holds the lines that it changes, so it
     /// fails when it runs after the edit view changed.</remarks>
@@ -33,7 +36,7 @@ public static class ItemEdits
     /// <exception cref="InvalidOperationException">Another section of the same kind of file has the new
     /// nickname.</exception>
     public static EditCommand Rename(EditSession session, SectionRef item, string newNickname,
-        List<Diagnostic>? warnings = null) => Rename(session, item, newNickname, warnings, null);
+        List<Diagnostic>? warnings = null) => Rename(session, item, newNickname, warnings, null, null);
 
     /// <summary>
     /// Gives an item that the active mod adds a new nickname, as
@@ -41,8 +44,11 @@ public static class ItemEdits
     /// </summary>
     /// <param name="changes">Gets each section that the edit changes and keeps, with its identity after the edit.
     /// These are the sections that it renames and the sections whose lines name the item. Null drops them.</param>
+    /// <param name="missing">Gets each line of the data lists that names the item and that the edit cannot change,
+    /// for example a line of a section that the active mod cannot patch. Such a line shows "Missing" after the edit.
+    /// Null drops them.</param>
     internal static EditCommand Rename(EditSession session, SectionRef item, string newNickname,
-        List<Diagnostic>? warnings, List<SectionRef>? changes)
+        List<Diagnostic>? warnings, List<SectionRef>? changes, List<MissingReference>? missing)
     {
         var index = session.Items;
         var kind = index.KindOf(item.Path);
@@ -71,16 +77,40 @@ public static class ItemEdits
         // A section that the edit renames has another identity when its links change.
         var moved = renamed.ToDictionary(r => r.Section, r => r.Section with { Id = r.Section.Id with { Key = newNickname } });
         var relinked = new List<SectionRef>();
+        // The keys of the sections whose lines the loop below changes.
+        var changedKeys = new HashSet<(SectionRef Section, string Key)>();
         foreach (var (section, name) in renamed.SelectMany(r => index.ReferencesTo(r.Kind, oldNickname)).Distinct())
         {
             // The active mod cannot change the line. It is a line of a lower layer that names a nickname that only
-            // the active mod adds.
+            // the active mod adds. The loop of the data lists reports it.
             if (session.Get(section)?.ReadOnlyReason != null)
                 continue;
             var lines = index.Section(section)!.Where(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                 .Select(e => Relinked(e, oldNickname, newNickname))
                 .ToList();
             commands.Add(EditCommand.SetLines(moved.GetValueOrDefault(section, section), name, lines));
+            relinked.Add(section);
+            changedKeys.Add((section, name.ToLowerInvariant()));
+        }
+        // The reverse index of the data lists has each other line that names the item, for example the equip line of a
+        // loadout. A line that the active mod cannot change shows "Missing" after the edit.
+        var references = renamed.SelectMany(r => session.Lists.SourcesOf(r.Section.Path, r.Section.Id.Type)
+                .SelectMany(l => session.Lists.ReferencesTo(l.Id, oldNickname,
+                    session.Lists.IsScoped(l.Id) ? r.Section.Path : null)))
+            .DistinctBy(r => (r.Section, r.Key.ToLowerInvariant(), r.Line, r.Index));
+        foreach (var reference in references)
+        {
+            var section = reference.Section;
+            if (changedKeys.Contains((section, reference.Key.ToLowerInvariant())) || session.Get(section) is not { } referrer)
+                continue;
+            if (referrer.ReadOnlyReason is { } reason)
+            {
+                missing?.Add(new MissingReference(reference, $"The editor cannot change this line: {reason}",
+                    reference.Rule.Closed));
+                continue;
+            }
+            commands.Add(EditCommand.SetValueAt(moved.GetValueOrDefault(section, section), reference.Key, reference.Line,
+                reference.Index, new StringValue(newNickname)));
             relinked.Add(section);
         }
         // The mission lines that name the item follow the rename in the same entry (decision D668).
@@ -95,7 +125,8 @@ public static class ItemEdits
             session.Missions.References.Rename(missionKinds, oldNickname, newNickname, warnings ?? []) is { } mission)
             commands.Add(mission);
         // The new nickname goes into the key lines and the links, so each of their files must take it.
-        foreach (var binary in renamed.Select(r => r.Section).Concat(relinked).Select(index.IsBinary).Distinct())
+        foreach (var binary in renamed.Select(r => r.Section).Concat(relinked).Select(s => session.IsBinaryFile(s.Path))
+                     .Distinct())
         {
             if (PatchFormatter.KeyError(newNickname, binary) is { } error)
                 throw new ArgumentException(error, nameof(newNickname));

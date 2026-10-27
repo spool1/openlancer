@@ -16,6 +16,7 @@ internal static class ItemWorkspace
     public const string GoodsPath = @"DATA\EQUIPMENT\goods.ini";
     public const string WeaponGoodsPath = @"DATA\EQUIPMENT\weapon_good.ini";
     public const string MarketPath = @"DATA\EQUIPMENT\market_misc.ini";
+    public const string LoadoutsPath = @"DATA\SHIPS\loadouts.ini";
 
     public const string FreelancerIni = """
         [Freelancer]
@@ -114,6 +115,17 @@ internal static class ItemWorkspace
             """);
         ws.Mod("act", new());
         ws.WriteProfile("act");
+        return ws;
+    }
+
+    /// <summary>A workspace of <see cref="Create"/> with a loadout file of the role "loadouts" in the base
+    /// folder.</summary>
+    /// <param name="loadouts">The text of the loadout file.</param>
+    public static TestWorkspace WithLoadouts(string loadouts)
+    {
+        var ws = Create();
+        ws.WriteBase(@"EXE\freelancer.ini", FreelancerIni + "\nloadouts = ships\\loadouts.ini\n");
+        ws.WriteBase(LoadoutsPath, loadouts);
         return ws;
     }
 

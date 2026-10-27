@@ -46,10 +46,12 @@ public static class DatabaseCommands
     /// </summary>
     /// <remarks>
     /// <para>The plan warns about each mission line that names the item and that the edit cannot change. The save stops
-    /// at such a line (rule M23).</para>
+    /// at such a line (rule M23). Each other line that names the item and that the edit cannot change is a "Missing"
+    /// line of the plan, for example a line of a section that the active mod cannot patch.</para>
     /// <para>The mentions are the files that name the old nickname as text and that the rename does not change, for
-    /// example a loadout (see <see cref="EditSession.StoryMentions"/>). A warning or a mention makes the plan need a
-    /// confirmation, as a rename in the Scene does (decision D242).</para>
+    /// example a file that no rule of the data lists reads (see <see cref="EditSession.StoryMentions"/>). A warning, a
+    /// "Missing" line or a mention makes the plan need a confirmation, as a rename in the Scene does (decision
+    /// D242).</para>
     /// </remarks>
     public static EditPlan Rename(EditSession session, SectionRef item, string newNickname) =>
         new RenamePlan(session, item, newNickname);
@@ -88,9 +90,10 @@ public static class DatabaseCommands
         {
             var warnings = new List<Diagnostic>();
             var changes = new List<SectionRef>();
+            var missing = new List<MissingReference>();
             try
             {
-                Command = ItemEdits.Rename(session, item, newNickname, warnings, changes);
+                Command = ItemEdits.Rename(session, item, newNickname, warnings, changes, missing);
             }
             catch (Exception e) when (e is ArgumentException or InvalidOperationException)
             {
@@ -108,6 +111,7 @@ public static class DatabaseCommands
 
             Changes = changes;
             Warnings = warnings;
+            Missing = missing;
             // The scan also finds the lines that the rename changes, so a file that it changes is no mention.
             var changed = changes.Select(c => VfsPath.Normalize(c.Path) ?? c.Path).ToHashSet(VfsPath.Comparer);
             var old = item.Id.Key!;
@@ -115,7 +119,7 @@ public static class DatabaseCommands
                 .Where(m => !changed.Contains(VfsPath.Normalize(m.Path) ?? m.Path))
                 .Select(m => new NamedMention(old, m.Path, m.Count))
                 .ToList();
-            NeedsConfirmation = Warnings.Count > 0 || Mentions.Count > 0;
+            NeedsConfirmation = Warnings.Count > 0 || Missing.Count > 0 || Mentions.Count > 0;
         }
     }
 }

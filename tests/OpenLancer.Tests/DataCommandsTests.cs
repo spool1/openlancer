@@ -188,9 +188,57 @@ public sealed class DatabaseCommandsTests
         Assert.True(plan.Report(session).NeedsConfirmation);
     }
 
+    /// <summary>
+    /// The rename also changes each other line that a rule of the data lists maps to the item, for example the equip
+    /// and the cargo lines of a loadout. A line that the active mod cannot patch keeps the old nickname. It is a
+    /// "Missing" line of the plan, so the plan needs a confirmation (review finding of MCP1-2, step 3).
+    /// </summary>
+    [Fact]
+    public void ARenameChangesTheLinesOfTheDataListsAndGivesTheOthersAsMissing()
+    {
+        // Two loadouts with one nickname: a patch cannot find one of them, so the session cannot change them.
+        using var ws = WithLoadouts("""
+            [Loadout]
+            nickname = lo_a
+            equip = gun2, HpWeapon01
+            cargo = gun2, 3
+
+            [Loadout]
+            nickname = lo_twin
+            equip = gun2
+
+            [Loadout]
+            nickname = lo_twin
+            equip = gun2
+            """);
+        var session = ws.Session("act");
+        session.Execute(ItemTemplates.Build(ItemTemplates.Plan(session, Gun("gun1"), "gun2")));
+
+        var plan = DatabaseCommands.Rename(session, Gun("gun2"), "gun3");
+        session.Execute(plan.Command!);
+
+        var loadout = Ref(LoadoutsPath, "Loadout", "lo_a");
+        Assert.Contains(loadout, plan.Changes);
+        Assert.Equal(["gun3"], Firsts(session, loadout, "equip"));
+        Assert.Equal(["gun3"], Firsts(session, loadout, "cargo"));
+        Assert.Equal("gun3, HpWeapon01", string.Join(", ", session.Get(loadout)!.Lines("equip")[0].Values));
+        Assert.Equal(2, plan.Missing.Count);
+        Assert.All(plan.Missing, m =>
+        {
+            Assert.Equal(("lo_twin", "equip"), (m.Reference.Section.Id.Key, m.Reference.Key));
+            Assert.StartsWith("The editor cannot change this line:", m.Consequence);
+            Assert.True(m.BlocksSave);
+        });
+        Assert.True(plan.NeedsConfirmation);
+        Assert.Equal(2, plan.Report(session).Missing.Count);
+
+        session.Undo();
+        Assert.Equal(["gun2"], Firsts(session, loadout, "equip"));
+    }
+
     /// <summary>A file that names the old nickname as text and that the rename does not change is a mention, for
-    /// example a loadout. The plan then needs a confirmation (decision D242). A file that the rename changes is no
-    /// mention.</summary>
+    /// example a loadout file that freelancer.ini does not name, so no rule of the data lists reads it. The plan then
+    /// needs a confirmation (decision D242). A file that the rename changes is no mention.</summary>
     [Fact]
     public void AFileThatTheRenameDoesNotChangeIsAMention()
     {
