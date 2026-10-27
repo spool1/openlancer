@@ -113,6 +113,11 @@ internal sealed partial class GraphView : IDisposable
     // design).
     private GraphNode? playStartNode;
 
+    // The Play buttons of the trigger cards (note of 2026-10-27 in section 8.1 of the M6c design): true in a frame where
+    // the cards keep the space of the button, and the trigger of a click on a button. The click plays after the canvas.
+    private bool playButtons;
+    private MissionTrigger? pendingPlay;
+
     /// <summary>A view move that waits for the next frame of the node editor.</summary>
     private enum Navigation
     {
@@ -450,9 +455,15 @@ internal sealed partial class GraphView : IDisposable
         EditorTheme.Reapply(ImGuiHelper.Scale);
         Menus(analysis.Script.Path, graph);
         EditMenus(analysis.Script.Path);
+        if (pendingPlay != null)
+        {
+            missions.Plays.PlayFromHere(analysis.Script.Path, pendingPlay.Nickname);
+            pendingPlay = null;
+        }
+
         if (pendingTooltip != null)
         {
-            ImGui.SetTooltip(pendingTooltip);
+            WrappedTooltip(pendingTooltip);
         }
 
         Info();
@@ -770,6 +781,15 @@ internal sealed partial class GraphView : IDisposable
         {
             right -= ChipHeight;
             AddPin(node, new Vector2(right, y - 1));
+            right -= ChipGap;
+        }
+
+        // Each trigger card keeps the space of the Play button, also without a button, so the title does not move when
+        // the states change after an edit.
+        if (playButtons && node.Kind == GraphNodeKind.Trigger)
+        {
+            right -= ChipHeight;
+            PlayButton(node, new Vector2(right, y - 1));
             right -= ChipGap;
         }
 
@@ -1243,15 +1263,22 @@ internal sealed partial class GraphView : IDisposable
 
     /// <summary>The run overlay of the dry run of the open mission in this frame, and "Follow": a new step frames the
     /// trigger of its last change (section 4.5 of the M6c design). A fold after an edit adds no step, so it does not
-    /// frame. Prefab mode has no dry run.</summary>
+    /// frame. Prefab mode has no dry run. The states of the Play buttons of the cards follow the open mission.</summary>
     private void RunState(MissionAnalysis analysis, MissionGraph graph)
     {
         var runs = missions.DryRuns;
         var open = missions.OpenPrefab == null && ReferenceEquals(analysis, missions.Open);
-        playStartNode = open && missions.Plays.PlayStartOf(analysis.Script.Path).Start.Trigger is { } start &&
-                        graph.Index.Trigger(start) is { } startTrigger
+        var playStart = missions.Plays.PlayStartOf(analysis.Script.Path);
+        playStartNode = open && playStart.Start.Trigger is { } start && graph.Index.Trigger(start) is { } startTrigger
             ? graph.NodeOf(startTrigger)
             : null;
+        // The Play buttons of the cards: only the open mission outside prefab mode, and only a script with a story slot.
+        if (open)
+        {
+            missions.PlayHere.Sync(analysis, playStart, window.Session?.Edits.InTransaction == true);
+        }
+
+        playButtons = open && missions.PlayHere.KeepsSpace;
         // The live view of a mission play comes before the dry run (section 6.3 of the M6c design).
         var live = open && missions.ShownLive(analysis.Script.Path) != null;
         runOverlay = live ? missions.LiveOverlay(graph)
@@ -1552,19 +1579,27 @@ internal sealed partial class GraphView : IDisposable
     /// <summary>
     /// The items of the node menu of the play start and the dry run (section 8.1 of the M6c design): "Play from here",
     /// "Set as play start", "Dry run from here" and, while the dry run is on, "Run this trigger (dry run)". Only a
-    /// trigger that waits can run. Prefab mode has no play.
+    /// trigger that waits can run. Prefab mode has no play. "Play from here" is off when the trigger cannot start, and
+    /// its tooltip gives the reason. When it is on, it has the tooltip of the Play button of the card.
     /// </summary>
     private void DryRunMenu(MissionTrigger trigger)
     {
         if (missions.OpenPrefab == null && missions.OpenPath is { } script)
         {
             ImGui.Separator();
-            if (ImGui.MenuItem($"{EditorIcons.Play}  Play from here"))
+            var start = missions.PlayHere.Of(trigger);
+            var placeProblem = start is { CanStart: true } ? window.StartPlaceProblem(start.Place) : null;
+            if (ImGui.MenuItem($"{EditorIcons.Play}  Play from here", "", false,
+                    PlayFromHereStates.CanPlay(start, placeProblem)))
             {
                 missions.Plays.PlayFromHere(script, trigger.Nickname);
             }
 
-            ImGui.SetItemTooltip(PlayFromHereTip);
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            {
+                WrappedTooltip(PlayFromHereStates.Tooltip(start, placeProblem, missions.MissionPlayRuns));
+            }
+
             var isStart = string.Equals(missions.Plays.PlayStartOf(script).Trigger, trigger.Nickname,
                 StringComparison.OrdinalIgnoreCase);
             if (ImGui.MenuItem("Set as play start", "", isStart))
@@ -1889,6 +1924,55 @@ internal sealed partial class GraphView : IDisposable
         {
             pendingTooltip = help.FirstSentence;
         }
+    }
+
+    /// <summary>
+    /// The Play button of a trigger card (note of 2026-10-27 in section 8.1 of the M6c design): a green Play glyph when
+    /// "Play from here" can start now, with a fill under the mouse and a solid fill while pressed. It takes the fade of
+    /// its node. A click plays from the trigger after the canvas. The button is an invisible button without overlap, as
+    /// the info glyph is, so the node editor does not select, drag or open the card.
+    /// </summary>
+    private void PlayButton(GraphNode node, Vector2 position)
+    {
+        var start = missions.PlayHere.Of(node.Trigger!);
+        var placeProblem = start is { CanStart: true } ? window.StartPlaceProblem(start.Place) : null;
+        if (!PlayFromHereStates.Shows(node, prefabMode: false, start, placeProblem))
+        {
+            return;
+        }
+
+        ImGui.SetCursorScreenPos(position);
+        if (ImGui.InvisibleButton("##play", new Vector2(ChipHeight)))
+        {
+            pendingPlay = node.Trigger;
+        }
+
+        var hovered = ImGui.IsItemHovered();
+        var pressed = ImGui.IsItemActive();
+        var alpha = Alpha(node);
+        var drawList = ImGui.GetWindowDrawList();
+        if (hovered || pressed)
+        {
+            drawList.AddRectFilled(position, position + new Vector2(ChipHeight),
+                EditorTheme.ToAbgr(EditorTheme.Play with { W = (pressed ? 1 : 0.25f) * alpha }), Rounding);
+        }
+
+        Text(drawList, ImGuiHelper.Roboto, GlyphSize, position + new Vector2(3, 1),
+            (pressed ? EditorTheme.GraphNodeHeader : EditorTheme.Play) with { W = alpha }, EditorIcons.Play.ToString());
+        if (hovered)
+        {
+            pendingTooltip = PlayFromHereStates.Tooltip(start, null, missions.MissionPlayRuns);
+        }
+    }
+
+    /// <summary>A tooltip in screen space that wraps at a readable width.</summary>
+    private static void WrappedTooltip(string text)
+    {
+        ImGui.BeginTooltip();
+        ImGui.PushTextWrapPos(ImGui.GetFontSize() * 30);
+        ImGui.Text(text);
+        ImGui.PopTextWrapPos();
+        ImGui.EndTooltip();
     }
 
     /// <summary>The popup of the info glyph that the user clicked, in screen space.</summary>
