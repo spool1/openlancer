@@ -16,8 +16,8 @@ using static OpenLancer.Tests.SceneWorkspace;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The commands of the Scene (section 4.0.8 of the M6b design): each command, run through the command runner as the
-/// editor runs it, gives the same W, adds, deletes and selection as the plan of today that it wraps.
+/// The commands of the Scene (section 4.0.8 of the M6b design). The command runner runs each command as the editor
+/// does. The command gives the same W, adds, deletes and selection as the plan of today that it wraps.
 /// </summary>
 public sealed class SceneCommandsTests
 {
@@ -41,8 +41,8 @@ public sealed class SceneCommandsTests
     }
 
     /// <summary>
-    /// The spawn of an asset (section 8 of the M23 design): a solar archetype takes the template of its type, a station
-    /// archetype with a docking sphere asks for a base, and a ship or a model makes a new static prop archetype with its
+    /// The spawn of an asset (section 8 of the M23 design). A solar archetype takes the template of its type. A station
+    /// archetype with a docking sphere asks for a base. A ship or a model makes a new static prop archetype with its
     /// object. An asset that the Scene does not place gives a plan that refuses.
     /// </summary>
     [Fact]
@@ -221,8 +221,8 @@ public sealed class SceneCommandsTests
 }
 
 /// <summary>
-/// The commands of the prop groups (section 4.0.8 of the M6b design): a placement is a plan, and a save, a rename and a
-/// delete are asset writes that refuse in an open batch, for a group of another mod, and for a session that takes no
+/// The commands of the prop groups (section 4.0.8 of the M6b design). A placement is a plan. A save, a rename and a
+/// delete are asset writes. They refuse in an open batch, for a group of another mod, and for a session that takes no
 /// edits.
 /// </summary>
 public sealed class PropGroupCommandsTests

@@ -11,8 +11,9 @@ using Xunit;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// A gesture of the command layer with many steps (section 5.2, item 5 of the MCP1 design): each step puts back the
-/// state before the gesture and makes its plan then, the gesture keeps only its last step, and the commit is one entry.
+/// A gesture of the command layer with many steps (section 5.2, item 5 of the MCP1 design). Each step puts back the
+/// state before the gesture and makes its plan then. The gesture keeps only its last step, and the commit is one
+/// entry.
 /// </summary>
 public sealed class CommandTransactionTests
 {

@@ -141,9 +141,10 @@ public static class SceneCommands
     }
 
     /// <summary>
-    /// Plans the drop of a loadout or a faction tile of the Assets panel on an object (decision D281 of the M23 design):
-    /// the Loadout user or the Faction member component with the value of the tile, as one entry "Set loadout of
-    /// &lt;object&gt;". It also replaces a present line (review finding R18 of the M23 design).
+    /// Plans the drop of a loadout or a faction tile of the Assets panel on an object (decision D281 of the M23 design).
+    /// The object gets the Loadout user or the Faction member component with the value of the tile. The drop is one
+    /// entry with the label "Set loadout of" and the object. It also replaces a present line (review finding R18 of the
+    /// M23 design).
     /// </summary>
     public static EditPlan DropAsset(EditSession session, SectionRef section, AssetRef asset)
     {

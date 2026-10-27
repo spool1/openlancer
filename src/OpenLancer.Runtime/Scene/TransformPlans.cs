@@ -27,9 +27,10 @@ public sealed record TransformChange(Vector3? Position = null, Vector3? Rotation
 
 /// <summary>
 /// The core of a transform of an object, a zone or a light as a plan of the command layer (section 4.0.8 of the M6b
-/// design): the <c>pos</c>, <c>rotate</c> or <c>size</c> line of a section of W, made by the number rules of
-/// <see cref="TransformValues"/> and <see cref="ZoneSizeAxes"/>. A drag of the gizmo makes one plan for each step, and
-/// the transform command of the command layer makes one plan for each item. So both use one rule.
+/// design). The plan sets the <c>pos</c>, <c>rotate</c> or <c>size</c> line of a section of W. It makes the line with
+/// the number rules of <see cref="TransformValues"/> and <see cref="ZoneSizeAxes"/>. A drag of the gizmo makes one plan
+/// for each step, and the transform command of the command layer makes one plan for each item. So both use one
+/// rule.
 /// </summary>
 /// <remarks>
 /// <para>A plan reads the lines of W when it is made, so make it and run it at once. A line that equals the line of W

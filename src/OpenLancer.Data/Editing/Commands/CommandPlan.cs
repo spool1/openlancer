@@ -3,9 +3,9 @@ using System.Collections.Generic;
 namespace OpenLancer.Data.Editing.Commands;
 
 /// <summary>
-/// The plan of one session command. A command of the command layer uses it when it wraps an edit that has no plan class
-/// of its own, for example the add of a component or a value of a cutscene element (section 4.0.8 of the M6b design).
-/// The plan adds and deletes no item. It names the sections that it changes when its maker gives them.
+/// The plan of one session command (section 4.0.8 of the M6b design). A command of the command layer uses it when it
+/// wraps an edit that has no plan class of its own. Examples are the add of a component and a value of a cutscene
+/// element. The plan adds and deletes no item. It names the sections that it changes when its maker gives them.
 /// </summary>
 public sealed class CommandPlan : EditPlan
 {

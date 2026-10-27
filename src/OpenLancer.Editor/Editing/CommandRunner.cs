@@ -30,8 +30,9 @@ internal interface ICommandHost
 /// <para>The runner writes each refusal and each problem of an edit to the Console with the source "Edit". A plan that
 /// refuses gives an error for each refusal. When the editor takes no edits, the runner gives a warning with the reason
 /// and runs nothing. After an edit, the warnings of its plan follow.</para>
-/// <para>The cutscene callers still run session commands through <see cref="Execute(EditCommand)"/> until milestone
-/// MCP1-4 moves them to the cutscene commands.</para>
+/// <para>Some callers still run session commands through <see cref="Execute(EditCommand)"/>: the data fields until
+/// they move to the field commands, and the cutscene callers until milestone MCP1-4 moves them to the cutscene
+/// commands.</para>
 /// </remarks>
 internal sealed class CommandRunner(ICommandHost host)
 {

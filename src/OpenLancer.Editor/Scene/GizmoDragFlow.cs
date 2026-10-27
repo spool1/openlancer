@@ -14,11 +14,11 @@ namespace OpenLancer.Editor.Scene;
 internal sealed record GizmoProblem(ConsoleSeverity Severity, string Message, object Target);
 
 /// <summary>
-/// The drag of the gizmo from frame to frame (sections 10.2 and 10.4 of the design). It opens a gesture of the command
-/// layer (see <see cref="CommandRunner.Gesture"/>) and the drag of its target in it (<see cref="IGizmoTarget.Begin"/>)
-/// when ImGuizmo starts to drag, gives the drag the raw matrix of each frame, and ends it
-/// on the release of the left button, on Esc or the right button, or when its item is not the selection any more. The
-/// Scene drags a section, and the Cutscene view drags an element of a cutscene. It has no ImGui call, so a test can
+/// The drag of the gizmo from frame to frame (sections 10.2 and 10.4 of the design). When ImGuizmo starts to drag, it
+/// opens a gesture of the command layer (see <see cref="CommandRunner.Gesture"/>) and the drag of its target in it (see
+/// <see cref="IGizmoTarget.Begin"/>). It gives the drag the raw matrix of each frame. It ends the drag on the release of
+/// the left button, on Esc or the right button, or when its item is not the selection any more. The Scene drags a
+/// section, and the Cutscene view drags an element of a cutscene. It has no ImGui call, so a test can
 /// script the frames. <see cref="TransformGizmo"/> gives it what ImGui and ImGuizmo report in each frame, and clears
 /// the drag state of ImGuizmo when a method returns true.
 /// </summary>

@@ -10,8 +10,8 @@ using Xunit;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The one runner of the editor (section 5.2, item 5 of the MCP1 design): a plan of a gesture of the user runs in a
-/// batch with the edit origin User, and the Console gets each refusal and each warning with the source "Edit".
+/// The one runner of the editor (section 5.2, item 5 of the MCP1 design). A plan of a gesture of the user runs in a
+/// batch with the edit origin User. The Console gets each refusal and each warning with the source "Edit".
 /// </summary>
 public sealed class CommandRunnerTests
 {
