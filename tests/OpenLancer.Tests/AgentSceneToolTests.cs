@@ -443,7 +443,7 @@ public sealed class AgentSceneToolTests
     }
 
     /// <summary>The Scene tools are in the tool group Scene (decision D725 of the MCP1 design). A hidden group gives
-    /// not_available.</summary>
+    /// not_available. create_from_template is a data tool of the group Studio, so it stays.</summary>
     [Fact]
     public void TheSceneToolsAreInTheGroupSceneAndAHiddenGroupGivesNotAvailable()
     {
@@ -456,6 +456,7 @@ public sealed class AgentSceneToolTests
         Assert.Equal(("not_available", "GroupHidden"), (hidden.Code, hidden.Detail));
         Assert.All(AgentTools.All.Where(t => t.Name.StartsWith("scene_") || t.Name.StartsWith("prop_group_")),
             t => Assert.Equal(ToolGroup.Scene, t.Group));
+        Assert.Equal(ToolGroup.Studio, AgentTools.Find("create_from_template")!.Group);
         Assert.False(session.CanUndo);
     }
 

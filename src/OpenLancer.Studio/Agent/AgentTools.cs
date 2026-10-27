@@ -159,6 +159,17 @@ public static class AgentTools
                 Text("group", true), Text("system", true), new PointParam("anchor", true), Text("parent"),
                 new FlagParam("leave_out_error_lines")),
             SceneEditTools.PlaceGroup, ToolGroup.Scene),
+        AssetWrite("prop_group_save", ToolHints.Adding,
+            PropGroupTools.Input(new TextListParam("refs", true), Text("nickname"), Text("name")), PropGroupTools.Save),
+        AssetWrite("prop_group_rename", ToolHints.Changing,
+            PropGroupTools.Input(Text("group", true), Text("nickname", true)), PropGroupTools.Rename),
+        AssetWrite("prop_group_delete", ToolHints.Changing, PropGroupTools.Input(Text("group", true)),
+            PropGroupTools.Delete),
+        Edit("create_from_template", ToolHints.Adding, EditTools.Input(false,
+                new TextParam("kind", true, DataEditTools.TemplateKinds, null),
+                Text("template", true),
+                Text("nickname", true)),
+            DataEditTools.CreateFromTemplate),
         SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
         SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),
         SessionTool("edit_batch", ToolHints.Adding, new ToolInput(Text("label"),
@@ -311,4 +322,9 @@ public static class AgentTools
         ToolGroup group = ToolGroup.Studio) =>
         new(name, ToolKind.Edit, group, ToolHosts.Both, hints, input, typeof(EditResult), run);
 
+    /// <summary>An asset write of a prop group (section 7.3 of the MCP1 design), in the group Scene. It writes files at
+    /// once, outside the edit history, so it cannot be a step of <c>edit_batch</c>. Its result has the form of the
+    /// result of an edit.</summary>
+    private static StudioTool AssetWrite(string name, ToolHints hints, ToolInput input, Func<ToolCall, ToolStep> run) =>
+        new(name, ToolKind.AssetWrite, ToolGroup.Scene, ToolHosts.Both, hints, input, typeof(EditResult), run);
 }

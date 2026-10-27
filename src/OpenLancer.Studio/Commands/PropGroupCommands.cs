@@ -59,67 +59,78 @@ public static class PropGroupCommands
 
     /// <summary>Writes a draft as a new group of the active mod (decision D283). See
     /// <see cref="PropGroups.Write"/>.</summary>
-    public static PropGroupWrite Save(EditSession session, PropGroupDraft draft, string nickname, string name)
+    public static PropGroupWrite Save(EditSession session, PropGroupDraft draft, string nickname, string name) =>
+        SaveProblem(session, draft, nickname, name) is { } problem
+            ? new PropGroupWrite(null, problem)
+            : Write(() => PropGroups.Write(session, draft, nickname, name));
+
+    /// <summary>Why <see cref="Save"/> cannot write a draft, or null. A preview of an agent reads it and writes
+    /// nothing.</summary>
+    public static EditError? SaveProblem(EditSession session, PropGroupDraft draft, string nickname, string name)
     {
         if (Refusal(session) is { } refused)
             return refused;
         if (draft.Refusals.Count > 0)
-            return Refuse(EditErrorKind.Refused, EditPlan.PlanRefused, draft.Refusals[0].Message);
+            return Error(EditErrorKind.Refused, EditPlan.PlanRefused, draft.Refusals[0].Message);
         if (NicknameRefusal(session, nickname, null) is { } bad)
             return bad;
-        if (PropGroups.NameProblem(name) is { } nameProblem)
-            return Refuse(EditErrorKind.InvalidValue, BadName, nameProblem);
-        return Write(() => PropGroups.Write(session, draft, nickname, name));
+        return PropGroups.NameProblem(name) is { } nameProblem
+            ? Error(EditErrorKind.InvalidValue, BadName, nameProblem) with { Field = "name" }
+            : null;
     }
 
     /// <summary>Gives a group of the active mod a new nickname (decision D294). See
     /// <see cref="PropGroups.Rename"/>.</summary>
-    public static PropGroupWrite Rename(EditSession session, PropGroup group, string nickname)
-    {
-        if ((Refusal(session) ?? OtherModRefusal(group, "rename")) is { } refused)
-            return refused;
-        if (!nickname.Equals(group.Nickname, StringComparison.Ordinal) &&
-            NicknameRefusal(session, nickname, group) is { } bad)
-            return bad;
-        return Write(() => PropGroups.Rename(session, group, nickname));
-    }
+    public static PropGroupWrite Rename(EditSession session, PropGroup group, string nickname) =>
+        RenameProblem(session, group, nickname) is { } problem
+            ? new PropGroupWrite(null, problem)
+            : Write(() => PropGroups.Rename(session, group, nickname));
+
+    /// <summary>Why <see cref="Rename"/> cannot rename a group, or null.</summary>
+    public static EditError? RenameProblem(EditSession session, PropGroup group, string nickname) =>
+        Refusal(session) ?? OtherModRefusal(group, "rename") ??
+        (nickname.Equals(group.Nickname, StringComparison.Ordinal) ? null : NicknameRefusal(session, nickname, group));
 
     /// <summary>Deletes a group of the active mod (decision D294). The copies in the systems stay. See
     /// <see cref="PropGroups.Delete"/>.</summary>
-    public static PropGroupWrite Delete(EditSession session, PropGroup group)
-    {
-        if ((Refusal(session) ?? OtherModRefusal(group, "delete")) is { } refused)
-            return refused;
-        return Write(() =>
-        {
-            PropGroups.Delete(session, group);
-            return null;
-        });
-    }
+    public static PropGroupWrite Delete(EditSession session, PropGroup group) =>
+        DeleteProblem(session, group) is { } problem
+            ? new PropGroupWrite(null, problem)
+            : Write(() =>
+            {
+                PropGroups.Delete(session, group);
+                return null;
+            });
+
+    /// <summary>Why <see cref="Delete"/> cannot delete a group, or null.</summary>
+    public static EditError? DeleteProblem(EditSession session, PropGroup group) =>
+        Refusal(session) ?? OtherModRefusal(group, "delete");
 
     /// <summary>Why no asset write can run now, or null: a batch is open, or the session takes no edits.</summary>
-    private static PropGroupWrite? Refusal(EditSession session)
+    private static EditError? Refusal(EditSession session)
     {
         if (session.OpenBatch != null)
         {
-            return Refuse(EditErrorKind.Refused, AssetWriteInBatch,
+            return Error(EditErrorKind.Refused, AssetWriteInBatch,
                 "A prop group changes its files at once, so it cannot be a step of a batch. Run it alone.");
         }
 
         return session.ReadOnlyReason is { } reason
-            ? Refuse(EditErrorKind.ReadOnly, MissionErrors.NotEditable, reason)
+            ? Error(EditErrorKind.ReadOnly, MissionErrors.NotEditable, reason)
             : null;
     }
 
-    private static PropGroupWrite? OtherModRefusal(PropGroup group, string verb) => group.Editable
+    private static EditError? OtherModRefusal(PropGroup group, string verb) => group.Editable
         ? null
-        : Refuse(EditErrorKind.Refused, OtherMod,
+        : Error(EditErrorKind.Refused, OtherMod,
             $"The prop group {group.Name} is of mod '{group.ModId}', so the editor cannot {verb} it.");
 
-    private static PropGroupWrite? NicknameRefusal(EditSession session, string nickname, PropGroup? except) =>
+    /// <summary>Why a text cannot be the nickname of a group, or null. The error names the argument
+    /// <c>nickname</c>.</summary>
+    private static EditError? NicknameRefusal(EditSession session, string nickname, PropGroup? except) =>
         PropGroups.NicknameProblem(session, nickname, except) is not { } problem ? null
-        : PropGroups.IsValidNickname(nickname) ? Refuse(EditErrorKind.NameTaken, NicknameTaken, problem)
-        : Refuse(EditErrorKind.InvalidValue, BadName, problem);
+        : (PropGroups.IsValidNickname(nickname) ? Error(EditErrorKind.NameTaken, NicknameTaken, problem)
+            : Error(EditErrorKind.InvalidValue, BadName, problem)) with { Field = "nickname" };
 
     /// <summary>Runs a write. A write that the disk refuses gives its reason.</summary>
     private static PropGroupWrite Write(Func<PropGroup?> write)
@@ -130,14 +141,13 @@ public static class PropGroupCommands
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            return Refuse(EditErrorKind.Refused, WriteFailed, e.Message);
+            return new PropGroupWrite(null, Error(EditErrorKind.Refused, WriteFailed, e.Message));
         }
         catch (Exception e) when (e is ArgumentException or InvalidOperationException)
         {
-            return Refuse(EditErrorKind.Refused, EditPlan.PlanRefused, ErrorText.Of(e));
+            return new PropGroupWrite(null, Error(EditErrorKind.Refused, EditPlan.PlanRefused, ErrorText.Of(e)));
         }
     }
 
-    private static PropGroupWrite Refuse(EditErrorKind kind, string detail, string message) =>
-        new(null, new EditError(kind, detail, message));
+    private static EditError Error(EditErrorKind kind, string detail, string message) => new(kind, detail, message);
 }
