@@ -89,13 +89,12 @@ internal static class SceneEditTools
         var args = call.Args;
         var (system, path) = System(call);
         var template = Enum.Parse<SceneTemplate>(args.Text("template")!, ignoreCase: true);
-        var archetype = args.Text("archetype")!;
-        if (session.Lists.List("solar_archetype")?.Find(archetype) == null)
-        {
-            throw new EditException(new EditError(EditErrorKind.NotFound, ItemRefs.NotFound,
-                AgentTexts.Error("archetype_none", ("archetype", archetype)) + ItemRefs.Hint(archetype,
-                    session.Lists.List("solar_archetype")?.Entries.Select(e => e.Value) ?? [])) { Field = "archetype" });
-        }
+        var text = args.Text("archetype")!;
+        // The line gets the nickname as the list gives it, as a pick in the Create menu does.
+        var archetype = session.Lists.List("solar_archetype")?.Find(text)?.Value ?? throw new EditException(new EditError(
+            EditErrorKind.NotFound, ItemRefs.NotFound, AgentTexts.Error("archetype_none", ("archetype", text)) +
+                                                       ItemRefs.Hint(text, session.Lists.List("solar_archetype")?.Entries
+                                                           .Select(e => e.Value) ?? [])) { Field = "archetype" });
         if (ScenePlans.TemplateFor(session, archetype) != template)
         {
             throw new EditException(new EditError(EditErrorKind.InvalidValue, ArchetypeTemplate,

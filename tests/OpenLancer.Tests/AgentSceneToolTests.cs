@@ -460,6 +460,54 @@ public sealed class AgentSceneToolTests
         Assert.False(session.CanUndo);
     }
 
+    /// <summary>
+    /// Each edit tool of section 7.3 of the MCP1 design (section 13.1, items 5 and 6). Its preview changes nothing and
+    /// gives the adds and the changes of the real call. The real call adds one entry with the edit origin Agent and the
+    /// label "Agent: ...". One undo puts back the states of each file before the call.
+    /// </summary>
+    [Fact]
+    public void EachSceneAndDataToolPreviewsAndIsOneAgentEntryThatOneUndoTakesBack()
+    {
+        (string Tool, string Arguments)[] calls =
+        [
+            ("scene_create_object", """{ "system": "Li01", "template": "planet", "archetype": "planet1", "position": [1, 2, 3], "name": "My Planet" }"""),
+            ("scene_create_zone", """{ "system": "Li01", "shape": "box", "position": [1, 2, 3], "size": [10, 20, 30], "nickname": "Zone_box" }"""),
+            ("scene_create_light", """{ "system": "Li01", "position": [1, 2, 3], "fields": { "range": 700 } }"""),
+            ("scene_spawn_asset", """{ "system": "Li01", "asset": "asset:ship/ship1", "position": [1, 2, 3] }"""),
+            ("scene_transform", """{ "moves": [{ "ref": "obj:Li01_14", "position": [5, 5, 5], "rotation": [0, 90, 0] }] }"""),
+            ("scene_set_component", """{ "ref": "obj:Li01_14", "component": "faction_member", "action": "add", "value": "li_n_grp" }"""),
+            ("prop_group_place", """{ "group": "group:trio", "system": "Li01", "anchor": [0, 0, 9000] }"""),
+            ("create_from_template", """{ "kind": "equipment", "template": "gun1", "nickname": "gun_copy" }"""),
+        ];
+        Assert.Equal(AgentTools.All.Where(t => t.Kind == ToolKind.Edit && (t.Name.StartsWith("scene_") ||
+                         t.Name.StartsWith("prop_group_") || t.Name == "create_from_template")).Select(t => t.Name),
+            calls.Select(c => c.Tool));
+
+        foreach (var (tool, arguments) in calls)
+        {
+            using var ws = GroupWorkspace.Create();
+            var session = ws.Session("act");
+            var host = new TestAgentHost(session);
+            PropGroupCommands.Save(session, PropGroups.Draft(session, [SceneWorkspace.Object("Li01_14")]), "trio", "Trio");
+            var paths = new[] { SceneWorkspace.Li01Path, ListWorkspace.SolarPath, ListWorkspace.EquipmentPath };
+            var before = paths.Select(p => W(session, p)).ToList();
+
+            var preview = Ok(host, tool, arguments.TrimEnd('}') + """, "preview": true }""");
+            Assert.Equal(("previewed", "0", false), ((string?)preview["status"], (string?)preview["rev"], session.CanUndo));
+            Assert.Equal(before, paths.Select(p => W(session, p)));
+            var result = Ok(host, tool, arguments);
+
+            Assert.Equal((tool, "applied", "1"), (tool, (string?)result["status"], (string?)result["rev"]));
+            Assert.StartsWith(EditBatch.AgentPrefix, (string?)result["undo_label"]);
+            Assert.Equal((EditOrigin.Agent, (string?)result["undo_label"]), (session.UndoOrigin, session.UndoLabel));
+            Assert.Equal(Texts(preview["adds"]), Texts(result["adds"]));
+            Assert.Equal(Texts(preview["changes"]), Texts(result["changes"]));
+            session.Undo();
+            Assert.Equal(before, paths.Select(p => W(session, p)));
+            Assert.False(session.CanUndo);
+        }
+    }
+
     /// <summary>A system with an outpost that has a child, a zone and a light, each with a position.</summary>
     internal const string Outpost = """
         [Object]

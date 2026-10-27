@@ -68,8 +68,8 @@ public sealed class AgentWriteScopeTests
         Assert.Equal(groups, PropGroups.Version(session));
     }
 
-    /// <summary>The tools of the table are the tools of MCP1-2 that take a reference: each edit tool and each asset write,
-    /// except the tools without a reference argument.</summary>
+    /// <summary>The table has each edit tool and each asset write of this build. Each of them takes a
+    /// reference.</summary>
     [Fact]
     public void TheTableHasEachEditToolOfThisBuild()
     {
