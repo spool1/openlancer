@@ -17,8 +17,8 @@ public static class ItemEdits
     /// Gives an item that the active mod adds a new nickname, and changes each line that names the item in the
     /// sections that the active mod can change (review finding F12): the <c>ship</c> of a hull good, the
     /// <c>hull</c> of a package, the <c>equipment</c> and the <c>addon</c> lines of a good, the
-    /// <c>projectile_archetype</c> of a gun and the <c>marketgood</c> lines of a market. The edit also changes each
-    /// other line that a rule of the data lists maps to the item, for example the <c>equip</c> line of a loadout.
+    /// <c>projectile_archetype</c> of a gun and the <c>marketgood</c> lines of a market. A rule of the data lists can
+    /// also map a line to the item, for example the <c>equip</c> line of a loadout. The edit changes such a line too.
     /// Equipment and its good keep the same nickname, because the engine finds the equipment of a good by that
     /// nickname.
     /// </summary>
@@ -44,9 +44,9 @@ public static class ItemEdits
     /// </summary>
     /// <param name="changes">Gets each section that the edit changes and keeps, with its identity after the edit.
     /// These are the sections that it renames and the sections whose lines name the item. Null drops them.</param>
-    /// <param name="missing">Gets each line of the data lists that names the item and that the edit cannot change,
-    /// for example a line of a section that the active mod cannot patch. Such a line shows "Missing" after the edit.
-    /// Null drops them.</param>
+    /// <param name="missing">Gets each line of the data lists that names the item and that the edit cannot change.
+    /// An example is a line of a section that the active mod cannot patch. Such a line shows "Missing" after the
+    /// edit. Null drops them.</param>
     internal static EditCommand Rename(EditSession session, SectionRef item, string newNickname,
         List<Diagnostic>? warnings, List<SectionRef>? changes, List<MissingReference>? missing)
     {

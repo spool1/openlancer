@@ -189,7 +189,7 @@ public sealed class DatabaseCommandsTests
     }
 
     /// <summary>
-    /// The rename also changes each other line that a rule of the data lists maps to the item, for example the equip
+    /// The rename also changes each other line that a rule of the data lists maps to the item. Examples are the equip
     /// and the cargo lines of a loadout. A line that the active mod cannot patch keeps the old nickname. It is a
     /// "Missing" line of the plan, so the plan needs a confirmation (review finding of MCP1-2, step 3).
     /// </summary>

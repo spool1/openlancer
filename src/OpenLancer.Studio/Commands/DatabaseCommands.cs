@@ -47,7 +47,7 @@ public static class DatabaseCommands
     /// <remarks>
     /// <para>The plan warns about each mission line that names the item and that the edit cannot change. The save stops
     /// at such a line (rule M23). Each other line that names the item and that the edit cannot change is a "Missing"
-    /// line of the plan, for example a line of a section that the active mod cannot patch.</para>
+    /// line of the plan. An example is a line of a section that the active mod cannot patch.</para>
     /// <para>The mentions are the files that name the old nickname as text and that the rename does not change, for
     /// example a file that no rule of the data lists reads (see <see cref="EditSession.StoryMentions"/>). A warning, a
     /// "Missing" line or a mention makes the plan need a confirmation, as a rename in the Scene does (decision
