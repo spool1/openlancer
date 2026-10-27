@@ -16,7 +16,7 @@ namespace OpenLancer.DataTests;
 /// The tests count and compare triggers. They name the retail triggers of the design rows and of a few examples, and
 /// read their points from the script lines. They hold no other retail text.
 /// </summary>
-public sealed class StartPlanRetailTests(ITestOutputHelper output)
+public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
 {
     private static readonly Lazy<MissionRunResult> Hde = new(() =>
     {
