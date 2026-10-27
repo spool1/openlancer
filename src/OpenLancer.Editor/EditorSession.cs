@@ -78,6 +78,10 @@ internal sealed class EditorSession : IDisposable
     /// session yet.</summary>
     public bool NeedsRepoConfirmation => repoReason != null && !RepoEditsAllowed;
 
+    /// <summary>The reason of <see cref="RepoMods.Reason"/> while the user did not allow the edits of the active mod
+    /// for this session, else null. The caller adds where the user allows the edits.</summary>
+    public string? PendingRepoReason => NeedsRepoConfirmation ? repoReason : null;
+
     /// <summary>True when the recovery file is older than the edits (decision D8).</summary>
     public bool RecoveryOutdated { get; private set; }
 
@@ -86,7 +90,7 @@ internal sealed class EditorSession : IDisposable
 
     /// <summary>Why the editor takes no edits now, or null.</summary>
     public string? NoEditReason =>
-        Edits.ReadOnlyReason ?? (NeedsRepoConfirmation ? repoReason + " Allow its edits for this session first." : null);
+        Edits.ReadOnlyReason ?? (PendingRepoReason is { } repo ? repo + " Allow its edits for this session first." : null);
 
     public bool CanEdit => NoEditReason == null;
 

@@ -265,6 +265,8 @@ public sealed class AgentControllerTests : IDisposable
 
         public string? EditReason { get; set; }
 
+        public string? RepoReason { get; set; }
+
         public string Name(int ids) => ids == 1 ? "Test Name" : "";
 
         public string InfoText(int ids) => "";
@@ -467,6 +469,27 @@ public sealed class AgentControllerTests : IDisposable
         Assert.False((bool)none["can_edit"]!);
         Assert.Equal("No profile is open. Open a profile in the editor, then try again.", (string?)none["reason"]);
         Assert.Equal("Test Name", host.NameText(1));
+    }
+
+    /// <summary>A mod in the OpenLancer repo whose edits the user did not allow gives read_only with the repo-mod text of
+    /// section 10 of the MCP1 design. The text tells where the user allows the edits. A reason of the session comes
+    /// first.</summary>
+    [Fact]
+    public void AnEditOfARepoModThatTheUserDidNotAllowGivesTheRepoModText()
+    {
+        using var ws = SceneWorkspace.Create();
+        const string repo = "The mod 'act' is part of the OpenLancer repo, so its files are tracked files.";
+        var editor = new FakeEditor { Edits = ws.Session("act"), RepoReason = repo };
+        var host = new EditorAgentHost(editor);
+        const string move = """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""";
+
+        var waits = AgentCalls.Error(host, "set_fields", move);
+        editor.EditReason = "Another editor has the mod act open.";
+        var locked = AgentCalls.Error(host, "set_fields", move);
+
+        Assert.Equal(("read_only", repo + " Allow edits of this mod in the editor first."), (waits.Code, waits.Message));
+        Assert.Equal(("read_only", "Another editor has the mod act open."), (locked.Code, locked.Message));
+        Assert.False(editor.Edits!.CanUndo);
     }
 
     [Fact]

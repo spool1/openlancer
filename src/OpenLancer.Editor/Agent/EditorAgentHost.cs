@@ -20,9 +20,13 @@ internal interface IAgentEditor
     /// <summary>The edit session of the open profile, or null while no profile is open.</summary>
     EditSession? Edits { get; }
 
-    /// <summary>Why the open profile takes no edits now, or null when it takes them or no profile is open: the reason
-    /// of the session, or a mod in the OpenLancer repo whose edits the user did not allow (decision D738).</summary>
+    /// <summary>Why the session of the open profile takes no edits now, or null when it takes them or no profile is
+    /// open. Examples are the lock and a profile in a game folder.</summary>
     string? EditReason { get; }
+
+    /// <summary>The reason of <see cref="OpenLancer.Data.Editing.RepoMods.Reason"/> while the user did not allow the
+    /// edits of the active mod for this session, else null (decision D738).</summary>
+    string? RepoReason { get; }
 
     /// <summary>The text of a string id of the game data of the open profile, or an empty text.</summary>
     string Name(int ids);
@@ -55,8 +59,11 @@ internal sealed class EditorAgentHost(IAgentEditor editor) : AgentHost
     public override EditSession? Session => editor.Edits;
 
     /// <summary>The reason of the open profile, or the reason that no profile is open. The edits of a mod in the
-    /// OpenLancer repo wait for the allowance of the user (decision D738).</summary>
-    public override string? NoEditReason => editor.Edits == null ? AgentTexts.Error("no_profile") : editor.EditReason;
+    /// OpenLancer repo wait for the allowance of the user (decision D738). The agent gets the repo-mod text of section
+    /// 10 of the MCP1 design, which tells where the user allows the edits.</summary>
+    public override string? NoEditReason =>
+        editor.Edits == null ? AgentTexts.Error("no_profile")
+        : editor.EditReason ?? (editor.RepoReason is { } repo ? $"{repo} {AgentTexts.Error("repo_mod_editor")}" : null);
 
     public override AgentLimits Limits => editor.Settings.Limits;
 

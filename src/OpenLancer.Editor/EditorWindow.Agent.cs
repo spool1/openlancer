@@ -82,7 +82,9 @@ internal sealed partial class EditorWindow : IAgentEditor
 
     EditSession? IAgentEditor.Edits => Session?.Edits;
 
-    string? IAgentEditor.EditReason => Session?.NoEditReason;
+    string? IAgentEditor.EditReason => Session?.Edits.ReadOnlyReason;
+
+    string? IAgentEditor.RepoReason => Session?.PendingRepoReason;
 
     string IAgentEditor.Name(int ids) => Session?.Name(ids) ?? "";
 
