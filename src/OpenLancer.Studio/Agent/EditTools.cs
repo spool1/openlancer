@@ -55,9 +55,12 @@ internal sealed class EditScope
     /// </summary>
     /// <param name="targets">The sections that the request names, for the problems before and after the
     /// edit.</param>
+    /// <param name="asks">False for a plan that the request needs and that the agent cannot confirm. An example is the
+    /// rename of a new item to the nickname of its request. Its warnings stay in the result, but the call does not ask
+    /// for <c>confirm: true</c>.</param>
     /// <exception cref="EditException">The plan refuses, or its session command does not apply. A command that does not
     /// apply ends the batch, and the states before the batch come back.</exception>
-    public void Run(EditPlan plan, IEnumerable<SectionRef>? targets = null)
+    public void Run(EditPlan plan, IEnumerable<SectionRef>? targets = null, bool asks = true)
     {
         if (!plan.CanRun)
             throw new EditException(EditTools.RefusalOf(Session, plan));
@@ -72,10 +75,12 @@ internal sealed class EditScope
             throw new EditException(new EditError(EditErrorKind.Refused, EditPlan.PlanRefused, ErrorText.Of(e)));
         }
         checks.After(plan);
-        Report(plan.Report(Session));
-        if (EditTools.ConfirmationOf(Session, plan) is { } reason)
+        var part = plan.Report(Session);
+        Report(asks ? part : part with { NeedsConfirmation = false });
+        if (asks && EditTools.ConfirmationOf(Session, plan) is { } reason)
             stepConfirmations.Add(reason);
     }
+
 
     /// <summary>Adds a part of the result, for example the warnings of a text that other sections share.</summary>
     public void Report(EditResult part)
@@ -233,10 +238,35 @@ internal static class EditTools
         }
     }
 
-    /// <summary>A result whose changes leave out the items that it adds. A step can add an item and a later step can
-    /// change it, for example the move of a copy.</summary>
-    internal static EditResult Shaped(EditResult result) =>
-        result with { Changes = result.Changes.Except(result.Adds).ToList() };
+    /// <summary>
+    /// The net result of the commands of a call. A step can add an item and a later step can change it, for example the
+    /// move of a copy. So the changes leave out the items that the call adds. An item that the call adds and then renames
+    /// is one new item with its last reference, and no rename. An example is a new object with the nickname of its
+    /// request.
+    /// </summary>
+    internal static EditResult Shaped(EditResult result)
+    {
+        var adds = result.Adds.ToList();
+        var renames = new List<ResultRename>();
+        var renamedAdds = new List<string>();
+        foreach (var rename in result.Renames)
+        {
+            var at = adds.IndexOf(rename.From);
+            if (at < 0)
+            {
+                renames.Add(rename);
+                continue;
+            }
+            adds[at] = rename.To;
+            renamedAdds.Add(rename.From);
+        }
+        return result with
+        {
+            Adds = adds,
+            Renames = renames,
+            Changes = result.Changes.Except(adds).Except(renamedAdds).ToList(),
+        };
+    }
 
     /// <summary>
     /// The section of a reference argument of an edit tool. The edit tools of this version change sections of INI
@@ -354,7 +384,7 @@ internal static class EditTools
     /// revision is the revision before the batch, because the batch changes it only at its commit.</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a text that is not a whole
     /// number, and <see cref="EditErrorKind.StaleRevision"/> for a revision that changed.</exception>
-    private static void Guard(ToolCall call)
+    internal static void Guard(ToolCall call)
     {
         if (call.Args.Text("if_revision") is not { } text)
             return;
@@ -363,6 +393,28 @@ internal static class EditTools
         if (call.Session.RevisionGuard(revision) is { } stale)
             throw new EditException(stale with { Field = "if_revision" });
     }
+
+    /// <summary>Runs a part of a request. Each error of the part that names no argument gets the argument of the part.
+    /// For example, a refusal of the rename to the nickname of a new item names the argument <c>nickname</c>.</summary>
+    /// <exception cref="EditException">The part refuses.</exception>
+    public static T At<T>(string field, Func<T> part)
+    {
+        try
+        {
+            return part();
+        }
+        catch (EditException e) when (e.Error.Field == null)
+        {
+            throw new EditException(e.Error with { Field = field });
+        }
+    }
+
+    /// <inheritdoc cref="At{T}"/>
+    public static void At(string field, Action part) => At(field, () =>
+    {
+        part();
+        return 0;
+    });
 
     /// <summary>The first references of a list, and the number of the others.</summary>
     private static string Shown(IReadOnlyList<string> refs) =>

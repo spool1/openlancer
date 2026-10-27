@@ -224,6 +224,85 @@
         "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position does not move, and the result warns about it. Without it, each copy is at the place of its item."
       }
     },
+    "scene_create_object": {
+      "title": "Create an object in a system",
+      "description": "Creates one object in a system. The tool makes one Undo step. Get the archetypes from list_values with the list solar_archetype. Set preview to true to see the result first.",
+      "fields": {
+        "system": "The nickname of the system, for example my_system.",
+        "template": "The kind of object. A station archetype with a docking sphere also needs a base.",
+        "archetype": "The solar archetype. Get the values from list_values with the list solar_archetype.",
+        "position": "The position in meters. The editor rounds each value to a whole number.",
+        "rotation": "The rotation in degrees about X, Y and Z.",
+        "nickname": "The nickname of the new object. Without it, the editor makes the next free nickname. A refusal tells why a nickname is not valid.",
+        "name": "The name that the game shows. The editor writes it into the text of the mod.",
+        "parent": "The reference of an object that gets the new object as a child. The object must be in the same system.",
+        "base": "The base of a station. Get the values from list_values with the list base.",
+        "fields": "More keys of the object, by INI key. Use get_item to see the keys."
+      }
+    },
+    "scene_create_zone": {
+      "title": "Create a zone in a system",
+      "description": "Creates one zone in a system with a shape and a size. The tool makes one Undo step. Set preview to true to see the result first.",
+      "fields": {
+        "shape": "The shape of the zone. The default is sphere.",
+        "position": "The position of the center in meters. The editor rounds each value to a whole number.",
+        "size": "The size in meters, in the order of the size line. A sphere has 1 value. A cylinder has 2: the radius and the height. The other shapes have 3. A ring has the outer radius, the inner radius and the height. Without it, the zone gets the default size of its shape.",
+        "rotation": "The rotation in degrees about X, Y and Z.",
+        "nickname": "The nickname of the new zone. Without it, the editor makes the next free nickname. A refusal tells why a nickname is not valid.",
+        "fields": "More keys of the zone, by INI key. Use get_item to see the keys."
+      }
+    },
+    "scene_create_light": {
+      "title": "Create a light in a system",
+      "description": "Creates one point light in a system. The tool makes one Undo step. The engine reads no rotation for a light.",
+      "fields": {
+        "position": "The position in meters. The editor rounds each value to a whole number.",
+        "nickname": "The nickname of the new light. Without it, the editor makes the next free nickname. A refusal tells why a nickname is not valid.",
+        "fields": "More keys of the light, by INI key, for example color, range or type. Use get_item to see the keys."
+      }
+    },
+    "scene_spawn_asset": {
+      "title": "Place an asset in a system",
+      "description": "Places an asset of search_assets at a point of a system, as a drop on the Scene does. The tool makes one Undo step. A ship or a model makes a new static prop archetype.",
+      "fields": {
+        "asset": "The asset reference from search_assets, for example asset:solar_archetype/my_archetype. Use prop_group_place for a prop group.",
+        "position": "The position in meters. The editor rounds each value to a whole number.",
+        "parent": "The reference of an object that gets the new object as a child. The object must be in the same system.",
+        "base": "The base of a station archetype with a docking sphere. Get the values from list_values with the list base."
+      }
+    },
+    "scene_transform": {
+      "title": "Move, rotate and size items",
+      "description": "Moves, rotates and sizes objects, zones and lights of a system, as the gizmo does. The tool makes one Undo step. Children do not move with their parent.",
+      "fields": {
+        "moves": "One row for each item. studio_status gives the most rows of one call.",
+        "ref": "The reference of the item, for example obj:my_station_1. The item must have a position.",
+        "position": "The position in meters: X, Y and Z.",
+        "rotation": "The rotation in degrees about X, Y and Z, as the rotate key holds it.",
+        "size": "The size of a zone in the order of its size line. A sphere has 1 value, a cylinder 2 and the other shapes 3. An object and a light have no size.",
+        "mode": "absolute sets the values. relative adds each value to the value now. The default is absolute."
+      }
+    },
+    "scene_set_component": {
+      "title": "Add or remove a component of an object",
+      "description": "Adds a component with its value to an object, or removes a component, as the Inspector does. The tool makes one Undo step. The component Solar cannot go.",
+      "fields": {
+        "ref": "The reference of the object, for example obj:my_station_1.",
+        "component": "The component. get_item gives the components of an object.",
+        "action": "add sets the value of the component. remove removes the keys of the component.",
+        "value": "The value of an added component: a loadout, a base or a faction. Get the values from list_values with the list loadout, base or faction."
+      }
+    },
+    "prop_group_place": {
+      "title": "Place a prop group",
+      "description": "Places the members of a prop group as new items of a system, as a drop of the group on the Scene does. The tool makes one Undo step.",
+      "fields": {
+        "group": "The reference of the group from list_prop_groups, for example group:my_group.",
+        "anchor": "The point of the anchor of the group in meters. Each member keeps its place relative to the anchor.",
+        "parent": "The reference of an object that gets each root object of the group as a child. The object must be in the same system.",
+        "leave_out_error_lines": "Leave out each line of a member that names an entry that the profile does not have. Then place the rest."
+      }
+    },
     "undo": {
       "title": "Undo the last edit of the agent",
       "description": "Undoes the last edit of the agent. The tool does not undo an edit of the user."
@@ -394,7 +473,22 @@
     "step_unknown": "Step {index}: the server has no tool {tool}.",
     "step_kind": "Step {index}: {tool} cannot be a step of edit_batch. A step must be an edit tool, for example set_fields.",
     "step_asset_write": "Step {index}: {tool} writes files at once, outside the Undo history. Call it alone, not in edit_batch.",
-    "step_failed": "Step {index} failed: {message} The batch changed nothing. The first step has the index 0."
+    "step_failed": "Step {index} failed: {message} The batch changed nothing. The first step has the index 0.",
+    "archetype_none": "The list solar_archetype has no archetype {archetype}.",
+    "base_needed": "The archetype {archetype} has a docking sphere, so the station needs a base. Get the bases from list_values with the list base.",
+    "base_not_taken": "The archetype {archetype} takes no base. Only a station archetype with a docking sphere takes a base.",
+    "base_ref": "The argument 'base' takes a nickname or a base: reference, not {ref}.",
+    "parent_object": "The parent {ref} is not an object. Give the reference of an object, for example obj:my_station_1.",
+    "parent_other_system": "The parent {ref} is not in the system {system}. Give an object of the same system.",
+    "asset_ref": "The argument 'asset' takes an asset: reference from search_assets, not {ref}.",
+    "group_ref": "The argument '{name}' takes a group: reference from list_prop_groups, not {ref}.",
+    "spawn_new_archetype": "The Scene shows {ref} after a save. The game data then loads the new archetype {archetype}.",
+    "transform_no_position": "{ref} has no position. Give it a pos with set_fields first.",
+    "limit_moves": "One call can give at most {max} moves. Split the call.",
+    "component_value": "An add needs the value of the component, for example the nickname of a loadout.",
+    "component_no_value": "A remove takes no value.",
+    "component_value_text": "The value of a component is one nickname. It cannot hold a comma, a semicolon or a line break.",
+    "place_errors": "Some lines of {group} name entries that this profile does not have. To place the group without these lines, call again with leave_out_error_lines: true. The lines: {lines}"
   },
   "resources": {
     "openlancer://catalog/lists": {

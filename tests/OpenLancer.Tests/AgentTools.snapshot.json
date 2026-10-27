@@ -9614,6 +9614,4034 @@
       }
     },
     {
+      "name": "scene_create_object",
+      "title": "Create an object in a system",
+      "description": "Creates one object in a system. The tool makes one Undo step. Get the archetypes from list_values with the list solar_archetype. Set preview to true to see the result first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The nickname of the system, for example my_system."
+          },
+          "template": {
+            "type": "string",
+            "enum": [
+              "station",
+              "planet",
+              "sun",
+              "satellite",
+              "solar"
+            ],
+            "description": "The kind of object. A station archetype with a docking sphere also needs a base."
+          },
+          "archetype": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The solar archetype. Get the values from list_values with the list solar_archetype."
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "The position in meters. The editor rounds each value to a whole number."
+          },
+          "rotation": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "The rotation in degrees about X, Y and Z."
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The nickname of the new object. Without it, the editor makes the next free nickname. A refusal tells why a nickname is not valid."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The name that the game shows. The editor writes it into the text of the mod."
+          },
+          "parent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The reference of an object that gets the new object as a child. The object must be in the same system."
+          },
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The base of a station. Get the values from list_values with the list base."
+          },
+          "fields": {
+            "type": "object",
+            "minProperties": 1,
+            "description": "More keys of the object, by INI key. Use get_item to see the keys."
+          },
+          "preview": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show what the edit does, and change nothing. The revision stays the same."
+          },
+          "if_revision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Refuse the edit when the edit view changed after this revision. Give the rev of a result that you read."
+          },
+          "with_patch": {
+            "type": "boolean",
+            "default": false,
+            "description": "With preview: also give the patch text of each INI file that the edit changes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "system",
+          "template",
+          "archetype",
+          "position"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "applied",
+              "no_change",
+              "previewed",
+              "refused"
+            ],
+            "description": "applied: the data changed in one Undo step. no_change: nothing changed. previewed: a preview that changed nothing."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed"
+                  ],
+                  "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "What is wrong and how to correct it."
+                },
+                "index": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "The index of the step of a batch that failed, or none."
+                },
+                "target": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference or the text that the error is about, or none."
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The argument or the field that the error is about, or none."
+                },
+                "step_code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed",
+                    null
+                  ],
+                  "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+                }
+              },
+              "required": [
+                "code",
+                "detail",
+                "message"
+              ]
+            },
+            "description": "The errors of a refusal. A tool error gives them as the error of the call."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the edit, for example Delete my_station_1."
+          },
+          "undo_label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the Undo step, for example Agent: Delete my_station_1, or none without a step."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view after the call, as text. A preview and a call without a change keep it."
+          },
+          "versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "The versions of the mission scripts that the edit changed, by install path."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The install paths of the files that the edit changed."
+          },
+          "adds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the new items."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the items that the edit changed and kept."
+          },
+          "deletes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the removed item."
+                },
+                "why": {
+                  "enum": [
+                    "target",
+                    "cascade"
+                  ],
+                  "description": "target for an item of the request, cascade for an item that goes with a target."
+                },
+                "cause": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "For a cascade: the line that names the target. Else none."
+                }
+              },
+              "required": [
+                "ref",
+                "why"
+              ]
+            },
+            "description": "The items that the edit removed."
+          },
+          "renames": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "description": "The reference before the rename."
+                },
+                "to": {
+                  "type": "string",
+                  "description": "The reference after the rename."
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            },
+            "description": "The items that got a new name, with the old and the new reference."
+          },
+          "fixes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the lines."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the first line."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "What the fix does."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "text"
+              ]
+            },
+            "description": "The lines that the edit changed because they name an item that the edit removed."
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the line."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the line."
+                },
+                "consequence": {
+                  "type": "string",
+                  "description": "What the game does with the line."
+                },
+                "blocks_save": {
+                  "type": "boolean",
+                  "description": "True when the line stops the save until a fix."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "consequence",
+                "blocks_save"
+              ]
+            },
+            "description": "The lines that show \u0027Missing\u0027 after the edit."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "warning",
+                    "error"
+                  ],
+                  "description": "error or warning. An error of the active mod stops a save."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The message of the check. The user reads the same message."
+                },
+                "ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference of the item or the line of the problem, or none."
+                },
+                "rule": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The id of the rule of the check, for example M05, or none."
+                },
+                "origin": {
+                  "enum": [
+                    "base_game",
+                    "mod",
+                    "some_mod",
+                    "openlancer",
+                    "unknown",
+                    "pending"
+                  ],
+                  "description": "Who causes the problem: base_game, mod, some_mod, openlancer or unknown. A base_game problem does not stop a save."
+                },
+                "mod_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The mod that causes the problem when the origin is mod, else none."
+                },
+                "fixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The ids of the fixes that the editor has for the problem."
+                }
+              },
+              "required": [
+                "severity",
+                "message"
+              ]
+            },
+            "description": "The warnings of the edit. The edit applied."
+          },
+          "refusals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The parts of the edit that the editor refused while the other parts applied."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nickname": {
+                  "type": "string",
+                  "description": "The nickname that the file names as text."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The install path of the file."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "How often the file names the nickname."
+                }
+              },
+              "required": [
+                "nickname",
+                "path",
+                "count"
+              ]
+            },
+            "description": "The files that name a renamed or removed item as text. The edit does not change them."
+          },
+          "new_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit adds. The edit applied."
+          },
+          "fixed_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit removes."
+          },
+          "needs_confirmation": {
+            "type": "boolean",
+            "description": "True when the edit changes more than its targets. The real call then needs confirm: true."
+          },
+          "select": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The item that the editor selects after the edit, or none."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes about the edit."
+          },
+          "patch": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "With with_patch: the patch text of each changed INI file, by install path."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One sentence that tells what the call did."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "status"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Create an object in a system",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "scene_create_zone",
+      "title": "Create a zone in a system",
+      "description": "Creates one zone in a system with a shape and a size. The tool makes one Undo step. Set preview to true to see the result first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The system: its nickname or its system: reference, for example my_system or system:my_system."
+          },
+          "shape": {
+            "type": "string",
+            "enum": [
+              "sphere",
+              "ellipsoid",
+              "box",
+              "cylinder",
+              "ring"
+            ],
+            "default": "sphere",
+            "description": "The shape of the zone. The default is sphere."
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "The position of the center in meters. The editor rounds each value to a whole number."
+          },
+          "size": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1,
+            "maxItems": 3,
+            "description": "The size in meters, in the order of the size line. A sphere has 1 value. A cylinder has 2: the radius and the height. The other shapes have 3. A ring has the outer radius, the inner radius and the height. Without it, the zone gets the default size of its shape."
+          },
+          "rotation": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "The rotation in degrees about X, Y and Z."
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The nickname of the new zone. Without it, the editor makes the next free nickname. A refusal tells why a nickname is not valid."
+          },
+          "fields": {
+            "type": "object",
+            "minProperties": 1,
+            "description": "More keys of the zone, by INI key. Use get_item to see the keys."
+          },
+          "preview": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show what the edit does, and change nothing. The revision stays the same."
+          },
+          "if_revision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Refuse the edit when the edit view changed after this revision. Give the rev of a result that you read."
+          },
+          "with_patch": {
+            "type": "boolean",
+            "default": false,
+            "description": "With preview: also give the patch text of each INI file that the edit changes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "system",
+          "position"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "applied",
+              "no_change",
+              "previewed",
+              "refused"
+            ],
+            "description": "applied: the data changed in one Undo step. no_change: nothing changed. previewed: a preview that changed nothing."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed"
+                  ],
+                  "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "What is wrong and how to correct it."
+                },
+                "index": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "The index of the step of a batch that failed, or none."
+                },
+                "target": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference or the text that the error is about, or none."
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The argument or the field that the error is about, or none."
+                },
+                "step_code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed",
+                    null
+                  ],
+                  "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+                }
+              },
+              "required": [
+                "code",
+                "detail",
+                "message"
+              ]
+            },
+            "description": "The errors of a refusal. A tool error gives them as the error of the call."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the edit, for example Delete my_station_1."
+          },
+          "undo_label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the Undo step, for example Agent: Delete my_station_1, or none without a step."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view after the call, as text. A preview and a call without a change keep it."
+          },
+          "versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "The versions of the mission scripts that the edit changed, by install path."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The install paths of the files that the edit changed."
+          },
+          "adds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the new items."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the items that the edit changed and kept."
+          },
+          "deletes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the removed item."
+                },
+                "why": {
+                  "enum": [
+                    "target",
+                    "cascade"
+                  ],
+                  "description": "target for an item of the request, cascade for an item that goes with a target."
+                },
+                "cause": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "For a cascade: the line that names the target. Else none."
+                }
+              },
+              "required": [
+                "ref",
+                "why"
+              ]
+            },
+            "description": "The items that the edit removed."
+          },
+          "renames": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "description": "The reference before the rename."
+                },
+                "to": {
+                  "type": "string",
+                  "description": "The reference after the rename."
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            },
+            "description": "The items that got a new name, with the old and the new reference."
+          },
+          "fixes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the lines."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the first line."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "What the fix does."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "text"
+              ]
+            },
+            "description": "The lines that the edit changed because they name an item that the edit removed."
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the line."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the line."
+                },
+                "consequence": {
+                  "type": "string",
+                  "description": "What the game does with the line."
+                },
+                "blocks_save": {
+                  "type": "boolean",
+                  "description": "True when the line stops the save until a fix."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "consequence",
+                "blocks_save"
+              ]
+            },
+            "description": "The lines that show \u0027Missing\u0027 after the edit."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "warning",
+                    "error"
+                  ],
+                  "description": "error or warning. An error of the active mod stops a save."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The message of the check. The user reads the same message."
+                },
+                "ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference of the item or the line of the problem, or none."
+                },
+                "rule": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The id of the rule of the check, for example M05, or none."
+                },
+                "origin": {
+                  "enum": [
+                    "base_game",
+                    "mod",
+                    "some_mod",
+                    "openlancer",
+                    "unknown",
+                    "pending"
+                  ],
+                  "description": "Who causes the problem: base_game, mod, some_mod, openlancer or unknown. A base_game problem does not stop a save."
+                },
+                "mod_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The mod that causes the problem when the origin is mod, else none."
+                },
+                "fixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The ids of the fixes that the editor has for the problem."
+                }
+              },
+              "required": [
+                "severity",
+                "message"
+              ]
+            },
+            "description": "The warnings of the edit. The edit applied."
+          },
+          "refusals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The parts of the edit that the editor refused while the other parts applied."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nickname": {
+                  "type": "string",
+                  "description": "The nickname that the file names as text."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The install path of the file."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "How often the file names the nickname."
+                }
+              },
+              "required": [
+                "nickname",
+                "path",
+                "count"
+              ]
+            },
+            "description": "The files that name a renamed or removed item as text. The edit does not change them."
+          },
+          "new_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit adds. The edit applied."
+          },
+          "fixed_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit removes."
+          },
+          "needs_confirmation": {
+            "type": "boolean",
+            "description": "True when the edit changes more than its targets. The real call then needs confirm: true."
+          },
+          "select": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The item that the editor selects after the edit, or none."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes about the edit."
+          },
+          "patch": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "With with_patch: the patch text of each changed INI file, by install path."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One sentence that tells what the call did."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "status"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Create a zone in a system",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "scene_create_light",
+      "title": "Create a light in a system",
+      "description": "Creates one point light in a system. The tool makes one Undo step. The engine reads no rotation for a light.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The system: its nickname or its system: reference, for example my_system or system:my_system."
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "The position in meters. The editor rounds each value to a whole number."
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The nickname of the new light. Without it, the editor makes the next free nickname. A refusal tells why a nickname is not valid."
+          },
+          "fields": {
+            "type": "object",
+            "minProperties": 1,
+            "description": "More keys of the light, by INI key, for example color, range or type. Use get_item to see the keys."
+          },
+          "preview": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show what the edit does, and change nothing. The revision stays the same."
+          },
+          "if_revision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Refuse the edit when the edit view changed after this revision. Give the rev of a result that you read."
+          },
+          "with_patch": {
+            "type": "boolean",
+            "default": false,
+            "description": "With preview: also give the patch text of each INI file that the edit changes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "system",
+          "position"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "applied",
+              "no_change",
+              "previewed",
+              "refused"
+            ],
+            "description": "applied: the data changed in one Undo step. no_change: nothing changed. previewed: a preview that changed nothing."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed"
+                  ],
+                  "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "What is wrong and how to correct it."
+                },
+                "index": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "The index of the step of a batch that failed, or none."
+                },
+                "target": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference or the text that the error is about, or none."
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The argument or the field that the error is about, or none."
+                },
+                "step_code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed",
+                    null
+                  ],
+                  "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+                }
+              },
+              "required": [
+                "code",
+                "detail",
+                "message"
+              ]
+            },
+            "description": "The errors of a refusal. A tool error gives them as the error of the call."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the edit, for example Delete my_station_1."
+          },
+          "undo_label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the Undo step, for example Agent: Delete my_station_1, or none without a step."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view after the call, as text. A preview and a call without a change keep it."
+          },
+          "versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "The versions of the mission scripts that the edit changed, by install path."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The install paths of the files that the edit changed."
+          },
+          "adds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the new items."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the items that the edit changed and kept."
+          },
+          "deletes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the removed item."
+                },
+                "why": {
+                  "enum": [
+                    "target",
+                    "cascade"
+                  ],
+                  "description": "target for an item of the request, cascade for an item that goes with a target."
+                },
+                "cause": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "For a cascade: the line that names the target. Else none."
+                }
+              },
+              "required": [
+                "ref",
+                "why"
+              ]
+            },
+            "description": "The items that the edit removed."
+          },
+          "renames": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "description": "The reference before the rename."
+                },
+                "to": {
+                  "type": "string",
+                  "description": "The reference after the rename."
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            },
+            "description": "The items that got a new name, with the old and the new reference."
+          },
+          "fixes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the lines."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the first line."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "What the fix does."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "text"
+              ]
+            },
+            "description": "The lines that the edit changed because they name an item that the edit removed."
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the line."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the line."
+                },
+                "consequence": {
+                  "type": "string",
+                  "description": "What the game does with the line."
+                },
+                "blocks_save": {
+                  "type": "boolean",
+                  "description": "True when the line stops the save until a fix."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "consequence",
+                "blocks_save"
+              ]
+            },
+            "description": "The lines that show \u0027Missing\u0027 after the edit."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "warning",
+                    "error"
+                  ],
+                  "description": "error or warning. An error of the active mod stops a save."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The message of the check. The user reads the same message."
+                },
+                "ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference of the item or the line of the problem, or none."
+                },
+                "rule": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The id of the rule of the check, for example M05, or none."
+                },
+                "origin": {
+                  "enum": [
+                    "base_game",
+                    "mod",
+                    "some_mod",
+                    "openlancer",
+                    "unknown",
+                    "pending"
+                  ],
+                  "description": "Who causes the problem: base_game, mod, some_mod, openlancer or unknown. A base_game problem does not stop a save."
+                },
+                "mod_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The mod that causes the problem when the origin is mod, else none."
+                },
+                "fixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The ids of the fixes that the editor has for the problem."
+                }
+              },
+              "required": [
+                "severity",
+                "message"
+              ]
+            },
+            "description": "The warnings of the edit. The edit applied."
+          },
+          "refusals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The parts of the edit that the editor refused while the other parts applied."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nickname": {
+                  "type": "string",
+                  "description": "The nickname that the file names as text."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The install path of the file."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "How often the file names the nickname."
+                }
+              },
+              "required": [
+                "nickname",
+                "path",
+                "count"
+              ]
+            },
+            "description": "The files that name a renamed or removed item as text. The edit does not change them."
+          },
+          "new_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit adds. The edit applied."
+          },
+          "fixed_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit removes."
+          },
+          "needs_confirmation": {
+            "type": "boolean",
+            "description": "True when the edit changes more than its targets. The real call then needs confirm: true."
+          },
+          "select": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The item that the editor selects after the edit, or none."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes about the edit."
+          },
+          "patch": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "With with_patch: the patch text of each changed INI file, by install path."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One sentence that tells what the call did."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "status"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Create a light in a system",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "scene_spawn_asset",
+      "title": "Place an asset in a system",
+      "description": "Places an asset of search_assets at a point of a system, as a drop on the Scene does. The tool makes one Undo step. A ship or a model makes a new static prop archetype.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The system: its nickname or its system: reference, for example my_system or system:my_system."
+          },
+          "asset": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The asset reference from search_assets, for example asset:solar_archetype/my_archetype. Use prop_group_place for a prop group."
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "The position in meters. The editor rounds each value to a whole number."
+          },
+          "parent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The reference of an object that gets the new object as a child. The object must be in the same system."
+          },
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The base of a station archetype with a docking sphere. Get the values from list_values with the list base."
+          },
+          "preview": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show what the edit does, and change nothing. The revision stays the same."
+          },
+          "if_revision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Refuse the edit when the edit view changed after this revision. Give the rev of a result that you read."
+          },
+          "with_patch": {
+            "type": "boolean",
+            "default": false,
+            "description": "With preview: also give the patch text of each INI file that the edit changes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "system",
+          "asset",
+          "position"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "applied",
+              "no_change",
+              "previewed",
+              "refused"
+            ],
+            "description": "applied: the data changed in one Undo step. no_change: nothing changed. previewed: a preview that changed nothing."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed"
+                  ],
+                  "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "What is wrong and how to correct it."
+                },
+                "index": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "The index of the step of a batch that failed, or none."
+                },
+                "target": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference or the text that the error is about, or none."
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The argument or the field that the error is about, or none."
+                },
+                "step_code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed",
+                    null
+                  ],
+                  "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+                }
+              },
+              "required": [
+                "code",
+                "detail",
+                "message"
+              ]
+            },
+            "description": "The errors of a refusal. A tool error gives them as the error of the call."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the edit, for example Delete my_station_1."
+          },
+          "undo_label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the Undo step, for example Agent: Delete my_station_1, or none without a step."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view after the call, as text. A preview and a call without a change keep it."
+          },
+          "versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "The versions of the mission scripts that the edit changed, by install path."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The install paths of the files that the edit changed."
+          },
+          "adds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the new items."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the items that the edit changed and kept."
+          },
+          "deletes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the removed item."
+                },
+                "why": {
+                  "enum": [
+                    "target",
+                    "cascade"
+                  ],
+                  "description": "target for an item of the request, cascade for an item that goes with a target."
+                },
+                "cause": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "For a cascade: the line that names the target. Else none."
+                }
+              },
+              "required": [
+                "ref",
+                "why"
+              ]
+            },
+            "description": "The items that the edit removed."
+          },
+          "renames": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "description": "The reference before the rename."
+                },
+                "to": {
+                  "type": "string",
+                  "description": "The reference after the rename."
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            },
+            "description": "The items that got a new name, with the old and the new reference."
+          },
+          "fixes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the lines."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the first line."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "What the fix does."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "text"
+              ]
+            },
+            "description": "The lines that the edit changed because they name an item that the edit removed."
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the line."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the line."
+                },
+                "consequence": {
+                  "type": "string",
+                  "description": "What the game does with the line."
+                },
+                "blocks_save": {
+                  "type": "boolean",
+                  "description": "True when the line stops the save until a fix."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "consequence",
+                "blocks_save"
+              ]
+            },
+            "description": "The lines that show \u0027Missing\u0027 after the edit."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "warning",
+                    "error"
+                  ],
+                  "description": "error or warning. An error of the active mod stops a save."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The message of the check. The user reads the same message."
+                },
+                "ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference of the item or the line of the problem, or none."
+                },
+                "rule": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The id of the rule of the check, for example M05, or none."
+                },
+                "origin": {
+                  "enum": [
+                    "base_game",
+                    "mod",
+                    "some_mod",
+                    "openlancer",
+                    "unknown",
+                    "pending"
+                  ],
+                  "description": "Who causes the problem: base_game, mod, some_mod, openlancer or unknown. A base_game problem does not stop a save."
+                },
+                "mod_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The mod that causes the problem when the origin is mod, else none."
+                },
+                "fixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The ids of the fixes that the editor has for the problem."
+                }
+              },
+              "required": [
+                "severity",
+                "message"
+              ]
+            },
+            "description": "The warnings of the edit. The edit applied."
+          },
+          "refusals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The parts of the edit that the editor refused while the other parts applied."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nickname": {
+                  "type": "string",
+                  "description": "The nickname that the file names as text."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The install path of the file."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "How often the file names the nickname."
+                }
+              },
+              "required": [
+                "nickname",
+                "path",
+                "count"
+              ]
+            },
+            "description": "The files that name a renamed or removed item as text. The edit does not change them."
+          },
+          "new_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit adds. The edit applied."
+          },
+          "fixed_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit removes."
+          },
+          "needs_confirmation": {
+            "type": "boolean",
+            "description": "True when the edit changes more than its targets. The real call then needs confirm: true."
+          },
+          "select": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The item that the editor selects after the edit, or none."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes about the edit."
+          },
+          "patch": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "With with_patch: the patch text of each changed INI file, by install path."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One sentence that tells what the call did."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "status"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Place an asset in a system",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "scene_transform",
+      "title": "Move, rotate and size items",
+      "description": "Moves, rotates and sizes objects, zones and lights of a system, as the gizmo does. The tool makes one Undo step. Children do not move with their parent.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "moves": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024,
+                  "description": "The reference of the item, for example obj:my_station_1. The item must have a position."
+                },
+                "position": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "description": "The position in meters: X, Y and Z."
+                },
+                "rotation": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "description": "The rotation in degrees about X, Y and Z, as the rotate key holds it."
+                },
+                "size": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 1,
+                  "maxItems": 3,
+                  "description": "The size of a zone in the order of its size line. A sphere has 1 value, a cylinder 2 and the other shapes 3. An object and a light have no size."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "ref"
+              ]
+            },
+            "minItems": 1,
+            "description": "One row for each item. studio_status gives the most rows of one call."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "absolute",
+              "relative"
+            ],
+            "default": "absolute",
+            "description": "absolute sets the values. relative adds each value to the value now. The default is absolute."
+          },
+          "preview": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show what the edit does, and change nothing. The revision stays the same."
+          },
+          "if_revision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Refuse the edit when the edit view changed after this revision. Give the rev of a result that you read."
+          },
+          "with_patch": {
+            "type": "boolean",
+            "default": false,
+            "description": "With preview: also give the patch text of each INI file that the edit changes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "moves"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "applied",
+              "no_change",
+              "previewed",
+              "refused"
+            ],
+            "description": "applied: the data changed in one Undo step. no_change: nothing changed. previewed: a preview that changed nothing."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed"
+                  ],
+                  "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "What is wrong and how to correct it."
+                },
+                "index": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "The index of the step of a batch that failed, or none."
+                },
+                "target": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference or the text that the error is about, or none."
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The argument or the field that the error is about, or none."
+                },
+                "step_code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed",
+                    null
+                  ],
+                  "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+                }
+              },
+              "required": [
+                "code",
+                "detail",
+                "message"
+              ]
+            },
+            "description": "The errors of a refusal. A tool error gives them as the error of the call."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the edit, for example Delete my_station_1."
+          },
+          "undo_label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the Undo step, for example Agent: Delete my_station_1, or none without a step."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view after the call, as text. A preview and a call without a change keep it."
+          },
+          "versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "The versions of the mission scripts that the edit changed, by install path."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The install paths of the files that the edit changed."
+          },
+          "adds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the new items."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the items that the edit changed and kept."
+          },
+          "deletes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the removed item."
+                },
+                "why": {
+                  "enum": [
+                    "target",
+                    "cascade"
+                  ],
+                  "description": "target for an item of the request, cascade for an item that goes with a target."
+                },
+                "cause": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "For a cascade: the line that names the target. Else none."
+                }
+              },
+              "required": [
+                "ref",
+                "why"
+              ]
+            },
+            "description": "The items that the edit removed."
+          },
+          "renames": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "description": "The reference before the rename."
+                },
+                "to": {
+                  "type": "string",
+                  "description": "The reference after the rename."
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            },
+            "description": "The items that got a new name, with the old and the new reference."
+          },
+          "fixes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the lines."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the first line."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "What the fix does."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "text"
+              ]
+            },
+            "description": "The lines that the edit changed because they name an item that the edit removed."
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the line."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the line."
+                },
+                "consequence": {
+                  "type": "string",
+                  "description": "What the game does with the line."
+                },
+                "blocks_save": {
+                  "type": "boolean",
+                  "description": "True when the line stops the save until a fix."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "consequence",
+                "blocks_save"
+              ]
+            },
+            "description": "The lines that show \u0027Missing\u0027 after the edit."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "warning",
+                    "error"
+                  ],
+                  "description": "error or warning. An error of the active mod stops a save."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The message of the check. The user reads the same message."
+                },
+                "ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference of the item or the line of the problem, or none."
+                },
+                "rule": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The id of the rule of the check, for example M05, or none."
+                },
+                "origin": {
+                  "enum": [
+                    "base_game",
+                    "mod",
+                    "some_mod",
+                    "openlancer",
+                    "unknown",
+                    "pending"
+                  ],
+                  "description": "Who causes the problem: base_game, mod, some_mod, openlancer or unknown. A base_game problem does not stop a save."
+                },
+                "mod_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The mod that causes the problem when the origin is mod, else none."
+                },
+                "fixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The ids of the fixes that the editor has for the problem."
+                }
+              },
+              "required": [
+                "severity",
+                "message"
+              ]
+            },
+            "description": "The warnings of the edit. The edit applied."
+          },
+          "refusals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The parts of the edit that the editor refused while the other parts applied."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nickname": {
+                  "type": "string",
+                  "description": "The nickname that the file names as text."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The install path of the file."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "How often the file names the nickname."
+                }
+              },
+              "required": [
+                "nickname",
+                "path",
+                "count"
+              ]
+            },
+            "description": "The files that name a renamed or removed item as text. The edit does not change them."
+          },
+          "new_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit adds. The edit applied."
+          },
+          "fixed_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit removes."
+          },
+          "needs_confirmation": {
+            "type": "boolean",
+            "description": "True when the edit changes more than its targets. The real call then needs confirm: true."
+          },
+          "select": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The item that the editor selects after the edit, or none."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes about the edit."
+          },
+          "patch": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "With with_patch: the patch text of each changed INI file, by install path."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One sentence that tells what the call did."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "status"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Move, rotate and size items",
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "scene_set_component",
+      "title": "Add or remove a component of an object",
+      "description": "Adds a component with its value to an object, or removes a component, as the Inspector does. The tool makes one Undo step. The component Solar cannot go.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The reference of the object, for example obj:my_station_1."
+          },
+          "component": {
+            "type": "string",
+            "enum": [
+              "solar",
+              "loadout_user",
+              "dockable_station",
+              "base_object",
+              "faction_member",
+              "jump_connection",
+              "trade_lane_ring",
+              "planet_ring"
+            ],
+            "description": "The component. get_item gives the components of an object."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "add",
+              "remove"
+            ],
+            "description": "add sets the value of the component. remove removes the keys of the component."
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The value of an added component: a loadout, a base or a faction. Get the values from list_values with the list loadout, base or faction."
+          },
+          "preview": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show what the edit does, and change nothing. The revision stays the same."
+          },
+          "if_revision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Refuse the edit when the edit view changed after this revision. Give the rev of a result that you read."
+          },
+          "with_patch": {
+            "type": "boolean",
+            "default": false,
+            "description": "With preview: also give the patch text of each INI file that the edit changes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ref",
+          "component",
+          "action"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "applied",
+              "no_change",
+              "previewed",
+              "refused"
+            ],
+            "description": "applied: the data changed in one Undo step. no_change: nothing changed. previewed: a preview that changed nothing."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed"
+                  ],
+                  "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "What is wrong and how to correct it."
+                },
+                "index": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "The index of the step of a batch that failed, or none."
+                },
+                "target": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference or the text that the error is about, or none."
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The argument or the field that the error is about, or none."
+                },
+                "step_code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed",
+                    null
+                  ],
+                  "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+                }
+              },
+              "required": [
+                "code",
+                "detail",
+                "message"
+              ]
+            },
+            "description": "The errors of a refusal. A tool error gives them as the error of the call."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the edit, for example Delete my_station_1."
+          },
+          "undo_label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the Undo step, for example Agent: Delete my_station_1, or none without a step."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view after the call, as text. A preview and a call without a change keep it."
+          },
+          "versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "The versions of the mission scripts that the edit changed, by install path."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The install paths of the files that the edit changed."
+          },
+          "adds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the new items."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the items that the edit changed and kept."
+          },
+          "deletes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the removed item."
+                },
+                "why": {
+                  "enum": [
+                    "target",
+                    "cascade"
+                  ],
+                  "description": "target for an item of the request, cascade for an item that goes with a target."
+                },
+                "cause": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "For a cascade: the line that names the target. Else none."
+                }
+              },
+              "required": [
+                "ref",
+                "why"
+              ]
+            },
+            "description": "The items that the edit removed."
+          },
+          "renames": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "description": "The reference before the rename."
+                },
+                "to": {
+                  "type": "string",
+                  "description": "The reference after the rename."
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            },
+            "description": "The items that got a new name, with the old and the new reference."
+          },
+          "fixes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the lines."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the first line."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "What the fix does."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "text"
+              ]
+            },
+            "description": "The lines that the edit changed because they name an item that the edit removed."
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the line."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the line."
+                },
+                "consequence": {
+                  "type": "string",
+                  "description": "What the game does with the line."
+                },
+                "blocks_save": {
+                  "type": "boolean",
+                  "description": "True when the line stops the save until a fix."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "consequence",
+                "blocks_save"
+              ]
+            },
+            "description": "The lines that show \u0027Missing\u0027 after the edit."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "warning",
+                    "error"
+                  ],
+                  "description": "error or warning. An error of the active mod stops a save."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The message of the check. The user reads the same message."
+                },
+                "ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference of the item or the line of the problem, or none."
+                },
+                "rule": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The id of the rule of the check, for example M05, or none."
+                },
+                "origin": {
+                  "enum": [
+                    "base_game",
+                    "mod",
+                    "some_mod",
+                    "openlancer",
+                    "unknown",
+                    "pending"
+                  ],
+                  "description": "Who causes the problem: base_game, mod, some_mod, openlancer or unknown. A base_game problem does not stop a save."
+                },
+                "mod_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The mod that causes the problem when the origin is mod, else none."
+                },
+                "fixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The ids of the fixes that the editor has for the problem."
+                }
+              },
+              "required": [
+                "severity",
+                "message"
+              ]
+            },
+            "description": "The warnings of the edit. The edit applied."
+          },
+          "refusals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The parts of the edit that the editor refused while the other parts applied."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nickname": {
+                  "type": "string",
+                  "description": "The nickname that the file names as text."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The install path of the file."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "How often the file names the nickname."
+                }
+              },
+              "required": [
+                "nickname",
+                "path",
+                "count"
+              ]
+            },
+            "description": "The files that name a renamed or removed item as text. The edit does not change them."
+          },
+          "new_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit adds. The edit applied."
+          },
+          "fixed_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit removes."
+          },
+          "needs_confirmation": {
+            "type": "boolean",
+            "description": "True when the edit changes more than its targets. The real call then needs confirm: true."
+          },
+          "select": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The item that the editor selects after the edit, or none."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes about the edit."
+          },
+          "patch": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "With with_patch: the patch text of each changed INI file, by install path."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One sentence that tells what the call did."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "status"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Add or remove a component of an object",
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "prop_group_place",
+      "title": "Place a prop group",
+      "description": "Places the members of a prop group as new items of a system, as a drop of the group on the Scene does. The tool makes one Undo step.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The reference of the group from list_prop_groups, for example group:my_group."
+          },
+          "system": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The system: its nickname or its system: reference, for example my_system or system:my_system."
+          },
+          "anchor": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "The point of the anchor of the group in meters. Each member keeps its place relative to the anchor."
+          },
+          "parent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The reference of an object that gets each root object of the group as a child. The object must be in the same system."
+          },
+          "leave_out_error_lines": {
+            "type": "boolean",
+            "default": false,
+            "description": "Leave out each line of a member that names an entry that the profile does not have. Then place the rest."
+          },
+          "preview": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show what the edit does, and change nothing. The revision stays the same."
+          },
+          "if_revision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Refuse the edit when the edit view changed after this revision. Give the rev of a result that you read."
+          },
+          "with_patch": {
+            "type": "boolean",
+            "default": false,
+            "description": "With preview: also give the patch text of each INI file that the edit changes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "group",
+          "system",
+          "anchor"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "applied",
+              "no_change",
+              "previewed",
+              "refused"
+            ],
+            "description": "applied: the data changed in one Undo step. no_change: nothing changed. previewed: a preview that changed nothing."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed"
+                  ],
+                  "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "What is wrong and how to correct it."
+                },
+                "index": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "The index of the step of a batch that failed, or none."
+                },
+                "target": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference or the text that the error is about, or none."
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The argument or the field that the error is about, or none."
+                },
+                "step_code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed",
+                    null
+                  ],
+                  "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+                }
+              },
+              "required": [
+                "code",
+                "detail",
+                "message"
+              ]
+            },
+            "description": "The errors of a refusal. A tool error gives them as the error of the call."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the edit, for example Delete my_station_1."
+          },
+          "undo_label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the Undo step, for example Agent: Delete my_station_1, or none without a step."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view after the call, as text. A preview and a call without a change keep it."
+          },
+          "versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "The versions of the mission scripts that the edit changed, by install path."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The install paths of the files that the edit changed."
+          },
+          "adds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the new items."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the items that the edit changed and kept."
+          },
+          "deletes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the removed item."
+                },
+                "why": {
+                  "enum": [
+                    "target",
+                    "cascade"
+                  ],
+                  "description": "target for an item of the request, cascade for an item that goes with a target."
+                },
+                "cause": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "For a cascade: the line that names the target. Else none."
+                }
+              },
+              "required": [
+                "ref",
+                "why"
+              ]
+            },
+            "description": "The items that the edit removed."
+          },
+          "renames": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "description": "The reference before the rename."
+                },
+                "to": {
+                  "type": "string",
+                  "description": "The reference after the rename."
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            },
+            "description": "The items that got a new name, with the old and the new reference."
+          },
+          "fixes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the lines."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the first line."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "What the fix does."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "text"
+              ]
+            },
+            "description": "The lines that the edit changed because they name an item that the edit removed."
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the line."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the line."
+                },
+                "consequence": {
+                  "type": "string",
+                  "description": "What the game does with the line."
+                },
+                "blocks_save": {
+                  "type": "boolean",
+                  "description": "True when the line stops the save until a fix."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "consequence",
+                "blocks_save"
+              ]
+            },
+            "description": "The lines that show \u0027Missing\u0027 after the edit."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "warning",
+                    "error"
+                  ],
+                  "description": "error or warning. An error of the active mod stops a save."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The message of the check. The user reads the same message."
+                },
+                "ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference of the item or the line of the problem, or none."
+                },
+                "rule": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The id of the rule of the check, for example M05, or none."
+                },
+                "origin": {
+                  "enum": [
+                    "base_game",
+                    "mod",
+                    "some_mod",
+                    "openlancer",
+                    "unknown",
+                    "pending"
+                  ],
+                  "description": "Who causes the problem: base_game, mod, some_mod, openlancer or unknown. A base_game problem does not stop a save."
+                },
+                "mod_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The mod that causes the problem when the origin is mod, else none."
+                },
+                "fixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The ids of the fixes that the editor has for the problem."
+                }
+              },
+              "required": [
+                "severity",
+                "message"
+              ]
+            },
+            "description": "The warnings of the edit. The edit applied."
+          },
+          "refusals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The parts of the edit that the editor refused while the other parts applied."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nickname": {
+                  "type": "string",
+                  "description": "The nickname that the file names as text."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The install path of the file."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "How often the file names the nickname."
+                }
+              },
+              "required": [
+                "nickname",
+                "path",
+                "count"
+              ]
+            },
+            "description": "The files that name a renamed or removed item as text. The edit does not change them."
+          },
+          "new_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit adds. The edit applied."
+          },
+          "fixed_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit removes."
+          },
+          "needs_confirmation": {
+            "type": "boolean",
+            "description": "True when the edit changes more than its targets. The real call then needs confirm: true."
+          },
+          "select": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The item that the editor selects after the edit, or none."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes about the edit."
+          },
+          "patch": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "With with_patch: the patch text of each changed INI file, by install path."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One sentence that tells what the call did."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "status"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Place a prop group",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
       "name": "undo",
       "title": "Undo the last edit of the agent",
       "description": "Undoes the last edit of the agent. The tool does not undo an edit of the user.",
@@ -9883,7 +13911,14 @@
                     "set_text",
                     "rename_item",
                     "delete_items",
-                    "duplicate_items"
+                    "duplicate_items",
+                    "scene_create_object",
+                    "scene_create_zone",
+                    "scene_create_light",
+                    "scene_spawn_asset",
+                    "scene_transform",
+                    "scene_set_component",
+                    "prop_group_place"
                   ],
                   "description": "The name of an edit tool, for example set_fields."
                 },

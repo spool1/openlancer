@@ -6,6 +6,7 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Assets;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Lists;
+using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Data.Missions.Run;
 using OpenLancer.Studio.Commands;
@@ -18,7 +19,8 @@ namespace OpenLancer.Studio.Agent;
 /// for another milestone is not in the table of this build (section 7.9).
 /// </summary>
 /// <remarks>This build has the query tools of section 7.1 (milestone MCP1-1a) and the dry run query of M6c-1. It also
-/// has the edit tools of sections 7.2 and 7.6 (milestone MCP1-2) and the view tools of section 7.7 (milestone MCP1-1b).
+/// has the edit tools of sections 7.2, 7.3 and 7.6 (milestone MCP1-2) and the view tools of section 7.7 (milestone
+/// MCP1-1b).
 /// The order of the rows follows the sections of the design, so a later part puts its tools at the place of its
 /// section. The view tools are tools of the editor host.</remarks>
 public static class AgentTools
@@ -110,6 +112,53 @@ public static class AgentTools
         Edit("duplicate_items", ToolHints.Adding,
             EditTools.Input(false, new TextListParam("refs", true), new PointParam("offset", false)),
             ItemEditTools.DuplicateItems),
+        Edit("scene_create_object", ToolHints.Adding, EditTools.Input(false,
+                Text("system", true),
+                new TextParam("template", true, SceneEditTools.ObjectTemplates, null),
+                Text("archetype", true),
+                new PointParam("position", true),
+                new PointParam("rotation", false),
+                Text("nickname"),
+                new TextParam("name", false, null, null, SceneEditTools.MaxName),
+                Text("parent"),
+                Text("base"),
+                new FieldsParam("fields", false)),
+            SceneEditTools.CreateObject, ToolGroup.Scene),
+        Edit("scene_create_zone", ToolHints.Adding, EditTools.Input(false,
+                Text("system", true),
+                new TextParam("shape", false, SceneEditTools.Shapes, SceneEditTools.Shapes[0]),
+                new PointParam("position", true),
+                new NumbersParam("size", false, 1, 3),
+                new PointParam("rotation", false),
+                Text("nickname"),
+                new FieldsParam("fields", false)),
+            SceneEditTools.CreateZone, ToolGroup.Scene),
+        Edit("scene_create_light", ToolHints.Adding, EditTools.Input(false,
+                Text("system", true), new PointParam("position", true), Text("nickname"), new FieldsParam("fields", false)),
+            SceneEditTools.CreateLight, ToolGroup.Scene),
+        Edit("scene_spawn_asset", ToolHints.Adding, EditTools.Input(false,
+                Text("system", true), Text("asset", true), new PointParam("position", true), Text("parent"), Text("base")),
+            SceneEditTools.SpawnAsset, ToolGroup.Scene),
+        Edit("scene_transform", ToolHints.Changing, EditTools.Input(false,
+                new RowsParam("moves", true, [
+                    Text("ref", true),
+                    new PointParam("position", false),
+                    new PointParam("rotation", false),
+                    new NumbersParam("size", false, 1, 3),
+                ]),
+                new TextParam("mode", false, SceneEditTools.Modes, SceneEditTools.Modes[0])),
+            SceneEditTools.Transform, ToolGroup.Scene),
+        Edit("scene_set_component", ToolHints.Changing, EditTools.Input(false,
+                Text("ref", true),
+                new TextParam("component", true,
+                    SceneEditTools.Components.Select(c => Snake(c.ToString())).ToList(), null),
+                new TextParam("action", true, SceneEditTools.Actions, null),
+                Text("value")),
+            SceneEditTools.SetComponent, ToolGroup.Scene),
+        Edit("prop_group_place", ToolHints.Adding, EditTools.Input(false,
+                Text("group", true), Text("system", true), new PointParam("anchor", true), Text("parent"),
+                new FlagParam("leave_out_error_lines")),
+            SceneEditTools.PlaceGroup, ToolGroup.Scene),
         SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
         SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),
         SessionTool("edit_batch", ToolHints.Adding, new ToolInput(Text("label"),
@@ -256,8 +305,10 @@ public static class AgentTools
         Func<ToolCall, ToolStep> run) =>
         new(name, ToolKind.Session, ToolGroup.Studio, ToolHosts.Both, hints, input, output, run);
 
-    /// <summary>An edit tool of the group Studio (section 7.2 of the MCP1 design). Its result is the result of the
-    /// command layer, and it can be a step of <c>edit_batch</c>.</summary>
-    private static StudioTool Edit(string name, ToolHints hints, ToolInput input, Func<ToolCall, ToolStep> run) =>
-        new(name, ToolKind.Edit, ToolGroup.Studio, ToolHosts.Both, hints, input, typeof(EditResult), run);
+    /// <summary>An edit tool (sections 7.2 and 7.3 of the MCP1 design). Its result is the result of the command layer,
+    /// and it can be a step of <c>edit_batch</c>. A generic edit tool and a data tool are in the group Studio.</summary>
+    private static StudioTool Edit(string name, ToolHints hints, ToolInput input, Func<ToolCall, ToolStep> run,
+        ToolGroup group = ToolGroup.Studio) =>
+        new(name, ToolKind.Edit, group, ToolHosts.Both, hints, input, typeof(EditResult), run);
+
 }

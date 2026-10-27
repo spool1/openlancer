@@ -19,7 +19,8 @@ namespace OpenLancer.Tests;
 public sealed class AgentToolTableTests
 {
     /// <summary>The order follows the sections of the design. The query tools of section 7.1 come first. Then come the
-    /// edit tools of section 7.2, the tools of section 7.6 and the view tools of section 7.7.</summary>
+    /// edit tools of section 7.2, the Scene and data tools of section 7.3, the tools of section 7.6 and the view tools of
+    /// section 7.7.</summary>
     [Fact]
     public void TheToolsHaveTheFixedOrderOfTheSectionsOfTheDesign()
     {
@@ -192,7 +193,9 @@ public sealed class AgentToolTableTests
         Assert.Contains("Use preview: true for a large edit or a delete.", edits);
     }
 
-    /// <summary>The edit tools of this build in the order of the table, with their kinds and hints.</summary>
+    /// <summary>The edit tools of this build in the order of the table, with their kinds and hints. The tools of
+    /// section 7.3 follow the tools of section 7.2. A tool that adds data is not destructive, and a tool that can change
+    /// or remove data is (review finding R7 of MCP1-2).</summary>
     private static readonly Dictionary<string, (ToolKind Kind, ToolHints Hints)> Edits = new()
     {
         ["set_fields"] = (ToolKind.Edit, new ToolHints(false, true, true)),
@@ -200,6 +203,13 @@ public sealed class AgentToolTableTests
         ["rename_item"] = (ToolKind.Edit, new ToolHints(false, true, false)),
         ["delete_items"] = (ToolKind.Edit, new ToolHints(false, true, false)),
         ["duplicate_items"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["scene_create_object"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["scene_create_zone"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["scene_create_light"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["scene_spawn_asset"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["scene_transform"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+        ["scene_set_component"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+        ["prop_group_place"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["undo"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["redo"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["edit_batch"] = (ToolKind.Session, new ToolHints(false, false, false)),

@@ -120,6 +120,9 @@ public static class SceneCommands
     /// another component needs (RequireComponent). See <see cref="ObjectComponents.Add"/> and
     /// <see cref="ObjectComponents.Remove"/>.
     /// </summary>
+    /// <remarks>Only an object takes an added component. An add that "Add component" of the Inspector does not offer
+    /// refuses with its reason (see <see cref="ObjectComponents.CanAdd"/>), for example Dockable station without a docking
+    /// sphere. An add of a component that the object has sets its value.</remarks>
     /// <param name="value">The value of the added component, for example a loadout, or null to remove the
     /// component.</param>
     public static EditPlan SetComponent(EditSession session, SectionRef section, ObjectComponent kind, string? value)
@@ -127,6 +130,11 @@ public static class SceneCommands
         var label = $"{(value != null ? "Add" : "Remove")} {ObjectComponents.Name(kind)}";
         if (session.Get(section) == null)
             return CommandPlan.Refused(label, $"The edit view has no section {section.Id}.", section);
+        if (value != null && SceneSections.KindOf(session, section) != SceneKind.Object)
+            return CommandPlan.Refused(label, $"{section.Id}: only an object takes a component.", section);
+        if (value != null && ObjectComponents.CanAdd(session, section).FirstOrDefault(c => c.Kind == kind) is
+            { Unavailable: { } unavailable })
+            return CommandPlan.Refused(label, $"{ObjectComponents.Name(kind)}: {unavailable}", section);
         return CommandPlan.Of(label, () => value != null
             ? ObjectComponents.Add(section, kind, value)
             : ObjectComponents.Remove(section, kind), [section]);

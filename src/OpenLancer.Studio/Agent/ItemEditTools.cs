@@ -131,7 +131,7 @@ internal static class ItemEditTools
     /// host.</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.Limit"/> above the limit, or the error of a reference
     /// with the place of the reference in the list as the field.</exception>
-    private static IReadOnlyList<SectionRef> Targets(ToolCall call)
+    internal static IReadOnlyList<SectionRef> Targets(ToolCall call)
     {
         var refs = call.Args.Texts("refs")!;
         var limit = call.Limits.EditItems;
@@ -145,7 +145,7 @@ internal static class ItemEditTools
 
     /// <summary>The INI key of the field argument of <c>set_text</c>. <c>name</c> and <c>info</c> give the key of the
     /// name and of the infocard of the section. Another text is the INI key itself.</summary>
-    private static string TextKey(EditSession session, SectionRef section, string field)
+    internal static string TextKey(EditSession session, SectionRef section, string field)
     {
         var keys = field.ToLowerInvariant() switch
         {

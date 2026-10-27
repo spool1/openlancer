@@ -212,6 +212,50 @@ internal sealed class PointParam(string name, bool required, float? bound = null
             float.IsFinite((float)number) && Math.Abs(number) <= (bound ?? float.MaxValue));
 }
 
+/// <summary>A list of numbers, for example the size of a zone. The list has a fixed range of counts, and each number fits
+/// a <see cref="float"/>.</summary>
+internal sealed class NumbersParam(string name, bool required, int minItems, int maxItems) : ToolParam(name, required)
+{
+    public override JsonObject Schema(string tool) => new()
+    {
+        ["type"] = "array",
+        ["items"] = new JsonObject { ["type"] = "number" },
+        ["minItems"] = minItems,
+        ["maxItems"] = maxItems,
+    };
+
+    public override string Expected => minItems == maxItems
+        ? $"a list of {minItems} numbers"
+        : $"a list of {minItems} to {maxItems} numbers";
+
+    public override bool Fits(JsonNode value) =>
+        value is JsonArray array && array.Count >= minItems && array.Count <= maxItems && array.All(n =>
+            n?.GetValueKind() == JsonValueKind.Number && n.AsValue().TryGetValue(out double number) &&
+            float.IsFinite((float)number));
+}
+
+/// <summary>
+/// A list of rows, each an object with arguments of its own, for example the moves of <c>scene_transform</c>. The
+/// check reads each row as the arguments of a tool, so an error names the row and the argument, for example
+/// <c>moves[2].position</c>. The list has at least one row. The tool checks the most rows, because a setting gives the
+/// limit.
+/// </summary>
+internal sealed class RowsParam(string name, bool required, IReadOnlyList<ToolParam> members) : ToolParam(name, required)
+{
+    public IReadOnlyList<ToolParam> Members { get; } = members;
+
+    public override JsonObject Schema(string tool) => new()
+    {
+        ["type"] = "array",
+        ["items"] = ToolInput.ObjectSchema(tool, Members),
+        ["minItems"] = 1,
+    };
+
+    public override string Expected => "a list of objects with: " + string.Join(", ", Members.Select(m => m.Name));
+
+    public override bool Fits(JsonNode value) => value is JsonArray { Count: > 0 } array && array.All(r => r is JsonObject);
+}
+
 /// <summary>
 /// A list of objects with a <c>kind</c>, for example the inputs of <c>mission_dry_run</c>. The schema gives the kinds and
 /// the fields of the items. The handler reads each item and gives the reason for an item that does not fit, because the
@@ -368,6 +412,7 @@ internal sealed class ToolInput(params ToolParam[] parameters)
         string Path(string name) => parent == null ? name : $"{parent}.{name}";
         var values = new Dictionary<string, JsonNode>(StringComparer.Ordinal);
         var groups = new Dictionary<string, ToolArgs>(StringComparer.Ordinal);
+        var rows = new Dictionary<string, IReadOnlyList<ToolArgs>>(StringComparer.Ordinal);
         foreach (var (name, value) in arguments ?? [])
         {
             var parameter = parameters.FirstOrDefault(p => p.Name == name);
@@ -387,10 +432,16 @@ internal sealed class ToolInput(params ToolParam[] parameters)
             values[name] = value;
             if (parameter is GroupParam group)
                 groups[name] = Read(tool, group.Members, (JsonObject)value, Path(name));
+            if (parameter is RowsParam list)
+            {
+                rows[name] = value.AsArray()
+                    .Select((row, i) => Read(tool, list.Members, (JsonObject)row!, Path($"{name}[{i}]")))
+                    .ToList();
+            }
         }
         foreach (var parameter in parameters.Where(p => p.Required && !values.ContainsKey(p.Name)))
             throw Bad(Path(parameter.Name), AgentTexts.Error("argument_missing", ("name", Path(parameter.Name))));
-        return new ToolArgs(parameters, values, groups);
+        return new ToolArgs(parameters, values, groups, rows);
     }
 
     /// <summary>The error of an argument that does not fit: <c>invalid_argument</c> with the detail
@@ -401,7 +452,7 @@ internal sealed class ToolInput(params ToolParam[] parameters)
 
 /// <summary>The checked arguments of a call. Each accessor gives the default of a missing argument.</summary>
 internal sealed class ToolArgs(IReadOnlyList<ToolParam> parameters, IReadOnlyDictionary<string, JsonNode> values,
-    IReadOnlyDictionary<string, ToolArgs> groups)
+    IReadOnlyDictionary<string, ToolArgs> groups, IReadOnlyDictionary<string, IReadOnlyList<ToolArgs>> rows)
 {
     /// <summary>True when the call gives the argument.</summary>
     public bool Has(string name) => values.ContainsKey(name);
@@ -439,4 +490,12 @@ internal sealed class ToolArgs(IReadOnlyList<ToolParam> parameters, IReadOnlyDic
 
     /// <summary>The arguments of an object argument, or null.</summary>
     public ToolArgs? Group(string name) => groups.GetValueOrDefault(name);
+
+    /// <summary>The arguments of each row of a <see cref="RowsParam"/>, in order, or null when the call does not give
+    /// the list.</summary>
+    public IReadOnlyList<ToolArgs>? Rows(string name) => rows.GetValueOrDefault(name);
+
+    /// <summary>The numbers of a <see cref="NumbersParam"/>, or null when the call does not give the list.</summary>
+    public IReadOnlyList<float>? Numbers(string name) =>
+        values.TryGetValue(name, out var value) ? value.AsArray().Select(n => n!.GetValue<float>()).ToList() : null;
 }

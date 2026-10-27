@@ -5,6 +5,7 @@ using System.Numerics;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Missions.Editing;
 
 namespace OpenLancer.Runtime.Scene;
 
@@ -82,7 +83,9 @@ public static class TransformPlans
     /// </summary>
     /// <remarks>The values come from a request, so the plan writes each value as the request gives it, or refuses. A
     /// change without a part refuses. A new size value below <see cref="ZoneSizeAxes.MinSize"/> also refuses. A drag of
-    /// the gizmo writes the smallest size in its place (see <see cref="ZoneSizeAxes.Line"/>).</remarks>
+    /// the gizmo writes the smallest size in its place (see <see cref="ZoneSizeAxes.Line"/>). A refusal of a value that
+    /// the line cannot take has the detail <see cref="MissionErrors.FieldValue"/>, so an agent gets
+    /// <c>invalid_value</c>.</remarks>
     public static EditPlan Plan(EditSession session, SectionRef section, TransformChange change, TransformMode mode)
     {
         var tools = new List<GizmoTool>();
@@ -111,7 +114,7 @@ public static class TransformPlans
                 var count = axes.LineCount == 1 ? "one value" : $"{axes.LineCount} values";
                 return CommandPlan.Refused(label,
                     $"The size of a {target.Shape.ToString()!.ToLowerInvariant()} zone has {count}. Give {count}.",
-                    section);
+                    section, MissionErrors.FieldValue);
             }
             var now = axes.LineValues(axes.GizmoScale);
             var line = relative ? now.Zip(size, (a, b) => a + b).ToList() : size;
@@ -120,7 +123,7 @@ public static class TransformPlans
             {
                 return CommandPlan.Refused(label,
                     $"A size value must be {ZoneSizeAxes.MinSize.ToString(CultureInfo.InvariantCulture)} or more.",
-                    section);
+                    section, MissionErrors.FieldValue);
             }
             values.Add((GizmoTool.Scale, axes.ScaleOf(line)));
         }
@@ -149,7 +152,8 @@ public static class TransformPlans
         foreach (var (tool, value) in values)
         {
             if (!float.IsFinite(value.X) || !float.IsFinite(value.Y) || !float.IsFinite(value.Z))
-                return CommandPlan.Refused(label, "A value of a transform must be a finite number.", section);
+                return CommandPlan.Refused(label, "A value of a transform must be a finite number.", section,
+                    MissionErrors.FieldValue);
             var start = target.StartLine(tool);
             var line = Line(tool, start, target.Axes, value);
             if (!SceneLines.Same(line, start ?? []))

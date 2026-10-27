@@ -205,7 +205,7 @@ public static partial class ScenePlans
 
     /// <summary>Why an archetype is not an archetype of a template: a connection type (decision D253), a type in no
     /// template (section 5.2 of the M23 design), or another template.</summary>
-    private static string TemplateProblem(EditSession session, string archetype, SceneTemplate template)
+    internal static string TemplateProblem(EditSession session, string archetype, SceneTemplate template)
     {
         var type = TypeOf(session, archetype);
         if (type != null && session.Lists.RuleData.ConnectionTypes.Contains(type))

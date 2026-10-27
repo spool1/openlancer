@@ -511,7 +511,10 @@ internal static class ItemQueries
                    AgentTexts.Error("prefab_none", ("ref", text))) { Target = text });
     }
 
-    private static PropGroup Group(EditSession session, ItemReference reference)
+    /// <summary>The prop group of a <c>group:</c> reference. A reference without a mod names a group of the active mod,
+    /// and <c>group:&lt;mod id&gt;/&lt;nickname&gt;</c> names a group of a lower mod.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.NotFound"/> with the closest names.</exception>
+    internal static PropGroup Group(EditSession session, ItemReference reference)
     {
         var groups = PropGroups.Of(session);
         return groups.FirstOrDefault(g => g.Nickname.Equals(reference.Name, StringComparison.OrdinalIgnoreCase) &&
@@ -522,20 +525,27 @@ internal static class ItemQueries
                    ItemRefs.Hint(reference.Name, groups.Select(g => g.Nickname))) { Target = reference.ToString() });
     }
 
+    /// <summary>The <c>group:</c> reference of a prop group. A group of the active mod has its nickname. A group of a
+    /// lower mod has the mod id and the nickname.</summary>
+    internal static string GroupRef(PropGroup group) =>
+        ItemRefs.Format(new ItemReference(ItemRefKind.Group, group.Nickname) { Scope = group.Editable ? null : group.ModId });
+
     private static PropGroupRow GroupRow(EditSession session, PropGroup group) => new(
-        ItemRefs.Format(new ItemReference(ItemRefKind.Group, group.Nickname) { Scope = group.Editable ? null : group.ModId }),
+        GroupRef(group),
         group.Nickname, group.Name, group.ModId ?? session.ActiveMod?.Id ?? "", group.Editable, group.Members.Count,
         group.Problems.Select(p => p.Message).ToList());
 
-    private static AssetItemRow Asset(EditSession session, ItemReference reference)
+    private static AssetItemRow Asset(EditSession session, ItemReference reference) => AssetRow(AssetOf(session, reference));
+
+    /// <summary>The asset of the Assets panel that an <c>asset:</c> reference names.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.NotFound"/>.</exception>
+    internal static AssetRow AssetOf(EditSession session, ItemReference reference)
     {
         var kind = Enum.GetValues<AssetKind>().Cast<AssetKind?>()
             .FirstOrDefault(k => AgentTools.Snake(k!.Value.ToString()) == reference.Scope?.ToLowerInvariant());
-        var row = kind is { } k ? session.Assets.Find(k, reference.Name) : null;
-        return row != null
-            ? AssetRow(row)
-            : throw new EditException(new EditError(EditErrorKind.NotFound, ItemRefs.NotFound,
-                AgentTexts.Error("asset_none", ("ref", reference))) { Target = reference.ToString() });
+        return (kind is { } k ? session.Assets.Find(k, reference.Name) : null) ??
+               throw new EditException(new EditError(EditErrorKind.NotFound, ItemRefs.NotFound,
+                   AgentTexts.Error("asset_none", ("ref", reference))) { Target = reference.ToString() });
     }
 
     private static AssetItemRow AssetRow(AssetRow row) => new(
