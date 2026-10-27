@@ -148,6 +148,17 @@ internal sealed class MissionPlayStart(IMissionPlayHost host, MissionPlayRequest
             return Refuse(problem!);
         }
 
+        // The setup of the world makes the objects of the system of the play and puts the companions next to its
+        // point: the point after the start check, also for the Scene camera.
+        if (plan.Kind == StartKind.Approximate)
+        {
+            plan = StartPlan.Make(index, slot, Request.Start, Request.Place, Request.PlaceBase, play: place);
+            if (!plan.CanStart)
+            {
+                return Refuse(plan.Reason!);
+            }
+        }
+
         var save = PlayFolder.StartSavePath(profile);
         var layer = PlayFolder.TestLayerPath(profile);
         try

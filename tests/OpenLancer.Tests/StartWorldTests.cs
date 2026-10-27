@@ -138,7 +138,7 @@ public sealed class StartWorldTests
             null) { DockWith = "ol_base_b" },
     ];
 
-    private static MissionWorld World() =>
+    internal static MissionWorld World() =>
         new(new Dictionary<MissionValueKind, IEnumerable<string>>
         {
             [MissionValueKind.System] = ["ol_sys_a", "ol_sys_b"],
@@ -148,7 +148,7 @@ public sealed class StartWorldTests
 
     /// <summary>The story with more lines: <paramref name="a"/> in the first trigger, <paramref name="jump"/> after the
     /// arrival, <paramref name="records"/> before the solar and <paramref name="triggers"/> at the end.</summary>
-    private static string Script(string a = "", string jump = "", string records = "", string triggers = "",
+    internal static string Script(string a = "", string jump = "", string records = "", string triggers = "",
         string guard = "system = ol_sys_a", string aSystem = "system = ol_sys_a\nCnd_SpaceEnter = ol_sys_a") =>
         Story.Replace("{A}", a).Replace("{JUMP}", jump).Replace("{RECORDS}", records).Replace("{TRIGGERS}", triggers)
             .Replace("{GUARD}", guard).Replace("{A_SYSTEM}", aSystem);

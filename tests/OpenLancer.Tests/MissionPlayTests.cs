@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
@@ -332,6 +333,28 @@ public sealed class MissionPlayTests : IDisposable
         Assert.Equal(start.Plan.Setup.Select(t => t.Nickname), start.SetupTriggers);
     }
 
+    /// <summary>Play makes the plan again with the place of the play after the start check (the note of 2026-10-28 in
+    /// section 5.3 of the M6c design). A start at the Scene camera then makes only the world of the camera system, and
+    /// the companions start next to the camera.</summary>
+    [Fact]
+    public void ThePlanOfThePlayUsesThePlaceOfThePlay()
+    {
+        editor.Index = MissionTestData.Index(StartWorldTests.Script(), StartWorldTests.World());
+        editor.Camera = new StartSavePlace("ol_sys_b", null, new Vector3(-5000, 0, 0), Quaternion.Identity);
+        plays.Request(new MissionPlayRequest(ScriptPath, MissionStartPoint.At("t_chosen")) { Place = StartPlaceChoice.Camera });
+        var start = (MissionPlayStart)editor.Requests[0];
+
+        var fromSave = start.Prepare();
+
+        Assert.NotNull(fromSave);
+        Assert.Contains(start.Plan!.LeftOut, l => l.Object == "ol_guard");
+        Assert.DoesNotContain(StartWorld.CameraWarning, start.Plan.Warnings);
+        var patch = Directory.GetFiles(fromSave.TestLayer!, "*.ini", SearchOption.AllDirectories).Single();
+        var text = File.ReadAllText(patch);
+        Assert.Contains("Act_RelocateShip = ol_wing, -5300, 0, 0, 1, 0, 0, 0", text);
+        Assert.DoesNotContain("ol_guard", text);
+    }
+
     private const string PlayStartNote = "The play start of M99 named trigger 't_gone'. The script does not have this " +
                                          "trigger now. The play start is the mission start again.";
 
@@ -546,9 +569,14 @@ public sealed class MissionPlayTests : IDisposable
             return Missing == null ? (Index, Slot) : null;
         }
 
+        /// <summary>The place of a start at the Scene camera, or null for the point of the plan.</summary>
+        public StartSavePlace? Camera { get; set; }
+
         public StartSavePlace? PlaceOf(StartPlace place, out string? problem)
         {
             problem = null;
+            if (place.Kind == StartPlaceKind.Camera && Camera != null)
+                return Camera;
             return place.Kind == StartPlaceKind.Base
                 ? StartSavePlace.AtBase("ol_sys_a", place.Base!)
                 : new StartSavePlace(place.System ?? "ol_sys_a", null, place.Position, place.Orientation);
