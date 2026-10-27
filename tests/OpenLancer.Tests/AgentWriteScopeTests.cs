@@ -39,6 +39,9 @@ public sealed class AgentWriteScopeTests
         ("scene_spawn_asset", """{ "system": "Li01", "asset": "asset:solar_archetype/buoy", "position": [0, 0, 0], "parent": REF }"""),
         ("scene_transform", """{ "moves": [{ "ref": "obj:Li01_14", "position": [1, 1, 1] }, { "ref": REF, "position": [1, 1, 1] }] }"""),
         ("scene_set_component", """{ "ref": REF, "component": "loadout_user", "action": "remove" }"""),
+        ("scene_place_wreck", """{ "system": REF, "position": [0, 0, 0], "archetype": "buoy", "ship_archetype": "ship1" }"""),
+        ("scene_place_patrol_route", """{ "system": REF, "name": "p1", "points": [[0, 0, 0], [0, 0, 1000]] }"""),
+        ("scene_set_encounters", """{ "zone": REF, "encounters": [] }"""),
         ("prop_group_place", """{ "group": REF, "system": "Li01", "anchor": [0, 0, 0] }"""),
         ("prop_group_place", """{ "group": "group:trio", "system": "Li01", "anchor": [0, 0, 0], "parent": REF }"""),
         ("prop_group_save", """{ "refs": [REF], "confirm": true }"""),
@@ -68,14 +71,15 @@ public sealed class AgentWriteScopeTests
         Assert.Equal(groups, PropGroups.Version(session));
     }
 
-    /// <summary>The table has each edit tool and each asset write of this build. Each of them takes a
-    /// reference.</summary>
+    /// <summary>The table has each edit tool and each asset write of this build that takes a reference.
+    /// <c>create_loadout</c> takes no reference: its nickname, its archetype and its rows are values of
+    /// lists.</summary>
     [Fact]
     public void TheTableHasEachEditToolOfThisBuild()
     {
         var tools = Calls.Select(c => c.Tool).Distinct().Order().ToList();
 
-        Assert.Equal(EditToolNames().Order(), tools);
+        Assert.Equal(EditToolNames().Except(["create_loadout"]).Order(), tools);
     }
 
     /// <summary>The edit tools and the asset writes of this build.</summary>

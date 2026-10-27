@@ -75,7 +75,9 @@ internal sealed class TextParam(string name, bool required, IReadOnlyList<string
 /// <summary>A whole number from a minimum.</summary>
 /// <param name="fallback">The value when the call does not give the argument, for the schema and the help, or
 /// null.</param>
-internal sealed class WholeParam(string name, int minimum, int? fallback = null) : ToolParam(name, false)
+/// <param name="required">True when the call must give the argument.</param>
+internal sealed class WholeParam(string name, int minimum, int? fallback = null, bool required = false)
+    : ToolParam(name, required)
 {
     public int Minimum { get; } = minimum;
 
@@ -212,6 +214,26 @@ internal sealed class PointParam(string name, bool required, float? bound = null
             float.IsFinite((float)number) && Math.Abs(number) <= (bound ?? float.MaxValue));
 }
 
+/// <summary>A list of points, for example the points of a route: each point is three numbers, X, Y and Z in meters, that
+/// fit a <see cref="float"/>. The list has at least <paramref name="minItems"/> points. The tool checks the most points,
+/// because a setting gives the limit.</summary>
+internal sealed class PointsParam(string name, bool required, int minItems) : ToolParam(name, required)
+{
+    private static readonly PointParam Point = new("point", true);
+
+    public override JsonObject Schema(string tool) => new()
+    {
+        ["type"] = "array",
+        ["items"] = Point.Schema(tool),
+        ["minItems"] = minItems,
+    };
+
+    public override string Expected => $"a list of {minItems} or more points of three numbers";
+
+    public override bool Fits(JsonNode value) =>
+        value is JsonArray array && array.Count >= minItems && array.All(p => p != null && Point.Fits(p));
+}
+
 /// <summary>A list of numbers, for example the size of a zone. The list has a fixed range of counts, and each number fits
 /// a <see cref="float"/>.</summary>
 internal sealed class NumbersParam(string name, bool required, int minItems, int maxItems) : ToolParam(name, required)
@@ -237,23 +259,29 @@ internal sealed class NumbersParam(string name, bool required, int minItems, int
 /// <summary>
 /// A list of rows, each an object with arguments of its own, for example the moves of <c>scene_transform</c>. The
 /// check reads each row as the arguments of a tool, so an error names the row and the argument, for example
-/// <c>moves[2].position</c>. The list has at least one row. The tool checks the most rows, because a setting gives the
+/// <c>moves[2].position</c>. The list has at least <paramref name="minItems"/> rows, one by default. An empty list can
+/// remove all rows, for example the encounters of a zone. The tool checks the most rows, because a setting gives the
 /// limit.
 /// </summary>
-internal sealed class RowsParam(string name, bool required, IReadOnlyList<ToolParam> members) : ToolParam(name, required)
+/// <remarks>The help of a member is the help of <c>&lt;list&gt;.&lt;member&gt;</c> of the tool when
+/// <c>agent-tools.json</c> has it, else the help of the member name. So a member can have the name of its list, for
+/// example <c>equipment[0].equipment</c>.</remarks>
+internal sealed class RowsParam(string name, bool required, IReadOnlyList<ToolParam> members, int minItems = 1)
+    : ToolParam(name, required)
 {
     public IReadOnlyList<ToolParam> Members { get; } = members;
 
     public override JsonObject Schema(string tool) => new()
     {
         ["type"] = "array",
-        ["items"] = ToolInput.ObjectSchema(tool, Members),
-        ["minItems"] = 1,
+        ["items"] = ToolInput.ObjectSchema(tool, Members, Name),
+        ["minItems"] = minItems,
     };
 
     public override string Expected => "a list of objects with: " + string.Join(", ", Members.Select(m => m.Name));
 
-    public override bool Fits(JsonNode value) => value is JsonArray { Count: > 0 } array && array.All(r => r is JsonObject);
+    public override bool Fits(JsonNode value) =>
+        value is JsonArray array && array.Count >= minItems && array.All(r => r is JsonObject);
 }
 
 /// <summary>
@@ -382,13 +410,17 @@ internal sealed class ToolInput(params ToolParam[] parameters)
     /// <summary>The schema of the arguments, with the help of each argument.</summary>
     public JsonObject Schema(string tool) => ObjectSchema(tool, Parameters);
 
-    internal static JsonObject ObjectSchema(string tool, IReadOnlyList<ToolParam> parameters)
+    /// <param name="list">The name of the list of a row, for the help of its members, or null.</param>
+    internal static JsonObject ObjectSchema(string tool, IReadOnlyList<ToolParam> parameters, string? list = null)
     {
         var properties = new JsonObject();
         foreach (var parameter in parameters)
         {
             var schema = parameter.Schema(tool);
-            schema["description"] = AgentTexts.Field(tool, parameter.Name);
+            schema["description"] = list != null && AgentTexts.Tool(tool).Fields.TryGetValue($"{list}.{parameter.Name}",
+                out var own)
+                ? own
+                : AgentTexts.Field(tool, parameter.Name);
             properties[parameter.Name] = schema;
         }
         var result = new JsonObject
@@ -494,6 +526,12 @@ internal sealed class ToolArgs(IReadOnlyList<ToolParam> parameters, IReadOnlyDic
     /// <summary>The arguments of each row of a <see cref="RowsParam"/>, in order, or null when the call does not give
     /// the list.</summary>
     public IReadOnlyList<ToolArgs>? Rows(string name) => rows.GetValueOrDefault(name);
+
+    /// <summary>The points of a <see cref="PointsParam"/>, or null when the call does not give the list.</summary>
+    public IReadOnlyList<Vector3>? Points(string name) => values.TryGetValue(name, out var value)
+        ? value.AsArray().Select(p => new Vector3(p![0]!.GetValue<float>(), p[1]!.GetValue<float>(), p[2]!.GetValue<float>()))
+            .ToList()
+        : null;
 
     /// <summary>The numbers of a <see cref="NumbersParam"/>, or null when the call does not give the list.</summary>
     public IReadOnlyList<float>? Numbers(string name) =>

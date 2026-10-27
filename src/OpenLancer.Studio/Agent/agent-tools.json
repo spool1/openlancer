@@ -293,6 +293,64 @@
         "value": "The value of an added component: a loadout, a base or a faction. Get the values from list_values with the list loadout, base or faction."
       }
     },
+    "scene_place_wreck": {
+      "title": "Place a wreck with cargo",
+      "description": "Places a wreck in a system: a solar of a wreck type with a new loadout of a ship. The player shoots the wreck to free its cargo. The tool makes one Undo step.",
+      "fields": {
+        "position": "The position in meters. The editor rounds each value to a whole number.",
+        "rotation": "The rotation in degrees about X, Y and Z.",
+        "archetype": "The solar archetype of the wreck. Its type must be MISSION_SATELLITE. Get the values from list_values with the list solar_archetype and the text MISSION_SATELLITE.",
+        "ship_archetype": "The ship that the wreck was. The new loadout of the wreck names it. Get the values from list_values with the list ship.",
+        "loot": "The cargo of the wreck, one row for each cargo line.",
+        "good": "The nickname of the cargo: a commodity or other equipment. Get the values from list_values with the list equipment.",
+        "count": "How many units of the cargo. The default is 1.",
+        "equipment": "The equipment of the wreck, one row for each equip line.",
+        "equipment.equipment": "The nickname of the equipment. Get the values from list_values with the list equipment.",
+        "hardpoint": "The hardpoint of the equipment, for example HpWeapon01. Without it, the equipment is internal.",
+        "nickname": "The nickname of the new wreck. Without it, the editor makes the next free nickname. The new loadout gets the nickname with _loadout.",
+        "name": "The name that the game shows. Without it, the wreck gets the name of the wreck builder. The editor writes it into the text of the mod."
+      }
+    },
+    "scene_place_patrol_route": {
+      "title": "Place a patrol or trade route",
+      "description": "Places a route of NPC ships in a system: one cylinder zone for each leg between two next points. The tool makes one Undo step.",
+      "fields": {
+        "name": "The path label of the route, for example my_patrol. Each zone gets the label and the number of its leg. The system must not have the label.",
+        "usage": "patrol for a route of patrols, trade for a route of traders. The default is patrol.",
+        "points": "The points of the route in meters, in order. Each leg goes from one point to the next. studio_status gives the most legs.",
+        "radius": "The radius of each zone in meters. Without it, the zones get the radius of the route template.",
+        "encounters": "The encounter groups of each zone. Each group is one encounter line with its faction lines.",
+        "encounter": "The nickname of the encounter. Get the values from list_values with the list encounter_of_system and the system. An encounter of another system also works.",
+        "level": "The level of the encounter, from 1.",
+        "chance": "The chance of the encounter, from 0 to 1.",
+        "factions": "The factions of the ships of the encounter, one row for each faction line.",
+        "faction": "The nickname of a faction. Get the values from list_values with the list faction.",
+        "weight": "The weight of the faction, from 0.",
+        "faction_weights": "The faction weights of each zone. They come before the first encounter line.",
+        "density_restrictions": "The density restrictions of each zone: the most ships of a class.",
+        "count": "The most ships of the class in the zone.",
+        "class": "The class of the ships, as the encounter files name it, for example lawful.",
+        "fields": "More keys of each zone, by INI key, for example toughness. Use get_item to see the keys."
+      }
+    },
+    "scene_set_encounters": {
+      "title": "Set the encounters of a zone",
+      "description": "Sets the encounter groups of a zone, with its faction weights and its density restrictions. The tool makes one Undo step.",
+      "fields": {
+        "zone": "The reference of the zone, for example zone:my_zone_1.",
+        "encounters": "The encounter groups of the zone. They take the place of each encounter line with its faction lines. An empty list removes them.",
+        "encounter": "The nickname of the encounter. Get the values from list_values with the list encounter_of_system and the system. An encounter of another system also works.",
+        "level": "The level of the encounter, from 1.",
+        "chance": "The chance of the encounter, from 0 to 1.",
+        "factions": "The factions of the ships of the encounter, one row for each faction line.",
+        "faction": "The nickname of a faction. Get the values from list_values with the list faction.",
+        "weight": "The weight of the faction, from 0.",
+        "faction_weights": "The faction weights of the zone before its first encounter line. Without it, the zone keeps its faction weights.",
+        "density_restrictions": "The density restrictions of the zone. Without it, the zone keeps its density restrictions.",
+        "count": "The most ships of the class in the zone.",
+        "class": "The class of the ships, as the encounter files name it, for example lawful."
+      }
+    },
     "prop_group_place": {
       "title": "Place a prop group",
       "description": "Places the members of a prop group as new items of a system, as a drop of the group on the Scene does. The tool makes one Undo step.",
@@ -328,6 +386,20 @@
       "fields": {
         "group": "The reference of the group, for example group:my_group. The group must be a group of the active mod.",
         "confirm": "Write the files. Without it, the tool gives needs_confirmation and writes nothing."
+      }
+    },
+    "create_loadout": {
+      "title": "Make a loadout",
+      "description": "Makes a new loadout with an archetype, equipment and cargo, in the first loadout file of the data. The tool makes one Undo step.",
+      "fields": {
+        "nickname": "The nickname of the new loadout. Another loadout cannot have it.",
+        "archetype": "The ship or the solar archetype of the loadout. Get the values from list_values with the list ship or solar_archetype.",
+        "equipment": "The equipment of the loadout, one row for each equip line.",
+        "equipment.equipment": "The nickname of the equipment. Get the values from list_values with the list equipment.",
+        "hardpoint": "The hardpoint of the equipment, for example HpWeapon01. Without it, the equipment is internal.",
+        "cargo": "The cargo of the loadout, one row for each cargo line.",
+        "good": "The nickname of the cargo: a commodity or other equipment. Get the values from list_values with the list equipment.",
+        "count": "How many units of the cargo. The default is 1."
       }
     },
     "create_from_template": {
@@ -521,6 +593,7 @@
     "spawn_new_archetype": "The Scene shows {ref} after a save. The game data then loads the new archetype {archetype}.",
     "transform_no_position": "{ref} has no position. Give it a pos with set_fields first.",
     "limit_moves": "One call can give at most {max} moves. Split the call.",
+    "limit_legs": "One route can have at most {max} legs, and this route has {count}. Split the route.",
     "component_value": "An add needs the value of the component, for example the nickname of a loadout.",
     "component_no_value": "A remove takes no value.",
     "component_value_text": "The value of a component is one nickname. It cannot hold a comma, a semicolon or a line break.",
@@ -1019,6 +1092,7 @@
     "AgentLimits.edit_items": "The most items that one call of delete_items or duplicate_items names.",
     "AgentLimits.edit_sections": "The most sections that one edit call changes, adds or removes.",
     "AgentLimits.batch_steps": "The most steps of one edit_batch call.",
+    "AgentLimits.route_legs": "The most legs of one route of scene_place_patrol_route.",
     "EditResult.status": "applied: the data changed in one Undo step. no_change: nothing changed. previewed: a preview that changed nothing.",
     "EditResult.errors": "The errors of a refusal. A tool error gives them as the error of the call.",
     "EditResult.label": "The label of the edit, for example Delete my_station_1.",

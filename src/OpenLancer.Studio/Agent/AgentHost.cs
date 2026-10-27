@@ -53,6 +53,10 @@ public sealed record AgentLimits
     /// <summary>The most steps of one <c>edit_batch</c> call. A batch runs in one frame of the editor.</summary>
     public int BatchSteps { get; init; } = 100;
 
+    /// <summary>The most legs of one route of <c>scene_place_patrol_route</c>. A retail route has at most 12
+    /// legs.</summary>
+    public int RouteLegs { get; init; } = 50;
+
     /// <summary>The allowed range of <see cref="MaxListRows"/>. <see cref="ListRows"/> goes from 1 to
     /// <see cref="MaxListRows"/>.</summary>
     public static readonly (int Min, int Max) MaxListRowsRange = (1, 1000);
@@ -85,6 +89,9 @@ public sealed record AgentLimits
     /// <summary>The allowed range of <see cref="BatchSteps"/>.</summary>
     public static readonly (int Min, int Max) BatchStepsRange = (1, 1000);
 
+    /// <summary>The allowed range of <see cref="RouteLegs"/>.</summary>
+    public static readonly (int Min, int Max) RouteLegsRange = (1, 500);
+
     /// <summary>The limits with each value in its allowed range: from the smallest useful value to the largest value
     /// that keeps the editor responsive and the result small enough for a model. The settings file can hold any
     /// value.</summary>
@@ -104,6 +111,7 @@ public sealed record AgentLimits
             EditItems = Clamp(EditItems, EditItemsRange),
             EditSections = Clamp(EditSections, EditSectionsRange),
             BatchSteps = Clamp(BatchSteps, BatchStepsRange),
+            RouteLegs = Clamp(RouteLegs, RouteLegsRange),
         };
     }
 

@@ -223,6 +223,9 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
         changed |= RangeField("Steps of one batch",
             "The most steps of one agent batch. The editor runs a batch in one frame.", limits.BatchSteps,
             AgentLimits.BatchStepsRange, v => limits = limits with { BatchSteps = v });
+        changed |= RangeField("Legs of one route",
+            "The most legs of one patrol or trade route that the agent places. Each leg is one zone.", limits.RouteLegs,
+            AgentLimits.RouteLegsRange, v => limits = limits with { RouteLegs = v });
         if (changed)
         {
             settings.Limits = limits.Clamped();

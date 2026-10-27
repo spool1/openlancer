@@ -490,8 +490,10 @@ public sealed class AgentSceneToolTests
             ("prop_group_place", """{ "group": "group:trio", "system": "Li01", "anchor": [0, 0, 9000] }"""),
             ("create_from_template", """{ "kind": "equipment", "template": "gun1", "nickname": "gun_copy" }"""),
         ];
-        Assert.Equal(AgentTools.All.Where(t => t.Kind == ToolKind.Edit && (t.Name.StartsWith("scene_") ||
-                         t.Name.StartsWith("prop_group_") || t.Name == "create_from_template")).Select(t => t.Name),
+        // AgentBuilderTests has the same test for the builder tools.
+        Assert.Equal(AgentTools.All.Where(t => t.Kind == ToolKind.Edit && !AgentBuilderTests.Tools.Contains(t.Name) &&
+                                               (t.Name.StartsWith("scene_") || t.Name.StartsWith("prop_group_") ||
+                                                t.Name == "create_from_template")).Select(t => t.Name),
             calls.Select(c => c.Tool));
 
         foreach (var (tool, arguments) in calls)

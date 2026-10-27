@@ -320,22 +320,27 @@ internal static class SceneEditTools
             EditTools.At("name", () => scope.Run(FieldCommands.SetText(session, item, key, name)));
         }
         if (args.Node("fields") is JsonObject fields)
-        {
-            try
-            {
-                scope.Run(FieldCommands.SetFields(session, item,
-                    fields.Select(f => KeyValuePair.Create(f.Key, f.Value)).ToList()));
-            }
-            catch (EditException e)
-            {
-                throw new EditException(e.Error with { Field = e.Error.Field is { } key ? $"fields.{key}" : "fields" });
-            }
-        }
+            Fields(scope, item, fields);
         return item;
     }
 
+    /// <summary>Sets the fields of a request on a new item, in the batch of the request. Each error names its field,
+    /// for example <c>fields.toughness</c>.</summary>
+    internal static void Fields(EditScope scope, SectionRef item, JsonObject fields)
+    {
+        try
+        {
+            scope.Run(FieldCommands.SetFields(scope.Session, item,
+                fields.Select(f => KeyValuePair.Create(f.Key, f.Value)).ToList()));
+        }
+        catch (EditException e)
+        {
+            throw new EditException(e.Error with { Field = e.Error.Field is { } key ? $"fields.{key}" : "fields" });
+        }
+    }
+
     /// <summary>The nickname and the file of the system of the argument <c>system</c>.</summary>
-    private static (string Nickname, string? Path) System(ToolCall call)
+    internal static (string Nickname, string? Path) System(ToolCall call)
     {
         var (nickname, _, path) = EditTools.At("system", () => SceneQueries.System(call.Session, call.Args.Text("system")!));
         return (nickname, path);
