@@ -187,10 +187,10 @@ internal sealed class PlayMenu(EditorWindow window)
 
     /// <summary>
     /// The submenu "Play mission" while a mission is open (section 5.2 of the M6c design): the play start, the mission
-    /// start, one item for each checkpoint, and "Restart the mission" while a mission play runs. Only "Play from here" and
-    /// "Set as play start" change the play start. The item of the play start shows F5 while F5 runs it. The mission start
-    /// and the checkpoints start at their suggested places, because the start place of the play start is for its own
-    /// start.
+    /// start, one item for each checkpoint, and "Restart the mission" while a mission play runs. Only the Play button of a
+    /// node, "Play from here" and "Set as play start" change the play start. The item of the play start shows F5 while F5
+    /// runs it. The mission start and the checkpoints start at their suggested places, because the start place of the play
+    /// start is for its own start.
     /// </summary>
     private void MissionMenu()
     {

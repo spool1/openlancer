@@ -261,9 +261,16 @@ internal sealed class MissionView : IDisposable
     /// comes with the start in the linked game (milestone M6c-3).</summary>
     internal const string PlayStartTip = "F5 plays this mission from this start in OpenLancer. Click to see the start.";
 
-    /// <summary>The chip "Play start: {start}" of the toolbar (section 5.2 of the M6c design). A click selects the play
-    /// start, and the Inspector shows the Play start page. The graph selects and frames the trigger of the play start
-    /// (UI rule 6).</summary>
+    /// <summary>The first line of the tooltip of the warning chip after the chip of the play start.</summary>
+    internal const string ChoiceProblemLead = "Play cannot start at the start place of the play start. F5 and \"Play from " +
+                                              "here\" do not play, and no node shows a Play button.";
+
+    /// <summary>
+    /// The chip "Play start: {start}" of the toolbar (section 5.2 of the M6c design). A click selects the play start,
+    /// and the Inspector shows the Play start page. The graph selects and frames the trigger of the play start (UI rule
+    /// 6). When the place choice of the play start cannot work for any trigger, a warning chip follows with the reason,
+    /// because no node of the graph then shows a Play button.
+    /// </summary>
     private void PlayStartChip(string script)
     {
         if (ImGui.Button($"{EditorIcons.Play}  Play start: {missions.Plays.StartNameOf(script)}##play-start"))
@@ -273,7 +280,19 @@ internal sealed class MissionView : IDisposable
         }
 
         ImGui.SetItemTooltip(PlayStartTip);
+        if (window.StartChoiceProblem(missions.Plays.PlayStartOf(script)) is { } problem)
+        {
+            ImGui.SameLine();
+            Chip.Flow([new ChipItem(EditorIcons.ExclamationTriangle.ToString(), ChipLook.GreyWarning)]);
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.ForTooltip))
+            {
+                ItemTooltip.Wrapped(ChoiceProblemTip(problem));
+            }
+        }
     }
+
+    /// <summary>The tooltip of the warning chip after the chip of the play start: the lead and the reason.</summary>
+    internal static string ChoiceProblemTip(string problem) => $"{ChoiceProblemLead}\n{problem}";
 
     /// <summary>The info icon of the banner of the rules (section 8.5 of the M6c design).</summary>
     internal static readonly HelpText RulesHelp = new("Rules differ",

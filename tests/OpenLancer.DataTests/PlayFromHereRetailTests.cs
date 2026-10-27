@@ -13,7 +13,7 @@ using Xunit;
 namespace OpenLancer.DataTests;
 
 /// <summary>
-/// Retail proofs of the Play buttons of the trigger cards (note of 2026-10-27 in section 8.1 of the M6c design) over the
+/// Retail proofs of the Play buttons of the trigger nodes (note of 2026-10-27 in section 8.1 of the M6c design) over the
 /// story scripts of the base game: the time of a pass and of the reads of one frame, and the agreement of the states with
 /// the full plans. The tests count triggers and measure time. They hold no retail text.
 /// </summary>
@@ -49,27 +49,34 @@ public sealed class PlayFromHereRetailTests(ITestOutputHelper output)
         Assert.True(best < limit, $"The pass over M10 took {best.TotalMilliseconds:0} ms.");
     }
 
-    /// <summary>Gate 2: the reads of one frame take less than 2 ms: the state of each of the 408 triggers of M10 and the
-    /// check of its start place. One try is the median of 100 frames.</summary>
-    [Fact]
+    /// <summary>Gate 2: the reads of one frame take less than 2 ms: the sync of the frame, and for each node of M10 the
+    /// state of its trigger and the check of its start place. One try is the median of 100 frames. The gate also holds
+    /// when each start place has a problem, because a frame checks each place once and makes few texts.</summary>
+    [Theory]
     [Trait(Timing.Category, Timing.Performance)]
-    public void TheReadsOfOneFrameTakeLessThanTwoMilliseconds()
+    [InlineData(false, 408)]
+    [InlineData(true, 0)]
+    public void TheReadsOfOneFrameTakeLessThanTwoMilliseconds(bool eachPlaceHasAProblem, int buttons)
     {
         var m10 = Biggest();
         GameDataPaths.RequireBase();
         var items = RetailGame.Instance.Data.Items;
-        var states = new PlayFromHereStates(pass => Task.FromResult(pass()));
+        // A place problem makes a new text, as a system or a base that the game data does not have does.
+        Func<StartPlace, string?> problem = eachPlaceHasAProblem
+            ? place => $"The start place names the system '{place.System}', which is not in the game data."
+            : place => MissionPlay.PlaceProblem(items, true, place);
+        var states = new PlayFromHereStates(problem, _ => { }, (pass, _) => Task.FromResult(pass()));
         states.Sync(m10, PlayStartSetting.Default, false);
-        var triggers = m10.Index.Triggers;
+        var graph = MissionGraph.Build(m10, new GraphOptions(GraphLens.Logic));
+        var triggers = graph.Nodes.Count(n => n.Kind == GraphNodeKind.Trigger);
         var shown = 0;
         void Frame()
         {
             shown = 0;
-            foreach (var trigger in triggers)
+            states.Sync(m10, PlayStartSetting.Default, false);
+            foreach (var node in graph.Nodes)
             {
-                var start = states.Of(trigger);
-                var problem = start is { CanStart: true } ? MissionPlay.PlaceProblem(items, true, start.Place) : null;
-                if (start is { CanStart: true } && problem == null)
+                if (states.Shows(node))
                     shown++;
             }
         }
@@ -94,8 +101,8 @@ public sealed class PlayFromHereRetailTests(ITestOutputHelper output)
         var limit = TimeSpan.FromMilliseconds(2);
         var median = new TimingGates().Gate(limit, Median);
 
-        output.WriteLine($"Reads of one frame for {triggers.Count} triggers: {median.TotalMilliseconds:0.000} ms, {shown} buttons.");
-        Assert.Equal(408, shown);
+        output.WriteLine($"Reads of one frame for {triggers} trigger nodes: {median.TotalMilliseconds:0.000} ms, {shown} buttons.");
+        Assert.Equal((408, buttons), (triggers, shown));
         Assert.True(median < limit, $"The reads of one frame took {median.TotalMilliseconds:0.000} ms.");
     }
 

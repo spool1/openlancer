@@ -85,6 +85,8 @@ public sealed class PlayStartPageTests
             ("duplicate", PlayFromHereStates.DuplicateReason), ("play runs", PlayFromHereStates.PlayRunsLine),
             ("exact start", PlayFromHereStates.ExactStart), ("exact triggers", PlayFromHereStates.ExactTriggers),
             ("approximate start", PlayFromHereStates.ApproximateStart),
+            ("failed pass", PlayFromHereStates.FailedLine("The plan broke.")),
+            ("choice problem", MissionView.ChoiceProblemLead), ("no game data", MissionPlay.NoGameData),
             ("live", RunPanel.LiveHelp.WhatItIs), ("clear", RunPanel.ClearTip),
             ("rules differ", RunOverlay.RulesDifferTip), ("no effect", RunOverlay.NoEffectStallTip),
             ("approximate note", MissionPlayTexts.Approximate),

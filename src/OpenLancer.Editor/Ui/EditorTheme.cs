@@ -90,7 +90,7 @@ internal static class EditorTheme
     /// and the prefab overrides. Each run state also has a glyph and a word, so no state depends on color alone.</summary>
     public static readonly Vector4 MissionRun = Rgb(0x3CCFA5);
 
-    /// <summary>The Play button of a trigger card in the mission graph (note of 2026-10-27 in section 8.1 of the M6c
+    /// <summary>The Play button of a trigger node in the mission graph (note of 2026-10-27 in section 8.1 of the M6c
     /// design). The button shows a start whose checks passed, so it has the green of a passed check. Its hue differs by
     /// 25 degrees or more from the run states, a selection, an error, a warning, the mission items and the prefab
     /// overrides. The Play glyph and the tooltip also give its meaning.</summary>

@@ -13,6 +13,9 @@ internal readonly record struct ChipLook(Vector4 Fill, Vector4 Border, Vector4 T
     /// <summary>The look of a fact without a state, for example a flag of the Inspector or a target game.</summary>
     public static ChipLook Grey => new(EditorTheme.SelectionUnfocused, EditorTheme.Transparent, EditorTheme.Text);
 
+    /// <summary>A grey chip with text in the warning color, for example a chip of a line with a warning.</summary>
+    public static ChipLook GreyWarning => Grey with { Text = EditorTheme.Warning };
+
     /// <summary>A filled chip in a state color, for example blue for unsaved edits or red for an error.</summary>
     public static ChipLook Filled(Vector4 color) =>
         new(color with { W = 0.3f }, color with { W = 0.7f }, EditorTheme.TextBright);

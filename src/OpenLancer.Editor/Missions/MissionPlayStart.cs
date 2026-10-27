@@ -28,9 +28,9 @@ internal sealed record MissionPlayRequest(string Script, MissionStartPoint Start
     /// own, and it never changes the play start of the user (user decision of 2026-10-20 of the M6c design).</summary>
     public EditOrigin Origin { get; init; } = EditOrigin.User;
 
-    /// <summary>True for a request of the play start of the settings: F5, "Play from here", the button of the Play start
-    /// page and the menu item "From the play start". Only such a request makes the play start the mission start when its
-    /// trigger is gone (decision D762).</summary>
+    /// <summary>True for a request of the play start of the settings: F5, the Play button of a node, "Play from here", the
+    /// button of the Play start page and the menu item "From the play start". Only such a request makes the play start
+    /// the mission start when its trigger is gone (decision D762).</summary>
     public bool FromPlayStart { get; init; }
 }
 

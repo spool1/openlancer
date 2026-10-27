@@ -44,8 +44,8 @@ The Mission tab shows the open mission as a graph. The Scene part is at its righ
 
 ### The graph
 
-- Each node is one trigger. Its header has the glyph of its event, its name, and the chips "Start" and "Repeats". Its body shows the event and the actions as a summary. With "Show lines", it shows each line.
-- The pins at the left take a start, a stop, a load from a checkpoint and a watch. The pins at the right give them. The "+" pin in the header starts or stops another trigger. The green Play button in the header plays the mission from the trigger (see "Set the play start and play").
+- Each node is one trigger. Its header has the glyph of its event, its name, and the chips "Start" and "Repeats". When the name or a chip does not fit, hover the name to read all of the header. Its body shows the event and the actions as a summary. With "Show lines", it shows each line.
+- The pins at the left take a start, a stop, a load from a checkpoint and a watch. The pins at the right give them. The "+" pin in the header starts or stops another trigger. The green Play button of a node plays the mission from its trigger (see "Set the play start and play").
 - A frame groups triggers: an act, the frame "Not started by the mission", or a behavior prefab. Click the arrow of a frame to collapse it into one node.
 - The marks at the right of a header show errors, warnings, the muted base-game messages, "Never starts" and "Watched state". Hover a mark to read the reasons.
 
@@ -175,21 +175,23 @@ Play from a trigger starts the mission in the OpenLancer game at a point of the 
 ### Set the play start and play
 
 1. Open a mission.
-2. Click the green Play button in the header of a trigger card. The trigger becomes the play start, and the game starts. You can also right-click the trigger and click "Play from here".
+2. Click the green Play button in the header of a trigger node. Play saves the edits of the active mod first, as F5 does. The trigger becomes the play start, and the game starts. You can also right-click the trigger and click "Play from here".
 3. To set the play start without a play, right-click the trigger and click "Set as play start". Click it again to make the mission start the play start again.
 4. Press F5 in the Mission tab to play from the play start again.
 
-The Play button shows only on a trigger where a play can start now, at the start place of the play start. Its tooltip names the start, the start place and the source of the place. A click on the button does not select or move the card. While a mission play runs, a click starts the mission again at that trigger.
+The Play button of a node shows only when a play can start at its trigger now. The button uses the start place that you pick on the Play start page. Its tooltip names the start and the start place. For the start place "Suggested", the tooltip also names the source of the place. A click on the button does not select or move the node. While a mission play runs, a click starts the game again at that trigger.
 
-When a trigger cannot start, its card has no Play button, and "Play from here" in its node menu is off. The tooltip of the item gives the reason. Examples are a path that another trigger stops, a start place that the game data does not have, and a script without a story slot. Prefab mode shows no Play buttons.
+When a trigger cannot start, its node has no Play button, and "Play from here" in its node menu is off. The tooltip of the item gives the reason. Examples are a path that another trigger stops, a start place that the game data does not have, and a script without a story slot. Prefab mode shows no Play buttons.
 
-After an edit, the editor checks the triggers again in the background. The buttons do not run the mission checks of the setup triggers. Play runs them when it starts, and the Console gives the reason when a check fails.
+When the start place cannot work for any trigger, no node shows a Play button. Examples are a base that the game data does not have, and the Scene camera without an open system. A warning chip then follows the toolbar chip "Play start", and its tooltip gives the reason.
+
+After an edit, the editor finds again which triggers can start. It does this in the background. The buttons do not run the mission checks of the setup triggers. Play runs them when it starts. When a check fails, the play does not start, and the Console gives the reason.
 
 The trigger of the play start has the chip "Play start". The toolbar chip "Play start: {start}" names the start. A click on it shows the Play start page in the Inspector, and the graph selects and frames the trigger of the play start.
 
 The play start is a setting of the editor for each profile and script. It is not data of the mod, so a change of it has no Undo entry, and the mod does not change. When you rename the trigger, the play start follows the rename, also its Undo and its Redo. The start of a running mission play follows the rename too. When the script does not have the trigger any more, F5 plays the mission start. The play start then becomes the mission start, and the Console tells it.
 
-The Play menu has the submenu "Play mission". It is available while a mission is open in the Mission tab. Its items are "From the play start", "From the mission start" and one item for each checkpoint. The item of the play start shows F5 while F5 runs it. The mission start and the checkpoints start at their suggested start places. While a mission play runs, the submenu also has "Restart the mission". Only the Play button of a card, "Play from here" and "Set as play start" change the play start.
+The Play menu has the submenu "Play mission". It is available while a mission is open in the Mission tab. Its items are "From the play start", "From the mission start" and one item for each checkpoint. The item of the play start shows F5 while F5 runs it. The mission start and the checkpoints start at their suggested start places. While a mission play runs, the submenu also has "Restart the mission". Only the Play button of a node, "Play from here" and "Set as play start" change the play start.
 
 In the Scene and Cutscene tabs, and in the Mission tab without an open mission, F5 stays Play from camera.
 

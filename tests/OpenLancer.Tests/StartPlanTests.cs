@@ -594,6 +594,34 @@ public sealed class StartPlanTests
         }
     }
 
+    /// <summary>
+    /// Only the full plan runs the setup check (the Play buttons of the graph, note of 2026-10-27 in section 8.1 of the
+    /// M6c design). The check refuses a setup line with a new error. The plan without the check keeps the line and can
+    /// start. A line of the same script has the error of its source line, which the check accepts, so the replay of the
+    /// test gets a state line of another script.
+    /// </summary>
+    [Fact]
+    public void ThePlanWithoutTheSetupCheckSkipsTheCheck()
+    {
+        var index = Index(Script);
+        var start = MissionStartPoint.At("t_chosen");
+        var replay = StartReplay.Run(index, start);
+        var other = Index(Script.Replace("Act_SetNNObj = ol_obj_1", "Act_SetNNObj = ol_obj_none"));
+        var bad = other.Lines.Single(l => MissionIndex.Is(l.Key, "Act_SetNNObj"));
+        var broken = replay with { Effects = [.. replay.Effects, (replay.Chosen!, bad)] };
+        var plan = StartPlan.Make(index, Slot, start, checkSetup: false);
+        var story = StartPlan.StoryPath(index, replay.Chosen);
+
+        var full = StartSetup.Apply(plan, index, broken, story);
+        var fast = StartSetup.Apply(plan, index, broken, story, check: false);
+
+        Assert.Equal(StartRefusal.SetupProblem, full.Refusal);
+        Assert.Contains("ol_obj_none", full.Reason);
+        Assert.True(fast.CanStart, fast.Reason);
+        Assert.Contains("Act_SetNNObj = ol_obj_none", Lines(fast, 0));
+        Assert.DoesNotContain("Act_SetNNObj = ol_obj_1", Lines(fast, 0));
+    }
+
     [Fact]
     public void AScriptWithoutASlotRefuses()
     {

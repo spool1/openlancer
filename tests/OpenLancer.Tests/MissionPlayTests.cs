@@ -90,9 +90,12 @@ public sealed class MissionPlayTests : IDisposable
         Assert.Equal((MissionStartPoint.At("t_kill"), StartPlaceChoice.Camera), (start.Request.Start, start.Request.Place));
     }
 
-    /// <summary>The Play button of a card (note of 2026-10-27 in section 8.1 of the M6c design) calls "Play from here".
-    /// The request of a click plays the start that the state of the button shows: the trigger, at the place of the
-    /// state.</summary>
+    /// <summary>The Play buttons of the nodes of the tests, with passes that run at once.</summary>
+    private static PlayFromHereStates Buttons() => new(_ => null, _ => { }, (pass, _) => Task.FromResult(pass()));
+
+    /// <summary>A click on the Play button of a node (note of 2026-10-27 in section 8.1 of the M6c design) plays after the
+    /// canvas, as "Play from here" does: it sets the play start and plays the start that the state of the button shows,
+    /// the trigger at the place of the state. The click plays once.</summary>
     [Fact]
     public void AClickOnAPlayButtonPlaysTheStartOfItsState()
     {
@@ -100,14 +103,44 @@ public sealed class MissionPlayTests : IDisposable
         var states = PlayFromHereStates.Make(editor.Index, editor.Slot, plays.PlayStartOf(ScriptPath),
             System.Threading.CancellationToken.None);
         var state = states["t_kill"];
+        var buttons = Buttons();
+        Assert.Null(buttons.PlayClick(plays, ScriptPath));
 
-        plays.PlayFromHere(ScriptPath, "t_kill");
+        buttons.Click(editor.Index.Trigger("t_kill")!, 1);
+        var result = buttons.PlayClick(plays, ScriptPath);
 
+        Assert.NotNull(result);
+        Assert.Null(buttons.PlayClick(plays, ScriptPath));
+        Assert.Equal(new PlayStartSetting("t_kill", "base:ol_base_a"), plays.PlayStartOf(ScriptPath));
         var start = Assert.IsType<MissionPlayStart>(Assert.Single(editor.Requests));
         var plan = StartPlan.Make(editor.Index, editor.Slot, start.Request.Start, start.Request.Place, start.Request.PlaceBase);
         Assert.Equal(MissionStartPoint.At("t_kill"), start.Request.Start);
+        Assert.True(start.Request.FromPlayStart);
         Assert.Equal((state.CanStart, state.Place), (plan.CanStart, plan.Place));
         Assert.Equal(StartPlaceKind.Base, state.Place.Kind);
+    }
+
+    /// <summary>A double-click on a Play button plays once. The release that ends the double-click, and each later click
+    /// in the row, does not start the game again. A click that the frame does not play is gone in the next
+    /// frame.</summary>
+    [Fact]
+    public void ADoubleClickOnAPlayButtonPlaysOnce()
+    {
+        var buttons = Buttons();
+        var trigger = editor.Index.Trigger("t_kill")!;
+
+        buttons.Click(trigger, 1);
+        buttons.PlayClick(plays, ScriptPath);
+        buttons.Click(trigger, 2);
+        Assert.Null(buttons.PlayClick(plays, ScriptPath));
+        buttons.Click(trigger, 3);
+        Assert.Null(buttons.PlayClick(plays, ScriptPath));
+
+        Assert.Single(editor.Requests);
+        buttons.Click(trigger, 1);
+        buttons.Sync(null, PlayStartSetting.Default, false);
+        Assert.Null(buttons.PlayClick(plays, ScriptPath));
+        Assert.Single(editor.Requests);
     }
 
     /// <summary>The agent play rule: with unsaved edits, the editor asks. Cancel gives refused with the reason, and no

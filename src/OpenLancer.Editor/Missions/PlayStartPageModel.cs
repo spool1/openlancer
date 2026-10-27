@@ -71,7 +71,7 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
     public string SuggestedText => SuggestedTextOf(Plan);
 
     /// <summary>The text of the start place choice of a play start and its plan. The Play start page and the tooltip of
-    /// the Play button of a trigger card show it.</summary>
+    /// the Play button of a trigger node show it.</summary>
     public static string PlaceTextOf(PlayStartSetting setting, StartPlan plan) => setting.PlaceChoice.Place switch
     {
         StartPlaceChoice.Base => $"At base {setting.PlaceChoice.Base}",

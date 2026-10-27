@@ -680,16 +680,10 @@ internal sealed class CutsceneView
     /// <summary>A tooltip of the last item that wraps at a readable width.</summary>
     private static void WrappedTooltip(string text)
     {
-        if (!ImGui.IsItemHovered(ImGuiHoveredFlags.ForTooltip))
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.ForTooltip))
         {
-            return;
+            ItemTooltip.Wrapped(text);
         }
-
-        ImGui.BeginTooltip();
-        ImGui.PushTextWrapPos(ImGui.GetFontSize() * 30);
-        ImGui.Text(text);
-        ImGui.PopTextWrapPos();
-        ImGui.EndTooltip();
     }
 
     private void AspectMenu(float width)
