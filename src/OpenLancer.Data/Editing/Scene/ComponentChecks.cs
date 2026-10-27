@@ -105,9 +105,7 @@ internal static class ComponentChecks
 
     /// <summary>The system of a base of the list of the bases, or null.</summary>
     internal static string? SystemOfBase(EditSession session, string baseName) =>
-        session.Lists.List("base")?.Find(baseName)?.Section is { } section && session.Get(section) is { } view
-            ? SceneSections.Last(view, "system")
-            : null;
+        session.Lists.List("base")?.Find(baseName)?.Section is { } section ? session.SystemOfBase(section) : null;
 
     private static string SystemOf(EditSession session, SectionRef section) =>
         session.SystemNicknameOf(section.Path) ?? SceneSections.FileName(section.Path);

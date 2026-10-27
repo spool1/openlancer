@@ -11,13 +11,15 @@ namespace OpenLancer.Data.Missions.Run;
 /// reviews). The suggestion is where the player is at the chosen trigger in the retail game. A walk reads the place
 /// facts of the timeline from the newest to the oldest. The newest fact gives the kind of the start. A base fact gives a
 /// base start. A launch, an arrival or a space fact gives a space start. A chosen trigger that waits at a base for the
-/// launch starts docked. A chosen trigger that waits for a jump starts before the jump. The facts of the segment give
-/// the system and the point. The segment is the part of the walk in one place in space, back to the base of the launch
-/// or to the arrival. The center of a system is never a start point, because most suns are there.
+/// launch starts docked. A chosen trigger that waits for a jump starts before the jump, unless the path already made
+/// that jump. The facts of the segment give the system and the point. The segment is the part of the walk in one place
+/// in space, back to the base of the launch or to the arrival. After an arrival without a point, the start is at the
+/// jump gate or hole of the jump. The center of a system is never a start point, because most suns are there.
 /// </summary>
 internal static class StartPlaces
 {
-    /// <summary>The offset of a start from a spawn position or from the point of a Cnd_DistVec line, in units.</summary>
+    /// <summary>The offset of a start from a spawn position, from an object or from the point of a Cnd_DistVec line, in
+    /// units.</summary>
     public const float Offset = 1000;
 
     private static readonly string[] PlaceActions = ["Act_MovePlayer", "Act_SetInitialPlayerPos"];
@@ -26,6 +28,10 @@ internal static class StartPlaces
     /// because scripts also park ships with it.</summary>
     private static readonly string[] SpawnActions =
         ["Act_SpawnShip", "Act_SpawnFormation", "Act_SpawnSolar", "Act_SpawnLoot"];
+
+    /// <summary>The lines that set the attitude between two objects or labels.</summary>
+    private static readonly string[] VibeActions =
+        ["Act_SetVibe", "Act_SetVibeLbl", "Act_SetVibeLblToShip", "Act_SetVibeShipToLbl"];
 
     private static readonly string[] BaseConditions = ["Cnd_BaseEnter", "Cnd_LocEnter", "Cnd_CharSelect"];
 
@@ -38,11 +44,15 @@ internal static class StartPlaces
     private static readonly string[] SpaceConditions =
         ["Cnd_DistVec", "Cnd_DistShip", "Cnd_DistCircle", "Cnd_InZone", "Cnd_CmpToPlane", "Cnd_TLEntered", "Cnd_TLExited"];
 
-    /// <summary>The suggested place of a start, and the warnings of the Play start page about it.</summary>
-    public sealed record Suggestion(StartPlace Place, IReadOnlyList<string> Warnings);
+    /// <summary>The suggested place of a start, the place of the start, and the warnings of the Play start page about
+    /// the place of the start.</summary>
+    public sealed record Suggestion(StartPlace Suggested, StartPlace Place, IReadOnlyList<string> Warnings);
 
-    /// <summary>The suggested place of the start of a replay.</summary>
-    public static Suggestion Suggest(MissionIndex index, StartReplay replay) => new Walk(index, replay).Suggest();
+    /// <summary>The suggested place of the start of a replay, and the warnings about the place that the user picked, or
+    /// about the suggested place.</summary>
+    /// <param name="picked">The base or the Scene camera that the user picked, or null for the suggested place.</param>
+    public static Suggestion Suggest(MissionIndex index, StartReplay replay, StartPlace? picked = null) =>
+        new Walk(index, replay).Suggest(picked);
 
     /// <summary>The warning of a trigger that waits for the end of a launch that the path already made. A start in
     /// space never ends a launch, so the trigger does not run.</summary>
@@ -55,6 +65,13 @@ internal static class StartPlaces
     public static string OtherSystemWarning(string trigger, string system, string start) =>
         $"Trigger '{trigger}' waits for the player to enter space in {system}. The play starts in {start}, so the linked " +
         "game does not run this trigger. OpenLancer does not compare the system and runs it.";
+
+    /// <summary>The warning of a trigger that waits for a jump into the system of the start. The path already made that
+    /// jump. OpenLancer tests the condition only at a jump, so the trigger waits for the next jump into the
+    /// system.</summary>
+    public static string ArrivedWarning(string trigger, string system) =>
+        $"Trigger '{trigger}' waits for a jump into {system}. The path already made that jump, so the play starts in " +
+        $"{system}. OpenLancer runs this trigger only at the next jump into {system}.";
 
     /// <summary>True for <c>Act_RelocateShip</c> of the player. Retail scripts move the player with it, for example after
     /// a scene in space. It is a place line, so the setup triggers do not copy it.</summary>
@@ -184,6 +201,7 @@ internal static class StartPlaces
         private readonly HashSet<MissionTrigger> checkpoints;
         private readonly ILookup<MissionTrigger, MissionTrigger> starts;
         private Dictionary<MissionTrigger, int>? depths;
+        private Dictionary<string, bool>? attitudes;
 
         public Walk(MissionIndex index, StartReplay replay)
         {
@@ -193,34 +211,47 @@ internal static class StartPlaces
             timeline = Timeline(index, replay);
             onTimeline = [.. timeline];
             checkpoints = [.. DryRun.Checkpoints(index)];
-            starts = index.Links.Where(l => l.Kind == MissionLinkKind.Start && l.Target is { IsDuplicate: false })
-                .ToLookup(l => l.Source, l => l.Target!);
+            starts = StartPlan.Next(index, MissionLinkKind.Start);
         }
 
         /// <summary>The number of earlier triggers of the timeline. The chosen trigger is the last trigger. The mission
         /// start has no chosen trigger.</summary>
         private int Earlier => chosen != null ? timeline.Count - 1 : timeline.Count;
 
-        public Suggestion Suggest()
+        public Suggestion Suggest(StartPlace? picked)
         {
             var facts = Facts().ToList();
-            var place = PlaceOf(facts);
+            var suggested = PlaceOf(facts);
+            var place = picked ?? suggested;
+            return new Suggestion(suggested, place, Warnings(facts, place));
+        }
+
+        /// <summary>The warnings about the place of the start, also for a place that the user picked. A base start
+        /// launches, so the triggers that wait for the launch run. A start in space or at the Scene camera never ends a
+        /// launch. The system of a picked Scene camera is not known, so it has no warning about the system.</summary>
+        private IReadOnlyList<string> Warnings(List<Fact> facts, StartPlace place)
+        {
             if (place.Kind == StartPlaceKind.Base)
-                return new Suggestion(place, [.. OtherSystem(place)]);
-            // A start in space never ends a launch, also for a chosen trigger that waits for it without a base to dock at.
+                return [.. OtherSystem(place.Base is { } dock ? BaseSystemOf(dock) : null)];
             IEnumerable<string> own = chosen != null && WaitsForLaunchEnd(chosen.Condition)
                 ? [LaunchWatcherWarning(chosen.Nickname)]
                 : [];
-            return new Suggestion(place, [.. own, .. LaunchWatchers(facts), .. OtherSystem(place)]);
+            return [.. own, .. LaunchWatchers(facts), .. OtherSystem(place.System), .. Arrived(place.System)];
         }
 
         /// <summary>The warning of a chosen trigger whose Cnd_SpaceEnter names another system than the system of the
         /// start. Retail compares the system, and OpenLancer does not.</summary>
-        private IEnumerable<string> OtherSystem(StartPlace place)
+        private IEnumerable<string> OtherSystem(string? at)
         {
-            var at = place.System ?? (place.Base is { } dock ? BaseSystemOf(dock) : null);
             if (OwnSystem() is { } waits && at != null && !MissionIndex.Is(waits, at))
                 yield return OtherSystemWarning(chosen!.Nickname, waits, at);
+        }
+
+        /// <summary>The warning of a chosen trigger that waits for a jump into the system of a start in space.</summary>
+        private IEnumerable<string> Arrived(string? at)
+        {
+            if (ArrivalSystem() is { } next && at != null && MissionIndex.Is(next, at))
+                yield return ArrivedWarning(chosen!.Nickname, next);
         }
 
         /// <summary>The place facts of the timeline, from the newest to the oldest (rule 1).</summary>
@@ -308,14 +339,41 @@ internal static class StartPlaces
             if (MissionIndex.Is(key, "Cnd_SpaceExit"))
                 return fact with { Kind = FactKind.Base };
             if (IsAny(key, LaunchConditions))
-                return MissionIndex.Is(key, "Cnd_LaunchComplete") && !NamesPlayer(condition)
-                    ? null
-                    : fact with { Kind = FactKind.Launch, System = ConditionSystem(condition) };
+            {
+                if (MissionIndex.Is(key, "Cnd_LaunchComplete") && !NamesPlayer(condition))
+                    return null;
+                // Cnd_BaseExit with a base names the base of the launch.
+                return fact with
+                {
+                    Kind = FactKind.Launch,
+                    System = ConditionSystem(condition),
+                    Base = MissionIndex.Is(key, "Cnd_BaseExit") ? Named(condition, "base", MissionValueKind.Base) : null,
+                };
+            }
             if (IsAny(key, ArrivalConditions))
                 return fact with { Kind = FactKind.Arrival, System = ConditionSystem(condition) };
-            return IsAny(key, SpaceConditions) && NamesPlayer(condition)
-                ? fact with { Point = NearPoint(condition) }
-                : null;
+            if (!IsAny(key, SpaceConditions) || !NamesPlayer(condition))
+                return null;
+            if (NearPoint(condition) is { } point)
+                return fact with { Point = point };
+            return NearObject(condition) is var (near, distance)
+                ? fact with { System = near.System, Point = near.Position + new Vector3(0, 0, distance) }
+                : fact;
+        }
+
+        /// <summary>The object of the game data of a Cnd_DistShip line that waits for the player inside its range, and
+        /// the distance of the start from the object, or null. The player is near that object. The start is at the edge
+        /// of the range, at least <see cref="Offset"/> units away, so it is not in the body of a big object.</summary>
+        private (WorldObject Near, float Distance)? NearObject(MissionLine condition)
+        {
+            if (!MissionIndex.Is(condition.Key, "Cnd_DistShip") || !MissionIndex.Is(condition.ValueOf("side"), "inside"))
+                return null;
+            var ship = condition.ValueOf("ship");
+            var other = condition.ValueOf("other");
+            var name = MissionIndex.Is(ship, "Player") ? other : MissionIndex.Is(other, "Player") ? ship : null;
+            if (name == null || index.World.ObjectOf(name) is not { } near)
+                return null;
+            return (near, Math.Max(Offset, Parse(condition.ValueOf("range")) ?? 0));
         }
 
         /// <summary>The fact of a place line, or null for another line.</summary>
@@ -357,13 +415,11 @@ internal static class StartPlaces
         /// <summary>The length of the story path of a trigger, or -1 when no start trigger reaches it.</summary>
         private int Depth(MissionTrigger trigger) => (depths ??= Depths()).GetValueOrDefault(trigger, -1);
 
-        /// <summary>The length of the story path of each trigger that a start trigger reaches through Start and Load
-        /// links.</summary>
+        /// <summary>The length of the story path of each trigger that a start trigger reaches. The search uses the links
+        /// of <see cref="StartPlan.StoryPath"/>, so each length is the length of that path.</summary>
         private Dictionary<MissionTrigger, int> Depths()
         {
-            var next = index.Links
-                .Where(l => l.Kind is MissionLinkKind.Start or MissionLinkKind.Load && l.Target is { IsDuplicate: false })
-                .ToLookup(l => l.Source, l => l.Target!);
+            var next = StartPlan.Next(index, MissionLinkKind.Start, MissionLinkKind.Load);
             var depth = new Dictionary<MissionTrigger, int>();
             var queue = new Queue<MissionTrigger>();
             foreach (var root in index.StartTriggers.Where(r => !r.IsDuplicate))
@@ -402,7 +458,12 @@ internal static class StartPlaces
                     Named(t.Condition!, "system", MissionValueKind.System) != null) is { } stage)
                 own = (Named(stage.Condition!, "system", MissionValueKind.System), Of(stage.Condition!, stage));
             (string? System, string? From) hint = (Hint(trigger), null);
-            var first = index.NothingStarts(trigger) ? hint.System != null ? hint : own : own.System != null ? own : hint;
+            (string? System, string? From) first;
+            // Retail never runs the condition of a trigger that nothing starts, so its system hint comes first.
+            if (index.NothingStarts(trigger))
+                first = hint.System != null ? hint : own;
+            else
+                first = own.System != null ? own : hint;
             return first.System != null
                 ? first
                 : next.Select(StepSystem).FirstOrDefault(s => s.System != null);
@@ -439,17 +500,12 @@ internal static class StartPlaces
         {
             // A trigger that waits for the end of a launch runs only after a launch from a dock (rule 2).
             if (chosen != null && WaitsForLaunchEnd(chosen.Condition) &&
-                facts.FirstOrDefault(f => f is { Kind: FactKind.Base, Base: not null }) is { } launch)
+                facts.FirstOrDefault(f => f is { Kind: FactKind.Base or FactKind.Launch, Base: not null }) is { } launch)
                 return Docked(launch, $"{launch.Source}. Trigger {chosen.Nickname} waits for the end of a launch, so the " +
                                       "play starts docked.");
-            // A chosen trigger that waits for an arrival needs the jump. An arrival fact in that system that is newer than
-            // each other fact is the same jump, so the start is before it (rule 2).
-            if (ArrivalSystem() is { } next && facts.FindIndex(f => !f.Jump) is var newest and >= 0 &&
-                facts[newest] is { Kind: FactKind.Arrival } arrival && MissionIndex.Is(arrival.System, next))
-                facts = facts.Skip(newest + 1).ToList();
             var decide = facts.FirstOrDefault(f => !f.Jump) ?? facts.FirstOrDefault();
             if (decide == null)
-                return NoFact();
+                return StartPlace.Camera("No line of the path gives a place.");
             if (decide.Kind == FactKind.Base)
                 return decide.Base != null
                     ? Docked(decide, $"{decide.Source}.")
@@ -458,9 +514,12 @@ internal static class StartPlaces
                         Trigger = decide.Trigger.Nickname,
                     };
 
-            // The segment ends at the newest base fact, the base of the launch. It also ends at the newest arrival.
+            // The segment ends at the newest base fact, the base of the launch. It also ends at the newest arrival. A
+            // Cnd_BaseExit with a base names the base of the launch when no base fact names it.
             var segment = new List<Fact>();
             Fact? launchBase = null;
+            Fact? exitBase = null;
+            Fact? arrival = null;
             var from = 0;
             foreach (var fact in facts)
             {
@@ -471,12 +530,16 @@ internal static class StartPlaces
                     break;
                 }
                 segment.Add(fact);
+                if (fact is { Kind: FactKind.Launch, Base: not null })
+                    exitBase ??= fact;
                 if (fact.Kind == FactKind.Arrival)
                 {
+                    arrival = fact;
                     from = fact.At;
                     break;
                 }
             }
+            launchBase ??= exitBase;
 
             var system = decide.System;
             var systemFrom = decide.SystemFrom;
@@ -499,14 +562,26 @@ internal static class StartPlaces
                         Trigger = decide.Trigger.Nickname,
                     };
 
+            // Rule 6: the fact, a point of the segment, the jump gate or hole of the arrival, a spawn of the segment, then
+            // a spawn of the replay before the segment.
             var point = decide.Point;
             var turn = decide.Turn;
             var pointText = "";
             if (point == null && segment.FirstOrDefault(f => f.Point != null && InSystem(f, system)) is { } near)
                 (point, turn, pointText) = (near.Point, near.Turn, $" The point comes from {near.Source}.");
-            if (point == null && SpawnIn(system, from) is var (spawn, ship))
-                (point, pointText) = (spawn + new Vector3(0, 0, Offset),
-                    $" The point is {Offset.ToString("N0", CultureInfo.InvariantCulture)} units from the spawn of {ship}.");
+            // After an arrival, the player came out of the jump gate or hole of the previous system. A spawn of the
+            // mission can be far from it, for example at a target or at a parking point.
+            if (point == null && arrival != null && !segment.Any(f => f.Kind == FactKind.Launch) &&
+                SystemBefore(arrival, system) is { } previous && index.World.JumpInto(system, previous) is { } gate)
+                (point, turn, pointText) = (gate.Position + Vector3.Transform(new Vector3(0, 0, Offset), gate.Rotation),
+                    gate.Rotation, $" The point is {Units} units from {gate.Nickname}, the jump gate or hole to {previous}.");
+            if (point == null && Spawns(system, from).ToList() is { Count: > 0 } spawns)
+            {
+                var spawn = spawns.FirstOrDefault(s => s is { Recent: true, Placed: true }) ??
+                            spawns.FirstOrDefault(s => s.Recent) ?? spawns.FirstOrDefault(s => s.Placed) ?? spawns[0];
+                (point, pointText) = (spawn.Point + new Vector3(0, 0, Offset),
+                    $" The point is {Units} units from the spawn of {spawn.Ship}.");
+            }
             if (point == null)
                 return launchBase != null
                     ? Docked(launchBase, $"{launchBase.Source}. No line of the path gives a point in {system} after " +
@@ -520,16 +595,21 @@ internal static class StartPlaces
             };
         }
 
-        /// <summary>The place when the walk finds no fact: the Scene camera. When the chosen trigger names its system, in
-        /// Cnd_SpaceEnter or in its system hint, the camera must be in that system.</summary>
-        private StartPlace NoFact()
+        /// <summary>The offset in the words of a source text.</summary>
+        private static string Units => Offset.ToString("N0", CultureInfo.InvariantCulture);
+
+        /// <summary>The system before the jump of an arrival: the nearest trigger before the arrival that names another
+        /// system, in its condition, in the base of its condition or in its system hint.</summary>
+        private string? SystemBefore(Fact arrival, string system)
         {
-            const string none = "No line of the path gives a place.";
-            if (OwnSystem() is { } waits)
-                return StartPlace.Camera($"{none} The system comes from {Of(chosen!.Condition!, chosen)}.", waits);
-            if (chosen != null && !IsArrival(chosen.Condition) && Hint(chosen) is { } hint)
-                return StartPlace.Camera($"{none} The system comes from the system hint of {chosen.Nickname}.", hint);
-            return StartPlace.Camera(none);
+            for (var k = arrival.At - 1; k >= 0; k--)
+            {
+                var trigger = timeline[k];
+                var named = ConditionSystem(trigger.Condition) ?? BaseSystem(trigger.Condition) ?? Hint(trigger);
+                if (named != null && !MissionIndex.Is(named, system))
+                    return named;
+            }
+            return null;
         }
 
         private static StartPlace Docked(Fact fact, string source) =>
@@ -559,21 +639,33 @@ internal static class StartPlaces
             return null;
         }
 
-        /// <summary>The first spawn in the system with a position (rule 6). The spawns of the segment before the chosen
-        /// trigger come first, then the spawns of the chosen trigger, then the last spawn of the replay. A move of a ship
-        /// that exists is no spawn, because scripts also park ships with it.</summary>
-        private (Vector3 Point, string Ship)? SpawnIn(string system, int from)
+        /// <summary>A spawn of the walk with a position in a system.</summary>
+        /// <param name="Placed">True when the spawn line gives the position. A script places a ship with it at that
+        /// moment, for example next to the player at the load of a checkpoint.</param>
+        /// <param name="Recent">True for a spawn of the segment before the chosen trigger or of the chosen trigger. False
+        /// for a spawn of the replay before the segment.</param>
+        private sealed record Spawn(Vector3 Point, string Ship, bool Placed, bool Recent);
+
+        /// <summary>The spawns in the system with a position (rule 6). The spawns of the segment before the chosen trigger
+        /// come first, then the spawns of the chosen trigger, then the spawns of the replay from the last. A move of a
+        /// ship that exists is no spawn, because scripts also park ships with it. A spawn that the path makes hostile to
+        /// the player does not count, because the player does not wait next to an enemy.</summary>
+        private IEnumerable<Spawn> Spawns(string system, int from)
         {
-            var lines = timeline.Skip(from).Take(Math.Max(0, Earlier - from)).SelectMany(t => t.Actions.Select(l => (t, l)))
-                .Concat(chosen == null ? [] : chosen.Actions.Select(l => (chosen, l)))
-                .Concat(replay.Effects.Reverse().Select(e => (e.Trigger, e.Line)));
-            foreach (var (trigger, line) in lines)
+            var recent = timeline.Skip(from).Take(Math.Max(0, Earlier - from))
+                .Concat(chosen == null ? [] : [chosen])
+                .SelectMany(t => t.Actions.Select(l => (Trigger: t, Line: l, Recent: true)));
+            var older = replay.Effects.Reverse().Select(e => (e.Trigger, e.Line, Recent: false));
+            foreach (var (trigger, line, isRecent) in recent.Concat(older))
             {
-                if (IsAny(line.Key, SpawnActions) && line.Value(0) is { } name &&
-                    MissionIndex.Is(SpawnSystem(trigger, name), system) && SpawnPoint(line, name) is { } point)
-                    return (point, name);
+                if (!IsAny(line.Key, SpawnActions) || line.Value(0) is not { } name ||
+                    !MissionIndex.Is(SpawnSystem(trigger, name), system) || IsHostile(name))
+                    continue;
+                if (line.Name?.Value("position") is { } at && Numbers(line, at.Index, 3) is { } own)
+                    yield return new Spawn(new Vector3(own[0], own[1], own[2]), name, true, isRecent);
+                else if (ItemPoint(name) is { } item)
+                    yield return new Spawn(item, name, false, isRecent);
             }
-            return null;
         }
 
         /// <summary>The system of a spawn: the system of the condition or the system hint of its trigger, else the
@@ -584,16 +676,41 @@ internal static class StartPlaces
                 ? MissionIndex.Text(line[0])
                 : null, MissionValueKind.System);
 
-        /// <summary>The position of a spawn line: its own point, or the <c>position</c> of the item.</summary>
-        private Vector3? SpawnPoint(MissionLine line, string name)
+        /// <summary>The <c>position</c> of an item, or null.</summary>
+        private Vector3? ItemPoint(string name)
         {
-            if (line.Name?.Value("position") is { } at && Numbers(line, at.Index, 3) is { } own)
-                return new Vector3(own[0], own[1], own[2]);
             if (ItemOf(name)?.Section.FirstOrDefault(e => MissionIndex.Is(e.Name, "position") && e.Count >= 3) is not
                 { } entry)
                 return null;
             var values = Enumerable.Range(0, 3).Select(i => Parse(MissionIndex.Text(entry[i]))).ToList();
             return values.All(v => v != null) ? new Vector3(values[0]!.Value, values[1]!.Value, values[2]!.Value) : null;
+        }
+
+        /// <summary>True when the last attitude line of the path between an object of a name and the player is hostile:
+        /// a REP_ word with HOSTILE, or a number of -0.2 or less. The name can be a ship, a formation or a label.</summary>
+        private bool IsHostile(string name) => StartSetup.Members(index, name).Any(o => Attitudes.GetValueOrDefault(o));
+
+        /// <summary>The objects that the attitude lines set toward the player, and true for a hostile attitude. The lines
+        /// come in time order: the earlier triggers of the timeline, the replay, then the chosen trigger.</summary>
+        private Dictionary<string, bool> Attitudes => attitudes ??= ReadAttitudes();
+
+        private Dictionary<string, bool> ReadAttitudes()
+        {
+            var result = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            var lines = timeline.Take(Earlier).SelectMany(t => t.Actions).Concat(replay.Effects.Select(e => e.Line))
+                .Concat(chosen?.Actions ?? []);
+            foreach (var line in lines.Where(l => IsAny(l.Key, VibeActions)))
+            {
+                var (first, second) = (line.ValueOf("from"), line.ValueOf("to"));
+                var other = MissionIndex.Is(first, "Player") ? second : MissionIndex.Is(second, "Player") ? first : null;
+                if (other == null || line.ValueOf("attitude") is not { } attitude)
+                    continue;
+                var hostile = attitude.Contains("HOSTILE", StringComparison.OrdinalIgnoreCase) ||
+                              Parse(attitude) is <= -0.2f;
+                foreach (var member in StartSetup.Members(index, other))
+                    result[member] = hostile;
+            }
+            return result;
         }
 
         private MissionSection? ItemOf(string name) =>

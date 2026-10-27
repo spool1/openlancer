@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
+using LibreLancer;
 using LibreLancer.Data.IO;
+using OpenLancer.Data.Editing.Assets;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Ini;
@@ -59,7 +62,7 @@ public sealed partial class EditSession
         names[MissionValueKind.SystemObject] = Nicknames.All.Where(n => !n.IsZone).Select(n => n.Name).ToList();
         var ini = FreelancerIni;
         var world = new MissionWorld(names, relative =>
-            DataPaths.Resolve(ini, relative) is { } path && files.FileExists(path), BaseSystems());
+            DataPaths.Resolve(ini, relative) is { } path && files.FileExists(path), BaseSystems(), SystemObjects());
         var removed = RemovedNames(baseFiles, world);
         var targets = ActiveMod?.Manifest.Targets;
         return new MissionInputs
@@ -306,17 +309,40 @@ public sealed partial class EditSession
     /// <summary>The values of a list of the edit view, or none when the list does not exist.</summary>
     private List<string> ListNames(string id) => Lists.List(id)?.Entries.Select(e => e.Value).ToList() ?? [];
 
-    /// <summary>The system of each base of the list of the bases: the <c>system</c> key of its section. The suggested
-    /// start place of a mission play reads the system of the base that the player launched from.</summary>
+    /// <summary>The system of a <c>[Base]</c> section of <c>universe.ini</c>: its <c>system</c> key, or null.</summary>
+    internal string? SystemOfBase(SectionRef section) => Get(section) is { } view ? SceneSections.Last(view, "system") : null;
+
+    /// <summary>The system of each base of the list of the bases. The suggested start place of a mission play reads the
+    /// system of the base that the player launched from.</summary>
     private Dictionary<string, string> BaseSystems()
     {
         var systems = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in Lists.List("base")?.Entries ?? [])
         {
-            if (entry.Section is { } section && Get(section) is { } view && SceneSections.Last(view, "system") is { } system)
+            if (entry.Section is { } section && SystemOfBase(section) is { } system)
                 systems.TryAdd(entry.Value, system);
         }
         return systems;
+    }
+
+    /// <summary>The objects of the system files of W, in file order, with their system, point, heading and jump. The
+    /// suggested start place of a mission play reads the point near an object and the jump gate or hole of a
+    /// jump.</summary>
+    private List<WorldObject> SystemObjects()
+    {
+        var objects = new List<WorldObject>();
+        foreach (var name in Nicknames.All.Where(n => !n.IsZone))
+        {
+            if (Systems.NicknameOf(name.Section.Path) is not { } system || Get(name.Section) is not { } view ||
+                view.Lines("pos").LastOrDefault() is not { } pos || !PropGroupFile.TryPosition(pos.Values, out var point))
+                continue;
+            var rotation = view.Lines("rotate").LastOrDefault() is { } rotate &&
+                           PropGroupFile.TryPosition(rotate.Values, out var degrees)
+                ? MathHelper.MatrixFromEulerDegrees(degrees).ExtractRotation()
+                : Quaternion.Identity;
+            objects.Add(new WorldObject(name.Name, system, point, rotation, SceneSections.Last(view, "goto")));
+        }
+        return objects;
     }
 
     /// <summary>The ledger of the edit view for the worker of the mission checks. The ledger of an edit view does not

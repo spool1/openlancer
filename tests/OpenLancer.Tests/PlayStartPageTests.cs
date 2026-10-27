@@ -122,6 +122,7 @@ public sealed class PlayStartPageTests
             ("camera system", MissionPlay.CameraSystemReason("Li01")),
             ("launch watcher", StartPlaces.LaunchWatcherWarning("t_wave")),
             ("other system", StartPlaces.OtherSystemWarning("t_wave", "Li02", "Li01")),
+            ("arrived", StartPlaces.ArrivedWarning("t_wave", "Li02")),
             ("restart refused", MissionPlayTexts.RestartRefused(new NamedStart(), "The path is refused.", "save 2")),
             ("restart failed", MissionPlayTexts.RestartFailedInGame(new NamedStart(), "The start save does not load.")),
             ("ship", PlayShips.ShipText(null, null).Tooltip), ("ship missing", PlayShips.ShipText(null, "ol_package").Tooltip),

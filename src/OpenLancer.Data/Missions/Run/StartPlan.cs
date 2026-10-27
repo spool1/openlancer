@@ -302,7 +302,6 @@ public sealed record StartPlan
         IReadOnlyList<string> restored = replay.Kind != StartKind.MissionStart && replay.Root is { StartsActive: false } root
             ? [CheckpointStateWarning(root.Nickname)]
             : [];
-        var suggestion = StartPlaces.Suggest(index, replay);
         var picked = place switch
         {
             StartPlaceChoice.Base when placeBase != null => new StartPlace(StartPlaceKind.Base, null, placeBase.Trim(),
@@ -310,13 +309,14 @@ public sealed record StartPlan
             StartPlaceChoice.Camera => StartPlace.Camera("The Scene camera."),
             _ => null,
         };
+        var suggestion = StartPlaces.Suggest(index, replay, picked);
         plan = plan with
         {
             Stage = accepted ? slot.AcceptStage : slot.StartStage,
             Accepted = accepted,
-            Warnings = [.. plan.Warnings, .. restored, .. notes, .. picked == null ? suggestion.Warnings : []],
-            Place = picked ?? suggestion.Place,
-            Suggested = suggestion.Place,
+            Warnings = [.. plan.Warnings, .. restored, .. notes, .. suggestion.Warnings],
+            Place = suggestion.Place,
+            Suggested = suggestion.Suggested,
         };
         return StartSetup.Apply(plan, index, replay, story);
     }
@@ -330,16 +330,23 @@ public sealed record StartPlan
     internal static IReadOnlyList<MissionTrigger> StoryPath(MissionIndex index, MissionTrigger? chosen) =>
         chosen == null ? [] : ShortestPath(index, index.StartTriggers, chosen, MissionLinkKind.Start, MissionLinkKind.Load);
 
-    /// <summary>The shortest path of links of some kinds from the first root that reaches the target, in the order of
-    /// the roots. Empty when no root reaches it. A start that a stop after it cancels in the same trigger is not a link,
-    /// because the game does not start its target (TR9).</summary>
+    /// <summary>The triggers that each trigger reaches through links of some kinds. A duplicate trigger has no link. A
+    /// start that a stop after it cancels in the same trigger is not a link, because the game does not start its target
+    /// (TR9).</summary>
+    internal static ILookup<MissionTrigger, MissionTrigger> Next(MissionIndex index, params MissionLinkKind[] kinds)
+    {
+        var cancelled = index.Cancels.Where(c => c.Target != null).Select(c => (c.Source, c.Target!)).ToHashSet();
+        return index.Links.Where(l => kinds.Contains(l.Kind) && l.Target is { IsDuplicate: false } && !l.Source.IsDuplicate &&
+                                      !(l.Kind == MissionLinkKind.Start && cancelled.Contains((l.Source, l.Target))))
+            .ToLookup(l => l.Source, l => l.Target!);
+    }
+
+    /// <summary>The shortest path of links of some kinds (see <see cref="Next"/>) from the first root that reaches the
+    /// target, in the order of the roots. Empty when no root reaches it.</summary>
     internal static IReadOnlyList<MissionTrigger> ShortestPath(MissionIndex index, IEnumerable<MissionTrigger> roots,
         MissionTrigger target, params MissionLinkKind[] kinds)
     {
-        var cancelled = index.Cancels.Where(c => c.Target != null).Select(c => (c.Source, c.Target!)).ToHashSet();
-        var next = index.Links.Where(l => kinds.Contains(l.Kind) && l.Target is { IsDuplicate: false } && !l.Source.IsDuplicate &&
-                                          !(l.Kind == MissionLinkKind.Start && cancelled.Contains((l.Source, l.Target))))
-            .ToLookup(l => l.Source, l => l.Target!);
+        var next = Next(index, kinds);
         var parent = new Dictionary<MissionTrigger, MissionTrigger?>();
         var queue = new Queue<MissionTrigger>();
         foreach (var root in roots.Where(r => !r.IsDuplicate))

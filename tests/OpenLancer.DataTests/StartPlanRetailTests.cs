@@ -13,7 +13,8 @@ namespace OpenLancer.DataTests;
 
 /// <summary>
 /// Retail proofs of the start plan (sections 5.3 and 12.3 of the M6c design) over the 14 story scripts of the base game.
-/// The tests count and compare triggers. They hold no retail text.
+/// The tests count and compare triggers. They name the retail triggers of the design rows and of a few examples, and
+/// read their points from the script lines. They hold no other retail text.
 /// </summary>
 public sealed class StartPlanRetailTests(ITestOutputHelper output)
 {
@@ -188,20 +189,31 @@ public sealed class StartPlanRetailTests(ITestOutputHelper output)
     /// <summary>
     /// The suggested place of each story trigger of the base game starts where the player is in the retail game (fix
     /// of 2026-10-27). The bug was a base start after the path had left the base. A base or camera start is suspect when
-    /// a later trigger of the story path has a launch, an arrival or a space condition. Only the named rows below can be
-    /// suspect.
+    /// a later trigger of the story path has a launch, an arrival or a space condition. A suspect row must give one of
+    /// the reasons of <see cref="Reason"/> in its source text. The test counts the rows of each reason. It also counts
+    /// the suggestions at the Scene camera in one system, because Play refuses them while the Scene shows another system.
     /// </summary>
     [Fact]
     public void EachStoryTriggerOfTheBaseGameStartsWhereThePlayerIs() =>
-        CheckEachStoryTrigger(Scripts(), "base game", 53);
+        CheckEachStoryTrigger(Scripts(), "base game", new Dictionary<Reason, int>
+        {
+            [Reason.LaunchEnd] = 12,
+            [Reason.AtTheBaseOfTheLaunch] = 18,
+            [Reason.CameraWithoutAPoint] = 3,
+        }, 4);
 
     /// <summary>The same for the 14 HD Edition scripts. HD Edition removed most debug triggers that move the player, so
-    /// more starts have no point after a jump.</summary>
+    /// more starts have no point after a launch.</summary>
     [Fact]
     public void EachHdStoryTriggerStartsWhereThePlayerIs()
     {
         GameDataPaths.RequireHde();
-        CheckEachStoryTrigger(Slots(Hde.Value), "HD Edition", 159);
+        CheckEachStoryTrigger(Slots(Hde.Value), "HD Edition", new Dictionary<Reason, int>
+        {
+            [Reason.LaunchEnd] = 12,
+            [Reason.AtTheBaseOfTheLaunch] = 44,
+            [Reason.CameraWithoutAPoint] = 3,
+        }, 4);
     }
 
     /// <summary>The places of the design rows (section 5.3, step 7 of the M6c design, fix of 2026-10-27), with the points
@@ -278,6 +290,9 @@ public sealed class StartPlanRetailTests(ITestOutputHelper output)
             LinePoint(Slot(scripts, "M10"), "save_post-bund", "Act_SetInitialPlayerPos"));
         SpaceAt(scripts, "M11", "dst_tw_jgate", "Li05",
             LinePoint(Slot(scripts, "M11"), "key_save_Akescape", "Act_SetInitialPlayerPos"));
+        // Review fix: HD Edition parks the ship of a comm voice far away, so the jump gate of the jump comes before the
+        // spawns of the mission.
+        AtGate(scripts, "M02", "practicescan_init", "Li03", "Li01");
         CommonRows(scripts);
     }
 
@@ -299,6 +314,50 @@ public sealed class StartPlanRetailTests(ITestOutputHelper output)
         Assert.Equal((StartPlaceKind.Base, "Br05_01_base"), Docked(scripts, "M06", "lcp_start"));
         var m06 = Slot(scripts, "M06");
         Assert.Contains(StartPlaces.LaunchWatcherWarning("lcp_start"), Plan(m06, m06.Index.Trigger("com_0950")!).Warnings);
+
+        // The rows of the reviews of the fix. A Cnd_True step of a restore trigger gives the place of the checkpoint.
+        SpaceAt(scripts, "M01a", "w_tutorialsave", "Li01", LinePoint(Slot(scripts, "M01a"), "w_tutorial", "Act_MovePlayer"));
+        Assert.Equal("Act_MovePlayer of w_tutorial, which w_tutorialsave starts.",
+            Suggested(scripts, "M01a", "w_tutorialsave").Source);
+        // A Cnd_DistShip line near an object of the game data gives a point near that object. So the checkpoint at the
+        // base of the Blood Dragons starts near that base, and not at a generator that the restore trigger makes hostile.
+        NearObjectOf(scripts, "M09", "key_save_at_ryuku", "near_blood_dragon_base");
+        NearObjectOf(scripts, "M04", "key_to_br04_init", "close_to_leeds_jump_hole");
+        // The path to these triggers already made the jump that they wait for. So the start is after the jump, at the jump
+        // gate of the jump, and the page warns.
+        AtGate(scripts, "M03", "play_brandon_scene", "Li02", "Li01");
+        var m10 = Slot(scripts, "M10");
+        Assert.Equal("Rh04", Suggested(scripts, "M10", "nse_jonnerpal_Rh04").System, ignoreCase: true);
+        Assert.Contains(StartPlaces.ArrivedWarning("nse_jonnerpal_Rh04", "Rh04"),
+            Plan(m10, m10.Index.Trigger("nse_jonnerpal_Rh04")!).Warnings);
+        // A spawn that the path makes hostile to the player gives no point.
+        Assert.DoesNotContain("bad_wing", Suggested(scripts, "M13", "general_triggers").Source);
+        // A start trigger without a place starts at the Scene camera in any system, as the mission start does.
+        Assert.Equal((StartPlaceKind.Camera, null), (Suggested(scripts, "M04", "start").Kind,
+            Suggested(scripts, "M04", "start").System));
+    }
+
+    /// <summary>Checks a start near the object of the Cnd_DistShip line of a trigger: at the edge of its range from the
+    /// object, at least the offset away.</summary>
+    private static void NearObjectOf(IReadOnlyList<MissionAnalysis> scripts, string slot, string trigger, string near)
+    {
+        var condition = Slot(scripts, slot).Index.Trigger(near)!.Condition!;
+        Assert.True(MissionIndex.Is(condition.Key, "Cnd_DistShip"), condition.Key);
+        var name = MissionIndex.Is(condition.Value(1), "Player") ? condition.Value(2)! : condition.Value(1)!;
+        var item = Slot(scripts, slot).Index.World.ObjectOf(name)!;
+        SpaceAt(scripts, slot, trigger, item.System,
+            item.Position + new Vector3(0, 0, Math.Max(StartPlaces.Offset, Number(condition, 3))));
+        Assert.Equal($"Cnd_DistShip of {near}.", Suggested(scripts, slot, trigger).Source);
+    }
+
+    /// <summary>Checks a start at the jump gate or hole of a system that leads to the system before the jump.</summary>
+    private static void AtGate(IReadOnlyList<MissionAnalysis> scripts, string slot, string trigger, string system,
+        string from)
+    {
+        var gate = Slot(scripts, slot).Index.World.JumpInto(system, from)!;
+        SpaceAt(scripts, slot, trigger, system,
+            gate.Position + Vector3.Transform(new Vector3(0, 0, StartPlaces.Offset), gate.Rotation));
+        Assert.EndsWith($"units from {gate.Nickname}, the jump gate or hole to {from}.", Suggested(scripts, slot, trigger).Source);
     }
 
     /// <summary>A time gate: the walk of the suggested place over each trigger of the biggest script, after a warm-up.
@@ -328,11 +387,14 @@ public sealed class StartPlanRetailTests(ITestOutputHelper output)
     /// <summary>The check of each story trigger of a data set (see
     /// <see cref="EachStoryTriggerOfTheBaseGameStartsWhereThePlayerIs"/>). Each suggestion names a system or a base that
     /// the game data has.</summary>
-    /// <param name="suspects">The number of suspect rows that the named lists allow in this data set.</param>
-    private void CheckEachStoryTrigger(IReadOnlyList<MissionAnalysis> scripts, string name, int suspects)
+    /// <param name="expected">The number of suspect rows of each reason in this data set.</param>
+    /// <param name="cameras">The number of suggestions at the Scene camera in one system.</param>
+    private void CheckEachStoryTrigger(IReadOnlyList<MissionAnalysis> scripts, string name,
+        IReadOnlyDictionary<Reason, int> expected, int cameras)
     {
         var kinds = new Dictionary<StartPlaceKind, int>();
-        var allowed = new List<string>();
+        var inOneSystem = 0;
+        var reasons = Enum.GetValues<Reason>().ToDictionary(r => r, _ => 0);
         var wrong = new List<string>();
         foreach (var analysis in scripts)
         {
@@ -345,6 +407,8 @@ public sealed class StartPlanRetailTests(ITestOutputHelper output)
                     continue;
                 var place = plan.Suggested;
                 kinds[place.Kind] = kinds.GetValueOrDefault(place.Kind) + 1;
+                if (place is { Kind: StartPlaceKind.Camera, System: not null })
+                    inOneSystem++;
                 var row = $"{slot} {trigger.Nickname}";
                 if (place.System is { } system)
                     Assert.True(index.World.Has(MissionValueKind.System, system), $"{row}: {place.Text}");
@@ -355,17 +419,19 @@ public sealed class StartPlanRetailTests(ITestOutputHelper output)
                 if (place.Kind == StartPlaceKind.Space ||
                     !SpaceAfterThePlace(StartPlan.StoryPath(index, trigger), trigger, place))
                     continue;
-                if (AllowedSuspect(row, place.Source))
-                    allowed.Add(row);
+                if (ReasonOf(place) is { } reason)
+                    reasons[reason]++;
                 else
                     wrong.Add($"{row}: {place.Text}. {place.Source}");
             }
         }
 
         output.WriteLine($"{name}: {string.Join(", ", kinds.OrderBy(k => k.Key).Select(k => $"{k.Key} {k.Value}"))}, " +
-                         $"{allowed.Count} allowed suspect rows");
+                         $"suspect rows {string.Join(", ", reasons.Select(r => $"{r.Key} {r.Value}"))}, " +
+                         $"{inOneSystem} at the Scene camera in one system");
         Assert.Empty(wrong);
-        Assert.Equal(suspects, allowed.Count);
+        Assert.Equal(expected.OrderBy(r => r.Key), reasons.OrderBy(r => r.Key));
+        Assert.Equal(cameras, inOneSystem);
     }
 
     /// <summary>The rule of the survey of 2026-10-27. A trigger of the story path after the trigger of the place has a
@@ -388,91 +454,51 @@ public sealed class StartPlanRetailTests(ITestOutputHelper output)
     private static readonly string[] SpaceWithPlayer =
         ["Cnd_NPCSystemEnter", "Cnd_TLEntered", "Cnd_TLExited", "Cnd_DistShip", "Cnd_DistVec"];
 
-    /// <summary>True when a suspect row is in the named list of its reason, and its source gives that reason.</summary>
-    private static bool AllowedSuspect(string row, string source) =>
-        LaunchEnd.Contains(row) && source.EndsWith("waits for the end of a launch, so the play starts docked.",
-            StringComparison.Ordinal) ||
-        AtTheBaseOfTheLaunch.Contains(row) && source.Contains(". No line of the path gives a point in ",
-            StringComparison.Ordinal) && source.Contains(" after ", StringComparison.Ordinal) ||
-        CameraWithoutAPoint.Contains(row) && source.Contains("No line of the path gives a point in ", StringComparison.Ordinal);
+    /// <summary>Why a base or camera start can follow a launch, an arrival or a space condition of the path.</summary>
+    private enum Reason
+    {
+        /// <summary>The chosen trigger waits for the end of a launch (Cnd_LaunchComplete of the player). Only a launch
+        /// from a dock ends a launch, in retail and in OpenLancer. So the start is docked at the base of the launch, and
+        /// the launch runs the trigger.</summary>
+        LaunchEnd,
 
-    /// <summary>
-    /// The chosen trigger waits for the end of a launch (Cnd_LaunchComplete of the player). Only a launch from a dock
-    /// ends a launch, in retail and in OpenLancer. So the start is docked at the base of the launch, and the launch runs
-    /// the trigger.
-    /// </summary>
-    private static readonly HashSet<string> LaunchEnd =
-    [
-        "M02 after_launch", "M04 enter_space", "M05 lcp_Br03_01", "M06 lcp_start", "M08 ku01_init",
-        .. Rows("M09", "lcp_ku06_01 lcp_ku07_01"),
-        .. Rows("M10", "timer_sendcomm_dx_m10_1260_fischer player_follows_von_claussen"),
-        .. Rows("M13", "launch_complete stop_player wait_until_after_launch"),
-    ];
+        /// <summary>No line of the path gives a point in the system after the launch. The start is docked at the base of
+        /// the launch. The dock is the point of the launch in the retail game, and the launch runs the launch triggers
+        /// again. The center of a system is never a start point, because most suns are there.</summary>
+        AtTheBaseOfTheLaunch,
 
-    /// <summary>
-    /// No line of the path gives a point in the system after the launch. The start is docked at the base of the launch.
-    /// The dock is the point of the launch in the retail game, and the launch runs the launch triggers again. The center
-    /// of a system is never a start point, because most suns are there.
-    /// </summary>
-    private static readonly HashSet<string> AtTheBaseOfTheLaunch =
-    [
-        .. Rows("M03", "tr_0100_juni com_0100_juni commcomplete_dx_m03_0120_juni hsm_yes commcomplete_DX_M03_0130_TRENT " +
-                       "commcomplete_DX_M03_0140_JUNI hsm_no commcomplete_DX_M03_0150_TRENT commcomplete_DX_M03_0160_JUNI " +
-                       "syx_ny sye_ca loaded_from_autosave play_brandon_scene sye_ca_repeatable " +
-                       "dialog_toward_ca_minor_complete dialog_at_ca_minor_complete"),
-        // HD Edition: all of them. The base game: only tr_to_sprague, because debug triggers give the other points.
-        .. Rows("M05", "tr_to_sprague tr_stop_player first_com com_0100 tle_Br03_45 com_0110 com_0120 tl_exit " +
-                       "com_0125_Norfolk com_0126 com_0127_Norfolk com_0130 tle_Br03_29 tl_23_exit delay_0140 syx_br03_bw01 " +
-                       "sye_bw01"),
-        // HD Edition: all of them. The base game: only Cam2_Timer and Cam3_Timer.
-        .. Rows("M07", "Cam2_Timer Cam3_Timer tr_to_space rh_agents_detected engage_rheinlanders_outside_leeds " +
-                       "rh_agent1_dead rh_agent2_dead agent_runs1 commcomplete_DX_M07_0180_RH_AGENT_01 " +
-                       "commcomplete_DX_M07_0200_JUNI"),
-        // HD Edition only.
-        .. Rows("M09", "commcomplete_DX_M09_0100_OZU start_travel_to_jumphole_dialog commcomplete_DX_M09_0110_JUNI " +
-                       "commcomplete_DX_M09_0120_OZU commcomplete_DX_M09_0130_JUNI commcomplete_DX_M09_0140_OZU " +
-                       "commcomplete_DX_M09_0150_JUNI commcomplete_DX_M09_0160_OZU start_near_jumphole_dialog " +
-                       "start_at_jumphole_dialog syx_Ku06 jumped_to_ku07 wait_for_ozu_in_ku07"),
-    ];
+        /// <summary>No line of the path gives a point in the system, and no line names a base of the launch. The start is
+        /// at the Scene camera in that system.</summary>
+        CameraWithoutAPoint,
+    }
 
-    /// <summary>
-    /// No line of the path gives a point in the system, and no line names a base of a launch. The path comes after a
-    /// jump, or after a launch from a base that the mission does not name. The start is at the Scene camera in that
-    /// system. Only the game data knows the arrival gate or hole of a jump (open point (c) of the design).
-    /// </summary>
-    private static readonly HashSet<string> CameraWithoutAPoint =
-    [
-        "M01b launch_complete_RTC", "M06 tm_junispeaks", "M06 com_0100", "M13 clear_waypoint", "M13 fail_range",
-        .. Rows("M03", "syx_ca perform_dialog_toward_ca_minor dialog_toward_ca_minor perform_dialog_at_ca_minor " +
-                       "dialog_at_ca_minor give_obj_to_dock_on_ca_minor"),
-        // HD Edition: also the two comm lines.
-        .. Rows("M04", "juni_near_player sendcomm_DX_M04_1370_JUNI sendcomm_DX_M04_1380_JUNI"),
-        // HD Edition only. The base game has debug triggers with points in Br03 and Br04.
-        .. Rows("M05", "syx_br03_br04 sye_br03_init sinclair_com com_0720 delay_next_juni_com com_0670 com_0680 com_0690 " +
-                       "delay_traitors_appearance traitors_decloak com_0730 com_740 com_750 com_760 com_770 com_780 com_790 " +
-                       "com_800 com_0810 dst_save_bship head_to_battleship delay_com_830 com_830 nse_juni_br04 " +
-                       "sye_br04_init com_960 com_970 com_980 com_990 com_1000 dst_to_br04_tradelane com_1029 com_1030 " +
-                       "player_near_br04_01"),
-        // HD Edition only. The base game has debug triggers with points in Bw10, Bw08 and Ku03.
-        .. Rows("M07", "tr_to_tau31 commcomplete_DX_M07_0595_JUNI tl_enter_to_holman tl_exit_at_holman " +
-                       "commcomplete_DX_M07_0650_TOBIAS juni_cautious tr_to_tau23 make_outcast_base_friendly " +
-                       "commcomplete_DX_M07_1590_RAZOR_1 close_to_outcast_base commcomplete_DX_M07_1620_CALI " +
-                       "commcomplete_DX_M07_1630_RAZOR_1 commcomplete_DX_M07_1640_CALI commcomplete_DX_M07_1650_RAZOR_1 " +
-                       "tr_to_ku03 commcomplete_DX_M07_1730_JUNI start_travel_to_tsushima_dialog " +
-                       "commcomplete_DX_M07_1740_JUNI start_near_kyushu_dialog commcomplete_DX_M07_1750_JUNI " +
-                       "start_at_kyushu_dialog commcomplete_DX_M07_1760_JUNI"),
-        // HD Edition: also the rows from tr_to_ku06.
-        .. Rows("M09", "tr_to_ku07 commcomplete_DX_M09_0210_OZU half_way_to_blood_dragon_base at_blood_dragon_base " +
-                       "near_blood_dragon_base commcomplete_DX_M09_0380_OZU commcomplete_DX_M09_0390_RYUKU " +
-                       "commcomplete_DX_M09_0391_RYUKU commcomplete_DX_M09_0410_OZU commcomplete_DX_M09_0401_RYUKU " +
-                       "tr_to_ku06 commcomplete_DX_M09_0740_HAKKERA Akira_sights_dragon_base restart_hakkera_patrol_path " +
-                       "activate_look_to_restart_hakkera_path restart_juni_patrol_path activate_look_to_restart_juni_path " +
-                       "commcomplete_DX_M09_0750_HAKKERA commcomplete_DX_M09_0760_KYOTO commcomplete_DX_M09_0770_HAKKERA " +
-                       "commcomplete_DX_M09_0780_KYOTO"),
-    ];
+    /// <summary>The reason that the source text of a suspect place gives, or null.</summary>
+    private static Reason? ReasonOf(StartPlace place) => place.Source switch
+    {
+        _ when place.Kind == StartPlaceKind.Base &&
+               place.Source.EndsWith("waits for the end of a launch, so the play starts docked.", StringComparison.Ordinal) =>
+            Reason.LaunchEnd,
+        _ when place.Kind == StartPlaceKind.Base &&
+               place.Source.Contains(". No line of the path gives a point in ", StringComparison.Ordinal) &&
+               place.Source.Contains(" after ", StringComparison.Ordinal) => Reason.AtTheBaseOfTheLaunch,
+        _ when place is { Kind: StartPlaceKind.Camera, System: not null } &&
+               place.Source.Contains(" No line of the path gives a point in ", StringComparison.Ordinal) =>
+            Reason.CameraWithoutAPoint,
+        _ => null,
+    };
 
-    private static IEnumerable<string> Rows(string slot, string triggers) =>
-        triggers.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(t => $"{slot} {t}");
+    /// <summary>A few suspect rows of each reason, in both data sets.</summary>
+    [Fact]
+    public void ExamplesOfTheReasonsOfTheSuspectRows()
+    {
+        var scripts = Scripts();
+        foreach (var (slot, trigger) in new[] { ("M02", "after_launch"), ("M06", "lcp_start"), ("M13", "launch_complete") })
+            Assert.Equal(Reason.LaunchEnd, ReasonOf(Suggested(scripts, slot, trigger)));
+        foreach (var (slot, trigger) in new[] { ("M03", "tr_0100_juni"), ("M05", "tr_to_sprague") })
+            Assert.Equal(Reason.AtTheBaseOfTheLaunch, ReasonOf(Suggested(scripts, slot, trigger)));
+        foreach (var (slot, trigger) in new[] { ("M06", "tm_junispeaks"), ("M01b", "launch_complete_RTC") })
+            Assert.Equal(Reason.CameraWithoutAPoint, ReasonOf(Suggested(scripts, slot, trigger)));
+    }
 
     private static MissionAnalysis Slot(IReadOnlyList<MissionAnalysis> scripts, string slot) =>
         scripts.Single(a => a.Script.Slot!.Slot == slot);
