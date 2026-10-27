@@ -195,13 +195,27 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 | Story slot | The story slot of the mission. The start save names its mission. |
 | Story stage | The story stage in the start save. After the accept, it is the accept stage of the slot. |
 | Mission accepted | Yes when the start comes after the player accepts the mission. |
-| Start place | Where the player starts: the suggestion, a base that you pick, or the Scene camera. The suggestion comes from the start trigger and from the path to it. A base that the game data does not have, and the Scene camera without an open system, show their reason under the field. |
+| Start place | Where the player starts: the suggestion, a base that you pick, or the Scene camera. The suggestion is where the player is at this trigger in the game (see below). A base or a system that the game data does not have shows its reason under the field. The Scene camera without an open system, and a suggested Scene camera in a system that the Scene does not show, also show their reason. |
+| Source of the place | The line of the script that gives the suggested place, for example "Act_SetInitialPlayerPos of key_save_x.". When another line gives the system or the point, the text names that line too. Click "Select" to select the trigger of the line in the graph. The row shows only for the suggested place. |
 | Ship | The ship package of the Play menu. |
 | Triggers that wait at the start | The triggers that are active when the play starts. Click a row to select the trigger. |
 | Advanced > Setup lines | The setup triggers of an approximate start, as read-only raw INI with colors. They are in the test layer of the play, not in the mod. |
 | Play from the play start | Plays the mission from this start in OpenLancer, as F5 in the Mission tab does. The button is off while the start or its start place cannot start, and its tooltip gives the reason. |
 
 A warning shows when no start trigger and no checkpoint leads to the trigger. The play then starts only this trigger. A warning also shows for a checkpoint start and for a start whose path starts at a checkpoint. The start save keeps only the triggers of a saved game. When the start cannot start, the page shows the reason, for example for a script without a story slot.
+
+Two warnings are about the suggested place. A trigger that waits for the end of the launch does not run after a start in space, so the page names it. Pick a base to run it. A trigger that waits for the player to enter space in another system runs in OpenLancer, but not in the linked game.
+
+### How the editor suggests the start place
+
+The suggestion is where the player is at the trigger in the game. The editor reads the path to the trigger from the newest trigger back. The newest line that tells where the player is gives the kind of the start:
+
+- A bar visit, a base entry or a forced landing docks the player at that base.
+- A launch, a jump into a system, a line that moves the player, or a condition about the player in space puts the player in space.
+- A trigger that waits at a base for the launch, or for the end of the launch, starts docked at the base of the launch. The launch then runs it.
+- A trigger that waits for a jump starts before the jump, so the jump runs it.
+
+The point of a start in space comes from a line that moves the player, a checkpoint, or a debug trigger of the script that moves the player to the same step. Else it comes from a point where a condition waits for the player, or it is 1,000 units from a ship that the path spawns. The system comes from the same lines, the base of the launch or a system hint. When no line gives a point after a launch, the start is docked at the base of the launch. When no line gives a point after a jump, the start is at the Scene camera in that system. Open that system in the Scene, or pick a base.
 
 The section "Play a mission" of [PLAY.md](PLAY.md) tells what Play does with the start. It tells about the save, the start save, the test layer and the restart after a save.
 
