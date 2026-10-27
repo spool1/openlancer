@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Strings;
 using Xunit;
 using static OpenLancer.Tests.ItemWorkspace;
@@ -71,9 +72,14 @@ public sealed class ItemEditsTests
         // eng1 is equipment in another file of the kind.
         Assert.Throws<InvalidOperationException>(() => ItemEdits.Rename(session, Gun("gun2"), "eng1"));
         Assert.Throws<ArgumentException>(() => ItemEdits.Rename(session, Gun("nothing"), "x"));
-        // The edit fails as a whole when it runs: only a new section gets a new key.
-        var rename = ItemEdits.Rename(session, Gun("gun1"), "gun9");
-        Assert.Throws<InvalidOperationException>(() => session.Execute(rename));
+        // Only a new section gets a new key, so the edit refuses at once. The command of the rename gives the same
+        // reason when it runs.
+        var lower = Assert.Throws<ArgumentException>(() => ItemEdits.Rename(session, Gun("gun1"), "gun9"));
+        Assert.Equal("[Gun] nickname = gun1: the editor can change the key only of a section that the active mod adds.",
+            ErrorText.Of(lower));
+        var same = Assert.Throws<ArgumentException>(() => ItemEdits.Rename(session, Gun("gun2"), "GUN2"));
+        Assert.Equal("[Gun] nickname = gun2: the new key must differ from the old key in more than letter case.",
+            ErrorText.Of(same));
         Assert.NotNull(session.Get(Good(WeaponGoodsPath, "gun1")));
         Assert.Equal("New gun2 from gun1", session.UndoLabel);
     }

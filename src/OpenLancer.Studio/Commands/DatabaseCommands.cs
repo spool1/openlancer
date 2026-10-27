@@ -4,6 +4,8 @@ using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions.Editing;
 
 namespace OpenLancer.Studio.Commands;
@@ -13,9 +15,10 @@ namespace OpenLancer.Studio.Commands;
 /// and rename an item that the active mod adds. The Database and the agent tools call them. Each one gives the plan
 /// that its caller runs.
 /// </summary>
-/// <remarks>Each command wraps the edit of today (<see cref="ItemTemplates"/> and <see cref="ItemEdits.Rename"/>) and
-/// does not copy its rules. A command never throws for a rule of the edit. It gives a plan that refuses, with the
-/// reason. A plan reads the edit view when it is made, so make it and run it at once.</remarks>
+/// <remarks>Each command wraps the edit of today (<see cref="ItemTemplates"/> and
+/// <see cref="ItemEdits.Rename(EditSession, SectionRef, string, List{Diagnostic})"/>) and does not copy its rules.
+/// A command never throws for a rule of the edit. It gives a plan that refuses, with the reason. A plan reads the
+/// edit view when it is made, so make it and run it at once.</remarks>
 public static class DatabaseCommands
 {
     /// <summary>
@@ -37,11 +40,17 @@ public static class DatabaseCommands
     /// <summary>
     /// Plans a new nickname for an item that the active mod adds, with each line that names it. The tool
     /// <c>rename_item</c> calls it for a data item (section 7.2 of the MCP1 design). See
-    /// <see cref="ItemEdits.Rename"/>. A nickname that another section of the same kind of file has refuses with the
-    /// detail <see cref="MissionErrors.NameTaken"/>.
+    /// <see cref="ItemEdits.Rename(EditSession, SectionRef, string, List{Diagnostic})"/>. A nickname that another
+    /// section of the same kind of file has refuses with the detail <see cref="MissionErrors.NameTaken"/>. An item of
+    /// the lower layer refuses, because the active mod can change the key only of a section that it adds.
     /// </summary>
-    /// <remarks>The plan warns about each mission line that names the item and that the edit cannot change. The save
-    /// stops at such a line (rule M23).</remarks>
+    /// <remarks>
+    /// <para>The plan warns about each mission line that names the item and that the edit cannot change. The save stops
+    /// at such a line (rule M23).</para>
+    /// <para>The mentions are the files that name the old nickname as text and that the rename does not change, for
+    /// example a loadout (see <see cref="EditSession.StoryMentions"/>). A warning or a mention makes the plan need a
+    /// confirmation, as a rename in the Scene does (decision D242).</para>
+    /// </remarks>
     public static EditPlan Rename(EditSession session, SectionRef item, string newNickname) =>
         new RenamePlan(session, item, newNickname);
 
@@ -78,9 +87,10 @@ public static class DatabaseCommands
             : base($"Rename {item.Id.Key} to {newNickname}")
         {
             var warnings = new List<Diagnostic>();
+            var changes = new List<SectionRef>();
             try
             {
-                Command = ItemEdits.Rename(session, item, newNickname, warnings);
+                Command = ItemEdits.Rename(session, item, newNickname, warnings, changes);
             }
             catch (Exception e) when (e is ArgumentException or InvalidOperationException)
             {
@@ -96,8 +106,16 @@ public static class DatabaseCommands
                 return;
             }
 
-            Changes = [item with { Id = item.Id with { Key = newNickname } }];
+            Changes = changes;
             Warnings = warnings;
+            // The scan also finds the lines that the rename changes, so a file that it changes is no mention.
+            var changed = changes.Select(c => VfsPath.Normalize(c.Path) ?? c.Path).ToHashSet(VfsPath.Comparer);
+            var old = item.Id.Key!;
+            Mentions = session.StoryMentions(old)
+                .Where(m => !changed.Contains(VfsPath.Normalize(m.Path) ?? m.Path))
+                .Select(m => new NamedMention(old, m.Path, m.Count))
+                .ToList();
+            NeedsConfirmation = Warnings.Count > 0 || Mentions.Count > 0;
         }
     }
 }

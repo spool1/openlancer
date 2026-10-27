@@ -102,7 +102,8 @@ public sealed class DatabaseCommandsTests
         Assert.Equal(Gun("gun1"), stale.Refusals[0].Target);
     }
 
-    /// <summary>The rename of an item of the active mod gives the W of <see cref="ItemEdits.Rename"/>: the item, its good
+    /// <summary>The rename of an item of the active mod gives the W of
+    /// <see cref="ItemEdits.Rename(EditSession, SectionRef, string, List{Diagnostic})"/>: the item, its good
     /// and each line that names it. A nickname that another section has refuses with the detail NameTaken.</summary>
     [Fact]
     public void ARenameOfAnItemGivesTheLinesOfToday()
@@ -116,13 +117,103 @@ public sealed class DatabaseCommandsTests
         New(session);
         var plan = DatabaseCommands.Rename(session, Gun("gun2"), "gun3");
         Assert.Equal("Rename gun2 to gun3", plan.Label);
-        Assert.Equal([Gun("gun3")], plan.Changes);
+        Assert.Equal([Gun("gun3"), Good(WeaponGoodsPath, "gun3")], plan.Changes);
+        Assert.Empty(plan.Mentions);
+        Assert.False(plan.NeedsConfirmation);
 
         var taken = DatabaseCommands.Rename(session, Gun("gun2"), "gun1");
         var error = Assert.Single(taken.Report(session).Errors);
         Assert.Equal(MissionErrors.NameTaken, error.Detail);
         Assert.Equal("Another section of the equipment files has the nickname gun1.", error.Message);
-        Assert.False(DatabaseCommands.Rename(session, Ship("s1"), "bad name;").CanRun);
+        Assert.False(DatabaseCommands.Rename(session, Gun("gun2"), "bad name;").CanRun);
+    }
+
+    /// <summary>An item of the lower layer, and a nickname that differs only in letter case, refuse in the plan with
+    /// the reason of the session command. Through the runner, nothing changes.</summary>
+    [Fact]
+    public void ARenameOfALowerItemOrToTheSameNicknameRefusesInThePlan()
+    {
+        using var ws = Create();
+        var session = ws.Session("act");
+        session.Execute(ItemTemplates.Build(ItemTemplates.Plan(session, Gun("gun1"), "gun2")));
+        var revision = session.Revision;
+
+        var lower = DatabaseCommands.Rename(session, Gun("gun1"), "gun9");
+        Assert.False(lower.CanRun);
+        Assert.False(lower.NeedsConfirmation);
+        Assert.Equal("[Gun] nickname = gun1: the editor can change the key only of a section that the active mod adds.",
+            Assert.Single(lower.Refusals).Message);
+        var same = DatabaseCommands.Rename(session, Gun("gun2"), "GUN2");
+        Assert.False(same.CanRun);
+        Assert.Equal("[Gun] nickname = gun2: the new key must differ from the old key in more than letter case.",
+            Assert.Single(same.Refusals).Message);
+
+        var result = FakeCommandHost.Runner(session).Run(lower);
+        Assert.Equal(EditStatus.Refused, result.Status);
+        Assert.Equal(EditPlan.PlanRefused, Assert.Single(result.Errors).Detail);
+        Assert.Equal(revision, session.Revision);
+        Assert.Equal("New gun2 from gun1", session.UndoLabel);
+        Assert.NotNull(session.Get(Gun("gun1")));
+        Assert.NotNull(session.Get(Good(WeaponGoodsPath, "gun1")));
+    }
+
+    /// <summary>A mission line that the rename cannot change gives a warning. The save stops at such a line (rule M23),
+    /// so the plan needs a confirmation (decision D242).</summary>
+    [Fact]
+    public void AWarningOfARenameNeedsAConfirmation()
+    {
+        using var ws = Create();
+        ws.WriteBase(@"DATA\MISSIONS\OL_TEST\ol_test.ini", """
+            [Mission]
+            npc_ship_file = missions\ol_test\npcships.ini
+            """);
+        // Two builds with one nickname: a patch cannot find one of them, so the session cannot change them.
+        ws.WriteBase(@"DATA\MISSIONS\OL_TEST\npcships.ini", """
+            [NPCShipArch]
+            nickname = ol_twin
+            ship_archetype = s2
+
+            [NPCShipArch]
+            nickname = ol_twin
+            ship_archetype = s2
+            """);
+        var session = ws.Session("act");
+        session.Execute(ItemTemplates.Build(ItemTemplates.Plan(session, Ship("s1"), "s2")));
+
+        var plan = DatabaseCommands.Rename(session, Ship("s2"), "s3");
+
+        Assert.True(plan.CanRun);
+        Assert.Equal(2, plan.Warnings.Count);
+        Assert.True(plan.NeedsConfirmation);
+        Assert.True(plan.Report(session).NeedsConfirmation);
+    }
+
+    /// <summary>A file that names the old nickname as text and that the rename does not change is a mention, for
+    /// example a loadout. The plan then needs a confirmation (decision D242). A file that the rename changes is no
+    /// mention.</summary>
+    [Fact]
+    public void AFileThatTheRenameDoesNotChangeIsAMention()
+    {
+        using var ws = Create();
+        ws.WriteBase(@"DATA\SHIPS\loadouts.ini", """
+            [Loadout]
+            nickname = s1_loadout
+            equip = gun2, HpWeapon01
+            """);
+        var session = ws.Session("act");
+        session.Execute(ItemTemplates.Build(ItemTemplates.Plan(session, Gun("gun1"), "gun2")));
+        Assert.True(session.Save().Saved);
+        Assert.Contains(session.StoryMentions("gun2"),
+            m => m.Path.EndsWith("weapon_equip.ini", StringComparison.OrdinalIgnoreCase));
+
+        var plan = DatabaseCommands.Rename(session, Gun("gun2"), "gun3");
+
+        Assert.True(plan.CanRun);
+        Assert.Empty(plan.Warnings);
+        var mention = Assert.Single(plan.Mentions);
+        Assert.Equal(("gun2", 1), (mention.Nickname, mention.Count));
+        Assert.EndsWith("loadouts.ini", mention.Path, StringComparison.OrdinalIgnoreCase);
+        Assert.True(plan.NeedsConfirmation);
     }
 }
 

@@ -20,29 +20,46 @@ public static class ItemEdits
     /// the same nickname, because the engine finds the equipment of a good by that nickname.
     /// </summary>
     /// <remarks>The edit is one entry of the edit history. Run it at once: it holds the lines that it changes, so it
-    /// fails when it runs after the edit view changed. It also fails when it runs if a section that it renames is not
-    /// a section that the active mod adds (see <see cref="EditCommand.RenameAdded"/>).</remarks>
-    /// <param name="item">A section of an item file with a nickname.</param>
+    /// fails when it runs after the edit view changed.</remarks>
+    /// <param name="item">A section of an item file with a nickname. The active mod adds it, and also each section
+    /// that the edit renames with it, for example the good of equipment (see
+    /// <see cref="EditCommand.RenameAdded"/>).</param>
     /// <param name="warnings">Gets a warning for each mission line that names the item and that the edit cannot change,
     /// for example a line of a section that the active mod cannot patch. The save stops at such a line (rule M23), so
     /// the caller shows the warnings at once. Null drops them.</param>
-    /// <exception cref="ArgumentException">The section is not a section of an item file with a nickname, or the new
-    /// nickname cannot be the value of a patch line.</exception>
+    /// <exception cref="ArgumentException">The section is not a section of an item file with a nickname. Or the lower
+    /// layer has a section that the edit renames. Or the new nickname differs from the old one only in letter case, or
+    /// it cannot be the value of a patch line.</exception>
     /// <exception cref="InvalidOperationException">Another section of the same kind of file has the new
     /// nickname.</exception>
     public static EditCommand Rename(EditSession session, SectionRef item, string newNickname,
-        List<Diagnostic>? warnings = null)
+        List<Diagnostic>? warnings = null) => Rename(session, item, newNickname, warnings, null);
+
+    /// <summary>
+    /// Gives an item that the active mod adds a new nickname, as
+    /// <see cref="Rename(EditSession, SectionRef, string, List{Diagnostic})"/> does.
+    /// </summary>
+    /// <param name="changes">Gets each section that the edit changes and keeps, with its identity after the edit: the
+    /// sections that it renames and the sections whose lines name the item. Null drops them.</param>
+    internal static EditCommand Rename(EditSession session, SectionRef item, string newNickname,
+        List<Diagnostic>? warnings, List<SectionRef>? changes)
     {
         var index = session.Items;
         var kind = index.KindOf(item.Path);
         var oldNickname = item.Id.Key;
         if (kind == null || oldNickname == null || index.Section(item) == null)
             throw new ArgumentException($"{item} is not a section of an item file with a nickname.", nameof(item));
+        if (string.Equals(oldNickname, newNickname, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException(EditCommand.SameKeyReason(item.Id), nameof(newNickname));
         var renamed = new List<(SectionRef Section, ItemFileKind Kind)> { (item, kind.Value) };
         if (kind == ItemFileKind.Equipment)
             renamed.AddRange(index.Related(item, ItemRelation.Good).Select(g => (g, ItemFileKind.Goods)));
         else if (kind == ItemFileKind.Goods)
             renamed.AddRange(index.Named(ItemFileKind.Equipment, oldNickname).Select(e => (e, ItemFileKind.Equipment)));
+        // RenameAdded refuses a section of the lower layer when it runs. This check refuses it before, so the plan of a
+        // command can refuse it.
+        if (renamed.FirstOrDefault(r => session.InBase(r.Section)).Section is { } lower)
+            throw new ArgumentException(EditCommand.OnlyAddedReason(lower.Id), nameof(item));
         foreach (var (section, sectionKind) in renamed)
         {
             if (index.Named(sectionKind, newNickname).Any(s => !s.Equals(section)))
@@ -83,6 +100,8 @@ public static class ItemEdits
             if (PatchFormatter.KeyError(newNickname, binary) is { } error)
                 throw new ArgumentException(error, nameof(newNickname));
         }
+        changes?.AddRange(renamed.Select(r => moved[r.Section])
+            .Concat(relinked.Select(s => moved.GetValueOrDefault(s, s))).Distinct());
         return EditCommand.Group($"Rename {oldNickname} to {newNickname}", commands, session.Snapshot());
     }
 

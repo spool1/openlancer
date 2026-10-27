@@ -117,6 +117,14 @@ public abstract class EditCommand
         return new RenameCommand($"Rename {target.Id} to {newKey}", target, newKey, onlyAdded: true);
     }
 
+    /// <summary>Why <see cref="RenameAdded"/> cannot give a section of the lower layer a new key.</summary>
+    internal static string OnlyAddedReason(SectionIdentity id) =>
+        $"{id}: the editor can change the key only of a section that the active mod adds.";
+
+    /// <summary>Why a rename cannot give a section a key that differs from its old key only in letter case.</summary>
+    internal static string SameKeyReason(SectionIdentity id) =>
+        $"{id}: the new key must differ from the old key in more than letter case.";
+
     /// <summary>
     /// Sets one value of one line in place: value <paramref name="index"/> of the line <paramref name="line"/> (from 0)
     /// of a name. The other lines keep their order, so a line of a group of lines that belong together stays with its
@@ -319,8 +327,7 @@ public abstract class EditCommand
             if (document.BaseIdOf(document.IdentityAt(index)) is { } before)
             {
                 if (onlyAdded)
-                    throw new InvalidOperationException(
-                        $"{target.Id}: the editor can change the key only of a section that the active mod adds.");
+                    throw new InvalidOperationException(OnlyAddedReason(target.Id));
                 if (SectionKeys.IsChild(section.Name))
                     throw new InvalidOperationException(
                         $"{target.Id}: a patch cannot give a child section of the lower layer a new key.");
@@ -336,8 +343,7 @@ public abstract class EditCommand
                         $"Another [{section.Name}] section of the lower layer has {keyName} = {newKey}.");
             }
             if (string.Equals(SectionIdentity.KeyOf(section), newKey, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException(
-                    $"{target.Id}: the new key must differ from the old key in more than letter case.");
+                throw new InvalidOperationException(SameKeyReason(target.Id));
             if (document.Working.Any(s => s.Name.Equals(section.Name, StringComparison.OrdinalIgnoreCase) &&
                                           string.Equals(SectionIdentity.KeyOf(s), newKey, StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidOperationException($"Another [{section.Name}] section has {keyName} = {newKey}.");
