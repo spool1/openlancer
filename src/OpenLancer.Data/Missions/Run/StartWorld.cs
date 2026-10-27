@@ -755,10 +755,11 @@ internal static class StartWorld
                 if (trigger.Condition is not { } condition)
                     continue;
                 var names = Names(condition).Select(n => n.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                if (names.Count > 0 && names.All(Outside))
+                // An object of a system file of another system stays in the game, so only a mission object counts.
+                if (names.Count > 0 && names.All(Outside) && names.FirstOrDefault(index.IsScriptObject) is { } made)
                 {
-                    yield return WaitingWarning(trigger.Nickname, names[0], SystemOf(names[0]) ??
-                        Members(names[0]).Select(SystemOf).FirstOrDefault(s => s != null) ?? "another system");
+                    yield return WaitingWarning(trigger.Nickname, made, SystemOf(made) ??
+                        Members(made).Select(SystemOf).FirstOrDefault(s => s != null) ?? "another system");
                     continue;
                 }
                 foreach (var label in names.Where(IsLabel))

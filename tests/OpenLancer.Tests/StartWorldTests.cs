@@ -593,7 +593,8 @@ public sealed class StartWorldTests
     [Fact]
     public void TheWaitingTriggersOfLeftOutObjectsGiveWarnings()
     {
-        var plan = Plan(Script(jump: "Act_ActTrig = t_guard_dies\nAct_ActTrig = t_friends_die", triggers: """
+        var plan = Plan(Script(jump: "Act_ActTrig = t_guard_dies\nAct_ActTrig = t_friends_die\nAct_ActTrig = t_near_buoy",
+            triggers: """
             [Trigger]
             nickname = t_guard_dies
             Cnd_Destroyed = ol_guard
@@ -601,10 +602,16 @@ public sealed class StartWorldTests
             [Trigger]
             nickname = t_friends_die
             Cnd_Destroyed = ol_friends
+
+            [Trigger]
+            nickname = t_near_buoy
+            Cnd_DistShip = inside, Player, ol_buoy_a, 1000
             """));
 
         Assert.Contains(StartWorld.WaitingWarning("t_guard_dies", "ol_guard", "ol_sys_a"), plan.Warnings);
         Assert.Contains(StartWorld.LabelWarning("t_friends_die", "ol_friends", 1), plan.Warnings);
+        // An object of a system file of another system stays in the game, so the trigger can run there.
+        Assert.DoesNotContain(plan.Warnings, w => w.Contains("t_near_buoy", StringComparison.Ordinal));
     }
 
     // Group 10: the JSON view and the texts of the Play start page.
