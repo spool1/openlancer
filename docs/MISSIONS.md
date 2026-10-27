@@ -207,7 +207,7 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 | Source of the place | The line of the script that gives the suggested place, for example Act_SetInitialPlayerPos of key_save_x. When another line gives the system or the point, the text names that line too. Click "Select {trigger}" to select the trigger of the line in the graph. The row shows only for the suggested place. |
 | Ship | The ship package of the Play menu. |
 | Triggers that wait at the start | The triggers that are active when the play starts. Click a row to select the trigger. |
-| Objects that the setup leaves out ({n}) | A closed list of an approximate start. At this trigger, these objects are in another system, so the setup does not make them. The list also has the fuse lines that the setup removes. Click a row to select the trigger of its spawn line. |
+| Objects that the setup leaves out ({n}) | A closed list of an approximate start. At this trigger, these objects are in another system, or a trigger of the start makes them again, so the setup does not make them. The list also has the fuse lines that the setup removes. Click a row to select the trigger of its spawn line. |
 | Ships that start next to the player ({n}) | A closed list of an approximate start. These ships travel with the player at this trigger, and each row tells why. The setup puts them next to the player. Click a row to select the trigger of its spawn line. |
 | Advanced > Setup lines | The setup triggers of an approximate start, as read-only raw INI with colors. They are in the test layer of the play, not in the mod. |
 | Play from the play start | Plays the mission from this start in OpenLancer, as F5 in the Mission tab does. The button is off while the start or its start place cannot start, and its tooltip gives the reason. |
@@ -260,15 +260,17 @@ The editor follows each object along the path:
 - A ship or a formation goes to the system of its record. A record without a system puts it in the system of the player at its spawn line.
 - A solar and a loot always go to the system of the player.
 - A line that moves a ship puts it in the system of the player.
-- When the player jumps, each ship with the jumper flag goes with the player. The flag at the time of the jump counts.
+- When the player jumps, each ship with the jumper flag goes with the player, also from another system. The flag at the time of the jump counts.
 - An object whose system no line tells stays in the setup.
 
-The setup leaves out each object that is in another system at the trigger. It also removes each line that names such an object, for example orders, attitudes, marks and fuses. A label with a member in the start system keeps its lines. A fuse on an object that no line makes goes too. When the path spawns an object two times, only the last spawn line stays. The lines between the two spawn lines that name the object go too.
+The setup leaves out each object that is in another system at the trigger. It also removes each line that names such an object, for example orders, attitudes, marks and fuses. A label with a member in the start system keeps its lines. A line on an object that no line of the setup makes goes too, because it fails in the game. When the path spawns an object two times, only the last spawn line stays. The lines between the two spawn lines that name the object go too.
+
+A trigger that runs at the start can spawn an object of the setup again. Such triggers wait for nothing, for the launch, for the entry to space, for a timer or for the base of a base start. The scripts spawn an object again only after the first object left space. So the setup leaves out the old object, and the page names the trigger that makes it again.
 
 A ship or a formation of the start system travels with the player when one of these is true. The path must not make it hostile to the player.
 
 - Its last orders follow, trail or dock with the player, or with another ship that travels with the player.
-- A FollowPlayer list of the player names it.
+- The newest FollowPlayer list of the player names it. A newer list of the player replaces the formation of the player.
 - It jumped with the player, and no later line moved it.
 - A nag keeps the player near it, or a waiting trigger watches its tether.
 
@@ -279,7 +281,9 @@ Such a ship starts next to the player. The first rule that applies gives its poi
 3. A Follow order with an offset gives that offset.
 4. Else the ship starts in a free slot to the left or to the right of the player.
 
-For a base start, these ships start 1,000 units in front of the dock of the base. When the game data does not give the dock, they keep their points, and the page warns. Each other object of the start system keeps the point of its lines. An object that the setup leaves out does not come back when the player flies to its system later.
+No ship starts nearer than 50 units to the player or to another ship of this list. A point that is too near goes to the next rule.
+
+For a base start, these ships start 1,000 units in front of the dock of the base. The dock is an object of the system files, or a mission solar of the script that holds the base. When neither exists, they keep their points, and the page warns. Each other object of the start system keeps the point of its lines. An object that the setup leaves out does not come back when the player flies to its system later.
 
 ## The live view
 

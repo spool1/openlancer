@@ -67,13 +67,6 @@ public sealed partial class StartPlanRetailTests
             yield return values[3].Trim();
     }
 
-    /// <summary>The start anchor of a space or a base start, or null.</summary>
-    private static Vector3? Anchor(MissionIndex index, StartPlace place) => place.Kind switch
-    {
-        StartPlaceKind.Space => place.Position,
-        StartPlaceKind.Base when index.World.DockOf(place.Base!) is { } dock => StartPlaces.InFront(dock).Point,
-        _ => null,
-    };
 
     private static Vector3 Point(IReadOnlyList<string> values, int from) =>
         new(Parse(values[from]), Parse(values[from + 1]), Parse(values[from + 2]));
@@ -85,6 +78,24 @@ public sealed partial class StartPlanRetailTests
         Assert.NotNull(point);
         var away = Vector3.Distance(anchor, point!.Value);
         Assert.True(away <= distance, $"{what} is {away:0} units from the start.");
+    }
+
+    /// <summary>Each companion with a point is at least <see cref="StartWorld.Spacing"/> units from the anchor and from
+    /// each other companion.</summary>
+    private static void Apart(Vector3 anchor, IReadOnlyList<StartCompanion> companions, string what)
+    {
+        var placed = companions.Where(c => c is { Point: not CompanionPoint.Kept, Position: not null }).ToList();
+        foreach (var companion in placed)
+        {
+            var away = Vector3.Distance(anchor, companion.Position!.Value);
+            Assert.True(away >= StartWorld.Spacing - 0.05f, $"{what}: {companion.Object} is {away:0} units from the start.");
+            foreach (var other in placed.TakeWhile(c => c != companion))
+            {
+                var apart = Vector3.Distance(other.Position!.Value, companion.Position.Value);
+                Assert.True(apart >= StartWorld.Spacing - 0.05f,
+                    $"{what}: {companion.Object} is {apart:0} units from {other.Object}.");
+            }
+        }
     }
 
     /// <summary>The design rows of M10, M08, M12 and M13 in the base game and in HD Edition.</summary>
@@ -125,18 +136,19 @@ public sealed partial class StartPlanRetailTests
             Assert.Equal(["our_formation", "bd_1", "bd_2", "bd_3"], ku04.Companions.Select(c => c.Object));
             if (vanilla)
             {
-                // The points of the jump-here trigger entering_ku04, because the start is at its point.
+                // The point of the jump-here trigger entering_ku04, because the start is at its point. That trigger puts
+                // bd_1 to bd_3 0 to 40 units from the player, so they take slots.
                 var jump = m08.Index.Trigger("entering_ku04")!;
-                foreach (var companion in ku04.Companions)
-                {
-                    var line = jump.Actions.Single(a => a.Value(0) == companion.Object);
-                    var from = MissionIndex.Is(line.Key, "Act_SpawnShip") ? 2 : 1;
-                    Assert.Equal(Point(line.Line.Select(RetailText.Of).ToList(), from), companion.Position);
-                    Assert.Equal(CompanionPoint.JumpHere, companion.Point);
-                }
+                var line = jump.Actions.Single(a => a.Value(0) == "our_formation");
+                var formation = ku04.Companions.Single(c => c.Object == "our_formation");
+                Assert.Equal(Point(line.Line.Select(RetailText.Of).ToList(), 1), formation.Position);
+                Assert.Equal(CompanionPoint.JumpHere, formation.Point);
+                Assert.All(ku04.Companions.Where(c => c.Object.StartsWith("bd_", StringComparison.Ordinal)),
+                    c => Assert.Equal(CompanionPoint.Slot, c.Point));
             }
             foreach (var companion in ku04.Companions)
                 Within(StartWorld.NearDistance, ku04.Place.Position, companion.Position, $"{set} ku04_init {companion.Object}");
+            Apart(ku04.Place.Position, ku04.Companions, $"{set} ku04_init");
             var old = OldWorldText(m08, "ku04_init");
             foreach (var kept in new[] { "Transport1", "bd_4" })
             {
@@ -258,17 +270,49 @@ public sealed partial class StartPlanRetailTests
                     var twice = world.Where(l => SpawnKeys.Any(k => MissionIndex.Is(l.Key, k)))
                         .GroupBy(l => l.Values[0], StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
                     Assert.True(twice == null, $"{what}: two spawn lines of {twice?.Key}.");
-                    if (Anchor(index, plan.Place) is { } anchor)
+                    if (StartAnchor.Of(index, plan.Place, null)?.Point is { } anchor)
                     {
                         foreach (var companion in plan.Companions.Where(c => c.Point != CompanionPoint.Kept))
                             Within(StartWorld.JumpHereDistance, anchor, companion.Position, $"{what} {companion.Object}");
+                        Apart(anchor, plan.Companions, what);
                     }
+                    // The old and the new ship of one character never start together, for example juni and juni2.
+                    var ships = plan.Companions.SelectMany(c => StartSetup.Members(index, c.Object))
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var twin = ships.FirstOrDefault(s => s.TrimEnd("0123456789".ToCharArray()) is var stem && stem != s &&
+                                                         ships.Contains(stem));
+                    Assert.True(twin == null, $"{what}: {twin} and the old ship of its character start together.");
                 }
             }
             output.WriteLine($"{set}: {plans} approximate plans, {leftOut} left-out objects, {fuses} removed fuse lines, " +
                              $"{companions} companions ({moved} moved), {withoutSystem} plans without a start system.");
         }
         output.WriteLine($"Time: {watch.Elapsed.TotalSeconds:0} s.");
+    }
+
+    /// <summary>The rows of the review of 2026-10-28 in both games. M11 com_1500: the newest list of the player names
+    /// juni2 and king2, so the old juni and king are no companions. M11 bse_Li0112: postBuff_init makes King and Juni
+    /// again after the launch, so the setup leaves out the old ships.</summary>
+    [Fact]
+    public void TheReviewRowsGetTheirCompanions()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var m11 = Slot(scripts, "M11");
+            var comsat = Plan(m11, "com_1500");
+            Assert.True(comsat.CanStart, $"{set}: {comsat.Reason}");
+            Assert.Equal(["juni2", "king2"], comsat.Companions.Select(c => c.Object));
+
+            var buffalo = Plan(m11, "bse_Li0112");
+            Assert.True(buffalo.CanStart, $"{set}: {buffalo.Reason}");
+            Assert.Empty(buffalo.Companions);
+            foreach (var ship in new[] { "king", "juni" })
+            {
+                var row = Assert.Single(buffalo.LeftOut, l => l.Object == ship);
+                Assert.Equal("postBuff_init", row.MadeAgainBy);
+            }
+            Assert.DoesNotContain(World(buffalo), l => l.Values.Count > 0 && l.Values[0] is "king" or "juni");
+        }
     }
 
     /// <summary>The world of the retail checks knows the dock object of a base of the system files.</summary>

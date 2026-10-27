@@ -47,7 +47,8 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
     public const string SetupTip = "The setup triggers of an approximate start. They are in a test layer of the play. The mod " +
                                    "does not change.";
     public const string LeftOutTip = "The setup makes only the objects of the start system. At this trigger, these objects " +
-                                     "are in another system. The setup also removes each line that names these objects.";
+                                     "are in another system, or a trigger of the start makes them again. The setup also " +
+                                     "removes each line that names these objects.";
     public const string CompanionsTip = "These ships travel with the player at this trigger. The setup puts them next to the " +
                                         "player. Then their last orders continue.";
     public const string RowTip = "Selects the trigger of its spawn line.";
@@ -116,10 +117,12 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
     public static string CompanionsLabel(int count) =>
         $"Ships that start next to the player ({count.ToString(CultureInfo.InvariantCulture)})";
 
-    /// <summary>A row of the list of the objects that the setup leaves out: "{object} in {system}", "Fuse {fuse} on
-    /// {target} in {system}" or "Fuse {fuse} on {target}. No line makes {target}."</summary>
+    /// <summary>A row of the list of the objects that the setup leaves out: "{object} in {system}", "{object}. Trigger
+    /// {trigger} makes it again at the start.", "Fuse {fuse} on {target} in {system}" or "Fuse {fuse} on {target}. No line
+    /// makes {target}."</summary>
     public static string LeftOutText(LeftOutObject row) => row switch
     {
+        { MadeAgainBy: { } again } => $"{row.Object}. Trigger {again} makes it again at the start.",
         { Kind: StartObjectKind.Fuse, System: null } => $"Fuse {row.Fuse} on {row.Object}. No line makes {row.Object}.",
         { Kind: StartObjectKind.Fuse } => $"Fuse {row.Fuse} on {row.Object} in {row.System}",
         _ => $"{row.Object} in {row.System}",

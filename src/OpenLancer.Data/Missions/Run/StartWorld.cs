@@ -33,6 +33,10 @@ public sealed record LeftOutObject(string Object, StartObjectKind Kind, string? 
     /// <summary>The kind of the target of a fuse line when the script has the target, else null: an object of a system
     /// file.</summary>
     public StartObjectKind? TargetKind { get; init; }
+
+    /// <summary>The trigger of the start that makes the object again, else null. Then the object is in the start
+    /// system, and the setup leaves out the old object.</summary>
+    public string? MadeAgainBy { get; init; }
 }
 
 /// <summary>Why a ship travels with the player at the chosen trigger.</summary>
@@ -119,10 +123,11 @@ internal sealed record StartAnchor(string System, Vector3? Point, Quaternion Tur
     }
 
     /// <summary>The anchor of a base start: <see cref="StartPlaces.Offset"/> units in front of the dock object of the
-    /// base, with its heading.</summary>
+    /// base, with its heading. The dock object is an object of a system file, else a mission solar of the script whose
+    /// <c>base</c> key names the base. The game launches the player from that solar at the point of its record.</summary>
     private static StartAnchor Docked(MissionIndex index, string system, string dock)
     {
-        if (index.World.DockOf(dock) is not { } item)
+        if ((index.World.DockOf(dock) ?? StartWorld.SolarDock(index, system, dock)) is not { } item)
             return new StartAnchor(system.Trim(), null, Quaternion.Identity, dock.Trim());
         var (point, turn) = StartPlaces.InFront(item);
         return new StartAnchor(system.Trim(), point, turn, dock.Trim());
@@ -147,10 +152,19 @@ internal static class StartWorld
     /// <summary>The step between two side slots.</summary>
     public const float SlotStep = 300;
 
+    /// <summary>The least distance of a companion from the player and from each other companion at the start. Ships
+    /// nearer than this can touch when they spawn. The retail checkpoints put companions 50 units or more from the
+    /// player.</summary>
+    public const float Spacing = 50;
+
     private static readonly string[] SpawnKeys =
         ["Act_SpawnShip", "Act_SpawnShipRel", "Act_SpawnFormation", "Act_SpawnSolar", "Act_SpawnLoot"];
 
     private static readonly string[] MoveKeys = ["Act_RelocateShip", "Act_RelocateForm"];
+
+    /// <summary>The conditions of the triggers that run at the start or soon after it.</summary>
+    private static readonly string[] StartConditions =
+        ["Cnd_True", "Cnd_SpaceEnter", "Cnd_PlayerLaunch", "Cnd_LaunchComplete", "Cnd_Timer"];
 
     private static readonly MissionValueKind[] ObjectKinds =
     [
@@ -236,6 +250,9 @@ internal static class StartWorld
 
         public string? JumpedFrom { get; set; }
 
+        /// <summary>The trigger of the start that makes the object again, or null.</summary>
+        public MissionTrigger? Again { get; set; }
+
         /// <summary>The order list of its last own orders, and the index of the line that gave them, or -1 for the spawn
         /// line or the record.</summary>
         public (string List, int At)? Orders { get; set; }
@@ -261,12 +278,16 @@ internal static class StartWorld
             Steps();
             DoubleSpawns();
             Track();
+            MadeAgain();
             var companions = Companions();
-            var leftOut = units.Where(u => !u.Destroyed && !InStart(u.System)).ToList();
+            var leftOut = units.Where(u => !u.Destroyed && (!InStart(u.System) || u.Again != null)).ToList();
             foreach (var unit in leftOut)
                 leftOutMembers.UnionWith(unit.Members.Append(unit.Name));
             var rows = new List<LeftOutObject>();
-            rows.AddRange(leftOut.Select(u => new LeftOutObject(u.Name, u.Kind, u.System, u.Spawn.Trigger.Nickname)));
+            rows.AddRange(leftOut.Select(u => new LeftOutObject(u.Name, u.Kind, u.System, u.Spawn.Trigger.Nickname)
+            {
+                MadeAgainBy = u.Again?.Nickname,
+            }));
             Remove(leftOut.ToHashSet(), rows);
             var warnings = new List<string>();
             var placed = Place(companions, warnings);
@@ -396,8 +417,14 @@ internal static class StartWorld
         {
             var line = entry.Line;
             var kind = KindOf(entry, name);
-            var members = Members(name);
             var record = ItemOf(name);
+            (string List, int At)? orders = line.ValueOf("orders") is { } own && !MissionIndex.Is(own, "no_ol")
+                ? (own.Trim(), -1)
+                : InitialOrders(Members(name));
+            var members = Members(name);
+            // Act_SpawnShipRel can give the new ship a new nickname. Later lines name the ship by it.
+            if (entry.Is("Act_SpawnShipRel") && line.ValueOf("newName")?.Trim() is { Length: > 0 } renamed)
+                (name, members) = (renamed, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { renamed });
             var unit = new Unit(name, kind, members, entry)
             {
                 System = kind is StartObjectKind.Ship or StartObjectKind.Formation
@@ -405,9 +432,7 @@ internal static class StartWorld
                     : entry.System,
                 Point = entry.Is("Act_SpawnShipRel") ? null : Numbers(line, "position") ?? RecordPoint(record),
                 Turn = Turn(line),
-                Orders = entry.Is("Act_SpawnShip") && line.Value(1) is { } own && !MissionIndex.Is(own, "no_ol")
-                    ? (own, -1)
-                    : InitialOrders(members),
+                Orders = orders,
             };
             units.Add(unit);
             spawned[entry] = unit;
@@ -440,22 +465,77 @@ internal static class StartWorld
             }
         }
 
-        /// <summary>A jump of the player: each object in the old system whose jumper flag is on goes with the
-        /// player.</summary>
+        /// <summary>A jump of the player: each live object whose jumper flag is on goes with the player, from any system.
+        /// Retail takes each such ship out of its system at the jump and puts it at the arrival gate.</summary>
         private void Jump(string from, string to)
         {
-            foreach (var unit in units.Where(u => !u.Destroyed && u.System != null && MissionIndex.Is(u.System, from) &&
-                                                  IsJumper(u)))
+            foreach (var unit in units.Where(u => !u.Destroyed && IsJumper(u)))
             {
+                unit.JumpedFrom = unit.System ?? from;
                 unit.System = to;
                 unit.Point = null;
-                unit.JumpedFrom = from;
             }
         }
 
         private bool IsJumper(Unit unit) =>
             unit.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&
             unit.Members.Append(unit.Name).Any(m => jumpers.TryGetValue(m, out var on) ? on : IsTrue(Text(ItemOf(m), "jumper")));
+
+        /// <summary>
+        /// A trigger that runs at the start can spawn an object of the setup again. The scripts spawn an object again only
+        /// after the first one left space, for example after it docked. So the setup leaves out the old object, as rule 4
+        /// does for two spawn lines of the path. The triggers of the start are the triggers of the active set that run at
+        /// the start or soon after it (<see cref="RunsAtStart"/>), with the triggers that they start with such a
+        /// condition. An <c>Act_Destroy</c> of the object before the spawn keeps
+        /// the old object, because the trigger removes it itself.
+        /// </summary>
+        private void MadeAgain()
+        {
+            var chain = new List<MissionTrigger>();
+            var queue = new Queue<MissionTrigger>();
+            void Add(MissionTrigger? trigger)
+            {
+                if (trigger is { IsDuplicate: false } && !chain.Contains(trigger))
+                {
+                    chain.Add(trigger);
+                    queue.Enqueue(trigger);
+                }
+            }
+            foreach (var trigger in replay.ActiveSet.Where(RunsAtStart))
+                Add(trigger);
+            while (queue.Count > 0)
+            {
+                foreach (var start in queue.Dequeue().Actions.Where(a => MissionIndex.Is(a.Key, "Act_ActTrig")))
+                {
+                    if (start.Value(0) is { } name && index.Trigger(name) is { } next && RunsAtStart(next))
+                        Add(next);
+                }
+            }
+            var destroyed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var trigger in chain)
+            {
+                foreach (var action in trigger.Actions)
+                {
+                    if (action.Value(0) is not { } name)
+                        continue;
+                    var members = Members(name).Append(name.Trim()).ToList();
+                    if (MissionIndex.Is(action.Key, "Act_Destroy"))
+                        destroyed.UnionWith(members);
+                    else if (SpawnKeys.Any(k => MissionIndex.Is(action.Key, k)) && !members.Any(destroyed.Contains))
+                    {
+                        foreach (var unit in units.Where(u => !u.Destroyed && u.Again == null && InStart(u.System) &&
+                                                              u.Members.Append(u.Name).Any(members.Contains)))
+                            unit.Again = trigger;
+                    }
+                }
+            }
+        }
+
+        /// <summary>True for a condition that is true at the start or soon after it: Cnd_True, a launch, Cnd_SpaceEnter,
+        /// a timer, or the entry to the base of a base start.</summary>
+        private bool RunsAtStart(MissionTrigger trigger) =>
+            StartConditions.Any(trigger.ConditionIs) ||
+            anchor.Base != null && trigger.ConditionIs("Cnd_BaseEnter") && MissionIndex.Is(trigger.Condition!.Value(0), anchor.Base);
 
         /// <summary>
         /// Rule 7: the companions. A ship or a formation of the start system that the path does not make hostile is a
@@ -465,7 +545,8 @@ internal static class StartWorld
         private List<(Unit Unit, CompanionSigns Signs)> Companions()
         {
             var candidates = units.Where(u => !u.Destroyed && u.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&
-                                              InStart(u.System) && !u.Members.Append(u.Name).Any(facts.Hostile.Contains))
+                                              InStart(u.System) && u.Again == null &&
+                                              !u.Members.Append(u.Name).Any(facts.Hostile.Contains))
                 .ToList();
             var signs = new Dictionary<Unit, CompanionSigns>();
             var nags = Nags();
@@ -521,14 +602,18 @@ internal static class StartWorld
             return result;
         }
 
-        /// <summary>True when a FollowPlayer list of the player names a member, after the last spawn line and the last
-        /// own orders of the object.</summary>
+        /// <summary>True when the newest list of the player has a FollowPlayer line that names a member, and that list
+        /// comes after the last spawn line and the last own orders of the object. A newer list of the player replaces the
+        /// formation of the player, so an older list does not count.</summary>
         private bool InPlayerFormation(Unit unit)
         {
-            var after = Math.Max(unit.Spawn.At, unit.Orders?.At ?? -1);
-            return playerLists.Any(p => p.At > after && OrderLinesOf(p.List).Any(l =>
-                MissionIndex.Is(l.Key, "FollowPlayer") &&
-                Enumerable.Range(1, Math.Max(0, l.Count - 1)).Any(i => l.Value(i) is { } ship && unit.Members.Contains(ship))));
+            if (playerLists.Count == 0)
+                return false;
+            var (list, at) = playerLists[^1];
+            if (at <= Math.Max(unit.Spawn.At, unit.Orders?.At ?? -1))
+                return false;
+            return OrderLinesOf(list).Any(l => MissionIndex.Is(l.Key, "FollowPlayer") &&
+                Enumerable.Range(1, Math.Max(0, l.Count - 1)).Any(i => l.Value(i) is { } ship && unit.Members.Contains(ship)));
         }
 
         /// <summary>True for an order that keeps a ship with the player: Follow, Trail or Dock with the player, or
@@ -586,6 +671,28 @@ internal static class StartWorld
                 if (spawned.TryGetValue(entry, out var made))
                     alive.UnionWith(made.Members.Append(made.Name));
             }
+            // A line on an object that no kept line makes and that no system file of the start system has fails in the
+            // game, so it goes too. An example is a line on a formation whose spawn the path destroyed.
+            var kept = spawned.Where(p => !p.Key.Removed).SelectMany(p => p.Value.Members.Append(p.Value.Name))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in entries.Where(e => !e.Removed && !spawned.ContainsKey(e)))
+            {
+                if (Names(entry.Line).Any(n => Unmade(n.Trim(), kept)))
+                    entry.Removed = true;
+            }
+        }
+
+        /// <summary>True when no kept line makes an object or a member of it, and no system file of the start system has
+        /// it. A label needs one made member. The mission solar of the base of a base start counts as made, because the
+        /// game makes it at the launch.</summary>
+        private bool Unmade(string name, IReadOnlySet<string> made)
+        {
+            if (made.Contains(name) || InStartFiles(name))
+                return false;
+            if (IsLabel(name) || index.Item(MissionSectionKind.Formation, name) != null)
+                return !Members(name).Any(made.Contains);
+            return !(anchor.Base != null && index.Item(MissionSectionKind.Solar, name) is { } solar &&
+                     MissionIndex.Is(Text(solar, "base"), anchor.Base));
         }
 
         /// <summary>True when an object of a system file of the start system has the name, or when the world does not
@@ -628,7 +735,9 @@ internal static class StartWorld
         /// the form OBJ is an object too, but its spec cannot tell it.</summary>
         private static IEnumerable<string> Names(MissionLine line)
         {
-            var names = line.References.Where(r => ObjectKinds.Contains(r.Kind)).Select(r => r.Name);
+            var names = line.References.Where(r => ObjectKinds.Contains(r.Kind) &&
+                                                   r.State is not (MissionReferenceState.Token or MissionReferenceState.Empty))
+                .Select(r => r.Name);
             if (MissionIndex.Is(line.Key, "Act_NagDistTowards") && MissionIndex.Is(line.Value(0), "OBJ") &&
                 line.Value(3) is { } target)
                 names = names.Append(target);
@@ -637,18 +746,21 @@ internal static class StartWorld
 
         /// <summary>
         /// Rule 9: where each companion starts. A companion near the anchor keeps its point. Else a jump-here trigger of
-        /// the script gives its offset from the player, else the offset of its Follow order, else a slot to the side.
-        /// Two companions never get the same offset. Rule 10: a ship gets <c>Act_RelocateShip</c> after its last line
-        /// that places it. A formation gets the point and the heading in its last <c>Act_SpawnFormation</c>, and a later
-        /// move of a member goes.
+        /// the script gives its offset from the player, else the offset of its Follow order, else a slot to the side. No
+        /// companion starts nearer than <see cref="Spacing"/> units to the player or to another companion. A point that is
+        /// too near goes to the next rule. Rule 10: a ship gets <c>Act_RelocateShip</c> after its last line that places
+        /// it. A formation gets the point and the heading in its last <c>Act_SpawnFormation</c>, and a later move of a
+        /// member goes.
         /// </summary>
         private List<StartCompanion> Place(List<(Unit Unit, CompanionSigns Signs)> companions, List<string> warnings)
         {
             var result = new List<StartCompanion>();
-            var used = new List<Vector3>();
+            // The offsets that the player and the companions take.
+            var used = new List<Vector3> { Vector3.Zero };
             var slot = 0;
             if (anchor.Point == null && companions.Count > 0 && anchor.Base != null)
                 warnings.Add(NoDockWarning(anchor.Base));
+            bool Free(Vector3 offset) => used.All(u => Vector3.Distance(u, offset) >= Spacing);
             foreach (var (unit, signs) in companions)
             {
                 var row = new StartCompanion(unit.Name, unit.Kind, signs, unit.Spawn.Trigger.Nickname, CompanionPoint.Kept)
@@ -656,35 +768,33 @@ internal static class StartWorld
                     JumpedFrom = unit.JumpedFrom,
                     Position = unit.Point,
                 };
-                if (anchor.Point is not { } origin)
+                // The new nickname of Act_SpawnShipRel is no item of the script, so no setup line can move that ship.
+                if (anchor.Point is not { } origin || !index.IsScriptObject(unit.Name))
                 {
                     result.Add(row);
                     continue;
                 }
-                if (unit.Point is { } point && Vector3.Distance(point, origin) <= NearDistance)
+                if (unit.Point is { } point && Vector3.Distance(point, origin) <= NearDistance && Free(point - origin))
                 {
                     used.Add(point - origin);
                     result.Add(row with { Point = CompanionPoint.Near });
                     continue;
                 }
-                var rule = CompanionPoint.Slot;
-                Vector3? offset = null;
-                var turn = anchor.Turn;
-                string? trigger = null;
-                if (JumpHere(unit) is { } jump)
-                    (rule, offset, turn, trigger) = (CompanionPoint.JumpHere, jump.Offset, jump.Turn ?? anchor.Turn,
+                var (rule, chosen, turn, trigger) = (CompanionPoint.Slot, Vector3.Zero, anchor.Turn, (string?)null);
+                if (JumpHere(unit) is { } jump && Free(jump.Offset))
+                    (rule, chosen, turn, trigger) = (CompanionPoint.JumpHere, jump.Offset, jump.Turn ?? anchor.Turn,
                         jump.Trigger.Nickname);
-                else if (FollowOffset(unit) is { } follow)
-                    (rule, offset) = (CompanionPoint.Follow, Vector3.Transform(follow, anchor.Turn));
-                if (offset is not { } chosen || used.Any(u => Vector3.Distance(u, chosen) < 1))
+                else if (FollowOffset(unit) is { } follow && Vector3.Transform(follow, anchor.Turn) is var turned &&
+                         Free(turned))
+                    (rule, chosen) = (CompanionPoint.Follow, turned);
+                else
                 {
                     do
                     {
                         var side = (slot % 2 == 0 ? -1 : 1) * SlotStep * (slot / 2 + 1);
                         chosen = Vector3.Transform(new Vector3(side, 0, 0), anchor.Turn);
                         slot++;
-                    } while (used.Any(u => Vector3.Distance(u, chosen) < 1));
-                    (rule, turn, trigger) = (CompanionPoint.Slot, anchor.Turn, null);
+                    } while (!Free(chosen));
                 }
                 used.Add(chosen);
                 var at = origin + chosen;
@@ -750,11 +860,15 @@ internal static class StartWorld
         /// <summary>The warnings of the triggers that wait for objects that the setup leaves out.</summary>
         private IEnumerable<string> Waiting()
         {
+            // A trigger of the start makes these objects again, so a trigger that waits for them can run.
+            var again = units.Where(u => u.Again != null).SelectMany(u => u.Members.Append(u.Name))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var trigger in replay.ActiveSet)
             {
                 if (trigger.Condition is not { } condition)
                     continue;
-                var names = Names(condition).Select(n => n.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                var names = Names(condition).Select(n => n.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Where(n => !again.Contains(n) && !Members(n).Any(again.Contains)).ToList();
                 // An object of a system file of another system stays in the game, so only a mission object counts.
                 if (names.Count > 0 && names.All(Outside) && names.FirstOrDefault(index.IsScriptObject) is { } made)
                 {
@@ -764,7 +878,7 @@ internal static class StartWorld
                 }
                 foreach (var label in names.Where(IsLabel))
                 {
-                    var count = Members(label).Count(leftOutMembers.Contains);
+                    var count = Members(label).Count(m => leftOutMembers.Contains(m) && !again.Contains(m));
                     if (count > 0 && !Outside(label))
                         yield return LabelWarning(trigger.Nickname, label, count);
                 }
@@ -810,6 +924,24 @@ internal static class StartWorld
                 : null;
     }
 
+    /// <summary>The first mission solar of the script whose <c>base</c> key names the base and whose <c>system</c> key
+    /// names the system or no system, with the point and the heading of its record, or null.</summary>
+    internal static WorldObject? SolarDock(MissionIndex index, string system, string dock)
+    {
+        foreach (var solar in index.Document.OfKind(MissionSectionKind.Solar))
+        {
+            if (!MissionIndex.Is(Text(solar, "base"), dock) ||
+                Text(solar, "system") is { } own && !MissionIndex.Is(own, system) ||
+                solar.Nickname?.Trim() is not { Length: > 0 } name || RecordPoint(solar) is not { } point)
+                continue;
+            return new WorldObject(name, system.Trim(), point, RecordTurn(solar) ?? Quaternion.Identity, null)
+            {
+                DockWith = dock.Trim(),
+            };
+        }
+        return null;
+    }
+
     private static bool IsTrue(string? text) => text != null && (MissionIndex.Is(text, "true") || text.Trim() == "1");
 
     /// <summary>The first value of a key of a section, or null.</summary>
@@ -825,6 +957,18 @@ internal static class StartWorld
             return null;
         var values = Enumerable.Range(0, 3).Select(i => Parse(MissionIndex.Text(entry[i]))).ToList();
         return values.All(v => v != null) ? new Vector3(values[0]!.Value, values[1]!.Value, values[2]!.Value) : null;
+    }
+
+    /// <summary>The <c>orientation</c> of a record (w, x, y, z), or null.</summary>
+    private static Quaternion? RecordTurn(MissionSection section)
+    {
+        if (section.Section.FirstOrDefault(e => MissionIndex.Is(e.Name, "orientation") && e.Count >= 4) is not { } entry)
+            return null;
+        var values = Enumerable.Range(0, 4).Select(i => Parse(MissionIndex.Text(entry[i]))).ToList();
+        if (values.Any(v => v == null))
+            return null;
+        var turn = new Quaternion(values[1]!.Value, values[2]!.Value, values[3]!.Value, values[0]!.Value);
+        return turn.Length() > 1e-3f ? Quaternion.Normalize(turn) : null;
     }
 
     /// <summary>The three numbers of a value spec of a line, or null.</summary>

@@ -57,6 +57,9 @@ public sealed record LeftOutView(string Object, StartObjectKind Kind, string Tri
 
     /// <summary>The fuse of a fuse line, or null.</summary>
     public string? Fuse { get; init; }
+
+    /// <summary>The <c>trg:</c> reference of the trigger of the start that makes the object again, or null.</summary>
+    public string? MadeAgainBy { get; init; }
 }
 
 /// <summary>A ship or a formation that starts next to the player, in JSON.</summary>
@@ -259,6 +262,7 @@ public static partial class RunJson
             {
                 System = l.System == null ? null : SystemRef(l.System),
                 Fuse = l.Fuse,
+                MadeAgainBy = l.MadeAgainBy == null ? null : Ref(l.MadeAgainBy),
             }).ToList(),
             Companions = plan.Companions.Select(c => new CompanionView(ObjectRef(script, c.Kind, c.Object), SignWords(c.Signs),
                 c.Point, c.Moved)

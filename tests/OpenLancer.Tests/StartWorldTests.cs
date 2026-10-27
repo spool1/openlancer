@@ -580,10 +580,12 @@ public sealed class StartWorldTests
         Near(new Vector3(-5300, 0, 0), Companion(play, "ol_wing").Position);
         Assert.Equal(play.SetupPatch, Plan(Script(), choice: StartPlaceChoice.Camera, play: camera).SetupPatch);
 
-        // A play in another system than the suggestion leaves out the objects of the suggested system.
+        // A play in another system than the suggestion leaves out the objects of the suggested system. The player goes
+        // to the system of the play after the last run, and the jumper goes with the player.
         var other = Plan(Script(), play: new StartSavePlace("ol_sys_a", null, Vector3.Zero, Quaternion.Identity));
         Assert.Contains(other.LeftOut, l => l.Object == "ol_local");
         Assert.DoesNotContain(other.LeftOut, l => l.Object == "ol_guard");
+        Assert.Equal(("ol_sys_b", CompanionSigns.Jump), (Companion(other, "ol_wing").JumpedFrom, Companion(other, "ol_wing").Signs));
     }
 
     // Group 8: the warnings of the waiting triggers.
@@ -613,6 +615,330 @@ public sealed class StartWorldTests
         // An object of a system file of another system stays in the game, so the trigger can run there.
         Assert.DoesNotContain(plan.Warnings, w => w.Contains("t_near_buoy", StringComparison.Ordinal));
     }
+
+    // Group 9: the fixes of the review of 2026-10-28.
+
+    /// <summary>Only the newest list of the player counts for the formation of the player. A newer list without the ship,
+    /// or a list that only breaks the formation, makes it no companion.</summary>
+    [Fact]
+    public void OnlyTheNewestListOfThePlayerCounts()
+    {
+        const string lists = """
+            [ObjList]
+            nickname = ol_wingmen_b
+            FollowPlayer = ol_shape, ol_wing
+
+            [ObjList]
+            nickname = ol_break
+            BreakFormation = no_params
+            """;
+        Assert.Equal(CompanionSigns.PlayerFormation, Companion(Plan(Script(jump: """
+            Act_GiveObjList = Player, ol_wingmen_b
+            Act_GiveObjList = Player, ol_wingmen
+            """, records: lists)), "ol_local").Signs);
+        Assert.DoesNotContain(Plan(Script(jump: """
+            Act_GiveObjList = Player, ol_wingmen
+            Act_GiveObjList = Player, ol_wingmen_b
+            """, records: lists)).Companions, c => c.Object == "ol_local");
+        Assert.DoesNotContain(Plan(Script(jump: """
+            Act_GiveObjList = Player, ol_wingmen
+            Act_GiveObjList = Player, ol_break
+            """, records: lists)).Companions, c => c.Object == "ol_local");
+    }
+
+    /// <summary>No companion starts nearer than the spacing to the player or to another companion. A jump-here point at
+    /// the point of the player, and a second jump-here point 20 units from the first, go to the next free slot.</summary>
+    [Fact]
+    public void TheCompanionsKeepTheirDistance()
+    {
+        var plan = Plan(Script(a: "Act_SpawnShip = ol_wing2\nAct_SpawnShip = ol_wing3", records: """
+            [MsnShip]
+            nickname = ol_wing2
+            jumper = true
+
+            [MsnShip]
+            nickname = ol_wing3
+            jumper = true
+            """, triggers: """
+            [Trigger]
+            nickname = t_debug_jump
+            system = ol_sys_b
+            Cnd_True = no_params
+            Act_MovePlayer = 40000, 0, 40000, 100
+            Act_SpawnShip = ol_wing, no_ol, 40000, 0, 40000
+            Act_SpawnShip = ol_wing2, no_ol, 40100, 0, 40200
+            Act_SpawnShip = ol_wing3, no_ol, 40120, 0, 40200
+            Act_ActTrig = t_chosen
+            """));
+
+        Assert.Equal(CompanionPoint.Slot, Companion(plan, "ol_wing").Point);
+        Near(Start + new Vector3(-300, 0, 0), Companion(plan, "ol_wing").Position);
+        Assert.Equal(CompanionPoint.JumpHere, Companion(plan, "ol_wing2").Point);
+        Near(Start + new Vector3(100, 0, 200), Companion(plan, "ol_wing2").Position);
+        Assert.Equal(CompanionPoint.Slot, Companion(plan, "ol_wing3").Point);
+        Near(Start + new Vector3(300, 0, 0), Companion(plan, "ol_wing3").Position);
+        var points = plan.Companions.Select(c => c.Position!.Value).Append(Start).ToList();
+        for (var i = 0; i < points.Count; i++)
+        {
+            for (var j = i + 1; j < points.Count; j++)
+                Assert.True(Vector3.Distance(points[i], points[j]) >= StartWorld.Spacing, $"{points[i]} and {points[j]}");
+        }
+    }
+
+    /// <summary>Two companions with the same Follow offset do not share a point. The second takes a slot.</summary>
+    [Fact]
+    public void TwoCompanionsWithOneFollowOffsetDoNotShareAPoint()
+    {
+        var plan = Plan(Script(jump: """
+            Act_GiveObjList = ol_local, ol_follow
+            Act_SpawnShip = ol_escort
+            Act_GiveObjList = ol_escort, ol_follow
+            """, records: """
+            [MsnShip]
+            nickname = ol_escort
+            position = 40000, 0, 40000
+            """));
+
+        Assert.Equal(CompanionPoint.Follow, Companion(plan, "ol_local").Point);
+        Assert.Equal(CompanionPoint.Slot, Companion(plan, "ol_escort").Point);
+        Assert.NotEqual(Companion(plan, "ol_local").Position, Companion(plan, "ol_escort").Position);
+    }
+
+    /// <summary>A jump-here point more than 5,000 units from the point of the player of its trigger does not count. The
+    /// companion takes a slot.</summary>
+    [Fact]
+    public void AFarJumpHerePointDoesNotCount()
+    {
+        var plan = Plan(Script(triggers: """
+            [Trigger]
+            nickname = t_debug_jump
+            system = ol_sys_b
+            Cnd_True = no_params
+            Act_MovePlayer = 40000, 0, 40000, 100
+            Act_SpawnShip = ol_wing, no_ol, 46000, 0, 40000
+            Act_ActTrig = t_chosen
+            """));
+
+        Assert.Equal(CompanionPoint.Slot, Companion(plan, "ol_wing").Point);
+        Assert.Null(Companion(plan, "ol_wing").PointTrigger);
+    }
+
+    /// <summary>A solar always spawns in the system of the player, also with a <c>system</c> key in its record.</summary>
+    [Fact]
+    public void ASolarSpawnsInTheSystemOfThePlayer()
+    {
+        var plan = Plan(Script(jump: "Act_SpawnSolar = ol_tower", records: """
+            [MsnSolar]
+            nickname = ol_tower
+            system = ol_sys_a
+            position = 12000, 0, 12000
+            """));
+
+        Assert.DoesNotContain(plan.LeftOut, l => l.Object == "ol_tower");
+        Assert.Contains("Act_SpawnSolar = ol_tower", WorldLines(plan));
+    }
+
+    /// <summary>At a jump of the player, a jumper goes with the player also from a third system. Retail takes each
+    /// jumper out of its system at the jump.</summary>
+    [Fact]
+    public void AJumperOfAThirdSystemJumpsWithThePlayer()
+    {
+        var plan = StartPlan.Make(Index(Script(a: "Act_SpawnShip = ol_far_wing", records: """
+            [MsnShip]
+            nickname = ol_far_wing
+            system = ol_sys_c
+            jumper = true
+            """), ThreeSystems()), StartPlanTests.Slot, MissionStartPoint.At("t_chosen"));
+
+        Assert.True(plan.CanStart, plan.Reason);
+        var wing = Companion(plan, "ol_far_wing");
+        Assert.Equal(("ol_sys_c", CompanionSigns.Jump), (wing.JumpedFrom, wing.Signs));
+    }
+
+    /// <summary>Act_SpawnShipRel with a new nickname makes a ship with that nickname. A later line names the ship by
+    /// it. No item of the script has that nickname, so the setup does not move the ship.</summary>
+    [Fact]
+    public void AShipOfSpawnShipRelHasItsNewName()
+    {
+        var plan = Plan(Script(jump: """
+            Act_SpawnShipRel = ol_local, no_ol, ol_buoy_b, POINT, 0, 0, 100, 0, ol_renamed
+            Act_GiveObjList = ol_renamed, ol_follow
+            """));
+
+        var renamed = Companion(plan, "ol_renamed");
+        Assert.Equal((CompanionSigns.Orders, CompanionPoint.Kept), (renamed.Signs, renamed.Point));
+        Assert.Contains("Act_GiveObjList = ol_renamed, ol_follow", WorldLines(plan));
+        Assert.DoesNotContain(WorldLines(plan), l => l.StartsWith("Act_RelocateShip = ol_renamed", StringComparison.Ordinal));
+    }
+
+    /// <summary>A base whose dock is a mission solar of the script: the companions start in front of the solar, at the
+    /// point of its record, as the game launches the player from it.</summary>
+    [Fact]
+    public void AMissionSolarCanBeTheDockOfABase()
+    {
+        var plan = Plan(Script(records: """
+            [MsnSolar]
+            nickname = ol_depot
+            system = ol_sys_b
+            base = ol_base_c
+            position = 5000, 0, 0
+            orientation = 1, 0, 0, 0
+            """), choice: StartPlaceChoice.Base, dock: "ol_base_c");
+
+        Assert.DoesNotContain(StartWorld.NoDockWarning("ol_base_c"), plan.Warnings);
+        Assert.Equal(CompanionPoint.Slot, Companion(plan, "ol_wing").Point);
+        Near(new Vector3(4700, 0, 1000), Companion(plan, "ol_wing").Position);
+    }
+
+    /// <summary>A line on an object that no kept line makes goes: a ship without a spawn, a label without a made member,
+    /// and a formation whose spawn the path destroyed. A line on an object of a system file of the start system
+    /// stays.</summary>
+    [Fact]
+    public void ALineOnAnObjectThatNoLineMakesGoes()
+    {
+        var plan = Plan(Script(jump: """
+            Act_SpawnFormation = ol_form_b
+            Act_Destroy = ol_form_b
+            Act_MarkObj = ol_unmade, 1
+            Act_Cloak = ol_nobody, false
+            Act_GiveObjList = ol_form_b, ol_patrol
+            Act_MarkObj = ol_g1, 1
+            Act_SetVibeLbl = ol_locals, Player, REP_FRIEND_THRESHOLD
+            Act_MarkObj = ol_buoy_b, 1
+            """, records: """
+            [MsnShip]
+            nickname = ol_unmade
+            label = ol_nobody
+
+            [MsnShip]
+            nickname = ol_g1
+            position = 0, 0, 0
+
+            [MsnFormation]
+            nickname = ol_form_b
+            position = 12000, 0, 12000
+            ship = ol_g1
+            """));
+        var lines = WorldLines(plan);
+
+        Assert.DoesNotContain(lines, l => l.Contains("ol_unmade") || l.Contains("ol_nobody") || l.Contains("ol_form_b") ||
+                                          l.Contains("ol_g1"));
+        Assert.Contains("Act_SetVibeLbl = ol_locals, Player, REP_FRIEND_THRESHOLD", lines);
+        Assert.Contains("Act_MarkObj = ol_buoy_b, 1", lines);
+    }
+
+    /// <summary>A trigger of the start that spawns an object of the setup again makes a new object. The setup leaves out
+    /// the old object, which is then no companion, and the page names the trigger. A trigger that waits for the object
+    /// gives no warning. An Act_Destroy before the spawn keeps the old object.</summary>
+    [Fact]
+    public void ATriggerOfTheStartThatSpawnsAgainReplacesTheObject()
+    {
+        const string again = """
+            Act_ActTrig = t_again
+            Act_ActTrig = t_local_dies
+
+            [Trigger]
+            nickname = t_again
+            Cnd_True = no_params
+            {LINES}
+
+            [Trigger]
+            nickname = t_local_dies
+            Cnd_Destroyed = ol_local
+            """;
+        var plan = Plan(Script(jump: "Act_GiveObjList = ol_local, ol_follow",
+            triggers: again.Replace("{LINES}", "Act_SpawnShip = ol_local")));
+        var row = Assert.Single(plan.LeftOut, l => l.Object == "ol_local");
+        Assert.Equal(("t_again", "ol_sys_b"), (row.MadeAgainBy, row.System));
+        Assert.Equal("ol_local. Trigger t_again makes it again at the start.", PlayStartPageModel.LeftOutText(row));
+        Assert.EndsWith("#t_again", Assert.Single(RunJson.View(plan, 7).LeftOut,
+            l => l.Object.EndsWith("MsnShip/ol_local", StringComparison.Ordinal)).MadeAgainBy);
+        Assert.DoesNotContain(plan.Companions, c => c.Object == "ol_local");
+        Assert.DoesNotContain(WorldLines(plan), l => l.Contains("ol_local"));
+        Assert.DoesNotContain(plan.Warnings, w => w.Contains("t_local_dies", StringComparison.Ordinal));
+
+        var destroyed = Plan(Script(jump: "Act_GiveObjList = ol_local, ol_follow",
+            triggers: again.Replace("{LINES}", "Act_Destroy = ol_local\nAct_SpawnShip = ol_local")));
+        Assert.DoesNotContain(destroyed.LeftOut, l => l.Object == "ol_local");
+        Assert.Contains("Act_SpawnShip = ol_local", WorldLines(destroyed));
+    }
+
+    /// <summary>The system of the player at the first run of a restore trigger at the root comes from its place line:
+    /// here the Cnd_SpaceEnter system of its second stage, not the system of the story before it. A Cnd_BaseExit run
+    /// takes the system of its base.</summary>
+    [Fact]
+    public void ARestoreRootAndABaseExitGiveTheSystemOfTheirRun()
+    {
+        const string text = """
+            [MsnShip]
+            nickname = ol_guard
+            position = 5000, 0, 5000
+
+            [MsnShip]
+            nickname = ol_local
+            position = 7000, 0, 7000
+
+            [Trigger]
+            nickname = t_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = t_a
+
+            [Trigger]
+            nickname = t_a
+            system = ol_sys_a
+            Cnd_SpaceEnter = ol_sys_a
+            Act_Save = t_restore, 1
+
+            [Trigger]
+            nickname = t_restore
+            Cnd_PlayerLaunch = no_params
+            Act_SetInitialPlayerPos = 100, 0, 100, 1, 0, 0, 0
+            Act_SpawnShip = ol_guard
+            Act_ActTrig = t_stage2
+
+            [Trigger]
+            nickname = t_stage2
+            Cnd_SpaceEnter = ol_sys_b
+            Act_ActTrig = t_exit
+
+            [Trigger]
+            nickname = t_exit
+            Cnd_BaseExit = ol_base_a
+            Act_SpawnShip = ol_local
+            Act_ActTrig = t_chosen
+
+            [Trigger]
+            nickname = t_chosen
+            Cnd_Timer = 5
+            """;
+        var world = new MissionWorld(new Dictionary<MissionValueKind, IEnumerable<string>>
+        {
+            [MissionValueKind.System] = ["ol_sys_a", "ol_sys_b"],
+            [MissionValueKind.Base] = ["ol_base_a", "ol_base_b"],
+        }, null, new Dictionary<string, string> { ["ol_base_a"] = "ol_sys_a", ["ol_base_b"] = "ol_sys_b" });
+        var index = Index(text, world);
+        var replay = StartReplay.Run(index, MissionStartPoint.At("t_chosen"));
+        var facts = StartPlaces.World(index, replay);
+        Assert.Equal(["t_restore ol_sys_b", "t_stage2 ol_sys_b", "t_exit ol_sys_a"], replay.Changes
+            .Select((change, at) => (change, at)).Where(p => p.change.Kind == MachineChangeKind.Ran)
+            .Select(p => $"{p.change.Trigger.Nickname} {facts.Systems[p.at] ?? "-"}"));
+
+        var plan = StartPlan.Make(index, StartPlanTests.Slot, MissionStartPoint.At("t_chosen"),
+            play: new StartSavePlace("ol_sys_a", null, new Vector3(100, 0, 100), Quaternion.Identity));
+        Assert.True(plan.CanStart, plan.Reason);
+        Assert.Equal(["ol_guard ol_sys_b"], plan.LeftOut.Select(l => $"{l.Object} {l.System}"));
+        Assert.Contains("Act_SpawnShip = ol_local", WorldLines(plan));
+    }
+
+    /// <summary>The world of <see cref="World"/> with a third system.</summary>
+    private static MissionWorld ThreeSystems() =>
+        new(new Dictionary<MissionValueKind, IEnumerable<string>>
+        {
+            [MissionValueKind.System] = ["ol_sys_a", "ol_sys_b", "ol_sys_c"],
+            [MissionValueKind.Base] = ["ol_base_b", "ol_base_c"],
+            [MissionValueKind.SystemObject] = Objects.Select(o => o.Nickname).ToList(),
+        }, null, new Dictionary<string, string> { ["ol_base_b"] = "ol_sys_b", ["ol_base_c"] = "ol_sys_b" }, Objects);
 
     // Group 10: the JSON view and the texts of the Play start page.
 
