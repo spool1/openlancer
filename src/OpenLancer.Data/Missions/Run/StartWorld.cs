@@ -29,6 +29,10 @@ public sealed record LeftOutObject(string Object, StartObjectKind Kind, string? 
 {
     /// <summary>The fuse of a fuse line, else null.</summary>
     public string? Fuse { get; init; }
+
+    /// <summary>The kind of the target of a fuse line when the script has the target, else null: an object of a system
+    /// file.</summary>
+    public StartObjectKind? TargetKind { get; init; }
 }
 
 /// <summary>Why a ship travels with the player at the chosen trigger.</summary>
@@ -570,6 +574,7 @@ internal static class StartWorld
                     rows.Add(new LeftOutObject(target, StartObjectKind.Fuse, SystemOf(target), entry.Trigger.Nickname)
                     {
                         Fuse = line.Value(1),
+                        TargetKind = ItemKindOf(target),
                     });
                     continue;
                 }
@@ -783,6 +788,14 @@ internal static class StartWorld
             _ when index.Item(MissionSectionKind.Formation, name) != null => StartObjectKind.Formation,
             _ => StartObjectKind.Ship,
         };
+
+        /// <summary>The kind of an object of the script, or null for another name.</summary>
+        private StartObjectKind? ItemKindOf(string name) =>
+            index.Item(MissionSectionKind.Ship, name) != null ? StartObjectKind.Ship
+            : index.Item(MissionSectionKind.Formation, name) != null ? StartObjectKind.Formation
+            : index.Item(MissionSectionKind.Solar, name) != null ? StartObjectKind.Solar
+            : index.Item(MissionSectionKind.Loot, name) != null ? StartObjectKind.Loot
+            : null;
 
         private MissionSection? ItemOf(string name) =>
             index.Item(MissionSectionKind.Ship, name) ?? index.Item(MissionSectionKind.Formation, name) ??

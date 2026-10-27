@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using ImGuiNET;
@@ -158,6 +159,11 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
             grid.EndSection();
         }
 
+        if (model.ShowsWorld)
+        {
+            WorldLists(analysis, model);
+        }
+
         if (model.SetupText is { } setup && grid.BeginSection("PlayStart.Advanced", EditorIcons.Terminal, "Advanced", false, null))
         {
             ImGui.TextDisabled("Setup lines");
@@ -183,6 +189,47 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
             ImGui.EndDisabled();
             ImGui.SetItemTooltip(block ?? PlayStartPageModel.PlayTip);
         });
+    }
+
+    /// <summary>The two closed lists of the world setup: the objects that the setup leaves out, and the ships that start
+    /// next to the player. A click on a row selects the trigger of its spawn line (UI rule 6).</summary>
+    private void WorldLists(MissionAnalysis analysis, PlayStartPageModel model)
+    {
+        var plan = model.Plan;
+        if (grid.BeginSection("PlayStart.LeftOut", EditorIcons.EyeSlash, PlayStartPageModel.LeftOutLabel(plan.LeftOut.Count),
+                false, null))
+        {
+            Rows(analysis, model.Script, PlayStartPageModel.LeftOutTip,
+                plan.LeftOut.Select(l => (PlayStartPageModel.LeftOutText(l), l.Trigger)).ToList(), "left-out");
+            grid.EndSection();
+        }
+
+        if (grid.BeginSection("PlayStart.Companions", EditorIcons.Users,
+                PlayStartPageModel.CompanionsLabel(plan.Companions.Count), false, null))
+        {
+            Rows(analysis, model.Script, PlayStartPageModel.CompanionsTip,
+                plan.Companions.Select(c => (PlayStartPageModel.CompanionText(c), c.Trigger)).ToList(), "companion");
+            grid.EndSection();
+        }
+    }
+
+    /// <summary>The rows of a list of the world setup, after its tooltip text.</summary>
+    private void Rows(MissionAnalysis analysis, string script, string tip, IReadOnlyList<(string Text, string Trigger)> rows,
+        string id)
+    {
+        ImGui.PushTextWrapPos(0);
+        ImGui.TextDisabled(tip);
+        ImGui.PopTextWrapPos();
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var (text, name) = rows[i];
+            if (ImGui.Selectable($"{text}##{id}-{i}") && analysis.Index.Trigger(name) is { } trigger)
+            {
+                SelectTrigger(script, trigger);
+            }
+
+            ImGui.SetItemTooltip(PlayStartPageModel.RowTip);
+        }
     }
 
     /// <summary>Frees the native editor of the setup lines.</summary>

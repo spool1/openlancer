@@ -216,6 +216,11 @@ public sealed record StartPlan
     /// <summary>The warnings of the Play start page.</summary>
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
+    /// <summary>The system whose world the setup trigger of the world makes, or null when the start system is not
+    /// known. Then the setup keeps each world line of the path, for example for a start at the Scene camera before the
+    /// play.</summary>
+    public string? StartSystem { get; init; }
+
     /// <summary>The objects that the setup of the world leaves out, because they are in another system at the chosen
     /// trigger, and the fuse lines that it removes.</summary>
     public IReadOnlyList<LeftOutObject> LeftOut { get; init; } = [];

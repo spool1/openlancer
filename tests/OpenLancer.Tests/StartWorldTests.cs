@@ -4,6 +4,8 @@ using System.Linq;
 using System.Numerics;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Run;
+using OpenLancer.Editor;
+using OpenLancer.Editor.Missions;
 using Xunit;
 using static OpenLancer.Tests.MissionTestData;
 
@@ -603,5 +605,69 @@ public sealed class StartWorldTests
 
         Assert.Contains(StartWorld.WaitingWarning("t_guard_dies", "ol_guard", "ol_sys_a"), plan.Warnings);
         Assert.Contains(StartWorld.LabelWarning("t_friends_die", "ol_friends", 1), plan.Warnings);
+    }
+
+    // Group 10: the JSON view and the texts of the Play start page.
+
+    /// <summary>The JSON view has the start system, the left-out objects and the companions with their references and
+    /// their sign words.</summary>
+    [Fact]
+    public void TheJsonViewHasBothLists()
+    {
+        var plan = Plan(Script(jump: "Act_GiveObjList = Player, ol_wingmen"));
+        var view = RunJson.View(plan, 7);
+        var json = System.Text.Json.JsonSerializer.Serialize(view, OpenLancer.Data.Editing.Commands.EditJson.Options);
+
+        Assert.Equal("system:ol_sys_b", view.StartSystem);
+        var guard = Assert.Single(view.LeftOut, l => l.Object.EndsWith("MsnShip/ol_guard", StringComparison.Ordinal));
+        Assert.Equal((StartObjectKind.Ship, "system:ol_sys_a"), (guard.Kind, guard.System));
+        Assert.StartsWith("trg:", guard.Trigger);
+        Assert.EndsWith("#t_a", guard.Trigger);
+        Assert.Contains(view.LeftOut, l => l is { Object: "obj:ol_buoy_a", Kind: StartObjectKind.Fuse, Fuse: "ol_fuse_2" });
+        var wing = Assert.Single(view.Companions, c => c.Object.EndsWith("MsnShip/ol_wing", StringComparison.Ordinal));
+        Assert.Equal(["player_formation", "jump"], wing.Signs);
+        Assert.Equal(("system:ol_sys_a", true), (wing.JumpedFrom, wing.Moved));
+        Assert.Contains("\"left_out\"", json);
+        Assert.Contains("\"jumped_from\":\"system:ol_sys_a\"", json);
+        Assert.Contains("\"point\":\"slot\"", json);
+    }
+
+    /// <summary>The page shows the two lists for an approximate start with a start system. Each row tells the object and
+    /// why it is in the list.</summary>
+    [Fact]
+    public void ThePageTellsEachRowOfBothLists()
+    {
+        var plan = Plan(Script(jump: "Act_LightFuse = ol_unmade, ol_fuse_6", records: """
+            [MsnShip]
+            nickname = ol_unmade
+            """, triggers: """
+            [Trigger]
+            nickname = t_debug_jump
+            system = ol_sys_b
+            Cnd_True = no_params
+            Act_MovePlayer = 40000, 0, 40000, 100
+            Act_SpawnShip = ol_wing, no_ol, 40100, 0, 40200
+            Act_ActTrig = t_chosen
+            """));
+        var model = new PlayStartPageModel(MissionTestData.Path, new PlayStartSetting("t_chosen", "suggested"), plan);
+
+        Assert.True(model.ShowsWorld);
+        Assert.Equal("Objects that the setup leaves out (7)", PlayStartPageModel.LeftOutLabel(plan.LeftOut.Count));
+        Assert.Equal(
+        [
+            "ol_guard in ol_sys_a", "ol_station in ol_sys_a", "ol_crate in ol_sys_a", "ol_form_a in ol_sys_a",
+            "Fuse ol_fuse_1 on ol_station in ol_sys_a", "Fuse ol_fuse_2 on ol_buoy_a in ol_sys_a",
+            "Fuse ol_fuse_6 on ol_unmade. No line makes ol_unmade.",
+        ], plan.LeftOut.Select(PlayStartPageModel.LeftOutText));
+        Assert.Equal("ol_wing: It jumped with the player from ol_sys_a. Its point comes from t_debug_jump.",
+            PlayStartPageModel.CompanionText(Companion(plan, "ol_wing")));
+        Assert.Equal("ol_local: Its orders keep it with the player. It flies in the formation of the player. The player " +
+                     "must stay near it. It is already near the player.",
+            PlayStartPageModel.CompanionText(new StartCompanion("ol_local", StartObjectKind.Ship,
+                CompanionSigns.Orders | CompanionSigns.PlayerFormation | CompanionSigns.Escort, "t_jump", CompanionPoint.Near)));
+
+        var camera = new PlayStartPageModel(MissionTestData.Path, new PlayStartSetting("t_chosen", "camera"),
+            Plan(Script(), choice: StartPlaceChoice.Camera));
+        Assert.False(camera.ShowsWorld);
     }
 }

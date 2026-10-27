@@ -92,6 +92,7 @@ internal static class StartSetup
             Setup = triggers,
             SavedTriggers = [setupName],
             State = state,
+            StartSystem = built != null ? anchor!.System : null,
             LeftOut = built?.LeftOut ?? [],
             Companions = built?.Companions ?? [],
             Warnings = [.. plan.Warnings, .. worldWarnings],

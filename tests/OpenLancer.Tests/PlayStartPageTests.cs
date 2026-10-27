@@ -131,6 +131,12 @@ public sealed class PlayStartPageTests
             ("restart refused", MissionPlayTexts.RestartRefused(new NamedStart(), "The path is refused.", "save 2")),
             ("restart failed", MissionPlayTexts.RestartFailedInGame(new NamedStart(), "The start save does not load.")),
             ("ship", PlayShips.ShipText(null, null).Tooltip), ("ship missing", PlayShips.ShipText(null, "ol_package").Tooltip),
+            ("left out", PlayStartPageModel.LeftOutTip), ("companions", PlayStartPageModel.CompanionsTip),
+            ("row", PlayStartPageModel.RowTip), ("left out title", PlayStartPageModel.LeftOutLabel(3)),
+            ("companions title", PlayStartPageModel.CompanionsLabel(2)),
+            ("waiting", StartWorld.WaitingWarning("t_wave", "ol_ship", "Li02")),
+            ("label", StartWorld.LabelWarning("t_wave", "ol_label", 2)), ("camera", StartWorld.CameraWarning),
+            ("no dock", StartWorld.NoDockWarning("li01_01_base")),
         };
 
         Assert.Empty(texts.SelectMany(t => SteLint.Problems(t.Text).Select(p => $"{t.Name}: {p}")));
