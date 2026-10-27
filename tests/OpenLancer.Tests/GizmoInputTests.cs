@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using ImGuiNET;
@@ -5,6 +7,8 @@ using LibreLancer.Data.GameData.World;
 using LibreLancer.Data.Ini;
 using LibreLancer.ImUI;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Scene;
 using OpenLancer.Runtime.Scene;
@@ -392,6 +396,37 @@ public sealed class GizmoInputTests
         Assert.Equal([DepotStart], Lines(session, Depot));
     }
 
+    /// <summary>
+    /// When the drag of the target cannot start after the runner opened the gesture, the flow cancels the gesture. So no
+    /// transaction stays open, and later edits, undo and save still run. Here the section goes after the prepare of the
+    /// frame. A drag start that throws an exception of another type also cancels the gesture, and the exception goes to
+    /// the caller.
+    /// </summary>
+    [Fact]
+    public void ADragStartThatFailsAfterTheGestureOpenedLeavesNoTransaction()
+    {
+        using var ws = GizmoSystem.Create();
+        var session = ws.Session("act");
+        var flow = new GizmoDragFlow();
+        Assert.True(flow.Prepare(GizmoSystem.Target(session, Depot), GizmoTool.Move, GizmoSpace.World));
+        session.Execute(ScenePlans.Delete(session, [Depot]).Command!);
+
+        Assert.True(flow.After(isUsing: true, leftDown: true, FakeCommandHost.Runner(session), Off, out var problem));
+
+        Assert.Equal(ConsoleSeverity.Warning, problem!.Severity);
+        Assert.StartsWith("The gizmo did not start a drag: ", problem.Message);
+        Assert.Equal(GizmoDragState.None, flow.State);
+        Assert.False(session.InTransaction);
+        Assert.Equal("Delete Li01_depot", session.UndoLabel);
+
+        Assert.True(flow.Prepare(new ThrowingTarget(), GizmoTool.Move, GizmoSpace.World));
+        Assert.Throws<ArgumentException>(() =>
+            flow.After(isUsing: true, leftDown: true, FakeCommandHost.Runner(session), Off, out _));
+        Assert.False(session.InTransaction);
+        session.Undo();
+        Assert.Equal([DepotStart], Lines(session, Depot));
+    }
+
     /// <summary>A frame whose edit does not apply stops the drag: the edit view goes back, the editor clears ImGuizmo,
     /// the Console gives the reason, and the gizmo keeps the mouse until the release.</summary>
     [Fact]
@@ -463,6 +498,24 @@ public sealed class GizmoInputTests
         Assert.False(flow.After(isUsing: true, leftDown: true, FakeCommandHost.Runner(session), Off, out _));
         Assert.Equal(["80642, 0, 12299"], Lines(session, Gate));
         Assert.Equal(["0, 105, 0"], session.Get(Gate)!.Lines("rotate").Select(Text).ToArray());
+    }
+
+    /// <summary>A target whose drag start throws an exception that is not an <see cref="InvalidOperationException"/>.</summary>
+    private sealed class ThrowingTarget : IGizmoTarget
+    {
+        public object Key => "throwing";
+
+        public IReadOnlyDictionary<GizmoTool, string?> Tools { get; } =
+            new Dictionary<GizmoTool, string?> { [GizmoTool.Move] = null, [GizmoTool.Rotate] = null, [GizmoTool.Scale] = null };
+
+        public ZoneSizeAxes? Axes => null;
+
+        public Matrix4x4 Matrix(GizmoTool tool) => Matrix4x4.Identity;
+
+        public string DragLabel(GizmoTool tool) => "Move throwing";
+
+        public IGizmoDrag Begin(CommandTransaction gesture, GizmoTool tool, GizmoSpace space, string? noEditReason) =>
+            throw new ArgumentException("The target refuses the drag.");
     }
 
     /// <summary>The click frame of a move with the World space: ImGuizmo starts to drag and gives back its
