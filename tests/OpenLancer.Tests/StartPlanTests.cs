@@ -436,12 +436,13 @@ public sealed class StartPlanTests
             "Cnd_True = no_params", "Act_SetRep = Player, ol_faction_a, -0.9", "Act_SetNNObj = ol_obj_1",
             "Act_ActTrig = ol_play_world",
         ], Lines(plan, 0));
-        // The world waits for space. The spawn of the ship that the path destroys goes, and only the last music stays.
-        // Then the world starts the whole active set, so its lines find the objects of the world.
+        // The world waits for the launch, which the game also sends when a start in space spawns the player. The spawn
+        // of the ship that the path destroys goes, and only the last music stays. Then the world starts the whole active
+        // set, so its lines find the objects of the world.
         Assert.Equal("ol_play_world", plan.Setup[1].Nickname);
         Assert.Equal(
         [
-            "Cnd_SpaceEnter = no_params", "Act_SpawnShip = ol_ship_c", "Act_PlayMusic = ol_music_2", "Act_ActTrig = t_fail",
+            "Cnd_PlayerLaunch = no_params", "Act_SpawnShip = ol_ship_c", "Act_PlayMusic = ol_music_2", "Act_ActTrig = t_fail",
             "Act_ActTrig = t_chosen",
         ], Lines(plan, 1));
         Assert.Equal(["ol_play_setup"], plan.SavedTriggers);
@@ -857,7 +858,7 @@ public sealed class StartPlanTests
         var patch = Plan(Script, "t_chosen").SetupPatch;
 
         Assert.StartsWith("[Trigger]\r\nnickname = ol_play_setup\r\nol.new = true\r\nCnd_True = no_params\r\n", patch);
-        Assert.Contains("\r\n\r\n[Trigger]\r\nnickname = ol_play_world\r\nol.new = true\r\nCnd_SpaceEnter = no_params\r\n",
+        Assert.Contains("\r\n\r\n[Trigger]\r\nnickname = ol_play_world\r\nol.new = true\r\nCnd_PlayerLaunch = no_params\r\n",
             patch);
     }
 

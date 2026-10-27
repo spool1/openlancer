@@ -882,6 +882,52 @@ public sealed class StartWorldTests
         Assert.Contains("Act_SpawnShip = ol_local", WorldLines(destroyed));
     }
 
+    /// <summary>A start in space spawns the player with a launch, so a launch trigger of the start spawns again, as at a
+    /// base start. The launch ends only after an undock, so a trigger that waits for the end of the launch spawns again
+    /// only at a base start (fix of the review of 2026-10-28).</summary>
+    [Theory]
+    [InlineData("Cnd_PlayerLaunch = no_params", null, true)]
+    [InlineData("Cnd_PlayerLaunch = no_params", "ol_base_b", true)]
+    [InlineData("Cnd_LaunchComplete = Player", null, false)]
+    [InlineData("Cnd_LaunchComplete = Player", "ol_base_b", true)]
+    public void TheEndOfALaunchSpawnsAgainOnlyAtABaseStart(string condition, string? dock, bool again)
+    {
+        var text = Script(jump: "Act_GiveObjList = ol_local, ol_follow", triggers: $"""
+            Act_ActTrig = t_again
+
+            [Trigger]
+            nickname = t_again
+            {condition}
+            Act_SpawnShip = ol_local
+            """);
+        var plan = dock == null ? Plan(text) : Plan(text, choice: StartPlaceChoice.Base, dock: dock);
+
+        Assert.Equal(again, plan.LeftOut.Any(l => l.Object == "ol_local" && l.MadeAgainBy == "t_again"));
+        Assert.Equal(!again, plan.Companions.Any(c => c.Object == "ol_local"));
+    }
+
+    /// <summary>The setup trigger of the world waits for the launch of the player, also for a start in space. The game
+    /// sends the launch when the start spawns the player, before the entry to space. So a chosen trigger that waits for
+    /// the launch starts after the world lines and still runs at the spawn (fix of the review of 2026-10-28).</summary>
+    [Fact]
+    public void AChosenLaunchTriggerOfASpaceStartStartsAfterTheWorld()
+    {
+        var plan = Plan(Script(triggers: """
+            Act_ActTrig = t_launch
+
+            [Trigger]
+            nickname = t_launch
+            Cnd_PlayerLaunch = no_params
+            Act_GiveObjList = Player, ol_wingmen
+            """), "t_launch");
+
+        Assert.Equal(StartPlaceKind.Space, plan.Place.Kind);
+        Assert.Equal(["Cnd_True = no_params", "Act_SetRep = Player, ol_faction_a, -0.9", "Act_ActTrig = ol_play_world"],
+            SetupLines(plan));
+        Assert.Equal(("Cnd_PlayerLaunch", "no_params"), (plan.Setup[1].Lines[0].Key, plan.Setup[1].Lines[0].Values[0]));
+        Assert.Equal(("Act_ActTrig", "t_launch"), (plan.Setup[1].Lines[^1].Key, plan.Setup[1].Lines[^1].Values[0]));
+    }
+
     /// <summary>The system of the player at the first run of a restore trigger at the root comes from its place line:
     /// here the Cnd_SpaceEnter system of its second stage, not the system of the story before it. A Cnd_BaseExit run
     /// takes the system of its base.</summary>

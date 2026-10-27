@@ -254,7 +254,9 @@ The section "Play a mission" of [PLAY.md](PLAY.md) tells what Play does with the
 
 ### How the setup builds the world
 
-An approximate start has two setup triggers. The first runs at the load. It sets the state of the path, for example the objective, the reputations and the locks. The second makes the world when the player enters space, or at the launch for a base start. Then it starts the triggers that wait at the start, so their lines find the ships of the world. For a base start, only a waiting trigger that runs at once with lines on ships starts at the launch. The other triggers start at the load, so a trigger of the base or of a room runs while the player is docked.
+An approximate start has two setup triggers. The first runs at the load. It sets the state of the path, for example the objective, the reputations and the locks. The second makes the world at the launch of the player. The game also sends the launch when a start in space spawns the player, before the entry to space.
+
+After the world lines, the second trigger starts the triggers that wait at the start. So their lines find the ships of the world, and a trigger that waits for the launch or for the entry to space still runs at the spawn. For a base start, only a waiting trigger that runs at once with lines on ships starts at the launch. The other triggers start at the load, so a trigger of the base or of a room runs while the player is docked.
 
 The editor runs the path without a game world. So a trigger that waits for an event of the world stays active in the run, also when the game ran it long before the trigger of the start. The editor runs such a trigger when the path shows its event:
 
@@ -276,7 +278,7 @@ The editor follows each object along the path:
 
 The setup leaves out each object that is in another system at the trigger. It also removes each line that names such an object, for example orders, attitudes, marks and fuses. A label with a member in the start system keeps its lines. A line on an object that no line of the setup makes goes too, because it fails in the game. When the path spawns an object two times, only the last spawn line stays. The lines between the two spawn lines that name the object go too.
 
-A trigger that runs at the start can spawn an object of the setup again. Such triggers wait for nothing, for the launch, for the entry to space, for a timer or for the base of a base start. The scripts spawn an object again only after the first object left space. So the setup leaves out the old object, and the page names the trigger that makes it again.
+A trigger that runs at the start can spawn an object of the setup again. Such triggers wait for nothing, for the launch, for the entry to space or for a timer. For a base start, they can also wait for the end of the launch or for the base. The scripts spawn an object again only after the first object left space. So the setup leaves out the old object, and the page names the trigger that makes it again.
 
 A ship or a formation of the start system travels with the player when one of these is true. The path must not make it hostile to the player.
 

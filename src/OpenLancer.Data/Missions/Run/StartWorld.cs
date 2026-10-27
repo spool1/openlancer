@@ -162,9 +162,9 @@ internal static class StartWorld
 
     private static readonly string[] MoveKeys = ["Act_RelocateShip", "Act_RelocateForm"];
 
-    /// <summary>The conditions of the triggers that run at the start or soon after it.</summary>
-    private static readonly string[] StartConditions =
-        ["Cnd_True", "Cnd_SpaceEnter", "Cnd_PlayerLaunch", "Cnd_LaunchComplete", "Cnd_Timer"];
+    /// <summary>The conditions of the triggers that run at each start or soon after it. The game sends the launch of
+    /// the player at each start: when a start in space spawns the player, or at the launch from the base.</summary>
+    private static readonly string[] StartConditions = ["Cnd_True", "Cnd_SpaceEnter", "Cnd_PlayerLaunch", "Cnd_Timer"];
 
     private static readonly MissionValueKind[] ObjectKinds =
     [
@@ -537,11 +537,14 @@ internal static class StartWorld
             }
         }
 
-        /// <summary>True for a condition that is true at the start or soon after it: Cnd_True, a launch, Cnd_SpaceEnter,
-        /// a timer, or the entry to the base of a base start.</summary>
+        /// <summary>True for a condition that is true at the start or soon after it: Cnd_True, the launch, Cnd_SpaceEnter
+        /// or a timer. For a base start, also the end of the launch and the entry to the base of the start. A start in
+        /// space has no undock, so the launch does not end.</summary>
         private bool RunsAtStart(MissionTrigger trigger) =>
             StartConditions.Any(trigger.ConditionIs) ||
-            anchor.Base != null && trigger.ConditionIs("Cnd_BaseEnter") && MissionIndex.Is(trigger.Condition!.Value(0), anchor.Base);
+            anchor.Base != null && (trigger.ConditionIs("Cnd_LaunchComplete") ||
+                                    trigger.ConditionIs("Cnd_BaseEnter") &&
+                                    MissionIndex.Is(trigger.Condition!.Value(0), anchor.Base));
 
         /// <summary>
         /// Rule 7: the companions. A ship or a formation of the start system that the path does not make hostile is a

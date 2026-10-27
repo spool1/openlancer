@@ -83,12 +83,17 @@ internal static class StartSetup
             var late = replay.ActiveSet.Where(t => !docked || RunsDockedOnWorld(index, t)).Select(t => t.Nickname).ToHashSet();
             setup.Add(Line("Act_ActTrig", worldName));
             setup.AddRange(plan.ActiveSet.Where(t => !late.Contains(t)).Select(t => Line("Act_ActTrig", t)));
-            // The world waits for the player in space, as 29 restore triggers of the retail scripts do. A base start
-            // rebuilds the world at the launch. no_params is case-sensitive (TR16). The triggers of the active set start
-            // after the world lines, so their lines find the objects of the world (fix of the review of 2026-10-28).
-            var wait = docked ? Line("Cnd_PlayerLaunch", "no_params") : Line("Cnd_SpaceEnter", "no_params");
+            // The world waits for the launch of the player, as 14 restore triggers of the retail scripts do. Retail and
+            // OpenLancer send the launch each time the ship of the player enters space, also when a start in space
+            // spawns it. OpenLancer sends it before the entry to space. A base start rebuilds the world at the launch
+            // from the base. no_params is case-sensitive (TR16). The triggers of the active set start after the world
+            // lines, so their lines find the objects of the world. They still get the launch, because the game gives
+            // the event to each trigger that starts while it handles the event (fixes of the reviews of 2026-10-28).
             triggers.Add(new SetupTrigger(worldName,
-                [wait, .. world, .. plan.ActiveSet.Where(late.Contains).Select(t => Line("Act_ActTrig", t))]));
+                [
+                    Line("Cnd_PlayerLaunch", "no_params"), .. world,
+                    .. plan.ActiveSet.Where(late.Contains).Select(t => Line("Act_ActTrig", t)),
+                ]));
         }
         else
         {
