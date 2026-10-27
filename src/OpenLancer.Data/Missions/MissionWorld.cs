@@ -5,9 +5,9 @@ using System.Linq;
 namespace OpenLancer.Data.Missions;
 
 /// <summary>
-/// The names of the game data outside the mission scripts, and the files of the edit view (section 12.3 of the M6a
-/// design). The UI thread makes it from the data lists of the edit view. The worker of the checks reads it only, so it
-/// holds plain sets and no session.
+/// The names of the game data outside the mission scripts, the system of each base, and the files of the edit view
+/// (section 12.3 of the M6a design). The UI thread makes it from the data lists of the edit view. The worker of the
+/// checks reads it only, so it holds plain sets and no session.
 /// </summary>
 /// <remarks>The world of a base-game run (decision D551) also holds the names that a mod removes or renames (see
 /// <see cref="WithRemoved"/>). A line that names such a name has a problem only with the mods. So the problem shows also
@@ -17,6 +17,7 @@ public sealed class MissionWorld
     private readonly Dictionary<MissionValueKind, HashSet<string>> names = [];
     private readonly Dictionary<MissionValueKind, Dictionary<string, string>> removed = [];
     private readonly Func<string, bool>? fileExists;
+    private readonly Dictionary<string, string> baseSystems = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>A world without names and files. The checks of names outside the script then find nothing.</summary>
     public static readonly MissionWorld Empty = new(new Dictionary<MissionValueKind, IEnumerable<string>>(), null);
@@ -24,18 +25,27 @@ public sealed class MissionWorld
     /// <param name="names">The names of each kind outside the script, for example the systems.</param>
     /// <param name="fileExists">Tells whether a file below the data folder exists, by its relative path, or null when
     /// the world does not know the files.</param>
-    public MissionWorld(IReadOnlyDictionary<MissionValueKind, IEnumerable<string>> names, Func<string, bool>? fileExists)
+    /// <param name="baseSystems">The system of each base, by the nickname of the base, or null when the world does not
+    /// know them.</param>
+    public MissionWorld(IReadOnlyDictionary<MissionValueKind, IEnumerable<string>> names, Func<string, bool>? fileExists,
+        IReadOnlyDictionary<string, string>? baseSystems = null)
     {
         foreach (var (kind, values) in names)
             this.names[kind] = values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v.Trim())
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
         this.fileExists = fileExists;
+        foreach (var (dock, system) in baseSystems ?? new Dictionary<string, string>())
+        {
+            if (!string.IsNullOrWhiteSpace(dock) && !string.IsNullOrWhiteSpace(system))
+                this.baseSystems.TryAdd(dock.Trim(), system.Trim());
+        }
     }
 
     private MissionWorld(MissionWorld world, IReadOnlyDictionary<MissionValueKind, IReadOnlyDictionary<string, string>> removed)
     {
         names = world.names;
         fileExists = world.fileExists;
+        baseSystems = world.baseSystems;
         // The names compare without letter case, as the engine hash does.
         foreach (var (kind, map) in removed.Where(p => p.Value.Count > 0))
         {
@@ -50,6 +60,7 @@ public sealed class MissionWorld
     {
         names = world.names;
         removed = world.removed;
+        baseSystems = world.baseSystems;
         this.fileExists = fileExists;
     }
 
@@ -64,7 +75,7 @@ public sealed class MissionWorld
         var all = names.ToDictionary(p => p.Key, p => (IEnumerable<string>)p.Value);
         foreach (var (kind, values) in more)
             all[kind] = all.TryGetValue(kind, out var known) ? known.Concat(values).ToList() : values;
-        var world = new MissionWorld(all, fileExists);
+        var world = new MissionWorld(all, fileExists, baseSystems);
         return removed.Count == 0
             ? world
             : world.WithRemoved(removed.ToDictionary(p => p.Key, p => (IReadOnlyDictionary<string, string>)p.Value));
@@ -102,6 +113,10 @@ public sealed class MissionWorld
         removed.TryGetValue(kind == MissionValueKind.Object ? MissionValueKind.SystemObject : kind, out var map)
             ? map.GetValueOrDefault(name.Trim())
             : null;
+
+    /// <summary>The system of a base of the game data, without letter case, or null when the world does not know
+    /// it.</summary>
+    public string? SystemOfBase(string name) => baseSystems.GetValueOrDefault(name.Trim());
 
     /// <summary>True when a file below the data folder exists. A world that does not know the files says yes.</summary>
     public bool FileExists(string relativePath) => fileExists?.Invoke(relativePath) ?? true;

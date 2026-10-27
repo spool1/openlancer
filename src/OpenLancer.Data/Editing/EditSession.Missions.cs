@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using LibreLancer.Data.IO;
 using OpenLancer.Data.Editing.Lists;
+using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Ini;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions;
@@ -58,7 +59,7 @@ public sealed partial class EditSession
         names[MissionValueKind.SystemObject] = Nicknames.All.Where(n => !n.IsZone).Select(n => n.Name).ToList();
         var ini = FreelancerIni;
         var world = new MissionWorld(names, relative =>
-            DataPaths.Resolve(ini, relative) is { } path && files.FileExists(path));
+            DataPaths.Resolve(ini, relative) is { } path && files.FileExists(path), BaseSystems());
         var removed = RemovedNames(baseFiles, world);
         var targets = ActiveMod?.Manifest.Targets;
         return new MissionInputs
@@ -304,6 +305,19 @@ public sealed partial class EditSession
 
     /// <summary>The values of a list of the edit view, or none when the list does not exist.</summary>
     private List<string> ListNames(string id) => Lists.List(id)?.Entries.Select(e => e.Value).ToList() ?? [];
+
+    /// <summary>The system of each base of the list of the bases: the <c>system</c> key of its section. The suggested
+    /// start place of a mission play reads the system of the base that the player launched from.</summary>
+    private Dictionary<string, string> BaseSystems()
+    {
+        var systems = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in Lists.List("base")?.Entries ?? [])
+        {
+            if (entry.Section is { } section && Get(section) is { } view && SceneSections.Last(view, "system") is { } system)
+                systems.TryAdd(entry.Value, system);
+        }
+        return systems;
+    }
 
     /// <summary>The ledger of the edit view for the worker of the mission checks. The ledger of an edit view does not
     /// change, so the worker can read it.</summary>
