@@ -253,8 +253,8 @@ public static class FieldCommands
                     throw Value(field, $"A value of '{field}' is empty. Give a value, or null to remove the field.");
                 if (text.IndexOfAny([',', '\n', '\r']) >= 0)
                 {
-                    throw Value(field, $"A value of '{field}' holds ',' or a line break. Give the values of a line as " +
-                                       "an array, for example [1, 2, 3], and each line as an array of its values.");
+                    throw Value(field, $"A value of '{field}' holds ',' or a line break. Give the values of one line " +
+                                       "as an array, for example [1, 2, 3]. Give more lines as an array of arrays.");
                 }
                 return text;
             default:

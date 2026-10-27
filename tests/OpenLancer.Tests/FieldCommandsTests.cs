@@ -106,6 +106,36 @@ public sealed class FieldCommandsTests
         Assert.Equal(["100"], Firsts(session, Ship("s1"), "mass"));
     }
 
+    /// <summary>A revert of a [system] whose file the active mod sets refuses with the lock of the row, because it
+    /// would move the system to another file. Through the runner, nothing changes.</summary>
+    [Fact]
+    public void ARevertOfASystemWhoseFileTheModSetsRefuses()
+    {
+        using var ws = SystemWorkspace.Create(SceneLi01);
+        ws.Mod("act", new()
+        {
+            [@"patches\" + SystemWorkspace.UniversePath] = """
+                [system]
+                nickname = Li01
+                file = Systems\Li01\moved.ini
+                """,
+        });
+        var session = ws.Session("act");
+        var li01 = SystemWorkspace.System("Li01");
+
+        var plan = FieldCommands.RevertSection(session, li01);
+
+        Assert.False(plan.CanRun);
+        var error = Assert.Single(plan.Report(session).Errors);
+        Assert.Equal((EditErrorKind.Refused, MissionErrors.FieldNotWritable), (error.Kind, error.Detail));
+        Assert.Equal(FieldBinding.RevertLock(session, li01), error.Message);
+        Assert.StartsWith("Changing the file of a system moves all its contents.", error.Message);
+        var result = FakeCommandHost.Runner(session).Run(s => FieldCommands.RevertSection(s, li01));
+        Assert.Equal(EditStatus.Refused, result.Status);
+        Assert.False(session.CanUndo);
+        Assert.Equal([@"Systems\Li01\moved.ini"], Firsts(session, li01, "file"));
+    }
+
     /// <summary>A text of a text key with the sections that show the same text gives the text and the lines of today
     /// (review finding F12). An empty text and a key without a text id refuse.</summary>
     [Fact]
@@ -137,7 +167,8 @@ public sealed class FieldCommandsTests
     }
 
     /// <summary>The schema of the key checks a field text. A text that is not valid refuses with the reason, and an
-    /// empty text removes the key. A text that a patch line cannot hold refuses in the plan and changes nothing.</summary>
+    /// empty text removes the key. A text that a patch line cannot hold refuses in the plan and changes
+    /// nothing.</summary>
     [Fact]
     public void AFieldTextGoesThroughTheSchemaOfTheKey()
     {
@@ -216,8 +247,10 @@ public sealed class FieldCommandsTests
 
         AssertError(session, Ship("s1"), """{ "mass": "heavy" }""", EditErrorKind.InvalidValue, MissionErrors.FieldValue,
             "mass");
-        AssertError(session, Package, """{ "addon": "eng1, internal, 1" }""", EditErrorKind.InvalidValue,
+        var comma = AssertError(session, Package, """{ "addon": "eng1, internal, 1" }""", EditErrorKind.InvalidValue,
             MissionErrors.FieldValue, "addon");
+        Assert.Equal("A value of 'addon' holds ',' or a line break. Give the values of one line as an array, for " +
+                     "example [1, 2, 3]. Give more lines as an array of arrays.", comma.Message);
         AssertError(session, Ship("s1"), """{ "mass": "" }""", EditErrorKind.InvalidValue, MissionErrors.FieldValue, "mass");
         AssertError(session, Ship("s1"), """{ "mass": { "value": 1 } }""", EditErrorKind.InvalidArgument,
             MissionErrors.ValueKind, "mass");
@@ -371,11 +404,12 @@ public sealed class FieldCommandsTests
         Assert.Empty(host.Log.Entries);
     }
 
-    private static void AssertError(EditSession session, SectionRef section, string json, EditErrorKind kind,
+    private static EditError AssertError(EditSession session, SectionRef section, string json, EditErrorKind kind,
         string detail, string? field)
     {
         var error = Assert.Throws<EditException>(() => FieldCommands.SetFields(session, section, Fields(json))).Error;
         Assert.Equal((kind, detail, field), (error.Kind, error.Detail, error.Field));
+        return error;
     }
 
     private static IReadOnlyList<KeyValuePair<string, JsonNode?>> Fields(string json) =>
