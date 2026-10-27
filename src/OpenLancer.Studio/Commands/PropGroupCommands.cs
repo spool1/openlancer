@@ -25,7 +25,7 @@ public sealed record PropGroupWrite(PropGroup? Group, EditError? Error)
 /// <remarks>
 /// <para>A placement is a plan with one entry of the edit history (decision D288 of the M23 design).</para>
 /// <para>A save, a rename and a delete are asset writes: they change the files of the group at once, outside the edit
-/// history, as Unity writes a prefab asset (decisions D283 and D294). No cancel of a batch can take them back, so they
+/// history, as Unity writes a prefab asset (decisions D283 and D294). No cancel of a batch can undo them, so they
 /// refuse while a batch is open (section 4.0.4, item 9 of the M6b design). They write only into the folder of the
 /// active mod.</para>
 /// </remarks>

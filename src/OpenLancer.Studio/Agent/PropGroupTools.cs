@@ -17,10 +17,10 @@ namespace OpenLancer.Studio.Agent;
 /// design).
 /// </summary>
 /// <remarks>
-/// <para>Undo cannot take an asset write back. So each one needs <c>confirm: true</c>, and its result says that the
+/// <para>Undo does not change an asset write. So each one needs <c>confirm: true</c>, and its result says that the
 /// change is not on the undo stack (section 8.3, item 6 of the MCP1 design). A preview gives the result and writes
-/// nothing. An asset write is never a step of <c>edit_batch</c>, because no cancel of the batch can take it
-/// back.</para>
+/// nothing. An asset write is never a step of <c>edit_batch</c>, because no cancel of the batch can undo
+/// it.</para>
 /// <para>A group of another mod refuses a rename and a delete. A save writes only into the folder of the active mod
 /// (see <see cref="PropGroupCommands"/>).</para>
 /// </remarks>

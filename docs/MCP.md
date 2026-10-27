@@ -229,7 +229,7 @@ A station archetype with a docking sphere needs a base, because the Create menu 
 
 `prop_group_place` refuses a group with lines that name entries that this profile does not have. The error lists each such line. With `leave_out_error_lines: true`, the tool places the group without these lines, as "Place without these lines" does.
 
-`prop_group_save`, `prop_group_rename` and `prop_group_delete` write the files of the group in the `props` folder of the active mod at once. Undo cannot take them back, as in the Unity Project window. So each one needs `confirm: true`, and its result tells that the change is not on the undo stack. A preview writes nothing. A group of another mod refuses a rename and a delete. A rename to the nickname that the group has gives `no_change`. Before each prop group tool reads the groups, it reads the `props` folders again. So a group file that another program wrote is known, and a save never replaces it.
+`prop_group_save`, `prop_group_rename` and `prop_group_delete` write the files of the group in the `props` folder of the active mod at once. Undo does not change these writes, as in the Unity Project window. So each one needs `confirm: true`, and its result tells that the change is not on the undo stack. A preview writes nothing. A group of another mod refuses a rename and a delete. A rename to the nickname that the group has gives `no_change`. Before each prop group tool reads the groups, it reads the `props` folders again. So a group file that another program wrote is known, and a save never replaces it.
 
 ## Permission rules for the agent program
 
@@ -256,7 +256,7 @@ mcp__openlancer__capture_panel
 
 `open_view` and `select_items` change what the editor shows. Without a rule, the agent program asks you before each call. For the oltool host, the names start with `mcp__openlancer-headless__` (the name of the server in the example below).
 
-The rules above do not allow an edit tool. So the agent program asks you before each edit, unless you add a rule for it. Each edit is one Undo step, so you can take back an edit that you allowed.
+The rules above do not allow an edit tool. So the agent program asks you before each edit, unless you add a rule for it. Each edit is one Undo step, so you can undo an edit that you allowed.
 
 ## The oltool host
 

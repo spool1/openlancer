@@ -116,7 +116,7 @@ public sealed class AgentPropGroupToolTests
     }
 
     /// <summary>
-    /// An asset write refuses as a step of edit_batch, because no cancel of the batch can take it back (section 4.0.4,
+    /// An asset write refuses as a step of edit_batch, because no cancel of the batch can undo it (section 4.0.4,
     /// item 9 of the M6b design). A rename and a delete of a group of another mod refuse, and a save writes only into the
     /// folder of the active mod. A used nickname gives name_taken.
     /// </summary>

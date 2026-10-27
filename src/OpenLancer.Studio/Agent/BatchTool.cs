@@ -25,7 +25,7 @@ internal sealed record BatchResult : EditResult
 /// </summary>
 /// <remarks>
 /// <para>Only a tool of the kind <see cref="ToolKind.Edit"/> can be a step (review finding R8 of MCP1-2). An asset
-/// write cannot be a step, because it writes files at once and no cancel can take it back. A query, a view tool, a
+/// write cannot be a step, because it writes files at once and no cancel can undo it. A query, a view tool, a
 /// play tool and a tool of the session as a whole cannot be a step either.</para>
 /// <para>A step cannot have <c>preview</c> or <c>with_patch</c>, because the batch gives the preview. A step that
 /// needs a confirmation fails unless it has <c>confirm: true</c>. The <c>if_revision</c> of a step compares with the

@@ -477,7 +477,7 @@ public sealed class AgentSceneToolTests
     /// label "Agent: ...". One undo puts back the states of each file before the call.
     /// </summary>
     [Fact]
-    public void EachSceneAndDataToolPreviewsAndIsOneAgentEntryThatOneUndoTakesBack()
+    public void EachSceneAndDataToolPreviewsAndIsOneAgentEntryThatOneUndoReverses()
     {
         (string Tool, string Arguments)[] calls =
         [

@@ -577,7 +577,7 @@
         "3. The edit tools change only the active mod. The server never changes the profile, the other mods, the game or the settings of the editor.",
         "4. Each result gives rev, the revision of the edit view that it read.",
         "5. Each edit is one Undo step. The user can undo it, and the agent can undo only its own edits.",
-        "6. The prop group tools write files at once. Undo cannot take them back, so they ask for confirm: true."
+        "6. The prop group tools write files at once. Undo does not change these writes, so they ask for confirm: true."
       ]
     },
     "openlancer://guide/refs": {

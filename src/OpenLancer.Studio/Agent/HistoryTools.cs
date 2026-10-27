@@ -12,7 +12,7 @@ internal sealed record HistoryStepView(string Label);
 /// <summary>
 /// The tools <c>undo</c> and <c>redo</c> of section 7.6 of the MCP1 design (decision D709). The agent undoes only an
 /// entry with the edit origin Agent at the top of the history. It redoes only an agent entry that it undid itself. So
-/// the agent never takes back an edit of the user, and never does again an edit that the user undid with Ctrl+Z. The
+/// the agent never undoes an edit of the user, and never does again an edit that the user undid with Ctrl+Z. The
 /// user can undo and redo each agent entry, as each other entry.
 /// </summary>
 internal static class HistoryTools
