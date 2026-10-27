@@ -137,7 +137,7 @@ public sealed class FieldCommandsTests
     }
 
     /// <summary>The schema of the key checks a field text. A text that is not valid refuses with the reason, and an
-    /// empty text removes the key. A command that a patch line cannot hold refuses and changes nothing.</summary>
+    /// empty text removes the key. A text that a patch line cannot hold refuses in the plan and changes nothing.</summary>
     [Fact]
     public void AFieldTextGoesThroughTheSchemaOfTheKey()
     {
@@ -154,7 +154,7 @@ public sealed class FieldCommandsTests
         Assert.Equal("Set mass", session.UndoLabel);
         Assert.Equal(["150"], Firsts(session, Ship("s1"), "mass"));
         var semicolon = FieldCommands.SetLines(session, Ship("s1"), "da_archetype", [@"ships\s1;old.cmp"]);
-        Assert.True(semicolon.CanRun);
+        Assert.False(semicolon.CanRun);
         Assert.Equal(EditStatus.Refused, runner.Run(semicolon).Status);
         Assert.Equal([@"ships\s1.cmp"], Firsts(session, Ship("s1"), "da_archetype"));
         Assert.Equal("Set mass", session.UndoLabel);
@@ -232,6 +232,39 @@ public sealed class FieldCommandsTests
         AssertError(session, Ship("s1"), """{ "mass": 1, "MASS": 2 }""", EditErrorKind.InvalidArgument,
             MissionErrors.ValueKind, "mass");
         AssertError(session, Ship("s1"), "{}", EditErrorKind.InvalidArgument, MissionErrors.ValueMissing, null);
+        Assert.False(session.CanUndo);
+        Assert.False(session.IsDirty);
+    }
+
+    /// <summary>
+    /// A value that a patch line cannot hold refuses before the edit runs: a ';', a character that is not ASCII, and a
+    /// control character such as a tab. The plan of the field command refuses with the detail FieldValue, and the
+    /// request of an agent throws the error invalid_value. Nothing changes.
+    /// </summary>
+    [Fact]
+    public void AValueThatAPatchLineCannotHoldRefusesInThePlan()
+    {
+        using var ws = Create();
+        var session = ws.Session("act");
+
+        foreach (var json in new[]
+                 {
+                     """{ "da_archetype": "ships\\s1;old.cmp" }""",
+                     """{ "da_archetype": "ships\\sé.cmp" }""",
+                     """{ "da_archetype": "ships\\s1\t.cmp" }""",
+                 })
+        {
+            var error = Assert.Throws<EditException>(() => FieldCommands.SetFields(session, Ship("s1"), Fields(json)))
+                .Error;
+            Assert.Equal((EditErrorKind.InvalidValue, MissionErrors.FieldValue, "da_archetype"),
+                (error.Kind, error.Detail, error.Field));
+            Assert.Contains("a value must be ASCII text with no ';' and no control character", error.Message);
+        }
+
+        var plan = FieldCommands.SetLines(session, Ship("s1"), "da_archetype", [@"ships\s1;old.cmp"]);
+        Assert.False(plan.CanRun);
+        Assert.Equal(MissionErrors.FieldValue, Assert.Single(plan.Report(session).Errors).Detail);
+        Assert.Equal(EditStatus.Refused, FakeCommandHost.Runner(session).Run(plan).Status);
         Assert.False(session.CanUndo);
         Assert.False(session.IsDirty);
     }

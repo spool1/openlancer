@@ -374,6 +374,19 @@ public sealed partial class EditSession : IDisposable
             changed);
     }
 
+    /// <summary>
+    /// Why value texts cannot be the lines of a name of a section, or null. It is the check of
+    /// <see cref="EditCommand.SetLinesFromText"/> when it runs, so the plan of a command can refuse before. Also null
+    /// when the edit view has no such section: the command then fails when it runs.
+    /// </summary>
+    internal string? LineTextError(SectionRef target, string name, IReadOnlyList<string> lines)
+    {
+        if (!TryFind(target, out var document, out var index))
+            return null;
+        EditCommand.ReadLines(document, index, name, lines, out var error);
+        return error;
+    }
+
     /// <summary>True when the session has an edit of a section that it did not save: W of the section is not W at the
     /// open of its file or at the last save. False when the edit view has no such section.</summary>
     internal bool IsUnsaved(SectionRef target) =>

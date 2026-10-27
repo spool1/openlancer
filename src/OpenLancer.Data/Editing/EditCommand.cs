@@ -213,18 +213,31 @@ public abstract class EditCommand
         internal override void Run(EditSession.CommandScope scope)
         {
             var (document, index) = scope.Find(target);
-            // The merge gives the n-th patch line of a name the type rules of the n-th line of that name in B.
-            var replaced = document.BaseSection(document.IdentityAt(index))?.Where(e => Is(e, name)).ToList() ?? [];
-            var values = new List<IReadOnlyList<ValueBase>>();
-            for (var i = 0; i < lines.Count; i++)
-            {
-                if (!PatchFormatter.TryReadLine(name, lines[i], i < replaced.Count ? replaced[i] : null,
-                        document.IsBinary, out var line, out var error))
-                    throw new ArgumentException(error, nameof(lines));
-                values.Add(line);
-            }
+            var values = ReadLines(document, index, name, lines, out var error) ??
+                         throw new ArgumentException(error, nameof(lines));
             new SetLinesCommand(Label, target, name, values).Run(scope);
         }
+    }
+
+    /// <summary>
+    /// The values of the lines of a name of a section from their value texts, as <see cref="SetLinesFromText"/> gives
+    /// them when it runs. Null, with the reason, when a patch line cannot hold a text.
+    /// </summary>
+    internal static List<IReadOnlyList<ValueBase>>? ReadLines(EditDocument document, int index, string name,
+        IReadOnlyList<string> lines, out string? error)
+    {
+        // The merge gives the n-th patch line of a name the type rules of the n-th line of that name in B.
+        var replaced = document.BaseSection(document.IdentityAt(index))?.Where(e => Is(e, name)).ToList() ?? [];
+        var values = new List<IReadOnlyList<ValueBase>>();
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (!PatchFormatter.TryReadLine(name, lines[i], i < replaced.Count ? replaced[i] : null, document.IsBinary,
+                    out var line, out error))
+                return null;
+            values.Add(line);
+        }
+        error = null;
+        return values;
     }
 
     private sealed class RevertCommand(string label, SectionRef target, string? name) : EditCommand(label)

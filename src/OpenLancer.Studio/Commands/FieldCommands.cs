@@ -32,14 +32,20 @@ public static class FieldCommands
     /// <summary>
     /// Plans the lines of a key from the text of their values, for example <c>1, 2.5, li_gun01</c> for one line. An
     /// empty list removes the key (see <see cref="RemoveKey"/>). Each line gets the values that a patch line with that
-    /// text gives (see <see cref="EditCommand.SetLinesFromText"/>).
+    /// text gives (see <see cref="EditCommand.SetLinesFromText"/>). A text that a patch line cannot hold refuses with
+    /// the detail <see cref="MissionErrors.FieldValue"/>, for example a text with ';'.
     /// </summary>
     /// <param name="name">The INI key, as the row of the Inspector spells it.</param>
     /// <param name="lines">The value text of each line, with the values separated by ", ".</param>
-    public static EditPlan SetLines(EditSession session, SectionRef section, string name, IReadOnlyList<string> lines) =>
-        lines.Count == 0
-            ? RemoveKey(session, section, name)
-            : CommandPlan.Of($"Set {name}", () => EditCommand.SetLinesFromText(section, name, lines), [section]);
+    public static EditPlan SetLines(EditSession session, SectionRef section, string name, IReadOnlyList<string> lines)
+    {
+        if (lines.Count == 0)
+            return RemoveKey(session, section, name);
+        var plan = CommandPlan.Of($"Set {name}", () => EditCommand.SetLinesFromText(section, name, lines), [section]);
+        return plan.CanRun && session.LineTextError(section, name, lines) is { } error
+            ? CommandPlan.Refused(plan.Label, error, section, MissionErrors.FieldValue)
+            : plan;
+    }
 
     /// <summary>
     /// Plans one line of a key from its values, for example the numbers of a label drag or a color picker. The line
@@ -115,15 +121,16 @@ public static class FieldCommands
     /// with one value. An array of values is one line, for example a vector <c>[x, y, z]</c>. An array of arrays has one
     /// line for each array, for example the <c>equip</c> rows of a loadout. A value never holds ',', so no field is a
     /// comma-separated text (AGENTS.md UI rule 3).</para>
-    /// <para>The schema of the key checks each value, as a field of the Inspector does. A value that the list checks
-    /// refuse goes into the edit view, and the result gives the new problem, as the Inspector does.</para>
+    /// <para>The schema of the key checks each value, as a field of the Inspector does. A patch line must also hold
+    /// the text of each line (see <see cref="SetLines"/>). A value that the list checks refuse goes into the edit
+    /// view, and the result gives the new problem, as the Inspector does.</para>
     /// <para>A key that the Inspector cannot change refuses (see <see cref="Lock"/>). Examples are the key line (use the
     /// rename), a key of a group of linked lines, the file of a system and a read-only section.</para>
     /// </remarks>
     /// <exception cref="EditException">A value has a form that the tool does not take
     /// (<see cref="EditErrorKind.InvalidArgument"/>). Or the section and its schema do not have the key
     /// (<see cref="EditErrorKind.InvalidArgument"/>, <see cref="MissionErrors.UnknownField"/>). Or the schema of the key
-    /// refuses a value (<see cref="EditErrorKind.InvalidValue"/>).</exception>
+    /// or a patch line refuses a value (<see cref="EditErrorKind.InvalidValue"/>).</exception>
     public static EditPlan SetFields(EditSession session, SectionRef section,
         IReadOnlyList<KeyValuePair<string, JsonNode?>> fields)
     {
@@ -164,7 +171,7 @@ public static class FieldCommands
                 continue;
             var plan = SetLines(session, section, name, parse.Lines);
             if (!plan.CanRun)
-                return CommandPlan.Refused(label, plan.Refusals[0].Message, section, MissionErrors.FieldValue);
+                throw Value(field, plan.Refusals[0].Message);
             plans.Add(plan);
         }
 
