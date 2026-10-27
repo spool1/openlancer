@@ -324,6 +324,42 @@ public sealed class AgentEditToolTests
         Assert.Equal(2, session.Revision);
     }
 
+    /// <summary>The problems of a section that the edit deletes do not count as fixed. The agent fixed nothing, it only
+    /// removed the item (review finding of MCP1-2, step 3).</summary>
+    [Fact]
+    public void TheProblemsOfADeletedItemAreNotFixedProblems()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+        var broken = Ok(host, "set_fields", """{ "ref": "obj:Li01_dock", "fields": { "loadout": "lo_missing" } }""");
+        Assert.Single(broken["new_problems"]!.AsArray());
+
+        var deleted = Ok(host, "delete_items", """{ "refs": ["obj:Li01_dock"], "confirm": true }""");
+
+        Assert.Equal("applied", (string?)deleted["status"]);
+        Assert.Null(session.Get(SceneWorkspace.Object("Li01_dock")));
+        Assert.Empty(deleted["fixed_problems"]!.AsArray());
+        Assert.Empty(deleted["new_problems"]!.AsArray());
+    }
+
+    /// <summary>A renamed section compares its problems with its problems before the rename. So a problem that it
+    /// keeps is neither new nor fixed (review finding of MCP1-2, step 3).</summary>
+    [Fact]
+    public void ARenamedItemKeepsItsProblemsWithoutNewOrFixedProblems()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+        Ok(host, "set_fields", """{ "ref": "obj:Li01_dock", "fields": { "loadout": "lo_missing" } }""");
+
+        var renamed = Ok(host, "rename_item", """{ "ref": "obj:Li01_dock", "new_name": "Li01_dock2", "confirm": true }""");
+
+        Assert.Equal("applied", (string?)renamed["status"]);
+        Assert.Contains(AgentRows.DiagnosticsOf(session, SceneWorkspace.Object("Li01_dock2")),
+            p => p.Message.Contains("lo_missing", StringComparison.Ordinal));
+        Assert.Empty(renamed["new_problems"]!.AsArray());
+        Assert.Empty(renamed["fixed_problems"]!.AsArray());
+    }
+
     /// <summary>A set_fields value that the field cannot hold refuses with invalid_value. A key that the item does not
     /// have gives invalid_argument, and the key line refuses.</summary>
     [Fact]
