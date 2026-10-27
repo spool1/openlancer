@@ -137,6 +137,28 @@ public abstract class EditCommand
     }
 
     /// <summary>
+    /// Sets the lines of a group of names as one block, in the order of <paramref name="lines"/>. The block takes the
+    /// place of the first line of any of the names, or goes at the end of the section. The other lines keep their
+    /// order. An example is the encounter lines of a zone with their faction lines (see
+    /// <see cref="SectionKeys.LinkedGroups"/>): the engine gives each faction line to the encounter line before it, so
+    /// one name alone cannot keep the order. An empty block removes the names.
+    /// </summary>
+    /// <param name="names">The names that the block replaces. Each line of the block has one of them.</param>
+    /// <param name="label">The label of the edit.</param>
+    /// <exception cref="ArgumentException">A name is not valid, or a line of the block has another name.</exception>
+    internal static EditCommand SetLineBlock(SectionRef target, IReadOnlyList<string> names, IReadOnlyList<EntryView> lines,
+        string label)
+    {
+        if (names.Count == 0)
+            throw new ArgumentException("Give one or more names.", nameof(names));
+        foreach (var name in names)
+            CheckName(name);
+        if (lines.FirstOrDefault(l => !names.Contains(l.Name, StringComparer.OrdinalIgnoreCase)) is { } other)
+            throw new ArgumentException($"The line '{other.Name}' is not a line of the block.", nameof(lines));
+        return new SetLineBlockCommand(label, target, names, lines);
+    }
+
+    /// <summary>
     /// Removes <paramref name="count"/> lines of a section from the line at <paramref name="first"/> (from 0, among all
     /// lines of the section). The other lines keep their order. The command throws an <see cref="ArgumentException"/>
     /// when it runs on a section without these lines, and an <see cref="InvalidOperationException"/> when the lines
@@ -384,6 +406,20 @@ public abstract class EditCommand
         }
     }
 
+    private sealed class SetLineBlockCommand(string label, SectionRef target, IReadOnlyList<string> names,
+        IReadOnlyList<EntryView> lines) : EditCommand(label)
+    {
+        internal override void Run(EditSession.CommandScope scope)
+        {
+            var (document, index) = scope.Find(target);
+            var old = document.Working[index];
+            if (KeyName(old) is { } key && names.Contains(key, StringComparer.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"'{key}' is the key of {target.Id}. Use Rename to change it.");
+            document.Replace(index, SectionEdits.WithBlock(old, names, lines), names);
+            scope.Changed(target, structural: false);
+        }
+    }
+
     private sealed class RemoveEntriesCommand(string label, SectionRef target, int first, int count) : EditCommand(label)
     {
         internal override void Run(EditSession.CommandScope scope)
@@ -444,6 +480,33 @@ internal static class SectionEdits
         }
         if (!placed)
             Add(result, spelling, lines);
+        return result;
+    }
+
+    /// <summary>
+    /// A copy of <paramref name="old"/> in which <paramref name="lines"/> take the place of the lines of each of
+    /// <paramref name="names"/>, as one block: at the first line of any of the names, or at the end.
+    /// </summary>
+    public static Section WithBlock(Section old, IReadOnlyList<string> names, IReadOnlyList<EntryView> lines)
+    {
+        var result = new Section(old.Name, old.Count) { File = old.File, Line = old.Line };
+        var placed = false;
+        foreach (var entry in old)
+        {
+            if (!names.Any(n => Is(entry, n)))
+                result.Add(Line(result, entry.Name, entry, entry.Line));
+            else if (!placed)
+            {
+                foreach (var line in lines)
+                    result.Add(Line(result, line.Name, line.Values));
+                placed = true;
+            }
+        }
+        if (!placed)
+        {
+            foreach (var line in lines)
+                result.Add(Line(result, line.Name, line.Values));
+        }
         return result;
     }
 

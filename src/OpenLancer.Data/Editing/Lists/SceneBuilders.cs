@@ -10,7 +10,7 @@ namespace OpenLancer.Data.Editing.Lists;
 internal sealed record BuilderLine(string Key, string? Value);
 
 /// <summary>
-/// The rules of a new wreck of the agent tool <c>scene_place_wreck</c> (decision D730 of the MCP1 design): the
+/// The rules of a new wreck of the agent tool <c>scene_place_wreck</c> (decision D730 of the MCP1 design). They give the
 /// <c>[Solar]</c> types of its archetype, the lines of its object, and the texts of its name and its infocard.
 /// </summary>
 /// <param name="Help">What a wreck is, for the agent.</param>
