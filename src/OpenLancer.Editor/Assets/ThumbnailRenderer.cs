@@ -37,8 +37,9 @@ internal sealed record ThumbnailModel(ModelSource Source, Vector3 Position);
 /// </remarks>
 internal sealed class ThumbnailRenderer : IDisposable
 {
-    /// <summary>The distance of the camera from the center, in radii of the model.</summary>
-    private const float CameraDistance = 2.35f;
+    /// <summary>The distance of the camera from the center, in radii of the model. The clip preview of the Inspector
+    /// uses it too.</summary>
+    internal const float CameraDistance = 2.35f;
 
     /// <summary>A sphere file renders a little smaller, so a planet fits the image.</summary>
     private const float SphereFactor = 1.17f;
@@ -46,7 +47,12 @@ internal sealed class ThumbnailRenderer : IDisposable
     /// <summary>The number of render updates of an image. Static models need no time to settle.</summary>
     private const int Updates = 2;
 
-    private static readonly SystemLighting Lighting = MakeLighting();
+    /// <summary>The background color of an image. The clip preview of the Inspector uses it too.</summary>
+    internal static readonly Color4 NullColor = new(56, 57, 58, 255);
+
+    /// <summary>Two white directional lights, from above and from the front. The clip preview of the Inspector uses them
+    /// too.</summary>
+    internal static readonly SystemLighting Lighting = MakeLighting();
 
     private readonly Game game;
     private readonly GameResourceManager resources;
@@ -62,7 +68,7 @@ internal sealed class ThumbnailRenderer : IDisposable
         this.files = files;
         renderer = new SystemRenderer(camera, resources, game)
         {
-            NullColor = new Color4(56, 57, 58, 255),
+            NullColor = NullColor,
             SystemLighting = Lighting,
         };
     }

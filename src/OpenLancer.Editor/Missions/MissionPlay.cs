@@ -80,15 +80,20 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
     public const string NoCameraSystem = "The start place is the Scene camera, and no system is open. Open a system, or " +
                                          "pick another start place on the Play start page.";
 
+    /// <summary>The reason of a suggested start at the Scene camera in a system that the Scene does not show.</summary>
+    public static string CameraSystemReason(string system) =>
+        $"The suggested start place is the Scene camera in {system}, because no line of the path gives a point there. " +
+        $"The play cannot start in another system. Open {system} in the Scene, or pick a base on the Play start page.";
+
     /// <summary>
     /// Why a mission play cannot start at a start place, or null when it can (UI rule 2): a system or a base that the
-    /// game data does not have, or the Scene camera while no system is open. The Play start page shows the reason under
-    /// the start place, and Play gives it when it refuses. The check has no side effect: it writes nothing to the
-    /// Console.
+    /// game data does not have, the Scene camera while no system is open, or a suggested Scene camera in a system that
+    /// the Scene does not show. The Play start page shows the reason under the start place, and Play gives it when it
+    /// refuses. The check has no side effect: it writes nothing to the Console.
     /// </summary>
     /// <param name="items">The game data of the profile, or null when it did not load.</param>
-    /// <param name="systemOpen">True while the Scene shows a system.</param>
-    internal static string? PlaceProblem(GameItemDb? items, bool systemOpen, StartPlace place)
+    /// <param name="openSystem">The nickname of the system that the Scene shows, or null.</param>
+    internal static string? PlaceProblem(GameItemDb? items, string? openSystem, StartPlace place)
     {
         if (items == null)
         {
@@ -101,9 +106,12 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
                 $"The start place names the system '{place.System}', which is not in the game data. Pick a base or the " +
                 "Scene camera on the Play start page.",
             StartPlaceKind.Base when items.Bases.Get(place.Base!) is not { System: not null } =>
-                $"The start place names the base '{place.Base}', which is not in the game data. Pick another base on the " +
-                "Play start page.",
-            StartPlaceKind.Camera when !systemOpen => NoCameraSystem,
+                $"The start place names the base '{place.Base}', which is not in the game data. Pick a base or the " +
+                "Scene camera on the Play start page.",
+            StartPlaceKind.Camera when place.System is { } system &&
+                                       !system.Equals(openSystem, StringComparison.OrdinalIgnoreCase) =>
+                CameraSystemReason(system),
+            StartPlaceKind.Camera when openSystem == null => NoCameraSystem,
             _ => null,
         };
     }
@@ -115,12 +123,14 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
     /// stop all of them. The chip of the play start shows the reason, because no node of the graph then shows a Play
     /// button.
     /// </summary>
-    internal static string? ChoiceProblem(GameItemDb? items, bool systemOpen, PlayStartSetting setting) =>
+    /// <param name="items">The game data of the profile, or null when it did not load.</param>
+    /// <param name="openSystem">The nickname of the system that the Scene shows, or null.</param>
+    internal static string? ChoiceProblem(GameItemDb? items, string? openSystem, PlayStartSetting setting) =>
         setting.PlaceChoice switch
         {
-            (StartPlaceChoice.Base, { } dock) => PlaceProblem(items, systemOpen,
+            (StartPlaceChoice.Base, { } dock) => PlaceProblem(items, openSystem,
                 new StartPlace(StartPlaceKind.Base, null, dock.Trim(), Vector3.Zero, Quaternion.Identity, "")),
-            (StartPlaceChoice.Camera, _) => PlaceProblem(items, systemOpen, StartPlace.Camera("")),
+            (StartPlaceChoice.Camera, _) => PlaceProblem(items, openSystem, StartPlace.Camera("")),
             _ => items == null ? NoGameData : null,
         };
 

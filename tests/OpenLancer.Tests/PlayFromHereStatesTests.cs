@@ -412,12 +412,13 @@ public sealed class PlayFromHereStatesTests
             states.Tooltip(analysis.Index.Trigger(trigger)!, playRuns).Split('\n');
 
         Assert.Equal([GraphView.PlayFromHereTip, "Start: Mission start (t_start). The start is exact.",
-            "Start place: Suggested: At the Scene camera", "Place source: No line of the path gives a place."], Lines("t_start"));
+            "Start place: Suggested: At the Scene camera", "Source of the place: No line of the path gives a place."], Lines("t_start"));
 
         var checkpoint = Lines("t_restore");
         Assert.Equal("Start: Checkpoint t_restore. The state of the triggers is exact.", checkpoint[1]);
         Assert.Equal("Start place: Suggested: In ol_sys_a at 10, 20, 30", checkpoint[2]);
-        Assert.Equal("Place source: Act_SetInitialPlayerPos of t_restore", checkpoint[3]);
+        Assert.Equal("Source of the place: Act_SetInitialPlayerPos of t_restore. The system comes from Cnd_SpaceEnter of " +
+                     "t_launch.", checkpoint[3]);
         var warning = $"{EditorIcons.ExclamationTriangle}  {StartPlan.CheckpointStateWarning("t_restore")}";
         // The tooltip draws the warning lines in the warning color, as the Play start page does.
         Assert.Equal(warning, Assert.Single(checkpoint, ItemTooltip.IsWarning));
@@ -428,7 +429,8 @@ public sealed class PlayFromHereStatesTests
         var page = PlayStartPageModel.Of(analysis, Suggested with { Trigger = "t_chosen" });
         Assert.Equal($"Start place: {page.PlaceText}", approximate[2]);
         Assert.StartsWith("Start place: Suggested: In ol_sys_a at ", approximate[2]);
-        Assert.Equal($"Place source: {page.Plan.Place.Source}", approximate[3]);
+        // The tooltip has the labels and the texts of the Play start page.
+        Assert.Equal($"{PlayStartPageModel.SourceLabel}: {page.Plan.Suggested.Source}", approximate[3]);
 
         var running = Lines("t_chosen", playRuns: true);
         Assert.Equal([.. approximate, PlayFromHereStates.PlayRunsLine], running);
@@ -437,7 +439,7 @@ public sealed class PlayFromHereStatesTests
     }
 
     [Fact]
-    public void TheTooltipOfABaseChoiceHasNoPlaceSource()
+    public void TheTooltipOfABaseChoiceHasNoSourceOfThePlace()
     {
         var analysis = Analysis(StartPlanTests.Script, StartPlanTests.Slot);
         var states = AtOnce();
@@ -448,7 +450,7 @@ public sealed class PlayFromHereStatesTests
 
         Assert.Equal("Start place: At base ol_base_a", lines[2]);
         Assert.Equal(PlayStartPageModel.Of(analysis, setting with { Trigger = "t_chosen" }).PlaceText, lines[2]["Start place: ".Length..]);
-        Assert.DoesNotContain(lines, l => l.StartsWith("Place source:", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, l => l.StartsWith($"{PlayStartPageModel.SourceLabel}:", StringComparison.Ordinal));
         Assert.DoesNotContain(lines, ItemTooltip.IsWarning);
     }
 
@@ -483,7 +485,7 @@ public sealed class PlayFromHereStatesTests
     public void WithoutGameDataEachPlaceChoiceHasAProblem()
     {
         Assert.All(new[] { Suggested, AtCamera, new PlayStartSetting("", "base:ol_base_a") },
-            setting => Assert.Equal(MissionPlay.NoGameData, MissionPlay.ChoiceProblem(null, true, setting)));
+            setting => Assert.Equal(MissionPlay.NoGameData, MissionPlay.ChoiceProblem(null, "ol_sys_a", setting)));
         Assert.Equal($"{MissionView.ChoiceProblemLead}\n{MissionPlay.NoCameraSystem}",
             MissionView.ChoiceProblemTip(MissionPlay.NoCameraSystem));
     }

@@ -61,10 +61,11 @@ public sealed class PlayFromHereRetailTests(ITestOutputHelper output)
         var m10 = Biggest();
         GameDataPaths.RequireBase();
         var items = RetailGame.Instance.Data.Items;
-        // A place problem makes a new text, as a system or a base that the game data does not have does.
+        // A place problem makes a new text, as a system or a base that the game data does not have does. Without a
+        // problem, the Scene shows the system of each place, so a suggested Scene camera in a system can start too.
         Func<StartPlace, string?> problem = eachPlaceHasAProblem
             ? place => $"The start place names the system '{place.System}', which is not in the game data."
-            : place => MissionPlay.PlaceProblem(items, true, place);
+            : place => MissionPlay.PlaceProblem(items, place.System ?? "li01", place);
         var states = new PlayFromHereStates(problem, _ => { }, (pass, _) => Task.FromResult(pass()));
         states.Sync(m10, PlayStartSetting.Default, false);
         var graph = MissionGraph.Build(m10, new GraphOptions(GraphLens.Logic));

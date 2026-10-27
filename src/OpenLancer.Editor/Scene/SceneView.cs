@@ -205,8 +205,7 @@ internal sealed class SceneView : IDisposable
     /// </summary>
     public IReadOnlyList<SpawnShape>? SpawnShapes(string system) =>
         System?.Nickname.Equals(system, StringComparison.OrdinalIgnoreCase) == true
-            ? SpawnPoint.Shapes(objects, System.Zones,
-                item => window.Session?.ItemName(item) is { Length: > 0 } name ? name : item.Nickname)
+            ? SpawnPoint.Shapes(objects, System.Zones, SpawnPoint.NameOf(window.Session))
             : null;
 
     /// <summary>True when the item is part of the open system, so that the camera can focus on it.</summary>

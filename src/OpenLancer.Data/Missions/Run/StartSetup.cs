@@ -105,6 +105,7 @@ internal static class StartSetup
     /// The lines of the replay that the setup keeps, in replay order (section 5.3, step 9): the lines of the roles
     /// "world", "state" and "save", without these lines:
     /// <list type="bullet">
+    /// <item><c>Act_RelocateShip</c> of the player. It is a place line of the start place.</item>
     /// <item>A spawn whose objects a later <c>Act_Destroy</c> of the replay removes, or a <c>Cnd_Destroyed</c> or a
     /// <c>Cnd_LootAcquired</c> line of the path names. An <c>Act_Destroy</c> of only such objects goes too.</item>
     /// <item>Each music line but the last.</item>
@@ -124,7 +125,9 @@ internal static class StartSetup
             else if (Is(condition, "Cnd_LootAcquired") && condition.ValueOf("loot") is { } loot)
                 gone.UnionWith(Members(index, loot));
         }
-        var keep = lines.Select(l => l.Name?.Start is StartRole.World or StartRole.State or StartRole.Save).ToArray();
+        // A move of the player is a place line: the start place has its result, so a later move must not undo the place.
+        var keep = lines.Select(l => l.Name?.Start is StartRole.World or StartRole.State or StartRole.Save &&
+                                     !StartPlaces.IsPlayerMove(l)).ToArray();
         var dropped = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < lines.Count; i++)
         {

@@ -179,7 +179,7 @@ Play from a trigger starts the mission in the OpenLancer game at a point of the 
 3. To set the play start without a play, right-click the trigger and click "Set as play start". Click it again to make the mission start the play start again.
 4. Press F5 in the Mission tab to play from the play start again.
 
-The Play button of a node shows only when a play can start at its trigger now. The button uses the start place that you pick on the Play start page. Its tooltip names the start and the start place. For the start place "Suggested", the tooltip also names the source of the place. A click on the button does not select or move the node. While a mission play runs, a click starts the game again at that trigger.
+The Play button of a node shows only when a play can start at its trigger now. The button uses the start place that you pick on the Play start page. Its tooltip names the start and the start place with the texts of the Play start page. For the start place "Suggested", the tooltip also gives the source of the place. A click on the button does not select or move the node. While a mission play runs, a click starts the game again at that trigger.
 
 When a trigger cannot start, its node has no Play button, and "Play from here" in its node menu is off. The tooltip of the item gives the reason. Examples are a path that another trigger stops, a start place that the game data does not have, and a script without a story slot. Prefab mode shows no Play buttons.
 
@@ -203,13 +203,42 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 | Story slot | The story slot of the mission. The start save names its mission. |
 | Story stage | The story stage in the start save. After the accept, it is the accept stage of the slot. |
 | Mission accepted | Yes when the start comes after the player accepts the mission. |
-| Start place | Where the player starts: the suggestion, a base that you pick, or the Scene camera. The suggestion comes from the start trigger and from the path to it. A base that the game data does not have, and the Scene camera without an open system, show their reason under the field. |
+| Start place | Where the player starts: the suggestion, a base that you pick, or the Scene camera. The suggestion is where the player is at this trigger in the game (see below). A base or a system that the game data does not have shows its reason under the field. The Scene camera without an open system, and a suggested Scene camera in a system that the Scene does not show, also show their reason. |
+| Source of the place | The line of the script that gives the suggested place, for example Act_SetInitialPlayerPos of key_save_x. When another line gives the system or the point, the text names that line too. Click "Select {trigger}" to select the trigger of the line in the graph. The row shows only for the suggested place. |
 | Ship | The ship package of the Play menu. |
 | Triggers that wait at the start | The triggers that are active when the play starts. Click a row to select the trigger. |
 | Advanced > Setup lines | The setup triggers of an approximate start, as read-only raw INI with colors. They are in the test layer of the play, not in the mod. |
 | Play from the play start | Plays the mission from this start in OpenLancer, as F5 in the Mission tab does. The button is off while the start or its start place cannot start, and its tooltip gives the reason. |
 
 A warning shows when no start trigger and no checkpoint leads to the trigger. The play then starts only this trigger. A warning also shows for a checkpoint start and for a start whose path starts at a checkpoint. The start save keeps only the triggers of a saved game. When the start cannot start, the page shows the reason, for example for a script without a story slot.
+
+Three warnings are about the start place. They follow the place that you pick:
+
+- A trigger that waits for the end of the launch does not run after a start in space or at the Scene camera, so the page names it. Pick a base to run it.
+- A trigger that waits for the player to enter space in another system runs in OpenLancer, but not in the linked game.
+- A trigger that waits for a jump into the system of the start does not run in OpenLancer until the next jump into that system. The path to the trigger already made that jump.
+
+### How the editor suggests the start place
+
+The suggestion is where the player is at the trigger in the game. The editor reads the path to the trigger from the newest trigger back. The newest line that tells where the player is gives the kind of the start:
+
+- A bar visit, a base entry or a forced landing docks the player at that base.
+- A launch, a jump, a line that moves the player, or a condition about the player in space puts the player in space.
+- A trigger that waits at a base for the launch, or for the end of the launch, starts docked at the base of the launch. The launch then runs it.
+- A trigger that waits for a jump starts before the jump, so the jump runs it.
+
+When the path already made the jump that the trigger waits for, the start is after that jump. The path then ran the triggers after the jump, so the world of the play is in the new system.
+
+The point of a start in space comes from a line that moves the player or from a checkpoint. A debug trigger of the script that moves the player to the same step can also give it. Else it comes from a condition that waits for the player near a point or near an object of the game data. The system comes from the same lines, the base of the launch or a system hint.
+
+When no line gives a point, these rules give it:
+
+1. After a jump, the start is 1,000 units from the jump gate or hole that leads back to the system before the jump. The game puts the player there after a jump.
+2. Else the start is 1,000 units from a ship that the path spawns in that system. A ship that the path makes hostile to the player does not count.
+3. Else, after a launch, the start is docked at the base of the launch.
+4. Else the start is at the Scene camera in that system. Open that system in the Scene, or pick a base.
+
+When no line of the path gives a place, the start is at the Scene camera in the system that the Scene shows.
 
 The section "Play a mission" of [PLAY.md](PLAY.md) tells what Play does with the start. It tells about the save, the start save, the test layer and the restart after a save.
 

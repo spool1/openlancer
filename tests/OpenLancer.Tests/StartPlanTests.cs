@@ -195,9 +195,9 @@ public sealed class StartPlanTests
         Assert.Equal(StartPlaceKind.Space, place.Kind);
         Assert.Equal(new Vector3(10, 20, 30), place.Position);
         Assert.Equal(Quaternion.Identity, place.Orientation);
-        // The point has no system. The last system condition of the story path gives it.
+        // The line has no system. The story at the step that the restore trigger starts gives it.
         Assert.Equal("ol_sys_a", place.System);
-        Assert.Equal("Act_SetInitialPlayerPos of t_restore", place.Source);
+        Assert.Equal("Act_SetInitialPlayerPos of t_restore. The system comes from Cnd_SpaceEnter of t_launch.", place.Source);
     }
 
     [Fact]
@@ -324,27 +324,39 @@ public sealed class StartPlanTests
         Assert.Equal((4, false), (Plan(Script, "t_accept").Stage, Plan(Script, "t_accept").Accepted));
     }
 
+    /// <summary>The launch gives the system, and the first spawn after the launch gives the point. Section 5.3, step 7
+    /// of the M6c design has the rule (fix of 2026-10-27).</summary>
     [Fact]
-    public void TheLastPlaceConditionOfTheStoryPathGivesASpaceStartNearTheLastSpawn()
+    public void TheLaunchOfTheStoryPathGivesASpaceStartNearTheFirstSpawnAfterIt()
     {
         var place = Plan(Script, "t_chosen").Place;
 
         Assert.Equal(StartPlaceKind.Space, place.Kind);
         Assert.Equal("ol_sys_a", place.System);
-        Assert.Equal(new Vector3(300, 0, 400 + StartPlaces.Offset), place.Position);
-        Assert.Equal("Cnd_SpaceEnter of t_launch", place.Source);
+        Assert.Equal(new Vector3(100, 0, 200 + StartPlaces.Offset), place.Position);
+        Assert.Equal("Cnd_SpaceEnter of t_launch. The point is 1,000 units from the spawn of ol_ship_a.", place.Source);
     }
 
+    /// <summary>A launch without a system is still a launch, so the start is not at the base of the offer. The base of the
+    /// launch gives the system when the world knows it. Else the start is at that base, and the launch fires the
+    /// triggers of the path again.</summary>
     [Fact]
-    public void CndSpaceEnterWithNoParamsGivesNoPlaceAndTheSearchGoesUpTheStoryPath()
+    public void CndSpaceEnterWithNoParamsIsALaunchFromTheBaseOfTheOffer()
     {
         var text = Script.Replace("Cnd_SpaceEnter = ol_sys_a", "Cnd_SpaceEnter = no_params");
+        var world = new MissionWorld(new Dictionary<MissionValueKind, IEnumerable<string>>(), null,
+            new Dictionary<string, string> { ["ol_base_a"] = "ol_sys_a" });
 
-        var place = Plan(text, "t_chosen").Place;
+        var known = StartPlan.Make(Index(text, world), Slot, MissionStartPoint.At("t_chosen")).Place;
+        var unknown = Plan(text, "t_chosen").Place;
 
-        Assert.Equal(StartPlaceKind.Base, place.Kind);
-        Assert.Equal("ol_base_a", place.Base);
-        Assert.Equal("Cnd_BaseEnter of t_offer", place.Source);
+        Assert.Equal((StartPlaceKind.Space, "ol_sys_a"), (known.Kind, known.System));
+        Assert.Equal(new Vector3(100, 0, 200 + StartPlaces.Offset), known.Position);
+        Assert.Equal("Cnd_SpaceEnter of t_launch. The system comes from the base of Cnd_BaseEnter of t_offer. The point " +
+                     "is 1,000 units from the spawn of ol_ship_a.", known.Source);
+        Assert.Equal((StartPlaceKind.Base, "ol_base_a"), (unknown.Kind, unknown.Base));
+        Assert.Equal("Cnd_BaseEnter of t_offer. No line of the path names the system of Cnd_SpaceEnter of t_launch.",
+            unknown.Source);
     }
 
     [Fact]

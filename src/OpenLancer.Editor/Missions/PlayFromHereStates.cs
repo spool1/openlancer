@@ -243,8 +243,8 @@ internal sealed class PlayFromHereStates(
         return states;
     }
 
-    /// <summary>The tooltip of a plan that can start: the action, the start and its kind, the start place with the words
-    /// of the Play start page, the source of a suggested place, and each warning of the plan.</summary>
+    /// <summary>The tooltip of a plan that can start: the action, the start and its kind, the start place and the source
+    /// of a suggested place with the labels and the words of the Play start page, and each warning of the plan.</summary>
     internal static string Tip(StartPlan plan, PlayStartSetting setting)
     {
         var kind = plan.Kind switch
@@ -257,10 +257,10 @@ internal sealed class PlayFromHereStates(
         {
             GraphView.PlayFromHereTip,
             $"Start: {plan.StartName}. {kind}",
-            $"Start place: {PlayStartPageModel.PlaceTextOf(setting, plan)}",
+            $"{PlayStartPageModel.PlaceLabel}: {PlayStartPageModel.PlaceTextOf(setting, plan)}",
         };
-        if (setting.PlaceChoice.Place == StartPlaceChoice.Suggested)
-            lines.Add($"Place source: {plan.Place.Source}");
+        if (PlayStartPageModel.ShowsSourceOf(setting, plan))
+            lines.Add($"{PlayStartPageModel.SourceLabel}: {plan.Suggested.Source}");
         foreach (var warning in plan.Warnings)
             lines.Add($"{EditorIcons.ExclamationTriangle}  {warning}");
         return string.Join("\n", lines);

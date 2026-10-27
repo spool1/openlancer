@@ -181,6 +181,31 @@ internal sealed partial class PropertyGrid
     private bool ListValue(ListView? list, string value, ListProblem? problem, float width, string hint,
         bool other = false)
     {
+        var entry = value.Length == 0 ? null : list?.Find(value);
+        var (text, dim, color, error) = other
+            ? (value, "other folder", EditorTheme.Text, false)
+            : ListText(list, value, entry, problem, hint);
+        var clicked = PickerField(text, dim, color, error, entry != null ? ObjectKinds.OfList(list?.Kind ?? "") : null, width);
+        if (list != null && ImGui.IsItemHovered(ImGuiHoveredFlags.ForTooltip))
+        {
+            ImGui.SetTooltip(other
+                ? string.Join("\n", ListPickerModel.Footer(new ListPickerRow(ListRowKind.Other, value, value, null),
+                    list.Label, UsedBy(list)))
+                : ListTooltip(list, value, entry, problem));
+        }
+
+        return clicked;
+    }
+
+    /// <summary>
+    /// Draws the closed field of a picker: a frame with the text, a dim text at the right, and the arrow. Returns true
+    /// when the user clicks the field. The field is the last item, so a tooltip after it belongs to the field.
+    /// </summary>
+    /// <param name="error">True for the red frame of an error.</param>
+    /// <param name="glyph">The kind of the value, for the glyph in front of the text, or null for no glyph.</param>
+    /// <param name="width">The width of the field, or a negative width that leaves that room at the right.</param>
+    internal static bool PickerField(string text, string dim, Vector4 color, bool error, ObjectKind? glyph, float width)
+    {
         var style = ImGui.GetStyle();
         var size = new Vector2(width < 0 ? Math.Max(1, ImGui.GetContentRegionAvail().X + width + 1) : width,
             ImGui.GetFrameHeight());
@@ -189,11 +214,6 @@ internal sealed partial class PropertyGrid
         var clicked = ImGui.InvisibleButton("##listfield", size);
         var hovered = ImGui.IsItemHovered();
         var drawList = ImGui.GetWindowDrawList();
-        var kind = ObjectKinds.OfList(list?.Kind ?? "");
-        var entry = value.Length == 0 ? null : list?.Find(value);
-        var (text, dim, color, error) = other
-            ? (value, "other folder", EditorTheme.Text, false)
-            : ListText(list, value, entry, problem, hint);
         drawList.AddRectFilled(min, max, ImGui.GetColorU32(hovered ? ImGuiCol.FrameBgHovered : ImGuiCol.FrameBg),
             style.FrameRounding);
         drawList.AddRect(min, max, error ? ImGui.GetColorU32(EditorTheme.Error) : ImGui.GetColorU32(ImGuiCol.Border),
@@ -204,10 +224,10 @@ internal sealed partial class PropertyGrid
         var arrow = ImGui.CalcTextSize(DropDown).X;
         var end = max.X - style.FramePadding.X - arrow - style.ItemInnerSpacing.X;
         var clip = new Vector4(min.X, min.Y, end, max.Y);
-        if (entry != null)
+        if (glyph != null)
         {
-            font.RenderChar(drawList, fontSize, position, kind.Abgr, kind.Icon, ref clip);
-            position.X += font.GetFontBaked(fontSize).FindGlyph(kind.Icon).AdvanceX + style.ItemInnerSpacing.X;
+            font.RenderChar(drawList, fontSize, position, glyph.Abgr, glyph.Icon, ref clip);
+            position.X += font.GetFontBaked(fontSize).FindGlyph(glyph.Icon).AdvanceX + style.ItemInnerSpacing.X;
         }
 
         var room = Math.Max(0, end - position.X);
@@ -223,14 +243,6 @@ internal sealed partial class PropertyGrid
 
         drawList.AddText(new Vector2(max.X - style.FramePadding.X - arrow, position.Y), ImGui.GetColorU32(ImGuiCol.Text),
             DropDown);
-        if (list != null && ImGui.IsItemHovered(ImGuiHoveredFlags.ForTooltip))
-        {
-            ImGui.SetTooltip(other
-                ? string.Join("\n", ListPickerModel.Footer(new ListPickerRow(ListRowKind.Other, value, value, null),
-                    list.Label, UsedBy(list)))
-                : ListTooltip(list, value, entry, problem));
-        }
-
         return clicked;
     }
 

@@ -35,11 +35,20 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
     public const string SlotTip = "The story slot of the mission. The start save names its mission.";
     public const string StageTip = "The story stage in the start save. After the accept, it is the accept stage of the slot.";
     public const string AcceptTip = "The start comes after the player accepts the mission.";
-    public const string PlaceTip = "Where the player starts. The suggestion comes from the start trigger and from the path to it.";
+    public const string PlaceTip = "Where the player starts. The suggestion is where the player is at this trigger in the " +
+                                   "game: docked at a base, or in space at a point. After a launch without a point, the " +
+                                   "suggestion is the base of the launch. After a jump without a point, it is the jump gate " +
+                                   "or hole of the jump. When no line of the path gives a place, it is the Scene camera.";
+    public const string SourceTip = "The line of the script that tells where the player is at this trigger. When that line " +
+                                    "gives no system or no point, the text names the line that gives the system or the point.";
     public const string ShipTip = "The ship package of the Play menu.";
     public const string WaitTip = "These triggers are active when the play starts, as at this point of the mission.";
     public const string SetupTip = "The setup triggers of an approximate start. They are in a test layer of the play. The mod " +
                                    "does not change.";
+
+    // The labels of the rows of the start place. The tooltip of the Play button of a node uses the same labels.
+    public const string PlaceLabel = "Start place";
+    public const string SourceLabel = "Source of the place";
 
     public const string PlayTip = "Play the mission from this start in OpenLancer (F5 in the Mission tab).";
 
@@ -67,11 +76,14 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
     /// camera".</summary>
     public string PlaceText => PlaceTextOf(Setting, Plan);
 
-    /// <summary>The suggested place in words.</summary>
+    /// <summary>The suggested place in words, also while the place choice is a base or the Scene camera.</summary>
     public string SuggestedText => SuggestedTextOf(Plan);
 
+    /// <summary>True when the page shows the row "Source of the place".</summary>
+    public bool ShowsSource => ShowsSourceOf(Setting, Plan);
+
     /// <summary>The text of the start place choice of a play start and its plan. The Play start page and the tooltip of
-    /// the Play button of a trigger node show it.</summary>
+    /// the Play button of a node show it.</summary>
     public static string PlaceTextOf(PlayStartSetting setting, StartPlan plan) => setting.PlaceChoice.Place switch
     {
         StartPlaceChoice.Base => $"At base {setting.PlaceChoice.Base}",
@@ -79,7 +91,12 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
         _ => $"Suggested: {SuggestedTextOf(plan)}",
     };
 
-    private static string SuggestedTextOf(StartPlan plan) => plan.CanStart ? plan.Place.Text : "none";
+    /// <summary>True when the source of the suggested place shows: for the place choice "Suggested" of a plan that can
+    /// start. The Play start page and the tooltip of the Play button of a node use it.</summary>
+    public static bool ShowsSourceOf(PlayStartSetting setting, StartPlan plan) =>
+        plan.CanStart && setting.PlaceChoice.Place == StartPlaceChoice.Suggested;
+
+    private static string SuggestedTextOf(StartPlan plan) => plan.CanStart ? plan.Suggested.Text : "none";
 
     /// <summary>The story stage: its name and its number.</summary>
     public string StageText =>

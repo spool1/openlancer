@@ -110,25 +110,30 @@ public enum StartPlaceKind
 }
 
 /// <summary>The start place of a plan.</summary>
-/// <param name="System">The system of a space start, or null when the plan knows none.</param>
+/// <param name="System">The system of a space start. A suggested Scene camera can also have the system where the
+/// player is, so the camera must be in that system. Else null.</param>
 /// <param name="Base">The base of a base start, else null.</param>
 /// <param name="Position">The point of a space start.</param>
 /// <param name="Orientation">The heading of a space start.</param>
-/// <param name="Source">Where the place comes from, in plain words, for example "Act_MovePlayer of t_wave".</param>
+/// <param name="Source">Where the place comes from, in plain words, for example "Act_MovePlayer of t_wave.".</param>
 public sealed record StartPlace(StartPlaceKind Kind, string? System, string? Base, Vector3 Position,
     Quaternion Orientation, string Source)
 {
-    /// <summary>The Scene camera.</summary>
-    public static StartPlace Camera(string source) =>
-        new(StartPlaceKind.Camera, null, null, Vector3.Zero, Quaternion.Identity, source);
+    /// <summary>The Scene camera, in any system or in a system of the suggestion.</summary>
+    public static StartPlace Camera(string source, string? system = null) =>
+        new(StartPlaceKind.Camera, system, null, Vector3.Zero, Quaternion.Identity, source);
 
-    /// <summary>The place in the words of the Play start page: "In {system} at {x}, {y}, {z}", "At base {base}" or "At
-    /// the Scene camera".</summary>
+    /// <summary>The trigger whose line gives the place, or null. The Play start page links to it.</summary>
+    public string? Trigger { get; init; }
+
+    /// <summary>The place in the words of the Play start page: "In {system} at {x}, {y}, {z}", "At base {base}", "At
+    /// the Scene camera" or "At the Scene camera in {system}".</summary>
     public string Text => Kind switch
     {
         StartPlaceKind.Space => string.Create(CultureInfo.InvariantCulture,
             $"In {System} at {Position.X:0}, {Position.Y:0}, {Position.Z:0}"),
         StartPlaceKind.Base => $"At base {Base}",
+        _ when System != null => $"At the Scene camera in {System}",
         _ => "At the Scene camera",
     };
 }
@@ -198,8 +203,11 @@ public sealed record StartPlan
     /// <summary>The keys of <c>[MissionState]</c> that come from the path.</summary>
     public StartMissionState State { get; init; } = StartMissionState.Empty;
 
-    /// <summary>The start place.</summary>
+    /// <summary>The start place of the place choice.</summary>
     public StartPlace Place { get; init; } = StartPlace.Camera("No rule gives a place.");
+
+    /// <summary>The place that the plan suggests, also while the place choice is a base or the Scene camera.</summary>
+    public StartPlace Suggested { get; init; } = StartPlace.Camera("No rule gives a place.");
 
     /// <summary>The triggers of the replay path, from the root to the chosen trigger. Empty when no root reaches the
     /// trigger.</summary>
@@ -297,18 +305,21 @@ public sealed record StartPlan
         IReadOnlyList<string> restored = replay.Kind != StartKind.MissionStart && replay.Root is { StartsActive: false } root
             ? [CheckpointStateWarning(root.Nickname)]
             : [];
+        var picked = place switch
+        {
+            StartPlaceChoice.Base when placeBase != null => new StartPlace(StartPlaceKind.Base, null, placeBase.Trim(),
+                Vector3.Zero, Quaternion.Identity, "The base that you picked."),
+            StartPlaceChoice.Camera => StartPlace.Camera("The Scene camera."),
+            _ => null,
+        };
+        var suggestion = StartPlaces.Suggest(index, replay, picked);
         plan = plan with
         {
             Stage = accepted ? slot.AcceptStage : slot.StartStage,
             Accepted = accepted,
-            Warnings = [.. plan.Warnings, .. restored, .. notes],
-            Place = place switch
-            {
-                StartPlaceChoice.Base when placeBase != null => new StartPlace(StartPlaceKind.Base, null, placeBase.Trim(),
-                    Vector3.Zero, Quaternion.Identity, "The base that you picked."),
-                StartPlaceChoice.Camera => StartPlace.Camera("The Scene camera."),
-                _ => StartPlaces.Suggest(index, replay.Chosen, story, replay.Effects),
-            },
+            Warnings = [.. plan.Warnings, .. restored, .. notes, .. suggestion.Warnings],
+            Place = suggestion.Place,
+            Suggested = suggestion.Suggested,
         };
         return StartSetup.Apply(plan, index, replay, story, checkSetup);
     }
@@ -322,16 +333,23 @@ public sealed record StartPlan
     internal static IReadOnlyList<MissionTrigger> StoryPath(MissionIndex index, MissionTrigger? chosen) =>
         chosen == null ? [] : ShortestPath(index, index.StartTriggers, chosen, MissionLinkKind.Start, MissionLinkKind.Load);
 
-    /// <summary>The shortest path of links of some kinds from the first root that reaches the target, in the order of
-    /// the roots. Empty when no root reaches it. A start that a stop after it cancels in the same trigger is not a link,
-    /// because the game does not start its target (TR9).</summary>
+    /// <summary>The triggers that each trigger reaches through links of some kinds. A duplicate trigger has no link. A
+    /// start that a stop after it cancels in the same trigger is not a link, because the game does not start its target
+    /// (TR9).</summary>
+    internal static ILookup<MissionTrigger, MissionTrigger> Next(MissionIndex index, params MissionLinkKind[] kinds)
+    {
+        var cancelled = index.Cancels.Where(c => c.Target != null).Select(c => (c.Source, c.Target!)).ToHashSet();
+        return index.Links.Where(l => kinds.Contains(l.Kind) && l.Target is { IsDuplicate: false } && !l.Source.IsDuplicate &&
+                                      !(l.Kind == MissionLinkKind.Start && cancelled.Contains((l.Source, l.Target))))
+            .ToLookup(l => l.Source, l => l.Target!);
+    }
+
+    /// <summary>The shortest path of links of some kinds (see <see cref="Next"/>) from the first root that reaches the
+    /// target, in the order of the roots. Empty when no root reaches it.</summary>
     internal static IReadOnlyList<MissionTrigger> ShortestPath(MissionIndex index, IEnumerable<MissionTrigger> roots,
         MissionTrigger target, params MissionLinkKind[] kinds)
     {
-        var cancelled = index.Cancels.Where(c => c.Target != null).Select(c => (c.Source, c.Target!)).ToHashSet();
-        var next = index.Links.Where(l => kinds.Contains(l.Kind) && l.Target is { IsDuplicate: false } && !l.Source.IsDuplicate &&
-                                          !(l.Kind == MissionLinkKind.Start && cancelled.Contains((l.Source, l.Target))))
-            .ToLookup(l => l.Source, l => l.Target!);
+        var next = Next(index, kinds);
         var parent = new Dictionary<MissionTrigger, MissionTrigger?>();
         var queue = new Queue<MissionTrigger>();
         foreach (var root in roots.Where(r => !r.IsDuplicate))
@@ -534,166 +552,4 @@ internal sealed record StartReplay
 
         public void Effect(MissionTrigger trigger, MissionLine action) => Effects.Add((trigger, action));
     }
-}
-
-/// <summary>The rules of the suggested start place (section 5.3, step 7 of the M6c design).</summary>
-internal static class StartPlaces
-{
-    /// <summary>The offset of a start from a spawn position or the system center, in meters.</summary>
-    public const float Offset = 1000;
-
-    private static readonly string[] PlaceActions = ["Act_MovePlayer", "Act_SetInitialPlayerPos"];
-
-    private static readonly string[] SpawnActions =
-        ["Act_SpawnShip", "Act_SpawnFormation", "Act_SpawnSolar", "Act_SpawnLoot", "Act_RelocateShip", "Act_RelocateForm"];
-
-    /// <summary>The suggested place: the first rule that gives a place.</summary>
-    /// <param name="chosen">The trigger of the start, or null for the mission start.</param>
-    /// <param name="story">The story path of the trigger.</param>
-    /// <param name="effects">The actions without flow of the replay, in order.</param>
-    public static StartPlace Suggest(MissionIndex index, MissionTrigger? chosen, IReadOnlyList<MissionTrigger> story,
-        IReadOnlyList<(MissionTrigger Trigger, MissionLine Line)> effects)
-    {
-        var earlier = story.Where(t => t != chosen).Reverse().ToList();
-        // A space start without a system takes the system of the last system condition on the story path, then the
-        // system hint of the trigger, then the system of the first spawn of the trigger, of the replay, or of the story
-        // path from its end. An exact start has no replay of the path, and a restore trigger rebuilds its scene with
-        // its own spawns.
-        string? SystemOfPoint() =>
-            earlier.Select(t => SpaceSystem(t.Condition)).FirstOrDefault(s => s != null) ?? chosen?.SystemHint ??
-            (chosen?.Actions ?? []).Concat(effects.Select(e => e.Line)).Concat(earlier.SelectMany(t => t.Actions))
-            .Select(line => SpawnSystem(index, line)).FirstOrDefault(s => s != null);
-
-        // 1. A place line of the chosen trigger.
-        if (chosen?.Actions.FirstOrDefault(IsPlaceLine) is { } own && Point(own) is var (point, turn))
-            return Space(SystemOfPoint(), point, turn, $"{own.Key} of {chosen.Nickname}");
-        // 2. The condition of the chosen trigger.
-        if (chosen != null && PlaceOf(index, chosen, effects) is { } place)
-            return place;
-        // 3. The last place condition on the story path.
-        foreach (var trigger in earlier)
-        {
-            if (PlaceOf(index, trigger, effects) is { } before)
-                return before;
-        }
-        // 4. The last place line of the replay.
-        if (effects.LastOrDefault(e => IsPlaceLine(e.Line)) is { Line: { } last } effect && Point(last) is var (at, heading))
-            return Space(SystemOfPoint(), at, heading, $"{last.Key} of {effect.Trigger.Nickname}");
-        // 5. The system hint of the trigger, at the first spawn of the replay in that system.
-        if (chosen?.SystemHint is { } hint &&
-            effects.FirstOrDefault(e => MissionIndex.Is(SpawnSystem(index, e.Line), hint)) is { Line: { } spawn } &&
-            SpawnPoint(index, spawn) is { } spawnPoint)
-            return Space(hint, spawnPoint + new Vector3(0, 0, Offset), Quaternion.Identity,
-                $"The system hint of {chosen.Nickname}, near {spawn.Key}");
-        // 6. The Scene camera.
-        return StartPlace.Camera("No line of the path gives a place.");
-    }
-
-    /// <summary>The place that the condition of a trigger gives, or null: a system of Cnd_SystemEnter,
-    /// Cnd_JumpInComplete or Cnd_SpaceEnter, or a base of Cnd_BaseEnter, Cnd_LocEnter or Cnd_CharSelect.</summary>
-    private static StartPlace? PlaceOf(MissionIndex index, MissionTrigger trigger,
-        IReadOnlyList<(MissionTrigger Trigger, MissionLine Line)> effects)
-    {
-        var condition = trigger.Condition;
-        if (SpaceSystem(condition) is { } system)
-        {
-            // A space start without a point uses the last spawn position of the replay in the system, or the system
-            // center, with an offset.
-            var near = effects.LastOrDefault(e => MissionIndex.Is(SpawnSystem(index, e.Line), system));
-            var point = near.Line != null && SpawnPoint(index, near.Line) is { } spawn ? spawn : Vector3.Zero;
-            return Space(system, point + new Vector3(0, 0, Offset), Quaternion.Identity,
-                $"{condition!.Key} of {trigger.Nickname}");
-        }
-        if (condition != null && BaseOf(condition) is { } dock)
-            return new StartPlace(StartPlaceKind.Base, null, dock, Vector3.Zero, Quaternion.Identity,
-                $"{condition.Key} of {trigger.Nickname}");
-        return null;
-    }
-
-    /// <summary>The system of a condition that gives a space start, or null. Cnd_SpaceEnter without a system gives
-    /// none.</summary>
-    private static string? SpaceSystem(MissionLine? condition) =>
-        condition?.Name?.Name is "Cnd_SystemEnter" or "Cnd_JumpInComplete" or "Cnd_SpaceEnter"
-            ? Named(condition, "system")
-            : null;
-
-    /// <summary>The base of a condition that gives a base start, or null.</summary>
-    private static string? BaseOf(MissionLine condition) =>
-        condition.Name?.Name is "Cnd_BaseEnter" or "Cnd_LocEnter" or "Cnd_CharSelect" ? Named(condition, "base") : null;
-
-    /// <summary>The name of a value of a line, or null when the value is empty or a word of the value, for example ANY
-    /// or no_params.</summary>
-    private static string? Named(MissionLine line, string value)
-    {
-        if (line.Name?.Value(value) is not { } spec || line.Value(spec.Index) is not { } text)
-            return null;
-        var reference = line.References.FirstOrDefault(r => r.ValueIndex == spec.Index);
-        if (reference is { State: MissionReferenceState.Token or MissionReferenceState.Empty })
-            return null;
-        return MissionIndex.Is(text, "ANY") || MissionIndex.Is(text, "no_params") ? null : text;
-    }
-
-    private static bool IsPlaceLine(MissionLine line) => PlaceActions.Any(a => MissionIndex.Is(line.Key, a));
-
-    /// <summary>The point and the heading of a place line. <c>Act_SetInitialPlayerPos</c> holds its heading as w, x,
-    /// y, z after the point.</summary>
-    private static (Vector3 Point, Quaternion Turn)? Point(MissionLine line)
-    {
-        if (Numbers(line, 0, 3) is not { } p)
-            return null;
-        var turn = MissionIndex.Is(line.Key, "Act_SetInitialPlayerPos") && Numbers(line, 3, 4) is { } q &&
-                   new Quaternion(q[1], q[2], q[3], q[0]) is var rotation && rotation.Length() > 1e-3f
-            ? Quaternion.Normalize(rotation)
-            : Quaternion.Identity;
-        return (new Vector3(p[0], p[1], p[2]), turn);
-    }
-
-    /// <summary>The system of the item that a spawn or a move line names, or null.</summary>
-    private static string? SpawnSystem(MissionIndex index, MissionLine line)
-    {
-        if (!SpawnActions.Any(a => MissionIndex.Is(line.Key, a)) || line.Value(0) is not { } name)
-            return null;
-        return ItemOf(index, name) is { } item ? index.SystemOf(item) : null;
-    }
-
-    /// <summary>The position of a spawn or a move line: its own point, or the <c>position</c> of the item.</summary>
-    private static Vector3? SpawnPoint(MissionIndex index, MissionLine line)
-    {
-        var at = line.Name?.Value("position");
-        if (at != null && Numbers(line, at.Index, 3) is { } own)
-            return new Vector3(own[0], own[1], own[2]);
-        if (line.Value(0) is not { } name || ItemOf(index, name) is not { } item ||
-            item.Section.FirstOrDefault(e => MissionIndex.Is(e.Name, "position") && e.Count >= 3) is not { } entry)
-            return null;
-        var values = Enumerable.Range(0, 3).Select(i => Parse(MissionIndex.Text(entry[i]))).ToList();
-        return values.All(v => v != null) ? new Vector3(values[0]!.Value, values[1]!.Value, values[2]!.Value) : null;
-    }
-
-    private static MissionSection? ItemOf(MissionIndex index, string name) =>
-        index.Item(MissionSectionKind.Ship, name) ?? index.Item(MissionSectionKind.Formation, name) ??
-        index.Item(MissionSectionKind.Solar, name) ?? index.Item(MissionSectionKind.Loot, name);
-
-    /// <summary>The numbers of a line from a value index, or null when one of them is not a finite number.</summary>
-    private static float[]? Numbers(MissionLine line, int from, int count)
-    {
-        var result = new float[count];
-        for (var i = 0; i < count; i++)
-        {
-            if (Parse(line.Value(from + i)) is not { } value)
-                return null;
-            result[i] = value;
-        }
-        return result;
-    }
-
-    private static float? Parse(string? text) =>
-        float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && float.IsFinite(value)
-            ? value
-            : null;
-
-    /// <summary>A space start. Without a system, the play cannot start in space, so the place is the Scene
-    /// camera.</summary>
-    private static StartPlace Space(string? system, Vector3 point, Quaternion turn, string source) => system != null
-        ? new StartPlace(StartPlaceKind.Space, system, null, point, turn, source)
-        : StartPlace.Camera($"No line of the path names the system of {source}.");
 }
