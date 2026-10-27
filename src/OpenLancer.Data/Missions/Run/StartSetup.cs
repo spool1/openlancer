@@ -37,7 +37,9 @@ internal static class StartSetup
     /// <summary>Gives a plan its setup triggers, its saved triggers and its save keys, and checks the setup
     /// triggers.</summary>
     /// <param name="story">The story path of the chosen trigger.</param>
-    public static StartPlan Apply(StartPlan plan, MissionIndex index, StartReplay replay, IReadOnlyList<MissionTrigger> story)
+    /// <param name="check">False gives the plan without the mission checks of the setup triggers.</param>
+    public static StartPlan Apply(StartPlan plan, MissionIndex index, StartReplay replay, IReadOnlyList<MissionTrigger> story,
+        bool check = true)
     {
         switch (plan.Kind)
         {
@@ -51,7 +53,8 @@ internal static class StartSetup
                     return plan with { SavedTriggers = [restore.Nickname] };
                 var name = FreeName(index, SetupName, []);
                 var only = new SetupTrigger(name, [Line("Cnd_True", "no_params"), Line("Act_ActTrig", restore.Nickname)]);
-                return Check(plan with { Setup = [only], SavedTriggers = [name] }, index);
+                var single = plan with { Setup = [only], SavedTriggers = [name] };
+                return check ? Check(single, index) : single;
         }
 
         var forced = replay.Path.Where(t => t != replay.Chosen).ToList();
@@ -76,12 +79,13 @@ internal static class StartSetup
         var state = StateOf(index, saved, forced);
         if (UnknownAmbientBase(index, state) is { } reason)
             return plan with { Refusal = StartRefusal.SaveProblem, Reason = reason };
-        return Check(plan with
+        var made = plan with
         {
             Setup = triggers,
             SavedTriggers = [setupName],
             State = state,
-        }, index);
+        };
+        return check ? Check(made, index) : made;
     }
 
     /// <summary>The reason when an ambient script of the start save names a base that the game data does not have, or

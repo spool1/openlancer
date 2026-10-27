@@ -571,6 +571,29 @@ public sealed class StartPlanTests
         Assert.Contains("Act_SetNNObj = ol_obj_1", Lines(plan, 0));
     }
 
+    /// <summary>A plan without the mission checks of the setup triggers (the Play buttons of the graph, note of 2026-10-27
+    /// in section 8.1 of the M6c design) equals the full plan for each trigger of the script.</summary>
+    [Fact]
+    public void APlanWithoutTheSetupCheckEqualsTheFullPlan()
+    {
+        var index = Index(Script);
+
+        foreach (var trigger in index.Triggers)
+        {
+            var start = MissionStartPoint.At(trigger.Nickname);
+            var full = StartPlan.Make(index, Slot, start);
+            var fast = StartPlan.Make(index, Slot, start, checkSetup: false);
+
+            Assert.Equal((full.Kind, full.Refusal, full.Reason, full.Place), (fast.Kind, fast.Refusal, fast.Reason, fast.Place));
+            Assert.Equal(full.ActiveSet, fast.ActiveSet);
+            Assert.Equal(full.SavedTriggers, fast.SavedTriggers);
+            Assert.Equal(full.SetupPatch, fast.SetupPatch);
+            Assert.Equal(full.State.Title, fast.State.Title);
+            Assert.Equal(full.State.Scenes, fast.State.Scenes);
+            Assert.Equal(full.Warnings, fast.Warnings);
+        }
+    }
+
     [Fact]
     public void AScriptWithoutASlotRefuses()
     {

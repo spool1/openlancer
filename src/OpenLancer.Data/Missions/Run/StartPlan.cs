@@ -268,8 +268,11 @@ public sealed record StartPlan
     /// <param name="slot">The story slot of the script, or null.</param>
     /// <param name="place">The place choice of the user.</param>
     /// <param name="placeBase">The base of <see cref="StartPlaceChoice.Base"/>, else null.</param>
+    /// <param name="checkSetup">False skips the mission checks of the setup triggers (section 5.3, step 11). They build
+    /// the index again for each plan, so the Play buttons of the graph make their plans without them. Play makes the
+    /// full plan.</param>
     public static StartPlan Make(MissionIndex index, StorySlot? slot, MissionStartPoint start,
-        StartPlaceChoice place = StartPlaceChoice.Suggested, string? placeBase = null)
+        StartPlaceChoice place = StartPlaceChoice.Suggested, string? placeBase = null, bool checkSetup = true)
     {
         var plan = new StartPlan { Script = index.Document.Path, Start = start, Slot = slot };
         if (slot == null)
@@ -307,7 +310,7 @@ public sealed record StartPlan
                 _ => StartPlaces.Suggest(index, replay.Chosen, story, replay.Effects),
             },
         };
-        return StartSetup.Apply(plan, index, replay, story);
+        return StartSetup.Apply(plan, index, replay, story, checkSetup);
     }
 
     /// <summary>
