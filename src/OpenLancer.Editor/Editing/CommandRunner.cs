@@ -31,8 +31,9 @@ internal interface ICommandHost
 /// refuses gives an error for each refusal. When the editor takes no edits, the runner gives a warning with the reason
 /// and runs nothing. After an edit, the warnings of its plan follow.</para>
 /// <para>Only the cutscene callers still run session commands through <see cref="Execute(EditCommand)"/>, until
-/// milestone MCP1-4 moves them to the cutscene commands. A test of the editor assembly fails when another type makes a
-/// session command or runs one outside this class (<c>EditorLayerTests</c>).</para>
+/// milestone MCP1-4 moves them to the cutscene commands. Outside this class, a test of the editor assembly fails when
+/// another type makes a session command, gets a delegate that makes one, runs one, or calls <c>Execute</c>
+/// (<c>EditorLayerTests</c>).</para>
 /// </remarks>
 internal sealed class CommandRunner(ICommandHost host)
 {
