@@ -325,9 +325,9 @@ public sealed partial class EditSession
         return systems;
     }
 
-    /// <summary>The objects of the system files of W, in file order, with their system, point, heading and jump. The
-    /// suggested start place of a mission play reads the point near an object and the jump gate or hole of a
-    /// jump.</summary>
+    /// <summary>The objects of the system files of W, in file order, with their system, point, heading, jump and dock. The
+    /// suggested start place of a mission play reads the point near an object and the jump gate or hole of a jump. The
+    /// setup of a mission play puts the companions of the player in front of the dock object of a base.</summary>
     private List<WorldObject> SystemObjects()
     {
         var objects = new List<WorldObject>();
@@ -340,7 +340,10 @@ public sealed partial class EditSession
                            PropGroupFile.TryPosition(rotate.Values, out var degrees)
                 ? MathHelper.MatrixFromEulerDegrees(degrees).ExtractRotation()
                 : Quaternion.Identity;
-            objects.Add(new WorldObject(name.Name, system, point, rotation, SceneSections.Last(view, "goto")));
+            objects.Add(new WorldObject(name.Name, system, point, rotation, SceneSections.Last(view, "goto"))
+            {
+                DockWith = SceneSections.Last(view, "dock_with"),
+            });
         }
         return objects;
     }

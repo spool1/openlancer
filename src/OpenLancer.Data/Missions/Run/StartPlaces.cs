@@ -73,6 +73,12 @@ internal static class StartPlaces
         $"Trigger '{trigger}' waits for a jump into {system}. The path already made that jump, so the play starts in " +
         $"{system}. OpenLancer runs this trigger only at the next jump into {system}.";
 
+    /// <summary>The point <see cref="Offset"/> units in front of an object of a system file, and the heading of the
+    /// object. The game puts a ship there after a jump through a jump gate or hole. The setup puts the companions of a base
+    /// start there, in front of the dock object of the base.</summary>
+    internal static (Vector3 Point, Quaternion Turn) InFront(WorldObject item) =>
+        (item.Position + Vector3.Transform(new Vector3(0, 0, Offset), item.Rotation), item.Rotation);
+
     /// <summary>True for <c>Act_RelocateShip</c> of the player. Retail scripts move the player with it, for example after
     /// a scene in space. It is a place line, so the setup triggers do not copy it.</summary>
     internal static bool IsPlayerMove(MissionLine line) =>
@@ -573,8 +579,8 @@ internal static class StartPlaces
             // mission can be far from it, for example at a target or at a parking point.
             if (point == null && arrival != null && !segment.Any(f => f.Kind == FactKind.Launch) &&
                 SystemBefore(arrival, system) is { } previous && index.World.JumpInto(system, previous) is { } gate)
-                (point, turn, pointText) = (gate.Position + Vector3.Transform(new Vector3(0, 0, Offset), gate.Rotation),
-                    gate.Rotation, $" The point is {Units} units from {gate.Nickname}, the jump gate or hole to {previous}.");
+                (point, turn, pointText) = (InFront(gate).Point, InFront(gate).Turn,
+                    $" The point is {Units} units from {gate.Nickname}, the jump gate or hole to {previous}.");
             if (point == null && Spawns(system, from).ToList() is { Count: > 0 } spawns)
             {
                 var spawn = spawns.FirstOrDefault(s => s is { Recent: true, Placed: true }) ??

@@ -7,7 +7,11 @@ namespace OpenLancer.Data.Missions;
 
 /// <summary>An object of a system file: its nickname, its system, its point, its heading, and the system that its jump
 /// gate or jump hole leads to. <see cref="JumpTo"/> is null for an object without a jump.</summary>
-public sealed record WorldObject(string Nickname, string System, Vector3 Position, Quaternion Rotation, string? JumpTo);
+public sealed record WorldObject(string Nickname, string System, Vector3 Position, Quaternion Rotation, string? JumpTo)
+{
+    /// <summary>The base that a ship docks with at this object (its <c>dock_with</c> key), or null.</summary>
+    public string? DockWith { get; init; }
+}
 
 /// <summary>
 /// The names of the game data outside the mission scripts, the places of the bases and the objects of the systems, and
@@ -134,6 +138,10 @@ public sealed class MissionWorld
         places.Jumps.FirstOrDefault(o => o.System.Equals(system.Trim(), StringComparison.OrdinalIgnoreCase) &&
                                          o.JumpTo!.Equals(from.Trim(), StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>The dock object of a base: the first object of the system files, in file order, whose <c>dock_with</c>
+    /// key names the base, without letter case. Null when the world does not know such an object.</summary>
+    public WorldObject? DockOf(string dock) => places.Docks.GetValueOrDefault(dock.Trim());
+
     /// <summary>True when a file below the data folder exists. A world that does not know the files says yes.</summary>
     public bool FileExists(string relativePath) => fileExists?.Invoke(relativePath) ?? true;
 
@@ -157,6 +165,8 @@ public sealed class MissionWorld
                 Objects.TryAdd(item.Nickname.Trim(), item);
                 if (!string.IsNullOrWhiteSpace(item.JumpTo))
                     Jumps.Add(item);
+                if (!string.IsNullOrWhiteSpace(item.DockWith))
+                    Docks.TryAdd(item.DockWith.Trim(), item);
             }
         }
 
@@ -165,5 +175,8 @@ public sealed class MissionWorld
         public Dictionary<string, WorldObject> Objects { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         public List<WorldObject> Jumps { get; } = [];
+
+        /// <summary>The first dock object of each base, by the nickname of the base.</summary>
+        public Dictionary<string, WorldObject> Docks { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }

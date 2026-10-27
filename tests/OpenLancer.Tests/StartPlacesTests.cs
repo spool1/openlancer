@@ -764,6 +764,27 @@ public sealed class StartPlacesTests
         Assert.Null(MissionWorld.Empty.ObjectOf("ol_buoy"));
     }
 
+    /// <summary>The dock object of a base is the first object, in file order, whose dock key names the base, without
+    /// letter case. Each copy of the world keeps it. The setup puts the companions of a base start 1,000 units in front
+    /// of it, as the start after a jump is in front of the jump gate.</summary>
+    [Fact]
+    public void TheWorldKnowsTheFirstDockObjectOfEachBase()
+    {
+        var ring = new WorldObject("ol_ring_a", "ol_sys_a", new Vector3(100, 0, 200),
+            Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2), null) { DockWith = " OL_BASE_A " };
+        var planet = ring with { Nickname = "ol_planet_a", Position = Vector3.Zero };
+        var world = World([GateToA, ring, planet]);
+
+        Assert.Equal(ring, world.DockOf("ol_base_a"));
+        Assert.Equal(ring, world.WithFiles(_ => false).DockOf(" ol_base_a "));
+        Assert.Null(world.DockOf("ol_base_b"));
+        Assert.Null(MissionWorld.Empty.DockOf("ol_base_a"));
+        var (point, turn) = StartPlaces.InFront(ring);
+        Assert.True(Vector3.Distance(new Vector3(1100, 0, 200), point) < 0.01f, point.ToString());
+        Assert.Equal(ring.Rotation, turn);
+        Assert.Equal(AtGateToA, StartPlaces.InFront(GateToA).Point);
+    }
+
     /// <summary>Each source text of the suggestion is plain STE and ends with a period.</summary>
     [Fact]
     public void TheSourceTextsAreSteAndEndWithAPeriod()
