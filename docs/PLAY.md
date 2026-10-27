@@ -204,7 +204,7 @@ The player starts at the start place of the Play start page. The suggestion is w
 
 The Console then names the play, for example "OpenLancer plays M02 from Checkpoint t_restore." For an approximate start, a second line says that setup triggers rebuild the state of the path. When the start cannot start, the Console says why. An example is "Play from here is not available: This mission script has no story slot."
 
-A start in space at a point of the plan gets the start check of Play from camera when the Scene shows its system. The start moves out of a planet or a station, and the Console warns about a death zone. When the Scene shows another system, Play checks the start point only for the zones of the game data. So the start also moves out of a death zone. The Console then warns that a planet or a station can hold the start point.
+A start in space at a point of the plan gets the start check of Play from camera when the Scene shows its system. The start moves out of a planet or a station, and the Console warns about a death zone. When the Scene shows another system, Play checks the start point only for the damage zones of the game data. So the start also moves out of a death zone. The Console then warns that a planet or a station can hold the start point.
 
 OpenLancer can start only the scripts of the 14 story slots. A start in the linked game (Ctrl+F5) comes with a later version.
 
