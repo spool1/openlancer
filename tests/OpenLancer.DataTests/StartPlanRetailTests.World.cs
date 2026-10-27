@@ -31,9 +31,14 @@ public sealed partial class StartPlanRetailTests
     private static StartPlan Plan(MissionAnalysis analysis, string trigger) =>
         StartPlan.Make(analysis.Index, analysis.Script.Slot, MissionStartPoint.At(trigger));
 
-    /// <summary>The lines of the setup trigger of the world of a plan.</summary>
+    /// <summary>The world lines of the setup trigger of the world of a plan, without the starts of the active set at its
+    /// end.</summary>
     private static List<(string Key, IReadOnlyList<string> Values)> World(StartPlan plan) =>
-        plan.Setup.Count < 2 ? [] : plan.Setup[1].Lines.Skip(1).ToList();
+        plan.Setup.Count < 2 ? [] : plan.Setup[1].Lines.Skip(1).Where(l => l.Key != "Act_ActTrig").ToList();
+
+    /// <summary>The triggers that a setup trigger of a plan starts.</summary>
+    private static List<string> Starts(StartPlan plan, int at) =>
+        plan.Setup[at].Lines.Where(l => l.Key == "Act_ActTrig").Select(l => l.Values[0]).ToList();
 
     private static List<string> WorldText(StartPlan plan) =>
         World(plan).Select(l => $"{l.Key} = {string.Join(", ", l.Values)}").ToList();
@@ -291,8 +296,9 @@ public sealed partial class StartPlanRetailTests
     }
 
     /// <summary>The rows of the review of 2026-10-28 in both games. M11 com_1500: the newest list of the player names
-    /// juni2 and king2, so the old juni and king are no companions. M11 bse_Li0112: postBuff_init makes King and Juni
-    /// again after the launch, so the setup leaves out the old ships.</summary>
+    /// juni2 and king2, so the old juni and king are no companions. M05 chase_player and M08 ku04_init start the active
+    /// set after the world. M11 bse_Li0112: postBuff_init makes King and Juni again after the launch, so the setup leaves
+    /// out the old ships.</summary>
     [Fact]
     public void TheReviewRowsGetTheirCompanions()
     {
@@ -303,6 +309,14 @@ public sealed partial class StartPlanRetailTests
             Assert.True(comsat.CanStart, $"{set}: {comsat.Reason}");
             Assert.Equal(["juni2", "king2"], comsat.Companions.Select(c => c.Object));
 
+            // The triggers of the active set start after the world, so their orders find the ships of the world.
+            foreach (var (slot, trigger) in new[] { ("M05", "chase_player"), ("M08", "ku04_init") })
+            {
+                var space = Plan(Slot(scripts, slot), trigger);
+                Assert.Equal(["ol_play_world"], Starts(space, 0));
+                Assert.Equal(space.ActiveSet, Starts(space, 1));
+            }
+
             var buffalo = Plan(m11, "bse_Li0112");
             Assert.True(buffalo.CanStart, $"{set}: {buffalo.Reason}");
             Assert.Empty(buffalo.Companions);
@@ -312,6 +326,8 @@ public sealed partial class StartPlanRetailTests
                 Assert.Equal("postBuff_init", row.MadeAgainBy);
             }
             Assert.DoesNotContain(World(buffalo), l => l.Values.Count > 0 && l.Values[0] is "king" or "juni");
+            // A base start starts the base trigger at the load, so it runs while the player is docked.
+            Assert.Contains("bse_Li0112", Starts(buffalo, 0));
         }
     }
 

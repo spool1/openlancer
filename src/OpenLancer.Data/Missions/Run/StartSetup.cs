@@ -72,16 +72,23 @@ internal static class StartSetup
                             (plan.Place.Kind == StartPlaceKind.Camera && world.Count > 0 ? [StartWorld.CameraWarning] : []);
         var setup = new List<(string Key, IReadOnlyList<string> Values)> { Line("Cnd_True", "no_params") };
         setup.AddRange(lines.Where(l => l.Name!.Start == StartRole.State).Select(Copy));
-        if (world.Count > 0)
-            setup.Add(Line("Act_ActTrig", worldName));
-        setup.AddRange(plan.ActiveSet.Select(t => Line("Act_ActTrig", t)));
         var triggers = new List<SetupTrigger> { new(setupName, setup) };
         if (world.Count > 0)
         {
+            var docked = plan.Place.Kind == StartPlaceKind.Base;
+            var late = replay.ActiveSet.Where(t => !docked || RunsDockedOnWorld(index, t)).Select(t => t.Nickname).ToHashSet();
+            setup.Add(Line("Act_ActTrig", worldName));
+            setup.AddRange(plan.ActiveSet.Where(t => !late.Contains(t)).Select(t => Line("Act_ActTrig", t)));
             // The world waits for the player in space, as 29 restore triggers of the retail scripts do. A base start
-            // rebuilds the world at the launch. no_params is case-sensitive (TR16).
-            var wait = plan.Place.Kind == StartPlaceKind.Base ? Line("Cnd_PlayerLaunch", "no_params") : Line("Cnd_SpaceEnter", "no_params");
-            triggers.Add(new SetupTrigger(worldName, [wait, .. world]));
+            // rebuilds the world at the launch. no_params is case-sensitive (TR16). The triggers of the active set start
+            // after the world lines, so their lines find the objects of the world (fix of the review of 2026-10-28).
+            var wait = docked ? Line("Cnd_PlayerLaunch", "no_params") : Line("Cnd_SpaceEnter", "no_params");
+            triggers.Add(new SetupTrigger(worldName,
+                [wait, .. world, .. plan.ActiveSet.Where(late.Contains).Select(t => Line("Act_ActTrig", t))]));
+        }
+        else
+        {
+            setup.AddRange(plan.ActiveSet.Select(t => Line("Act_ActTrig", t)));
         }
         var saved = lines.Where(l => l.Name!.Start == StartRole.Save).ToList();
         var state = StateOf(index, saved, forced);
@@ -98,6 +105,33 @@ internal static class StartSetup
             Warnings = [.. plan.Warnings, .. worldWarnings],
         };
         return check ? Check(made, index) : made;
+    }
+
+    /// <summary>
+    /// True when a trigger of the active set of a base start must start after the world lines: it runs at once
+    /// (<c>Cnd_True</c>), and it or a <c>Cnd_True</c> trigger that it starts has a world line. Such a trigger runs at the
+    /// load, while the player is docked. The game does its world lines at the launch, before the world lines of the setup,
+    /// so they cannot find the objects of the world. Each other trigger of a base start starts at the load, so the base
+    /// and room triggers run while the player is docked.
+    /// </summary>
+    private static bool RunsDockedOnWorld(MissionIndex index, MissionTrigger trigger)
+    {
+        var seen = new HashSet<MissionTrigger>();
+        var queue = new Queue<MissionTrigger>([trigger]);
+        while (queue.Count > 0)
+        {
+            var next = queue.Dequeue();
+            if (!next.ConditionIs("Cnd_True") || !seen.Add(next))
+                continue;
+            if (next.Actions.Any(a => a.Name?.Start == StartRole.World))
+                return true;
+            foreach (var start in next.Actions.Where(a => Is(a, "Act_ActTrig")))
+            {
+                if (start.Value(0) is { } name && index.Trigger(name) is { IsDuplicate: false } child)
+                    queue.Enqueue(child);
+            }
+        }
+        return false;
     }
 
     /// <summary>The reason when an ambient script of the start save names a base that the game data does not have, or

@@ -253,7 +253,9 @@ The section "Play a mission" of [PLAY.md](PLAY.md) tells what Play does with the
 
 ### How the setup builds the world
 
-An approximate start rebuilds the world of the path in a setup trigger. In the game, the objects of an earlier system stay in that system when the player jumps. So the setup makes only the objects of the start system. That is the system of the start place. For a base start, it is the system of the base. For a start at the Scene camera, it is the system of the camera when the play starts.
+An approximate start has two setup triggers. The first runs at the load. It sets the state of the path, for example the objective, the reputations and the locks. The second makes the world when the player enters space, or at the launch for a base start. Then it starts the triggers that wait at the start, so their lines find the ships of the world. For a base start, only a waiting trigger that runs at once with lines on ships starts at the launch. The other triggers start at the load, so a trigger of the base or of a room runs while the player is docked.
+
+The setup trigger of the world rebuilds the world of the path. In the game, the objects of an earlier system stay in that system when the player jumps. So the setup makes only the objects of the start system. That is the system of the start place. For a base start, it is the system of the base. For a start at the Scene camera, it is the system of the camera when the play starts.
 
 The editor follows each object along the path:
 

@@ -164,11 +164,13 @@ public sealed class StartWorldTests
         return plan;
     }
 
-    /// <summary>The lines of the setup trigger of the world, as "key = values".</summary>
+    /// <summary>The world lines of the setup trigger of the world, as "key = values", without the starts of the active
+    /// set at its end.</summary>
     private static List<string> WorldLines(StartPlan plan) =>
         plan.Setup.Count < 2
             ? []
-            : plan.Setup[1].Lines.Skip(1).Select(l => $"{l.Key} = {string.Join(", ", l.Values)}").ToList();
+            : plan.Setup[1].Lines.Skip(1).Where(l => l.Key != "Act_ActTrig")
+                .Select(l => $"{l.Key} = {string.Join(", ", l.Values)}").ToList();
 
     private static List<string> SetupLines(StartPlan plan) =>
         plan.Setup[0].Lines.Select(l => $"{l.Key} = {string.Join(", ", l.Values)}").ToList();
@@ -929,6 +931,60 @@ public sealed class StartWorldTests
         Assert.True(plan.CanStart, plan.Reason);
         Assert.Equal(["ol_guard ol_sys_b"], plan.LeftOut.Select(l => $"{l.Object} {l.System}"));
         Assert.Contains("Act_SpawnShip = ol_local", WorldLines(plan));
+    }
+
+    /// <summary>The triggers of the active set start after the world lines. A space start starts each of them at the end
+    /// of the world trigger. A base start starts there only a trigger that runs at once and has a world line, or starts
+    /// such a trigger. The other triggers of a base start start at the load, for example a trigger of a room or a
+    /// trigger that runs at once with only a comm line.</summary>
+    [Fact]
+    public void TheActiveSetStartsAfterTheWorld()
+    {
+        var text = Script(jump: "Act_ActTrig = t_room\nAct_ActTrig = t_watch", triggers: """
+            Act_ActTrig = t_next
+            Act_ActTrig = t_talk
+
+            [Trigger]
+            nickname = t_room
+            Cnd_LocEnter = Bar, ol_base_b
+            Act_SendComm = ol_local, Player, ol_line_1
+
+            [Trigger]
+            nickname = t_watch
+            Cnd_Timer = 9
+            Act_SendComm = ol_local, Player, ol_line_3
+
+            [Trigger]
+            nickname = t_next
+            Cnd_True = no_params
+            Act_ActTrig = t_orders
+
+            [Trigger]
+            nickname = t_orders
+            Cnd_True = no_params
+            Act_GiveObjList = ol_local, ol_patrol
+
+            [Trigger]
+            nickname = t_talk
+            Cnd_True = no_params
+            Act_SendComm = ol_local, Player, ol_line_2
+            """);
+        string Starts(StartPlan plan, int at) => string.Join(" ", plan.Setup[at].Lines.Where(l => l.Key == "Act_ActTrig")
+            .Select(l => l.Values[0]));
+
+        var space = Plan(text, "t_next");
+        Assert.Equal("ol_play_world", Starts(space, 0));
+        Assert.Equal(string.Join(" ", space.ActiveSet), Starts(space, 1));
+        Assert.Contains("t_room", space.ActiveSet);
+        Assert.Equal("Act_ActTrig", space.Setup[1].Lines[^1].Key);
+
+        var docked = Plan(text, "t_next", StartPlaceChoice.Base, "ol_base_b");
+        Assert.Equal("ol_play_world " + string.Join(" ", docked.ActiveSet.Where(t => t != "t_next")), Starts(docked, 0));
+        Assert.Equal("t_next", Starts(docked, 1));
+
+        var talk = Plan(text, "t_talk", StartPlaceChoice.Base, "ol_base_b");
+        Assert.Contains("t_talk", Starts(talk, 0).Split(' '));
+        Assert.DoesNotContain("t_talk", Starts(talk, 1).Split(' '));
     }
 
     /// <summary>The world of <see cref="World"/> with a third system.</summary>

@@ -235,16 +235,20 @@ public sealed class StartPlanTests
         var plan = Plan(Script, "t_chosen");
 
         Assert.Equal(2, plan.Setup.Count);
-        // The state lines and the starts of the whole active set. The comm line, the starts and the save do not go.
+        // The state lines and the start of the world. The comm line, the starts and the save do not go.
         Assert.Equal(
         [
             "Cnd_True = no_params", "Act_SetRep = Player, ol_faction_a, -0.9", "Act_SetNNObj = ol_obj_1",
-            "Act_ActTrig = ol_play_world", "Act_ActTrig = t_fail", "Act_ActTrig = t_chosen",
+            "Act_ActTrig = ol_play_world",
         ], Lines(plan, 0));
         // The world waits for space. The spawn of the ship that the path destroys goes, and only the last music stays.
+        // Then the world starts the whole active set, so its lines find the objects of the world.
         Assert.Equal("ol_play_world", plan.Setup[1].Nickname);
-        Assert.Equal(["Cnd_SpaceEnter = no_params", "Act_SpawnShip = ol_ship_c", "Act_PlayMusic = ol_music_2"],
-            Lines(plan, 1));
+        Assert.Equal(
+        [
+            "Cnd_SpaceEnter = no_params", "Act_SpawnShip = ol_ship_c", "Act_PlayMusic = ol_music_2", "Act_ActTrig = t_fail",
+            "Act_ActTrig = t_chosen",
+        ], Lines(plan, 1));
         Assert.Equal(["ol_play_setup"], plan.SavedTriggers);
     }
 
@@ -389,7 +393,7 @@ public sealed class StartPlanTests
 
         Assert.True(plan.CanStart, plan.Reason);
         Assert.Contains("t_chosen", plan.ActiveSet);
-        Assert.Contains("Act_ActTrig = t_chosen", Lines(plan, 0));
+        Assert.Equal("Act_ActTrig = t_chosen", Lines(plan, 1)[^1]);
     }
 
     [Fact]
