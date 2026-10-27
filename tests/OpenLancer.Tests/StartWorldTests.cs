@@ -597,8 +597,21 @@ public sealed class StartWorldTests
     [Fact]
     public void TheWaitingTriggersOfLeftOutObjectsGiveWarnings()
     {
-        var plan = Plan(Script(jump: "Act_ActTrig = t_guard_dies\nAct_ActTrig = t_friends_die\nAct_ActTrig = t_near_buoy",
+        var plan = Plan(Script(jump: "Act_ActTrig = t_guard_dies\nAct_ActTrig = t_friends_die\nAct_ActTrig = t_near_buoy\n" +
+            "Act_ActTrig = t_spawn_a\nAct_ActTrig = t_arrive_a",
             triggers: """
+            [Trigger]
+            nickname = t_spawn_a
+            system = ol_sys_a
+            Cnd_PlayerLaunch = no_params
+            Act_SpawnShip = ol_guard
+
+            [Trigger]
+            nickname = t_arrive_a
+            system = ol_sys_a
+            Cnd_SystemEnter = ol_sys_a
+            Act_SpawnShip = ol_guard
+
             [Trigger]
             nickname = t_guard_dies
             Cnd_Destroyed = ol_guard
@@ -613,6 +626,10 @@ public sealed class StartWorldTests
             """));
 
         Assert.Contains(StartWorld.WaitingWarning("t_guard_dies", "ol_guard", "ol_sys_a"), plan.Warnings);
+        // A trigger whose system key names another system spawns its objects in the start system, because the game does
+        // not read that key. A condition that names a system has its own rule.
+        Assert.Contains(StartWorld.OtherSystemWarning("t_spawn_a", "ol_sys_a", "ol_sys_b"), plan.Warnings);
+        Assert.DoesNotContain(plan.Warnings, w => w.Contains("'t_arrive_a'", StringComparison.Ordinal));
         Assert.Contains(StartWorld.LabelWarning("t_friends_die", "ol_friends", 1), plan.Warnings);
         // An object of a system file of another system stays in the game, so the trigger can run there.
         Assert.DoesNotContain(plan.Warnings, w => w.Contains("t_near_buoy", StringComparison.Ordinal));

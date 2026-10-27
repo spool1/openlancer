@@ -137,6 +137,11 @@ public sealed class PlayStartPageTests
             ("waiting", StartWorld.WaitingWarning("t_wave", "ol_ship", "Li02")),
             ("label", StartWorld.LabelWarning("t_wave", "ol_label", 2)), ("camera", StartWorld.CameraWarning),
             ("no dock", StartWorld.NoDockWarning("li01_01_base")),
+            ("spawn elsewhere", StartWorld.OtherSystemWarning("t_wave", "Li04", "Li01")),
+            ("made again", PlayStartPageModel.LeftOutText(new LeftOutObject("ol_ship", StartObjectKind.Ship, "Li01", "t_a")
+            {
+                MadeAgainBy = "t_wave",
+            })),
         };
 
         Assert.Empty(texts.SelectMany(t => SteLint.Problems(t.Text).Select(p => $"{t.Name}: {p}")));

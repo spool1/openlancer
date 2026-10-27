@@ -220,12 +220,13 @@ Three warnings are about the start place. They follow the place that you pick:
 - A trigger that waits for the player to enter space in another system runs in OpenLancer, but not in the linked game.
 - A trigger that waits for a jump into the system of the start does not run in OpenLancer until the next jump into that system. The path to the trigger already made that jump.
 
-Four warnings are about the world of the setup (see "How the setup builds the world"):
+Five warnings are about the world of the setup (see "How the setup builds the world"):
 
 - A trigger that waits for an object that the setup leaves out does not run in the play.
 - A trigger that waits for a label with left-out ships can run before it runs in the game.
 - A start at the Scene camera makes the world of the camera system when the play starts. Until then, the page shows each world line of the path.
 - For a base start without a known dock, the ships that travel with the player keep the points of their lines.
+- A trigger that waits at the start and spawns objects can name another system in its system key. The game does not read that key, so the trigger spawns its objects in the start system.
 
 ### How the editor suggests the start place
 

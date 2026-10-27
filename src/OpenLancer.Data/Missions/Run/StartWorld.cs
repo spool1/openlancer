@@ -187,6 +187,12 @@ internal static class StartWorld
         $"Trigger '{trigger}' waits for label {label}. The setup does not make {count.ToString(CultureInfo.InvariantCulture)} " +
         "of its ships, because they are in another system. This trigger can run before it runs in the game.";
 
+    /// <summary>The warning of a waiting trigger that spawns objects and whose system key names another system than
+    /// the start system. Retail and OpenLancer do not read the system key of a trigger.</summary>
+    public static string OtherSystemWarning(string trigger, string system, string start) =>
+        $"Trigger '{trigger}' waits at the start, and its system key names {system}. The game does not read that key, so " +
+        $"this trigger can spawn its objects in {start}.";
+
     /// <summary>The warning of a start at the Scene camera, before the play gives the point of the camera.</summary>
     public const string CameraWarning = "The start is at the Scene camera. When the play starts, the setup makes only the " +
                                         "objects of the camera system. It puts the ships that travel with the player next to " +
@@ -860,6 +866,8 @@ internal static class StartWorld
         /// <summary>The warnings of the triggers that wait for objects that the setup leaves out.</summary>
         private IEnumerable<string> Waiting()
         {
+            foreach (var trigger in replay.ActiveSet.Where(SpawnsElsewhere))
+                yield return OtherSystemWarning(trigger.Nickname, trigger.SystemHint!.Trim(), anchor.System);
             // A trigger of the start makes these objects again, so a trigger that waits for them can run.
             var again = units.Where(u => u.Again != null).SelectMany(u => u.Members.Append(u.Name))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -884,6 +892,15 @@ internal static class StartWorld
                 }
             }
         }
+
+        /// <summary>True for a waiting trigger with a spawn line whose system key names a known system other than the
+        /// start system. A condition that names a system has its own rule, for example an arrival in that system.</summary>
+        private bool SpawnsElsewhere(MissionTrigger trigger) =>
+            Known(trigger.SystemHint) is { } system && !MissionIndex.Is(system, "ALL") && !MissionIndex.Is(system, "ANY") &&
+            !MissionIndex.Is(system, anchor.System) && trigger.Condition is { } condition &&
+            !condition.References.Any(r => r.Kind == MissionValueKind.System &&
+                                           r.State is not (MissionReferenceState.Token or MissionReferenceState.Empty)) &&
+            trigger.Actions.Any(a => SpawnKeys.Any(k => MissionIndex.Is(a.Key, k)));
 
         /// <summary>True for a system that is the start system, or for an unknown system.</summary>
         private bool InStart(string? system) => system == null || MissionIndex.Is(system, anchor.System);
