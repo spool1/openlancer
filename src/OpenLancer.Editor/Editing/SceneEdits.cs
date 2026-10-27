@@ -368,7 +368,7 @@ internal sealed class SceneEdits(EditorWindow window)
         var (kind, what) = row.Asset.Kind == AssetKind.Loadout
             ? (ObjectComponent.LoadoutUser, "loadout")
             : (ObjectComponent.FactionMember, "faction");
-        window.Edits.Execute(() => EditCommand.Group($"Set {what} of {section.Id.Key}",
+        window.Commands.Execute(() => EditCommand.Group($"Set {what} of {section.Id.Key}",
             [ObjectComponents.Add(section, kind, row.Asset.Id)]));
     }
 
@@ -449,12 +449,12 @@ internal sealed class SceneEdits(EditorWindow window)
         picker.Show($"Add {ObjectComponents.Name(kind)}", $"Pick the {list} of {section.Id.Key}.", ObjectKinds.OfList(list),
             entries.Select(e => (e, e.Section != null && session.ItemName(e.Section) is { Length: > 0 } name ? name : e.Value,
                 list == "base" ? BaseSystem(edits, e) : e.Detail)).ToList(),
-            picked => window.Edits.Execute(ObjectComponents.Add(section, kind, picked.Value)));
+            picked => window.Commands.Execute(ObjectComponents.Add(section, kind, picked.Value)));
     }
 
     /// <summary>Removes a component of an object (decision D244). One remove is one entry of the edit history.</summary>
     public void RemoveComponent(SectionRef section, ObjectComponent kind) =>
-        window.Edits.Execute(() => ObjectComponents.Remove(section, kind));
+        window.Commands.Execute(() => ObjectComponents.Remove(section, kind));
 
     /// <summary>Copies an item with its children (decisions D241 and D262). Unity does not ask, so the warnings go to the
     /// Console.</summary>
@@ -546,7 +546,7 @@ internal sealed class SceneEdits(EditorWindow window)
             return;
         }
 
-        if (!window.Edits.Execute(plan.Command))
+        if (!window.Commands.Execute(plan.Command))
             return;
         foreach (var warning in plan.Warnings)
             window.Log.Add(ConsoleSeverity.Warning, Source, warning.Message, warning.Target);

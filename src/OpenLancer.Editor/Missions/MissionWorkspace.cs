@@ -680,7 +680,7 @@ internal sealed class MissionWorkspace
 
         if (plan.Batch != null)
         {
-            window.Edits.Apply(plan.Batch);
+            window.Commands.Apply(plan.Batch);
         }
     }
 
@@ -694,7 +694,7 @@ internal sealed class MissionWorkspace
     /// dialog first (section 4.0.5 of the M6b design). "Confirm" runs it again with the confirmation.</remarks>
     public bool Run(MissionBatch? batch)
     {
-        if (batch == null || window.Edits.Apply(batch) is not { } result)
+        if (batch == null || window.Commands.Apply(batch) is not { } result)
         {
             return false;
         }

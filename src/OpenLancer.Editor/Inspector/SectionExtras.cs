@@ -220,11 +220,11 @@ internal sealed class SectionExtras(EditorWindow window, PropertyGrid grid)
 
         if (plan.Mission != null)
         {
-            window.Edits.Apply(plan.Mission);
+            window.Commands.Apply(plan.Mission);
         }
         else if (plan.Command != null)
         {
-            window.Edits.Execute(plan.Command);
+            window.Commands.Execute(plan.Command);
         }
 
         return null;

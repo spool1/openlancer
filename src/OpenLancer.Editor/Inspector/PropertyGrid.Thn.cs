@@ -263,13 +263,13 @@ internal sealed partial class PropertyGrid
         var editable = field.ReadOnly == null && window.Session?.NoEditReason == null;
         if (Theme.IconMenuItem(EditorIcons.Undo, "Revert to the lower cutscene", editable && field.CanRevert))
         {
-            window.Edits.Execute(() => ThnEdits.Revert(field.Target.Path, field.Target, field.Path));
+            window.Commands.Execute(() => ThnEdits.Revert(field.Target.Path, field.Target, field.Path));
         }
 
         ImGui.SetItemTooltip("Puts back the value of the cutscene as the base data and the mods before the active mod have it.");
         if (Theme.IconMenuItem(EditorIcons.TrashAlt, "Remove", editable && field.Value != null))
         {
-            window.Edits.Execute(() => ThnEdits.Remove(field.Target, field.Path));
+            window.Commands.Execute(() => ThnEdits.Remove(field.Target, field.Path));
         }
 
         if (Theme.IconMenuItem(EditorIcons.Copy, "Copy value", field.Value != null))

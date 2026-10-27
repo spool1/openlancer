@@ -230,7 +230,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
                     return parse.Error;
                 }
 
-                window.Edits.Execute(() => ThnEdits.SetDuration(path, number.Value));
+                window.Commands.Execute(() => ThnEdits.SetDuration(path, number.Value));
                 return null;
             });
     }
@@ -254,7 +254,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
                 if (ImGui.Button("Move", new System.Numerics.Vector2(ToolbarItems.IconWidth * 3, 0)) &&
                     float.TryParse(shift, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds))
                 {
-                    window.Edits.Execute(() => ThnEdits.MoveEvents(set.Events, seconds, 0));
+                    window.Commands.Execute(() => ThnEdits.MoveEvents(set.Events, seconds, 0));
                 }
 
                 ImGui.EndDisabled();
@@ -507,7 +507,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
                         var selected = choice.Equals(name, StringComparison.OrdinalIgnoreCase);
                         if (ImGui.Selectable(choice, selected) && !selected && table.List[2] is ThnTable targets)
                         {
-                            window.Edits.Execute(() => ThnEdits.Set(ev, path, ThnFieldEdit.TargetsValue(targets, index, choice)));
+                            window.Commands.Execute(() => ThnEdits.Set(ev, path, ThnFieldEdit.TargetsValue(targets, index, choice)));
                         }
                     }
 
@@ -660,7 +660,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         ImGui.BeginDisabled(field.ReadOnly != null);
         if (ImGui.Checkbox("##value", ref on))
         {
-            window.Edits.Execute(() => ThnEdits.Set(field.Target, field.Path, ThnFieldEdit.BoolValue(field.Value, on)));
+            window.Commands.Execute(() => ThnEdits.Set(field.Target, field.Path, ThnFieldEdit.BoolValue(field.Value, on)));
         }
 
         ImGui.EndDisabled();
@@ -692,7 +692,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
                 var selected = name == current;
                 if (ImGui.Selectable(name, selected) && !selected)
                 {
-                    window.Edits.Execute(() =>
+                    window.Commands.Execute(() =>
                         ThnEdits.Set(field.Target, field.Path, ThnFieldEdit.SymbolValue(field.Value, name, Symbols)));
                 }
             }
@@ -721,7 +721,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         }
 
         grid.ThnRow(label, field, note, () => Checkboxes(ThnFlags.Shown(sound), on, field.ReadOnly, chosen =>
-            window.Edits.Execute(() => ThnEdits.SetFlags(entity, chosen))));
+            window.Commands.Execute(() => ThnEdits.SetFlags(entity, chosen))));
     }
 
     /// <summary>The bits of a flags key of an event, with the write rules of <see cref="ThnFlags.WriteBits"/>.</summary>
@@ -739,7 +739,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         }
 
         grid.ThnRow(label, field, note, () => Checkboxes(row.Bits.Select(b => b.Name).ToList(), on, field.ReadOnly, chosen =>
-            window.Edits.Execute(() => ThnFlags.WriteBits(field.Value, row, chosen, Symbols) is { } value
+            window.Commands.Execute(() => ThnFlags.WriteBits(field.Value, row, chosen, Symbols) is { } value
                 ? ThnEdits.Set(field.Target, field.Path, value)
                 : ThnEdits.Remove(field.Target, field.Path))));
     }

@@ -136,7 +136,7 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
 
         templateDialog.Show(session.Edits, template, plan =>
         {
-            if (Edits.Execute(() => ItemTemplates.Build(plan)))
+            if (Commands.Execute(() => ItemTemplates.Build(plan)))
             {
                 Selection = plan.Copies.First(c => c.Source.Equals(plan.Template)).Copy;
                 Log.Add(ConsoleSeverity.Info, EditController.Source,
@@ -146,7 +146,7 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         });
     }
 
-    public void Revert(SectionRef section) => Edits.Execute(EditCommand.Revert(section));
+    public void Revert(SectionRef section) => Commands.Execute(EditCommand.Revert(section));
 
     /// <summary>
     /// Shows the game data that loaded again after a save. A selection of the game data becomes the item with the same

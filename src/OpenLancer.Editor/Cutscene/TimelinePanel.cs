@@ -877,7 +877,7 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
                 var label = other.Targets.Count > 0 ? $"{other.Type} {other.Targets[0]}" : other.Type;
                 if (ImGui.MenuItem($"{label}##{other.Ref.Id.Value}", "", false, refusal == null))
                 {
-                    window.Edits.Execute(ThnEdits.Reorder(ev.Ref, other.Ref));
+                    window.Commands.Execute(ThnEdits.Reorder(ev.Ref, other.Ref));
                 }
 
                 ImGui.SetItemTooltip(refusal ?? $"Runs the event before {label}. The engine runs the events of one time " +
@@ -912,7 +912,7 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
             {
                 if (ImGui.MenuItem(choice.Role.Type, "", false, choice.Refusal == null))
                 {
-                    if (window.Edits.Execute(() => TimelineEdits.Add(path, choice, name!, target.Time)))
+                    if (window.Commands.Execute(() => TimelineEdits.Add(path, choice, name!, target.Time)))
                     {
                         workspace.SelectEvents(TimelineEdits.Added(workspace.Working!, 1));
                     }

@@ -99,7 +99,7 @@ internal sealed partial class PropertyGrid
         // A tile of the Assets panel drops on the field, as Unity drops an asset on an object field (decision D281 of the
         // M23 design). The drop sets the value as a pick does.
         window.AssetDrag.Field(rule.Lists, list?.Label ?? "value",
-            dropped => window.Edits.Execute(EditCommand.SetLinesFromText(field.Section, field.Name, [dropped])));
+            dropped => window.Commands.Execute(EditCommand.SetLinesFromText(field.Section, field.Name, [dropped])));
         ListPopup("##list", clicked, field, list, value, !rule.Required, _ => picked, other);
     }
 
@@ -400,7 +400,7 @@ internal sealed partial class PropertyGrid
             ImGui.SameLine();
             if (ImGui.SmallButton("None"))
             {
-                window.Edits.Execute(EditCommand.RemoveName(field.Section, field.Name));
+                window.Commands.Execute(EditCommand.RemoveName(field.Section, field.Name));
             }
 
             ImGui.SetItemTooltip("Removes the line. The engine then uses its default.");
@@ -411,7 +411,7 @@ internal sealed partial class PropertyGrid
             ImGui.SameLine();
             if (ImGui.SmallButton("Revert"))
             {
-                window.Edits.Execute(field.Revert());
+                window.Commands.Execute(field.Revert());
             }
 
             ImGui.SetItemTooltip("Puts back the value of the base data and the mods that load before the active mod.");

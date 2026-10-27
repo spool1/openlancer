@@ -6,9 +6,6 @@ using LibreLancer;
 using LibreLancer.Data;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
-using OpenLancer.Data.Editing.Commands;
-using OpenLancer.Data.Missions;
-using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Strings;
 using OpenLancer.Editor.Dialogs;
@@ -56,8 +53,9 @@ internal enum SaveFailure
 }
 
 /// <summary>
-/// Runs the edits of the open profile and the saves, and what follows a save: the Console report, the reload of the
-/// game data and the validation. It also keeps the recovery file of the unsaved edits up to date (decision D8).
+/// Runs the saves of the open profile, undo and redo, and what follows a save: the Console report, the reload of the
+/// game data and the validation. It also keeps the recovery file of the unsaved edits up to date (decision D8). The
+/// edits run through <see cref="CommandRunner"/>.
 /// </summary>
 /// <remarks>
 /// <para>A save writes the files of the active mod at once. Then the game data loads again in the background from a
@@ -102,93 +100,6 @@ internal sealed class EditController(EditorWindow window) : IDisposable
     /// <summary>The text for a save in the Console: "save 2", or "the saved files" for 0, the saved files of a session
     /// without a save that changed files.</summary>
     public static string SaveText(int save) => save > 0 ? $"save {save}" : "the saved files";
-
-    /// <summary>
-    /// Runs an edit as one entry of the edit history. When the editor takes no edits, or the edit does not apply,
-    /// the Console tells why and the result is false.
-    /// </summary>
-    public bool Execute(EditCommand command)
-    {
-        if (window.Session is not { } session)
-        {
-            return false;
-        }
-
-        if (session.NoEditReason is { } reason)
-        {
-            Log.Add(ConsoleSeverity.Warning, Source, reason);
-            return false;
-        }
-
-        try
-        {
-            session.Edits.Execute(command);
-            return true;
-        }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException)
-        {
-            Log.Add(ConsoleSeverity.Error, Source, ErrorText.Of(e));
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Runs a batch of mission commands through the mission editor of the session (decision D660 of the M6b design). A
-    /// refusal changes nothing, and the Console tells why. A batch that needs a confirmation tells nothing here, because
-    /// the caller asks in a dialog. Returns the result, or null when no profile is open or the editor takes no edits.
-    /// </summary>
-    public MissionEditResult? Apply(MissionBatch batch)
-    {
-        if (window.Session is not { } session)
-        {
-            return null;
-        }
-
-        if (session.NoEditReason is { } reason)
-        {
-            Log.Add(ConsoleSeverity.Warning, Source, reason);
-            return null;
-        }
-
-        var result = session.Edits.Missions.Apply(batch);
-        foreach (var error in result.NeedsConfirmation && !batch.Confirm ? [] : result.Errors)
-        {
-            Log.Add(ConsoleSeverity.Error, MissionChecks.Source, error.Message);
-        }
-
-        foreach (var note in result.Notes)
-        {
-            Log.Add(ConsoleSeverity.Info, MissionChecks.Source, note);
-        }
-
-        return result;
-    }
-
-    /// <summary>
-    /// Makes an edit and runs it, for an edit that reads the edit view when it is made, for example a new item from a
-    /// template. When the edit cannot be made, the Console tells why and the result is false.
-    /// </summary>
-    public bool Execute(Func<EditCommand> make)
-    {
-        if (window.Session?.NoEditReason is { } reason)
-        {
-            Log.Add(ConsoleSeverity.Warning, Source, reason);
-            return false;
-        }
-
-        EditCommand command;
-        try
-        {
-            command = make();
-        }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException)
-        {
-            Log.Add(ConsoleSeverity.Error, Source, ErrorText.Of(e));
-            return false;
-        }
-
-        return Execute(command);
-    }
 
     public void Undo()
     {
@@ -488,7 +399,8 @@ internal sealed class EditController(EditorWindow window) : IDisposable
     /// <remarks>An end that is not interactive, for example when the window closes, cannot show the dialog. Then only
     /// this section gets the new text, as with the choice "Only this one", which changes the least. The recovery file
     /// then keeps the edit.</remarks>
-    /// <param name="execute">Makes the edit and runs it, as <see cref="Execute(Func{EditCommand})"/> does.</param>
+    /// <param name="execute">Makes the edit and runs it, as <see cref="CommandRunner.Execute(Func{EditCommand})"/>
+    /// does.</param>
     /// <param name="ask">Shows a dialog: its title, its message and its choices.</param>
     internal static Func<string, bool, string?> TextKeyCommit(EditSession edits, FieldBinding field, StringKind kind,
         Action<Func<EditCommand>> execute, Action<string, string, IReadOnlyList<Choice>> ask) =>

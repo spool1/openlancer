@@ -256,7 +256,7 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
         {
             ImGui.CloseCurrentPopup();
         }
-        else if (create && refusal == null && window.Edits.Execute(ThnEdits.NewCutscene(path!, ThnTemplates.NewScript())))
+        else if (create && refusal == null && window.Commands.Execute(ThnEdits.NewCutscene(path!, ThnTemplates.NewScript())))
         {
             ImGui.CloseCurrentPopup();
             selected = path;
@@ -321,7 +321,7 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
 
     private void Revert(string path)
     {
-        if (window.Edits.Execute(ThnEdits.Revert(path)))
+        if (window.Commands.Execute(ThnEdits.Revert(path)))
         {
             window.Log.Add(ConsoleSeverity.Info, EditorWindow.EditorSource,
                 $"Reverted cutscene {path}. The next save deletes the patch of the active mod.");

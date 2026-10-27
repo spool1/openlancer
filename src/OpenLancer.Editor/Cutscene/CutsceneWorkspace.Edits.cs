@@ -86,7 +86,7 @@ internal sealed partial class CutsceneWorkspace
             return;
         }
 
-        if (window.Edits.Execute(() => TimelineEdits.Paste(path, clip, time, row)))
+        if (window.Commands.Execute(() => TimelineEdits.Paste(path, clip, time, row)))
         {
             SelectEvents(TimelineEdits.Added(Working!, clip.Events.Count));
         }
@@ -102,7 +102,7 @@ internal sealed partial class CutsceneWorkspace
         }
 
         var clip = TimelineEdits.Copy(working, events);
-        if (window.Edits.Execute(() => TimelineEdits.Duplicate(path, clip)))
+        if (window.Commands.Execute(() => TimelineEdits.Duplicate(path, clip)))
         {
             SelectEvents(TimelineEdits.Added(Working!, clip.Events.Count));
         }
@@ -123,7 +123,7 @@ internal sealed partial class CutsceneWorkspace
         }
 
         var events = SelectedEvents;
-        if (events.Count > 0 && window.Edits.Execute(EventsDelete(events)))
+        if (events.Count > 0 && window.Commands.Execute(EventsDelete(events)))
         {
             window.Selection = Root;
         }
@@ -175,7 +175,7 @@ internal sealed partial class CutsceneWorkspace
 
         void Run(Data.Editing.EditCommand command)
         {
-            if (window.Edits.Execute(command))
+            if (window.Commands.Execute(command))
             {
                 window.Selection = Root;
             }
@@ -197,13 +197,13 @@ internal sealed partial class CutsceneWorkspace
         var uses = RenameUses(path, oldName);
         if (uses.Count == 0)
         {
-            window.Edits.Execute(() => ThnEdits.RenameEntity(entity, newName));
+            window.Commands.Execute(() => ThnEdits.RenameEntity(entity, newName));
             return;
         }
 
         window.Choice.Show("Rename entity", CutsceneRename.Message(oldName, newName, uses),
         [
-            new Choice("Rename in this file", () => window.Edits.Execute(() => ThnEdits.RenameEntity(entity, newName))),
+            new Choice("Rename in this file", () => window.Commands.Execute(() => ThnEdits.RenameEntity(entity, newName))),
             new Choice("Cancel", () => { }),
         ]);
     }

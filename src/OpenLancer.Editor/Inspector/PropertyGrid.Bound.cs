@@ -462,7 +462,7 @@ internal sealed partial class PropertyGrid
             : unset == "true";
         if (ImGui.Checkbox("##value", ref value))
         {
-            window.Edits.Execute(field.EditLines([value ? "true" : "false"]));
+            window.Commands.Execute(field.EditLines([value ? "true" : "false"]));
         }
 
         if (field.Lines.Count == 0)
@@ -503,7 +503,7 @@ internal sealed partial class PropertyGrid
             }
 
             CommitField(field.FieldKey, changed, text, edited, EditController.TextKeyCommit(window.Session!.Edits,
-                field, kind, make => window.Edits.Execute(make),
+                field, kind, make => window.Commands.Execute(make),
                 (title, message, choices) => window.Choice.Show(title, message, choices)));
             ImGui.SetItemTooltip("The text of the active mod. A new text gets a key in the strings.json of the mod.");
         }
@@ -644,7 +644,7 @@ internal sealed partial class PropertyGrid
         var canEdit = window.Session?.NoEditReason == null;
         if (Theme.IconMenuItem(EditorIcons.Undo, "Revert to the lower layer", field.CanRevert && canEdit))
         {
-            window.Edits.Execute(field.Revert());
+            window.Commands.Execute(field.Revert());
         }
 
         ImGui.SetItemTooltip("Puts back the value of the base data and the mods that load before the active mod.");

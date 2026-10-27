@@ -204,7 +204,7 @@ internal sealed class CutsceneView
                 "Set camera from view: write the pose of the free camera into the start pose of the selected camera, " +
                 $"in one edit.{(cameraReason != null ? $"\n\n{cameraReason}" : "")}", camera != null))
         {
-            window.Edits.Execute(ThnGizmoTarget.SetStartPose(camera!, new ThnPoseValue(freeCamera.Position,
+            window.Commands.Execute(ThnGizmoTarget.SetStartPose(camera!, new ThnPoseValue(freeCamera.Position,
                 freeCamera.Orientation), "Set camera from view"));
         }
 
