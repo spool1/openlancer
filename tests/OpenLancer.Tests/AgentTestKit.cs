@@ -40,6 +40,12 @@ internal sealed class TestAgentHost(EditSession? session, AgentHostKind kind = A
 
     public AgentLimits TestLimits { get; set; } = new();
 
+    /// <summary>The linked games of the host, or null for the base folder of the profile, as the host without a window
+    /// has it.</summary>
+    public AgentGames? TestGames { get; set; }
+
+    public override AgentGames Games(Data.Mods.ModManifest manifest) => TestGames ?? base.Games(manifest);
+
     public override AgentLimits Limits => TestLimits;
 
     public HashSet<ToolGroup> Hidden { get; } = [];

@@ -263,12 +263,13 @@ internal sealed partial class ModsWindow : IDisposable
     public ChecklistInput ChecklistInputOf(ModManifest manifest, PublishSettings settings, PublishHistory history,
         string content, string page)
     {
-        return ChecklistInput.Of(manifest, settings, history, content, page, LinkedReports,
-            [
-                .. PlayGames(manifest).Select(g => ExportTarget.Find(g.Game.Target ?? "")).OfType<ExportTarget>()
-                    .Distinct(),
-            ]);
+        return ChecklistInput.Of(manifest, settings, history, content, page, LinkedReports, PlayTargets(manifest));
     }
+
+    /// <summary>The retail targets that "Play this mod alone" can start for a mod: the targets of its linked games with
+    /// a game program.</summary>
+    public IReadOnlyList<ExportTarget> PlayTargets(ModManifest manifest) =>
+        [.. PlayGames(manifest).Select(g => ExportTarget.Find(g.Game.Target ?? "")).OfType<ExportTarget>().Distinct()];
 
     /// <summary>Opens the Settings tab and the field (a Go to of the checklist).</summary>
     public void GoTo(PublishField field)

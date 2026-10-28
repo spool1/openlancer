@@ -99,6 +99,9 @@ internal sealed partial class EditorWindow : IAgentEditor
 
     SaveOutcome IAgentEditor.Save() => Edits.Save();
 
+    AgentGames IAgentEditor.Games(OpenLancer.Data.Mods.ModManifest manifest) =>
+        new(LinkedGameReports(), Mods.GameRoots(), Mods.PlayTargets(manifest));
+
     ValidationState? IAgentEditor.Validation => Edits.Validation;
 
     event System.Action<ValidationState>? IAgentEditor.Validated

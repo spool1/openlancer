@@ -5,6 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Export;
+using OpenLancer.Data.Games;
+using OpenLancer.Data.Mods;
 using OpenLancer.Studio.Commands;
 
 namespace OpenLancer.Studio.Agent;
@@ -142,6 +145,16 @@ public sealed record AgentConsoleEntry(long Sequence, DateTime Time, AgentSeveri
 /// <param name="Since">Only entries after this sequence number, or null.</param>
 public sealed record ConsoleFilter(string? Source, AgentSeverity Severity, bool BaseGame, long? Since);
 
+/// <summary>The linked games of a host for <c>export_mod</c> and <c>publish_checklist</c> (section 7.6 of the MCP1
+/// design).</summary>
+/// <param name="Reports">The checks of the linked games. A retail target takes its base from them (see
+/// <see cref="ExportTarget.BaseIn"/>).</param>
+/// <param name="Roots">The game folders that the folder of the publish history must not overlap.</param>
+/// <param name="PlayTargets">The retail targets whose linked game has a game program, for the step "Test play" of the
+/// publish checklist.</param>
+public sealed record AgentGames(IReadOnlyList<GameReport> Reports, IReadOnlyList<string> Roots,
+    IReadOnlyList<ExportTarget> PlayTargets);
+
 /// <summary>The problems of the target checks of a profile (see <see cref="AgentHost.CheckTarget"/>).</summary>
 /// <param name="Notes">Notes of the check, for example a target game that the profile does not link.</param>
 public sealed record TargetCheckResult(IReadOnlyList<Problem> Problems, IReadOnlyList<string> Notes);
@@ -215,6 +228,28 @@ public abstract class AgentHost
             return new AgentSave(refused, 0, Blocked: true);
         var result = session.Save();
         return new AgentSave(result, result.Saved && result.Written.Count + result.Deleted.Count > 0 ? ++saves : 0, false);
+    }
+
+    /// <summary>The linked games of the host without a window, after the first read.</summary>
+    private AgentGames? profileGames;
+
+    /// <summary>
+    /// The linked games of the host for <c>export_mod</c> and <c>publish_checklist</c>, on the thread that owns the
+    /// session. The host without a window has the base folder of the profile as its one game, as <c>oltool export</c>
+    /// and <c>oltool publish</c> without <c>--game</c> do. It checks the folder once. The editor host gives the game
+    /// links of the editor.
+    /// </summary>
+    /// <param name="manifest">The mod of the export or of the checklist. The editor gives the games that can play
+    /// it.</param>
+    public virtual AgentGames Games(ModManifest manifest)
+    {
+        if (profileGames == null)
+        {
+            var folder = Session!.Profile.BaseFolder;
+            var report = GameDetector.CheckRoot(folder);
+            profileGames = new AgentGames([report], [folder, .. report.Root is { } root ? [root] : Array.Empty<string>()], []);
+        }
+        return profileGames;
     }
 
     /// <summary>True while the user pauses the agent edits (decision D734).</summary>

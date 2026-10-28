@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Mods;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Runtime.Validation;
@@ -56,6 +57,9 @@ internal interface IAgentEditor
 
     /// <summary>Runs on the UI thread when a validation of the session gives its result.</summary>
     event Action<ValidationState>? Validated;
+
+    /// <summary>The game links of the editor for an export and the publish checklist of a mod.</summary>
+    AgentGames Games(ModManifest manifest);
 }
 
 /// <summary>
@@ -85,6 +89,9 @@ internal sealed class EditorAgentHost(IAgentEditor editor) : AgentHost
     public override IAgentViews Views => editor.Views;
 
     public override string NameText(int ids) => editor.Name(ids);
+
+    /// <summary>The game links of the editor, as the Export dialog and the Mods window use them.</summary>
+    public override AgentGames Games(ModManifest manifest) => editor.Games(manifest);
 
     /// <summary>
     /// The save of the editor (section 7.6 of the MCP1 design): the gate, the report in the Console, the reload and the

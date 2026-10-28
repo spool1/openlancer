@@ -207,6 +207,7 @@ public static class AgentTools
         SessionTool("edit_batch", ToolHints.Adding, new ToolInput(Text("label"),
                 new StepsParam("steps", () => BatchTool.StepTools), EditTools.Preview, EditTools.WithPatch),
             typeof(BatchResult), BatchTool.Run),
+        SessionTool("publish_checklist", ToolHints.Query, ToolInput.None, typeof(ChecklistView), PublishTools.Checklist),
         View("open_view", ToolGroup.Studio, ToolHints.View, new ToolInput(Text("system"), Text("mission"), Text("cutscene")),
             typeof(OpenedView), ViewTools.OpenView),
         View("select_items", ToolGroup.Studio, ToolHints.View,

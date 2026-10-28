@@ -439,6 +439,10 @@
         "with_patch": "With preview: also give the patch text of each INI file that the batch changes."
       }
     },
+    "publish_checklist": {
+      "title": "Get the publish checklist of the active mod",
+      "description": "Gives the steps of the publish checklist of the active mod, as the Mods window shows them. The checklist reads the saved files. This tool changes nothing."
+    },
     "open_view": {
       "title": "Open a view of the editor",
       "description": "Opens a system in the Scene, a mission script in the Mission tab or a cutscene in the Cutscene tab. Give one of the three. The tool changes what the user sees, not the data. Only the editor host has this tool.",
@@ -623,7 +627,10 @@
     "changed_on_disk": "Files of the mod changed outside the editor: {files}. The editor asks the user to replace them or to keep them. The save wrote nothing.",
     "changed_on_disk_headless": "Files of the mod changed outside the server: {files}. The server does not replace them, so the save wrote nothing. Ask the user to open the mod in the editor.",
     "save_validation_waited": "The validation did not end before the time limit of the call. The Console of the editor shows its result.",
-    "save_not_started": "The editor did not start the save. The Console of the editor tells why."
+    "save_not_started": "The editor did not start the save. The Console of the editor tells why.",
+    "checklist_unsaved": "The checklist reads the saved files. The active mod has unsaved edits, and the checklist does not count them.",
+    "no_active_mod": "The profile has no active mod. Ask the user to select a mod to edit in the editor.",
+    "mod_not_read": "OpenLancer could not read the active mod: {reason}"
   },
   "resources": {
     "openlancer://catalog/lists": {
@@ -1163,6 +1170,19 @@
     "ValidationView.errors": "The number of errors that the mod adds.",
     "ValidationView.warnings": "The number of warnings that the mod adds.",
     "ValidationView.problems": "The first problems of the validation, errors first.",
-    "ValidationView.failure": "Why the validation did not give a result, or none."
+    "ValidationView.failure": "Why the validation did not give a result, or none.",
+    "ChecklistView.mod": "The id of the active mod.",
+    "ChecklistView.name": "The display name of the mod.",
+    "ChecklistView.version": "The version of the mod in mod.json.",
+    "ChecklistView.complete": "The number of complete steps.",
+    "ChecklistView.total": "The number of steps.",
+    "ChecklistView.steps": "The steps in order, each with done or what is missing.",
+    "ChecklistView.recommended": "The recommended items. They do not count as steps.",
+    "ChecklistView.warnings": "The problems of the reads of publish.json and of the publish history.",
+    "ChecklistView.note": "A note about what the checklist reads, or none.",
+    "ChecklistStepRow.number": "The number of the step, from 1.",
+    "ChecklistStepRow.name": "The name of the step, for example Summary.",
+    "ChecklistStepRow.complete": "True when the step is done.",
+    "ChecklistStepRow.missing": "What is missing and why it is necessary. Empty when the step is done."
   }
 }

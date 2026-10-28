@@ -19640,6 +19640,205 @@
       }
     },
     {
+      "name": "publish_checklist",
+      "title": "Get the publish checklist of the active mod",
+      "description": "Gives the steps of the publish checklist of the active mod, as the Mods window shows them. The checklist reads the saved files. This tool changes nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "mod": {
+            "type": "string",
+            "description": "The id of the active mod."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name of the mod."
+          },
+          "version": {
+            "type": "string",
+            "description": "The version of the mod in mod.json."
+          },
+          "complete": {
+            "type": "integer",
+            "description": "The number of complete steps."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The number of steps."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "integer",
+                  "description": "The number of the step, from 1."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The name of the step, for example Summary."
+                },
+                "complete": {
+                  "type": "boolean",
+                  "description": "True when the step is done."
+                },
+                "missing": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "What is missing and why it is necessary. Empty when the step is done."
+                }
+              },
+              "required": [
+                "number",
+                "name",
+                "complete",
+                "missing"
+              ]
+            },
+            "description": "The steps in order, each with done or what is missing."
+          },
+          "recommended": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The recommended items. They do not count as steps."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The problems of the reads of publish.json and of the publish history."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A note about what the checklist reads, or none."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view that the tool read, as text. A save does not change it."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "mod",
+              "name",
+              "version",
+              "complete",
+              "total",
+              "steps",
+              "recommended"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Get the publish checklist of the active mod",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
       "name": "open_view",
       "title": "Open a view of the editor",
       "description": "Opens a system in the Scene, a mission script in the Mission tab or a cutscene in the Cutscene tab. Give one of the three. The tool changes what the user sees, not the data. Only the editor host has this tool.",

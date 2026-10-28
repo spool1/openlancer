@@ -301,6 +301,11 @@ public sealed class AgentControllerTests : IDisposable
         }
 
         public int ValidatedHandlers => Validated?.GetInvocationList().Length ?? 0;
+
+        /// <summary>The game links of the test.</summary>
+        public AgentGames TestGames { get; set; } = new([], [], []);
+
+        public AgentGames Games(OpenLancer.Data.Mods.ModManifest manifest) => TestGames;
     }
 
     private string Agent => Path.Combine(folder, "agent");
