@@ -142,6 +142,7 @@ public sealed class AgentPublishToolTests
         host.TestExportBusy = null;
         var noBase = Error(host, "export_mod", """{ "targets": ["hde-0.7.1"] }""");
         var noForm = Error(host, "export_mod", """{ "formats": [] }""");
+        var folder = Error(host, "export_mod", """{ "folder": "out" }""");
         var manifest = Path.Combine(ModFolder(game), ModManifest.FileName);
         File.WriteAllText(manifest, File.ReadAllText(manifest).Replace("\"1.2.0\"", "\"1.2.0/x\""));
         var unsafeVersion = Error(host, "export_mod");
@@ -154,6 +155,8 @@ public sealed class AgentPublishToolTests
         Assert.Equal(("refused", "ExportRuns", "An export runs now. Wait until it ends."), busy);
         Assert.Equal(("refused", "TargetRefused"), (noBase.Code, noBase.Detail));
         Assert.Equal("invalid_argument", noForm.Code);
+        // The export goes into the default export folder only, so the tool takes no folder (decision D714).
+        Assert.Equal("invalid_argument", folder.Code);
         Assert.Equal(("refused", "UnsafeVersion"), (unsafeVersion.Code, unsafeVersion.Detail));
         Assert.Equal(("refused", "HistoryNotLoaded"), (noHistory.Code, noHistory.Detail));
         Assert.False(Directory.Exists(Path.Combine(ExportRoot(game), "1.2.0")));
