@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Runtime.Validation;
 using OpenLancer.Studio.Agent;
@@ -45,6 +46,16 @@ internal interface IAgentEditor
 
     /// <summary>The views of the editor for the view tools: the open of a view, the selection and the images.</summary>
     IAgentViews Views { get; }
+
+    /// <summary>Saves as File &gt; Save does: the gate, the report in the Console, the reload and the validation. When
+    /// files of the mod changed outside the editor, the dialog of the editor asks the user.</summary>
+    SaveOutcome Save();
+
+    /// <summary>The state of the last validation of the session, or null.</summary>
+    ValidationState? Validation { get; }
+
+    /// <summary>Runs on the UI thread when a validation of the session gives its result.</summary>
+    event Action<ValidationState>? Validated;
 }
 
 /// <summary>
@@ -74,6 +85,56 @@ internal sealed class EditorAgentHost(IAgentEditor editor) : AgentHost
     public override IAgentViews Views => editor.Views;
 
     public override string NameText(int ids) => editor.Name(ids);
+
+    /// <summary>
+    /// The save of the editor (section 7.6 of the MCP1 design): the gate, the report in the Console, the reload and the
+    /// validation. A save that changed files has the validation as the tail of the call. The tail waits for the result
+    /// of the validation of its save, or of a later save that replaced it.
+    /// </summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.Refused"/>: the save did not start. The Console tells
+    /// why.</exception>
+    public override AgentSave Save()
+    {
+        var outcome = editor.Save();
+        if (outcome.Result is not { } result)
+            throw new EditException(new EditError(EditErrorKind.Refused, "SaveNotStarted", AgentTexts.Error("save_not_started")));
+        var save = new AgentSave(result, outcome.Number, outcome.Failure == SaveFailure.Blocked);
+        return result is { Saved: true, Incomplete: false } && outcome.Number > 0
+            ? save with { Validation = ValidationOf(outcome.Number) }
+            : save;
+    }
+
+    /// <summary>The wait for the result of the validation of a save. A validation that cannot start gives its result
+    /// at once, during the save, so the wait also reads the state of the last validation. The tail does not touch the
+    /// session.</summary>
+    private Func<CancellationToken, Task<SaveValidation>> ValidationOf(int number)
+    {
+        var done = new TaskCompletionSource<SaveValidation>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Action<ValidationState> handler = null!;
+        handler = state =>
+        {
+            // A later save stops the validation of an earlier save, and its validation replaces it.
+            if (state.Save < number || state.Result is not { } result)
+                return;
+            done.TrySetResult(new SaveValidation(result.Save, result.Problems, result.Failure));
+            editor.Validated -= handler;
+        };
+        editor.Validated += handler;
+        if (editor.Validation is { Running: false } last)
+            handler(last);
+        return async cancel =>
+        {
+            try
+            {
+                return await done.Task.WaitAsync(cancel).ConfigureAwait(false);
+            }
+            finally
+            {
+                // The removal of a handler is safe on each thread.
+                editor.Validated -= handler;
+            }
+        };
+    }
 
     public override string InfoText(int ids) => editor.InfoText(ids);
 

@@ -31,11 +31,17 @@ internal sealed record SaveOutcome(bool Saved, int Number, bool Incomplete)
     /// the M6c design).</summary>
     public SaveFailure Failure { get; init; }
 
+    /// <summary>The result of the save or of the save gate, or null when the save did not start, for example without an
+    /// active mod. The save tool of the agent gives its files and its problems (section 7.6 of the MCP1
+    /// design).</summary>
+    public SaveResult? Result { get; init; }
+
     /// <summary>The outcome of a save that gave <paramref name="result"/>.</summary>
     /// <param name="number">The number that the session gave the save (see <see cref="EditorSession.Saved"/>).</param>
     public static SaveOutcome Of(SaveResult result, int number) => new(result.Saved, number, result.Incomplete)
     {
         Failure = !result.Saved && result.ChangedOnDisk.Count > 0 ? SaveFailure.ChangedOnDisk : SaveFailure.None,
+        Result = result,
     };
 }
 
@@ -185,10 +191,10 @@ internal sealed class EditController(EditorWindow window) : IDisposable
 
         // The save gate runs first, so that a refused save does not stop the validation for nothing (review finding
         // R21 of the M21 design). EditSession.Save runs it again.
-        if (Gate(session.Edits) is { } refused)
+        if (session.Edits.GateRefusal() is { } refused)
         {
             Report(refused, mod, 0, hadEdits);
-            return SaveOutcome.Blocked;
+            return SaveOutcome.Blocked with { Result = refused };
         }
 
         // The oltool process of an earlier validation reads the files of the mod. So it stops before a save of the edits
@@ -227,18 +233,6 @@ internal sealed class EditController(EditorWindow window) : IDisposable
 
         FollowUp(session, result, number, stopped);
         return outcome;
-    }
-
-    /// <summary>
-    /// The result of a save that the save gate refuses (see <see cref="EditSession.SaveProblems"/>), or null when the gate
-    /// finds no error. The result tells nothing about the files, because the save does not start.
-    /// </summary>
-    internal static SaveResult? Gate(EditSession edits)
-    {
-        var problems = edits.SaveProblems();
-        return problems.Any(p => p.Severity == DiagnosticSeverity.Error)
-            ? new SaveResult(false, [], [], problems, [])
-            : null;
     }
 
     /// <summary>Writes the report of a save to the Console. The summary comes last, so the status bar shows it.</summary>

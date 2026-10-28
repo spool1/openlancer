@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
-using OpenLancer.Editor.Editing;
 using Xunit;
 
 namespace OpenLancer.Tests;
@@ -116,7 +115,7 @@ public sealed class CurveCheckTests
         Assert.StartsWith("[LightSource] nickname = Light_point: 'atten_curve = no_such_curve': no curve has the name " +
                           "'no_such_curve'.", curve.Message);
         Assert.EndsWith("The game stops loading with this value.", curve.Message);
-        var refused = EditController.Gate(session);
+        var refused = session.GateRefusal();
         Assert.NotNull(refused);
         Assert.False(refused.Saved);
         var result = session.Save();
@@ -127,7 +126,7 @@ public sealed class CurveCheckTests
         session.Undo();
         Assert.Contains(SystemWorkspace.Li01Path, session.EditedPaths, StringComparer.OrdinalIgnoreCase);
         Assert.Empty(session.SaveProblems());
-        Assert.Null(EditController.Gate(session));
+        Assert.Null(session.GateRefusal());
     }
 
     [Theory]

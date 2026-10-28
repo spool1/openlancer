@@ -17,6 +17,10 @@
     ],
     "read_only": [
       "This server only reads the data. It changes no file."
+    ],
+    "save": [
+      "Call check before save. Correct each error.",
+      "Do not save until the user asks, unless the user told you to save."
     ]
   },
   "fields": {
@@ -411,6 +415,10 @@
         "nickname": "The nickname of the new item. The copies of its goods get names from it. A refusal tells why a nickname is not valid."
       }
     },
+    "save": {
+      "title": "Save the edits of the active mod",
+      "description": "Saves the edits into the patch files of the active mod. The save stops when the checks find errors. Read the errors, correct them, then save again."
+    },
     "undo": {
       "title": "Undo the last edit of the agent",
       "description": "Undoes the last edit of the agent. The tool does not undo an edit of the user."
@@ -607,7 +615,15 @@
     "asset_write_confirm": "The edit '{label}' writes files at once. This change is not on the undo stack. To write the files, call the tool again with confirm: true.",
     "asset_write_applied": "The editor wrote the files: {label}. This change is not on the undo stack.",
     "template_none": "The list {list} has no item {template}.",
-    "template_kind": "{ref} is not an item of the list {list}. Give a nickname of the list {list}."
+    "template_kind": "{ref} is not an item of the list {list}. Give a nickname of the list {list}.",
+    "save_blocked": "The save stopped. {count} errors block it. Correct them, then save again. {errors}",
+    "save_blocked_one": "The save stopped. 1 error blocks it. Correct it, then save again. {errors}",
+    "save_blocked_more": "Call check to read all errors.",
+    "save_failed": "The save wrote nothing. {errors}",
+    "changed_on_disk": "Files of the mod changed outside the editor: {files}. The editor asks the user to replace them or to keep them. The save wrote nothing.",
+    "changed_on_disk_headless": "Files of the mod changed outside the server: {files}. The server does not replace them, so the save wrote nothing. Ask the user to open the mod in the editor.",
+    "save_validation_waited": "The validation did not end before the time limit of the call. The Console of the editor shows its result.",
+    "save_not_started": "The editor did not start the save. The Console of the editor tells why."
   },
   "resources": {
     "openlancer://catalog/lists": {
@@ -1134,6 +1150,19 @@
     "NamedMention.path": "The install path of the file.",
     "NamedMention.count": "How often the file names the nickname.",
     "HistoryStepView.label": "The label of the step that the tool undid or did again, for example Agent: Delete my_station_1.",
-    "BatchResult.steps": "The result of each step, in order. Each step has the status of the batch."
+    "BatchResult.steps": "The result of each step, in order. Each step has the status of the batch.",
+    "SaveView.saved": "True when the save wrote its files. A save without unsaved edits also gives true.",
+    "SaveView.number": "The number of the save in this session, or 0 when the save changed no file.",
+    "SaveView.written": "The files that the save wrote, relative to the folder of the mod.",
+    "SaveView.deleted": "The files that the save deleted, relative to the folder of the mod.",
+    "SaveView.problems": "The first problems of the save, errors first. Use check for all problems.",
+    "SaveView.problem_count": "The number of all problems of the save.",
+    "SaveView.incomplete": "True when a file did not move into place. The next save completes the save.",
+    "SaveView.validation": "The validation of the saved files in the editor, or none. The server without a window does not validate.",
+    "ValidationView.save": "The number of the save that the validation checked. A later save replaces the validation of an earlier save.",
+    "ValidationView.errors": "The number of errors that the mod adds.",
+    "ValidationView.warnings": "The number of warnings that the mod adds.",
+    "ValidationView.problems": "The first problems of the validation, errors first.",
+    "ValidationView.failure": "Why the validation did not give a result, or none."
   }
 }

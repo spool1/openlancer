@@ -372,7 +372,7 @@ public sealed class EditSessionThnSaveTests
         Assert.Contains(error, result.Problems);
         Assert.Null(PatchText(ws));
         // Play saves first, and the same gate stops it.
-        Assert.NotNull(Editor.Editing.EditController.Gate(session));
+        Assert.NotNull(session.GateRefusal());
 
         session.Execute(ThnEdits.Set(cam, Fovh, N(30)));
         Assert.Empty(session.CutsceneErrors(ScriptPath));

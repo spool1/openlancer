@@ -201,6 +201,7 @@ public static class AgentTools
                 Text("template", true),
                 Text("nickname", true)),
             DataEditTools.CreateFromTemplate),
+        SessionTool("save", ToolHints.Changing, ToolInput.None, typeof(SaveView), SaveTools.Save),
         SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
         SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),
         SessionTool("edit_batch", ToolHints.Adding, new ToolInput(Text("label"),

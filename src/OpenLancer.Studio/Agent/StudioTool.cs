@@ -132,12 +132,13 @@ public sealed class StudioTool
     public ToolKind Kind { get; }
 
     /// <summary>True when Pause refuses the tool (decision D734 of the MCP1 design): a tool that changes the data, writes
-    /// files or starts a play. A query and a view tool still run.</summary>
-    public bool Pausable => Kind is ToolKind.Edit or ToolKind.AssetWrite or ToolKind.Session or ToolKind.Play;
+    /// files or starts a play. A query, a view tool and a tool of the session that only reads, for example
+    /// <c>publish_checklist</c>, still run.</summary>
+    public bool Pausable => Changes;
 
     /// <summary>True when the tool changes the data or the files of the mod, or starts a play. The Console of the
-    /// editor shows each refusal of such a tool.</summary>
-    public bool Changes => Kind is not (ToolKind.Query or ToolKind.View);
+    /// editor shows each refusal of such a tool. A tool with the hint "read only" changes nothing.</summary>
+    public bool Changes => Kind is not (ToolKind.Query or ToolKind.View) && !Hints.ReadOnly;
 
     public ToolGroup Group { get; }
 

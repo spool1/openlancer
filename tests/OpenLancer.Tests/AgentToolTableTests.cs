@@ -78,7 +78,8 @@ public sealed class AgentToolTableTests
             };
             Assert.Equal((kind, hints), (tool.Kind, tool.Hints));
             Assert.Equal(editor.Contains(tool.Name) ? ToolHosts.Editor : ToolHosts.Both, tool.Hosts);
-            Assert.Equal(kind is not (ToolKind.Query or ToolKind.View), tool.Pausable);
+            // A tool of the session that only reads, for example publish_checklist, runs during Pause.
+            Assert.Equal(kind is not (ToolKind.Query or ToolKind.View) && !hints.ReadOnly, tool.Pausable);
         }
     }
 
@@ -87,7 +88,8 @@ public sealed class AgentToolTableTests
     [Fact]
     public void AHostThatOnlyReadsHasTheReadOnlyTools()
     {
-        Assert.Equal(AgentTools.All.Where(t => !Edits.ContainsKey(t.Name) && t.Name is not ("open_view" or "select_items")),
+        Assert.Equal(AgentTools.All.Where(t => !(Edits.TryGetValue(t.Name, out var edit) && !edit.Hints.ReadOnly) &&
+                                               t.Name is not ("open_view" or "select_items")),
             AgentTools.ReadOnly);
         Assert.Equal(AgentTools.All, new TestAgentHost(null).Tools);
     }
@@ -176,26 +178,34 @@ public sealed class AgentToolTableTests
     }
 
     /// <summary>The server instructions follow the tools of the host (section 9.2 of the MCP1 design, review finding R10
-    /// of MCP1-2). A host without edit tools tells that the server only reads.</summary>
+    /// of MCP1-2). A host without edit tools tells that the server only reads. A host without the tool save gets no
+    /// step of the save.</summary>
     [Fact]
     public void TheServerInstructionsAreShortStepsForTheToolsOfTheHost()
     {
-        var edits = AgentTexts.InstructionsFor(edits: true);
-        var reads = AgentTexts.InstructionsFor(edits: false);
+        var edits = AgentTexts.InstructionsFor(edits: true, save: true);
+        var noSave = AgentTexts.InstructionsFor(edits: true, save: false);
+        var reads = AgentTexts.InstructionsFor(edits: false, save: false);
 
-        Assert.InRange(edits.Count, 3, 12);
+        Assert.InRange(edits.Count, 3, 14);
         Assert.StartsWith("Call studio_status first.", edits[0]);
         Assert.StartsWith("Call studio_status first.", reads[0]);
         Assert.Equal(string.Join("\n", edits), AgentResources.InstructionsFor(AgentTools.All));
+        Assert.Equal(string.Join("\n", noSave),
+            AgentResources.InstructionsFor(AgentTools.All.Where(t => t.Name is not ("save" or "export_mod"))));
         Assert.Equal(string.Join("\n", reads), AgentResources.InstructionsFor(AgentTools.ReadOnly));
         Assert.Equal("This server only reads the data. It changes no file.", reads[^1]);
         Assert.DoesNotContain(edits, i => i.Contains("only reads"));
         Assert.Contains("Use preview: true for a large edit or a delete.", edits);
+        Assert.Contains("Call check before save. Correct each error.", edits);
+        Assert.Contains("Do not save until the user asks, unless the user told you to save.", edits);
+        Assert.DoesNotContain(noSave, i => i.Contains("save"));
     }
 
-    /// <summary>The edit tools of this build in the order of the table, with their kinds and hints. The tools of
-    /// section 7.3 follow the tools of section 7.2. A tool that adds data is not destructive, and a tool that can change
-    /// or remove data is (review finding R7 of MCP1-2).</summary>
+    /// <summary>The edit tools and the tools of the session of this build in the order of the table, with their kinds
+    /// and hints. The tools of section 7.3 follow the tools of section 7.2, and the tools of section 7.6 follow them. A
+    /// tool that adds data is not destructive, and a tool that can change or remove data is (review finding R7 of
+    /// MCP1-2).</summary>
     private static readonly Dictionary<string, (ToolKind Kind, ToolHints Hints)> Edits = new()
     {
         ["set_fields"] = (ToolKind.Edit, new ToolHints(false, true, true)),
@@ -218,6 +228,7 @@ public sealed class AgentToolTableTests
         ["prop_group_delete"] = (ToolKind.AssetWrite, new ToolHints(false, true, false)),
         ["create_loadout"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["create_from_template"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["save"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["undo"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["redo"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["edit_batch"] = (ToolKind.Session, new ToolHints(false, false, false)),

@@ -3,7 +3,6 @@ using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Lists;
-using OpenLancer.Editor.Editing;
 using Xunit;
 using static OpenLancer.Tests.ListWorkspace;
 
@@ -82,7 +81,7 @@ public sealed class UnusableEntryTests
         // The active mod did not change the light.
         Assert.Equal(ValueOrigin.Base, session.Origin(Light, "atten_curve").Origin);
         Assert.Equal([problem.Diagnostic], session.SaveProblems());
-        Assert.NotNull(EditController.Gate(session));
+        Assert.NotNull(session.GateRefusal());
         var refused = session.Save();
         Assert.False(refused.Saved);
         Assert.Contains(problem.Diagnostic, refused.Problems);
@@ -92,7 +91,7 @@ public sealed class UnusableEntryTests
         session.Undo();
         Assert.Empty(session.Lists.Problems(Light));
         Assert.Empty(session.SaveProblems());
-        Assert.Null(EditController.Gate(session));
+        Assert.Null(session.GateRefusal());
         Assert.True(session.Save().Saved);
     }
 
@@ -241,7 +240,7 @@ public sealed class UnusableEntryTests
                      "'no_such_base'. The game crashes when the player docks here.", own.Diagnostic.Message);
         Assert.Empty(session.Lists.Problems(partner));
         Assert.Equal([own.Diagnostic], session.SaveProblems());
-        Assert.NotNull(EditController.Gate(session));
+        Assert.NotNull(session.GateRefusal());
         Assert.False(session.Save().Saved);
 
         session.Undo();

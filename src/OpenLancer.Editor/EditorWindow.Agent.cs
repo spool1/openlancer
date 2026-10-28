@@ -5,6 +5,7 @@ using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Editor.Agent;
+using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Studio.Agent;
@@ -95,6 +96,16 @@ internal sealed partial class EditorWindow : IAgentEditor
     ConsoleLog IAgentEditor.Log => Log;
 
     IAgentViews IAgentEditor.Views => agentViews;
+
+    SaveOutcome IAgentEditor.Save() => Edits.Save();
+
+    ValidationState? IAgentEditor.Validation => Edits.Validation;
+
+    event System.Action<ValidationState>? IAgentEditor.Validated
+    {
+        add => Edits.Validated += value;
+        remove => Edits.Validated -= value;
+    }
 
     AgentView IAgentEditor.View => new(
         Scene.System is { } system ? ItemRefs.Format(new ItemReference(ItemRefKind.System, system.Nickname)) : null,

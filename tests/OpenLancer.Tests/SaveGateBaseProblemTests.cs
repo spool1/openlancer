@@ -64,7 +64,7 @@ public sealed class SaveGateBaseProblemTests
         Assert.Equal((DiagnosticSeverity.Warning, "pos", Bad), (warning.Severity, warning.Key, warning.Target));
         Assert.Equal($"{error.Message} {EditSession.BaseGameSaveSuffix}", warning.Message);
         Assert.Equal(MessageOrigin.BaseGame, warning.Origin);
-        Assert.Null(EditController.Gate(session));
+        Assert.Null(session.GateRefusal());
         var saved = session.Save();
         Assert.True(saved.Saved, string.Join("\n", saved.Problems));
         Assert.Contains(warning, saved.Problems);

@@ -65,6 +65,17 @@ public sealed partial class EditSession
     /// <exception cref="InvalidOperationException">A transaction or a batch is open.</exception>
     public SaveResult Save(bool overwrite = false) => Save(overwrite, null);
 
+    /// <summary>
+    /// The result of a save that the save gate refuses (see <see cref="SaveProblems"/>), or null when the gate finds no
+    /// error. The result tells nothing about the files, because the save does not start. The save of the editor and the
+    /// save tool of the agent run the gate before <see cref="Save(bool)"/>, which runs it again.
+    /// </summary>
+    public SaveResult? GateRefusal()
+    {
+        var problems = SaveProblems();
+        return problems.Any(IsError) ? new SaveResult(false, [], [], problems, []) : null;
+    }
+
     /// <param name="afterSteps">Called with k after k moves and deletes of the save transaction, from k = 0 at its
     /// commit point. The fault tests use it.</param>
     internal SaveResult Save(bool overwrite, Action<int>? afterSteps)

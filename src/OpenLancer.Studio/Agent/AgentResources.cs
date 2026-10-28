@@ -31,9 +31,13 @@ public static class AgentResources
 
     /// <summary>The server instructions of a host with a tool set, one step on each line (section 9.2 of the MCP1
     /// design). A host with edit tools gets the steps of the edits. A host without them gets the step that the server
-    /// only reads.</summary>
-    public static string InstructionsFor(IEnumerable<StudioTool> tools) =>
-        string.Join("\n", AgentTexts.InstructionsFor(tools.Any(t => t.Kind == ToolKind.Edit)));
+    /// only reads. A host with the tool <c>save</c> also gets the steps of the save.</summary>
+    public static string InstructionsFor(IEnumerable<StudioTool> tools)
+    {
+        var list = tools.ToList();
+        return string.Join("\n", AgentTexts.InstructionsFor(list.Any(t => t.Kind == ToolKind.Edit),
+            list.Any(t => t.Name == "save")));
+    }
 
     /// <summary>The resource with a URI, or null.</summary>
     public static AgentResource? Find(string uri) => All.FirstOrDefault(r => r.Uri == uri);

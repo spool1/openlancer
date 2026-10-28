@@ -21,9 +21,10 @@ public sealed class PlaySeamTests
         var saved = new SaveResult(true, [@"C:\mods\act\patches\DATA\EQUIPMENT\goods.ini"], [], [], []);
         var notSaved = new SaveResult(false, [], [], [Diagnostic.Error("goods.ini", "changed outside the editor")], []);
 
-        Assert.Equal(new SaveOutcome(true, 3, false), SaveOutcome.Of(saved, 3));
-        Assert.Equal(new SaveOutcome(true, 4, true), SaveOutcome.Of(saved with { Incomplete = true }, 4));
-        Assert.Equal(new SaveOutcome(false, 0, false), SaveOutcome.Of(notSaved, 0));
+        Assert.Equal(new SaveOutcome(true, 3, false) { Result = saved }, SaveOutcome.Of(saved, 3));
+        var incomplete = saved with { Incomplete = true };
+        Assert.Equal(new SaveOutcome(true, 4, true) { Result = incomplete }, SaveOutcome.Of(incomplete, 4));
+        Assert.Equal(new SaveOutcome(false, 0, false) { Result = notSaved }, SaveOutcome.Of(notSaved, 0));
     }
 
     /// <summary>A save that did not save tells why, so a play request of an agent gives save_blocked or changed_on_disk

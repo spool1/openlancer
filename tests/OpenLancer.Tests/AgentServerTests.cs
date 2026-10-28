@@ -9,8 +9,11 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using ModelContextProtocol.Client;
+using OpenLancer.Data;
+using OpenLancer.Data.Editing;
 using OpenLancer.Editor;
 using OpenLancer.Editor.Agent;
+using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Mcp;
 using OpenLancer.Studio.Agent;
@@ -257,6 +260,8 @@ public sealed class AgentServerTests
 [Collection(nameof(AgentServerTests))]
 public sealed class AgentControllerTests : IDisposable
 {
+    private static CancellationToken Token => TestContext.Current.CancellationToken;
+
     private readonly string folder = Path.Combine(Path.GetTempPath(), "openlancer-tests", Guid.NewGuid().ToString("N"));
 
     private sealed class FakeEditor : IAgentEditor
@@ -278,6 +283,24 @@ public sealed class AgentControllerTests : IDisposable
         public AgentView View => new("system:Li01", null, null);
 
         public IAgentViews Views { get; } = new FakeAgentViews();
+
+        /// <summary>The save of the test, or null for a save that does not start.</summary>
+        public Func<SaveOutcome>? Saving { get; set; }
+
+        public SaveOutcome Save() => Saving?.Invoke() ?? SaveOutcome.NotSaved;
+
+        public ValidationState? Validation { get; set; }
+
+        public event Action<ValidationState>? Validated;
+
+        /// <summary>Ends a validation, as the runner of the editor does on the UI thread.</summary>
+        public void Validate(ValidationState state)
+        {
+            Validation = state;
+            Validated?.Invoke(state);
+        }
+
+        public int ValidatedHandlers => Validated?.GetInvocationList().Length ?? 0;
     }
 
     private string Agent => Path.Combine(folder, "agent");
@@ -490,6 +513,100 @@ public sealed class AgentControllerTests : IDisposable
         Assert.Equal(("read_only", repo + " Allow edits of this mod in the editor first."), (waits.Code, waits.Message));
         Assert.Equal(("read_only", "Another editor has the mod act open."), (locked.Code, locked.Message));
         Assert.False(editor.Edits!.CanUndo);
+    }
+
+    /// <summary>The save of the editor host runs the save of the editor (section 7.6 of the MCP1 design). The validation
+    /// of the save is the tail of the call. The tail waits for the result of its save, also from a later save that
+    /// replaced it, and removes its handler.</summary>
+    [Fact]
+    public async Task TheEditorSaveWaitsForTheValidationOfItsSave()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var editor = new FakeEditor { Edits = session, Saving = () => SaveOutcome.Of(session.Save(), 3) };
+        var host = new EditorAgentHost(editor);
+        AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""");
+
+        var step = AgentTools.Run(host, "save", null);
+        var tail = step.Tail!(Token);
+        editor.Validate(new ValidationState(2, false, new ValidationResult(2, [], null)));
+        var waited = tail.IsCompleted;
+        var problem = Diagnostic.Error("mods/act/mod.json", "The mod has a problem.");
+        editor.Validate(new ValidationState(3, false, new ValidationResult(3, [problem, problem with
+        {
+            Severity = DiagnosticSeverity.Warning,
+        }], null)));
+        var result = await tail.WaitAsync(TimeSpan.FromSeconds(10), Token);
+
+        Assert.Null(step.Result);
+        Assert.False(waited);
+        Assert.False(result.IsError, result.Text);
+        Assert.Equal(3, (int)result.Content["number"]!);
+        var validation = result.Content["validation"]!;
+        Assert.Equal((3, 1, 1), ((int)validation["save"]!, (int)validation["errors"]!, (int)validation["warnings"]!));
+        Assert.Equal("The mod has a problem.", (string?)validation["problems"]![0]!["message"]);
+        Assert.Equal(0, editor.ValidatedHandlers);
+    }
+
+    /// <summary>A validation that ended during the save, for example because oltool did not start, ends the tail at
+    /// once. A save that changed no file has no tail. A tail that the client or the time limit stops still tells that
+    /// the save wrote its files.</summary>
+    [Fact]
+    public async Task TheEditorSaveTellsTheSaveAlsoWithoutTheResultOfTheValidation()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var number = 1;
+        var editor = new FakeEditor { Edits = session, Saving = () => SaveOutcome.Of(session.Save(), number) };
+        var host = new EditorAgentHost(editor);
+        AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""");
+        editor.Validation = new ValidationState(1, false, new ValidationResult(1, null, "oltool did not start."));
+
+        var done = await AgentTools.Run(host, "save", null).Tail!(Token).WaitAsync(TimeSpan.FromSeconds(10), Token);
+        Assert.Equal(0, editor.ValidatedHandlers);
+        number = 0;
+        var unchanged = AgentTools.Run(host, "save", null);
+        number = 2;
+        AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [4, 5, 6] } }""");
+        using var cancel = new CancellationTokenSource();
+        var stopped = AgentTools.Run(host, "save", null).Tail!(cancel.Token);
+        Assert.Equal(1, editor.ValidatedHandlers);
+        await cancel.CancelAsync();
+        var late = await stopped.WaitAsync(TimeSpan.FromSeconds(10), Token);
+
+        Assert.Equal("oltool did not start.", (string?)done.Content["validation"]!["failure"]);
+        Assert.Null(unchanged.Tail);
+        Assert.Null(unchanged.Result!.Content["validation"]);
+        Assert.True((bool)late.Content["saved"]!);
+        Assert.Equal("The validation did not end before the time limit of the call. The Console of the editor shows its " +
+                     "result.", (string?)late.Content["validation"]!["failure"]);
+        Assert.Equal(0, editor.ValidatedHandlers);
+    }
+
+    /// <summary>The errors of the save of the editor host. The gate gives <c>save_blocked</c>. A change of the files of
+    /// the mod outside the editor gives <c>changed_on_disk</c>, and the editor asks the user. A save that did not start
+    /// gives <c>refused</c>.</summary>
+    [Fact]
+    public void TheEditorSaveGivesTheErrorsOfTheSaveOfTheEditor()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var editor = new FakeEditor { Edits = session };
+        var host = new EditorAgentHost(editor);
+        AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "loadout": "lo_missing" } }""");
+        editor.Saving = () => SaveOutcome.Blocked with { Result = session.GateRefusal() };
+        var blocked = AgentCalls.Error(host, "save");
+        editor.Saving = () => SaveOutcome.Of(new SaveResult(false, [], [], [],
+            [Path.Combine(ws.ModFolder("act"), "patches", "file.ini")]), 0);
+        var changed = AgentCalls.Error(host, "save");
+        editor.Saving = null;
+        var none = AgentCalls.Error(host, "save");
+
+        Assert.Equal(("save_blocked", "Gate"), (blocked.Code, blocked.Detail));
+        Assert.Equal(("changed_on_disk", "Files of the mod changed outside the editor: patches\\file.ini. The editor asks " +
+                                         "the user to replace them or to keep them. The save wrote nothing."),
+            (changed.Code, changed.Message));
+        Assert.Equal(("refused", "SaveNotStarted"), (none.Code, none.Detail));
     }
 
     [Fact]

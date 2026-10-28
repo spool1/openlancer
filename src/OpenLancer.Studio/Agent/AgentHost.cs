@@ -198,6 +198,25 @@ public abstract class AgentHost
     {
     }
 
+    /// <summary>The saves of this host that changed files.</summary>
+    private int saves;
+
+    /// <summary>
+    /// Saves the edits of the active mod (tool <c>save</c>, section 7.6 of the MCP1 design), on the thread that owns the
+    /// session. This is the save of the host without a window: the save gate, then <see cref="EditSession.Save(bool)"/>.
+    /// The editor host runs the save of the editor instead: the gate, the report in the Console, the reload and the
+    /// validation.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">A batch or a transaction is open.</exception>
+    public virtual AgentSave Save()
+    {
+        var session = Session!;
+        if (session.GateRefusal() is { } refused)
+            return new AgentSave(refused, 0, Blocked: true);
+        var result = session.Save();
+        return new AgentSave(result, result.Saved && result.Written.Count + result.Deleted.Count > 0 ? ++saves : 0, false);
+    }
+
     /// <summary>True while the user pauses the agent edits (decision D734).</summary>
     public virtual bool Paused => false;
 

@@ -33,13 +33,14 @@ internal static class AgentTexts
 
     /// <summary>The server instructions: the order of work in short STE steps (section 9.2 of the MCP1 design). The
     /// group <c>all</c> is for each host, <c>edit</c> for a host with edit tools, and <c>read_only</c> for a host
-    /// without them.</summary>
+    /// without them. The group <c>save</c> is for a host with the tool <c>save</c>.</summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<string>> Instructions => Loaded.Value.Instructions;
 
     /// <summary>The server instructions of a host, in order.</summary>
     /// <param name="edits">True for a host with edit tools.</param>
-    public static IReadOnlyList<string> InstructionsFor(bool edits) =>
-        [.. Instructions["all"], .. Instructions[edits ? "edit" : "read_only"]];
+    /// <param name="save">True for a host with the tool <c>save</c>.</param>
+    public static IReadOnlyList<string> InstructionsFor(bool edits, bool save) =>
+        [.. Instructions["all"], .. Instructions[edits ? "edit" : "read_only"], .. save ? Instructions["save"] : []];
 
     /// <summary>The help of the arguments that many tools share, by argument name.</summary>
     public static IReadOnlyDictionary<string, string> SharedFields => Loaded.Value.Fields;

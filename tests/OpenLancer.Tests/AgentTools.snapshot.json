@@ -18398,6 +18398,264 @@
       }
     },
     {
+      "name": "save",
+      "title": "Save the edits of the active mod",
+      "description": "Saves the edits into the patch files of the active mod. The save stops when the checks find errors. Read the errors, correct them, then save again.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "saved": {
+            "type": "boolean",
+            "description": "True when the save wrote its files. A save without unsaved edits also gives true."
+          },
+          "number": {
+            "type": "integer",
+            "description": "The number of the save in this session, or 0 when the save changed no file."
+          },
+          "written": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The files that the save wrote, relative to the folder of the mod."
+          },
+          "deleted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The files that the save deleted, relative to the folder of the mod."
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "warning",
+                    "error"
+                  ],
+                  "description": "error or warning. An error of the active mod stops a save."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The message of the check. The user reads the same message."
+                },
+                "ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference of the item or the line of the problem, or none."
+                },
+                "rule": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The id of the rule of the check, for example M05, or none."
+                },
+                "origin": {
+                  "enum": [
+                    "base_game",
+                    "mod",
+                    "some_mod",
+                    "openlancer",
+                    "unknown",
+                    "pending"
+                  ],
+                  "description": "Who causes the problem: base_game, mod, some_mod, openlancer or unknown. A base_game problem does not stop a save."
+                },
+                "mod_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The mod that causes the problem when the origin is mod, else none."
+                },
+                "fixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The ids of the fixes that the editor has for the problem."
+                }
+              },
+              "required": [
+                "severity",
+                "message"
+              ]
+            },
+            "description": "The first problems of the save, errors first. Use check for all problems."
+          },
+          "problem_count": {
+            "type": "integer",
+            "description": "The number of all problems of the save."
+          },
+          "incomplete": {
+            "type": "boolean",
+            "description": "True when a file did not move into place. The next save completes the save."
+          },
+          "validation": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "save": {
+                "type": "integer",
+                "description": "The number of the save that the validation checked. A later save replaces the validation of an earlier save."
+              },
+              "errors": {
+                "type": "integer",
+                "description": "The number of errors that the mod adds."
+              },
+              "warnings": {
+                "type": "integer",
+                "description": "The number of warnings that the mod adds."
+              },
+              "problems": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/properties/problems/items"
+                },
+                "description": "The first problems of the validation, errors first."
+              },
+              "failure": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Why the validation did not give a result, or none."
+              }
+            },
+            "required": [
+              "save",
+              "errors",
+              "warnings",
+              "problems"
+            ],
+            "description": "The validation of the saved files in the editor, or none. The server without a window does not validate."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view that the tool read, as text. A save does not change it."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "saved",
+              "number",
+              "written",
+              "deleted",
+              "problems",
+              "problem_count",
+              "incomplete"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Save the edits of the active mod",
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
       "name": "undo",
       "title": "Undo the last edit of the agent",
       "description": "Undoes the last edit of the agent. The tool does not undo an edit of the user.",
