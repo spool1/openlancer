@@ -379,6 +379,11 @@ internal sealed record StartReplay
     /// starts.</summary>
     public IReadOnlyList<MissionTrigger> ActiveSet { get; init; } = [];
 
+    /// <summary>The jumps of the player that the conditions of the path show, in order. Each jump is the number of
+    /// <see cref="Changes"/> before the arrival: the triggers of the exit ran before that point, and the triggers of the
+    /// entry after it.</summary>
+    public IReadOnlyList<int> Jumps { get; init; } = [];
+
     private readonly IReadOnlyList<MachineChange> changes = [];
 
     /// <summary>The runs and the actions without flow of the replay, in the order of the game (the Ran and the Effect
@@ -488,7 +493,7 @@ internal sealed record StartReplay
         // The game starts the rest of the start set or of the drain in the same pass as the chosen trigger.
         var active = new List<MissionTrigger>(machine.Active) { chosen };
         active.AddRange(machine.Pending.Where(t => !active.Contains(t)));
-        return replay with { ActiveSet = active, Changes = run.Changes };
+        return replay with { ActiveSet = active, Changes = run.Changes, Jumps = run.Jumps };
     }
 
     /// <summary>How a run of one trigger of the path ends.</summary>
@@ -561,6 +566,9 @@ internal sealed record StartReplay
         public TriggerMachine Machine { get; private set; }
 
         public List<MachineChange> Changes { get; } = [];
+
+        /// <summary>The jumps that the system rule finds, as <see cref="StartReplay.Jumps"/> tells.</summary>
+        public List<int> Jumps { get; } = [];
 
         /// <summary>Runs one trigger: a pending trigger starts at the next heartbeat, and an active trigger runs as if its
         /// condition is met now. The chosen trigger only starts.</summary>
@@ -644,8 +652,9 @@ internal sealed record StartReplay
                 tried.Add(chain[^1]);
                 TryRun(chain, rest);
             }
-            // Then the exit ran each trigger that waited for it, and the entry did the same.
+            // Then the exit ran each trigger that waited for it. The player arrived, and the entry did the same.
             RunWaiting(c => Exits(c, old, next), rest);
+            Jumps.Add(Changes.Count);
             RunWaiting(c => Enters(c, next, old), rest);
         }
 

@@ -448,7 +448,7 @@ public sealed class StartPlanTests
     /// <summary>A waiting trigger near the gate starts the stop of the watcher. The jump shows that it ran before the
     /// exit, so the replay runs it, then the stop. The exit runs the triggers that wait for the exit to the new system and
     /// the entry from the old system. Triggers of other exits and entries, and a trigger that waits for the end of the
-    /// jump, still wait.</summary>
+    /// jump, still wait. The replay marks the arrival after the exit and before the entry.</summary>
     [Fact]
     public void TheExitRunsTheChainToItsTriggersAndTheEntryRunsItsTriggers()
     {
@@ -456,6 +456,9 @@ public sealed class StartPlanTests
 
         var ran = Names(replay.Changes.Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger));
         Assert.Equal(["j_start", "j_launch", "j_near_gate", "j_leave", "j_log", "j_entry", "j_arrive"], ran);
+        var arrival = Assert.Single(replay.Jumps);
+        Assert.Equal(["j_start", "j_launch", "j_near_gate", "j_leave", "j_log"],
+            Names(replay.Changes.Take(arrival).Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger)));
         Assert.Equal(["j_chosen", "j_jump_end", "j_other_entry", "j_other_exit"],
             Names(replay.ActiveSet).OrderBy(n => n != "j_chosen").ThenBy(n => n, StringComparer.Ordinal));
 

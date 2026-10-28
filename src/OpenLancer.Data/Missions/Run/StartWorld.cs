@@ -232,8 +232,10 @@ internal static class StartWorld
         public bool IsAny(string[] keys) => keys.Any(Is);
     }
 
-    /// <summary>A step of the pass: a kept world line, or a jump of the player.</summary>
-    private readonly record struct Step(Entry? Entry, string? From, string? To);
+    /// <summary>A step of the pass: a kept world line, a jump of the player, or the arrival of the jumpers after a jump
+    /// that a condition of the path shows.</summary>
+    /// <param name="Arrival">For an arrival, the number of kept world lines before it, else null.</param>
+    private readonly record struct Step(Entry? Entry, string? From, string? To, int? Arrival = null);
 
     /// <summary>One object of the setup: a ship, a formation, a solar or a loot, with its track.</summary>
     private sealed class Unit(string name, StartObjectKind kind, IReadOnlySet<string> members, Entry spawn)
@@ -264,8 +266,14 @@ internal static class StartWorld
         public MissionTrigger? Leaves { get; set; }
 
         /// <summary>The order list of its last own orders, and the index of the line that gave them, or -1 for the spawn
-        /// line or the record.</summary>
+        /// line or the record. An arrival can cancel them (<see cref="Cancelled"/>).</summary>
         public (string List, int At)? Orders { get; set; }
+
+        /// <summary>The number of kept world lines before the last arrival that cancelled its orders, or -1.</summary>
+        public int CancelledBefore { get; set; } = -1;
+
+        /// <summary>True when an arrival after its last own orders cancelled them.</summary>
+        public bool Cancelled => Orders is { } orders && CancelledBefore > (orders.At >= 0 ? orders.At : Spawn.At);
 
         public bool Destroyed { get; set; }
     }
@@ -280,6 +288,7 @@ internal static class StartWorld
         private readonly Dictionary<string, Unit> byMember = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, bool> jumpers = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<(string List, int At)> playerLists = [];
+        private readonly Dictionary<Entry, List<Unit>> orderLines = [];
         private readonly HashSet<string> leftOutMembers = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> madeMembers = new(StringComparer.OrdinalIgnoreCase);
 
@@ -288,6 +297,7 @@ internal static class StartWorld
             Steps();
             DoubleSpawns();
             Track();
+            RemoveCancelledOrders();
             MadeAgain();
             var companions = Companions();
             var leftOut = units.Where(u => !u.Destroyed && (!InStart(u.System) || u.Again != null)).ToList();
@@ -311,14 +321,17 @@ internal static class StartWorld
             return new Result(lines, rows, placed, warnings);
         }
 
-        /// <summary>The kept world lines and the jumps of the player, in the order of the replay. After the last run, the
-        /// player goes to the start system.</summary>
+        /// <summary>The kept world lines, the jumps of the player and the arrivals of the jumpers, in the order of the
+        /// replay. After the last run, the player goes to the start system.</summary>
         private void Steps()
         {
             string? current = null;
             var effect = 0;
+            var arrival = 0;
             for (var i = 0; i < replay.Changes.Count; i++)
             {
+                for (; arrival < replay.Jumps.Count && replay.Jumps[arrival] <= i; arrival++)
+                    steps.Add(new Step(null, null, null, entries.Count));
                 var change = replay.Changes[i];
                 var system = facts.Systems[i];
                 if (change.Kind == MachineChangeKind.Ran)
@@ -338,6 +351,8 @@ internal static class StartWorld
                 }
                 effect++;
             }
+            for (; arrival < replay.Jumps.Count; arrival++)
+                steps.Add(new Step(null, null, null, entries.Count));
             if (current != null && !MissionIndex.Is(current, anchor.System))
                 steps.Add(new Step(null, current, anchor.System));
         }
@@ -379,12 +394,18 @@ internal static class StartWorld
         /// Rule 3: the track of each object. A spawn line makes it in the system of its record, else in the system of the
         /// player. A solar and a loot always go to the system of the player. <c>Act_RelocateShip</c> moves it into the
         /// system of the player, and makes it when it does not exist, as the fork does. At a jump of the player, each
-        /// object in the old system whose jumper flag is on goes to the new system without a point.
+        /// object in the old system whose jumper flag is on goes to the new system without a point. At the arrival after a
+        /// jump that a condition shows, each jumper loses its orders.
         /// </summary>
         private void Track()
         {
             foreach (var step in steps)
             {
+                if (step.Arrival is { } before)
+                {
+                    Arrive(before);
+                    continue;
+                }
                 if (step.Entry is not { Removed: false } entry)
                 {
                     if (step.Entry == null)
@@ -411,8 +432,10 @@ internal static class StartWorld
                         playerLists.Add((list, entry.At));
                     else
                     {
-                        foreach (var unit in UnitsOf(name))
+                        var targets = UnitsOf(name).ToList();
+                        foreach (var unit in targets)
                             unit.Orders = (list, entry.At);
+                        orderLines[entry] = targets;
                     }
                 }
                 else if (entry.Is("Act_Destroy"))
@@ -484,6 +507,27 @@ internal static class StartWorld
                 unit.JumpedFrom = unit.System ?? from;
                 unit.System = to;
                 unit.Point = null;
+            }
+        }
+
+        /// <summary>The arrival after a jump of the player that a condition of the path shows. Retail cancels the orders
+        /// of each jumper that comes with the player when it arrives.</summary>
+        /// <param name="before">The number of kept world lines before the arrival.</param>
+        private void Arrive(int before)
+        {
+            foreach (var unit in units.Where(u => !u.Destroyed && IsJumper(u)))
+                unit.CancelledBefore = before;
+        }
+
+        /// <summary>Removes each order line whose ships all lost their orders at a later arrival. The game cancels those
+        /// orders, so the setup must not give them again. Only a jump that a condition of the path shows counts, because
+        /// the system key of a trigger can name another system than the system where it runs.</summary>
+        private void RemoveCancelledOrders()
+        {
+            foreach (var (entry, targets) in orderLines)
+            {
+                if (targets.Count > 0 && targets.All(u => u.CancelledBefore > entry.At))
+                    entry.Removed = true;
             }
         }
 
@@ -670,8 +714,9 @@ internal static class StartWorld
                 ? order.Value(0)
                 : null;
 
+        /// <summary>The lines of the last own orders of an object, or none when an arrival cancelled them.</summary>
         private IEnumerable<MissionLine> OrderLines(Unit unit) =>
-            unit.Orders is { } orders ? OrderLinesOf(orders.List) : [];
+            unit.Orders is { } orders && !unit.Cancelled ? OrderLinesOf(orders.List) : [];
 
         private IEnumerable<MissionLine> OrderLinesOf(string list) =>
             index.Item(MissionSectionKind.OrderList, list) is { } section

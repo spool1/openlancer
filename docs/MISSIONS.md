@@ -275,6 +275,7 @@ The editor follows each object along the path:
 - A solar and a loot always go to the system of the player.
 - A line that moves a ship puts it in the system of the player.
 - When the player jumps, each ship with the jumper flag goes with the player, also from another system. The flag at the time of the jump counts.
+- Such a ship loses its orders when it arrives, as in the game. So the setup removes each order line that such ships got before the jump. Only a jump that a condition of the path shows counts, not a system key.
 - An object whose system no line tells stays in the setup.
 
 The setup leaves out each object that is in another system at the trigger. It also removes each line that names such an object, for example orders, attitudes, marks and fuses. A label with a member in the start system keeps its lines. A line on an object that no line of the setup makes goes too, because it fails in the game. When the path spawns an object two times, only the last spawn line stays. The lines between the two spawn lines that name the object go too.

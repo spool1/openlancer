@@ -384,6 +384,34 @@ public sealed partial class StartPlanRetailTests
         }
     }
 
+    /// <summary>Retail cancels the orders of each jumper that comes with the player when it arrives. M04
+    /// juni_mactan_tether in both games: Juni does not get enter_jumpgate of Li01. HD Edition M10: the exit from Ku06 runs
+    /// approaching_bw05_hole, which gives Cobo and Hakkera orders at the Ku06 hole. Both jump with the player, so the
+    /// setup does not give these orders, and the orders are no sign of the formation.</summary>
+    [Fact]
+    public void AJumperLosesTheOrdersOfBeforeTheJump()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var tether = Plan(Slot(scripts, "M04"), "juni_mactan_tether");
+            Assert.True(tether.CanStart, $"{set}: {tether.Reason}");
+            Assert.DoesNotContain("Act_GiveObjList = juni, enter_jumpgate", WorldText(tether));
+        }
+        var m10 = Slot(Slots(Hde.Value), "M10");
+        foreach (var trigger in new[] { "nse_jonnerpal_Rh04", "switch_23833_to_23835" })
+        {
+            var plan = Plan(m10, trigger);
+            Assert.True(plan.CanStart, $"{trigger}: {plan.Reason}");
+            Assert.Contains(StartReplay.Run(m10.Index, MissionStartPoint.At(trigger)).Changes,
+                c => c.Kind == MachineChangeKind.Ran && c.Trigger.Nickname == "approaching_bw05_hole");
+            var world = WorldText(plan);
+            Assert.DoesNotContain("Act_GiveObjList = Cobo, break_formation_and_dock_with_bw05_hole", world);
+            Assert.DoesNotContain("Act_GiveObjList = hakkera, follow_to_the_bw05_hole", world);
+            var wing = Assert.Single(plan.Companions, c => c.Object == "Hakkeras_Formation");
+            Assert.Equal(CompanionSigns.Jump, wing.Signs & (CompanionSigns.Jump | CompanionSigns.Orders));
+        }
+    }
+
     /// <summary>The rows of the review of 2026-10-28 in both games. M11 com_1500: the newest list of the player names
     /// juni2 and king2, so the old juni and king are no companions. M05 chase_player and M08 ku04_init start the active
     /// set after the world. M11 bse_Li0112: postBuff_init makes King and Juni again after the launch, so the setup leaves

@@ -774,6 +774,32 @@ public sealed class StartWorldTests
         Assert.Equal(("ol_sys_c", CompanionSigns.Jump), (wing.JumpedFrom, wing.Signs));
     }
 
+    /// <summary>Retail cancels the orders of each jumper that comes with the player when it arrives. So an order line
+    /// that a jumper got before a jump that a condition shows goes, and its orders are no sign. An order line after the
+    /// arrival stays. A line that also gives orders to a ship that did not jump stays. A jump that only system keys show
+    /// cancels nothing, because a system key can name the wrong system.</summary>
+    [Fact]
+    public void AJumperLosesTheOrdersOfBeforeTheJump()
+    {
+        const string old = "Act_GiveObjList = ol_wing, ol_follow";
+        var before = Plan(Script(a: old));
+        Assert.DoesNotContain(old, WorldLines(before));
+        var wing = Companion(before, "ol_wing");
+        Assert.Equal((CompanionSigns.Jump, CompanionPoint.Slot), (wing.Signs, wing.Point));
+
+        var after = Plan(Script(a: old, jump: "Act_GiveObjList = ol_wing, ol_follow_near"));
+        Assert.DoesNotContain(old, WorldLines(after));
+        Assert.Contains("Act_GiveObjList = ol_wing, ol_follow_near", WorldLines(after));
+        Assert.Equal(CompanionSigns.Orders | CompanionSigns.Jump, Companion(after, "ol_wing").Signs);
+
+        Assert.Contains("Act_GiveObjList = ol_friends, ol_follow",
+            WorldLines(Plan(Script(a: "Act_GiveObjList = ol_friends, ol_follow"))));
+
+        var keys = Plan(Script(a: old).Replace("Cnd_SystemEnter = ol_sys_b", "Cnd_Timer = 1"));
+        Assert.Contains(old, WorldLines(keys));
+        Assert.Equal(CompanionSigns.Orders | CompanionSigns.Jump, Companion(keys, "ol_wing").Signs);
+    }
+
     /// <summary>Act_SpawnShipRel with a new nickname makes a ship with that nickname. A later line names the ship by
     /// it. No item of the script has that nickname, so the setup does not move the ship.</summary>
     [Fact]
