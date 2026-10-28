@@ -99,6 +99,74 @@ public sealed class PatchWriterTests
             "encounter = e1, 5, 0.4", "faction = f1, 3"), patch);
     }
 
+    /// <summary>A new line before the lines of a linked group: without the group, the merge adds the line after them. So
+    /// the patch also writes the group, and the merge gives the order of W (milestone MCP1-2).</summary>
+    [Fact]
+    public void ANewLineBeforeALinkedGroupAlsoWritesTheGroup()
+    {
+        const string b = """
+            [Zone]
+            nickname = z1
+            shape = SPHERE
+            encounter = e1, 5, 0.4
+            faction = f1, 1
+            toughness = 4
+            """;
+        var w = b.Replace("encounter =", "density_restriction = 2, lawful\nencounter =");
+
+        var patch = Patch(b, w);
+
+        Assert.Equal(Lines("[Zone]", "nickname = z1", "density_restriction = 2, lawful", "encounter = e1, 5, 0.4",
+            "faction = f1, 1"), patch);
+        Assert.Equal(Names(w), Names(Merged(b, patch)));
+    }
+
+    /// <summary>A line between the lines of one linked group can be a line of another group. Then the patch writes
+    /// both groups, because the merge needs all names of a group or none (milestone MCP1-2).</summary>
+    [Fact]
+    public void ALineOfAnotherGroupBetweenTheLinesOfAGroupAddsThatGroupToo()
+    {
+        const string b = """
+            [MBase]
+            nickname = b1
+            [GF_NPC]
+            nickname = n1
+            rumor = r1, 1
+            know = k1, 1
+            rumor = r2, 1
+            rumor_type2 = t2, 1
+            knowdb = d1
+            """;
+        var w = b.Replace("rumor = r2, 1", "rumor = r2, 2");
+
+        var patch = Patch(b, w);
+
+        Assert.Equal(Lines("[GF_NPC]", "nickname = n1", "rumor = r1, 1", "know = k1, 1", "rumor = r2, 2",
+            "rumor_type2 = t2, 1", "knowdb = d1"), patch);
+        Assert.Equal(Names(w), Names(Merged(b, patch)));
+    }
+
+    /// <summary>A change of a line that is not in a linked group, at the same place in B and W, writes only that line,
+    /// also in a section with a group.</summary>
+    [Fact]
+    public void AChangeOutsideTheLinkedGroupsWritesOnlyItsLine()
+    {
+        const string b = """
+            [Zone]
+            nickname = z1
+            pos = 1, 2, 3
+            shape = SPHERE
+            rotate = 0, 0, 0
+            encounter = e1, 5, 0.4
+            faction = f1, 1
+            """;
+
+        var patch = Patch(b, b.Replace("pos = 1, 2, 3", "pos = 4, 5, 6").Replace("rotate = 0, 0, 0", "rotate = 0, 90, 0"));
+
+        // The merge moves rotate after pos, but the order of these lines does not change what the game reads.
+        Assert.Equal(Lines("[Zone]", "nickname = z1", "pos = 4, 5, 6", "rotate = 0, 90, 0"), patch);
+    }
+
     [Fact]
     public void AChangeInAnOrderSensitiveSectionWritesAllLines()
     {
@@ -505,6 +573,23 @@ public sealed class PatchWriterTests
     }
 
     private static PatchText Write(string b, string w) => PatchWriter.Write(FilePath, Text(b), Text(w).Sections, _ => []);
+
+    /// <summary>The document that the merge of a patch text gives from B. The merge must give no diagnostics.</summary>
+    private static IniDocument Merged(string b, string patch)
+    {
+        var merged = Text(b);
+        var diagnostics = new List<Diagnostic>();
+        IniPatcher.Apply(merged, Text(patch).Sections,
+            new PatchContext("act", FilePath, FilePath, null, new PatchLedger(), diagnostics));
+        Assert.Empty(diagnostics);
+        return merged;
+    }
+
+    /// <summary>The names of the lines of each section, in order.</summary>
+    private static string[] Names(string text) => Names(Text(text));
+
+    private static string[] Names(IniDocument document) =>
+        document.Sections.Select(s => $"[{s.Name}] " + string.Join(" ", s.Select(e => e.Name))).ToArray();
 
     /// <summary>The expected patch text: the lines with CRLF ends.</summary>
     internal static string Lines(params string[] lines) => string.Concat(lines.Select(l => l + "\r\n"));

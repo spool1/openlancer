@@ -70,10 +70,10 @@ internal sealed record PatchText(
 /// the order of B, then the new sections in the order of W. So two saves of similar edits give similar text.</para>
 /// <list type="bullet">
 /// <item>Changed: the key line, then the lines of each name that changed, in the order of W, then
-/// <c>ol.remove</c> with the names that W does not have. A name of a linked group adds the whole group. In an
-/// order-sensitive section, a change writes all lines, also a change of the order of lines with different names. A
-/// pinned name (a name that the loaded patch sets or removes, and that no edit touched) is always written, so the mod
-/// keeps it when a lower mod changes.</item>
+/// <c>ol.remove</c> with the names that W does not have. A name of a linked group adds the whole group and each line
+/// between its lines (see <c>AddLinked</c>). In an order-sensitive section, a change writes all lines, also a change of
+/// the order of lines with different names. A pinned name (a name that the loaded patch sets or removes, and that no
+/// edit touched) is always written, so the mod keeps it when a lower mod changes.</item>
 /// <item>Deleted: the key line and <c>ol.delete</c>. The merge also deletes the child sections.</item>
 /// <item>New: <c>ol.new</c> and all lines. A new child of a section in B gets <c>ol.parent</c>. The children of
 /// a new section follow it with no directive. A new <c>[BaseGood]</c> needs no directive.</item>
@@ -156,9 +156,47 @@ internal static class PatchWriter
         }
     }
 
+    /// <summary>
+    /// Adds the names that a patch must also write because of the linked groups of a section (see
+    /// <see cref="SectionKeys.LinkedGroups"/>). The merge needs all names of a group, or none. It writes the lines of a
+    /// patch as one block at the first line that they replace. So a line between the lines of a group moves with the
+    /// group, for example a density_restriction line between the faction_weight and the encounter lines of a zone.
+    /// </summary>
+    /// <remarks>
+    /// A line between the lines of a group can be a line of another group. So the step repeats until no name comes.
+    /// When the merge then gives the lines of a group another place among the written lines than W does, the patch also
+    /// writes each group. An example is a new density_restriction line before the encounter lines of a zone. Without the
+    /// group, the merge adds it after them.
+    /// </remarks>
+    /// <param name="names">The names to write. The step adds the new names.</param>
+    /// <param name="present">True for a name that B or W has.</param>
+    /// <param name="isKey">True for the key name, which a patch does not write.</param>
+    private static void AddLinked(Section original, Section edited, HashSet<string> names, Func<string, bool> present,
+        Func<string, bool> isKey)
+    {
+        var groups = SectionKeys.LinkedGroups(edited.Name).Select(g => g.Where(present).ToList()).Where(g => g.Count > 0)
+            .ToList();
+        if (groups.Count == 0 || names.Count == 0)
+            return;
+        for (var count = -1; count != names.Count;)
+        {
+            count = names.Count;
+            foreach (var group in groups.Where(g => g.Any(names.Contains)).ToList())
+            {
+                names.UnionWith(group);
+                names.UnionWith(Between(edited, group).Concat(Between(original, group)).Where(n => !isKey(n)));
+            }
+            if (names.Count == count && !MergeKeepsOrder(original, edited, names, groups))
+            {
+                foreach (var group in groups)
+                    names.UnionWith(group);
+            }
+        }
+    }
+
     /// <summary>The names of the lines between the first and the last line of a group of names (see
     /// <see cref="SectionKeys.LinkedGroups"/>), without the names of the group.</summary>
-    private static IEnumerable<string> Between(Section section, string[] group)
+    private static IEnumerable<string> Between(Section section, IReadOnlyCollection<string> group)
     {
         bool InGroup(Entry e) => group.Contains(e.Name, StringComparer.OrdinalIgnoreCase);
         var lines = section.ToList();
@@ -167,6 +205,35 @@ internal static class PatchWriter
         return first < 0
             ? []
             : lines.Skip(first).Take(last - first + 1).Where(e => !InGroup(e)).Select(e => e.Name);
+    }
+
+    /// <summary>
+    /// True when the merge of a patch that writes <paramref name="names"/> keeps the order of W among the lines of
+    /// these names and of the groups. The merge writes the lines of the names that W has as one block, at the first
+    /// line of B that they replace or at the end. It removes the lines of the names that W does not have.
+    /// </summary>
+    private static bool MergeKeepsOrder(Section original, Section edited, HashSet<string> names,
+        IEnumerable<IReadOnlyCollection<string>> groups)
+    {
+        var compared = new HashSet<string>(names.Concat(groups.SelectMany(g => g)), StringComparer.OrdinalIgnoreCase);
+        var written = edited.Select(e => e.Name).Where(names.Contains).ToList();
+        var replaced = new HashSet<string>(written, StringComparer.OrdinalIgnoreCase);
+        var merged = new List<string>();
+        var placed = false;
+        foreach (var name in original.Select(e => e.Name))
+        {
+            if (!names.Contains(name))
+                merged.Add(name);
+            else if (!placed && replaced.Contains(name))
+            {
+                merged.AddRange(written);
+                placed = true;
+            }
+        }
+        if (!placed)
+            merged.AddRange(written);
+        return merged.Where(compared.Contains).SequenceEqual(edited.Select(e => e.Name).Where(compared.Contains),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -446,14 +513,7 @@ internal static class PatchWriter
             names.UnionWith(before.Keys.Where(n => !after.ContainsKey(n)));
             names.UnionWith(pinned);
             names.RemoveWhere(IsKey);
-            foreach (var group in SectionKeys.LinkedGroups(edited.Name).Where(g => g.Any(names.Contains)))
-            {
-                names.UnionWith(group.Where(n => before.ContainsKey(n) || after.ContainsKey(n)));
-                // The merge writes the lines of a patch as one block at the first line that they replace. So a line
-                // between the lines of a group moves with the group, or a save and a reload change the order. An
-                // example is a density_restriction line between the faction_weight and the encounter lines of a zone.
-                names.UnionWith(Between(edited, group).Concat(Between(original, group)).Where(n => !IsKey(n)));
-            }
+            AddLinked(original, edited, names, n => before.ContainsKey(n) || after.ContainsKey(n), IsKey);
             // The lines of each name can be the same while lines with different names change places. In an
             // order-sensitive section, that is a change too. A new key alone is a rename, not a change of the order.
             var orderSensitive = SectionKeys.IsOrderSensitive(edited.Name, path);
