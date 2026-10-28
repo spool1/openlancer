@@ -800,6 +800,63 @@ public sealed class StartWorldTests
         Assert.Equal(CompanionSigns.Orders | CompanionSigns.Jump, Companion(keys, "ol_wing").Signs);
     }
 
+    /// <summary>A trigger that waits for the arrival of the jumpers (Cnd_NPCSystemEnter) gives them new orders in the
+    /// game after the cancel. The play makes the jumpers in the start system, so the trigger does not run. The setup
+    /// gives its orders to each jumper without orders after the arrival, after the world lines. That is true for a
+    /// waiting trigger, for the chosen trigger and for a trigger that a trigger of the start starts. A warning names the
+    /// trigger, but for the chosen trigger the place of the start warns. The setup does not give orders to a ship that
+    /// did not jump, to a jumper with orders after the arrival or for an arrival in another system.</summary>
+    [Fact]
+    public void AnArrivalTriggerOfTheStartGivesItsOrdersToTheJumpers()
+    {
+        const string old = "Act_GiveObjList = ol_wing, ol_follow";
+        const string orders = "Act_GiveObjList = ol_wing, ol_follow_near";
+        string Arrival(string condition) => $"""
+            [Trigger]
+            nickname = t_init
+            system = ol_sys_b
+            Cnd_True = no_params
+            Act_ActTrig = t_arrive
+
+            [Trigger]
+            nickname = t_arrive
+            system = ol_sys_b
+            Cnd_NPCSystemEnter = {condition}
+            Act_GiveObjList = ol_wing, ol_follow_near
+            Act_GiveObjList = ol_guard, ol_patrol
+            """;
+        var warning = StartWorld.ArrivalWarning("t_arrive", "ol_wing", "ol_sys_b", "ol_wing");
+        foreach (var (start, jump) in new[]
+                 {
+                     ("t_chosen", "Act_ActTrig = t_arrive"), ("t_arrive", "Act_ActTrig = t_arrive"),
+                     ("t_init", "Act_ActTrig = t_init"),
+                 })
+        {
+            var plan = Plan(Script(a: old, jump: jump, triggers: Arrival("ol_sys_b, ol_wing, Player")), start);
+            var world = WorldLines(plan);
+            Assert.Equal(orders, world[^1]);
+            Assert.DoesNotContain(old, world);
+            Assert.DoesNotContain(world, l => l.Contains("ol_patrol", StringComparison.Ordinal));
+            Assert.Equal(CompanionSigns.Orders | CompanionSigns.Jump, Companion(plan, "ol_wing").Signs);
+            // The place of the start warns about the chosen trigger.
+            Assert.Equal(start != "t_arrive", plan.Warnings.Contains(warning));
+            Assert.Equal(start == "t_arrive", plan.Warnings.Contains(StartPlaces.ArrivedWarning("t_arrive", "ol_sys_b")));
+        }
+
+        var later = Plan(Script(a: old, jump: "Act_GiveObjList = ol_wing, ol_hunt\nAct_ActTrig = t_arrive",
+            triggers: Arrival("ANY, ol_wing")));
+        Assert.Equal("Act_GiveObjList = ol_wing, ol_hunt", Assert.Single(WorldLines(later), l => l.Contains("ol_wing, ol_")));
+        Assert.Contains(StartWorld.ArrivalWarning("t_arrive", "ol_wing", "ol_sys_b", null), later.Warnings);
+
+        foreach (var condition in new[] { "ol_sys_a, ol_wing", "ol_sys_b, ol_wing, ol_local" })
+        {
+            var plan = Plan(Script(a: old, jump: "Act_ActTrig = t_arrive", triggers: Arrival(condition)));
+            Assert.DoesNotContain(orders, WorldLines(plan));
+            Assert.DoesNotContain(plan.Warnings, w => w.StartsWith("Trigger 't_arrive'", StringComparison.Ordinal));
+            Assert.Equal(CompanionSigns.Jump, Companion(plan, "ol_wing").Signs);
+        }
+    }
+
     /// <summary>Act_SpawnShipRel with a new nickname makes a ship with that nickname. A later line names the ship by
     /// it. No item of the script has that nickname, so the setup does not move the ship.</summary>
     [Fact]

@@ -412,6 +412,36 @@ public sealed partial class StartPlanRetailTests
         }
     }
 
+    /// <summary>M10 in both games: Fischer jumps from Rh01 to Rh04 with the player and loses the orders of Rh01. In the
+    /// game, nse_jonnerpal_Rh04 (Cnd_NPCSystemEnter = Rh04, fischer) then gives Fischer follow_to_holstein_docking_ring.
+    /// That trigger waits at these starts, or frankfurt2_init starts it, and the play does not send the arrival. So the
+    /// setup gives Fischer its Follow order of the player. A warning names the trigger. When it is the chosen trigger,
+    /// the warning of the start place names it.</summary>
+    [Fact]
+    public void AnArrivalTriggerGivesFischerItsFollowOrder()
+    {
+        var warning = StartWorld.ArrivalWarning("nse_jonnerpal_Rh04", "fischer", "Rh04", "fischer");
+        var arrived = StartPlaces.ArrivedWarning("nse_jonnerpal_Rh04", "Rh04");
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var m10 = Slot(scripts, "M10");
+            foreach (var trigger in new[] { "switch_23870_to_blank", "frankfurt2_init", "nse_jonnerpal_Rh04" })
+            {
+                var what = $"{set} {trigger}";
+                var plan = Plan(m10, trigger);
+                Assert.True(plan.CanStart, $"{what}: {plan.Reason}");
+                var world = WorldText(plan);
+                Assert.Equal("Act_GiveObjList = fischer, follow_to_holstein_docking_ring",
+                    Assert.Single(world, l => l.StartsWith("Act_GiveObjList = fischer,", StringComparison.Ordinal)));
+                var chosen = trigger == "nse_jonnerpal_Rh04";
+                Assert.Equal(!chosen, plan.Warnings.Contains(warning));
+                Assert.Equal(chosen, plan.Warnings.Contains(arrived));
+                var fischer = Assert.Single(plan.Companions, c => c.Object == "fischer");
+                Assert.Equal(CompanionSigns.Orders | CompanionSigns.Jump, fischer.Signs);
+            }
+        }
+    }
+
     /// <summary>The rows of the review of 2026-10-28 in both games. M11 com_1500: the newest list of the player names
     /// juni2 and king2, so the old juni and king are no companions. M05 chase_player and M08 ku04_init start the active
     /// set after the world. M11 bse_Li0112: postBuff_init makes King and Juni again after the launch, so the setup leaves

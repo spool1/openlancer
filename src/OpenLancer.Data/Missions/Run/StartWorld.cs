@@ -193,6 +193,14 @@ internal static class StartWorld
         $"Trigger '{trigger}' waits at the start, and its system key names {system}. The game does not read that key, so " +
         $"this trigger can spawn its objects in {start}.";
 
+    /// <summary>The warning of a waiting trigger that waits for ships to arrive with the player in the start system. The
+    /// play makes them there, so they do not arrive.</summary>
+    /// <param name="ordered">The ships that get the orders of the trigger from the setup, or null.</param>
+    public static string ArrivalWarning(string trigger, string ships, string system, string? ordered) =>
+        $"Trigger '{trigger}' waits for {ships} to arrive in {system} with the player. The play makes them in {system}, " +
+        "so they do not arrive. This trigger does not run in this play." +
+        (ordered != null ? $" The setup gives its orders to {ordered}." : "");
+
     /// <summary>The warning of a start at the Scene camera, before the play gives the point of the camera.</summary>
     public const string CameraWarning = "The start is at the Scene camera. When the play starts, the setup makes only the " +
                                         "objects of the camera system. It puts the ships that travel with the player next to " +
@@ -275,6 +283,10 @@ internal static class StartWorld
         /// <summary>True when an arrival after its last own orders cancelled them.</summary>
         public bool Cancelled => Orders is { } orders && CancelledBefore > (orders.At >= 0 ? orders.At : Spawn.At);
 
+        /// <summary>True when it arrived after a jump that a condition shows, and it got no own orders after that
+        /// arrival.</summary>
+        public bool IdleSinceArrival => CancelledBefore >= 0 && (Orders == null || Cancelled);
+
         public bool Destroyed { get; set; }
     }
 
@@ -292,6 +304,9 @@ internal static class StartWorld
         private readonly HashSet<string> leftOutMembers = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> madeMembers = new(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>The order lines that the setup gives after the world lines (<see cref="ArrivalOrders"/>).</summary>
+        private readonly List<(string Key, IReadOnlyList<string> Values)> arrivalLines = [];
+
         public Result Build()
         {
             Steps();
@@ -299,6 +314,7 @@ internal static class StartWorld
             Track();
             RemoveCancelledOrders();
             MadeAgain();
+            var arrivals = ArrivalOrders();
             var companions = Companions();
             var leftOut = units.Where(u => !u.Destroyed && (!InStart(u.System) || u.Again != null)).ToList();
             foreach (var unit in leftOut)
@@ -312,12 +328,14 @@ internal static class StartWorld
             var warnings = new List<string>();
             var placed = Place(companions, warnings);
             warnings.AddRange(Waiting());
+            warnings.AddRange(arrivals);
             var lines = new List<(string Key, IReadOnlyList<string> Values)>();
             foreach (var entry in entries.Where(e => !e.Removed))
             {
                 lines.Add((entry.Line.Key.Trim(), entry.Values ?? entry.Line.Line.Select(RetailText.Of).ToList()));
                 lines.AddRange(entry.After);
             }
+            lines.AddRange(arrivalLines);
             return new Result(lines, rows, placed, warnings);
         }
 
@@ -530,6 +548,59 @@ internal static class StartWorld
                     entry.Removed = true;
             }
         }
+
+        /// <summary>
+        /// Rule 3, the end of an arrival. After retail cancels the orders of the jumpers, it sends the arrival of each
+        /// jumper. A trigger that waits for that arrival (<c>Cnd_NPCSystemEnter</c>) then runs, and it can give new
+        /// orders. The play makes the jumpers in the start system, so they do not arrive. A trigger of the start that
+        /// waits for ships that came with the player into the start system thus does not run in the play. The setup
+        /// gives its <c>Act_GiveObjList</c> lines on such ships that got no orders after the arrival, after the world
+        /// lines. A warning names the trigger, when it is not the chosen trigger.
+        /// </summary>
+        /// <returns>The warnings.</returns>
+        private List<string> ArrivalOrders()
+        {
+            var warnings = new List<string>();
+            foreach (var trigger in WaitingAtStart().Where(t => t.ConditionIs("Cnd_NPCSystemEnter")))
+            {
+                var condition = trigger.Condition!;
+                if (condition.Value(0)?.Trim() is not { Length: > 0 } system ||
+                    !MissionIndex.Is(system, anchor.System) && !MissionIndex.Is(system, "ANY"))
+                    continue;
+                // Retail forgets a ship that does not exist. It waits for the player and for each other ship.
+                var ships = Enumerable.Range(1, Math.Max(0, condition.Count - 1)).Select(condition.Value)
+                    .OfType<string>().Where(n => !MissionIndex.Is(n, "Player")).SelectMany(UnitsOf).Distinct().ToList();
+                if (ships.Count == 0 || !ships.All(u => u.Again == null && InStart(u.System) && u.JumpedFrom != null))
+                    continue;
+                var ordered = new List<Unit>();
+                foreach (var line in trigger.Actions.Where(a => MissionIndex.Is(a.Key, "Act_GiveObjList")))
+                {
+                    if (line.Value(0) is not { } target || MissionIndex.Is(target, "Player") ||
+                        line.Value(1)?.Trim() is not { Length: > 0 } list)
+                        continue;
+                    var targets = UnitsOf(target).ToList();
+                    if (targets.Count == 0 || !targets.All(u => u.Again == null && u.IdleSinceArrival && InStart(u.System)))
+                        continue;
+                    foreach (var unit in targets)
+                        unit.Orders = (list, entries.Count);
+                    ordered.AddRange(targets);
+                    arrivalLines.Add((line.Key.Trim(), line.Line.Select(RetailText.Of).ToList()));
+                }
+                // The place of the start already warns about the chosen trigger (StartPlaces.ArrivedWarning).
+                if (trigger != replay.Chosen)
+                    warnings.Add(ArrivalWarning(trigger.Nickname, string.Join(", ", ships.Select(u => u.Name)),
+                        anchor.System, ordered.Count > 0 ? string.Join(", ", ordered.Distinct().Select(u => u.Name)) : null));
+            }
+            return warnings;
+        }
+
+        /// <summary>The triggers that wait at the start: the active set, and each trigger that a trigger of the start
+        /// starts (<see cref="RunsAtStart"/>).</summary>
+        private IEnumerable<MissionTrigger> WaitingAtStart() =>
+            replay.ActiveSet.Concat(Reach(RunsAtStart).SelectMany(t => t.Actions)
+                    .Where(a => MissionIndex.Is(a.Key, "Act_ActTrig") && a.Value(0) != null)
+                    .Select(a => index.Trigger(a.Value(0)!)).OfType<MissionTrigger>())
+                .Where(t => !t.IsDuplicate).Distinct();
 
         private bool IsJumper(Unit unit) =>
             unit.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&

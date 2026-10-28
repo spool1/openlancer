@@ -220,9 +220,10 @@ Three warnings are about the start place. They follow the place that you pick:
 - A trigger that waits for the player to enter space in another system runs in OpenLancer, but not in the linked game.
 - A trigger that waits for a jump into the system of the start does not run in OpenLancer until the next jump into that system. The path to the trigger already made that jump.
 
-Five warnings are about the world of the setup (see "How the setup builds the world"):
+Six warnings are about the world of the setup (see "How the setup builds the world"):
 
 - A trigger that waits for an object that the setup leaves out does not run in the play.
+- A trigger that waits for ships to arrive with the player in the start system does not run in the play. The setup makes these ships in the start system, so they do not arrive.
 - A trigger that waits for a label with left-out ships can run before it runs in the game.
 - A start at the Scene camera makes the world of the camera system when the play starts. Until then, the page shows each world line of the path.
 - For a base start without a known dock, the ships that travel with the player keep the points of their lines.
@@ -276,6 +277,7 @@ The editor follows each object along the path:
 - A line that moves a ship puts it in the system of the player.
 - When the player jumps, each ship with the jumper flag goes with the player, also from another system. The flag at the time of the jump counts.
 - Such a ship loses its orders when it arrives, as in the game. So the setup removes each order line that such ships got before the jump. Only a jump that a condition of the path shows counts, not a system key.
+- In the game, the arrival of such a ship then runs each trigger that waits for it (Cnd_NPCSystemEnter). Such a trigger can give the ship new orders. The play makes the ship in the start system, so a trigger of the start that waits for its arrival does not run. The setup gives the orders of that trigger to each ship that came with the player and got no orders after the arrival. These lines come after the other world lines.
 - An object whose system no line tells stays in the setup.
 
 The setup leaves out each object that is in another system at the trigger. It also removes each line that names such an object, for example orders, attitudes, marks and fuses. A label with a member in the start system keeps its lines. A line on an object that no line of the setup makes goes too, because it fails in the game. When the path spawns an object two times, only the last spawn line stays. The lines between the two spawn lines that name the object go too.
