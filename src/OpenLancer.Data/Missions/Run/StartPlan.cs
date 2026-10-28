@@ -785,8 +785,15 @@ internal sealed record StartReplay
             var state = Machine.Snapshot();
             var count = Changes.Count;
             var before = rest.Distinct().Select(t => (Trigger: t, Alive: Alive(t), Machine.StateOf(t).Runs)).ToList();
-            var ok = chain.All(t => Reach(t, again: true) == Reached.Ran && Machine.Halt == null && Machine.End == null) &&
-                     before.All(b => Machine.StateOf(b.Trigger).Runs == b.Runs && (!b.Alive || Alive(b.Trigger)));
+            var runs = chain.Select(t => Machine.StateOf(t).Runs).ToList();
+            var ok = true;
+            for (var i = 0; ok && i < chain.Count; i++)
+            {
+                // A link can run in the pass of the link before it, for example a link with Cnd_True. That run counts.
+                var ran = Machine.StateOf(chain[i]).Runs > runs[i] || Reach(chain[i], again: true) == Reached.Ran;
+                ok = ran && Machine.Halt == null && Machine.End == null;
+            }
+            ok = ok && before.All(b => Machine.StateOf(b.Trigger).Runs == b.Runs && (!b.Alive || Alive(b.Trigger)));
             if (ok)
                 return;
             Machine = TriggerMachine.From(state, index, world);

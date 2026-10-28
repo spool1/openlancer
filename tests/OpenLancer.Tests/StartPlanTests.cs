@@ -417,6 +417,34 @@ public sealed class StartPlanTests
         Assert.DoesNotContain("j_too_far", ran);
     }
 
+    /// <summary>A link of a chain can run in the pass of the link before it, for example a link with Cnd_True. That run
+    /// counts, so the objective rule and the exit rule still run the whole chain. Retail M11 and M08 have such chains to
+    /// a trigger of the exit, and M12 has one to an objective.</summary>
+    [Fact]
+    public void AChainWithACndTrueLinkStillRuns()
+    {
+        const string relay = """
+            [Trigger]
+            nickname = {NAME}
+            Cnd_True = no_params
+            Act_ActTrig = {NEXT}
+            """;
+        var objective = Waiting.Replace("Act_ActTrig = r_switch", "Act_ActTrig = r_relay").Replace("{START}", "")
+            .Replace("{TRIGGERS}", relay.Replace("{NAME}", "r_relay").Replace("{NEXT}", "r_switch"));
+        var replay = StartReplay.Run(Index(objective), MissionStartPoint.At("r_chosen"));
+
+        Assert.Contains(replay.Effects, e => e.Line.Key.Trim() == "Act_SetNNObj" && e.Line.Value(0) == "r_obj_dock");
+        Assert.DoesNotContain(replay.ActiveSet, t => t.Nickname is "r_delay" or "r_relay" or "r_switch");
+
+        var exit = Jump.Replace("Act_ActTrig = j_leave", "Act_ActTrig = j_relay").Replace("{LAUNCH}", "")
+            .Replace("{TRIGGERS}", relay.Replace("{NAME}", "j_relay").Replace("{NEXT}", "j_leave"));
+        var jump = StartReplay.Run(Index(exit), MissionStartPoint.At("j_chosen"));
+
+        Assert.Equal(["j_start", "j_launch", "j_near_gate", "j_relay", "j_leave", "j_log", "j_entry", "j_arrive"],
+            Names(jump.Changes.Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger)));
+        Assert.DoesNotContain("j_too_far", Names(jump.ActiveSet));
+    }
+
     /// <summary>A waiting trigger near the gate starts the stop of the watcher. The jump shows that it ran before the
     /// exit, so the replay runs it, then the stop. The exit runs the triggers that wait for the exit to the new system and
     /// the entry from the old system. Triggers of other exits and entries, and a trigger that waits for the end of the
