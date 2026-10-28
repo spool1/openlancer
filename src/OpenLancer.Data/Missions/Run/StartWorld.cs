@@ -274,7 +274,9 @@ internal static class StartWorld
         public MissionTrigger? Leaves { get; set; }
 
         /// <summary>The order list of its last own orders, and the index of the line that gave them, or -1 for the spawn
-        /// line or the record. An arrival can cancel them (<see cref="Cancelled"/>).</summary>
+        /// line or the record. For the orders of an arrival trigger (<see cref="Builder"/>), it is the number of kept world
+        /// lines, because the setup gives them after these lines. An arrival can cancel them (<see
+        /// cref="Cancelled"/>).</summary>
         public (string List, int At)? Orders { get; set; }
 
         /// <summary>The number of kept world lines before the last arrival that cancelled its orders, or -1.</summary>
