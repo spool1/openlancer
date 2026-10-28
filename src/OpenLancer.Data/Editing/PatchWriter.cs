@@ -72,8 +72,8 @@ internal sealed record PatchText(
 /// <item>Changed: the key line, then the lines of each name that changed, in the order of W, then
 /// <c>ol.remove</c> with the names that W does not have. A name of a linked group adds the whole group and each line
 /// between its lines (see <c>AddLinked</c>). In an order-sensitive section, a change writes all lines, also a change of
-/// the order of lines with different names. A pinned name (a name that the loaded patch sets or removes, and that no
-/// edit touched) is always written, so the mod keeps it when a lower mod changes.</item>
+/// the order of lines with different names. A pinned name is a name that the loaded patch sets or removes, and that no
+/// edit touched. The writer always writes it, so the mod keeps it when a lower mod changes.</item>
 /// <item>Deleted: the key line and <c>ol.delete</c>. The merge also deletes the child sections.</item>
 /// <item>New: <c>ol.new</c> and all lines. A new child of a section in B gets <c>ol.parent</c>. The children of
 /// a new section follow it with no directive. A new <c>[BaseGood]</c> needs no directive.</item>
@@ -160,7 +160,7 @@ internal static class PatchWriter
     /// Adds the names that a patch must also write because of the linked groups of a section (see
     /// <see cref="SectionKeys.LinkedGroups"/>). The merge needs all names of a group, or none. It writes the lines of a
     /// patch as one block at the first line that they replace. So a line between the lines of a group moves with the
-    /// group, for example a density_restriction line between the faction_weight and the encounter lines of a zone.
+    /// group. An example is a density_restriction line between the faction_weight and the encounter lines of a zone.
     /// </summary>
     /// <remarks>
     /// A line between the lines of a group can be a line of another group. So the step repeats until no name comes.
@@ -209,8 +209,9 @@ internal static class PatchWriter
 
     /// <summary>
     /// True when the merge of a patch that writes <paramref name="names"/> keeps the order of W among the lines of
-    /// these names and of the groups. The merge writes the lines of the names that W has as one block, at the first
-    /// line of B that they replace or at the end. It removes the lines of the names that W does not have.
+    /// these names and of the groups. The merge writes the lines of the names that W has as one block. The block goes
+    /// to the first line of B that it replaces, or to the end. The merge removes the lines of a name that W does not
+    /// have.
     /// </summary>
     private static bool MergeKeepsOrder(Section original, Section edited, HashSet<string> names,
         IEnumerable<IReadOnlyCollection<string>> groups)

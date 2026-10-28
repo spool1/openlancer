@@ -146,8 +146,8 @@ public sealed class PatchWriterTests
         Assert.Equal(Names(w), Names(Merged(b, patch)));
     }
 
-    /// <summary>A change of a line that is not in a linked group, at the same place in B and W, writes only that line,
-    /// also in a section with a group.</summary>
+    /// <summary>A section with a linked group. A change of lines outside the group writes only these lines, when the
+    /// merge keeps the place of the group among them.</summary>
     [Fact]
     public void AChangeOutsideTheLinkedGroupsWritesOnlyItsLine()
     {
