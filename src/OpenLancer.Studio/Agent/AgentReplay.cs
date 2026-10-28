@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 
@@ -8,7 +9,8 @@ namespace OpenLancer.Studio.Agent;
 /// <c>oltool mcp replay</c> (section 6.2 of the MCP1 design): runs each line of an audit log, or of a file of calls,
 /// through the tool table, on the thread of the caller. It writes one result line for each call. When a line has a
 /// recorded result, it compares the status and the error code with it. It is the form of the agent calls for CI, and a
-/// user replays an agent run on a copy of the profile with it.
+/// user replays an agent run on a copy of the profile with it. The edit calls change the profile that the replay gets,
+/// and a recorded <c>save</c> saves them.
 /// </summary>
 /// <remarks>
 /// <para>Some results come from the host of the log, not from the data (decision D728): a call that waited too long, a
@@ -32,15 +34,17 @@ public static class AgentReplay
     /// <param name="calls">The JSON lines of the calls.</param>
     /// <param name="output">Gets one JSON line for each call: the line number, the tool, the short result and the
     /// structured content.</param>
+    /// <param name="preview">True to run each edit as a preview (<c>--preview</c>). The replay then changes nothing. It
+    /// skips each call that changes data and has no preview, for example <c>save</c> and <c>undo</c>.</param>
     /// <returns>Null when each result is as recorded, else why the replay stopped.</returns>
     /// <exception cref="InvalidDataException">A line is not a call. The message names the line.</exception>
-    public static string? Run(AgentHost host, TextReader calls, TextWriter output)
+    public static string? Run(AgentHost host, TextReader calls, TextWriter output, bool preview = false)
     {
         foreach (var call in AuditLog.Read(calls))
         {
             if (AgentTools.Find(call.Tool) is not { } tool)
                 return $"Line {call.Line}: the tool table has no tool '{call.Tool}'.";
-            if (SkipReason(host, tool, call) is { } reason)
+            if ((SkipReason(host, tool, call) ?? (preview ? PreviewSkip(tool) : null)) is { } reason)
             {
                 output.WriteLine(new JsonObject
                 {
@@ -51,7 +55,7 @@ public static class AgentReplay
                 }.ToJsonString());
                 continue;
             }
-            var step = AgentTools.Run(host, call.Tool, call.Arguments);
+            var step = AgentTools.Run(host, call.Tool, preview && tool.Changes ? Previewed(call.Arguments) : call.Arguments);
             var result = (step.Result ?? step.Tail!(CancellationToken.None, ToolProgress.None).GetAwaiter().GetResult()).Limited(host.Limits);
             var outcome = result.Outcome;
             var compared = call.Expected == null || (call.Expected.Code != Limit && outcome.Code != Limit);
@@ -73,6 +77,21 @@ public static class AgentReplay
                 return $"Line {call.Line}: {call.Tool} gave {Describe(outcome)}: {(string?)result.Content["message"]}";
         }
         return null;
+    }
+
+    /// <summary>Why a replay with <c>--preview</c> does not run a call, or null: the call changes data and has no
+    /// preview.</summary>
+    private static string? PreviewSkip(StudioTool tool) =>
+        tool.Changes && tool.Input.Parameters.All(p => p.Name != EditTools.Preview.Name)
+            ? $"The replay with --preview does not run {tool.Name}, because the tool has no preview."
+            : null;
+
+    /// <summary>The arguments of a call with <c>preview: true</c>.</summary>
+    private static JsonObject Previewed(JsonObject? arguments)
+    {
+        var previewed = (JsonObject?)arguments?.DeepClone() ?? [];
+        previewed[EditTools.Preview.Name] = true;
+        return previewed;
     }
 
     /// <summary>Why the replay does not run a line, or null when it runs it.</summary>

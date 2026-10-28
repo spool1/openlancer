@@ -143,7 +143,7 @@ OpenLancer has an agent server: an MCP (Model Context Protocol) server. An AI ag
 2. Pick **Agent > Connect an agent...**. It shows the `.mcp.json` entry for Claude Code, with the port and the folder of `oltool`, and a Copy button.
 3. Put the entry in the `.mcp.json` file of your agent, and start the agent.
 
-Without the editor, `oltool mcp serve <profile.json> --mod <id> --read-only` starts the same server over stdio, without the view tools. See [docs/MCP.md](docs/MCP.md) for the details.
+Without the editor, `oltool mcp serve <profile.json> --mod <id>` starts the same server over stdio, without the view tools. With `--read-only`, it only reads. See [docs/MCP.md](docs/MCP.md) for the details.
 
 **Safety**
 

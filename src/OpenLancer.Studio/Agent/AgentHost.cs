@@ -268,6 +268,14 @@ public abstract class AgentHost
     /// Export dialog also stops it.</summary>
     public virtual string? ExportBusy => Exports.Running ? AgentTexts.Error("export_busy") : null;
 
+    /// <summary>
+    /// The work of the host between two calls, on the thread that owns the session. The host without a window writes
+    /// the recovery file here. Its session thread calls this before it waits for the next call.
+    /// </summary>
+    /// <returns>How long the thread can wait for the next call before it calls this again, or null to wait without a
+    /// limit.</returns>
+    public virtual TimeSpan? Idle() => null;
+
     /// <summary>True while the user pauses the agent edits (decision D734).</summary>
     public virtual bool Paused => false;
 

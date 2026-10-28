@@ -240,6 +240,48 @@ public sealed class McpServerTests
         Assert.Equal(1, Volatile.Read(ref runs));
     }
 
+    /// <summary>The client starts ten edit calls at the same time (section 13.2, item 5 of the MCP1 design). They run
+    /// one after the other on the session thread of the host without a window. Each call is one Undo step, and each new
+    /// zone gets its own nickname.</summary>
+    [Fact]
+    public async Task TenEditCallsAtTheSameTimeRunOneAfterTheOtherInTheHostWithoutAWindow()
+    {
+        using var ws = SceneWorkspace.Create();
+        await using var connection = new Connection(HeadlessHost.Open(ws.ProfilePath, "act",
+            new HeadlessOptions { WritesRecovery = false }));
+        var client = await connection.Client();
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 10).Select(i => client.CallToolAsync("scene_create_zone",
+            new Dictionary<string, object?> { ["system"] = "Li01", ["position"] = new[] { i * 1000, 0, 0 } },
+            cancellationToken: Token).AsTask()));
+        // The ten calls take the calls of one second (the rate limit of section 8.4 of the MCP1 design).
+        await Task.Delay(TimeSpan.FromSeconds(1.1), Token);
+        var status = await client.CallToolAsync("studio_status", cancellationToken: Token);
+
+        Assert.All(results, r => Assert.NotEqual(true, r.IsError));
+        Assert.Equal(10, results.Select(r => r.StructuredContent!.Value.GetProperty("adds")[0].GetString()).Distinct().Count());
+        Assert.Equal("10", status.StructuredContent!.Value.GetProperty("rev").GetString());
+        Assert.True(status.StructuredContent.Value.GetProperty("can_edit").GetBoolean());
+    }
+
+    /// <summary>A host with <c>--no-save</c> does not list <c>save</c> and <c>export_mod</c>, and a call of them is a
+    /// protocol error. The server instructions then have no step of the save.</summary>
+    [Fact]
+    public async Task AHostWithoutSaveDoesNotListSaveAndExport()
+    {
+        using var ws = SceneWorkspace.Create();
+        await using var connection = new Connection(HeadlessHost.Open(ws.ProfilePath, "act",
+            new HeadlessOptions { NoSave = true, WritesRecovery = false }));
+        var client = await connection.Client();
+
+        var tools = await client.ListToolsAsync(cancellationToken: Token);
+
+        Assert.DoesNotContain(tools, t => t.Name is "save" or "export_mod");
+        Assert.Contains(tools, t => t.Name == "set_fields");
+        Assert.DoesNotContain("save", client.ServerInstructions);
+        await Assert.ThrowsAsync<McpProtocolException>(() => client.CallToolAsync("save", cancellationToken: Token).AsTask());
+    }
+
     /// <summary>A call whose request has a progress token gets <c>notifications/progress</c> of its tail (section 5.3 of
     /// the MCP1 design), for example of an export. Each notification tells the step of the export.</summary>
     [Fact]

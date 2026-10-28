@@ -13,7 +13,7 @@ Two programs can host the server. They give the same tools, with the same names 
 | Host | How it starts | Transport | Tools |
 |---|---|---|---|
 | The editor | **Agent > Start agent server** in the editor | HTTP on `http://127.0.0.1:<port>/mcp` | All tools |
-| oltool | The agent program starts `oltool mcp serve` | Standard input and output (stdio). It opens no port. | The read tools. This version of the oltool host only reads. |
+| oltool | The agent program starts `oltool mcp serve` | Standard input and output (stdio). It opens no port. | All tools. The tools of the editor give `not_available`. |
 
 Use the editor host when you work in the editor. The agent then sees your unsaved edits, and the view tools show its work to you. Use the oltool host for a script or for an agent that works without the editor. An editor-only tool gives the error `not_available` in the oltool host.
 
@@ -144,7 +144,7 @@ For each image, the bench writes two times to the engine log of the editor. The 
 
 ### The edit tools
 
-These tools change the data of the active mod. They work in the editor host. The oltool host of this version only reads, so it does not list them.
+These tools change the data of the active mod. They work in both hosts. The oltool host with `--read-only` does not list them.
 
 | Tool | What it does |
 |---|---|
@@ -203,7 +203,7 @@ The edit tools refuse with `read_only` when the editor takes no edits, and the m
 
 ### The Scene and data tools
 
-These tools call the commands of the Scene, the Assets panel and the Database of the editor. Each tool is one Undo step, except the three prop group writes. They work in the editor host.
+These tools call the commands of the Scene, the Assets panel and the Database of the editor. Each tool is one Undo step, except the three prop group writes. They work in both hosts.
 
 | Tool | What it does |
 |---|---|
@@ -329,19 +329,32 @@ Add a server that starts oltool to `.mcp.json`:
     "openlancer-headless": {
       "type": "stdio",
       "command": "<OpenLancer folder>\\oltool.exe",
-      "args": ["mcp", "serve", "<workspace>\\profiles\\my-profile.json", "--mod", "my-mod", "--read-only"]
+      "args": ["mcp", "serve", "<workspace>\\profiles\\my-profile.json", "--mod", "my-mod"]
     }
   }
 }
 ```
 
-`oltool mcp serve <profile.json> --mod <id> --read-only` opens the profile with the mod as the active mod. Then it serves the tools on its standard input and output. It writes its own messages to the standard error. This version only reads, so `--read-only` is necessary.
+`oltool mcp serve <profile.json> --mod <id>` opens the profile with the mod as the active mod. Then it serves the tools on its standard input and output. It writes its own messages to the standard error.
+
+The oltool host edits the active mod with the same tools, checks and Undo history as the editor host. It has its own Undo history, which ends with the server. It takes the lock of the mod, as the editor does. So when the editor has the mod open, the oltool host takes no edits, and the edit tools give `read_only`. Use the agent server of that editor instead. Each edit stays unsaved until a call of `save`.
+
+The oltool host writes the unsaved edits to the recovery file of the mod 2 seconds after the last edit. It writes them again at the end of its standard input. The agent program can end the server at any time, and the next start of the editor then offers to restore the edits. A waiting recovery file of an earlier session stops the edits until you decide.
+
+| Option | What it does |
+|---|---|
+| `--read-only` | Opens the profile only to read. The server takes no lock, writes no file and lists only the read tools. |
+| `--no-save` | Leaves out `save` and `export_mod`. The edits stay unsaved. The recovery file still keeps them. |
+| `--restore-recovery` | Restores the unsaved edits of an earlier session from the recovery file at the start. |
+| `--discard-recovery` | Deletes the unsaved edits of an earlier session at the start. |
+
+The oltool host never edits a mod in the OpenLancer repo, because it cannot ask you. It opens such a mod only to read, and the edit tools give `read_only`. A profile or an active mod in the game folder also opens only to read.
 
 ## The audit log
 
 The editor writes each call of an agent into an audit log: one file for each run of the editor, for example `%LOCALAPPDATA%\OpenLancer\logs\agent-20261020-142233.jsonl`. Each line holds the time, the tool, the arguments and a summary of the result. The log holds no token. At 64 MB, the log stops, and the Console tells you.
 
-`oltool mcp replay <profile.json> --mod <id> <log>` runs the calls of a log again and compares each result with the recorded result. It opens the profile only to read, so an edit call of the log gives the error `read_only`. It exits with the code 1 at the first result that differs.
+`oltool mcp replay <profile.json> --mod <id> <log>` runs the calls of a log again and compares each result with the recorded result. It exits with the code 1 at the first result that differs. The edit calls of the log change the profile that the replay gets, so give it a copy of the profile and its mods. The replay saves only at a recorded `save` call, and it writes no recovery file. With `--preview`, the replay runs each edit as a preview and changes no file. It then skips the calls that have no preview, for example `save`, `export_mod`, `undo` and `redo`.
 
 ## Safety
 

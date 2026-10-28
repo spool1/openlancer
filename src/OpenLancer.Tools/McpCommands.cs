@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using ModelContextProtocol;
@@ -11,22 +12,29 @@ namespace OpenLancer.Tools;
 
 /// <summary>
 /// The commands <c>oltool mcp</c> of the agent server (section 6.2 of the MCP1 design): <c>serve</c>, <c>replay</c>,
-/// <c>token</c> and <c>tools</c>. In this build, the server without a window only reads, so <c>serve</c> needs
-/// <c>--read-only</c>, and <c>replay</c> opens the profile only to read.
+/// <c>token</c> and <c>tools</c>. The server without a window takes edits and saves, unless <c>--read-only</c> or
+/// <c>--no-save</c> stops it. <c>replay</c> runs the edits of a log on the profile that it gets.
 /// </summary>
 internal static class McpCommands
 {
     public const string Usage = """
-          mcp serve <profile.json> --mod <id> --read-only
+          mcp serve <profile.json> --mod <id> [--read-only] [--no-save]
+                    [--restore-recovery | --discard-recovery]
                                             Serve the agent tools on stdin and stdout (the MCP stdio transport). The
-                                            server opens the profile with the mod as the active mod. --read-only: the
-                                            server only reads and writes no file. This build has only the query tools,
-                                            so --read-only is necessary. The server writes its own messages to stderr.
-          mcp replay <profile.json> --mod <id> <calls.jsonl>
+                                            server opens the profile with the mod as the active mod and takes its lock.
+                                            It writes the unsaved edits to the recovery file of the mod 2 seconds after
+                                            the last edit, and at the end of stdin. --read-only: the server only reads
+                                            and writes no file. --no-save: the server has no save and no export.
+                                            --restore-recovery or --discard-recovery: restore or delete the unsaved
+                                            edits of an earlier session. Without them, a recovery file stops the edits.
+                                            The server writes its own messages to stderr.
+          mcp replay <profile.json> --mod <id> <calls.jsonl> [--preview]
                                             Run each call of an audit log or of a file of calls through the agent
                                             tools, and write one result line for each call. Exit 1 at the first result
                                             that differs from the recorded result, or at an error of a call without a
-                                            recorded result. The profile opens only to read.
+                                            recorded result. The edits change the profile: give a copy. The replay saves
+                                            only at a recorded save and writes no recovery file. --preview: run each
+                                            edit as a preview, and skip the saves, the exports, undo and redo.
           mcp token                         Print the header with the token of the agent server of the editor, as JSON,
                                             for the headersHelper of Claude Code. Exit 2 and print nothing when no
                                             editor server runs, or when CLAUDE_CODE_MCP_SERVER_URL names no running
@@ -51,7 +59,7 @@ internal static class McpCommands
     private static int Serve(string profile, string[] options, TextWriter error)
     {
         string? mod = null;
-        var readOnly = false;
+        bool readOnly = false, noSave = false, restore = false, discard = false;
         for (var i = 0; i < options.Length; i++)
         {
             switch (options[i])
@@ -62,28 +70,50 @@ internal static class McpCommands
                 case "--read-only" when !readOnly:
                     readOnly = true;
                     break;
+                case "--no-save" when !noSave:
+                    noSave = true;
+                    break;
+                case "--restore-recovery" when !restore:
+                    restore = true;
+                    break;
+                case "--discard-recovery" when !discard:
+                    discard = true;
+                    break;
                 default:
                     return Fail(error, $"Unknown argument {options[i]}. Usage:\n{Usage}");
             }
         }
         if (mod == null)
             return Fail(error, $"The server needs the active mod. Add --mod <id>. Usage:\n{Usage}");
-        if (!readOnly)
-            return Fail(error, "This build of the server without a window only reads the data. Add --read-only.");
+        if (restore && discard)
+            return Fail(error, "Give --restore-recovery or --discard-recovery, not both.");
+        if (readOnly && (restore || discard))
+            return Fail(error, "A server with --read-only does not read the recovery file. Remove --read-only to restore " +
+                               "or discard the unsaved edits.");
 
+        var recovery = restore ? RecoveryChoice.Restore : discard ? RecoveryChoice.Discard : RecoveryChoice.Keep;
         SessionThread thread;
         try
         {
-            thread = SessionThread.Start(() => HeadlessHost.OpenReadOnly(profile, mod));
+            thread = SessionThread.Start(() => readOnly
+                ? HeadlessHost.OpenReadOnly(profile, mod)
+                : HeadlessHost.Open(profile, mod,
+                    new HeadlessOptions { NoSave = noSave, Recovery = recovery, Messages = error }));
         }
-        catch (Exception e) when (e is ModLoadException or ArgumentException or IOException or UnauthorizedAccessException)
+        catch (Exception e) when (e is ModLoadException or ArgumentException or IOException or UnauthorizedAccessException
+                                      or InvalidDataException)
         {
             return Fail(error, e.Message);
         }
         using (thread)
         {
-            error.WriteLine($"oltool mcp serve: profile {thread.Host.Session!.Profile.Name}, mod {mod}, read-only. " +
-                            "The server reads the MCP messages on stdin.");
+            var host = thread.Host;
+            var state = readOnly ? "read-only"
+                : host.NoEditReason is { } reason ? $"no edits: {reason}"
+                : noSave ? "edits, no save"
+                : "edits";
+            error.WriteLine($"oltool mcp serve: profile {host.Session!.Profile.Name}, mod {mod}, {state}. The server reads " +
+                            "the MCP messages on stdin.");
             McpServe.ServeStdioAsync(thread, CancellationToken.None).GetAwaiter().GetResult();
         }
         return 0;
@@ -91,15 +121,18 @@ internal static class McpCommands
 
     private static int Replay(string profile, string[] options, TextWriter output, TextWriter error)
     {
-        if (options is not ["--mod", var mod, var calls])
+        var preview = options.Contains("--preview");
+        if (options.Where(o => o != "--preview").ToArray() is not ["--mod", var mod, var calls] ||
+            options.Count(o => o == "--preview") > 1)
             return Fail(error, $"Usage:\n{Usage}");
         if (!File.Exists(calls))
             return Fail(error, $"The file {calls} does not exist.");
         try
         {
-            using var host = HeadlessHost.OpenReadOnly(profile, mod);
+            // The replay keeps no unsaved edits: it saves only at a recorded save.
+            using var host = HeadlessHost.Open(profile, mod, new HeadlessOptions { WritesRecovery = false, Messages = error });
             using var reader = new StreamReader(calls);
-            if (AgentReplay.Run(host, reader, output) is { } difference)
+            if (AgentReplay.Run(host, reader, output, preview) is { } difference)
             {
                 error.WriteLine(difference);
                 return 1;

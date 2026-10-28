@@ -17,10 +17,10 @@ using static OpenLancer.Tests.OltoolExportTests;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// <c>oltool mcp</c> (section 6.2 and section 13, items 1.1 and 3 of the MCP1 design): the snapshot of the tool list,
-/// and the end-to-end test of the server without a window. The test starts <c>oltool mcp serve</c> as a child process
-/// through the stdio client of the SDK, calls the query tools, stops the server, and replays the recorded calls with
-/// <c>oltool mcp replay</c>.
+/// <c>oltool mcp</c> (section 6.2 and section 13, items 1.1, 2.6 and 3 of the MCP1 design). The tests cover the
+/// snapshot of the tool list and the end-to-end tests of the server without a window. A test starts <c>oltool mcp serve</c> as a child
+/// process through the stdio client of the SDK. It calls the tools, stops the server, and replays the recorded calls
+/// with <c>oltool mcp replay</c>.
 /// </summary>
 public sealed class OltoolMcpTests
 {
@@ -79,22 +79,235 @@ public sealed class OltoolMcpTests
     }
 
     [Fact]
-    public void ServeNeedsTheModAndReadOnlyInThisBuild()
+    public void ServeAndReplayCheckTheirArguments()
     {
         using var ws = SceneWorkspace.Create();
 
         var noMod = Run("mcp", "serve", ws.ProfilePath, "--read-only");
-        var noReadOnly = Run("mcp", "serve", ws.ProfilePath, "--mod", "act");
-        var unknown = Run("mcp", "serve", ws.ProfilePath, "--mod", "none", "--read-only");
-        var flag = Run("mcp", "serve", ws.ProfilePath, "--mod", "act", "--read-only", "--no-save");
+        var unknown = Run("mcp", "serve", ws.ProfilePath, "--mod", "none");
+        var both = Run("mcp", "serve", ws.ProfilePath, "--mod", "act", "--restore-recovery", "--discard-recovery");
+        var readOnly = Run("mcp", "serve", ws.ProfilePath, "--mod", "act", "--read-only", "--discard-recovery");
+        var twice = Run("mcp", "serve", ws.ProfilePath, "--mod", "act", "--no-save", "--no-save");
+        var replay = Run("mcp", "replay", ws.ProfilePath, "--mod", "act");
 
         Assert.Equal(2, noMod.Exit);
-        Assert.Equal(2, noReadOnly.Exit);
-        Assert.Contains("only reads the data. Add --read-only.", noReadOnly.Errors);
+        Assert.Contains("The server needs the active mod.", noMod.Errors);
         Assert.Equal(2, unknown.Exit);
         Assert.Contains("has no mod 'none'", unknown.Errors);
-        Assert.Equal(2, flag.Exit);
-        Assert.Empty(noReadOnly.Output);
+        Assert.Equal(2, both.Exit);
+        Assert.Contains("Give --restore-recovery or --discard-recovery, not both.", both.Errors);
+        Assert.Equal(2, readOnly.Exit);
+        Assert.Contains("A server with --read-only does not read the recovery file.", readOnly.Errors);
+        Assert.Equal(2, twice.Exit);
+        Assert.Equal(2, replay.Exit);
+        Assert.Empty(noMod.Output + unknown.Output + both.Output + readOnly.Output + twice.Output + replay.Output);
+    }
+
+    /// <summary>A server on stdio and its client. Disposal closes the client and the standard input, and waits for the
+    /// end of the server.</summary>
+    private sealed class Server : IAsyncDisposable
+    {
+        private readonly Process process;
+        private readonly Task<string> errors;
+
+        private Server(Process process, McpClient client)
+        {
+            this.process = process;
+            Client = client;
+            errors = process.StandardError.ReadToEndAsync(Token);
+        }
+
+        public McpClient Client { get; }
+
+        /// <summary>The exit code after <see cref="DisposeAsync"/>.</summary>
+        public int ExitCode => process.ExitCode;
+
+        /// <summary>The standard error of the server after <see cref="DisposeAsync"/>.</summary>
+        public Task<string> Errors => errors;
+
+        /// <summary>Starts <c>oltool mcp serve</c> on the mod <c>act</c> of a profile. The test starts the child process
+        /// itself, because the stdio transport of the SDK starts a command through cmd.exe on Windows. cmd.exe splits a
+        /// command path with a space, and the test folder can have one.</summary>
+        public static async Task<Server> Start(string profile, params string[] options)
+        {
+            var info = new ProcessStartInfo(Tool)
+            {
+                ArgumentList = { "mcp", "serve", profile, "--mod", "act" },
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            foreach (var option in options)
+                info.ArgumentList.Add(option);
+            var process = Process.Start(info)!;
+            try
+            {
+                var client = await McpClient.CreateAsync(
+                    new StreamClientTransport(process.StandardInput.BaseStream, process.StandardOutput.BaseStream),
+                    cancellationToken: Token);
+                return new Server(process, client);
+            }
+            catch
+            {
+                process.Kill(entireProcessTree: true);
+                process.Dispose();
+                throw;
+            }
+        }
+
+        /// <summary>Ends the server without the end of its standard input, as a client that ends it at once does.</summary>
+        public void Kill()
+        {
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit(TimeSpan.FromSeconds(30));
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    await Client.DisposeAsync();
+                    process.StandardInput.Close();
+                    Assert.True(process.WaitForExit(TimeSpan.FromSeconds(60)), "oltool mcp serve did not end at the end of stdin.");
+                }
+            }
+            finally
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+                process.Dispose();
+            }
+        }
+    }
+
+    /// <summary>The arguments of a call from JSON text, for the client of the SDK and for the log.</summary>
+    private static Dictionary<string, object?> Arguments(string json) =>
+        JsonDocument.Parse(json).RootElement.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
+
+    /// <summary>The test makes an edit through the server, waits 3 seconds and ends the process without the end of stdin
+    /// (section 13.2, item 6 of the MCP1 design). The recovery file then has the edit, and a new session finds
+    /// it.</summary>
+    [Fact]
+    public async Task AnEditStaysInTheRecoveryFileWhenTheServerEndsWithoutTheEndOfStdin()
+    {
+        using var ws = SceneWorkspace.Create();
+        var recovery = RecoveryFile.PathOf(ws.ModFolder("act"));
+
+        await using (var server = await Server.Start(ws.ProfilePath))
+        {
+            var edit = await server.Client.CallToolAsync("set_fields",
+                Arguments("""{ "ref": "obj:Li01_01", "fields": { "pos": [10, 20, 30] } }"""), cancellationToken: Token);
+            Assert.NotEqual(true, edit.IsError);
+            await Task.Delay(TimeSpan.FromSeconds(3), Token);
+            server.Kill();
+        }
+        var session = ws.Session("act");
+
+        Assert.True(File.Exists(recovery));
+        Assert.True(session.HasRecovery);
+        Assert.Empty(session.RestoreRecovery());
+        Assert.Equal("10, 20, 30", AgentEditToolTests.Line(session, SceneWorkspace.Object("Li01_01"), "pos"));
+    }
+
+    /// <summary>
+    /// The end-to-end test of section 13.3 of the MCP1 design. The server without a window runs workflow 2 of section 9.5
+    /// without the Play step, then saves. The patch files then have the zones of the route, the wreck and its loadout. A
+    /// second server on the same mod gives <c>read_only</c>. A replay of the recorded calls on a fresh copy of the
+    /// profile exits 0 and gives the same files of the mod.
+    /// </summary>
+    [Fact]
+    public async Task WorkflowTwoThroughTheServerSavesAndTheReplayGivesTheSameFiles()
+    {
+        using var ws = BuilderWorkspace.Create();
+        using var copy = BuilderWorkspace.Create();
+        var calls = new List<(string Tool, string Arguments, ToolOutcome Outcome)>();
+
+        await using (var server = await Server.Start(ws.ProfilePath))
+        {
+            var client = server.Client;
+
+            async Task<JsonElement> Call(string tool, string arguments = "{}")
+            {
+                // The server takes at most 10 calls each second (section 8.4 of the MCP1 design).
+                await Task.Delay(TimeSpan.FromMilliseconds(150), Token);
+                var result = await client.CallToolAsync(tool, Arguments(arguments), cancellationToken: Token);
+                var content = result.StructuredContent!.Value;
+                calls.Add((tool, arguments, result.IsError == true
+                    ? new ToolOutcome(ToolOutcome.Error, content.GetProperty("code").GetString(),
+                        content.GetProperty("detail").GetString())
+                    : new ToolOutcome(ToolOutcome.Ok)));
+                Assert.True(result.IsError != true, $"{tool}: {content.GetRawText()}");
+                return content;
+            }
+
+            string First(JsonElement page) => page.GetProperty("rows")[0].GetProperty("value").GetString()!;
+
+            var tools = await client.ListToolsAsync(cancellationToken: Token);
+            var status = await Call("studio_status");
+            await Call("list_systems");
+            await Call("list_items", """{ "system": "Li01", "kinds": ["zone"] }""");
+            var faction = First(await Call("list_values", """{ "list": "faction", "text": "li_p" }"""));
+            var encounter = First(await Call("list_values", """{ "list": "encounter_of_system", "system": "Li01" }"""));
+            await Call("scene_place_patrol_route", $$"""
+                {
+                  "system": "Li01", "name": "my_patrol", "points": [[0, 0, 0], [15000, 0, 0], [15000, 0, 15000]],
+                  "radius": 750, "encounters": [{ "encounter": "{{encounter}}", "level": 4, "chance": 0.4,
+                  "factions": [{ "faction": "{{faction}}", "weight": 1 }] }]
+                }
+                """);
+            var archetype = First(await Call("list_values", """{ "list": "solar_archetype", "text": "MISSION_SATELLITE" }"""));
+            var ship = First(await Call("list_values", """{ "list": "ship" }"""));
+            await Call("scene_place_wreck", $$"""
+                {
+                  "system": "Li01", "position": [8000, 500, 2000], "archetype": "{{archetype}}",
+                  "ship_archetype": "{{ship}}", "loot": [{ "good": "commodity_gold", "count": 20 }],
+                  "nickname": "my_wreck_1", "name": "Lost Freighter"
+                }
+                """);
+            await Call("check");
+            var saved = await Call("save");
+
+            Assert.Contains(tools, t => t.Name == "save");
+            Assert.EndsWith("Do not save until the user asks, unless the user told you to save.", client.ServerInstructions);
+            Assert.True(status.GetProperty("can_edit").GetBoolean());
+            Assert.True(saved.GetProperty("saved").GetBoolean());
+            Assert.Equal(1, saved.GetProperty("number").GetInt32());
+
+            // A second server on the same mod takes no edits, because the first one holds the lock of the mod.
+            var second = await Server.Start(ws.ProfilePath);
+            await using (second)
+            {
+                var secondStatus = await second.Client.CallToolAsync("studio_status", cancellationToken: Token);
+                var refused = await second.Client.CallToolAsync("set_fields",
+                    Arguments("""{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }"""), cancellationToken: Token);
+                Assert.False(secondStatus.StructuredContent!.Value.GetProperty("can_edit").GetBoolean());
+                Assert.True(refused.IsError);
+                Assert.Equal("read_only", refused.StructuredContent!.Value.GetProperty("code").GetString());
+            }
+            Assert.Contains("no edits: Another editor has mod 'act' open", await second.Errors);
+        }
+
+        var system = ws.ReadModPatch(SceneWorkspace.Li01Path);
+        Assert.Contains("path_label = my_patrol, 1", system);
+        Assert.Contains("path_label = my_patrol, 2", system);
+        Assert.Contains("nickname = my_wreck_1", system);
+        Assert.Contains("nickname = my_wreck_1_loadout", ws.ReadModPatch(BuilderWorkspace.Loadout("my_wreck_1_loadout").Path));
+        Assert.False(File.Exists(RecoveryFile.PathOf(ws.ModFolder("act"))));
+
+        var log = Path.Combine(copy.Root, "calls.jsonl");
+        File.WriteAllLines(log, calls.Select(c => new JsonObject
+        {
+            ["tool"] = c.Tool,
+            ["arguments"] = JsonNode.Parse(c.Arguments),
+            ["result"] = AuditLog.Outcome(c.Outcome),
+        }.ToJsonString()));
+        var replay = Run("mcp", "replay", copy.ProfilePath, "--mod", "act", log);
+
+        Assert.True(replay.Exit == 0, replay.Errors);
+        Assert.Equal(TestWorkspace.Files(ws.ModFolder("act")), TestWorkspace.Files(copy.ModFolder("act")));
     }
 
     [Fact]

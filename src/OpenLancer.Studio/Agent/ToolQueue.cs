@@ -104,10 +104,12 @@ public sealed class ToolQueue : IDisposable
         return pending.Done.Task;
     }
 
-    /// <summary>Waits until a call is in the queue or the token cancels. For the session thread of a host without a
-    /// window.</summary>
+    /// <summary>Waits until a call is in the queue, the time limit ends or the token cancels. For the session thread of
+    /// a host without a window.</summary>
+    /// <param name="limit">The longest wait, or null to wait without a limit.</param>
     /// <exception cref="OperationCanceledException">The token cancelled.</exception>
-    public void WaitForCall(CancellationToken stop) => queued.Wait(stop);
+    public void WaitForCall(TimeSpan? limit, CancellationToken stop) =>
+        queued.Wait(limit ?? Timeout.InfiniteTimeSpan, stop);
 
     /// <summary>
     /// Runs the session part of the first call, on the thread that owns the session. While <paramref name="waitReason"/>
