@@ -5,7 +5,6 @@ using ImGuiNET;
 using OpenLancer.Data.Export;
 using OpenLancer.Data.Games;
 using OpenLancer.Editor.Dialogs;
-using OpenLancer.Editor.Export;
 using OpenLancer.Editor.Games;
 using OpenLancer.Editor.Logs;
 
@@ -51,7 +50,7 @@ internal sealed partial class EditorWindow : IGameLinkHost
     /// <summary>The linked game that is the base of a retail target, or null. The save gate merges the mission patches
     /// of the active mod on it (section 6.12 of the M6b design).</summary>
     private GameBase? TargetGameOf(string target) =>
-        ExportTarget.Find(target) is { } found && ExportDialog.BaseOf(found, LinkedGameReports()) is { Root: { } root }
+        ExportTarget.Find(target) is { } found && found.BaseIn(LinkedGameReports()) is { Root: { } root }
             ? GameBase.Standard(root)
             : null;
 

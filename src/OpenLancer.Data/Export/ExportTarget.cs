@@ -72,6 +72,12 @@ public sealed record ExportTarget(string Id, string Name, string Game)
             : $"No linked game gives the target '{Id}'. Link a game folder of {Game} in File > Game link.";
     }
 
+    /// <summary>The check of the linked game that is the base of this retail target, or null. It is the first check that
+    /// <see cref="BaseRefusal"/> takes. The target OpenLancer has no base.</summary>
+    /// <param name="reports">The checks of the linked games.</param>
+    public GameReport? BaseIn(IReadOnlyList<GameReport> reports) =>
+        IsRetail ? reports.FirstOrDefault(r => BaseRefusal(r) == null) : null;
+
     /// <summary>The warnings of a base: its INI files differ from the file list of its build, or it has JFLP.</summary>
     public IEnumerable<string> BaseWarnings(GameReport report)
     {

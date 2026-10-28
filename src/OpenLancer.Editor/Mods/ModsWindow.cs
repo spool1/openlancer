@@ -12,7 +12,6 @@ using OpenLancer.Data.Games;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Publishing;
 using OpenLancer.Editor.Dialogs;
-using OpenLancer.Editor.Export;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Ui;
 
@@ -264,9 +263,7 @@ internal sealed partial class ModsWindow : IDisposable
     public ChecklistInput ChecklistInputOf(ModManifest manifest, PublishSettings settings, PublishHistory history,
         string content, string page)
     {
-        var reports = LinkedReports;
-        return new ChecklistInput(manifest, settings, history, content, page,
-            target => ExportDialog.BaseOf(target, reports) is { } report ? TargetCheck.BaseKey(report) : null,
+        return ChecklistInput.Of(manifest, settings, history, content, page, LinkedReports,
             [
                 .. PlayGames(manifest).Select(g => ExportTarget.Find(g.Game.Target ?? "")).OfType<ExportTarget>()
                     .Distinct(),

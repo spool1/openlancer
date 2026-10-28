@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using OpenLancer.Data;
@@ -52,9 +53,10 @@ public sealed class ExportTargetTests
         Assert.Equal("No linked game gives the target 'vanilla-1.1'. Link a game folder of Freelancer 1.0 or 1.1 in " +
                      "File > Game link.", ExportTarget.Vanilla.BaseRefusal(null));
         Assert.Null(ExportTarget.OpenLancer.BaseRefusal(null));
-        // The dialog finds the base of each target among the linked games.
-        Assert.Same(report, ExportDialog.BaseOf(ExportTarget.Vanilla, [report]));
-        Assert.Null(ExportDialog.BaseOf(ExportTarget.HdEdition, [report]));
+        // Each target finds its base among the linked games.
+        Assert.Same(report, ExportTarget.Vanilla.BaseIn([report]));
+        Assert.Null(ExportTarget.HdEdition.BaseIn([report]));
+        Assert.Null(ExportTarget.OpenLancer.BaseIn([report]));
     }
 
     [Fact]
@@ -64,8 +66,8 @@ public sealed class ExportTargetTests
         var mod = game.GoodsMod("[Good]\nnickname = lf_hull\nprice = 5600\n");
         PublishSettings.Write(mod.Folder, PublishSettings.Empty with { Summary = "From publish.json." });
 
-        var request = ExportDialog.RequestOf(mod, [ExportTarget.Vanilla], [game.Report()], game.Game.Folder, ExportForms.DropIn,
-            out var problems);
+        var request = ExportRequest.Of(mod, [ExportTarget.Vanilla], [game.Report()], game.Game.Folder, ExportForms.DropIn,
+            TestWorkspace.FakeDllWriter.Instance, ThnScripts.Evaluator, out var problems);
 
         Assert.Equal("From publish.json.", request.Publish.Summary);
         Assert.NotNull(request.BaseOf(ExportTarget.Vanilla));
@@ -81,11 +83,73 @@ public sealed class ExportTargetTests
         PublishWorkspace.Write(Path.Combine(mod.Folder, PublishSettings.FileName),
             """{ "formatVersion": 1, "summary": "Kept.", "authors": "Ann" }""");
 
-        var request = ExportDialog.RequestOf(mod, [ExportTarget.Vanilla], [game.Report()], game.Game.Folder, ExportForms.DropIn,
-            out var problems);
+        var request = ExportRequest.Of(mod, [ExportTarget.Vanilla], [game.Report()], game.Game.Folder, ExportForms.DropIn,
+            TestWorkspace.FakeDllWriter.Instance, ThnScripts.Evaluator, out var problems);
 
         Assert.Equal("Kept.", request.Publish.Summary);
         Assert.Equal("publish.json: 'authors' must be a list of texts. OpenLancer ignores the value.", Assert.Single(problems));
+    }
+
+    /// <summary>The one request builder of DA gives the request that the Export dialog and <c>oltool export</c> built
+    /// before (review finding R12 of MCP1-2). A report of a folder without a game is never a base. The first report of
+    /// a target that can be its base is the base of the target, as in both old builders.</summary>
+    [Fact]
+    public void TheOneRequestBuilderGivesTheRequestOfTheDialogAndOfOltool()
+    {
+        using var game = new ExportGame();
+        var mod = game.GoodsMod("[Good]\nnickname = lf_hull\nprice = 5600\n");
+        PublishSettings.Write(mod.Folder, PublishSettings.Empty with { Summary = "From publish.json." });
+        var noGame = GameDetector.CheckRoot(Path.Combine(game.Root, "none"));
+        var report = game.Report();
+        IReadOnlyList<GameReport> reports = [noGame, report];
+        var folder = Path.Combine(game.Root, "out");
+
+        var request = ExportRequest.Of(mod, ExportTarget.All, reports, folder, ExportForms.Flmm,
+            TestWorkspace.FakeDllWriter.Instance, ThnScripts.Evaluator, out var problems);
+
+        foreach (var target in ExportTarget.All)
+        {
+            // The rule of the Export dialog before the builder.
+            var dialog = target.IsRetail ? reports.FirstOrDefault(r => target.BaseRefusal(r) == null) : null;
+            Assert.Same(dialog, request.BaseOf(target));
+        }
+        // The rule of oltool export before the builder, for the base that the game gives.
+        Assert.Same(reports.FirstOrDefault(r => r.Target == ExportTarget.Vanilla.Id), request.BaseOf(ExportTarget.Vanilla));
+        Assert.Same(mod, request.Mod);
+        Assert.Equal(ExportTarget.All, request.Targets);
+        Assert.Equal(folder, request.OutputFolder);
+        Assert.Equal(ExportForms.Flmm, request.Forms);
+        Assert.Equal("From publish.json.", request.Publish.Summary);
+        Assert.Same(TestWorkspace.FakeDllWriter.Instance, request.StringWriter);
+        Assert.False(request.ChecklistOnly || request.FlmmProbe);
+        Assert.Null(request.OpenLancerBase);
+        Assert.Empty(problems);
+    }
+
+    /// <summary>The one checklist builder of DA gives the base key of the rule of the Mods window and of <c>oltool
+    /// publish</c>. A read of the saved files gives the same input as the parts that the Mods window reads.</summary>
+    [Fact]
+    public void TheOneChecklistBuilderGivesTheBaseKeyOfTheModsWindowAndOfOltool()
+    {
+        using var game = new ExportGame();
+        var mod = game.GoodsMod("[Good]\nnickname = lf_hull\nprice = 5600\n");
+        var report = game.Report();
+        var history = Path.Combine(game.Root, "history");
+
+        var read = ChecklistInput.Read(mod, history, [report], [ExportTarget.Vanilla], out var problems);
+        var fingerprint = new ModFingerprint();
+        var parts = ChecklistInput.Of(mod.Manifest, PublishSettings.Empty, new PublishHistory { ModId = mod.Id },
+            fingerprint.Content(mod.Manifest, mod.Folder), fingerprint.Page(mod.Manifest, mod.Folder, PublishSettings.Empty),
+            [report], [ExportTarget.Vanilla]);
+
+        Assert.Empty(problems);
+        Assert.Equal(TargetCheck.BaseKey(report), read.BaseOf(ExportTarget.Vanilla));
+        Assert.Null(read.BaseOf(ExportTarget.HdEdition));
+        Assert.Null(read.BaseOf(ExportTarget.OpenLancer));
+        Assert.Equal(parts.Content, read.Content);
+        Assert.Equal(parts.Page, read.Page);
+        Assert.Equal(PublishChecklist.Of(parts).Steps.Select(s => (s.Name, s.Complete)),
+            PublishChecklist.Of(read).Steps.Select(s => (s.Name, s.Complete)));
     }
 
     [Fact]

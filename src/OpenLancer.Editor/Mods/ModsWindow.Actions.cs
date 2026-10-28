@@ -16,6 +16,8 @@ using OpenLancer.Editor.Games;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Play;
 using OpenLancer.Editor.Ui;
+using OpenLancer.Runtime.Strings;
+using OpenLancer.Runtime.Thn;
 
 namespace OpenLancer.Editor.Mods;
 
@@ -340,7 +342,8 @@ internal sealed partial class ModsWindow
         playPrepare = (row, target, Task.Run(() =>
         {
             var mod = Mod.Load(row.Folder);
-            var request = ExportDialog.RequestOf(mod, [exportTarget], [target.Game], root, 0, out _) with
+            var request = ExportRequest.Of(mod, [exportTarget], [target.Game], root, 0, DllStringResourceWriter.Instance,
+                ThornEvaluator.Instance, out _) with
             {
                 // Play writes no file, so it needs no package and no check of the output folder.
                 ChecklistOnly = true,

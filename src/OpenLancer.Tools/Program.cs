@@ -506,24 +506,16 @@ internal static class Program
             Err.WriteLine(unsafeVersion);
             return ExitProblems;
         }
-        var publish = PublishSettings.Load(mod.Folder);
-        foreach (var problem in publish.Problems)
-            Err.WriteLine($"Warning: {mod.Folder}: {problem}");
-        var request = new ExportRequest
+        // Each retail target uses the game of its kind.
+        var request = ExportRequest.Of(mod, targets, reports, output ?? ModExport.VersionFolder(root, mod.Manifest), forms,
+            DllStringResourceWriter.Instance, ThornEvaluator.Instance, out var publishProblems) with
         {
-            Mod = mod,
-            Targets = targets,
-            // Each retail target uses the game of its kind.
-            BaseOf = t => reports.FirstOrDefault(r => r.Target == t.Id),
-            OutputFolder = output ?? ModExport.VersionFolder(root, mod.Manifest),
-            Forms = forms,
             FlmmProbe = probe,
             ChecklistOnly = checklist,
             OpenLancerBase = GameBase.Standard(profile.BaseFolder),
-            Publish = publish.Settings,
-            StringWriter = DllStringResourceWriter.Instance,
-            Thn = ThornEvaluator.Instance,
         };
+        foreach (var problem in publishProblems)
+            Err.WriteLine($"Warning: {mod.Folder}: {problem}");
         // The probe is not for players, and the checklist writes nothing. Neither runs the guard or goes into the
         // history.
         if (checklist || probe)
@@ -617,15 +609,11 @@ internal static class Program
         if (index < 0)
             return Fail($"The profile has no mod '{modId}'.");
         var mod = profile.Mods[index];
-        var publish = PublishSettings.Load(mod.Folder);
-        var (history, historyProblem) = PublishHistory.Load(ModExport.DefaultFolder(profile.FilePath, modId), modId);
-        foreach (var problem in publish.Problems.Append(historyProblem).OfType<string>())
+        var input = ChecklistInput.Read(mod, ModExport.DefaultFolder(profile.FilePath, modId),
+            [GameDetector.CheckRoot(profile.BaseFolder)], [], out var problems);
+        foreach (var problem in problems)
             Err.WriteLine($"Warning: {problem}");
-        var fingerprint = new ModFingerprint();
-        var report = GameDetector.CheckRoot(profile.BaseFolder);
-        var checklist = PublishChecklist.Of(new ChecklistInput(mod.Manifest, publish.Settings, history,
-            fingerprint.Content(mod.Manifest, mod.Folder), fingerprint.Page(mod.Manifest, mod.Folder, publish.Settings),
-            t => report is { CanBeBase: true } && report.Target == t.Id ? TargetCheck.BaseKey(report) : null, []));
+        var checklist = PublishChecklist.Of(input);
 
         if (json)
         {

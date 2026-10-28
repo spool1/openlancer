@@ -56,6 +56,37 @@ public sealed record ExportRequest
     public required IStringResourceWriter StringWriter { get; init; }
 
     public required IThnEvaluator Thn { get; init; }
+
+    /// <summary>
+    /// The request of an export of the saved files of a mod, with the texts of its <c>publish.json</c> (milestone
+    /// M11c). Each retail target takes its base from the linked games (see <see cref="ExportTarget.BaseIn"/>). The
+    /// Export dialog, the checks and "Play this mod alone" of the Mods window, <c>oltool export</c> and the agent tool
+    /// <c>export_mod</c> build their request here. So all of them export in the same way (review finding R12 of
+    /// MCP1-2).
+    /// </summary>
+    /// <param name="targets">The targets, in the order of <see cref="ExportTarget.All"/>.</param>
+    /// <param name="reports">The checks of the linked games.</param>
+    /// <param name="folder">The exact folder of the packages, for example <see cref="ModExport.VersionFolder"/>.</param>
+    /// <param name="publishProblems">The problems of the read of <c>publish.json</c>. The texts leave out a field with
+    /// a problem, so the caller shows the problems.</param>
+    public static ExportRequest Of(Mod mod, IReadOnlyList<ExportTarget> targets, IReadOnlyList<GameReport> reports,
+        string folder, ExportForms forms, IStringResourceWriter strings, IThnEvaluator thn,
+        out IReadOnlyList<string> publishProblems)
+    {
+        var publish = PublishSettings.Load(mod.Folder);
+        publishProblems = publish.Problems;
+        return new ExportRequest
+        {
+            Mod = mod,
+            Targets = targets,
+            BaseOf = target => target.BaseIn(reports),
+            OutputFolder = folder,
+            Forms = forms,
+            Publish = publish.Settings,
+            StringWriter = strings,
+            Thn = thn,
+        };
+    }
 }
 
 /// <summary>One package of an export.</summary>

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using OpenLancer.Data.Export;
+using OpenLancer.Data.Games;
 using OpenLancer.Data.Mods;
 
 namespace OpenLancer.Data.Publishing;
@@ -58,7 +60,42 @@ public sealed record ChecklistInput(
     string Content,
     string Page,
     Func<ExportTarget, string?> BaseOf,
-    IReadOnlyList<ExportTarget> PlayTargets);
+    IReadOnlyList<ExportTarget> PlayTargets)
+{
+    /// <summary>
+    /// The input of a mod with the bases of the linked games: each retail target takes the base key of its base (see
+    /// <see cref="ExportTarget.BaseIn"/>). The Mods window, the Export dialog, <c>oltool publish</c> and the agent tool
+    /// <c>publish_checklist</c> build the input here, so all of them count the same steps.
+    /// </summary>
+    /// <param name="reports">The checks of the linked games.</param>
+    /// <param name="playTargets">The retail targets whose linked game has a game program, for Play.</param>
+    public static ChecklistInput Of(ModManifest manifest, PublishSettings settings, PublishHistory history, string content,
+        string page, IReadOnlyList<GameReport> reports, IReadOnlyList<ExportTarget> playTargets) =>
+        new(manifest, settings, history, content, page,
+            target => target.BaseIn(reports) is { } report ? TargetCheck.BaseKey(report) : null, playTargets);
+
+    /// <summary>
+    /// The input of a mod from its saved files: its <c>publish.json</c>, the publish history of a folder and the
+    /// fingerprints of the files of the mod. <c>oltool publish</c> and the agent tool <c>publish_checklist</c> read it
+    /// here. The fingerprints read each file of the mod, so a window calls it on a worker thread.
+    /// </summary>
+    /// <param name="historyFolder">The folder of the publish history, for example the default export folder of the
+    /// mod.</param>
+    /// <param name="problems">The problems of the reads of <c>publish.json</c> and of the history. The checklist then
+    /// counts without the part that has the problem.</param>
+    /// <exception cref="IOException">A file of the mod cannot be read.</exception>
+    /// <exception cref="UnauthorizedAccessException">A file of the mod cannot be read.</exception>
+    public static ChecklistInput Read(Mod mod, string historyFolder, IReadOnlyList<GameReport> reports,
+        IReadOnlyList<ExportTarget> playTargets, out IReadOnlyList<string> problems)
+    {
+        var publish = PublishSettings.Load(mod.Folder);
+        var history = PublishHistory.Load(historyFolder, mod.Id);
+        problems = [.. publish.Problems.Append(history.Problem).OfType<string>()];
+        var fingerprint = new ModFingerprint();
+        return Of(mod.Manifest, publish.Settings, history.History, fingerprint.Content(mod.Manifest, mod.Folder),
+            fingerprint.Page(mod.Manifest, mod.Folder, publish.Settings), reports, playTargets);
+    }
+}
 
 /// <summary>
 /// The publish checklist of a mod (section 11 of the M11c design, AGENTS.md UI rule 12). It has six steps, or five for

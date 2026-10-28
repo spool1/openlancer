@@ -10,7 +10,6 @@ using OpenLancer.Data.Mods;
 using OpenLancer.Data.Publishing;
 using OpenLancer.Data.Strings;
 using OpenLancer.Data.Thn;
-using OpenLancer.Editor.Export;
 using OpenLancer.Runtime.Strings;
 using OpenLancer.Runtime.Thn;
 
@@ -148,12 +147,8 @@ internal sealed class ModChecks(Func<ModCheckRequest, ModCheckResult> run)
         }
 
         var targets = ExportTarget.All.Where(t => mod.Manifest.Targets.Contains(t.Id)).ToList();
-        var exportRequest = ExportDialog.RequestOf(mod, targets, request.Reports,
-            PublishHistory.FolderOf(request.Workspace, mod.Id), ExportForms.All, out var publishProblems) with
-        {
-            StringWriter = strings,
-            Thn = thn,
-        };
+        var exportRequest = ExportRequest.Of(mod, targets, request.Reports,
+            PublishHistory.FolderOf(request.Workspace, mod.Id), ExportForms.All, strings, thn, out var publishProblems);
         var prepared = ModExport.Prepare(exportRequest);
         var problems = publishProblems.Select(p => Diagnostic.Warning(Path.Combine(mod.Folder, PublishSettings.FileName), p))
             .Concat(prepared.Problems).ToList();

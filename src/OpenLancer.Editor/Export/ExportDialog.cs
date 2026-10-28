@@ -175,11 +175,7 @@ internal sealed class ExportDialog : ModalDialog
             : $"OpenLancer could not read the mod: {ErrorText.Of(read.Exception!.GetBaseException())}";
     }
 
-    /// <summary>The check of the linked game that is the base of a retail target, or null.</summary>
-    internal static GameReport? BaseOf(ExportTarget target, IReadOnlyList<GameReport> reports) =>
-        target.IsRetail ? reports.FirstOrDefault(r => target.BaseRefusal(r) == null) : null;
-
-    private bool Available(ExportTarget target) => !target.IsRetail || BaseOf(target, bases) != null;
+    private bool Available(ExportTarget target) => !target.IsRetail || target.BaseIn(bases) != null;
 
     protected override void Body()
     {
@@ -245,7 +241,7 @@ internal sealed class ExportDialog : ModalDialog
                 Start(mod, play);
             ImGui.SetItemTooltip(window.GamePlay.Busy
                 ? "A game or the test server of a play copy runs. Stop it first."
-                : $"Export, then install the export for {play.Name} into the play copy of {BaseOf(play, bases)!.Root} " +
+                : $"Export, then install the export for {play.Name} into the play copy of {play.BaseIn(bases)!.Root} " +
                   "and start the game. The play copy then holds this mod alone.");
         }
         ImGui.SameLine();
@@ -302,7 +298,7 @@ internal sealed class ExportDialog : ModalDialog
 
     /// <summary>The first checked retail target whose base has a game program, or null.</summary>
     private ExportTarget? PlayTargetOf() =>
-        ExportTarget.All.FirstOrDefault(t => t.IsRetail && targets.Contains(t.Id) && BaseOf(t, bases) is { ExePath: not null });
+        ExportTarget.All.FirstOrDefault(t => t.IsRetail && targets.Contains(t.Id) && t.BaseIn(bases) is { ExePath: not null });
 
     /// <summary>The check box of each target, with its base or the reason why it has none.</summary>
     private void Targets(Mod exported)
@@ -316,7 +312,7 @@ internal sealed class ExportDialog : ModalDialog
         {
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
-            var reason = target.Refusal(exported.Manifest) ?? target.BaseRefusal(BaseOf(target, bases));
+            var reason = target.Refusal(exported.Manifest) ?? target.BaseRefusal(target.BaseIn(bases));
             var on = targets.Contains(target.Id) && reason == null;
             ImGui.BeginDisabled(reason != null);
             if (ImGui.Checkbox(target.Name, ref on))
@@ -331,7 +327,7 @@ internal sealed class ExportDialog : ModalDialog
             if (reason != null)
                 ImGui.TextColored(EditorTheme.Warning, reason);
             else
-                ImGui.Text(target.IsRetail ? BaseText(BaseOf(target, bases)!) : "the mod folder");
+                ImGui.Text(target.IsRetail ? BaseText(target.BaseIn(bases)!) : "the mod folder");
         }
         ImGui.EndTable();
     }
@@ -348,8 +344,9 @@ internal sealed class ExportDialog : ModalDialog
         var chosen = ExportTarget.All.Where(t => targets.Contains(t.Id)).ToList();
         window.Settings.SetExport(exported.Folder, new ExportChoices([.. chosen.Select(t => t.Id)], dropIn, flmm, folder));
         window.Settings.Save();
-        var request = RequestOf(exported, chosen, bases, ModExport.VersionFolder(folder, exported.Manifest),
-            (dropIn ? ExportForms.DropIn : 0) | (flmm ? ExportForms.Flmm : 0), out var publishProblems);
+        var request = ExportRequest.Of(exported, chosen, bases, ModExport.VersionFolder(folder, exported.Manifest),
+            (dropIn ? ExportForms.DropIn : 0) | (flmm ? ExportForms.Flmm : 0), DllStringResourceWriter.Instance,
+            ThornEvaluator.Instance, out var publishProblems);
         foreach (var problem in publishProblems)
             window.Log.Add(ConsoleSeverity.Warning, Source, $"{exported.Folder}: {problem}");
         var location = Location(exported);
@@ -359,28 +356,6 @@ internal sealed class ExportDialog : ModalDialog
     /// <summary>The publish history of a mod in the workspace of the dialog (decision D565).</summary>
     private HistoryLocation Location(Mod exported) =>
         new(PublishHistory.FolderOf(workspace, exported.Id), exported.Id, exported.Folder, window.Mods.GameRoots());
-
-    /// <summary>The request of an export. The texts of the packages come from the publish.json of the mod (milestone
-    /// M11c).</summary>
-    /// <param name="publishProblems">The problems of the read of publish.json. The texts leave out a field with a
-    /// problem, so the Console shows them.</param>
-    internal static ExportRequest RequestOf(Mod exported, IReadOnlyList<ExportTarget> chosen, IReadOnlyList<GameReport> reports,
-        string folder, ExportForms forms, out IReadOnlyList<string> publishProblems)
-    {
-        var publish = PublishSettings.Load(exported.Folder);
-        publishProblems = publish.Problems;
-        return new ExportRequest
-        {
-            Mod = exported,
-            Targets = chosen,
-            BaseOf = target => BaseOf(target, reports),
-            OutputFolder = folder,
-            Forms = forms,
-            Publish = publish.Settings,
-            StringWriter = DllStringResourceWriter.Instance,
-            Thn = ThornEvaluator.Instance,
-        };
-    }
 
     /// <summary>After the prepare: a history that does not load stops the export, a conflict asks in the dialog, and
     /// else the write starts.</summary>
@@ -555,7 +530,7 @@ internal sealed class ExportDialog : ModalDialog
         if (written.Closed)
             window.Log.Add(ConsoleSeverity.Info, Source, "Play did not start, because you closed the Export dialog.");
         else if (done.Builds.TryGetValue(play, out var files) &&
-                 done.Packages.Where(p => p.Target == play).All(p => p.Path != null) && BaseOf(play, bases) is { } game)
+                 done.Packages.Where(p => p.Target == play).All(p => p.Path != null) && play.BaseIn(bases) is { } game)
             window.GamePlay.PlayExport(game, files, new PlayedMod(mod.Id, mod.Manifest.Name, mod.Folder,
                 PublishHistory.FolderOf(workspace, mod.Id), done.Content));
         else
