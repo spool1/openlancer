@@ -219,6 +219,10 @@
               "route_legs": {
                 "type": "integer",
                 "description": "The most legs of one route of scene_place_patrol_route."
+              },
+              "export_minutes": {
+                "type": "integer",
+                "description": "How long one export can take, in minutes."
               }
             },
             "description": "The limits of one call."
@@ -19634,6 +19638,316 @@
       "annotations": {
         "title": "Run edits as one Undo step",
         "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "export_mod",
+      "title": "Export the active mod",
+      "description": "Exports the saved files of the active mod as packages into the default export folder of the mod, as the Export dialog does. The export does not change the data. Save the edits first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "hde-0.7.1",
+                "vanilla-1.1",
+                "openlancer"
+              ]
+            },
+            "uniqueItems": true,
+            "description": "The target games of the packages. Without it, the export takes each target of mod.json that has a linked game."
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "drop_in",
+                "flmm"
+              ]
+            },
+            "uniqueItems": true,
+            "description": "The package forms of a retail target: drop_in for a zip for Nexus, flmm for an FLMM package. Without it, the export makes both."
+          },
+          "replace_version": {
+            "type": "boolean",
+            "default": false,
+            "description": "Replace the packages of an earlier export of the same version. The export never replaces a version with the mark published."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "The version of the mod that the export wrote."
+          },
+          "folder": {
+            "type": "string",
+            "description": "The folder of the packages, relative to the workspace of the profile."
+          },
+          "succeeded": {
+            "type": "boolean",
+            "description": "True when the export wrote each package without an error."
+          },
+          "replaced": {
+            "type": "boolean",
+            "description": "True when the export replaced the packages of an earlier export of the version."
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "description": "The id of the target game, for example vanilla-1.1."
+                },
+                "form": {
+                  "type": "string",
+                  "description": "The form of the package: drop_in, flmm or the zip of the mod folder."
+                },
+                "file": {
+                  "type": "string",
+                  "description": "The name of the file in the folder of the version."
+                },
+                "written": {
+                  "type": "boolean",
+                  "description": "False when a problem stopped the package."
+                }
+              },
+              "required": [
+                "target",
+                "form",
+                "file",
+                "written"
+              ]
+            },
+            "description": "The packages of the export."
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "description": "The id of the target game."
+                },
+                "errors": {
+                  "type": "integer",
+                  "description": "The number of errors of the checks of the target."
+                },
+                "warnings": {
+                  "type": "integer",
+                  "description": "The number of warnings of the checks of the target."
+                }
+              },
+              "required": [
+                "target",
+                "errors",
+                "warnings"
+              ]
+            },
+            "description": "The errors and the warnings of the checks of each target."
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "warning",
+                    "error"
+                  ],
+                  "description": "error or warning. An error of the active mod stops a save."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The message of the check. The user reads the same message."
+                },
+                "ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference of the item or the line of the problem, or none."
+                },
+                "rule": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The id of the rule of the check, for example M05, or none."
+                },
+                "origin": {
+                  "enum": [
+                    "base_game",
+                    "mod",
+                    "some_mod",
+                    "openlancer",
+                    "unknown",
+                    "pending"
+                  ],
+                  "description": "Who causes the problem: base_game, mod, some_mod, openlancer or unknown. A base_game problem does not stop a save."
+                },
+                "mod_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The mod that causes the problem when the origin is mod, else none."
+                },
+                "fixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The ids of the fixes that the editor has for the problem."
+                }
+              },
+              "required": [
+                "severity",
+                "message"
+              ]
+            },
+            "description": "The first problems of the export, errors first."
+          },
+          "problem_count": {
+            "type": "integer",
+            "description": "The number of all problems of the export."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the publish history recorded."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The problems of the reads and the writes of publish.json and of the publish history."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view that the tool read, as text. A save does not change it."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "version",
+              "folder",
+              "succeeded",
+              "replaced",
+              "packages",
+              "checks",
+              "problems",
+              "problem_count"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Export the active mod",
+        "destructiveHint": true,
         "idempotentHint": false,
         "openWorldHint": false,
         "readOnlyHint": false

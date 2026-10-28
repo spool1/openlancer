@@ -52,7 +52,7 @@ public static class AgentReplay
                 continue;
             }
             var step = AgentTools.Run(host, call.Tool, call.Arguments);
-            var result = (step.Result ?? step.Tail!(CancellationToken.None).GetAwaiter().GetResult()).Limited(host.Limits);
+            var result = (step.Result ?? step.Tail!(CancellationToken.None, ToolProgress.None).GetAwaiter().GetResult()).Limited(host.Limits);
             var outcome = result.Outcome;
             var compared = call.Expected == null || (call.Expected.Code != Limit && outcome.Code != Limit);
             var line = new JsonObject

@@ -122,13 +122,31 @@ public sealed class ToolResult
             : this;
 }
 
+/// <summary>A progress notification of a tail (section 5.3 of the MCP1 design). A client that asked for progress gets
+/// it as <c>notifications/progress</c>.</summary>
+/// <param name="Progress">The work until now, for example 1 of 3 steps.</param>
+/// <param name="Total">The work of the whole call, or null when it is not known.</param>
+/// <param name="Message">What the call does now, in strict STE, or null.</param>
+public sealed record ToolProgress(double Progress, double? Total, string? Message)
+{
+    /// <summary>The progress of a call whose client did not ask for progress: it drops each report.</summary>
+    public static readonly IProgress<ToolProgress> None = new Dropped();
+
+    private sealed class Dropped : IProgress<ToolProgress>
+    {
+        public void Report(ToolProgress value)
+        {
+        }
+    }
+}
+
 /// <summary>
 /// What the session part of a call gives (decision D765 of the MCP1 design): the result, or a tail. A tail runs on a
 /// worker, does not touch the session, and gives the result later. The next call can start while a tail runs.
 /// </summary>
 public sealed class ToolStep
 {
-    private ToolStep(ToolResult? result, Func<CancellationToken, Task<ToolResult>>? tail)
+    private ToolStep(ToolResult? result, Func<CancellationToken, IProgress<ToolProgress>, Task<ToolResult>>? tail)
     {
         Result = result;
         Tail = tail;
@@ -137,10 +155,15 @@ public sealed class ToolStep
     /// <summary>The result, or null when the call has a tail.</summary>
     public ToolResult? Result { get; }
 
-    /// <summary>The tail, or null. It gets a token that the time limit of the tail and the client cancel.</summary>
-    public Func<CancellationToken, Task<ToolResult>>? Tail { get; }
+    /// <summary>The tail, or null. It gets a token that the time limit of the tail and the client cancel, and the
+    /// progress of the call. A tail that the client asked no progress of gets <see cref="ToolProgress.None"/>.</summary>
+    public Func<CancellationToken, IProgress<ToolProgress>, Task<ToolResult>>? Tail { get; }
 
-    public static ToolStep Then(Func<CancellationToken, Task<ToolResult>> tail) => new(null, tail);
+    /// <summary>A tail without progress notifications.</summary>
+    public static ToolStep Then(Func<CancellationToken, Task<ToolResult>> tail) => new(null, (cancel, _) => tail(cancel));
+
+    /// <summary>A tail that reports its progress, for example an export.</summary>
+    public static ToolStep Then(Func<CancellationToken, IProgress<ToolProgress>, Task<ToolResult>> tail) => new(null, tail);
 
     public static implicit operator ToolStep(ToolResult result) => new(result, null);
 }

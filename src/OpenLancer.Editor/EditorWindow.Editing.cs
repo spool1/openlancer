@@ -487,8 +487,8 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         ]);
     }
 
-    /// <summary>True while an export prepares or writes.</summary>
-    internal bool ExportRuns => exportDialog?.Running == true;
+    /// <summary>True while an export of the Export dialog or of the agent prepares or writes.</summary>
+    internal bool ExportRuns => exportDialog?.Running == true || AgentExportRuns;
 
     /// <summary>Why the Export dialog cannot open now, or null.</summary>
     internal string? ExportBlock => ExportRuns ? "An export runs now. Wait until it ends." : null;

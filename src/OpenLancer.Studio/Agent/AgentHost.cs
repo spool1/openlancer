@@ -60,6 +60,10 @@ public sealed record AgentLimits
     /// legs.</summary>
     public int RouteLegs { get; init; } = 50;
 
+    /// <summary>How long the tail of <c>export_mod</c> can run, in minutes. Then it gives <c>limit</c>. A write of the
+    /// packages that started goes on to its end.</summary>
+    public int ExportMinutes { get; init; } = 10;
+
     /// <summary>The allowed range of <see cref="MaxListRows"/>. <see cref="ListRows"/> goes from 1 to
     /// <see cref="MaxListRows"/>.</summary>
     public static readonly (int Min, int Max) MaxListRowsRange = (1, 1000);
@@ -95,6 +99,9 @@ public sealed record AgentLimits
     /// <summary>The allowed range of <see cref="RouteLegs"/>.</summary>
     public static readonly (int Min, int Max) RouteLegsRange = (1, 500);
 
+    /// <summary>The allowed range of <see cref="ExportMinutes"/>.</summary>
+    public static readonly (int Min, int Max) ExportMinutesRange = (1, 120);
+
     /// <summary>The limits with each value in its allowed range: from the smallest useful value to the largest value
     /// that keeps the editor responsive and the result small enough for a model. The settings file can hold any
     /// value.</summary>
@@ -115,6 +122,7 @@ public sealed record AgentLimits
             EditSections = Clamp(EditSections, EditSectionsRange),
             BatchSteps = Clamp(BatchSteps, BatchStepsRange),
             RouteLegs = Clamp(RouteLegs, RouteLegsRange),
+            ExportMinutes = Clamp(ExportMinutes, ExportMinutesRange),
         };
     }
 
@@ -251,6 +259,14 @@ public abstract class AgentHost
         }
         return profileGames;
     }
+
+    /// <summary>The export of the agent that runs now (tool <c>export_mod</c>). The editor keeps one for all starts of
+    /// its server, so its Export dialog waits also for an export of an earlier start.</summary>
+    public virtual AgentExports Exports { get; } = new();
+
+    /// <summary>Why an export cannot start now, or null: an export of the agent runs. In the editor, an export of the
+    /// Export dialog also stops it.</summary>
+    public virtual string? ExportBusy => Exports.Running ? AgentTexts.Error("export_busy") : null;
 
     /// <summary>True while the user pauses the agent edits (decision D734).</summary>
     public virtual bool Paused => false;

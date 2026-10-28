@@ -97,8 +97,45 @@ public static class McpBinding
             foreach (var (key, value) in given)
                 arguments[key] = JsonNode.Parse(value.GetRawText());
         }
-        var result = await queue.CallAsync(name, arguments, request.Server.ClientInfo?.Name, cancel).ConfigureAwait(false);
+        var progress = request.Params?.ProgressToken is { } token ? new Notifier(request.Server, token) : null;
+        var result = await queue.CallAsync(name, arguments, request.Server.ClientInfo?.Name, cancel, progress)
+            .ConfigureAwait(false);
         return Protocol(result);
+    }
+
+    /// <summary>
+    /// The progress of a call whose request has a progress token (section 5.3 of the MCP1 design). Each report of the
+    /// tail is a <c>notifications/progress</c> of the token. The reports go out in their order. A report that the server
+    /// cannot send, for example after the client went away, is lost, and the call goes on.
+    /// </summary>
+    private sealed class Notifier(McpServer server, ProgressToken token) : IProgress<ToolProgress>
+    {
+        private readonly object gate = new();
+        private Task last = Task.CompletedTask;
+
+        public void Report(ToolProgress value)
+        {
+            lock (gate)
+                last = last.ContinueWith(_ => Send(value), CancellationToken.None, TaskContinuationOptions.None,
+                    TaskScheduler.Default).Unwrap();
+        }
+
+        private async Task Send(ToolProgress value)
+        {
+            try
+            {
+                await server.NotifyProgressAsync(token, new ProgressNotificationValue
+                {
+                    Progress = (float)value.Progress,
+                    Total = (float?)value.Total,
+                    Message = value.Message,
+                }).ConfigureAwait(false);
+            }
+            catch (Exception e) when (e is not OutOfMemoryException)
+            {
+                // The client went away or the server stopped. A progress notification is only a help.
+            }
+        }
     }
 
     private static ReadResourceResult Read(string? uri)

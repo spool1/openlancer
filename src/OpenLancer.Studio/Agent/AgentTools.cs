@@ -207,6 +207,11 @@ public static class AgentTools
         SessionTool("edit_batch", ToolHints.Adding, new ToolInput(Text("label"),
                 new StepsParam("steps", () => BatchTool.StepTools), EditTools.Preview, EditTools.WithPatch),
             typeof(BatchResult), BatchTool.Run),
+        SessionTool("export_mod", ToolHints.Changing, new ToolInput(
+                new ChoicesParam("targets", PublishTools.Targets),
+                new ChoicesParam("formats", PublishTools.Formats),
+                new FlagParam("replace_version")),
+            typeof(ExportView), PublishTools.Export, limits => TimeSpan.FromMinutes(limits.ExportMinutes)),
         SessionTool("publish_checklist", ToolHints.Query, ToolInput.None, typeof(ChecklistView), PublishTools.Checklist),
         View("open_view", ToolGroup.Studio, ToolHints.View, new ToolInput(Text("system"), Text("mission"), Text("cutscene")),
             typeof(OpenedView), ViewTools.OpenView),
@@ -280,11 +285,11 @@ public static class AgentTools
         if (step.Result is { } result)
             return result.WithRevision(revision);
         var tail = step.Tail!;
-        return ToolStep.Then(async cancel =>
+        return ToolStep.Then(async (cancel, progress) =>
         {
             try
             {
-                return (await tail(cancel).ConfigureAwait(false)).WithRevision(revision);
+                return (await tail(cancel, progress).ConfigureAwait(false)).WithRevision(revision);
             }
             catch (EditException e)
             {
@@ -345,9 +350,13 @@ public static class AgentTools
 
     /// <summary>A tool of the session as a whole, of the group Studio (section 7.6 of the MCP1 design), for example
     /// <c>undo</c>. It cannot be a step of <c>edit_batch</c>.</summary>
+    /// <param name="tail">The time limit of the tail of the tool, or null for the tail limit of the limits.</param>
     private static StudioTool SessionTool(string name, ToolHints hints, ToolInput input, Type output,
-        Func<ToolCall, ToolStep> run) =>
-        new(name, ToolKind.Session, ToolGroup.Studio, ToolHosts.Both, hints, input, output, run);
+        Func<ToolCall, ToolStep> run, Func<AgentLimits, TimeSpan>? tail = null) =>
+        new(name, ToolKind.Session, ToolGroup.Studio, ToolHosts.Both, hints, input, output, run)
+        {
+            TailLimit = tail ?? StudioTool.TailOfLimits,
+        };
 
     /// <summary>An edit tool (sections 7.2 and 7.3 of the MCP1 design). Its result is the result of the command layer,
     /// and it can be a step of <c>edit_batch</c>. A generic edit tool and a data tool are in the group Studio.</summary>

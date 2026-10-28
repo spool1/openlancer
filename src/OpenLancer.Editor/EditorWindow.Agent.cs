@@ -99,6 +99,12 @@ internal sealed partial class EditorWindow : IAgentEditor
 
     SaveOutcome IAgentEditor.Save() => Edits.Save();
 
+    string? IAgentEditor.ExportBlock => ExportBlock;
+
+    /// <summary>True while an export of the agent prepares or writes. The Export dialog and the Mods window wait for
+    /// it.</summary>
+    internal bool AgentExportRuns => agentController.Exports.Running;
+
     AgentGames IAgentEditor.Games(OpenLancer.Data.Mods.ModManifest manifest) =>
         new(LinkedGameReports(), Mods.GameRoots(), Mods.PlayTargets(manifest));
 

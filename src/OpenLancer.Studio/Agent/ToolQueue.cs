@@ -65,7 +65,10 @@ public sealed class ToolQueue : IDisposable
     /// </summary>
     /// <param name="tool">The name of a tool of <see cref="AgentTools.All"/>.</param>
     /// <param name="client">The name of the client program, for the status bar of the editor, or null.</param>
-    public Task<ToolResult> CallAsync(string tool, JsonObject? arguments, string? client, CancellationToken cancel)
+    /// <param name="progress">Gets the progress of the tail of the call, or null when the client did not ask for
+    /// progress.</param>
+    public Task<ToolResult> CallAsync(string tool, JsonObject? arguments, string? client, CancellationToken cancel,
+        IProgress<ToolProgress>? progress = null)
     {
         var limits = host.Limits;
         Pending pending;
@@ -88,7 +91,7 @@ public sealed class ToolQueue : IDisposable
                 return Task.FromResult(refused);
             }
             accepted.Enqueue(now);
-            pending = new Pending(tool, arguments, now, cancel);
+            pending = new Pending(tool, arguments, now, cancel, progress ?? ToolProgress.None);
             pending.Node = waiting.AddLast(pending);
         }
         if (cancel.CanBeCanceled)
@@ -196,18 +199,20 @@ public sealed class ToolQueue : IDisposable
             AgentTexts.Error("busy", ("reason", reason), ("seconds", host.Limits.WaitSeconds))));
     }
 
-    /// <summary>Runs the tail of a call on a worker, with the time limit of a tail.</summary>
-    private void StartTail(Pending pending, Func<CancellationToken, Task<ToolResult>> tail)
+    /// <summary>Runs the tail of a call on a worker, with the time limit of the tail of its tool (section 8.4 of the MCP1
+    /// design). An export has a longer limit than a check or an image.</summary>
+    private void StartTail(Pending pending, Func<CancellationToken, IProgress<ToolProgress>, Task<ToolResult>> tail)
     {
-        var seconds = host.Limits.TailSeconds;
+        var limit = AgentTools.Find(pending.Tool)!.TailLimit(host.Limits);
+        var seconds = (long)limit.TotalSeconds;
         // The time limit starts with the session part, not when the worker starts.
-        var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(seconds), clock);
+        var timeout = new CancellationTokenSource(limit, clock);
         var linked = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token, pending.Cancel);
         _ = Task.Run(async () =>
         {
             try
             {
-                Finish(pending, await tail(linked.Token).ConfigureAwait(false));
+                Finish(pending, await tail(linked.Token, pending.Progress).ConfigureAwait(false));
             }
             catch (OperationCanceledException) when (timeout.IsCancellationRequested)
             {
@@ -239,7 +244,8 @@ public sealed class ToolQueue : IDisposable
     }
 
     /// <summary>A call in the queue.</summary>
-    private sealed class Pending(string tool, JsonObject? arguments, long queued, CancellationToken cancel)
+    private sealed class Pending(string tool, JsonObject? arguments, long queued, CancellationToken cancel,
+        IProgress<ToolProgress> progress)
     {
         public string Tool { get; } = tool;
 
@@ -249,6 +255,9 @@ public sealed class ToolQueue : IDisposable
         public long Queued { get; } = queued;
 
         public CancellationToken Cancel { get; } = cancel;
+
+        /// <summary>The progress of the tail of the call.</summary>
+        public IProgress<ToolProgress> Progress { get; } = progress;
 
         /// <summary>The place of the call in the queue, or null after it left the queue.</summary>
         public LinkedListNode<Pending>? Node { get; set; }

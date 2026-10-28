@@ -306,6 +306,8 @@ public sealed class AgentControllerTests : IDisposable
         public AgentGames TestGames { get; set; } = new([], [], []);
 
         public AgentGames Games(OpenLancer.Data.Mods.ModManifest manifest) => TestGames;
+
+        public string? ExportBlock { get; set; }
     }
 
     private string Agent => Path.Combine(folder, "agent");
@@ -533,7 +535,7 @@ public sealed class AgentControllerTests : IDisposable
         AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""");
 
         var step = AgentTools.Run(host, "save", null);
-        var tail = step.Tail!(Token);
+        var tail = step.Tail!(Token, ToolProgress.None);
         editor.Validate(new ValidationState(2, false, new ValidationResult(2, [], null)));
         var waited = tail.IsCompleted;
         var problem = Diagnostic.Error("mods/act/mod.json", "The mod has a problem.");
@@ -567,14 +569,14 @@ public sealed class AgentControllerTests : IDisposable
         AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""");
         editor.Validation = new ValidationState(1, false, new ValidationResult(1, null, "oltool did not start."));
 
-        var done = await AgentTools.Run(host, "save", null).Tail!(Token).WaitAsync(TimeSpan.FromSeconds(10), Token);
+        var done = await AgentTools.Run(host, "save", null).Tail!(Token, ToolProgress.None).WaitAsync(TimeSpan.FromSeconds(10), Token);
         Assert.Equal(0, editor.ValidatedHandlers);
         number = 0;
         var unchanged = AgentTools.Run(host, "save", null);
         number = 2;
         AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [4, 5, 6] } }""");
         using var cancel = new CancellationTokenSource();
-        var stopped = AgentTools.Run(host, "save", null).Tail!(cancel.Token);
+        var stopped = AgentTools.Run(host, "save", null).Tail!(cancel.Token, ToolProgress.None);
         Assert.Equal(1, editor.ValidatedHandlers);
         await cancel.CancelAsync();
         var late = await stopped.WaitAsync(TimeSpan.FromSeconds(10), Token);
@@ -612,6 +614,33 @@ public sealed class AgentControllerTests : IDisposable
                                          "the user to replace them or to keep them. The save wrote nothing."),
             (changed.Code, changed.Message));
         Assert.Equal(("refused", "SaveNotStarted"), (none.Code, none.Detail));
+    }
+
+    /// <summary>An export of the Export dialog stops an export of the agent in the editor host. The host shares the
+    /// export of the controller, so an export of an earlier start of the server also counts (review finding R12 of
+    /// MCP1-2).</summary>
+    [Fact]
+    public void TheEditorHostWaitsForTheExportDialogAndKeepsTheExportOfTheController()
+    {
+        var editor = new FakeEditor { ExportBlock = "An export runs now. Wait until it ends." };
+        editor.Settings.Port = FreePort();
+        using var controller = new AgentController(editor, new QueuedUIThread(), () => default, Discovery, folder);
+        var host = new EditorAgentHost(editor, controller.Exports);
+
+        var dialog = host.ExportBusy;
+        editor.ExportBlock = null;
+        var none = host.ExportBusy;
+        var run = controller.Exports.Begin()!;
+        var agent = host.ExportBusy;
+        var second = controller.Exports.Begin();
+        run.Cancel();
+
+        Assert.Same(controller.Exports, host.Exports);
+        Assert.Equal("An export runs now. Wait until it ends.", dialog);
+        Assert.Null(none);
+        Assert.Equal("An export runs now. Wait until it ends.", agent);
+        Assert.Null(second);
+        Assert.False(controller.Exports.Running);
     }
 
     [Fact]

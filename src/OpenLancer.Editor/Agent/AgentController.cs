@@ -47,6 +47,10 @@ internal sealed class AgentController : IDisposable
     private AgentServer? server;
     private AuditLog? audit;
     private int generation;
+
+    /// <summary>The export of the agent that runs now. It stays for all starts of the server, so the Export dialog
+    /// waits also for an export of an earlier start.</summary>
+    public AgentExports Exports { get; } = new();
     private (EditSession? Session, string? Mod) written;
 
     /// <param name="activity">What the editor does now, for the waits of the calls.</param>
@@ -87,7 +91,7 @@ internal sealed class AgentController : IDisposable
         Port = editor.Settings.Port;
         var limits = editor.Settings.Limits;
         audit ??= OpenAudit();
-        dispatcher = new AgentDispatcher(new EditorAgentHost(editor), activity, audit);
+        dispatcher = new AgentDispatcher(new EditorAgentHost(editor, Exports), activity, audit);
         var queue = dispatcher.Queue;
         var port = Port;
         var id = ++generation;
@@ -128,6 +132,8 @@ internal sealed class AgentController : IDisposable
             return;
         generation++;
         State = AgentServerState.Off;
+        // An export of the agent stops before its write. A write that started goes on to its end.
+        Exports.Stop();
         dispatcher?.Dispose();
         dispatcher = null;
         if (server is not { } running)

@@ -28,6 +28,12 @@ internal sealed class TestAgentHost(EditSession? session, AgentHostKind kind = A
 
     public override bool Paused => TestPaused;
 
+    /// <summary>Why an export cannot start beside an export of the agent, for example an export of the Export dialog,
+    /// or null.</summary>
+    public string? TestExportBusy { get; set; }
+
+    public override string? ExportBusy => TestExportBusy ?? base.ExportBusy;
+
     /// <summary>Each edit that the host learned, with its tool.</summary>
     public List<(string Tool, OpenLancer.Data.Editing.Commands.EditResult Result)> Edits { get; } = [];
 
@@ -153,7 +159,7 @@ internal static class AgentCalls
     public static ToolResult Call(AgentHost host, string tool, string arguments = "{}")
     {
         var step = AgentTools.Run(host, tool, JsonNode.Parse(arguments)!.AsObject());
-        return step.Result ?? step.Tail!(CancellationToken.None).GetAwaiter().GetResult();
+        return step.Result ?? step.Tail!(CancellationToken.None, ToolProgress.None).GetAwaiter().GetResult();
     }
 
     /// <summary>Runs a call that must give a result, not an error, and gives its structured content.</summary>

@@ -439,6 +439,15 @@
         "with_patch": "With preview: also give the patch text of each INI file that the batch changes."
       }
     },
+    "export_mod": {
+      "title": "Export the active mod",
+      "description": "Exports the saved files of the active mod as packages into the default export folder of the mod, as the Export dialog does. The export does not change the data. Save the edits first.",
+      "fields": {
+        "targets": "The target games of the packages. Without it, the export takes each target of mod.json that has a linked game.",
+        "formats": "The package forms of a retail target: drop_in for a zip for Nexus, flmm for an FLMM package. Without it, the export makes both.",
+        "replace_version": "Replace the packages of an earlier export of the same version. The export never replaces a version with the mark published."
+      }
+    },
     "publish_checklist": {
       "title": "Get the publish checklist of the active mod",
       "description": "Gives the steps of the publish checklist of the active mod, as the Mods window shows them. The checklist reads the saved files. This tool changes nothing."
@@ -630,7 +639,20 @@
     "save_not_started": "The editor did not start the save. The Console of the editor tells why.",
     "checklist_unsaved": "The checklist reads the saved files. The active mod has unsaved edits, and the checklist does not count them.",
     "no_active_mod": "The profile has no active mod. Ask the user to select a mod to edit in the editor.",
-    "mod_not_read": "OpenLancer could not read the active mod: {reason}"
+    "mod_not_read": "OpenLancer could not read the active mod: {reason}",
+    "export_unsaved": "The export uses the saved files. Save first.",
+    "export_busy": "An export runs now. Wait until it ends.",
+    "export_no_target": "No target of the mod can export now. {reasons}",
+    "export_no_target_given": "Give at least one target.",
+    "export_no_format": "A retail target needs at least one package form. Give drop_in, flmm or both.",
+    "export_refused": "The export cannot make the packages. {errors}",
+    "export_stopped": "The export stopped before it wrote a package.",
+    "export_write_goes_on": "The export took more time than the limit of the call. The write of the packages goes on to its end, and the publish history records it. Call publish_checklist later to see the export.",
+    "export_progress_check": "The export checks the mod.",
+    "export_progress_write": "The export writes the packages.",
+    "export_progress_record": "The export records the packages in the publish history.",
+    "guard_published": "Version {version} has the mark published. A new export needs a higher version. Ask the user to increase the version in the Mods window.",
+    "guard_exported": "An earlier export of version {version} has other game files, so players cannot see which package they have. Call export_mod again with replace_version: true to replace that export. Or ask the user for a higher version."
   },
   "resources": {
     "openlancer://catalog/lists": {
@@ -1183,6 +1205,24 @@
     "ChecklistStepRow.number": "The number of the step, from 1.",
     "ChecklistStepRow.name": "The name of the step, for example Summary.",
     "ChecklistStepRow.complete": "True when the step is done.",
-    "ChecklistStepRow.missing": "What is missing and why it is necessary. Empty when the step is done."
+    "ChecklistStepRow.missing": "What is missing and why it is necessary. Empty when the step is done.",
+    "AgentLimits.export_minutes": "How long one export can take, in minutes.",
+    "ExportView.version": "The version of the mod that the export wrote.",
+    "ExportView.folder": "The folder of the packages, relative to the workspace of the profile.",
+    "ExportView.succeeded": "True when the export wrote each package without an error.",
+    "ExportView.replaced": "True when the export replaced the packages of an earlier export of the version.",
+    "ExportView.packages": "The packages of the export.",
+    "ExportView.checks": "The errors and the warnings of the checks of each target.",
+    "ExportView.problems": "The first problems of the export, errors first.",
+    "ExportView.problem_count": "The number of all problems of the export.",
+    "ExportView.history": "What the publish history recorded.",
+    "ExportView.warnings": "The problems of the reads and the writes of publish.json and of the publish history.",
+    "PackageRow.target": "The id of the target game, for example vanilla-1.1.",
+    "PackageRow.form": "The form of the package: drop_in, flmm or the zip of the mod folder.",
+    "PackageRow.file": "The name of the file in the folder of the version.",
+    "PackageRow.written": "False when a problem stopped the package.",
+    "TargetCheckRow.target": "The id of the target game.",
+    "TargetCheckRow.errors": "The number of errors of the checks of the target.",
+    "TargetCheckRow.warnings": "The number of warnings of the checks of the target."
   }
 }

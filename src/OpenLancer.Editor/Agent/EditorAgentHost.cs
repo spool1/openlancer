@@ -60,6 +60,9 @@ internal interface IAgentEditor
 
     /// <summary>The game links of the editor for an export and the publish checklist of a mod.</summary>
     AgentGames Games(ModManifest manifest);
+
+    /// <summary>Why an export cannot start now, or null: an export of the Export dialog or of the agent runs.</summary>
+    string? ExportBlock { get; }
 }
 
 /// <summary>
@@ -67,9 +70,16 @@ internal interface IAgentEditor
 /// the user, the Console, the view, and the target checks in an oltool process. Each member runs on the UI thread,
 /// in the session part of a call.
 /// </summary>
-internal sealed class EditorAgentHost(IAgentEditor editor) : AgentHost
+/// <param name="exports">The export of the agent that runs now. The controller keeps it for all starts of the server,
+/// or null for an own one.</param>
+internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports = null) : AgentHost
 {
     public override AgentHostKind Kind => AgentHostKind.Editor;
+
+    public override AgentExports Exports { get; } = exports ?? new AgentExports();
+
+    /// <summary>An export of the Export dialog or of the agent runs (review finding R12 of MCP1-2).</summary>
+    public override string? ExportBusy => editor.ExportBlock ?? base.ExportBusy;
 
     public override EditSession? Session => editor.Edits;
 

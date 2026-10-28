@@ -226,6 +226,10 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
         changed |= RangeField("Legs of one route",
             "The most legs of one patrol or trade route that the agent places. Each leg is one zone.", limits.RouteLegs,
             AgentLimits.RouteLegsRange, v => limits = limits with { RouteLegs = v });
+        changed |= RangeField("Time of an export (min)",
+            "How long an export of the agent can take. A longer export gives the agent an error. A write of the packages " +
+            "that started goes on to its end.", limits.ExportMinutes, AgentLimits.ExportMinutesRange,
+            v => limits = limits with { ExportMinutes = v });
         if (changed)
         {
             settings.Limits = limits.Clamped();

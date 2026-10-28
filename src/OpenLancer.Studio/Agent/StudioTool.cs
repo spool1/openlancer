@@ -165,6 +165,13 @@ public sealed class StudioTool
 
     internal Func<ToolCall, ToolStep> Run { get; }
 
+    /// <summary>The time limit of the tail of a call (section 8.4 of the MCP1 design). It is the tail limit of the
+    /// limits, or a longer limit of the tool, for example of an export.</summary>
+    internal Func<AgentLimits, TimeSpan> TailLimit { get; init; } = TailOfLimits;
+
+    /// <summary>The tail limit of the limits, for example of a check or an image.</summary>
+    internal static TimeSpan TailOfLimits(AgentLimits limits) => TimeSpan.FromSeconds(limits.TailSeconds);
+
     /// <summary>
     /// The output schema of a tool (section 5.7 of the MCP1 design). The structured content of each call fits it: the
     /// result of the tool, or a tool error. The specification says that structured content must fit the output schema,
