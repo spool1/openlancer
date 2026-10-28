@@ -42,7 +42,8 @@ public static class PatrolCommands
     /// <param name="name">The path label of the route. A path label that the system has refuses with the detail
     /// <see cref="MissionErrors.NameTaken"/>.</param>
     /// <param name="usage">The usage of the route: a usage of a route template of the rule data.</param>
-    /// <param name="points">The points of the route, two or more.</param>
+    /// <param name="points">The points of the route, two or more. Each leg must have a finite length of 1 meter or
+    /// more.</param>
     /// <param name="radius">The radius of each zone, or null for the radius of the template.</param>
     /// <exception cref="EditException">A value is not valid (<see cref="EditErrorKind.InvalidValue"/>).</exception>
     public static EditPlan Place(EditSession session, string system, string name, string usage,
@@ -67,7 +68,14 @@ public static class PatrolCommands
             throw Value("points", "A route needs two or more points.");
         for (var i = 1; i < points.Count; i++)
         {
-            if (Vector3.Distance(points[i - 1], points[i]) < MinLeg)
+            // A leg without a finite length has no finite center and angles.
+            var distance = Vector3.Distance(points[i - 1], points[i]);
+            if (!float.IsFinite(distance))
+            {
+                throw Value($"points[{i}]", $"The leg from point {i - 1} to point {i} has no finite length. Give points " +
+                                            "nearer to the center of the system.");
+            }
+            if (distance < MinLeg)
                 throw Value($"points[{i}]", $"The points {i - 1} and {i} are less than 1 meter apart. Move one of them.");
         }
         var size = radius ?? template.Radius;

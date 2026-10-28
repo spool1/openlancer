@@ -189,6 +189,38 @@ public sealed class AgentBuilderTests
         Assert.Equal(1, session.Revision);
     }
 
+    /// <summary>Each coordinate of a point of a builder is at most the far distance of the Scene camera. So the length
+    /// and the angles of a leg stay finite. The argument fields cannot give a key that the route tool writes itself.
+    /// The error names the key and the argument that gives it.</summary>
+    [Fact]
+    public void ARouteRefusesFarPointsAndAKeyThatItWritesInFields()
+    {
+        var (ws, session, host) = Builders();
+        using var _ = ws;
+        const string route = """ "system": "Li01", "name": "my_patrol", "points": [[0, 0, 0], [5000, 0, 0]] """;
+
+        var far = Call(host, "scene_place_patrol_route",
+            """{ "system": "Li01", "name": "far", "points": [[-3e38, 0, 0], [3e38, 0, 0]] }""");
+        var wreck = Call(host, "scene_place_wreck", """
+            { "system": "Li01", "position": [20000000, 0, 0], "archetype": "wreck_freighter", "ship_archetype": "ship1" }
+            """);
+        var shape = Call(host, "scene_place_patrol_route", $$"""{ {{route}}, "fields": { "toughness": 5, "shape": "SPHERE" } }""");
+        var usage = Call(host, "scene_place_patrol_route", $$"""{ {{route}}, "fields": { "USAGE": "trade" } }""");
+
+        Assert.Equal(("invalid_argument", "points"), ((string?)far.Content["code"], (string?)far.Content["field"]));
+        Assert.Equal("The argument 'points' needs a list of 2 or more points, each three numbers from -10000000 to 10000000.",
+            (string?)far.Content["message"]);
+        Assert.Equal(("invalid_argument", "position"), ((string?)wreck.Content["code"], (string?)wreck.Content["field"]));
+        Assert.Equal(("invalid_argument", ToolInput.BadArgument, "fields.shape",
+                "The tool writes the key shape of each zone of the route. Remove the key from fields."),
+            ((string?)shape.Content["code"], (string?)shape.Content["detail"], (string?)shape.Content["field"],
+                (string?)shape.Content["message"]));
+        Assert.Equal(("fields.USAGE", "The tool writes the key USAGE of each zone of the route. Remove the key from " +
+                                      "fields, and use the argument usage."),
+            ((string?)usage.Content["field"], (string?)usage.Content["message"]));
+        Assert.Equal(0, session.Revision);
+    }
+
     /// <summary>
     /// The encounters of a zone (decision D732 of the MCP1 design). Each faction_weight and density_restriction line
     /// comes before the first encounter line. Each faction line comes after its encounter line. An encounter that

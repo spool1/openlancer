@@ -13097,7 +13097,9 @@
           "position": {
             "type": "array",
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": -10000000,
+              "maximum": 10000000
             },
             "minItems": 3,
             "maxItems": 3,
@@ -13747,7 +13749,9 @@
             "items": {
               "type": "array",
               "items": {
-                "type": "number"
+                "type": "number",
+                "minimum": -10000000,
+                "maximum": 10000000
               },
               "minItems": 3,
               "maxItems": 3
@@ -13875,7 +13879,7 @@
           "fields": {
             "type": "object",
             "minProperties": 1,
-            "description": "More keys of each zone, by INI key, for example toughness. Use get_item to see the keys."
+            "description": "More keys of each zone, by INI key, for example toughness. Use get_item to see the keys. This argument cannot give a key that the tool writes itself, for example pos or usage."
           },
           "preview": {
             "type": "boolean",

@@ -330,7 +330,7 @@
         "density_restrictions": "The density restrictions of each zone: the most ships of a class.",
         "count": "The most ships of the class in the zone.",
         "class": "The class of the ships, as the encounter files name it, for example lawful.",
-        "fields": "More keys of each zone, by INI key, for example toughness. Use get_item to see the keys."
+        "fields": "More keys of each zone, by INI key, for example toughness. Use get_item to see the keys. This argument cannot give a key that the tool writes itself, for example pos or usage."
       }
     },
     "scene_set_encounters": {
@@ -594,6 +594,8 @@
     "transform_no_position": "{ref} has no position. Give it a pos with set_fields first.",
     "limit_moves": "One call can give at most {max} moves. Split the call.",
     "limit_legs": "One route can have at most {max} legs, and this route has {count}. Split the route.",
+    "route_key": "The tool writes the key {key} of each zone of the route. Remove the key from fields.",
+    "route_key_argument": "The tool writes the key {key} of each zone of the route. Remove the key from fields, and use the argument {argument}.",
     "component_value": "An add needs the value of the component, for example the nickname of a loadout.",
     "component_no_value": "A remove takes no value.",
     "component_value_text": "The value of a component is one nickname. It cannot hold a comma, a semicolon or a line break.",

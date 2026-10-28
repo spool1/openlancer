@@ -282,6 +282,25 @@ public sealed class BuilderCommandsTests
         Assert.Equal("name", bad.Error.Field);
     }
 
+    /// <summary>A leg without a finite length has no finite center and angles. So the command refuses it, and the error
+    /// names the point at the end of the leg.</summary>
+    [Fact]
+    public void ARouteRefusesALegWithoutAFiniteLength()
+    {
+        using var ws = BuilderWorkspace.Create();
+        var session = ws.Session("act");
+
+        var far = Assert.Throws<EditException>(() => PatrolCommands.Place(session, "Li01", "far", "patrol",
+            [Vector3.Zero, new Vector3(1000, 0, 0), new Vector3(1e20f, 0, 0)], null, [], [], []));
+        var nan = Assert.Throws<EditException>(() => PatrolCommands.Place(session, "Li01", "far", "patrol",
+            [Vector3.Zero, new Vector3(float.NaN, 0, 0)], null, [], [], []));
+
+        Assert.Equal((EditErrorKind.InvalidValue, "points[2]", "The leg from point 1 to point 2 has no finite length. " +
+                                                              "Give points nearer to the center of the system."),
+            (far.Error.Kind, far.Error.Field, far.Error.Message));
+        Assert.Equal("points[1]", nan.Error.Field);
+    }
+
     /// <summary>The encounter lines of a zone are one block (decision D732). The faction weights and the density
     /// restrictions come before the first encounter line. Then each encounter line comes with its faction lines. The
     /// other lines keep their place. A save writes the whole linked group, and a reload gives the same lines.</summary>

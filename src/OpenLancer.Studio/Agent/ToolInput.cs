@@ -217,21 +217,22 @@ internal sealed class PointParam(string name, bool required, float? bound = null
 /// <summary>A list of points, for example the points of a route: each point is three numbers, X, Y and Z in meters, that
 /// fit a <see cref="float"/>. The list has at least <paramref name="minItems"/> points. The tool checks the most points,
 /// because a setting gives the limit.</summary>
-internal sealed class PointsParam(string name, bool required, int minItems) : ToolParam(name, required)
+/// <param name="bound">The largest size of each number, or null for each number that fits a <see cref="float"/>.</param>
+internal sealed class PointsParam(string name, bool required, int minItems, float? bound = null) : ToolParam(name, required)
 {
-    private static readonly PointParam Point = new("point", true);
+    private readonly PointParam point = new("point", true, bound);
 
     public override JsonObject Schema(string tool) => new()
     {
         ["type"] = "array",
-        ["items"] = Point.Schema(tool),
+        ["items"] = point.Schema(tool),
         ["minItems"] = minItems,
     };
 
-    public override string Expected => $"a list of {minItems} or more points of three numbers";
+    public override string Expected => $"a list of {minItems} or more points, each {point.Expected}";
 
     public override bool Fits(JsonNode value) =>
-        value is JsonArray array && array.Count >= minItems && array.All(p => p != null && Point.Fits(p));
+        value is JsonArray array && array.Count >= minItems && array.All(p => p != null && point.Fits(p));
 }
 
 /// <summary>A list of numbers, for example the size of a zone. The list has a fixed range of counts, and each number fits

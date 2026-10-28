@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Nodes;
@@ -21,6 +22,27 @@ internal static class BuilderTools
 {
     /// <summary>The detail code of a route with more legs than the limit.</summary>
     public const string RouteLegs = "RouteLegs";
+
+    /// <summary>The largest size of each coordinate of a point of a builder, in meters. The Scene camera sees no farther.
+    /// The bound also keeps the length and the angles of a leg finite.</summary>
+    public const float MaxCoordinate = ShotCamera.MaxCoordinate;
+
+    /// <summary>The keys that <c>scene_place_patrol_route</c> writes itself on each zone, each with the argument that
+    /// gives it, or null. The argument <c>fields</c> cannot give them, because they make the zones a route.</summary>
+    private static readonly Dictionary<string, string?> RouteKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["nickname"] = null,
+        ["shape"] = null,
+        ["pos"] = "points",
+        ["rotate"] = "points",
+        ["size"] = "radius",
+        [SceneBuilders.PathLabel] = "name",
+        [SceneBuilders.Usage] = "usage",
+        ["encounter"] = "encounters",
+        ["faction"] = "encounters",
+        ["faction_weight"] = "faction_weights",
+        ["density_restriction"] = "density_restrictions",
+    };
 
     /// <summary>The usages of the route templates of the rule data, in their order.</summary>
     public static IReadOnlyList<string> Usages { get; } = ListRules.Retail.Builders.Routes.Select(r => r.Usage).ToList();
@@ -88,12 +110,21 @@ internal static class BuilderTools
     /// <summary>
     /// Places a patrol or trade route: one cylinder zone for each leg (decision D731 of the MCP1 design). The tool
     /// refuses a route with more legs than the limit of the settings. The fields of the request go to each zone in the
-    /// same batch.
+    /// same batch. They cannot give a key that the tool writes itself (see <see cref="RouteKeys"/>).
     /// </summary>
     public static ToolStep PlaceRoute(ToolCall call) => EditTools.Apply(call, scope =>
     {
         var session = scope.Session;
         var args = call.Args;
+        var fields = args.Node("fields") as JsonObject;
+        foreach (var key in fields?.Select(f => f.Key) ?? [])
+        {
+            if (!RouteKeys.TryGetValue(key, out var argument))
+                continue;
+            throw ToolInput.Bad($"fields.{key}", argument == null
+                ? AgentTexts.Error("route_key", ("key", key))
+                : AgentTexts.Error("route_key_argument", ("key", key), ("argument", argument)));
+        }
         var points = args.Points("points")!;
         var limit = call.Limits.RouteLegs;
         if (points.Count - 1 > limit)
@@ -106,7 +137,7 @@ internal static class BuilderTools
             (float?)args.Number("radius"), Encounters(args), Shares(args.Rows("faction_weights")) ?? [],
             Densities(args) ?? []);
         scope.Run(plan);
-        if (args.Node("fields") is not JsonObject fields)
+        if (fields == null)
             return;
         foreach (var zone in plan.Adds.Where(a => SceneSections.Is(a.Id.Type, SceneSections.ZoneType)))
             SceneEditTools.Fields(scope, zone, fields);
