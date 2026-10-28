@@ -320,6 +320,73 @@ public sealed class BuilderCommandsTests
         Assert.Equal(expected, Lines(reloaded, Pop));
     }
 
+    /// <summary>The engine reads a density_restriction line at each place in a zone. So a call without density
+    /// restrictions keeps each of them, also a line after an encounter line. The kept line moves into the block. A save
+    /// and a reload keep the order.</summary>
+    [Fact]
+    public void ACallWithoutDensityRestrictionsKeepsALineAfterTheEncounterLines()
+    {
+        using var ws = BuilderWorkspace.Create();
+        ws.WriteBase(SceneWorkspace.Li01Path, BuilderWorkspace.Li01Text + LateZone);
+        var session = ws.Session("act");
+
+        session.Execute(EncounterCommands.SetGroups(session, Late,
+            [new EncounterGroup("patrol_a", 2, 0.5, [new FactionShare("li_p_grp", 1)])], null, null).Command!);
+
+        string[] expected =
+        [
+            "nickname = Zone_late", "pos = 0, 0, 5000", "shape = SPHERE", "size = 2000", "faction_weight = li_n_grp, 1",
+            "density_restriction = 2, lawful", "encounter = patrol_a, 2, 0.5", "faction = li_p_grp, 1", "toughness = 3",
+        ];
+        Assert.Equal(expected, Lines(session, Late));
+        Assert.True(session.Save().Saved);
+        session.Dispose();
+        using var reloaded = ws.Session("act");
+        Assert.Equal(expected, Lines(reloaded, Late));
+    }
+
+    /// <summary>A call that changes only the density restrictions of a zone. The new line comes before the encounter
+    /// lines that do not change. The save writes them too, so a reload keeps the order.</summary>
+    [Fact]
+    public void ANewDensityRestrictionBeforeTheEncounterLinesKeepsItsPlaceAfterAReload()
+    {
+        using var ws = BuilderWorkspace.Create();
+        ws.WriteBase(SceneWorkspace.Li01Path, BuilderWorkspace.Li01Text + LateZone.Replace("density_restriction = 2, lawful\n", ""));
+        var session = ws.Session("act");
+
+        session.Execute(EncounterCommands.SetGroups(session, Late,
+            [new EncounterGroup("patrol_a", 3, 0.5, [new FactionShare("li_n_grp", 1)])], null,
+            [new DensityRestriction(4, "lawful")]).Command!);
+
+        string[] expected =
+        [
+            "nickname = Zone_late", "pos = 0, 0, 5000", "shape = SPHERE", "size = 2000", "faction_weight = li_n_grp, 1",
+            "density_restriction = 4, lawful", "encounter = patrol_a, 3, 0.5", "faction = li_n_grp, 1", "toughness = 3",
+        ];
+        Assert.Equal(expected, Lines(session, Late));
+        Assert.True(session.Save().Saved);
+        session.Dispose();
+        using var reloaded = ws.Session("act");
+        Assert.Equal(expected, Lines(reloaded, Late));
+    }
+
+    private static readonly SectionRef Late = SceneWorkspace.Zone("Zone_late");
+
+    /// <summary>A zone with a faction weight, an encounter group, then a density restriction and a toughness line.</summary>
+    private const string LateZone = """
+
+        [zone]
+        nickname = Zone_late
+        pos = 0, 0, 5000
+        shape = SPHERE
+        size = 2000
+        faction_weight = li_n_grp, 1
+        encounter = patrol_a, 3, 0.5
+        faction = li_n_grp, 1
+        density_restriction = 2, lawful
+        toughness = 3
+        """;
+
     /// <summary>The system can lack the [EncounterParameters] section of an encounter that another system has. Then the
     /// same entry adds a copy of the section of that system, as a fix of the plan. An encounter of no system gives an
     /// error with the row.</summary>

@@ -49,8 +49,9 @@ public static class EncounterCommands
 
     /// <summary>
     /// Plans the encounter groups of a zone, as one entry of the edit history. The encounter groups replace each
-    /// encounter line of the zone with its faction lines. The faction weights and the density restrictions replace the
-    /// lines of the zone before its first encounter line. A null list keeps these lines.
+    /// encounter line of the zone with its faction lines. The faction weights replace the faction_weight lines before
+    /// the first encounter line. The density restrictions replace each density_restriction line of the zone. A null
+    /// list keeps these lines, and they move into the block.
     /// </summary>
     /// <exception cref="EditException">A value of a row is not valid (<see cref="EditErrorKind.InvalidValue"/>).</exception>
     public static EditPlan SetGroups(EditSession session, SectionRef zone, IReadOnlyList<EncounterGroup> encounters,
@@ -66,8 +67,11 @@ public static class EncounterCommands
         var document = session.OpenDocument(zone.Path)!;
         var index = document.IndexOf(zone.Id);
 
-        // The lines of the zone before its first encounter line, which a null list keeps.
-        var zoneLines = view.Entries.TakeWhile(e => !SceneSections.Is(e.Name, "encounter")).ToList();
+        bool Is(EntryView line, string name) => SceneSections.Is(line.Name, name);
+        // The lines that a null list keeps. A faction_weight line after an encounter line belongs to that encounter, so
+        // the new groups replace it. The engine reads a density_restriction line at each place in the zone.
+        var keptWeights = view.Entries.TakeWhile(e => !Is(e, "encounter")).Where(e => Is(e, "faction_weight")).ToList();
+        var keptDensities = view.Entries.Where(e => Is(e, "density_restriction")).ToList();
         var block = Lines(session, zone.Path, encounters, factionWeights, densityRestrictions, out var parameters);
         var typed = new Dictionary<string, List<IReadOnlyList<ValueBase>>>(StringComparer.OrdinalIgnoreCase);
         foreach (var name in BlockNames)
@@ -86,10 +90,9 @@ public static class EncounterCommands
             used[name] = n + 1;
             lines.Add(new EntryView(name, typed[name][n]));
         }
-        bool Is(EntryView line, string name) => SceneSections.Is(line.Name, name);
         var ordered = new List<EntryView>();
-        ordered.AddRange((factionWeights == null ? zoneLines : lines).Where(l => Is(l, "faction_weight")));
-        ordered.AddRange((densityRestrictions == null ? zoneLines : lines).Where(l => Is(l, "density_restriction")));
+        ordered.AddRange(factionWeights == null ? keptWeights : lines.Where(l => Is(l, "faction_weight")));
+        ordered.AddRange(densityRestrictions == null ? keptDensities : lines.Where(l => Is(l, "density_restriction")));
         ordered.AddRange(lines.Where(l => Is(l, "encounter") || Is(l, "faction")));
 
         var (adds, fixes, commands) = Added(session, zone.Path, parameters);
