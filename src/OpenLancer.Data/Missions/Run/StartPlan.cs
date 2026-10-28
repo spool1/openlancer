@@ -524,7 +524,8 @@ internal sealed record StartReplay
     /// (Cnd_JumpInComplete) does not run, because it can start a scene of the arrival, and the path does not show the
     /// end of that scene. Only a condition shows a change, because the system key of a trigger can name another system
     /// than the system where it runs. Before the first condition that names a system, the newest system key of the path
-    /// gives the old system.</item>
+    /// gives the old system. The condition of the chosen trigger does not count, because the chosen trigger only
+    /// starts.</item>
     /// </list>
     /// Such a run must not stop the replay, end the mission, run or stop a trigger of the rest of the path, or start the
     /// chosen trigger. Else the replay goes back to the state before it. A repeatable trigger does not run in this way.
@@ -618,15 +619,14 @@ internal sealed record StartReplay
                 TryRun([peer], rest);
         }
 
-        /// <summary>The system rule, before a trigger of the path runs. The chosen trigger counts only with a base
-        /// condition, because the play starts docked at that base. A chosen trigger that waits for a launch or a jump
-        /// starts before that event.</summary>
+        /// <summary>The system rule, before a trigger of the path runs. The chosen trigger only starts in the replay, so
+        /// its condition does not show a new system.</summary>
         /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
         public void Systems(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
         {
-            var next = trigger == chosen
-                ? StartPlaces.DockedSystemAt(index, trigger.Condition)
-                : StartPlaces.SystemAt(index, trigger.Condition);
+            if (trigger == chosen)
+                return;
+            var next = StartPlaces.SystemAt(index, trigger.Condition);
             if (next == null)
             {
                 hinted = StartPlaces.Hint(index, trigger) ?? hinted;

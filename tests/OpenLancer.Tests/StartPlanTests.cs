@@ -489,8 +489,10 @@ public sealed class StartPlanTests
         Assert.Contains("j_chosen", Names(against.ActiveSet));
     }
 
-    /// <summary>Only a condition shows a change of the system. A system key after the first condition with a system
-    /// does not show a jump. Before that condition, the newest system key gives the old system.</summary>
+    /// <summary>Only a condition shows a change of the system. Before the first condition with a system, the newest
+    /// system key gives the old system, so the exit from k_sys_a runs at the arrival in k_sys_b. A system key after that
+    /// condition does not show a jump: the entry into k_sys_a does not run at k_wrong_key. The next arrival shows the
+    /// exit from k_sys_b, the system of the last condition, and not from the newest system key.</summary>
     [Fact]
     public void TheSystemKeyGivesOnlyTheOldSystemBeforeTheFirstCondition()
     {
@@ -511,8 +513,9 @@ public sealed class StartPlanTests
             [Trigger]
             nickname = k_arrive
             Cnd_SystemEnter = k_sys_b
-            Act_ActTrig = k_wrong_key
             Act_ActTrig = k_leave_b
+            Act_ActTrig = k_enter_a
+            Act_ActTrig = k_wrong_key
 
             [Trigger]
             nickname = k_leave_b
@@ -520,9 +523,19 @@ public sealed class StartPlanTests
             Act_NNIds = 8, HISTORY
 
             [Trigger]
+            nickname = k_enter_a
+            Cnd_SystemEnter = k_sys_a
+            Act_NNIds = 9, HISTORY
+
+            [Trigger]
             nickname = k_wrong_key
             system = k_sys_a
-            Cnd_True = no_params
+            Cnd_Timer = 1
+            Act_ActTrig = k_arrive_c
+
+            [Trigger]
+            nickname = k_arrive_c
+            Cnd_SystemEnter = k_sys_c
             Act_ActTrig = k_chosen
 
             [Trigger]
@@ -532,8 +545,115 @@ public sealed class StartPlanTests
 
         var replay = StartReplay.Run(Index(text), MissionStartPoint.At("k_chosen"));
 
-        Assert.Equal(["k_chosen", "k_leave_b"], Names(replay.ActiveSet).OrderBy(n => n, StringComparer.Ordinal));
-        Assert.Contains(replay.Changes, c => c.Kind == MachineChangeKind.Ran && c.Trigger.Nickname == "k_leave");
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["k_start", "k_leave", "k_arrive", "k_wrong_key", "k_leave_b", "k_arrive_c"],
+            Names(replay.Changes.Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger)));
+        Assert.Equal(["k_chosen", "k_enter_a"], Names(replay.ActiveSet).OrderBy(n => n, StringComparer.Ordinal));
+    }
+
+    /// <summary>A dock and a launch in the system of the condition before them show no new system, so a trigger of the
+    /// exit from that system still waits.</summary>
+    [Fact]
+    public void ADockAndALaunchInTheSameSystemShowNoExit()
+    {
+        const string text = """
+            [Trigger]
+            nickname = s_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = s_launch
+
+            [Trigger]
+            nickname = s_launch
+            Cnd_SpaceEnter = s_sys_a
+            Act_ActTrig = s_leave
+            Act_ActTrig = s_dock
+
+            [Trigger]
+            nickname = s_leave
+            Cnd_SystemExit = s_sys_a
+            Act_NNIds = 7, HISTORY
+
+            [Trigger]
+            nickname = s_dock
+            Cnd_BaseEnter = s_base_a
+            Act_ActTrig = s_launch_again
+
+            [Trigger]
+            nickname = s_launch_again
+            Cnd_SpaceEnter = s_sys_a
+            Act_ActTrig = s_chosen
+
+            [Trigger]
+            nickname = s_chosen
+            Cnd_Timer = 5
+            """;
+        var world = new MissionWorld(new Dictionary<MissionValueKind, IEnumerable<string>>
+        {
+            [MissionValueKind.System] = ["s_sys_a"],
+            [MissionValueKind.Base] = ["s_base_a"],
+        }, null, new Dictionary<string, string> { ["s_base_a"] = "s_sys_a" });
+
+        var replay = StartReplay.Run(Index(text, world), MissionStartPoint.At("s_chosen"));
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Contains("s_leave", Names(replay.ActiveSet));
+        Assert.DoesNotContain(replay.Changes, c => c.Kind == MachineChangeKind.Ran && c.Trigger.Nickname == "s_leave");
+    }
+
+    /// <summary>The entry runs a trigger only when its second system is the system before the jump or ANY. A trigger
+    /// that waits for an entry from a third system still waits.</summary>
+    [Fact]
+    public void TheEntryComparesTheSystemBeforeTheJump()
+    {
+        var replay = JumpReplay("j_chosen", launch: "Act_ActTrig = j_entry_from_c", triggers: """
+            [Trigger]
+            nickname = j_entry_from_c
+            Cnd_SystemEnter = j_sys_b, j_sys_c
+            Act_NNIds = 9, HISTORY
+            """);
+
+        Assert.Contains("j_entry_from_c", Names(replay.ActiveSet));
+        Assert.Contains(replay.Changes, c => c.Kind == MachineChangeKind.Ran && c.Trigger.Nickname == "j_entry");
+    }
+
+    /// <summary>The chosen trigger only starts in the replay, so its condition does not show a new system. A chosen
+    /// trigger that docks at a base of another system does not run the exit from the old system.</summary>
+    [Fact]
+    public void TheConditionOfTheChosenTriggerShowsNoNewSystem()
+    {
+        const string text = """
+            [Trigger]
+            nickname = d_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = d_launch
+
+            [Trigger]
+            nickname = d_launch
+            Cnd_SpaceEnter = d_sys_a
+            Act_ActTrig = d_leave
+            Act_ActTrig = d_chosen
+
+            [Trigger]
+            nickname = d_leave
+            Cnd_SystemExit = d_sys_a
+            Act_NNIds = 7, HISTORY
+
+            [Trigger]
+            nickname = d_chosen
+            Cnd_BaseEnter = d_base_b
+            """;
+        var world = new MissionWorld(new Dictionary<MissionValueKind, IEnumerable<string>>
+        {
+            [MissionValueKind.System] = ["d_sys_a", "d_sys_b"],
+            [MissionValueKind.Base] = ["d_base_b"],
+        }, null, new Dictionary<string, string> { ["d_base_b"] = "d_sys_b" });
+
+        var replay = StartReplay.Run(Index(text, world), MissionStartPoint.At("d_chosen"));
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["d_chosen", "d_leave"], Names(replay.ActiveSet).OrderBy(n => n, StringComparer.Ordinal));
     }
 
     [Fact]

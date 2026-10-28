@@ -169,7 +169,7 @@ internal static class StartPlaces
 
     /// <summary>The system of the base where the condition of a trigger shows the player docked: the base of a base
     /// condition or of Cnd_BaseExit. Null for another condition, and for a base that the world does not know.</summary>
-    internal static string? DockedSystemAt(MissionIndex index, MissionLine? condition) =>
+    private static string? DockedSystemAt(MissionIndex index, MissionLine? condition) =>
         BaseSystem(index, condition) ??
         (MissionIndex.Is(condition?.Key, "Cnd_BaseExit") &&
          Named(index, condition!, "base", MissionValueKind.Base) is { } dock
