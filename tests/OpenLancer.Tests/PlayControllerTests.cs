@@ -376,7 +376,7 @@ public sealed class PlayControllerTests : IDisposable
     /// does not show stops the play before its save, with the words of the agent.
     /// </summary>
     [Fact]
-    public void AnAgentStartInSpaceHasTheStartCheckWithTheWordsOfThePoint()
+    public async Task AnAgentStartInSpaceHasTheStartCheckWithTheWordsOfThePoint()
     {
         editor.Commit(1);
         editor.Finish(1);
@@ -385,7 +385,8 @@ public sealed class PlayControllerTests : IDisposable
         var started = play.Request(Space, null, PlaySaveRule.NoEdits, EditOrigin.Agent);
         play.Update(false, false);
 
-        Assert.True(started.IsCompletedSuccessfully && started.Result.Started);
+        Assert.True(started.IsCompletedSuccessfully);
+        Assert.True((await started).Started);
         Near(MovedStart, Assert.IsType<PlayStart.InSpace>(Assert.Single(starts).Start).Position);
         Assert.Contains("Agent Play: the start point is inside Zone_Br01_death. The ship starts 200 units behind the " +
                         "start point.", Console);
@@ -397,10 +398,12 @@ public sealed class PlayControllerTests : IDisposable
             PlaySaveRule.NoEdits, EditOrigin.Agent);
         play.Update(false, false);
 
-        Assert.Equal("NoSceneSystem", elsewhere.Result.Error!.Detail);
+        Assert.True(elsewhere.IsCompletedSuccessfully);
+        var refused = (await elsewhere).Error!;
+        Assert.Equal("NoSceneSystem", refused.Detail);
         Assert.Equal("Agent Play stopped: the Scene does not show li01 now, so Play cannot check the start point. Open " +
                      "the system, then start Play again.", Console[^1]);
-        Assert.Equal(Console[^1], elsewhere.Result.Error.Message);
+        Assert.Equal(Console[^1], refused.Message);
         Assert.Empty(SteLint.Problems(Console[^1]));
         Assert.Single(starts);
     }

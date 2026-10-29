@@ -167,7 +167,7 @@ public sealed class PlayRequestsTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ACancelClosesTheQuestionAsCancelAndALateClickStartsNothing(bool clickFirst)
+    public async Task ACancelClosesTheQuestionAsCancelAndALateClickStartsNothing(bool clickFirst)
     {
         var host = new FakeAgentHost { UnsavedMod = "ol_mod" };
         var rules = new List<PlaySaveRule>();
@@ -181,16 +181,16 @@ public sealed class PlayRequestsTests : IDisposable
             host.Click(0);
         host.RunWithdrawn();
 
-        Assert.True(result.Wait(Wait));
+        var error = (await result.WaitAsync(Wait, TestContext.Current.CancellationToken)).Error!;
         Assert.Empty(rules);
         Assert.False(host.QuestionShows);
         Assert.Equal((EditErrorKind.Refused, PlayRequests.NotSavedDetail, PlayRequests.NotSavedReason),
-            (result.Result.Error!.Kind, result.Result.Error.Detail, result.Result.Error.Message));
+            (error.Kind, error.Detail, error.Message));
     }
 
     /// <summary>A cancel after the answer changes nothing: the play that the user allowed goes on.</summary>
     [Fact]
-    public void ACancelAfterTheAnswerKeepsThePlay()
+    public async Task ACancelAfterTheAnswerKeepsThePlay()
     {
         var host = new FakeAgentHost { UnsavedMod = "ol_mod" };
         var rules = new List<PlaySaveRule>();
@@ -198,12 +198,12 @@ public sealed class PlayRequestsTests : IDisposable
 
         var result = PlayRequests.WithAgentRule(host, EditOrigin.Agent, () => PlayStatus.Idle, Start(rules), cancel.Token);
         host.Click(0);
-        cancel.Cancel();
+        await cancel.CancelAsync();
         host.RunWithdrawn();
 
-        Assert.True(result.Wait(Wait));
+        var started = await result.WaitAsync(Wait, TestContext.Current.CancellationToken);
         Assert.Equal([PlaySaveRule.Save], rules);
-        Assert.True(result.Result.Started);
+        Assert.True(started.Started);
     }
 
     /// <summary>Starts the play: it keeps the save rule of each start.</summary>
