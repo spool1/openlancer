@@ -4,7 +4,7 @@ OpenLancer has an agent server. An agent program, for example Claude Code, conne
 
 The agent reads the data as the editor shows it. It reads the systems and their items, the data lists, the assets, the missions and the cutscenes. It also reads the raw INI text and the problems of the checks. In the editor, the agent can also open views, select items, and get images of a system, of a cutscene and of a panel.
 
-The agent can also edit the items of the active mod. It sets fields and texts, renames, deletes and copies items, and undoes its own edits. It creates objects, zones and lights, places assets and prop groups, moves items and makes items from templates. Each agent edit goes through the same commands, checks and Undo history as an edit of the user. An edit changes the edit view of the editor. It is not saved until you or the agent save the mod. See "The edit tools", "The Scene and data tools" and "Save". In the editor, the agent can also start and stop Play. See "Play".
+The agent can also edit the items of the active mod. It sets fields and texts, renames, deletes and copies items, and undoes its own edits. It creates objects, zones and lights, places assets and prop groups, moves items and makes items from templates. Each agent edit goes through the same commands, checks and Undo history as an edit of the user. An edit changes the edit view of the editor. It is not saved until you or the agent save the mod. See "The edit tools", "The Scene and data tools" and "Save". In the editor, the agent can also start and stop Play. See "Play". The editor marks each agent edit, and you can pause the agent edits. See "What you see in the editor".
 
 ## The two hosts
 
@@ -27,7 +27,7 @@ Use the editor host when you work in the editor. The agent then sees your unsave
 6. Paste the text into the file `.mcp.json` in the folder of your agent project.
 7. Start the agent program in that folder.
 
-The status bar shows the state of the server, for example "Agent server: on, port 47815". While an agent calls, it shows the name of the agent program. Click the status bar segment to open the Agent menu.
+The status bar shows the state of the server, for example "Agent server: on, port 47815". While an agent calls, it shows the name of the agent program and the number of its edits since the last save, for example "Agent: claude-code, 3 edits". While you pause the agent edits, it shows "Agent paused". Click the status bar segment to open the Agent menu.
 
 ### The .mcp.json entry
 
@@ -67,6 +67,8 @@ Else the helper prints no token and exits with the code 2. It writes the reason 
 |---|---|
 | Start agent server | Starts the server on the port of the settings. At the first start, a notice tells what the agent reads. |
 | Stop agent server | Stops the server at once. |
+| Pause agent edits | Stops all agent edits until you pick **Resume agent edits**. The agent can still read the data. |
+| Follow agent | Opens and frames the item of each agent edit. It is on by default. It stops when you move the camera or select an item. |
 | Connect an agent... | Shows the text for `.mcp.json` and a Copy button. |
 | Show agent messages | Shows the messages of the server in the Console. |
 | Start the agent server with the editor | Starts the server when the editor starts. The server is off by default. |
@@ -198,7 +200,7 @@ When one step fails, the error `step_failed` gives its index and its error, and 
 
 One call names at most 200 items and changes at most 2000 sections. One batch has at most 100 steps, and one route has at most 50 legs. **Agent > Agent settings > Advanced** changes these limits. A call above a limit gives the error `limit` and changes nothing. The size limit of a result applies to an edit too. The edit checks the size of its result before it applies, so a larger edit also changes nothing.
 
-While you pause the agent edits, each tool that changes data, writes files or starts a play gives the error `paused`. Examples are the edit tools, `undo`, `redo`, `save`, `export_mod` and `play`. The read tools still work, also `publish_checklist`. `play_stop` also works, so the agent can stop its game. A later version adds **Pause agent edits** to the Agent menu.
+While you pause the agent edits, each tool that changes data, writes files or starts a play gives the error `paused`. Examples are the edit tools, `undo`, `redo`, `save`, `export_mod` and `play`. The read tools still work, also `publish_checklist`. `play_stop` also works, so the agent can stop its game. Pick **Agent > Pause agent edits** to pause the agent edits, and **Resume agent edits** to let the agent edit again.
 
 The edit tools refuse with `read_only` when the editor takes no edits, and the message tells the reason. For example, another editor has the mod open, or the profile or the active mod is in the game folder. A mod in the OpenLancer repo also refuses until you allow its edits.
 
@@ -310,6 +312,29 @@ While a game runs, `play` gives `refused`, and the agent calls `play_stop` first
 When Play saves the active mod, the save gate runs first, as for `save`. When the save stops, `play` gives `save_blocked` or `changed_on_disk`, and the game does not start. A second play request of an agent gives `busy` until the earlier request ends, because one dialog shows the question. Without an open profile, `play` gives `not_available`, as the tools that read the profile do. `play_stop` also works without a profile.
 
 `play_stop` stops the game of Play in OpenLancer, else the game of a play copy, as Shift+F5 does. It gives what it stopped and the state of Play. A play and a stop are not Undo steps.
+
+### What you see in the editor
+
+The editor shows each agent edit in the Console, in the Scene, in the Hierarchy and in the status bar.
+
+| Place | What it shows |
+|---|---|
+| Console | Each agent edit adds an Info entry with the source "Agent" and the label of the edit, for example "Create Zone_test_01.". Click the entry to select its item. A refused call of a tool that changes data adds a warning with the tool and the reason. An undo and a redo of the agent add an entry too. A preview and a read tool add no entry. **Agent > Show agent messages** shows only the entries of the agent. |
+| Scene | A pulse ring in the agent color goes around each item of an agent edit for 4 seconds. |
+| Hierarchy | A robot glyph at the right end of a row shows an item that an agent edit changed after the last save. The blue mark of the unsaved edit stays, so the row shows both marks. `list_items` gives the same mark as `agent_changed`. |
+| Status bar | The agent program and the number of its edits since the last save, or "Agent paused". |
+
+An undo of an agent edit removes its marks, and a redo puts them back. A save clears the marks.
+
+#### Follow mode
+
+With **Agent > Follow agent** on, the editor opens the system of each agent edit and moves the camera to its item. The selection then follows Unity. A create or a copy selects the new item, a delete clears the selection, and a rename keeps it. An undo of an agent delete selects the item again. An item without a place in the Scene, for example a loadout, shows in the Inspector, and the view does not change.
+
+When you move the camera of the Scene or select an item, follow mode stops. Click **Follow agent** to start it again. The settings keep the last value that you clicked, so follow mode is on again at the next start of the editor. With follow mode off, the agent changes the view and the selection only with `open_view` and `select_items`. When an agent edit removes the selected item, the selection goes, as after an undo.
+
+#### Pause
+
+**Agent > Pause agent edits** stops each agent edit until you pick **Resume agent edits**. A click on the agent segment of the status bar opens the same menu. While you pause, each tool that changes data, writes files or starts a play gives the error `paused`. The read tools, the view tools, `publish_checklist` and `play_stop` still work. The pause stays when you stop and start the server again.
 
 ## Permission rules for the agent program
 

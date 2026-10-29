@@ -1,6 +1,6 @@
 # OpenLancer
 
-OpenLancer makes Freelancer (2003) openly moddable. It adds a mod overlay with a load order, and an editor for the game content. The editor has data editors, a 3D scene editor for star systems, a mission studio, and a cutscene editor. An MCP server lets AI agents read the game content and see the editor views, and edit tools for agents come next. OpenLancer runs on its own fork of the [Librelancer](https://codeberg.org/Librelancer/Librelancer) engine. The fork is a git submodule at `external/Librelancer` (see docs/UPSTREAM.md).
+OpenLancer makes Freelancer (2003) openly moddable. It adds a mod overlay with a load order, and an editor for the game content. The editor has data editors, a 3D scene editor for star systems, a mission studio, and a cutscene editor. An MCP server lets AI agents read the game content, see the editor views and edit the systems and the data of a mod. Mission and cutscene edits for agents come next. OpenLancer runs on its own fork of the [Librelancer](https://codeberg.org/Librelancer/Librelancer) engine. The fork is a git submodule at `external/Librelancer` (see docs/UPSTREAM.md).
 
 ![The OpenLancer editor: the Scene view of New York (Li01) with the Hierarchy and the Assets panel](docs/images/editor-view.gif)
 
@@ -135,7 +135,7 @@ Open the Cutscenes tab of the editor to browse the retail cutscenes and the cuts
 
 ## Agents (MCP)
 
-OpenLancer has an agent server: an MCP (Model Context Protocol) server. An AI agent, for example Claude Code, uses it to read the game content of a profile and to see the views of the editor. The goal is that agents make content with the same tools as a modder: systems and areas, NPC ships, loot wrecks, missions and cutscenes. The edit tools come in parts, after the read and view tools that are in the editor now.
+OpenLancer has an agent server: an MCP (Model Context Protocol) server. An AI agent, for example Claude Code, uses it to read the game content of a profile, to see the views of the editor and to edit the active mod. The goal is that agents make content with the same tools as a modder: systems and areas, NPC ships, loot wrecks, missions and cutscenes. The agent edits the items of the systems and the data of the active mod now. It also saves, exports and starts Play. The mission and cutscene edit tools come next.
 
 **Connect an agent**
 
@@ -149,10 +149,11 @@ Without the editor, `oltool mcp serve <profile.json> --mod <id>` starts the same
 
 - The server listens only on 127.0.0.1, on one fixed port. Each request needs the token of the session. No other computer can connect.
 - A tool reads the profile through the edit session of the editor. The path rules refuse each path outside the profile.
-- The edit tools will use the same commands, checks, save gate and undo as the editor. They will change only the active mod, never a game folder or another mod. You see each agent edit in the editor and can undo it.
+- The edit tools use the same commands, checks, save gate and undo as the editor. They change only the active mod, never a game folder or another mod. Each agent edit is one Undo step.
+- The editor marks each agent edit in the Console, the Scene and the Hierarchy, and follows it with the camera. **Agent > Pause agent edits** stops all agent edits until you resume them.
 - When an agent starts Play and the mod has unsaved edits, the editor asks you to save first. A setting turns on an automatic save for agents.
 
-**Tools of the server now (read and view)**
+**Tools of the server now (read, view and edit)**
 
 | Group | Tools | What they do |
 |---|---|---|
@@ -163,13 +164,15 @@ Without the editor, `oltool mcp serve <profile.json> --mod <id>` starts the same
 | Cutscenes | `list_cutscenes`, `get_cutscene` | The cutscene scripts with their entities and events |
 | Checks | `check`, `get_console` | The problems of the mod, and the Console of the editor |
 | Views (editor only) | `open_view`, `select_items`, `render_scene`, `render_cutscene`, `capture_panel` | Open a system, a mission or a cutscene, select an item, and get images of the Scene, a cutscene frame or a panel. The views of the user do not move. |
+| Edits | `set_fields`, `set_text`, `rename_item`, `delete_items`, `duplicate_items`, `undo`, `redo`, `edit_batch` | Change the fields, the texts and the nicknames of items, delete and copy items of a system, and undo the edits of the agent |
+| Scene and data | `scene_create_object`, `scene_create_zone`, `scene_create_light`, `scene_spawn_asset`, `scene_transform`, `scene_set_component`, `scene_place_wreck`, `scene_place_patrol_route`, `scene_set_encounters`, `prop_group_place`, `prop_group_save`, `prop_group_rename`, `prop_group_delete`, `create_loadout`, `create_from_template` | Create and move the items of a system, place wrecks, patrol routes and prop groups, and make loadouts and items from templates |
+| Save, export and Play | `save`, `export_mod`, `publish_checklist`, `play`, `play_stop` | Save the active mod, export it, give the publish checklist, and start and stop Play (editor only) |
 
 **Tools that come next (edits)**
 
 | Part | Tools |
 |---|---|
-| Scene and data edits (MCP1-2) | `set_fields`, `set_text`, `rename_item`, `delete_items`, `duplicate_items`, `scene_create_object`, `scene_create_zone`, `scene_create_light`, `scene_spawn_asset`, `scene_transform`, `scene_set_component`, `scene_place_wreck`, `scene_place_patrol_route`, `scene_set_encounters`, `prop_group_place`, `create_loadout`, `create_from_template`, and `save`, `undo`, `redo`, `edit_batch`, `export_mod`, `publish_checklist`, `play`, `play_stop` |
 | Mission edits (MCP1-3) | `mission_edit`, `mission_add_trigger`, `mission_set_condition`, `mission_add_action`, `mission_set_action`, `mission_move_action`, `mission_link_triggers`, `mission_insert_trigger`, `mission_add_item`, `mission_place_prefab`, `mission_start_plan`, `mission_play`, `mission_play_trace` |
 | Cutscene edits (MCP1-4) | `cutscene_create`, `cutscene_add_entity`, `cutscene_add_event`, `cutscene_move_events`, `cutscene_set_duration`, `cutscene_set_flags` |
 
-Examples of requests to an agent now: "Show me an image of New York from above." "Which triggers of Mission 4 spawn ships, and when?" "Run Mission 1 in a dry run up to the first checkpoint, and tell me which triggers wait."
+Examples of requests to an agent now: "Show me an image of New York from above." "Which triggers of Mission 4 spawn ships, and when?" "Run Mission 1 in a dry run up to the first checkpoint, and tell me which triggers wait." "Make a patrol route with three legs in New York, put a wreck with cargo at its end, and save the mod."
