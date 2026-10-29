@@ -11,9 +11,10 @@ using Xunit;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The color of the mission layer (decision D557 of the M6a design). Its hue differs by 25 degrees or more from each
-/// color of <see cref="EditorTheme"/> and <see cref="ObjectKinds"/>. So no other meaning uses it. A grey has no hue, so
-/// the test leaves out the colors with a saturation below 0.15.
+/// The color of the mission layer (decision D557 of the M6a design) and the agent color (section 8.5 of the MCP1 design).
+/// The hue of each one differs by 25 degrees or more from each other color of <see cref="EditorTheme"/> and
+/// <see cref="ObjectKinds"/>. So no other meaning uses it. A grey has no hue, so the test leaves out the colors with a
+/// saturation below 0.15.
 /// </summary>
 public sealed class ThemeColorTests
 {
@@ -34,11 +35,11 @@ public sealed class ThemeColorTests
         return ((hue * 60 + 360) % 360, saturation);
     }
 
-    /// <summary>The colors of the theme and of all kinds, without the mission color.</summary>
-    private static IEnumerable<(string Name, Vector4 Color)> OtherColors()
+    /// <summary>The colors of the theme and of all kinds, without one color of the theme.</summary>
+    private static IEnumerable<(string Name, Vector4 Color)> OtherColors(string except)
     {
         foreach (var field in typeof(EditorTheme).GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
-                     .Where(f => f.FieldType == typeof(Vector4) && f.Name != nameof(EditorTheme.MissionItem)))
+                     .Where(f => f.FieldType == typeof(Vector4) && f.Name != except))
             yield return (field.Name, (Vector4)field.GetValue(null)!);
         foreach (var type in new[] { typeof(ObjectKinds) }.Concat(typeof(ObjectKinds).GetNestedTypes()))
         {
@@ -48,11 +49,15 @@ public sealed class ThemeColorTests
         }
     }
 
-    [Fact]
-    public void TheMissionColorHasItsOwnHue()
+    /// <summary>The mission color and the agent color each have a hue that no other color of the theme or of the kinds
+    /// is near. The agent color is the only hue of the theme that is 25 degrees or more from each other color.</summary>
+    [Theory]
+    [InlineData(nameof(EditorTheme.MissionItem))]
+    [InlineData(nameof(EditorTheme.Agent))]
+    public void TheMissionColorAndTheAgentColorHaveTheirOwnHue(string own)
     {
-        var (hue, saturation) = Hsv(EditorTheme.MissionItem);
-        var others = OtherColors().ToList();
+        var (hue, saturation) = Hsv(ThemeColor(own));
+        var others = OtherColors(own).ToList();
 
         Assert.True(saturation >= MinSaturation);
         Assert.True(others.Count > 40, $"The test found only {others.Count} colors.");
@@ -63,7 +68,7 @@ public sealed class ThemeColorTests
                 continue;
             var distance = MathF.Abs(hue - otherHue);
             distance = MathF.Min(distance, 360 - distance);
-            Assert.True(distance >= 25, $"{name} has a hue of {otherHue:0} degrees, only {distance:0} degrees from the mission color.");
+            Assert.True(distance >= 25, $"{name} has a hue of {otherHue:0} degrees, only {distance:0} degrees from {own}.");
         }
     }
 
@@ -107,8 +112,8 @@ public sealed class ThemeColorTests
     }
 
     /// <summary>The run color of the dry run (decision D761 of the M6c design) differs in hue by 25 degrees or more from
-    /// the colors of a selection, an error, a warning, a success, the mission items and the prefab overrides. The theme
-    /// has no agent color yet, so the test cannot check it.</summary>
+    /// the colors of a selection, an error, a warning, a success, the mission items, the prefab overrides and the agent
+    /// marks.</summary>
     [Theory]
     [InlineData(nameof(EditorTheme.Accent))]
     [InlineData(nameof(EditorTheme.Error))]
@@ -116,6 +121,7 @@ public sealed class ThemeColorTests
     [InlineData(nameof(EditorTheme.Success))]
     [InlineData(nameof(EditorTheme.MissionItem))]
     [InlineData(nameof(EditorTheme.Override))]
+    [InlineData(nameof(EditorTheme.Agent))]
     public void TheRunColorHasItsOwnHue(string other)
     {
         var (hue, saturation) = Hsv(EditorTheme.MissionRun);
@@ -125,9 +131,6 @@ public sealed class ThemeColorTests
 
         Assert.True(saturation >= MinSaturation);
         Assert.True(distance >= 25, $"{other} has a hue of {otherHue:0} degrees, only {distance:0} degrees from the run color.");
-        // When the theme gets the agent color of MCP1, this test must check it too (decision D761).
-        Assert.True(typeof(EditorTheme).GetField("Agent", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) == null,
-            "Add the agent color to the cases of this test.");
     }
 
     /// <summary>The violet bar of an override is a mark that is not text, so it needs a contrast of 3:1 or more against
@@ -142,6 +145,20 @@ public sealed class ThemeColorTests
         var contrast = Contrast(EditorTheme.Override, ThemeColor(background));
 
         Assert.True(contrast >= 3, $"The override color has a contrast of {contrast:0.00}:1 on {background}.");
+    }
+
+    /// <summary>The robot glyph of an agent edit and the pulse ring are marks that are not text, so they need a contrast
+    /// of 3:1 or more against the Hierarchy and the selected row (WCAG 1.4.11).</summary>
+    [Theory]
+    [InlineData(nameof(EditorTheme.Panel))]
+    [InlineData(nameof(EditorTheme.SectionHover))]
+    [InlineData(nameof(EditorTheme.Pressed))]
+    [InlineData(nameof(EditorTheme.Backdrop))]
+    public void TheAgentMarkHasContrastOnEachPanel(string background)
+    {
+        var contrast = Contrast(EditorTheme.Agent, ThemeColor(background));
+
+        Assert.True(contrast >= 3, $"The agent color has a contrast of {contrast:0.00}:1 on {background}.");
     }
 
     [Fact]

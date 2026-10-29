@@ -8,6 +8,7 @@ using LibreLancer.Data.GameData.World;
 using LibreLancer.ImUI;
 using LibreLancer.Render;
 using LibreLancer.World;
+using OpenLancer.Editor.Agent;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Studio.Commands;
 
@@ -29,6 +30,11 @@ internal sealed class SceneOverlay(EditorWindow window, IReadOnlyDictionary<Syst
     private const float SelectionThickness = 2;
     private const float HoverThickness = 1.5f;
     private const float HintMargin = 8;
+    private const float PulseThickness = 2;
+
+    // The pulse ring of an agent edit grows from the brackets to this factor of their radius in each period.
+    private const float PulseGrowth = 0.6f;
+    private const float PulsePeriod = 1;
     private static readonly Vector2 PillPadding = new(5, 1);
     private static readonly Vector2 ShadowOffset = new(1, 1);
 
@@ -38,6 +44,7 @@ internal sealed class SceneOverlay(EditorWindow window, IReadOnlyDictionary<Syst
     private static readonly uint SelectedLabelColor = EditorTheme.ToAbgr(EditorTheme.TextBright);
     private static readonly uint SelectionColor = EditorTheme.ToAbgr(EditorTheme.Accent);
     private static readonly uint HoverColor = EditorTheme.ToAbgr(EditorTheme.Highlight);
+    private static readonly Vector4 PulseColor = EditorTheme.Agent;
 
     private readonly List<SceneMarker> labelOrder = [];
     private readonly List<(Vector2 Min, Vector2 Max)> placedLabels = [];
@@ -63,6 +70,10 @@ internal sealed class SceneOverlay(EditorWindow window, IReadOnlyDictionary<Syst
     /// <summary>The items that the cross-links of the Mission tab highlight, for example the gate of a lock line
     /// (section 7.3 of the M6a design). Each one gets brackets and its label.</summary>
     public IReadOnlyCollection<object> Highlighted { get; set; } = [];
+
+    /// <summary>The items of the agent edits whose pulse runs, with the time since the start of each pulse (section 8.5 of
+    /// the MCP1 design). The Scene sets them in each frame.</summary>
+    public IReadOnlyList<(object Item, TimeSpan Age)> Pulses { get; set; } = [];
 
     /// <summary>Forgets the markers and the cached labels. Call it when a system opens or closes.</summary>
     public void Reset()
@@ -111,6 +122,11 @@ internal sealed class SceneOverlay(EditorWindow window, IReadOnlyDictionary<Syst
             {
                 DrawGlyph(drawList, marker);
             }
+        }
+
+        foreach (var (item, age) in Pulses)
+        {
+            DrawPulse(drawList, item, age);
         }
 
         if (hovered != null && !Equals(hovered, window.Selection))
@@ -214,6 +230,29 @@ internal sealed class SceneOverlay(EditorWindow window, IReadOnlyDictionary<Syst
         Corner(drawList, new Vector2(max.X, min.Y), new Vector2(-arm.X, arm.Y), color, thickness);
         Corner(drawList, max, new Vector2(-arm.X, -arm.Y), color, thickness);
         Corner(drawList, new Vector2(min.X, max.Y), new Vector2(arm.X, -arm.Y), color, thickness);
+    }
+
+    /// <summary>
+    /// The pulse ring of an item of an agent edit, in the agent color: a ring around the brackets that fades over the
+    /// time of the pulse, and a wave that grows from it once in each second.
+    /// </summary>
+    private void DrawPulse(ImDrawListPtr drawList, object item, TimeSpan age)
+    {
+        if (!BracketBounds(item, out var min, out var max))
+        {
+            return;
+        }
+
+        var scale = ImGuiHelper.Scale;
+        var radius = MathF.Max(Vector2.Distance(min, max) / 2, BracketMinSize * scale / 2) + BracketPadding * scale;
+        var center = (min + max) / 2;
+        var seconds = (float)age.TotalSeconds;
+        var fade = Math.Clamp(1 - seconds / (float)AgentMarks.PulseTime.TotalSeconds, 0, 1);
+        var cycle = seconds % PulsePeriod / PulsePeriod;
+        var thickness = PulseThickness * scale;
+        drawList.AddCircle(center, radius, ImGui.GetColorU32(PulseColor with { W = fade }), 0, thickness);
+        drawList.AddCircle(center, radius * (1 + PulseGrowth * cycle),
+            ImGui.GetColorU32(PulseColor with { W = fade * (1 - cycle) }), 0, thickness);
     }
 
     private static void Corner(ImDrawListPtr drawList, Vector2 corner, Vector2 arm, uint color, float thickness)

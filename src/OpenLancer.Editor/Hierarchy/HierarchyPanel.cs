@@ -409,11 +409,45 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
             return;
         }
 
-        ListRow.Text(start, textStart, right, node.Kind.Icon, node.Kind.Abgr, node.Name, node.Detail, node.CountText);
+        // The robot glyph of an agent edit takes the right end of the row, so the text ends before it.
+        var agentMarked = section != null && window.AgentMarks.Marked(section);
+        var textRight = agentMarked ? right - AgentMarkWidth() : right;
+        ListRow.Text(start, textStart, textRight, node.Kind.Icon, node.Kind.Abgr, node.Name, node.Detail, node.CountText);
         ProblemMark(node.Problem, start, right);
         if (section != null)
         {
             Mark(HierarchyModel.MarkOf(window.Session?.Edits.Get(section)), start, textStart);
+        }
+
+        if (agentMarked)
+        {
+            AgentMark(start, right);
+        }
+    }
+
+    /// <summary>The tooltip of the robot glyph of a row.</summary>
+    internal const string AgentMarkTip =
+        "An agent edit changed this item after the last save. An undo of the agent edit or a save removes the mark.";
+
+    /// <summary>The width of the robot glyph and the gap before it, in pixels.</summary>
+    private static float AgentMarkWidth() =>
+        ImGui.CalcTextSize(EditorIcons.Robot.ToString()).X + ImGui.GetStyle().FramePadding.X + ImGui.GetStyle().ItemSpacing.X;
+
+    /// <summary>
+    /// The mark of a row that an agent edit changed after the last save (section 8.5 of the MCP1 design): the robot glyph
+    /// in the agent color at the right end of the row. The blue bar of the unsaved edit stays, so the row shows both
+    /// marks.
+    /// </summary>
+    private static void AgentMark(Vector2 start, float right)
+    {
+        var text = EditorIcons.Robot.ToString();
+        var size = ImGui.CalcTextSize(text);
+        var height = ImGui.GetFrameHeight();
+        var min = new Vector2(right - size.X - ImGui.GetStyle().FramePadding.X, start.Y + (height - size.Y) / 2);
+        ImGui.GetWindowDrawList().AddText(min, ImGui.GetColorU32(EditorTheme.Agent), text);
+        if (ImGui.IsMouseHoveringRect(min, min + size))
+        {
+            ImGui.SetTooltip(AgentMarkTip);
         }
     }
 

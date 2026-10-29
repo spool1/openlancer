@@ -90,6 +90,12 @@ internal static class EditorTheme
     /// and the prefab overrides. Each run state also has a glyph and a word, so no state depends on color alone.</summary>
     public static readonly Vector4 MissionRun = Rgb(0x3CCFA5);
 
+    /// <summary>The marks of the agent edits (section 8.5 of the MCP1 design, decision D718): the pulse ring in the Scene
+    /// and the robot glyph of a Hierarchy row. Its hue differs by 25 degrees or more from each other color of the theme
+    /// and of the kinds, so no other meaning uses it. The robot glyph also marks the row, so no mark depends on color
+    /// alone.</summary>
+    public static readonly Vector4 Agent = Rgb(0xC3E65C);
+
     /// <summary>The brackets and lines of an item under the mouse, and of the items that the cross-links of the Mission
     /// tab name. It is a light grey, so it does not look like the blue of the selection (UI rule 7).</summary>
     public static readonly Vector4 Highlight = Label;

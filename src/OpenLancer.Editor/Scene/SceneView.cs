@@ -434,6 +434,7 @@ internal sealed class SceneView : IDisposable
         var mouse = ImGui.GetMousePos();
         var hoverMouse = sceneHovered && !active ? mouse : (Vector2?)null;
         hovered = hoverMouse is { } point && gizmo.HitTest(point) == null ? overlay.Markers.HitTest(point) : null;
+        overlay.Pulses = Pulses();
         overlay.Draw(hovered, gizmo.Bounds, hoverMouse is { } at ? cycle.Hint(at, window.Selection) : null);
         // The gizmo draws over the markers and the labels. A handle over the axis widget wins over the widget.
         transform.Draw(camera, projection);
@@ -447,6 +448,27 @@ internal sealed class SceneView : IDisposable
         // moves the item in the same frame.
         stage.Flush();
         stage.RenderUpdate(elapsed);
+    }
+
+    /// <summary>The items of the open system whose agent pulse runs now (section 8.5 of the MCP1 design).</summary>
+    private IReadOnlyList<(object Item, TimeSpan Age)> Pulses()
+    {
+        var pulses = window.AgentMarks.Pulses();
+        if (pulses.Count == 0)
+        {
+            return [];
+        }
+
+        var items = new List<(object Item, TimeSpan Age)>();
+        foreach (var (section, age) in pulses)
+        {
+            if (ItemOf(section) is { } item and not StarSystem)
+            {
+                items.Add((item, age));
+            }
+        }
+
+        return items;
     }
 
     /// <summary>

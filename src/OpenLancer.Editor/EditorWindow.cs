@@ -768,6 +768,8 @@ internal sealed partial class EditorWindow : Game
 
         RefreshOnFocus();
         ReopenAfterReload();
+        // The marks follow the session of the open profile before an agent call can change it.
+        AgentMarks.Track(Session?.Edits);
         // The session part of at most one agent call runs before the panels draw (decision D708 of the MCP1 design).
         agentController.Frame();
         agentRender.Frame();

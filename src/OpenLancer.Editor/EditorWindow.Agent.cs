@@ -24,6 +24,9 @@ internal sealed partial class EditorWindow : IAgentEditor
     private EditorAgentViews agentViews = null!;
     private EditorAgentPlay agentPlay = null!;
 
+    /// <summary>The pulse rings and the robot glyphs of the agent edits (section 8.5 of the MCP1 design).</summary>
+    internal AgentMarks AgentMarks { get; } = new(() => System.DateTime.UtcNow);
+
     /// <summary>The agent server, its menu and its render service. The window makes them before its first
     /// frame.</summary>
     private void MakeAgent()

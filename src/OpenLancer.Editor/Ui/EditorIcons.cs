@@ -107,7 +107,11 @@ internal static class EditorIcons
     public const char CaretDown = '\uf0d7';
     public const char CaretRight = '\uf0da';
     public const char Play = '\uf04b';
+    public const char Pause = '\uf04c';
     public const char Stop = '\uf04d';
+
+    // The mark of the agent edits in the Hierarchy (section 8.5 of the MCP1 design).
+    public const char Robot = '\uf544';
 
     // The Preview controls of a cutscene have the circle icons, so they do not look like the Play of the game (section
     // 7.7 of the M8 design).
