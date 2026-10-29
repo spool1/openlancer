@@ -43,8 +43,8 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
     internal const string Tip =
         "Opens and frames the item of each agent edit. Follow mode stops when you move the camera or select an item.";
 
-    /// <summary>The first removed item of each agent delete, by the label of its entry, so an agent undo of the delete
-    /// selects the item again (decision D249).</summary>
+    /// <summary>The first removed item of each agent delete, by the label of its entry, so an undo of the delete selects
+    /// the item again (decision D249).</summary>
     private readonly Dictionary<string, string> deleted = [];
 
     private EditSession? session;
@@ -134,6 +134,15 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
         if (On && tool == "undo" && deleted.TryGetValue(label, out var reference))
             Show([reference], select: true);
     }
+
+    /// <summary>
+    /// The first item of the agent delete with the label of an entry, when the edit view has the item again, else null.
+    /// The undo of the user selects it, as the undo of a delete of the user does (decision D249). This works also with
+    /// follow mode off, because the user asked for the undo.
+    /// </summary>
+    /// <param name="label">The label of the entry that the undo took back.</param>
+    public SectionRef? DeletedItem(string label) =>
+        session != null && deleted.TryGetValue(label, out var reference) ? SectionOf(reference) : null;
 
     /// <summary>
     /// Shows the first item of an edit: in the Scene for an item of a system, else in the Inspector. An item of a system

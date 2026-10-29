@@ -328,7 +328,7 @@ An undo of an agent edit removes its marks, and a redo puts them back. A save cl
 
 #### Follow mode
 
-With **Agent > Follow agent** on, the editor opens the system of each agent edit and moves the camera to its item. The selection then follows Unity. A create or a copy selects the new item, a delete clears the selection, and a rename keeps it. An undo of an agent delete selects the item again. An item without a place in the Scene, for example a loadout, shows in the Inspector, and the view does not change.
+With **Agent > Follow agent** on, the editor opens the system of each agent edit and moves the camera to its item. The selection then follows Unity. A create or a copy selects the new item, a delete clears the selection, and a rename keeps it. When the agent undoes its delete, follow mode selects the item again. When you undo an agent delete, the Scene selects the item again, as after the undo of your own delete. This is also true with follow mode off. An item without a place in the Scene, for example a loadout, shows in the Inspector, and the view does not change.
 
 When you move the camera of the Scene or select an item, follow mode stops. Click **Follow agent** to start it again. The settings keep the last value that you clicked, so follow mode is on again at the next start of the editor. With follow mode off, the agent changes the view and the selection only with `open_view` and `select_items`. When an agent edit removes the selected item, the selection goes, as after an undo.
 

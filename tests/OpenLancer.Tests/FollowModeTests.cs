@@ -141,6 +141,26 @@ public sealed class FollowModeTests
         Assert.Equal(2, entries.Count(e => e.Severity == OpenLancer.Editor.Logs.ConsoleSeverity.Error));
     }
 
+    /// <summary>An undo of the user of an agent delete finds the first item of the delete, so the Scene selects it again
+    /// (decision D249). This works also with follow mode off, because the user asked for the undo. A label of an entry
+    /// of the user is not an agent delete.</summary>
+    [Fact]
+    public void AnUndoOfTheUserFindsTheItemOfAnAgentDelete()
+    {
+        var (ws, session, editor, host) = Editor();
+        using var _ = ws;
+        editor.Follow.Set(false);
+
+        Ok(host, "delete_items", """{ "refs": ["obj:Li01_dock"], "confirm": true }""");
+        var label = session.UndoLabel!;
+        Assert.Null(editor.Follow.DeletedItem(label));
+        session.Undo();
+
+        Assert.Equal(Dock, editor.Follow.DeletedItem(label));
+        Assert.Null(editor.Follow.DeletedItem(label.Replace("Agent: ", "")));
+        Assert.Empty(editor.FollowView.Shown);
+    }
+
     /// <summary>A rename keeps the selection: a selected section gets its new reference.</summary>
     [Fact]
     public void ARenameKeepsTheSelection()

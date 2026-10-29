@@ -552,12 +552,16 @@ internal sealed class SceneEdits(EditorWindow window)
     /// selects the item again (decision D249).</summary>
     private readonly System.Collections.Generic.Dictionary<string, SectionRef> deleted = [];
 
-    /// <summary>Selects the item of a delete again after the undo of the delete, as Unity does. Other undos change no
+    /// <summary>Selects the item of a delete again after the undo of the delete, as Unity does. This is also true for an
+    /// agent delete, which follow mode keeps (review finding of MCP1-2, step 8). Other undos change no
     /// selection.</summary>
     /// <param name="label">The label of the entry that the undo took back, or null.</param>
     public void Undone(string? label)
     {
-        if (label != null && deleted.TryGetValue(label, out var section) && window.Session?.Edits.Get(section) != null)
+        if (label == null)
+            return;
+        var section = deleted.TryGetValue(label, out var own) ? own : window.AgentFollow.DeletedItem(label);
+        if (section != null && window.Session?.Edits.Get(section) != null)
             window.Scene.SelectWhenShown(section);
     }
 
