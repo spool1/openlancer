@@ -94,6 +94,15 @@ public sealed record EditChange(IReadOnlyList<SectionRef> Sections, bool Structu
     /// not change in the end. A restore of unsaved edits lists its files here and no section. The mission editor gives
     /// the new script versions from it (section 4.2 of the M6b design).</summary>
     public IReadOnlyList<string> Files { get; init; } = [];
+
+    /// <summary>Who made the entry of the edit history: the user, an agent or the restore of the unsaved edits. A step of
+    /// a transaction has the origin of its transaction. The marks of the agent edits read it (section 8.5 of the MCP1
+    /// design).</summary>
+    public EditOrigin Origin { get; init; } = EditOrigin.User;
+
+    /// <summary>True when the change takes the entry back: an undo, or the cancel of a transaction. Then
+    /// <see cref="Renames"/> go in the other direction.</summary>
+    public bool Undone { get; init; }
 }
 
 /// <summary>The result of <see cref="EditSession.Save"/>.</summary>

@@ -88,6 +88,7 @@ internal sealed class ChangeSet(string label, EditOrigin origin = EditOrigin.Use
                                      f.Key.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) &&
                                      !f.Value.Before.Equals(f.Value.After))
                 .Select(f => f.Key).Order(StringComparer.OrdinalIgnoreCase).ToList(),
+            Origin = Origin,
         };
 
     /// <summary>What an undo of the entry changes: the same sections, and each rename in the other direction, in
@@ -95,6 +96,7 @@ internal sealed class ChangeSet(string label, EditOrigin origin = EditOrigin.Use
     public EditChange UndoChange => Change with
     {
         Renames = renames.AsEnumerable().Reverse().Select(r => (r.To, r.From)).ToList(),
+        Undone = true,
     };
 
     private bool Structural { get; set; }
@@ -203,6 +205,17 @@ internal sealed class EditHistory
     /// <summary>True when the top entry is not the entry of the last save.</summary>
     public bool IsDirty => TopId != savedId;
 
+    /// <summary>A number that grows at each push, undo, redo and save. A cache of the entries since the save compares
+    /// it.</summary>
+    public long Version { get; private set; }
+
+    /// <summary>
+    /// The entries of the undo stack that came after the entry of the last save, oldest first. An entry below the saved
+    /// entry was saved. When an undo went below the saved entry and a new edit cleared the redo stack, only the new
+    /// entries come after the save.
+    /// </summary>
+    public IEnumerable<ChangeSet> SinceSave => undo.Where(e => e.Id > savedId).Select(e => e.Change);
+
     private long TopId => CanUndo ? undo[^1].Id : OpenId;
 
     /// <summary>Adds an entry on top. The redo stack goes.</summary>
@@ -210,6 +223,7 @@ internal sealed class EditHistory
     {
         undo.Add(new Entry(nextId++, change, null));
         redo.Clear();
+        Version++;
     }
 
     /// <summary>Moves the top entry to the redo stack and returns it.</summary>
@@ -218,6 +232,7 @@ internal sealed class EditHistory
     {
         var entry = Pop(undo);
         redo.Add(entry with { UndoneBy = by });
+        Version++;
         return entry.Change;
     }
 
@@ -226,11 +241,16 @@ internal sealed class EditHistory
     {
         var entry = Pop(redo);
         undo.Add(entry);
+        Version++;
         return entry.Change;
     }
 
     /// <summary>Makes the top entry the entry of the last save.</summary>
-    public void MarkSaved() => savedId = TopId;
+    public void MarkSaved()
+    {
+        savedId = TopId;
+        Version++;
+    }
 
     private static Entry Pop(List<Entry> from)
     {

@@ -144,6 +144,43 @@ public sealed partial class EditSession : IDisposable
     /// redoes only an entry that it undid itself (decision D709 of the MCP1 design).</summary>
     public EditOrigin? RedoUndoneBy => history.RedoUndoneBy;
 
+    /// <summary>The agent entries since the last save, at the version of the history that it read.</summary>
+    private (long Version, int Count, HashSet<SectionRef> Sections)? agentEdits;
+
+    /// <summary>
+    /// The sections that the entries of an agent changed since the last save, by their references now (section 8.5 of the
+    /// MCP1 design). A later rename of such a section, also by the user, gives its new reference. An undo of the entry
+    /// removes its sections, a redo puts them back, and a save clears them. The Hierarchy marks these rows.
+    /// </summary>
+    public IReadOnlySet<SectionRef> AgentSections => AgentEditsNow().Sections;
+
+    /// <summary>The number of agent entries since the last save. The status bar shows it.</summary>
+    public int AgentEdits => AgentEditsNow().Count;
+
+    private (long Version, int Count, HashSet<SectionRef> Sections) AgentEditsNow()
+    {
+        if (agentEdits is { } known && known.Version == history.Version)
+            return known;
+        var sections = new HashSet<SectionRef>();
+        var count = 0;
+        foreach (var entry in history.SinceSave)
+        {
+            // The renames of each entry come first, so a section of an earlier agent entry keeps its mark under its new
+            // key. The sections of an agent rename hold the old and the new reference.
+            foreach (var (from, to) in entry.Renames)
+            {
+                if (sections.Remove(from))
+                    sections.Add(to);
+            }
+            if (entry.Origin != EditOrigin.Agent)
+                continue;
+            count++;
+            sections.UnionWith(entry.Change.Sections);
+        }
+        agentEdits = (history.Version, count, sections);
+        return agentEdits.Value;
+    }
+
     /// <summary>
     /// The revision of the session (decision D764 of the MCP1 design). It grows when the history changes the state: a
     /// commit that changes data, an undo, a redo and a restore of unsaved edits. A preview, a cancel, a refused
