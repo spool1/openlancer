@@ -27,6 +27,7 @@ internal static class HistoryTools
             throw NotAgentEntry("UserEntry", "undo_user_entry", session.UndoLabel!);
         var label = session.UndoLabel!;
         Step(() => session.Undo(EditOrigin.Agent));
+        call.Host.Stepped(call.Tool, label);
         return ToolResult.Of(new HistoryStepView(label));
     }
 
@@ -42,6 +43,7 @@ internal static class HistoryTools
             throw NotAgentEntry("UserUndid", "redo_user_undid", session.RedoLabel!);
         var label = session.RedoLabel!;
         Step(session.Redo);
+        call.Host.Stepped(call.Tool, label);
         return ToolResult.Of(new HistoryStepView(label));
     }
 

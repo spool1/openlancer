@@ -1151,6 +1151,10 @@
                     "unsaved"
                   ],
                   "description": "The layer of the edit view that gives the item, and if the item has an edit that is not saved."
+                },
+                "agent_changed": {
+                  "type": "boolean",
+                  "description": "True when an edit of an agent changed the item after the last save. An undo of that edit clears it."
                 }
               },
               "required": [

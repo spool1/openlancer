@@ -219,6 +219,14 @@ public abstract class AgentHost
     {
     }
 
+    /// <summary>Tells the host that <c>undo</c> or <c>redo</c> of the agent moved an entry of the history (section 8.5 of
+    /// the MCP1 design). It runs after the step, on the thread that owns the session.</summary>
+    /// <param name="tool">The name of the tool: <c>undo</c> or <c>redo</c>.</param>
+    /// <param name="label">The label of the entry, for example "Agent: Delete my_station_1".</param>
+    public virtual void Stepped(string tool, string label)
+    {
+    }
+
     /// <summary>The saves of this host that changed files.</summary>
     private int saves;
 

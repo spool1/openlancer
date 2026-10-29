@@ -273,10 +273,15 @@ public static class AgentTools
     public static ToolStep Run(AgentHost host, string name, JsonObject? arguments)
     {
         var tool = Find(name) ?? throw new ArgumentException($"The tool table has no tool {name}.", nameof(name));
+        // The checks before the read of the arguments read the flag preview from the JSON, so a refused preview adds no
+        // Console entry either.
         if (Unavailable(host, tool) is { } unavailable)
-            return Refuse(host, tool, unavailable, false);
+            return Refuse(host, tool, unavailable, AsksPreview(arguments));
         if (host.Paused && tool.Pausable)
-            return Refuse(host, tool, new EditError(EditErrorKind.Paused, "Paused", AgentTexts.Error("paused")), false);
+        {
+            return Refuse(host, tool, new EditError(EditErrorKind.Paused, "Paused", AgentTexts.Error("paused")),
+                AsksPreview(arguments));
+        }
         ToolStep step;
         ToolArgs? args = null;
         try
@@ -322,6 +327,10 @@ public static class AgentTools
             return new EditError(EditErrorKind.NotAvailable, "EditorOnly", AgentTexts.Error("editor_only", ("tool", tool.Name)));
         return host.HiddenGroups.Contains(tool.Group) ? GroupHidden(tool.Group) : null;
     }
+
+    /// <summary>True when the arguments of a call ask for a preview: <c>"preview": true</c>.</summary>
+    private static bool AsksPreview(JsonObject? arguments) =>
+        arguments?["preview"] is JsonValue value && value.TryGetValue<bool>(out var preview) && preview;
 
     /// <summary>The tool error of a refusal. The host gets the refusal of a tool that changes data, except of a preview,
     /// for its Console.</summary>

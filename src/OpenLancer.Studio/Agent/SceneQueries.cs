@@ -98,6 +98,10 @@ internal sealed record SceneItemRow(string Ref, string? Nickname, string Name, S
     public IReadOnlyList<ObjectComponent> Components { get; init; } = [];
 
     public required ItemOrigin Origin { get; init; }
+
+    /// <summary>True when an agent entry changed the item after the last save (see
+    /// <see cref="EditSession.AgentSections"/>). The Hierarchy of the editor marks the same rows.</summary>
+    public bool AgentChanged { get; init; }
 }
 
 /// <summary>The query tools of the star systems and their items (section 7.1 of the MCP1 design).</summary>
@@ -192,6 +196,7 @@ internal static class SceneQueries
                 Size = r.Kind == SceneKind.Zone ? AgentRows.Numbers(view, "size") : null,
                 Components = isObject ? ObjectComponents.Of(session, r.Section).Select(c => c.Kind).ToList() : [],
                 Origin = Origin(session, r.Section, view, r.Kind),
+                AgentChanged = session.AgentSections.Contains(r.Section),
             };
         }));
     }

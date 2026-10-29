@@ -849,6 +849,7 @@
     "SceneItemRow.rotate": "The rotation in degrees about X, Y and Z, as the rotate line gives it, or none.",
     "SceneItemRow.size": "The size of a zone, as the size line gives it, or none.",
     "SceneItemRow.components": "The components of an object, for example base_object or dockable_station.",
+    "SceneItemRow.agent_changed": "True when an edit of an agent changed the item after the last save. An undo of that edit clears it.",
     "ItemView.kind": "The kind of the item. The view of that kind is the one view that the result has.",
     "ItemView.section": "The view of a section of an INI file.",
     "ItemView.mission_script": "The summary of a mission script.",

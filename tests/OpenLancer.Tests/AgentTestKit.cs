@@ -44,6 +44,11 @@ internal sealed class TestAgentHost(EditSession? session, AgentHostKind kind = A
 
     public override void Refused(string tool, OpenLancer.Data.Editing.Commands.EditError error) => Refusals.Add((tool, error));
 
+    /// <summary>Each undo and redo of the agent that the host learned, with the label of its entry.</summary>
+    public List<(string Tool, string Label)> Steps { get; } = [];
+
+    public override void Stepped(string tool, string label) => Steps.Add((tool, label));
+
     public AgentLimits TestLimits { get; set; } = new();
 
     /// <summary>The linked games of the host, or null for the base folder of the profile, as the host without a window

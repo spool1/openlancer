@@ -161,6 +161,51 @@ public sealed class AgentEditToolTests
         Assert.Equal([("set_fields", EditErrorKind.Paused)], host.Refusals.Select(r => (r.Tool, r.Error.Kind)));
     }
 
+    /// <summary>A preview that Pause or a hidden group refuses does not go to the Console of the host either (section 8.5
+    /// of the MCP1 design). The refusal comes before the check of the arguments, so it reads the flag from the
+    /// JSON.</summary>
+    [Fact]
+    public void APreviewThatPauseRefusesDoesNotGoToTheHost()
+    {
+        var (ws, _, host) = Scene();
+        using var __ = ws;
+        host.TestPaused = true;
+
+        var preview = Error(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] }, "preview": true }""");
+        host.TestPaused = false;
+        host.Hidden.Add(ToolGroup.Scene);
+        var hidden = Error(host, "scene_create_zone",
+            """{ "system": "Li01", "shape": "sphere", "position": [0, 0, 0], "preview": true }""");
+        Error(host, "scene_create_zone", """{ "system": "Li01", "shape": "sphere", "position": [0, 0, 0] }""");
+
+        Assert.Equal(("paused", "not_available"), (preview.Code, hidden.Code));
+        Assert.Equal([("scene_create_zone", EditErrorKind.NotAvailable)], host.Refusals.Select(r => (r.Tool, r.Error.Kind)));
+    }
+
+    /// <summary>The rows of list_items mark each item that an agent edit changed since the last save (section 7.1 of the
+    /// MCP1 design). An edit of the user does not mark a row, an undo of the agent edit clears the mark, and a save
+    /// clears all marks.</summary>
+    [Fact]
+    public void ListItemsMarksTheItemsOfTheAgentEditsSinceTheSave()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+        bool Marked(string nickname) => (bool)Ok(host, "list_items",
+            $$"""{ "system": "Li01", "text": {{AgentCalls.Json(nickname)}}, "kinds": ["object"] }""")["rows"]![0]!["agent_changed"]!;
+
+        Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""");
+        session.Execute(EditCommand.SetLinesFromText(SceneWorkspace.Object("Li01_dock"), "pos", ["4, 5, 6"]));
+        Assert.Equal((true, false), (Marked("Li01_01"), Marked("Li01_dock")));
+
+        session.Undo();
+        session.Undo();
+        Assert.False(Marked("Li01_01"));
+        session.Redo();
+        Assert.True(Marked("Li01_01"));
+        Assert.True(session.Save().Saved);
+        Assert.False(Marked("Li01_01"));
+    }
+
     /// <summary>An edit call while a gesture of the user is open gives busy. The editor host waits for the end of the
     /// gesture first, so the error comes only from a host without such a wait.</summary>
     [Fact]

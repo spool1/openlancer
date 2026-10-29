@@ -33,6 +33,8 @@ public sealed class AgentUndoTests
         Assert.Equal(("Agent: Set pos", "3"), ((string?)redo["label"], (string?)redo["rev"]));
         Assert.Same(after, session.WorkingSection(Station));
         Assert.Equal(EditOrigin.Agent, session.UndoOrigin);
+        // The host learns each step for its Console and its follow mode (section 8.5 of the MCP1 design).
+        Assert.Equal([("undo", "Agent: Set pos"), ("redo", "Agent: Set pos")], host.Steps);
     }
 
     /// <summary>The observable result of step 3 of MCP1-2. A preview of a delete gives the cascade and keeps the
