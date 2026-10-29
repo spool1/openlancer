@@ -19,8 +19,8 @@ namespace OpenLancer.Studio.Agent;
 /// for another milestone is not in the table of this build (section 7.9).
 /// </summary>
 /// <remarks>This build has the query tools of section 7.1 (milestone MCP1-1a) and the dry run query of M6c-1. It also
-/// has the edit tools of sections 7.2, 7.3 and 7.6 (milestone MCP1-2) and the view tools of section 7.7 (milestone
-/// MCP1-1b).
+/// has the edit tools of sections 7.2, 7.3 and 7.6 and the play tools of section 7.6 (milestone MCP1-2), and the view
+/// tools of section 7.7 (milestone MCP1-1b).
 /// The order of the rows follows the sections of the design, so a later part puts its tools at the place of its
 /// section. The view tools are tools of the editor host.</remarks>
 public static class AgentTools
@@ -213,6 +213,16 @@ public static class AgentTools
                 new FlagParam("replace_version")),
             typeof(ExportView), PublishTools.Export, limits => TimeSpan.FromMinutes(limits.ExportMinutes)),
         SessionTool("publish_checklist", ToolHints.Query, ToolInput.None, typeof(ChecklistView), PublishTools.Checklist),
+        PlayTool("play", ToolHints.Changing, new ToolInput(
+                new TextParam("start", true, PlayTools.Starts, null),
+                Text("system"),
+                new PointParam("position", false, BuilderTools.MaxCoordinate),
+                new PointParam("orientation", false),
+                Text("base")),
+            typeof(PlayRequestView), PlayTools.Play),
+        // A stop removes no data and starts nothing. Pause does not keep a game of the agent running.
+        PlayTool("play_stop", new ToolHints(ReadOnly: false, Destructive: false, Idempotent: false), ToolInput.None,
+            typeof(PlayStopView), PlayTools.Stop, runsInPause: true),
         View("open_view", ToolGroup.Studio, ToolHints.View, new ToolInput(Text("system"), Text("mission"), Text("cutscene")),
             typeof(OpenedView), ViewTools.OpenView),
         View("select_items", ToolGroup.Studio, ToolHints.View,
@@ -254,8 +264,9 @@ public static class AgentTools
     /// the error <c>step_failed</c> with the detail <c>ToolFailed</c>, so the agent reads a code and the audit log has
     /// the call. An edit tool runs its commands in a batch, and the batch cancels at the exception. So nothing
     /// changed.</para>
-    /// <para>Pause refuses each tool that changes the data (decision D734). The host gets each refusal of such a tool,
-    /// except of a preview, for its Console (section 8.5 of the MCP1 design).</para>
+    /// <para>Pause refuses each tool that changes the data, writes files or starts a play (decision D734). The host gets
+    /// each refusal of a tool that changes something, except of a preview, for its Console (section 8.5 of the MCP1
+    /// design).</para>
     /// </remarks>
     /// <exception cref="ArgumentException">The table has no tool with the name. The SDK binding refuses an unknown
     /// tool before it queues the call.</exception>
@@ -357,6 +368,13 @@ public static class AgentTools
         {
             TailLimit = tail ?? StudioTool.TailOfLimits,
         };
+
+    /// <summary>A play tool of section 7.6 of the MCP1 design, in the group Play. Only the editor host can play
+    /// (decision D739).</summary>
+    /// <param name="runsInPause">True for a tool that Pause does not refuse (see <see cref="StudioTool.RunsInPause"/>).</param>
+    private static StudioTool PlayTool(string name, ToolHints hints, ToolInput input, Type output,
+        Func<ToolCall, ToolStep> run, bool runsInPause = false) =>
+        new(name, ToolKind.Play, ToolGroup.Play, ToolHosts.Editor, hints, input, output, run) { RunsInPause = runsInPause };
 
     /// <summary>An edit tool (sections 7.2 and 7.3 of the MCP1 design). Its result is the result of the command layer,
     /// and it can be a step of <c>edit_batch</c>. A generic edit tool and a data tool are in the group Studio.</summary>

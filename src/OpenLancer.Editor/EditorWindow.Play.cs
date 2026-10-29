@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Run;
 using OpenLancer.Data.PlayCopies;
+using OpenLancer.Editor.Agent;
 using OpenLancer.Editor.Dialogs;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Games;
@@ -21,9 +23,9 @@ namespace OpenLancer.Editor;
 /// in the game and the test server of milestone M11 use the same seam (<see cref="IGamePlayHost"/>). The members of the
 /// seam delegate to the session, the edits and the Console. They are explicit, so the public surface of the window does
 /// not grow. The mission play of the Mission tab (section 5 of the M6c design) reads the window through
-/// <see cref="IMissionPlayEditor"/>.
+/// <see cref="IMissionPlayEditor"/>, and the play tools of the agent read it through <see cref="IAgentPlayEditor"/>.
 /// </summary>
-internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissionPlayEditor
+internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissionPlayEditor, IAgentPlayEditor
 {
     // The clock of the watchdogs of Play and of the time from Play to flight.
     private readonly Stopwatch playClock = Stopwatch.StartNew();
@@ -235,4 +237,15 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
     void IAgentPlayHost.Withdraw(IReadOnlyList<Choice> choices) => QueueUIThread(() => Choice.Withdraw(choices));
 
     AgentPlayRule IAgentPlayHost.AgentPlays => agentPlays;
+
+    PlayStatus IAgentPlayEditor.PlayStatus => Play.Status;
+
+    bool IAgentPlayEditor.GameRuns => GamePlay.GameRuns;
+
+    string? IAgentPlayEditor.StartBlock(PlayStart start) => PlayStartBlock(start);
+
+    Task<PlayRequestResult> IAgentPlayEditor.Request(PlayStart start, PlaySaveRule save) =>
+        Play.Request(start, PlayPackage, save, EditOrigin.Agent);
+
+    PlayStopped IAgentPlayEditor.Stop() => PlayRequests.Stop(Play, GamePlay);
 }

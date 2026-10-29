@@ -744,7 +744,7 @@ public sealed class AgentQueryTests
 
         Assert.Equal(("not_available", "GroupHidden"), Code(hidden));
         Assert.Equal("The user hid the tool group 'scene'. Ask the user to show it in the agent settings.", hidden.Message);
-        Assert.Equal(["studio", "missions", "cutscenes"], Ok(host, "studio_status")["tool_groups"]!.AsArray().Select(g => (string)g!));
+        Assert.Equal(["studio", "missions", "cutscenes", "play"], Ok(host, "studio_status")["tool_groups"]!.AsArray().Select(g => (string)g!));
     }
 
     [Fact]

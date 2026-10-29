@@ -19,8 +19,8 @@ namespace OpenLancer.Tests;
 public sealed class AgentToolTableTests
 {
     /// <summary>The order follows the sections of the design. The query tools of section 7.1 come first. Then come the
-    /// edit tools of section 7.2, the Scene and data tools of section 7.3, the tools of section 7.6 and the view tools of
-    /// section 7.7.</summary>
+    /// edit tools of section 7.2, the Scene and data tools of section 7.3, the tools of section 7.6 with the play tools
+    /// at their end, and the view tools of section 7.7.</summary>
     [Fact]
     public void TheToolsHaveTheFixedOrderOfTheSectionsOfTheDesign()
     {
@@ -59,12 +59,13 @@ public sealed class AgentToolTableTests
     /// <summary>The kind and the hints of each tool (section 7.0 of the MCP1 design, review finding R7 of MCP1-2). A
     /// query changes nothing. <c>open_view</c> and <c>select_items</c> change what the user sees, so they are not
     /// read-only. An edit that can change or remove data is destructive, and only <c>set_fields</c> is idempotent,
-    /// because MCP has one hint for each tool. The Console and the view tools need the window of the editor.</summary>
+    /// because MCP has one hint for each tool. The Console, the play tools and the view tools need the window of the
+    /// editor. Pause refuses each tool that changes something, except play_stop.</summary>
     [Fact]
     public void EachToolHasTheKindAndTheHintsOfWhatItChanges()
     {
         string[] views = ["open_view", "select_items", "render_scene", "render_cutscene", "capture_panel"];
-        string[] editor = ["get_console", .. views];
+        string[] editor = ["get_console", "play", "play_stop", .. views];
         var query = new ToolHints(ReadOnly: true, Destructive: false, Idempotent: true);
 
         foreach (var tool in AgentTools.All)
@@ -78,8 +79,11 @@ public sealed class AgentToolTableTests
             };
             Assert.Equal((kind, hints), (tool.Kind, tool.Hints));
             Assert.Equal(editor.Contains(tool.Name) ? ToolHosts.Editor : ToolHosts.Both, tool.Hosts);
-            // A tool of the session that only reads, for example publish_checklist, runs during Pause.
-            Assert.Equal(kind is not (ToolKind.Query or ToolKind.View) && !hints.ReadOnly, tool.Pausable);
+            // A tool of the session that only reads, for example publish_checklist, and play_stop run during Pause.
+            Assert.Equal(kind is not (ToolKind.Query or ToolKind.View) && !hints.ReadOnly && tool.Name != "play_stop",
+                tool.Pausable);
+            // The play tools, and only they, are in the group Play.
+            Assert.Equal(kind == ToolKind.Play, tool.Group == ToolGroup.Play);
         }
     }
 
@@ -179,21 +183,27 @@ public sealed class AgentToolTableTests
 
     /// <summary>The server instructions follow the tools of the host (section 9.2 of the MCP1 design, review finding R10
     /// of MCP1-2). A host without edit tools tells that the server only reads. A host without the tool save gets no
-    /// step of the save.</summary>
+    /// step of the save. Only the editor host gets the step of the play tools, because only it can play.</summary>
     [Fact]
     public void TheServerInstructionsAreShortStepsForTheToolsOfTheHost()
     {
-        var edits = AgentTexts.InstructionsFor(edits: true, save: true);
-        var noSave = AgentTexts.InstructionsFor(edits: true, save: false);
-        var reads = AgentTexts.InstructionsFor(edits: false, save: false);
+        var editor = AgentTexts.InstructionsFor(edits: true, save: true, play: true);
+        var edits = AgentTexts.InstructionsFor(edits: true, save: true, play: false);
+        var noSave = AgentTexts.InstructionsFor(edits: true, save: false, play: false);
+        var reads = AgentTexts.InstructionsFor(edits: false, save: false, play: false);
 
-        Assert.InRange(edits.Count, 3, 14);
+        Assert.InRange(editor.Count, 3, 14);
         Assert.StartsWith("Call studio_status first.", edits[0]);
         Assert.StartsWith("Call studio_status first.", reads[0]);
-        Assert.Equal(string.Join("\n", edits), AgentResources.InstructionsFor(AgentTools.All));
-        Assert.Equal(string.Join("\n", noSave),
-            AgentResources.InstructionsFor(AgentTools.All.Where(t => t.Name is not ("save" or "export_mod"))));
-        Assert.Equal(string.Join("\n", reads), AgentResources.InstructionsFor(AgentTools.ReadOnly));
+        Assert.Equal(string.Join("\n", editor), AgentResources.InstructionsFor(AgentTools.All, AgentHostKind.Editor));
+        Assert.Equal(string.Join("\n", edits), AgentResources.InstructionsFor(AgentTools.All, AgentHostKind.Headless));
+        Assert.Equal(string.Join("\n", noSave), AgentResources.InstructionsFor(
+            AgentTools.All.Where(t => t.Name is not ("save" or "export_mod")), AgentHostKind.Headless));
+        Assert.Equal(string.Join("\n", reads), AgentResources.InstructionsFor(AgentTools.ReadOnly, AgentHostKind.Headless));
+        Assert.Equal(string.Join("\n", reads), AgentResources.InstructionsFor(AgentTools.ReadOnly, AgentHostKind.Editor));
+        Assert.Equal("A play tool asks the user to save when the mod has unsaved edits. Do not play until the user asks. " +
+                     "Use play_stop to stop each kind of play.", editor[^1]);
+        Assert.DoesNotContain(edits, i => i.Contains("play_stop"));
         Assert.Equal("This server only reads the data. It changes no file.", reads[^1]);
         Assert.DoesNotContain(edits, i => i.Contains("only reads"));
         Assert.Contains("Use preview: true for a large edit or a delete.", edits);
@@ -202,10 +212,11 @@ public sealed class AgentToolTableTests
         Assert.DoesNotContain(noSave, i => i.Contains("save"));
     }
 
-    /// <summary>The edit tools and the tools of the session of this build in the order of the table, with their kinds
-    /// and hints. The tools of section 7.3 follow the tools of section 7.2, and the tools of section 7.6 follow them. A
-    /// tool that adds data is not destructive, and a tool that can change or remove data is (review finding R7 of
-    /// MCP1-2).</summary>
+    /// <summary>The edit tools, the tools of the session and the play tools of this build in the order of the table,
+    /// with their kinds and hints. The tools of section 7.3 follow the tools of section 7.2, and the tools of section
+    /// 7.6 follow them. A tool that adds data is not destructive, and a tool that can change or remove data is (review
+    /// finding R7 of MCP1-2). play can save the mod, so it is destructive (section 7.0). play_stop removes no
+    /// data.</summary>
     private static readonly Dictionary<string, (ToolKind Kind, ToolHints Hints)> Edits = new()
     {
         ["set_fields"] = (ToolKind.Edit, new ToolHints(false, true, true)),
@@ -234,6 +245,8 @@ public sealed class AgentToolTableTests
         ["edit_batch"] = (ToolKind.Session, new ToolHints(false, false, false)),
         ["export_mod"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["publish_checklist"] = (ToolKind.Session, new ToolHints(true, false, true)),
+        ["play"] = (ToolKind.Play, new ToolHints(false, true, false)),
+        ["play_stop"] = (ToolKind.Play, new ToolHints(false, false, false)),
     };
 
     private static IEnumerable<string> EditTools => Edits.Keys;

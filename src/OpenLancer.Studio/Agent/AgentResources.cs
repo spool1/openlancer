@@ -31,12 +31,14 @@ public static class AgentResources
 
     /// <summary>The server instructions of a host with a tool set, one step on each line (section 9.2 of the MCP1
     /// design). A host with edit tools gets the steps of the edits. A host without them gets the step that the server
-    /// only reads. A host with the tool <c>save</c> also gets the steps of the save.</summary>
-    public static string InstructionsFor(IEnumerable<StudioTool> tools)
+    /// only reads. A host with the tool <c>save</c> also gets the steps of the save. A host that can run a play tool
+    /// also gets the step of the play tools. The host without a window lists them, but it cannot play.</summary>
+    public static string InstructionsFor(IEnumerable<StudioTool> tools, AgentHostKind host)
     {
         var list = tools.ToList();
+        var runs = host == AgentHostKind.Editor ? ToolHosts.Editor : ToolHosts.Headless;
         return string.Join("\n", AgentTexts.InstructionsFor(list.Any(t => t.Kind == ToolKind.Edit),
-            list.Any(t => t.Name == "save")));
+            list.Any(t => t.Name == "save"), list.Any(t => t.Kind == ToolKind.Play && (t.Hosts & runs) != 0)));
     }
 
     /// <summary>The resource with a URI, or null.</summary>

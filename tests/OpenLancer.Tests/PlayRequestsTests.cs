@@ -152,13 +152,14 @@ public sealed class PlayRequestsTests : IDisposable
         Assert.Empty(texts.SelectMany(t => SteLint.Problems(t)));
     }
 
-    /// <summary>The setting of agent Play shows only when an agent tool can start Play (UI rule 4). This build has no
-    /// such tool. Milestone MCP1 adds them.</summary>
+    /// <summary>The setting of agent Play shows only when an agent tool can start Play (UI rule 4). This build has the
+    /// tool play of MCP1-2. MCP1-3 adds mission_play.</summary>
     [Fact]
-    public void TheSettingOfAgentPlayShowsOnlyWithAPlayTool()
+    public void TheSettingOfAgentPlayShowsWithThePlayTool()
     {
-        Assert.False(Editor.Agent.AgentMenu.AgentCanPlay);
-        Assert.All(Editor.Agent.AgentMenu.PlayTools, name => Assert.Null(OpenLancer.Studio.Agent.AgentTools.Find(name)));
+        Assert.True(Editor.Agent.AgentMenu.AgentCanPlay);
+        Assert.NotNull(OpenLancer.Studio.Agent.AgentTools.Find("play"));
+        Assert.Contains("play", Editor.Agent.AgentMenu.PlayTools);
     }
 
     /// <summary>A cancel closes the open question as Cancel does (MCP1-2 step 7). The close waits for the UI thread, and a

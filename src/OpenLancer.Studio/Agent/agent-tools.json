@@ -21,6 +21,9 @@
     "save": [
       "Call check before save. Correct each error.",
       "Do not save until the user asks, unless the user told you to save."
+    ],
+    "play": [
+      "A play tool asks the user to save when the mod has unsaved edits. Do not play until the user asks. Use play_stop to stop each kind of play."
     ]
   },
   "fields": {
@@ -452,6 +455,21 @@
       "title": "Get the publish checklist of the active mod",
       "description": "Gives the steps of the publish checklist of the active mod, as the Mods window shows them. The checklist reads the saved files. This tool changes nothing."
     },
+    "play": {
+      "title": "Start Play in OpenLancer",
+      "description": "When the active mod has unsaved edits, the editor asks the user to save them first. Then the tool starts the game in OpenLancer at a point in space or at a base. When the user cancels, Play does not start. While a game runs, the tool refuses. Call play_stop first. Only the editor host can play.",
+      "fields": {
+        "start": "Where the player starts: space for a point in a system, or base for a dock at a base.",
+        "system": "The system of a start in space: its nickname or its system: reference. The Scene must show the system, because Play checks the start point with the shapes of the Scene.",
+        "position": "The start point of a start in space, [x, y, z] in meters. When a planet, a station or a death zone holds the point, Play moves the start out of it.",
+        "orientation": "The heading of the ship of a start in space, [x, y, z] in degrees, as the rotate key holds it. The ship flies along its -Z axis. The default is [0, 0, 0].",
+        "base": "The base of a start at a base: its nickname or its base: reference, for example my_base_01."
+      }
+    },
+    "play_stop": {
+      "title": "Stop the game of Play",
+      "description": "Stops the game of Play in OpenLancer when one runs, else the game of a play copy, as Shift+F5 does. The tool changes no data. It also works while the user pauses the agent edits. Only the editor host has this tool."
+    },
     "open_view": {
       "title": "Open a view of the editor",
       "description": "Opens a system in the Scene, a mission script in the Mission tab or a cutscene in the Cutscene tab. Give one of the three. The tool changes what the user sees, not the data. Only the editor host has this tool.",
@@ -659,7 +677,10 @@
     "headless_recovery_restored": "The server restored the unsaved edits of the earlier session. Save them to keep them.",
     "headless_recovery_not_applied": "The files of the mod changed after the earlier session wrote its unsaved edits, so the edits do not apply. The recovery file stays, and the server takes no edits.",
     "headless_recovery_discarded": "The server deleted the unsaved edits of the earlier session.",
-    "headless_recovery_lost": "The recovery file does not keep this edit: {problem}"
+    "headless_recovery_lost": "The recovery file does not keep this edit: {problem}",
+    "play_space_only": "The argument '{name}' is only for a start in space. Remove it, or use start: space.",
+    "play_base_only": "The argument 'base' is only for a start at a base. Remove it, or use start: base.",
+    "play_ref": "The argument '{name}' takes a nickname or a {name}: reference, not {ref}."
   },
   "resources": {
     "openlancer://catalog/lists": {
@@ -1230,6 +1251,9 @@
     "PackageRow.written": "False when a problem stopped the package.",
     "TargetCheckRow.target": "The id of the target game.",
     "TargetCheckRow.errors": "The number of errors of the checks of the target.",
-    "TargetCheckRow.warnings": "The number of warnings of the checks of the target."
+    "TargetCheckRow.warnings": "The number of warnings of the checks of the target.",
+    "PlayRequestView.play": "The state of Play in OpenLancer when the request ended: idle, starting, validating, running, reloading, not_responding or stopping.",
+    "PlayStopView.stopped": "The game that the stop stopped: openlancer for Play in OpenLancer, game for the game of a play copy, or nothing.",
+    "PlayStopView.play": "The state of Play in OpenLancer after the stop. A game that stops gives stopping until it exits."
   }
 }

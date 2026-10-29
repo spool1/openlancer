@@ -48,6 +48,9 @@ internal interface IAgentEditor
     /// <summary>The views of the editor for the view tools: the open of a view, the selection and the images.</summary>
     IAgentViews Views { get; }
 
+    /// <summary>The Play of the editor for the play tools.</summary>
+    IAgentPlay Play { get; }
+
     /// <summary>Saves as File &gt; Save does: the gate, the report in the Console, the reload and the validation. When
     /// files of the mod changed outside the editor, the dialog of the editor asks the user.</summary>
     SaveOutcome Save();
@@ -97,6 +100,8 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
     public override AgentView? View => editor.View;
 
     public override IAgentViews Views => editor.Views;
+
+    public override IAgentPlay Play => editor.Play;
 
     public override string NameText(int ids) => editor.Name(ids);
 

@@ -164,7 +164,8 @@
                 "studio",
                 "scene",
                 "missions",
-                "cutscenes"
+                "cutscenes",
+                "play"
               ]
             },
             "description": "The tool groups that the user shows. A tool of another group gives not_available."
@@ -20150,6 +20151,319 @@
         "idempotentHint": true,
         "openWorldHint": false,
         "readOnlyHint": true
+      }
+    },
+    {
+      "name": "play",
+      "title": "Start Play in OpenLancer",
+      "description": "When the active mod has unsaved edits, the editor asks the user to save them first. Then the tool starts the game in OpenLancer at a point in space or at a base. When the user cancels, Play does not start. While a game runs, the tool refuses. Call play_stop first. Only the editor host can play.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "enum": [
+              "space",
+              "base"
+            ],
+            "description": "Where the player starts: space for a point in a system, or base for a dock at a base."
+          },
+          "system": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The system of a start in space: its nickname or its system: reference. The Scene must show the system, because Play checks the start point with the shapes of the Scene."
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": -10000000,
+              "maximum": 10000000
+            },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "The start point of a start in space, [x, y, z] in meters. When a planet, a station or a death zone holds the point, Play moves the start out of it."
+          },
+          "orientation": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "The heading of the ship of a start in space, [x, y, z] in degrees, as the rotate key holds it. The ship flies along its -Z axis. The default is [0, 0, 0]."
+          },
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The base of a start at a base: its nickname or its base: reference, for example my_base_01."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "start"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "play": {
+            "enum": [
+              "idle",
+              "starting",
+              "validating",
+              "running",
+              "reloading",
+              "not_responding",
+              "stopping"
+            ],
+            "description": "The state of Play in OpenLancer when the request ended: idle, starting, validating, running, reloading, not_responding or stopping."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view that the tool read, as text. A save does not change it."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "play"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Start Play in OpenLancer",
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "play_stop",
+      "title": "Stop the game of Play",
+      "description": "Stops the game of Play in OpenLancer when one runs, else the game of a play copy, as Shift\u002BF5 does. The tool changes no data. It also works while the user pauses the agent edits. Only the editor host has this tool.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stopped": {
+            "enum": [
+              "nothing",
+              "openlancer",
+              "game"
+            ],
+            "description": "The game that the stop stopped: openlancer for Play in OpenLancer, game for the game of a play copy, or nothing."
+          },
+          "play": {
+            "enum": [
+              "idle",
+              "starting",
+              "validating",
+              "running",
+              "reloading",
+              "not_responding",
+              "stopping"
+            ],
+            "description": "The state of Play in OpenLancer after the stop. A game that stops gives stopping until it exits."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view that the tool read, as text. A save does not change it."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "stopped",
+              "play"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Stop the game of Play",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
       }
     },
     {

@@ -161,7 +161,7 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
             Limits(settings);
     }
 
-    /// <summary>The agent tools that start Play. They come with milestone MCP1.</summary>
+    /// <summary>The agent tools that start Play: <c>play</c> of MCP1-2 and <c>mission_play</c> of MCP1-3.</summary>
     internal static readonly IReadOnlyList<string> PlayTools = ["play", "mission_play"];
 
     /// <summary>True when the tool list of this build has a tool that starts Play. The setting of agent Play shows only
@@ -175,11 +175,14 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
         "When an agent starts Play and the active mod has unsaved edits, the editor saves them and plays. Off: the editor " +
         "asks you first, and Cancel gives the agent an error. Your own F5 and Ctrl+F5 always save first.";
 
-    private static string GroupTip(ToolGroup group) => group switch
+    /// <summary>The tooltip of the check box of a tool group.</summary>
+    internal static string GroupTip(ToolGroup group) => group switch
     {
         ToolGroup.Scene => "The tools of the star systems, their items, the assets and the prop groups.",
         ToolGroup.Missions => "The tools of the mission scripts.",
-        _ => "The tools of the cutscene scripts.",
+        ToolGroup.Cutscenes => "The tools of the cutscene scripts.",
+        ToolGroup.Play => "The tools that start and stop a play in OpenLancer.",
+        _ => throw new ArgumentOutOfRangeException(nameof(group), group, null),
     };
 
     /// <summary>The fields of the limits of one agent call (decision D724).</summary>

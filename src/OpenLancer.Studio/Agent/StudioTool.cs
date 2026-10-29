@@ -45,6 +45,9 @@ public enum ToolGroup
 
     /// <summary>The cutscene scripts.</summary>
     Cutscenes,
+
+    /// <summary>The start and the stop of a play in OpenLancer.</summary>
+    Play,
 }
 
 /// <summary>
@@ -132,13 +135,18 @@ public sealed class StudioTool
     public ToolKind Kind { get; }
 
     /// <summary>True when Pause refuses the tool (decision D734 of the MCP1 design): a tool that changes the data, writes
-    /// files or starts a play. A query, a view tool and a tool of the session that only reads, for example
-    /// <c>publish_checklist</c>, still run.</summary>
-    public bool Pausable => Changes;
+    /// files or starts a play. A query, a view tool, a tool of the session that only reads, for example
+    /// <c>publish_checklist</c>, and <c>play_stop</c> still run.</summary>
+    public bool Pausable => Changes && !RunsInPause;
 
-    /// <summary>True when the tool changes the data or the files of the mod, or starts a play. The Console of the
-    /// editor shows each refusal of such a tool. A tool with the hint "read only" changes nothing.</summary>
+    /// <summary>True when the tool changes the data or the files of the mod, or starts or stops a play. The Console of
+    /// the editor shows each refusal of such a tool. A tool with the hint "read only" changes nothing.</summary>
     public bool Changes => Kind is not (ToolKind.Query or ToolKind.View) && !Hints.ReadOnly;
+
+    /// <summary>True for a tool that changes a state and still runs while the user pauses the agent edits:
+    /// <c>play_stop</c>. A stop of a game does not change the data, and Pause must not keep a game of the agent
+    /// running.</summary>
+    internal bool RunsInPause { get; init; }
 
     public ToolGroup Group { get; }
 

@@ -69,6 +69,11 @@ internal sealed class TestAgentHost(EditSession? session, AgentHostKind kind = A
 
     public override IAgentViews? Views => TestViews;
 
+    /// <summary>The Play of the editor, or null for a host without a window.</summary>
+    public IAgentPlay? TestPlay { get; set; }
+
+    public override IAgentPlay? Play => TestPlay;
+
     /// <summary>Runs in each read of <see cref="View"/>. studio_status reads the view, so a test sees each session part
     /// of the tool with it.</summary>
     public Action? Probe { get; set; }

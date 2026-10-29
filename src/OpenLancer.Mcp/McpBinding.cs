@@ -59,7 +59,7 @@ public static class McpBinding
     {
         var tools = queue.Host.Tools;
         options.ServerInfo = new Implementation { Name = ServerName, Title = Product.Name, Version = Version };
-        options.ServerInstructions = AgentResources.InstructionsFor(tools);
+        options.ServerInstructions = AgentResources.InstructionsFor(tools, queue.Host.Kind);
         options.Capabilities = new ServerCapabilities
         {
             Tools = new ToolsCapability { ListChanged = false },

@@ -22,6 +22,7 @@ internal sealed partial class EditorWindow : IAgentEditor
     private AgentMenu agentMenu = null!;
     private AgentRender agentRender = null!;
     private EditorAgentViews agentViews = null!;
+    private EditorAgentPlay agentPlay = null!;
 
     /// <summary>The agent server, its menu and its render service. The window makes them before its first
     /// frame.</summary>
@@ -29,6 +30,7 @@ internal sealed partial class EditorWindow : IAgentEditor
     {
         agentRender = new AgentRender(this);
         agentViews = new EditorAgentViews(this);
+        agentPlay = new EditorAgentPlay(this);
         agentController = new AgentController(this, this, Activity,
             AgentDiscovery.PathOf(AgentDiscovery.DefaultFolder, System.Environment.ProcessId),
             AppHandler.LogFolder(Product.Name));
@@ -96,6 +98,8 @@ internal sealed partial class EditorWindow : IAgentEditor
     ConsoleLog IAgentEditor.Log => Log;
 
     IAgentViews IAgentEditor.Views => agentViews;
+
+    IAgentPlay IAgentEditor.Play => agentPlay;
 
     SaveOutcome IAgentEditor.Save() => Edits.Save();
 

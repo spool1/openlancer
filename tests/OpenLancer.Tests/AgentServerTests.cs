@@ -284,6 +284,8 @@ public sealed class AgentControllerTests : IDisposable
 
         public IAgentViews Views { get; } = new FakeAgentViews();
 
+        public IAgentPlay Play { get; } = new EditorAgentPlay(new AgentPlayToolTests.FakePlayEditor());
+
         /// <summary>The save of the test, or null for a save that does not start.</summary>
         public Func<SaveOutcome>? Saving { get; set; }
 

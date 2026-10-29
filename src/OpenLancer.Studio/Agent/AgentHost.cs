@@ -286,6 +286,10 @@ public abstract class AgentHost
     /// window.</summary>
     public virtual IAgentViews? Views => null;
 
+    /// <summary>The Play of the editor for the play tools (section 7.6 of the MCP1 design, decision D739), or null in a
+    /// host without a window.</summary>
+    public virtual IAgentPlay? Play => null;
+
     /// <summary>The entries of the Console that match the filter, oldest first, or null in a host without a
     /// Console.</summary>
     public virtual IReadOnlyList<AgentConsoleEntry>? Console(ConsoleFilter filter) => null;
