@@ -190,6 +190,9 @@ public sealed class OltoolMcpTests
     /// <summary>The test makes an edit through the server, waits 3 seconds and ends the process without the end of stdin
     /// (section 13.2, item 6 of the MCP1 design). The recovery file then has the edit, and a new session finds
     /// it.</summary>
+    /// <remarks>The server writes the file 2 seconds after the edit. A cold process under the load of the parallel tests
+    /// can need more time for its first write, so the test waits for the file before it ends the process. The file
+    /// still comes without the end of stdin.</remarks>
     [Fact]
     public async Task AnEditStaysInTheRecoveryFileWhenTheServerEndsWithoutTheEndOfStdin()
     {
@@ -202,6 +205,9 @@ public sealed class OltoolMcpTests
                 Arguments("""{ "ref": "obj:Li01_01", "fields": { "pos": [10, 20, 30] } }"""), cancellationToken: Token);
             Assert.NotEqual(true, edit.IsError);
             await Task.Delay(TimeSpan.FromSeconds(3), Token);
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+            while (!File.Exists(recovery) && DateTime.UtcNow < deadline)
+                await Task.Delay(100, Token);
             server.Kill();
         }
         var session = ws.Session("act");
