@@ -67,7 +67,7 @@ public sealed partial class EditSession
                                string.Equals(SectionIdentity.KeyOf(s), key, System.StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The nickname of the system whose file is the install path, or null.</summary>
-    internal string? SystemNicknameOf(string path) => Systems.NicknameOf(path);
+    public string? SystemNicknameOf(string path) => Systems.NicknameOf(path);
 
     /// <summary>True when the section of W has another key in the lower layer: the active mod renames it.</summary>
     internal bool IsRenamed(SectionRef target) =>

@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using ImGuiNET;
 using LibreLancer;
@@ -7,6 +8,7 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Editor.Agent;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
+using OpenLancer.Editor.Scene;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Studio.Agent;
 
@@ -16,7 +18,7 @@ namespace OpenLancer.Editor;
 /// The agent server of the editor (milestone MCP1): the seam of the editor host of the agent tools. The members of the
 /// seam are explicit, so the public surface of the window does not grow.
 /// </summary>
-internal sealed partial class EditorWindow : IAgentEditor
+internal sealed partial class EditorWindow : IAgentEditor, IFollowView
 {
     private AgentController agentController = null!;
     private AgentMenu agentMenu = null!;
@@ -27,6 +29,9 @@ internal sealed partial class EditorWindow : IAgentEditor
     /// <summary>The pulse rings and the robot glyphs of the agent edits (section 8.5 of the MCP1 design).</summary>
     internal AgentMarks AgentMarks { get; } = new(() => System.DateTime.UtcNow);
 
+    /// <summary>Follow mode of the agent edits (decision D719).</summary>
+    internal AgentFollow AgentFollow { get; private set; } = null!;
+
     /// <summary>The agent server, its menu and its render service. The window makes them before its first
     /// frame.</summary>
     private void MakeAgent()
@@ -34,6 +39,7 @@ internal sealed partial class EditorWindow : IAgentEditor
         agentRender = new AgentRender(this);
         agentViews = new EditorAgentViews(this);
         agentPlay = new EditorAgentPlay(this);
+        AgentFollow = new AgentFollow(Settings.Agent, this);
         agentController = new AgentController(this, this, Activity,
             AgentDiscovery.PathOf(AgentDiscovery.DefaultFolder, System.Environment.ProcessId),
             AppHandler.LogFolder(Product.Name));
@@ -109,6 +115,73 @@ internal sealed partial class EditorWindow : IAgentEditor
     string? IAgentEditor.ExportBlock => ExportBlock;
 
     bool IAgentEditor.Paused => agentController.Paused;
+
+    AgentFollow IAgentEditor.Follow => AgentFollow;
+
+    /// <summary>Follow mode of the agent edits: opens the system of a section in the Scene, shows the Scene, frames the
+    /// item and selects it on request.</summary>
+    bool IFollowView.ShowInScene(SectionRef section, string system, bool select)
+    {
+        if (Session?.GameData?.Items.Systems.Get(system) is not { } data)
+        {
+            return false;
+        }
+
+        if (!IsSceneSystem(system))
+        {
+            OpenSystem(data);
+            if (!IsSceneSystem(system))
+            {
+                return false;
+            }
+        }
+
+        // The agent call runs before the panels draw, so the Scene can apply the edit now.
+        Scene.Flush();
+        if (Scene.ItemOf(section) is not { } item || item is LibreLancer.Data.GameData.World.StarSystem)
+        {
+            return false;
+        }
+
+        ShowPanel(SceneView.PanelId);
+        if (select)
+        {
+            SelectInTab(CenterMode.Scene, item);
+        }
+
+        Scene.Focus(item);
+        return true;
+    }
+
+    private bool IsSceneSystem(string system) =>
+        Scene.System?.Nickname.Equals(system, StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>
+    /// Watches the input of the user in one frame for follow mode (decision D719): a click or a key that moves the
+    /// selection, and a camera input of the Scene. Call it after the panels draw, with the selection before them.
+    /// </summary>
+    private void WatchFollow(object? selectionBefore)
+    {
+        var input = false;
+        foreach (var button in new[] { ImGuiMouseButton.Left, ImGuiMouseButton.Right, ImGuiMouseButton.Middle })
+        {
+            input |= ImGui.IsMouseClicked(button) || ImGui.IsMouseReleased(button);
+        }
+
+        foreach (var key in SelectionKeys)
+        {
+            input |= ImGui.IsKeyPressed(key);
+        }
+
+        AgentFollow.Watch(selectionBefore, Selection, input, Scene.CameraInputFrame == ImGui.GetFrameCount());
+    }
+
+    /// <summary>The keys that move the selection of a list or a tree.</summary>
+    private static readonly ImGuiKey[] SelectionKeys =
+    [
+        ImGuiKey.UpArrow, ImGuiKey.DownArrow, ImGuiKey.LeftArrow, ImGuiKey.RightArrow, ImGuiKey.Home, ImGuiKey.End,
+        ImGuiKey.PageUp, ImGuiKey.PageDown,
+    ];
 
     /// <summary>True while the user pauses the agent edits (decision D734).</summary>
     public bool AgentPaused => agentController.Paused;

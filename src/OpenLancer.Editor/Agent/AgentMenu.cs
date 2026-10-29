@@ -50,6 +50,14 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
         if (Theme.IconMenuItem(paused ? EditorIcons.Play : EditorIcons.Pause, PauseLabel(paused), true))
             controller.Paused = !paused;
         ImGui.SetItemTooltip(PauseTip(paused));
+        var follow = window.AgentFollow.On;
+        // ImGui draws the check mark of the setting at the right, so the icon must not look like a check mark.
+        if (ImGui.MenuItem($"{EditorIcons.Video}   {AgentFollow.Label}", "", ref follow))
+        {
+            window.AgentFollow.Set(follow);
+            window.Settings.Save();
+        }
+        ImGui.SetItemTooltip(AgentFollow.Tip);
         ImGui.Separator();
         if (Theme.IconMenuItem(EditorIcons.Link, "Connect an agent...", true))
             connect.Show(running ? controller.Port : settings.Port);

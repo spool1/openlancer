@@ -146,7 +146,16 @@ internal sealed class SceneCamera(CameraScale? scale = null)
     }
 
     /// <summary>Reads the mouse and the keyboard. Call this right after the scene view's invisible button.</summary>
-    public void HandleInput(Keyboard keyboard, bool hovered, bool active, double elapsed)
+    /// <returns>True when the input moved or turned the camera, or changed its fly speed. Follow mode of the agent edits
+    /// stops then (section 8.5 of the MCP1 design).</returns>
+    public bool HandleInput(Keyboard keyboard, bool hovered, bool active, double elapsed)
+    {
+        var before = (position, target, yaw, pitch, roll, Speed);
+        Read(keyboard, hovered, active, elapsed);
+        return before != (position, target, yaw, pitch, roll, Speed);
+    }
+
+    private void Read(Keyboard keyboard, bool hovered, bool active, double elapsed)
     {
         var io = ImGui.GetIO();
         var delta = io.MouseDelta;

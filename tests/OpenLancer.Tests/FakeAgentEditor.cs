@@ -12,7 +12,21 @@ namespace OpenLancer.Tests;
 /// state that each test sets.</summary>
 internal sealed class FakeAgentEditor : IAgentEditor
 {
-    public EditSession? Edits { get; set; }
+    public FakeAgentEditor() => Follow = new AgentFollow(Settings, FollowView);
+
+    private EditSession? edits;
+
+    /// <summary>The session of the test. Follow mode follows its changes, as the window makes it do in each
+    /// frame.</summary>
+    public EditSession? Edits
+    {
+        get => edits;
+        set
+        {
+            edits = value;
+            Follow.Track(value);
+        }
+    }
 
     public string? EditReason { get; set; }
 
@@ -58,4 +72,45 @@ internal sealed class FakeAgentEditor : IAgentEditor
     public string? ExportBlock { get; set; }
 
     public bool Paused { get; set; }
+
+    /// <summary>The views of follow mode. They keep each request.</summary>
+    public FakeFollowView FollowView { get; } = new();
+
+    /// <summary>Follow mode over the settings and the views of the test. It follows the changes of
+    /// <see cref="Edits"/>.</summary>
+    public AgentFollow Follow { get; }
+}
+
+/// <summary>An item of the Scene of a test: the item of a section. The real Scene keeps the same item when its section
+/// gets a new nickname.</summary>
+internal sealed record FakeSceneItem(SectionRef Section);
+
+/// <summary>The views of follow mode for the tests: the selection, and each request to show an item in the
+/// Scene.</summary>
+internal sealed class FakeFollowView : IFollowView
+{
+    public object? Selection { get; set; }
+
+    /// <summary>Each request to show an item in the Scene: the section, the system and the selection flag.</summary>
+    public System.Collections.Generic.List<(SectionRef Section, string System, bool Select)> Shown { get; } = [];
+
+    /// <summary>False to act as a Scene that cannot show the system, for example while the game data loads.</summary>
+    public bool CanShow { get; set; } = true;
+
+    public SectionRef? SectionOf(object? item) => item switch
+    {
+        SectionRef section => section,
+        FakeSceneItem scene => scene.Section,
+        _ => null,
+    };
+
+    public bool ShowInScene(SectionRef section, string system, bool select)
+    {
+        if (!CanShow)
+            return false;
+        Shown.Add((section, system, select));
+        if (select)
+            Selection = new FakeSceneItem(section);
+        return true;
+    }
 }

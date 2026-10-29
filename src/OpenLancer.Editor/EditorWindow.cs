@@ -770,6 +770,7 @@ internal sealed partial class EditorWindow : Game
         ReopenAfterReload();
         // The marks follow the session of the open profile before an agent call can change it.
         AgentMarks.Track(Session?.Edits);
+        AgentFollow.Track(Session?.Edits);
         // The session part of at most one agent call runs before the panels draw (decision D708 of the MCP1 design).
         agentController.Frame();
         agentRender.Frame();
@@ -782,6 +783,7 @@ internal sealed partial class EditorWindow : Game
         CenterFrame(elapsed);
         var position = new Vector2(0, menuHeight);
         var size = new Vector2(Width, Height - menuHeight - statusHeight);
+        var selectionBefore = Selection;
         if (Session == null)
         {
             welcome.Draw(position, size);
@@ -790,6 +792,9 @@ internal sealed partial class EditorWindow : Game
         {
             Settings.Save();
         }
+
+        // A selection or a camera input of the user in the panels stops follow mode of the agent edits.
+        WatchFollow(selectionBefore);
 
         statusBar.Draw(new Vector2(0, Height - statusHeight), Width);
         gameLinkWindow.Draw();

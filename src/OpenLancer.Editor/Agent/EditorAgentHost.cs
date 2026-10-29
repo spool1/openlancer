@@ -70,6 +70,9 @@ internal interface IAgentEditor
     /// <summary>True while the user pauses the agent edits (decision D734). The Agent menu and the status bar set
     /// it.</summary>
     bool Paused { get; }
+
+    /// <summary>Follow mode of the agent edits (decision D719).</summary>
+    AgentFollow Follow { get; }
 }
 
 /// <summary>
@@ -173,9 +176,13 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
     /// OpenLancer, as each message of the editor has, so the toggle of the base-game messages never hides it (decision
     /// D718).
     /// </summary>
-    public override void Edited(string tool, EditResult result) =>
+    /// <remarks>Follow mode then opens and frames the item of the edit (decision D719).</remarks>
+    public override void Edited(string tool, EditResult result)
+    {
         editor.Log.Add(ConsoleSeverity.Info, AgentController.Source, Sentence(result.Label ?? result.UndoLabel ?? tool),
             FirstItem(result));
+        editor.Follow.Edited(result);
+    }
 
     /// <summary>The Console entry of a refused call of a tool that changes something: a Warning "{tool}:
     /// {message}".</summary>
@@ -183,9 +190,14 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
         editor.Log.Add(ConsoleSeverity.Warning, AgentController.Source, $"{tool}: {error.Message}",
             error.Target is { } target ? SectionOf(target) : null);
 
-    /// <summary>The Console entry of an undo or a redo of the agent, for example "Undo Agent: Create Zone_1.".</summary>
-    public override void Stepped(string tool, string label) =>
+    /// <summary>The Console entry of an undo or a redo of the agent, for example "Undo Agent: Create Zone_1.". The undo
+    /// does not run the selection rule of an undo of the user. Only follow mode selects the item of an undone delete
+    /// again.</summary>
+    public override void Stepped(string tool, string label)
+    {
         editor.Log.Add(ConsoleSeverity.Info, AgentController.Source, Sentence($"{(tool == "redo" ? "Redo" : "Undo")} {label}"));
+        editor.Follow.Stepped(tool, label);
+    }
 
     /// <summary>A label as a sentence with a full stop.</summary>
     private static string Sentence(string label) => label.TrimEnd().TrimEnd('.') + ".";
