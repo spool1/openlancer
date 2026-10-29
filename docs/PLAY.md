@@ -232,7 +232,7 @@ When you rename the trigger of the start, the start of the running play follows 
 
 ### Agent Play
 
-An agent of the agent server can start a mission play. The agent tools that start Play come with a later version of the agent server. A request of an agent never saves on its own:
+An agent of the agent server can start Play with the tool `play`, at a point in space or at a base. The tool `play_stop` stops each kind of play, as Shift+F5 does. A later version of the agent server adds the tool `mission_play` for a mission play. [MCP.md](MCP.md) tells about the tools. A request of an agent never saves on its own:
 
 | Case | What the editor does |
 |---|---|
@@ -240,9 +240,10 @@ An agent of the agent server can start a mission play. The agent tools that star
 | The active mod has unsaved edits | The dialog "An agent wants to start Play. Mod '{id}' has unsaved edits. Save them and continue?" opens. "Save and continue" saves and plays. "Cancel" gives the agent the error "The user did not save. Play did not start." Cancel is the default button, so Enter does not save. |
 | The setting "Auto-save and continue when an MCP agent starts Play" is on | Play saves and starts without the dialog. The setting is in Agent > Agent settings. It is off by default. |
 | The active mod gets unsaved edits after the request, before the save of Play | Play does not save and does not start. The agent gets an error, and a new request opens the dialog. |
-| Another play runs, for example a play from the camera | Play does not start. The agent must stop the other play first. The editor checks it again after "Save and continue". |
-| A mission play runs | The game starts again at the start of the request. |
-| The start cannot start | Play does not start. The agent gets the reason of the start plan. |
+| Another play runs, for example a play from the camera | Play does not start. The agent must stop the other play first with `play_stop`. The editor checks it again after "Save and continue". |
+| A mission play runs | A mission play of an agent starts the game again at the start of the request. `play` does not start, and the agent must stop the mission play first. |
+| The start cannot start | Play does not start. The agent gets the reason of the start plan of a mission play, or of the checks of the Play menu. |
+| The call of the agent ends before you answer, for example at its time limit | The dialog closes as Cancel does. A click after the end of the call does not start Play. |
 | The dialog of another agent request is open | Play does not start. The agent gets an error and waits for the result of the other request. |
 | You clicked "Save and continue" for another agent request, and Play did not end that request yet | Play does not start. The agent gets an error and waits for the result of the other request. |
 
