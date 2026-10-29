@@ -191,7 +191,7 @@ public sealed class OltoolMcpTests
     /// (section 13.2, item 6 of the MCP1 design). The recovery file then has the edit, and a new session finds
     /// it.</summary>
     /// <remarks>The server writes the file 2 seconds after the edit. A cold process under the load of the parallel tests
-    /// can need more time for its first write, so the test waits for the file before it ends the process. The file
+    /// can need more time for its first write. So the test waits for the file before it ends the process. The file
     /// still comes without the end of stdin.</remarks>
     [Fact]
     public async Task AnEditStaysInTheRecoveryFileWhenTheServerEndsWithoutTheEndOfStdin()

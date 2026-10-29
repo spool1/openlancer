@@ -384,8 +384,8 @@ public sealed class AgentPublishToolTests
         }
     }
 
-    /// <summary>A progress that holds the export at a step until the test releases it: at the check of the mod by
-    /// default, or at the start of the write (step 1).</summary>
+    /// <summary>A progress that holds the export at a step until the test releases it. Step 0 is the check of the mod,
+    /// and step 1 is the start of the write.</summary>
     private sealed class Holding(ManualResetEventSlim release, int step = 0) : IProgress<ToolProgress>
     {
         public ManualResetEventSlim Started { get; } = new();

@@ -617,7 +617,7 @@ public sealed class AgentControllerTests : IDisposable
     }
 
     /// <summary>While an export of the Export dialog or of the agent runs, the save of the editor host gives
-    /// <c>busy</c> and does not start the save of the editor. The export reads the saved files.</summary>
+    /// <c>busy</c>. It does not start the save of the editor, because the export reads the saved files.</summary>
     [Fact]
     public void TheEditorSaveGivesBusyWhileAnExportRuns()
     {
