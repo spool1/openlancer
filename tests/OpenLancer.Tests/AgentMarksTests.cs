@@ -94,6 +94,7 @@ public sealed class AgentMarksTests
         Assert.Empty(marks.Pulses());
         Assert.True(marks.Marked(Station));
         Assert.Equal(TimeSpan.FromSeconds(4), AgentMarks.PulseTime);
+        Assert.Empty(SteLint.Problems(Editor.Hierarchy.HierarchyPanel.AgentMarkTip));
     }
 
     /// <summary>The marks follow the session of the open profile. A new session starts without pulses.</summary>
