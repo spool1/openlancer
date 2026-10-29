@@ -206,7 +206,7 @@ public abstract class AgentHost
 
     /// <summary>Tells the host that an edit call of the agent changed the data (section 8.5 of the MCP1 design). It runs
     /// after the commit, on the thread that owns the session. A preview and a call without a change do not call it. The
-    /// change is in the history then, so the hook must not throw. An exception would give the agent the error
+    /// change is done then, so the hook must not throw. An exception would give the agent the error
     /// <c>step_failed</c> for an applied edit.</summary>
     /// <param name="tool">The name of the tool, for example <c>delete_items</c>.</param>
     /// <param name="result">The result of the commit, with the label of the history entry.</param>

@@ -203,9 +203,10 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
     internal const string ShowFailedText = "The editor could not show the agent change:";
 
     /// <summary>
-    /// Runs what the editor shows of an agent change: the Console entry and follow mode. The change is in the history when
-    /// this runs. So a fault here must not give the agent an error that tells that the tool changed nothing. The Console
-    /// gets the fault as an Error entry, and the call keeps its result (review finding of MCP1-2, step 8).
+    /// Runs what the editor shows of an agent change: the Console entry and follow mode. The change is done when this
+    /// runs: it is in the history, or a prop group file has it. So a fault here must not give the agent an error that
+    /// tells that the tool changed nothing. The Console gets the fault as an Error entry, and the call keeps its result
+    /// (review finding of MCP1-2, step 8).
     /// </summary>
     private void AfterChange(Action show)
     {
