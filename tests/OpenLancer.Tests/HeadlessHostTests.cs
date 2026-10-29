@@ -61,6 +61,30 @@ public sealed class HeadlessHostTests
         Assert.Equal("40, 50, 60", Line(session, "pos"));
     }
 
+    /// <summary>The 2 seconds start again at each edit, as in the editor (section 6.2 of the MCP1 design). So the host
+    /// writes the recovery file 2 seconds after the last edit of a series, not 2 seconds after its first edit.</summary>
+    [Fact]
+    public void EachEditStartsTheTwoSecondsAgain()
+    {
+        using var ws = SceneWorkspace.Create();
+        var clock = new FakeClock();
+        using var host = HeadlessHost.Open(ws.ProfilePath, "act", new HeadlessOptions { Clock = clock });
+
+        Ok(host, "set_fields", Move);
+        clock.Advance(TimeSpan.FromSeconds(1.5));
+        Ok(host, "set_fields", MoveAgain);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var wait = host.Idle();
+        var early = File.Exists(Recovery(ws));
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var written = host.Idle();
+
+        Assert.Equal(TimeSpan.FromSeconds(1), wait);
+        Assert.False(early);
+        Assert.Null(written);
+        Assert.True(File.Exists(Recovery(ws)));
+    }
+
     /// <summary>A replay keeps no unsaved edits, so its host writes no recovery file.</summary>
     [Fact]
     public void AHostWithoutTheRecoveryWritesNoRecoveryFile()
@@ -137,8 +161,8 @@ public sealed class HeadlessHostTests
         using var host = HeadlessHost.Open(ws.ProfilePath, "act", new HeadlessOptions());
         var editor = ws.Session("act");
 
-        const string Text = "The mod act is part of the OpenLancer repo. The server without a window cannot change it. " +
-                            "Use the agent server of the editor.";
+        const string Text = "The mod 'act' is part of the OpenLancer repo, so its files are tracked files. The server " +
+                            "without a window never changes this mod. Use the agent server of the editor.";
         Assert.Equal(("read_only", "NotEditable", Text), Error(host, "set_fields", Move));
         Assert.False(host.Session.HoldsLock);
         Assert.True(editor.HoldsLock);

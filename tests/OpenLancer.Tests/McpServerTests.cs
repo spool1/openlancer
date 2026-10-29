@@ -397,8 +397,8 @@ public sealed class McpServerTests
 
         using var host = HeadlessHost.OpenReadOnly(ws.ProfilePath, "act");
 
-        Assert.Equal("The mod act is part of the OpenLancer repo. The server without a window cannot change it. Use the " +
-                     "agent server of the editor.", host.RepoReason);
+        Assert.Equal("The mod 'act' is part of the OpenLancer repo, so its files are tracked files. The server without a " +
+                     "window never changes this mod. Use the agent server of the editor.", host.RepoReason);
         Assert.NotNull(host.NoEditReason);
     }
 

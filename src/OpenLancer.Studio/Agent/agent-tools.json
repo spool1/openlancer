@@ -534,7 +534,7 @@
     "check_target_note": "The target check reads the saved files of the mods. An edit that you did not save is not in it.",
     "check_target_failed": "The target check did not run. {reason} Make sure that the profile loads and that the files of the target game exist. Then try again.",
     "headless_read_only": "The server without a window opened the mod {mod} only to read (--read-only). It takes no edits.",
-    "headless_repo_mod": "The mod {mod} is part of the OpenLancer repo. The server without a window cannot change it. Use the agent server of the editor.",
+    "headless_repo_mod": "The server without a window never changes this mod. Use the agent server of the editor.",
     "list_needs_script": "The list {list} holds the items of one mission script. Give the argument 'script'.",
     "list_no_system": "The list {list} is not a list of one system. Remove the argument 'system'.",
     "list_no_script": "The list {list} is not a list of one mission script. Remove the argument 'script'.",

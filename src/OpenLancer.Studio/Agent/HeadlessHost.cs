@@ -90,12 +90,11 @@ public sealed class HeadlessHost : AgentHost, IDisposable
         texts = new Lazy<InfocardManager?>(() => Infocards(session));
         if (session.ActiveMod is { } mod)
         {
-            if (RepoMods.Reason(mod) != null)
-                RepoReason = AgentTexts.Error("headless_repo_mod", ("mod", mod.Id));
+            RepoReason = RepoText(mod);
             lockedByOther = !session.HoldsLock && ModLock.HeldBy(mod.Folder, mod.Id) != null;
         }
         if (options.WritesRecovery && session.HoldsLock)
-            session.Changed += _ => outdatedSince ??= options.Clock.GetTimestamp();
+            session.Changed += _ => outdatedSince = options.Clock.GetTimestamp();
     }
 
     public override AgentHostKind Kind => AgentHostKind.Headless;
@@ -145,10 +144,9 @@ public sealed class HeadlessHost : AgentHost, IDisposable
     {
         var profile = ModProfile.Load(Path.GetFullPath(profilePath));
         var index = profile.IndexOf(modId);
-        var session = index >= 0 && RepoMods.Reason(profile.Mods[index]) != null
+        var session = (index >= 0 ? RepoText(profile.Mods[index]) : null) is { } repo
             // The host never edits a repo mod, so it takes no lock, and the editor can still edit the mod.
-            ? EditSession.OpenReadOnly(profile, modId, DllStringResourceWriter.Instance, ThornEvaluator.Instance,
-                AgentTexts.Error("headless_repo_mod", ("mod", modId)))
+            ? EditSession.OpenReadOnly(profile, modId, DllStringResourceWriter.Instance, ThornEvaluator.Instance, repo)
             : EditSession.Open(profile, modId, DllStringResourceWriter.Instance, ThornEvaluator.Instance);
         try
         {
@@ -166,6 +164,11 @@ public sealed class HeadlessHost : AgentHost, IDisposable
             throw;
         }
     }
+
+    /// <summary>The reason of <see cref="RepoMods.Reason"/> with the step of this host, or null for a mod outside the
+    /// OpenLancer repo (decision D738). The editor host adds its own step to the same reason.</summary>
+    private static string? RepoText(Mod mod) =>
+        RepoMods.Reason(mod) is { } reason ? $"{reason} {AgentTexts.Error("headless_repo_mod")}" : null;
 
     /// <summary>Restores or discards a recovery file of an earlier session, as the options ask. The restored edits are
     /// unsaved edits of this session, so the host writes them to a new recovery file.</summary>
