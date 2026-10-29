@@ -653,6 +653,7 @@
     "export_progress_record": "The export records the packages in the publish history.",
     "guard_published": "Version {version} has the mark published. A new export needs a higher version. Ask the user to increase the version in the Mods window.",
     "guard_exported": "An earlier export of version {version} has other game files, so players cannot see which package they have. Call export_mod again with replace_version: true to replace that export. Or ask the user for a higher version.",
+    "guard_partial": "An earlier export of version {version} also has packages for {targets}. A replace needs these targets and forms too. Call export_mod again with them in targets and formats. Or ask the user for a higher version.",
     "headless_recovery": "The mod {mod} has unsaved edits of an earlier session in its recovery file. Restore them in the editor, or start the server with --restore-recovery or --discard-recovery.",
     "headless_locked": "Or use the agent server of the editor that has the mod open.",
     "headless_recovery_restored": "The server restored the unsaved edits of the earlier session. Save them to keep them.",

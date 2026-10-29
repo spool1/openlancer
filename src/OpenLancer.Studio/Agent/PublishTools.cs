@@ -198,7 +198,8 @@ internal static class PublishTools
             var (detail, message) = guard.Kind == GuardKind.Published
                 ? ("Published", AgentTexts.Error("guard_published", ("version", guard.Version)))
                 : replace
-                    ? ("PartialReplace", guard.PartialText!)
+                    ? ("PartialReplace", AgentTexts.Error("guard_partial", ("version", guard.Version),
+                        ("targets", string.Join(", ", guard.Missing))))
                     : ("Exported", AgentTexts.Error("guard_exported", ("version", guard.Version)));
             return ExportOutcome.Error(EditErrorKind.GuardConflict, detail, message, warnings);
         }

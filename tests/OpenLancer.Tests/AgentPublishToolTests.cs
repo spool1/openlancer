@@ -200,6 +200,62 @@ public sealed class AgentPublishToolTests
                      "increase the version in the Mods window.", published.Message);
     }
 
+    /// <summary>A replace of a version must cover each target and form of the earlier export, as in the Export dialog
+    /// and <c>oltool export --same-version</c>. Otherwise the export gives <c>guard_conflict</c> with the detail
+    /// <c>PartialReplace</c>, and the package of the earlier export stays.</summary>
+    [Fact]
+    public void AReplaceThatLeavesOutAnEarlierPackageGivesGuardConflict()
+    {
+        using var game = new ExportGame();
+        var (_, session) = Ready(game);
+        using var __ = session;
+        var host = new TestAgentHost(session);
+
+        var first = Ok(host, "export_mod");
+        var flmm = first["packages"]!.AsArray().Single(p => (string?)p!["form"] == "flmm")!;
+        var package = Path.Combine(ExportRoot(game), "1.2.0", (string)flmm["file"]!);
+        var before = File.ReadAllBytes(package);
+        SetPrice(game, 4400);
+        var partial = Error(host, "export_mod", """{ "formats": ["drop_in"], "replace_version": true }""");
+
+        Assert.Equal(("guard_conflict", "PartialReplace"), (partial.Code, partial.Detail));
+        Assert.StartsWith("An earlier export of version 1.2.0 also has packages for ", partial.Message);
+        Assert.Contains("(FLMM package)", partial.Message);
+        Assert.EndsWith("Call export_mod again with them in targets and formats. Or ask the user for a higher version.",
+            partial.Message);
+        Assert.Equal(before, File.ReadAllBytes(package));
+        Assert.Single(PublishHistory.Load(ExportRoot(game), "ol-test").History.Exports);
+    }
+
+    /// <summary>The host without a window waits at its close for an export of the agent whose write started (section
+    /// 6.2 of the MCP1 design). So the end of stdin during the write does not end the process before the publish
+    /// history records the export.</summary>
+    [Fact]
+    public async Task TheHostWithoutAWindowWaitsAtItsCloseForTheWriteOfAnExport()
+    {
+        using var game = new ExportGame();
+        var (profile, session) = Ready(game);
+        // The host takes the lock of the mod itself.
+        session.Dispose();
+        var host = HeadlessHost.Open(profile, "ol-test", new HeadlessOptions { WritesRecovery = false });
+        using var release = new ManualResetEventSlim();
+        var progress = new Holding(release, step: 1);
+
+        var tail = AgentTools.Run(host, "export_mod", JsonNode.Parse("""{ "formats": ["drop_in"] }""")!.AsObject())
+            .Tail!(TestContext.Current.CancellationToken, progress);
+        Assert.True(progress.Started.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        var close = Task.Run(host.Dispose, TestContext.Current.CancellationToken);
+        var waited = await Task.WhenAny(close, Task.Delay(300, TestContext.Current.CancellationToken)) != close;
+        release.Set();
+        await close.WaitAsync(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
+        var result = await tail.WaitAsync(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
+
+        Assert.True(waited);
+        Assert.True((bool)result.Content["succeeded"]!, result.Text);
+        Assert.Single(PublishHistory.Load(ExportRoot(game), "ol-test").History.Exports);
+        Assert.False(host.Session.HoldsLock);
+    }
+
     /// <summary>A cancel during the write stops the call, and the write goes on to its end. The history records the
     /// export, as in the Export dialog (sections 5.5, item 6 and 8.5, item 6 of the MCP1 design).</summary>
     [Fact]
@@ -328,14 +384,15 @@ public sealed class AgentPublishToolTests
         }
     }
 
-    /// <summary>A progress that holds the export at its first step until the test releases it.</summary>
-    private sealed class Holding(ManualResetEventSlim release) : IProgress<ToolProgress>
+    /// <summary>A progress that holds the export at a step until the test releases it: at the check of the mod by
+    /// default, or at the start of the write (step 1).</summary>
+    private sealed class Holding(ManualResetEventSlim release, int step = 0) : IProgress<ToolProgress>
     {
         public ManualResetEventSlim Started { get; } = new();
 
         public void Report(ToolProgress value)
         {
-            if (value.Progress > 0)
+            if (value.Progress != step)
                 return;
             Started.Set();
             release.Wait(TimeSpan.FromSeconds(30));
