@@ -21,9 +21,12 @@ namespace OpenLancer.Tests;
 /// the user decision of 2026-10-20: the Play of the editor with a fake editor, the checks that the Play menu shares, the
 /// question of the user, and its close at the time limit and at a cancel of the client.
 /// </summary>
-public sealed class AgentPlayToolTests
+public sealed class AgentPlayToolTests : IDisposable
 {
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
+
+    // The profile of the session of the editor host. play needs an open profile, and the fake editor gives the rest.
+    private readonly TestWorkspace ws = new();
 
     private const string AtBase = """{ "start": "base", "base": "ol_base_01" }""";
 
@@ -32,11 +35,17 @@ public sealed class AgentPlayToolTests
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    /// <summary>The editor host with the Play of a fake editor.</summary>
-    private static (TestAgentHost Host, FakePlayEditor Editor) Editor()
+    public AgentPlayToolTests() => ws.WriteProfile();
+
+    public void Dispose() => ws.Dispose();
+
+    /// <summary>The editor host with an open profile and the Play of a fake editor.</summary>
+    /// <param name="profileOpen">False for an editor host without an open profile.</param>
+    private (TestAgentHost Host, FakePlayEditor Editor) Editor(bool profileOpen = true)
     {
         var editor = new FakePlayEditor();
-        return (new TestAgentHost(null, AgentHostKind.Editor) { TestPlay = new EditorAgentPlay(editor) }, editor);
+        var session = profileOpen ? ws.Session(null) : null;
+        return (new TestAgentHost(session, AgentHostKind.Editor) { TestPlay = new EditorAgentPlay(editor) }, editor);
     }
 
     /// <summary>Without unsaved edits, the play starts at once. Nobody allowed a save, so Play refuses edits that come
@@ -340,6 +349,23 @@ public sealed class AgentPlayToolTests
         Assert.Equal(("not_available", "EditorOnly"), Codes(Error(host, "play_stop")));
     }
 
+    /// <summary>Without an open profile, play gives the error of each tool that reads the profile, with the text of
+    /// section 10 of the MCP1 design. play_stop stops a game also without a profile.</summary>
+    [Fact]
+    public void WithoutAProfilePlayGivesNotAvailableAndPlayStopRuns()
+    {
+        var (host, editor) = Editor(profileOpen: false);
+        editor.Stopping = PlayStopped.Game;
+
+        var play = Refusal(host, AtBase);
+        var stop = Ok(host, "play_stop");
+
+        Assert.Equal(("not_available", "NoProfile", "No profile is open. Open a profile in the editor, then try again."),
+            play);
+        Assert.Empty(editor.Requests);
+        Assert.Equal("game", (string?)stop["stopped"]);
+    }
+
     /// <summary>A tool of the hidden group Play stays in the list and gives not_available (decision D725).</summary>
     [Fact]
     public void AHiddenPlayGroupGivesNotAvailable()
@@ -359,8 +385,8 @@ public sealed class AgentPlayToolTests
     [InlineData("play_stop")]
     public void EditBatchRefusesAPlayToolAsAStep(string tool)
     {
-        var (ws, session, host) = AgentEditToolTests.Scene();
-        using var _ = ws;
+        var (scene, session, host) = AgentEditToolTests.Scene();
+        using var _ = scene;
 
         var (code, detail, message) = Error(host, "edit_batch", $$"""{ "steps": [{ "tool": "{{tool}}" }] }""");
 
@@ -376,8 +402,8 @@ public sealed class AgentPlayToolTests
     [Fact]
     public void TheMenuAndTheToolGiveTheSameReasonForASystemThatDoesNotExist()
     {
-        using var ws = new TestWorkspace();
-        var items = PlayMenuTests.Items(ws);
+        using var data = new TestWorkspace();
+        var items = PlayMenuTests.Items(data);
         var (host, editor) = Editor();
         editor.Check = start => PlayChecks.StartBlock(true, items, "ol_sys", start);
         var gone = new PlayStart.InSpace("ol_gone", Vector3.Zero, Quaternion.Identity);

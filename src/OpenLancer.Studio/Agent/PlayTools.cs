@@ -98,6 +98,9 @@ internal static class PlayTools
     {
         var play = PlayOf(call);
         var start = StartOf(call.Args);
+        // Without an open profile, play gives the error of each tool that reads the session (section 10 of the MCP1
+        // design). The checks of the Play menu give the other reasons.
+        _ = call.Session;
         var wait = play.Start(start);
         return ToolStep.Then(async cancel => ToolResult.Of(await wait(cancel).ConfigureAwait(false)));
     }

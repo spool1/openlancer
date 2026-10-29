@@ -307,7 +307,7 @@ A play of an agent never saves on its own. When the active mod has unsaved edits
 
 While a game runs, `play` gives `refused`, and the agent calls `play_stop` first. The Play menu closes the running game instead. `play` also gives `refused` when the checks of the Play menu refuse the start, for example for a system that the game data does not have. These checks are the same for the menu and the agent.
 
-When Play saves the active mod, the save gate runs first, as for `save`. When the save stops, `play` gives `save_blocked` or `changed_on_disk`, and the game does not start. A second play request of an agent gives `busy` until the earlier request ends, because one dialog shows the question.
+When Play saves the active mod, the save gate runs first, as for `save`. When the save stops, `play` gives `save_blocked` or `changed_on_disk`, and the game does not start. A second play request of an agent gives `busy` until the earlier request ends, because one dialog shows the question. Without an open profile, `play` gives `not_available`, as the tools that read the profile do. `play_stop` also works without a profile.
 
 `play_stop` stops the game of Play in OpenLancer, else the game of a play copy, as Shift+F5 does. It gives what it stopped and the state of Play. A play and a stop are not Undo steps.
 
