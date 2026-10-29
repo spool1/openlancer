@@ -12,8 +12,8 @@ using static OpenLancer.Tests.AgentCalls;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// What the user sees of the agent calls in the editor (section 8.5 of the MCP1 design): the Console entries of the edits
-/// and the refusals, Pause (decision D734) and the text of the status bar (section 10).
+/// What the user sees of the agent calls in the editor (section 8.5 of the MCP1 design). These are the Console entries of
+/// the edits and the refusals, Pause (decision D734) and the text of the status bar (section 10).
 /// </summary>
 public sealed class AgentConsoleTests
 {
@@ -105,8 +105,8 @@ public sealed class AgentConsoleTests
     }
 
     /// <summary>
-    /// Section 13.2, item 1 of the MCP1 design: while the user pauses the agent edits, the dispatcher of the editor gives
-    /// paused for an edit, and lets a query and play_stop run. The Console gets the refusal.
+    /// Section 13.2, item 1 of the MCP1 design. While the user pauses the agent edits, the dispatcher of the editor gives
+    /// paused for an edit. It lets a query and play_stop run. The Console gets the refusal.
     /// </summary>
     [Fact]
     public async Task PauseGivesPausedForAnEditAndLetsAQueryAndPlayStopRun()

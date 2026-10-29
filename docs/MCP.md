@@ -27,7 +27,7 @@ Use the editor host when you work in the editor. The agent then sees your unsave
 6. Paste the text into the file `.mcp.json` in the folder of your agent project.
 7. Start the agent program in that folder.
 
-The status bar shows the state of the server, for example "Agent server: on, port 47815". While an agent calls, it shows the name of the agent program and the number of its edits since the last save, for example "Agent: claude-code, 3 edits". While you pause the agent edits, it shows "Agent paused". Click the status bar segment to open the Agent menu.
+The status bar shows the state of the server, for example "Agent server: on, port 47815". While an agent calls, it shows the name of the agent program and the number of its edits since the last save. An example is "Agent: claude-code, 3 edits". While you pause the agent edits, it shows "Agent paused". Click the status bar segment to open the Agent menu.
 
 ### The .mcp.json entry
 

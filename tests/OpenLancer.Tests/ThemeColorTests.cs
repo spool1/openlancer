@@ -147,7 +147,7 @@ public sealed class ThemeColorTests
         Assert.True(contrast >= 3, $"The override color has a contrast of {contrast:0.00}:1 on {background}.");
     }
 
-    /// <summary>The robot glyph of an agent edit and the pulse ring are marks that are not text, so they need a contrast
+    /// <summary>The robot glyph of an agent edit and the pulse ring are marks that are not text. So they need a contrast
     /// of 3:1 or more against the Hierarchy and the selected row (WCAG 1.4.11).</summary>
     [Theory]
     [InlineData(nameof(EditorTheme.Panel))]

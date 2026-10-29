@@ -215,8 +215,8 @@ public sealed class FollowModeTests
         new(before, after, (Vector3.Zero, Quaternion.Identity, 1), (Vector3.Zero, Quaternion.Identity, 1), input);
 
     /// <summary>A change of the position, the orientation or the fly speed of the Scene camera in the panels is a camera
-    /// input of the user, also without a click in the frame, for example a key that flies the camera. The same pose is
-    /// not.</summary>
+    /// input of the user. This is also true without a click in the frame, for example for a key that flies the camera.
+    /// The same pose is not a camera input.</summary>
     [Fact]
     public void EachChangeOfTheCameraPoseIsACameraInputOfTheUser()
     {

@@ -7,7 +7,7 @@ namespace OpenLancer.Editor.Agent;
 
 /// <summary>
 /// The marks of the agent edits (section 8.5 of the MCP1 design, decision D718). The Scene draws a pulse ring around each
-/// item of an agent entry for 4 seconds, and the Hierarchy shows the robot glyph on each row that an agent entry changed
+/// item of an agent entry for 4 seconds. The Hierarchy shows the robot glyph on each row that an agent entry changed
 /// since the last save. The marks follow <see cref="EditSession.Changed"/>: an undo of the entry removes them, a redo
 /// puts them back, and a save clears them. The blue mark of an unsaved edit stays as it is.
 /// </summary>

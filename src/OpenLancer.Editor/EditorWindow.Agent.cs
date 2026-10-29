@@ -157,9 +157,9 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
         Scene.System?.Nickname.Equals(system, StringComparison.OrdinalIgnoreCase) == true;
 
     /// <summary>
-    /// Watches the input of the user in one frame for follow mode (decision D719): a click or a key that moves the
-    /// selection, and a camera input of the Scene. Call it after the panels draw, with the selection and the camera pose
-    /// before them.
+    /// Watches the input of the user in one frame for follow mode (decision D719). It reads the clicks and the keys that
+    /// move the selection, and the camera pose of the Scene. Call it after the panels draw, with the selection and the
+    /// camera pose before them.
     /// </summary>
     private void WatchFollow(object? selectionBefore, (Vector3, Quaternion, float) poseBefore)
     {

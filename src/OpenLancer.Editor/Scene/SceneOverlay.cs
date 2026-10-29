@@ -233,8 +233,8 @@ internal sealed class SceneOverlay(EditorWindow window, IReadOnlyDictionary<Syst
     }
 
     /// <summary>
-    /// The pulse ring of an item of an agent edit, in the agent color: a ring around the brackets that fades over the
-    /// time of the pulse, and a wave that grows from it once in each second.
+    /// The pulse ring of an item of an agent edit, in the agent color. A ring around the brackets fades over the time of
+    /// the pulse. A wave grows from the ring once in each second.
     /// </summary>
     private void DrawPulse(ImDrawListPtr drawList, object item, TimeSpan age)
     {

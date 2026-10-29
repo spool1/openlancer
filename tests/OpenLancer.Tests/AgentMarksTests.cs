@@ -8,9 +8,9 @@ using static OpenLancer.Tests.SceneWorkspace;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The marks of the agent edits (section 8.5 of the MCP1 design, decision D718): the pulse ring of the Scene for 4
-/// seconds and the robot glyph of the Hierarchy until the save. The marks follow the changes of the session, with a fake
-/// clock.
+/// The marks of the agent edits (section 8.5 of the MCP1 design, decision D718). The Scene shows the pulse ring for 4
+/// seconds, and the Hierarchy shows the robot glyph until the save. The marks follow the changes of the session, with a
+/// fake clock.
 /// </summary>
 public sealed class AgentMarksTests
 {

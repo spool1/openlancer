@@ -434,9 +434,9 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
         ImGui.CalcTextSize(EditorIcons.Robot.ToString()).X + ImGui.GetStyle().FramePadding.X + ImGui.GetStyle().ItemSpacing.X;
 
     /// <summary>
-    /// The mark of a row that an agent edit changed after the last save (section 8.5 of the MCP1 design): the robot glyph
-    /// in the agent color at the right end of the row. The blue bar of the unsaved edit stays, so the row shows both
-    /// marks.
+    /// The mark of a row that an agent edit changed after the last save (section 8.5 of the MCP1 design). It is the robot
+    /// glyph in the agent color at the right end of the row. The blue bar of the unsaved edit stays, so the row shows
+    /// both marks.
     /// </summary>
     private static void AgentMark(Vector2 start, float right)
     {

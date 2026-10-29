@@ -144,7 +144,7 @@ internal sealed class AgentSettings
 
     /// <summary>True when the editor follows each agent edit: it opens and frames its item (decision D719 of the MCP1
     /// design). It is on by default. A camera input or a selection of the user stops follow mode for the run of the
-    /// editor, and this setting keeps the last value that the user clicked.</summary>
+    /// editor. This setting keeps the last value that the user clicked.</summary>
     public bool FollowAgent { get; set; } = true;
 
     public AgentLimits Limits { get; set; } = new();

@@ -13,10 +13,10 @@ using OpenLancer.Studio.Agent;
 namespace OpenLancer.Editor.Agent;
 
 /// <summary>
-/// The menu "Agent" of the editor (decision D742) and its dialogs: Start and Stop of the agent server, Pause of the agent
-/// edits (decision D734), the data notice at the first start (decision D735), the Connect dialog with the text of
-/// <c>.mcp.json</c>, the agent settings and the segment of the status bar (section 10 of the MCP1 design). A click on the
-/// segment of the status bar opens the same menu, so Pause is also in the status bar.
+/// The menu "Agent" of the editor (decision D742) and its dialogs. The menu starts and stops the agent server and pauses
+/// the agent edits (decision D734). The dialogs are the data notice at the first start (decision D735) and the Connect
+/// dialog with the text of <c>.mcp.json</c>. The class also draws the agent settings and the segment of the status bar
+/// (section 10 of the MCP1 design). A click on the segment opens the same menu, so Pause is also in the status bar.
 /// </summary>
 internal sealed class AgentMenu(EditorWindow window, AgentController controller)
 {

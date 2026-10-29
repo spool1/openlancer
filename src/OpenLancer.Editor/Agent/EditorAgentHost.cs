@@ -171,10 +171,10 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
     public override string InfoText(int ids) => editor.InfoText(ids);
 
     /// <summary>
-    /// The Console entry of an applied edit (section 8.5 of the MCP1 design): an Info entry with the source "Agent", the
-    /// label of the request and a link to the first item that the edit adds, renames or changes. The entry has the origin
-    /// OpenLancer, as each message of the editor has, so the toggle of the base-game messages never hides it (decision
-    /// D718).
+    /// The Console entry of an applied edit (section 8.5 of the MCP1 design). It is an Info entry with the source "Agent"
+    /// and the label of the request. It links to the first item that the edit adds, renames or changes. The entry has the
+    /// origin OpenLancer, as each message of the editor has. So the toggle of the base-game messages never hides it
+    /// (decision D718).
     /// </summary>
     /// <remarks>Follow mode then opens and frames the item of the edit (decision D719).</remarks>
     public override void Edited(string tool, EditResult result) => AfterChange(() =>
@@ -228,7 +228,7 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
         result.Adds.Concat(result.Renames.Select(r => r.To)).Concat(result.Changes).Select(SectionOf)
             .FirstOrDefault(s => s != null);
 
-    /// <summary>The section of an item reference of a result, or null when the reference names no section of the edit
+    /// <summary>The section of an item reference of a result. It is null when the reference names no section of the edit
     /// view now, for example a prop group.</summary>
     private SectionRef? SectionOf(string reference)
     {

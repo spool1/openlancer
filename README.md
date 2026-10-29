@@ -135,7 +135,7 @@ Open the Cutscenes tab of the editor to browse the retail cutscenes and the cuts
 
 ## Agents (MCP)
 
-OpenLancer has an agent server: an MCP (Model Context Protocol) server. An AI agent, for example Claude Code, uses it to read the game content of a profile, to see the views of the editor and to edit the active mod. The goal is that agents make content with the same tools as a modder: systems and areas, NPC ships, loot wrecks, missions and cutscenes. The agent edits the items of the systems and the data of the active mod now. It also saves, exports and starts Play. The mission and cutscene edit tools come next.
+OpenLancer has an agent server: an MCP (Model Context Protocol) server. An AI agent, for example Claude Code, uses it. The agent reads the game content of a profile, sees the views of the editor and edits the active mod. The goal is that agents make content with the same tools as a modder: systems and areas, NPC ships, loot wrecks, missions and cutscenes. The agent edits the items of the systems and the data of the active mod now. It also saves, exports and starts Play. The mission and cutscene edit tools come next.
 
 **Connect an agent**
 
