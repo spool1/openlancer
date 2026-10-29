@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using LibreLancer;
 using OpenLancer.Data;
+using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Games;
 using OpenLancer.Editor.Editing;
@@ -220,9 +221,12 @@ internal sealed class PlayController : IDisposable
     /// moves it when the game starts.</param>
     /// <param name="package">The ship package, or null for the package of a new multiplayer character (D15).</param>
     /// <param name="save">What the save of Play does (user decision of 2026-10-20 of the M6c design).</param>
+    /// <param name="origin">Who asks. The start check of a start in space of an agent names the start point, not the
+    /// camera.</param>
     /// <returns>The result of the request, when the play started or did not start.</returns>
-    public Task<PlayRequestResult> Request(PlayStart start, string? package, PlaySaveRule save = PlaySaveRule.Save) =>
-        Replace(new PlayRequest(start, package, clock()) { Save = save });
+    public Task<PlayRequestResult> Request(PlayStart start, string? package, PlaySaveRule save = PlaySaveRule.Save,
+        EditOrigin origin = EditOrigin.User) =>
+        Replace(new PlayRequest(start, package, clock()) { Save = save, Origin = origin });
 
     /// <summary>Stops the game, or ends its process at once when <see cref="ForceStop"/> is true. A request that waits
     /// is dropped.</summary>
@@ -415,16 +419,20 @@ internal sealed class PlayController : IDisposable
         SpawnCheck? check = null;
         if (start is PlayStart.InSpace camera)
         {
+            var agent = request.Origin == EditOrigin.Agent;
             if (editor.SpawnShapes(camera.System) is not { } shapes)
             {
-                var message = "Play from camera stopped: the Scene does not show " +
-                              $"{SystemText(camera.System)} now, so Play cannot check the start at " +
-                              "the camera. Open the system, then press Play.";
+                var message = agent
+                    ? $"Agent Play stopped: the Scene does not show {SystemText(camera.System)} now, so Play cannot " +
+                      "check the start point. Open the system, then start Play again."
+                    : "Play from camera stopped: the Scene does not show " +
+                      $"{SystemText(camera.System)} now, so Play cannot check the start at " +
+                      "the camera. Open the system, then press Play.";
                 Log(ConsoleSeverity.Warning, message);
                 return Refused("NoSceneSystem", message);
             }
 
-            check = SpawnPoint.FromCamera(camera, shapes);
+            check = agent ? SpawnPoint.FromAgentPoint(camera, shapes) : SpawnPoint.FromCamera(camera, shapes);
             start = check.Start;
         }
 
@@ -1271,6 +1279,9 @@ internal sealed class PlayController : IDisposable
 
         /// <summary>What the save of Play does for the request.</summary>
         public PlaySaveRule Save { get; init; }
+
+        /// <summary>Who asks for the play.</summary>
+        public EditOrigin Origin { get; init; }
 
         /// <summary>True after the Console told why the request waits for the Scene.</summary>
         public bool SceneWaitTold { get; set; }

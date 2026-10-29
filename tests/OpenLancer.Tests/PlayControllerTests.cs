@@ -370,6 +370,41 @@ public sealed class PlayControllerTests : IDisposable
                      "the camera. Open the system, then press Play.", Console[^1]);
     }
 
+    /// <summary>
+    /// A start in space of the agent tool play has the start check of Play from camera (section 7.6 of the MCP1 design).
+    /// The agent gives a point, not the camera, so the lines of the check name the start point. A system that the Scene
+    /// does not show stops the play before its save, with the words of the agent.
+    /// </summary>
+    [Fact]
+    public void AnAgentStartInSpaceHasTheStartCheckWithTheWordsOfThePoint()
+    {
+        editor.Commit(1);
+        editor.Finish(1);
+        editor.Shapes.Add(DeathZone());
+
+        var started = play.Request(Space, null, PlaySaveRule.NoEdits, EditOrigin.Agent);
+        play.Update(false, false);
+
+        Assert.True(started.IsCompletedSuccessfully && started.Result.Started);
+        Near(MovedStart, Assert.IsType<PlayStart.InSpace>(Assert.Single(starts).Start).Position);
+        Assert.Contains("Agent Play: the start point is inside Zone_Br01_death. The ship starts 200 units behind the " +
+                        "start point.", Console);
+        Assert.DoesNotContain(Console, m => m.StartsWith("Play from camera", StringComparison.Ordinal));
+        RunUntil(PlayStatus.Running);
+        StopAndRunToIdle();
+
+        var elsewhere = play.Request(new PlayStart.InSpace("li01", Vector3.Zero, Quaternion.Identity), null,
+            PlaySaveRule.NoEdits, EditOrigin.Agent);
+        play.Update(false, false);
+
+        Assert.Equal("NoSceneSystem", elsewhere.Result.Error!.Detail);
+        Assert.Equal("Agent Play stopped: the Scene does not show li01 now, so Play cannot check the start point. Open " +
+                     "the system, then start Play again.", Console[^1]);
+        Assert.Equal(Console[^1], elsewhere.Result.Error.Message);
+        Assert.Empty(SteLint.Problems(Console[^1]));
+        Assert.Single(starts);
+    }
+
     /// <summary>(8) A second request while the game runs: stop, the exit, then a new game with the new start.</summary>
     [Fact]
     public void ASecondPlayStopsTheGameAndStartsANewOneAfterItsExit()

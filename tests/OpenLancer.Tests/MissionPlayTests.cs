@@ -513,5 +513,11 @@ public sealed class MissionPlayTests : IDisposable
 
         public void Ask(string title, string message, IReadOnlyList<Choice> choices, Action cancel) =>
             Asked = (title, message, choices, cancel);
+
+        public void Withdraw(IReadOnlyList<Choice> choices)
+        {
+        }
+
+        public AgentPlayRule AgentPlays { get; } = new();
     }
 }

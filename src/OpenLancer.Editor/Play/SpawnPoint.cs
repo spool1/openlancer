@@ -110,6 +110,15 @@ internal static class SpawnPoint
     public static SpawnCheck FromPoint(PlayStart.InSpace start, IReadOnlyList<SpawnShape> shapes) =>
         Check(start, shapes, "Mission play", "the start point", "the heading of the ship");
 
+    /// <summary>
+    /// The same check for the start point of the agent tool <c>play</c> (section 7.6 of the MCP1 design). The agent gives
+    /// the point, so it can be inside a planet, a station or a death zone.
+    /// </summary>
+    /// <param name="start">The system, the point and the heading of the start. The ship looks along the -Z of the
+    /// heading.</param>
+    public static SpawnCheck FromAgentPoint(PlayStart.InSpace start, IReadOnlyList<SpawnShape> shapes) =>
+        Check(start, shapes, "Agent Play", "the start point", "the heading of the ship");
+
     /// <param name="who">The start of each line, for example "Play from camera".</param>
     /// <param name="point">The point in words, for example "the camera".</param>
     /// <param name="axis">The axis of the moves in words, for example "the view axis".</param>

@@ -28,6 +28,9 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
     // The clock of the watchdogs of Play and of the time from Play to flight.
     private readonly Stopwatch playClock = Stopwatch.StartNew();
 
+    // The agent play request that asked the user and did not end, for each kind of agent play.
+    private readonly AgentPlayRule agentPlays = new();
+
     /// <summary>The game of Play: its start, its state and its stop.</summary>
     public PlayController Play { get; }
 
@@ -54,6 +57,17 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
             ? $"Play uses the default ship of a new character{(ship == null ? "" : $": {ship}")}."
             : $"Play uses the ship package {package}{(ship == null ? "" : $": {ship}")}.");
     }
+
+    /// <summary>The ship package of the Play menu for the open profile, or null for the default ship.</summary>
+    internal string? PlayPackage => Session is { } session ? Settings.PlayPackageOf(session.Profile.FilePath) : null;
+
+    /// <summary>Why no play can start now, or null (<see cref="PlayChecks.DataBlock"/>).</summary>
+    internal string? PlayDataBlock => PlayChecks.DataBlock(Session != null, Session?.GameData?.Items);
+
+    /// <summary>Why Play cannot start at a start now, or null. The Play menu and the agent tool play share the checks
+    /// (<see cref="PlayChecks.StartBlock"/>).</summary>
+    internal string? PlayStartBlock(PlayStart start) =>
+        PlayChecks.StartBlock(Session != null, Session?.GameData?.Items, Scene.System?.Nickname, start);
 
     ConsoleLog IPlayHost.Log => Log;
 
@@ -198,7 +212,7 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
         $"Mission play: the Scene does not show {system}, so Play checked the start point only for the zones. A planet " +
         "or a station can hold it. Open the system in the Scene to check it at the next play.";
 
-    string? IMissionPlayEditor.PlayPackage => Session is { } session ? Settings.PlayPackageOf(session.Profile.FilePath) : null;
+    string? IMissionPlayEditor.PlayPackage => PlayPackage;
 
     PlayStatus IMissionPlayEditor.PlayStatus => Play.Status;
 
@@ -217,4 +231,8 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
 
     void IAgentPlayHost.Ask(string title, string message, IReadOnlyList<Choice> choices, Action cancel) =>
         Choice.Show(title, message, choices, cancel);
+
+    void IAgentPlayHost.Withdraw(IReadOnlyList<Choice> choices) => QueueUIThread(() => Choice.Withdraw(choices));
+
+    AgentPlayRule IAgentPlayHost.AgentPlays => agentPlays;
 }

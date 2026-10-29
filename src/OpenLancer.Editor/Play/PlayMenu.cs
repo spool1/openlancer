@@ -65,8 +65,7 @@ internal sealed class PlayMenu(EditorWindow window)
             return;
         }
 
-        var scene = window.Scene;
-        Request(new PlayStart.InSpace(scene.System!.Nickname, scene.CameraPosition, scene.CameraOrientation));
+        Request(CameraStart(window.Scene.System!));
     }
 
     /// <summary>
@@ -258,12 +257,15 @@ internal sealed class PlayMenu(EditorWindow window)
     internal const string RestartTip = "Start the mission play again from its start, with the saved files. Unsaved " +
                                        "edits do not go to the game.";
 
-    /// <summary>Why Play from camera cannot run now, or null when it can.</summary>
-    private string? CameraBlock() =>
-        window.Session == null ? "No profile is open."
-        : window.Session.GameData == null ? "The game data of the profile did not load."
-        : window.Scene.System == null ? "No system is open. Play from camera starts the ship at the Scene camera."
-        : null;
+    /// <summary>Why Play from camera cannot run now, or null when it can: the checks that the agent tool play shares
+    /// (<see cref="PlayChecks"/>).</summary>
+    private string? CameraBlock() => window.Scene.System is { } open
+        ? window.PlayStartBlock(CameraStart(open))
+        : window.PlayDataBlock ?? PlayChecks.NoOpenSystem;
+
+    /// <summary>The start of Play from camera in the open system.</summary>
+    private PlayStart.InSpace CameraStart(StarSystem open) =>
+        new(open.Nickname, window.Scene.CameraPosition, window.Scene.CameraOrientation);
 
     private string PlayTooltip(string? block) =>
         block ?? (window.Play.Status != PlayStatus.Idle
@@ -426,8 +428,17 @@ internal sealed class PlayMenu(EditorWindow window)
     private string Named(StarSystem system) =>
         window.Session?.ItemName(system) is { Length: > 0 } name ? $"{name} ({system.Nickname})" : system.Nickname;
 
-    private void Request(PlayStart start) =>
-        window.Play.Request(start, window.Settings.PlayPackageOf(window.Session!.Profile.FilePath));
+    /// <summary>Asks for a play after the checks that the agent tool play shares (<see cref="PlayChecks"/>).</summary>
+    private void Request(PlayStart start)
+    {
+        if (window.PlayStartBlock(start) is { } reason)
+        {
+            Log(ConsoleSeverity.Warning, $"Play is not available: {reason}");
+            return;
+        }
+
+        window.Play.Request(start, window.PlayPackage);
+    }
 
     private void Log(ConsoleSeverity severity, string message) =>
         window.Log.Add(severity, PlayController.Source, message);

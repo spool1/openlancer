@@ -112,9 +112,6 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
         };
     }
 
-    // The last agent request that asked the user, or null. Until it ends, a new agent request gets busy.
-    private AgentQuestion? asking;
-
     /// <summary>The play start of a script of the open profile, or the mission start without a profile.</summary>
     public PlayStartSetting PlayStartOf(string script) => editor.ProfilePath is { } profile
         ? editor.Settings.PlayStartOf(profile, script)
@@ -219,28 +216,11 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
             return Task.FromResult(refused);
         }
 
-        var question = PlayRequests.AsksUser(editor, request.Origin) ? new AgentQuestion() : null;
-        var result = PlayRequests.WithAgentRule(editor, request.Origin, () => editor.PlayStatus, save =>
-        {
-            if (question == null)
-            {
-                return editor.RequestMission(new MissionPlayStart(this, request), editor.PlayPackage, save);
-            }
-
-            // The user can start another play while the question is open, so the rule of an agent request runs again
-            // after the answer.
-            question.Answered = true;
-            return AgentRefusal(request, afterQuestion: true) is { } late
-                ? Task.FromResult(late)
-                : editor.RequestMission(new MissionPlayStart(this, request), editor.PlayPackage, save);
-        });
-        if (question != null)
-        {
-            question.Result = result;
-            asking = question;
-        }
-
-        return result;
+        // The user can start another play while the question is open, so the rule of an agent request runs again after
+        // the answer.
+        return editor.AgentPlays.Run(editor, request.Origin, () => editor.PlayStatus,
+            () => AgentRefusal(request, afterQuestion: true),
+            save => editor.RequestMission(new MissionPlayStart(this, request), editor.PlayPackage, save));
     }
 
     /// <summary>
@@ -254,10 +234,9 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
     private PlayRequestResult? AgentRefusal(MissionPlayRequest request, bool afterQuestion = false)
     {
         var status = editor.PlayStatus;
-        if (!afterQuestion && asking is { Result.IsCompleted: false } earlier)
+        if (!afterQuestion && editor.AgentPlays.Busy(status) is { } busy)
         {
-            return PlayRequestResult.Refused(status, PlayRequests.AgentWaitsDetail,
-                earlier.Answered ? PlayRequests.AgentRunsReason : PlayRequests.AgentWaitsReason, EditErrorKind.Busy);
+            return busy;
         }
 
         if (editor.GameRuns || status != PlayStatus.Idle && editor.RunningMission == null)
@@ -288,15 +267,4 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
         editor.ModelOf(script, out problem);
 
     StartSavePlace? IMissionPlayHost.PlaceOf(StartPlace place, out string? problem) => editor.PlaceOf(place, out problem);
-
-    /// <summary>An agent request that asked the user.</summary>
-    private sealed class AgentQuestion
-    {
-        /// <summary>The result of the request. It completes when Play gives the result, which can be after the
-        /// answer.</summary>
-        public Task<PlayRequestResult>? Result { get; set; }
-
-        /// <summary>True after the user clicked "Save and continue".</summary>
-        public bool Answered { get; set; }
-    }
 }

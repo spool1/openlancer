@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
@@ -160,6 +161,50 @@ public sealed class PlayRequestsTests : IDisposable
         Assert.All(Editor.Agent.AgentMenu.PlayTools, name => Assert.Null(OpenLancer.Studio.Agent.AgentTools.Find(name)));
     }
 
+    /// <summary>A cancel closes the open question as Cancel does (MCP1-2 step 7). The close waits for the UI thread, and a
+    /// click of "Save and continue" before the close does not start the play either.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ACancelClosesTheQuestionAsCancelAndALateClickStartsNothing(bool clickFirst)
+    {
+        var host = new FakeAgentHost { UnsavedMod = "ol_mod" };
+        var rules = new List<PlaySaveRule>();
+        using var cancel = new CancellationTokenSource();
+
+        var result = PlayRequests.WithAgentRule(host, EditOrigin.Agent, () => PlayStatus.Idle, Start(rules), cancel.Token);
+        cancel.Cancel();
+        Assert.Equal(1, host.Withdrawn);
+        Assert.True(host.QuestionShows);
+        if (clickFirst)
+            host.Click(0);
+        host.RunWithdrawn();
+
+        Assert.True(result.Wait(Wait));
+        Assert.Empty(rules);
+        Assert.False(host.QuestionShows);
+        Assert.Equal((EditErrorKind.Refused, PlayRequests.NotSavedDetail, PlayRequests.NotSavedReason),
+            (result.Result.Error!.Kind, result.Result.Error.Detail, result.Result.Error.Message));
+    }
+
+    /// <summary>A cancel after the answer changes nothing: the play that the user allowed goes on.</summary>
+    [Fact]
+    public void ACancelAfterTheAnswerKeepsThePlay()
+    {
+        var host = new FakeAgentHost { UnsavedMod = "ol_mod" };
+        var rules = new List<PlaySaveRule>();
+        using var cancel = new CancellationTokenSource();
+
+        var result = PlayRequests.WithAgentRule(host, EditOrigin.Agent, () => PlayStatus.Idle, Start(rules), cancel.Token);
+        host.Click(0);
+        cancel.Cancel();
+        host.RunWithdrawn();
+
+        Assert.True(result.Wait(Wait));
+        Assert.Equal([PlaySaveRule.Save], rules);
+        Assert.True(result.Result.Started);
+    }
+
     /// <summary>Starts the play: it keeps the save rule of each start.</summary>
     private static Func<PlaySaveRule, Task<PlayRequestResult>> Start(List<PlaySaveRule> rules) => rule =>
     {
@@ -181,16 +226,71 @@ public sealed class PlayRequestsTests : IDisposable
         }
     }
 
-    /// <summary>The editor side of the agent play rule. It keeps the last question.</summary>
-    internal sealed class FakeAgentHost : IAgentPlayHost
+    /// <summary>The editor side of the agent play rule. It keeps the last question, and the closes of questions until
+    /// the test runs them as the UI thread does.</summary>
+    internal class FakeAgentHost : IAgentPlayHost
     {
+        private readonly List<IReadOnlyList<Choice>> withdrawn = [];
+
         public string? UnsavedMod { get; set; }
 
         public bool AutoSaveAgentPlay { get; set; }
 
         public (string Title, string Message, IReadOnlyList<Choice> Choices, Action Cancel)? Asked { get; private set; }
 
-        public void Ask(string title, string message, IReadOnlyList<Choice> choices, Action cancel) =>
+        /// <summary>True while the question of <see cref="Asked"/> shows.</summary>
+        public bool QuestionShows { get; private set; }
+
+        public AgentPlayRule AgentPlays { get; } = new();
+
+        public void Ask(string title, string message, IReadOnlyList<Choice> choices, Action cancel)
+        {
             Asked = (title, message, choices, cancel);
+            QuestionShows = true;
+        }
+
+        /// <summary>The cancel of a call can come on another thread.</summary>
+        public void Withdraw(IReadOnlyList<Choice> choices)
+        {
+            lock (withdrawn)
+                withdrawn.Add(choices);
+        }
+
+        /// <summary>The number of closes that wait for the UI thread.</summary>
+        public int Withdrawn
+        {
+            get
+            {
+                lock (withdrawn)
+                    return withdrawn.Count;
+            }
+        }
+
+        /// <summary>Runs the closes that wait, as the UI thread does: the question that still shows closes as Cancel
+        /// does (see <see cref="ChoiceDialog.Withdraw"/>).</summary>
+        public void RunWithdrawn()
+        {
+            List<IReadOnlyList<Choice>> closes;
+            lock (withdrawn)
+            {
+                closes = [.. withdrawn];
+                withdrawn.Clear();
+            }
+            foreach (var choices in closes)
+            {
+                if (QuestionShows && ReferenceEquals(Asked!.Value.Choices, choices))
+                {
+                    QuestionShows = false;
+                    Asked.Value.Cancel();
+                }
+            }
+        }
+
+        /// <summary>Clicks a button of the question, as the dialog does: the dialog closes first.</summary>
+        public void Click(int button)
+        {
+            QuestionShows = false;
+            Asked!.Value.Choices[button].Action();
+        }
     }
 }

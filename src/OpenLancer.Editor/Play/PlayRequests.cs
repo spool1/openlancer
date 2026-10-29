@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
@@ -81,6 +82,14 @@ internal interface IAgentPlayHost
     /// <summary>Shows a question with buttons.</summary>
     /// <param name="cancel">What Escape and the close button of the title bar do.</param>
     void Ask(string title, string message, IReadOnlyList<Choice> choices, Action cancel);
+
+    /// <summary>Closes the question of <see cref="Ask"/> with these buttons as Cancel does, when it still shows. It can
+    /// run on each thread. The close runs on the UI thread, and it runs the cancel action of the question.</summary>
+    void Withdraw(IReadOnlyList<Choice> choices);
+
+    /// <summary>The agent play request of the editor that asked the user and did not end. Each kind of agent play shares
+    /// it, because one dialog shows the question.</summary>
+    AgentPlayRule AgentPlays { get; }
 }
 
 /// <summary>
@@ -164,8 +173,10 @@ internal static class PlayRequests
     /// <param name="status">Gives the Play status for a refusal.</param>
     /// <param name="start">Starts the play on the UI thread with the save rule of the request. The question calls it
     /// from its button, so it also runs on the UI thread.</param>
+    /// <param name="cancel">Closes the question as Cancel does, for example at the time limit of an agent call. After
+    /// it, "Save and continue" does not start the play, also when the click comes before the close.</param>
     public static Task<PlayRequestResult> WithAgentRule(IAgentPlayHost host, EditOrigin origin, Func<PlayStatus> status,
-        Func<PlaySaveRule, Task<PlayRequestResult>> start)
+        Func<PlaySaveRule, Task<PlayRequestResult>> start, CancellationToken cancel = default)
     {
         if (origin != EditOrigin.Agent || host.AutoSaveAgentPlay)
         {
@@ -178,11 +189,25 @@ internal static class PlayRequests
         }
 
         var done = new TaskCompletionSource<PlayRequestResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-        host.Ask(AgentPlayTitle, AgentPlayQuestion(mod),
+        IReadOnlyList<Choice> choices =
         [
-            new Choice(SaveAndContinue, () => Forward(start(PlaySaveRule.Save), done)),
+            // The cancel can come on another thread while the close of the question waits for the UI thread.
+            new Choice(SaveAndContinue, () =>
+            {
+                if (cancel.IsCancellationRequested)
+                    Refuse();
+                else
+                    Forward(start(PlaySaveRule.Save), done);
+            }),
             new Choice(CancelLabel, Refuse) { Default = true },
-        ], Refuse);
+        ];
+        host.Ask(AgentPlayTitle, AgentPlayQuestion(mod), choices, Refuse);
+        if (cancel.CanBeCanceled)
+        {
+            var withdraw = cancel.Register(() => host.Withdraw(choices));
+            done.Task.ContinueWith(_ => withdraw.Dispose(), TaskScheduler.Default);
+        }
+
         return done.Task;
 
         void Refuse() => done.TrySetResult(PlayRequestResult.Refused(status(), NotSavedDetail, NotSavedReason));
@@ -205,4 +230,63 @@ internal static class PlayRequests
                 to.TrySetCanceled();
             }
         }, TaskScheduler.Default);
+}
+
+/// <summary>
+/// The agent play request of one editor that asked the user and did not end (user decision of 2026-10-20 of the M6c
+/// design). One dialog shows the question, so the agent tools <c>play</c> and <c>mission_play</c> share it. Until that
+/// request ends, a new agent request gets <c>busy</c>. The members run on the UI thread.
+/// </summary>
+internal sealed class AgentPlayRule
+{
+    // The last agent request that asked the user, or null.
+    private Asked? asking;
+
+    /// <summary>The refusal <c>busy</c> of a new agent request while an earlier agent request that asked the user did
+    /// not end, or null.</summary>
+    /// <param name="status">The Play status for the refusal.</param>
+    public PlayRequestResult? Busy(PlayStatus status) =>
+        asking is { Result.IsCompleted: false } earlier
+            ? PlayRequestResult.Refused(status, PlayRequests.AgentWaitsDetail,
+                earlier.Answered ? PlayRequests.AgentRunsReason : PlayRequests.AgentWaitsReason, EditErrorKind.Busy)
+            : null;
+
+    /// <summary>Runs a play request with the agent play rule (see <see cref="PlayRequests.WithAgentRule"/>) and keeps a
+    /// request that asks the user until it ends.</summary>
+    /// <param name="afterAnswer">Why the request cannot start after "Save and continue", or null. The user can start
+    /// another play while the question is open, so the checks of the request run again after the answer.</param>
+    public Task<PlayRequestResult> Run(IAgentPlayHost host, EditOrigin origin, Func<PlayStatus> status,
+        Func<PlayRequestResult?> afterAnswer, Func<PlaySaveRule, Task<PlayRequestResult>> start,
+        CancellationToken cancel = default)
+    {
+        var asked = PlayRequests.AsksUser(host, origin) ? new Asked() : null;
+        var result = PlayRequests.WithAgentRule(host, origin, status, save =>
+        {
+            if (asked == null)
+            {
+                return start(save);
+            }
+
+            asked.Answered = true;
+            return afterAnswer() is { } late ? Task.FromResult(late) : start(save);
+        }, cancel);
+        if (asked != null)
+        {
+            asked.Result = result;
+            asking = asked;
+        }
+
+        return result;
+    }
+
+    /// <summary>An agent request that asked the user.</summary>
+    private sealed class Asked
+    {
+        /// <summary>The result of the request. It completes when Play gives the result, which can be after the
+        /// answer.</summary>
+        public Task<PlayRequestResult>? Result { get; set; }
+
+        /// <summary>True after the user clicked "Save and continue".</summary>
+        public bool Answered { get; set; }
+    }
 }

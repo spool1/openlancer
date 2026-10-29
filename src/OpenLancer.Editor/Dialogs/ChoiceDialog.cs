@@ -33,6 +33,9 @@ internal sealed class ChoiceDialog : ModalDialog
     private Action? cancel;
     private bool cancellable = true;
 
+    // True when the question closes as Cancel at its next draw (see Withdraw).
+    private bool withdrawn;
+
     protected override string Title => title;
 
     protected override bool CanCancel => cancellable;
@@ -50,6 +53,7 @@ internal sealed class ChoiceDialog : ModalDialog
         this.choices = choices;
         this.cancel = cancel;
         cancellable = true;
+        withdrawn = false;
         Open();
         // After the new question is in place, so a cancel action that shows a question replaces it in turn.
         replaced?.Invoke();
@@ -64,8 +68,30 @@ internal sealed class ChoiceDialog : ModalDialog
         cancellable = false;
     }
 
+    /// <summary>
+    /// Closes the question with these buttons as Cancel does, when it still shows, for example the question of an agent
+    /// request whose call ended. ImGui closes a popup only while it draws, so the close and the cancel action run at the
+    /// next draw, before the buttons. Call it on the UI thread.
+    /// </summary>
+    /// <param name="question">The buttons of the question, as <see cref="Show"/> got them.</param>
+    public void Withdraw(IReadOnlyList<Choice> question)
+    {
+        if (IsOpen && ReferenceEquals(choices, question))
+        {
+            withdrawn = true;
+        }
+    }
+
     protected override void Body()
     {
+        if (withdrawn)
+        {
+            withdrawn = false;
+            Close();
+            cancel?.Invoke();
+            return;
+        }
+
         ImGui.TextWrapped(message);
         ImGui.Spacing();
         var primary = Math.Max(0, choices.ToList().FindIndex(c => c.Default));
