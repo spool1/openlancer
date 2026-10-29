@@ -98,9 +98,19 @@ public static class McpBinding
                 arguments[key] = JsonNode.Parse(value.GetRawText());
         }
         var progress = request.Params?.ProgressToken is { } token ? new Notifier(request.Server, token) : null;
-        var result = await queue.CallAsync(name, arguments, request.Server.ClientInfo?.Name, cancel, progress)
-            .ConfigureAwait(false);
-        return Protocol(result);
+        try
+        {
+            var result = await queue.CallAsync(name, arguments, request.Server.ClientInfo?.Name, cancel, progress)
+                .ConfigureAwait(false);
+            return Protocol(result);
+        }
+        finally
+        {
+            // A progress notification refers to a call that still runs. So each report of the tail goes out before the
+            // response, and a later report goes nowhere.
+            if (progress != null)
+                await progress.Close().ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -112,12 +122,27 @@ public static class McpBinding
     {
         private readonly object gate = new();
         private Task last = Task.CompletedTask;
+        private bool closed;
 
         public void Report(ToolProgress value)
         {
             lock (gate)
-                last = last.ContinueWith(_ => Send(value), CancellationToken.None, TaskContinuationOptions.None,
-                    TaskScheduler.Default).Unwrap();
+            {
+                if (!closed)
+                    last = last.ContinueWith(_ => Send(value), CancellationToken.None, TaskContinuationOptions.None,
+                        TaskScheduler.Default).Unwrap();
+            }
+        }
+
+        /// <summary>Takes no more reports. The task ends when the server sent each earlier report or could not send
+        /// it.</summary>
+        public Task Close()
+        {
+            lock (gate)
+            {
+                closed = true;
+                return last;
+            }
         }
 
         private async Task Send(ToolProgress value)

@@ -283,37 +283,47 @@ public sealed class McpServerTests
     }
 
     /// <summary>A call whose request has a progress token gets <c>notifications/progress</c> of its tail (section 5.3 of
-    /// the MCP1 design), for example of an export. Each notification tells the step of the export.</summary>
+    /// the MCP1 design), for example of an export. Each notification tells the step of the export. A notification
+    /// refers to a call that still runs, so the server sends each one in its order and before the response. The test
+    /// reads the lines of the server itself, because the client of the SDK can give the notifications to its progress
+    /// in another order.</summary>
     [Fact]
-    public async Task AnExportSendsProgressNotificationsToAClientThatAsksForThem()
+    public async Task AnExportSendsItsProgressNotificationsInOrderBeforeItsResponse()
     {
         using var game = new ExportGame();
         var (_, session) = AgentPublishToolTests.Ready(game);
         using var _ = session;
         await using var connection = new Connection(new TestAgentHost(session));
-        var client = await connection.Client();
-        var reports = new ConcurrentQueue<ProgressNotificationValue>();
+        var (writer, reader) = connection.Raw();
+        await writer.WriteLineAsync(Request(1, "initialize",
+            """{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1"}}"""));
+        Assert.Equal(1, (int)JsonNode.Parse((await reader.ReadLineAsync(Token))!)!["id"]!);
+        await writer.WriteLineAsync("""{"jsonrpc":"2.0","method":"notifications/initialized"}""");
 
-        var result = await client.CallToolAsync("export_mod",
-            new Dictionary<string, object?> { ["formats"] = new[] { "drop_in" } }, new Reports(reports),
-            cancellationToken: Token);
-        await WaitUntil(() => reports.Count == 4);
+        await writer.WriteLineAsync(Request(2, "tools/call",
+            """{"name":"export_mod","arguments":{"formats":["drop_in"]},"_meta":{"progressToken":"export"}}"""));
+        var before = new List<JsonNode>();
+        JsonNode answer;
+        while (true)
+        {
+            var line = JsonNode.Parse((await reader.ReadLineAsync(Token).AsTask().WaitAsync(TimeSpan.FromSeconds(60), Token))!)!;
+            if (line["id"] != null)
+            {
+                answer = line;
+                break;
+            }
+            before.Add(line);
+        }
 
-        Assert.NotEqual(true, result.IsError);
-        Assert.True(result.StructuredContent!.Value.GetProperty("succeeded").GetBoolean());
-        // The server sends the notifications in their order. The client of the SDK can give them to the progress in
-        // another order, and the progress value tells the order.
-        var sorted = reports.OrderBy(r => r.Progress).ToList();
-        Assert.Equal([0f, 1f, 2f, 3f], sorted.Select(r => r.Progress));
-        Assert.All(sorted, r => Assert.Equal(3f, r.Total));
+        Assert.Equal(2, (int)answer["id"]!);
+        Assert.True((bool)answer["result"]!["structuredContent"]!["succeeded"]!, answer.ToJsonString());
+        Assert.All(before, n => Assert.Equal(("notifications/progress", "export"),
+            ((string?)n["method"], (string?)n["params"]!["progressToken"])));
+        var reports = before.Select(n => n["params"]!).ToList();
+        Assert.Equal([0, 1, 2, 3], reports.Select(r => (int)r["progress"]!));
+        Assert.All(reports, r => Assert.Equal(3, (int)r["total"]!));
         Assert.Equal(["The export checks the mod.", "The export writes the packages.",
-            "The export records the packages in the publish history.", null], sorted.Select(r => r.Message));
-    }
-
-    /// <summary>Keeps each progress notification of a call, on the thread that gets it.</summary>
-    private sealed class Reports(ConcurrentQueue<ProgressNotificationValue> reports) : IProgress<ProgressNotificationValue>
-    {
-        public void Report(ProgressNotificationValue value) => reports.Enqueue(value);
+            "The export records the packages in the publish history.", null], reports.Select(r => (string?)r["message"]));
     }
 
     private static string Request(int id, string method, string parameters) =>
