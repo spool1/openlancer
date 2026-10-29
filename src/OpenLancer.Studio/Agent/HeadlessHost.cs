@@ -72,6 +72,10 @@ public sealed class HeadlessHost : AgentHost, IDisposable
     /// <summary>The time without a change before the host writes the recovery file.</summary>
     internal static readonly TimeSpan RecoveryDelay = TimeSpan.FromSeconds(2);
 
+    /// <summary>The tools that write the saved files of the mod or its packages. <c>--no-save</c> leaves them
+    /// out.</summary>
+    internal static readonly IReadOnlySet<string> SaveTools = new HashSet<string> { "save", "export_mod" };
+
     private readonly Lazy<InfocardManager?> texts;
     private readonly HeadlessOptions options;
 
@@ -152,7 +156,7 @@ public sealed class HeadlessHost : AgentHost, IDisposable
         {
             session.Missions.Coverage = EngineCoverage.Instance;
             IReadOnlyList<StudioTool> tools = options.NoSave
-                ? [.. AgentTools.All.Where(t => t.Name is not ("save" or "export_mod"))]
+                ? [.. AgentTools.All.Where(t => !SaveTools.Contains(t.Name))]
                 : AgentTools.All;
             var host = new HeadlessHost(session, tools, options);
             host.Recover(options.Recovery);

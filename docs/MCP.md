@@ -354,7 +354,7 @@ The oltool host never edits a mod in the OpenLancer repo, because it cannot ask 
 
 The editor writes each call of an agent into an audit log: one file for each run of the editor, for example `%LOCALAPPDATA%\OpenLancer\logs\agent-20261020-142233.jsonl`. Each line holds the time, the tool, the arguments and a summary of the result. The log holds no token. At 64 MB, the log stops, and the Console tells you.
 
-`oltool mcp replay <profile.json> --mod <id> <log>` runs the calls of a log again and compares each result with the recorded result. It exits with the code 1 at the first result that differs. The edit calls of the log change the profile that the replay gets, so give it a copy of the profile and its mods. The replay saves only at a recorded `save` call, and it writes no recovery file. With `--preview`, the replay runs each edit as a preview and changes no file. It then skips the calls that have no preview, for example `save`, `export_mod`, `undo` and `redo`.
+`oltool mcp replay <profile.json> --mod <id> <log>` runs the calls of a log again and compares each result with the recorded result. It exits with the code 1 at the first result that differs. The edit calls of the log change the profile that the replay gets, so give it a copy of the profile and its mods. The replay saves only at a recorded `save` call, and it writes no recovery file. With `--preview`, the replay changes no file. The edits change only the data in memory, so a later call can still use the items of an earlier call. The replay then skips the calls that write files: `save`, `export_mod`, `prop_group_save`, `prop_group_rename` and `prop_group_delete`.
 
 ## Safety
 

@@ -216,25 +216,27 @@ public sealed class HeadlessHostTests
     }
 
     /// <summary>A replay runs the edits on its profile and saves at a recorded save (section 6.2 of the MCP1 design).
-    /// With <c>--preview</c>, each edit runs as a preview, and the replay skips the save. It then changes no
-    /// file.</summary>
+    /// With <c>--preview</c>, the edits change only the data in memory, and the replay skips the save. So a later call
+    /// can use the item of an earlier call, and the replay changes no file.</summary>
     [Fact]
-    public void AReplaySavesAtARecordedSaveAndAPreviewReplayChangesNothing()
+    public void AReplaySavesAtARecordedSaveAndAPreviewReplayChangesNoFile()
     {
         using var ws = SceneWorkspace.Create();
         var before = TestWorkspace.Files(ws.ModFolder("act"));
         var log = $$$"""
-            {"tool": "set_fields", "arguments": {{{Move}}}, "result": {"status": "ok"}}
+            {"tool": "scene_create_zone", "arguments": {"system": "Li01", "position": [0, 0, 0], "nickname": "Zone_replay"}, "result": {"status": "ok"}}
+            {"tool": "set_fields", "arguments": {"ref": "zone:Zone_replay", "fields": {"pos": [1, 2, 3]}}, "result": {"status": "ok"}}
             {"tool": "save", "arguments": {}, "result": {"status": "ok"}}
-            {"tool": "undo", "arguments": {}, "result": {"status": "ok"}}
+            {"tool": "set_fields", "arguments": {{{Move}}}, "result": {"status": "ok"}}
             """;
 
         var previewOutput = new StringWriter();
         string? previewDifference;
+        bool dirty;
         using (var host = HeadlessHost.Open(ws.ProfilePath, "act", new HeadlessOptions { WritesRecovery = false }))
         {
             previewDifference = AgentReplay.Run(host, new StringReader(log), previewOutput, preview: true);
-            Assert.False(host.Session.IsDirty);
+            dirty = host.Session.IsDirty;
         }
         var afterPreview = TestWorkspace.Files(ws.ModFolder("act"));
         var output = new StringWriter();
@@ -242,14 +244,19 @@ public sealed class HeadlessHostTests
         using (var host = HeadlessHost.Open(ws.ProfilePath, "act", new HeadlessOptions { WritesRecovery = false }))
             difference = AgentReplay.Run(host, new StringReader(log), output);
 
-        Assert.Null(previewDifference);
+        Assert.True(previewDifference == null, previewDifference);
+        Assert.True(dirty);
         Assert.Equal(before, afterPreview);
         var lines = previewOutput.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
-        Assert.Equal("previewed", (string?)lines[0]["content"]!["status"]);
-        Assert.Equal(["skipped", "skipped"], lines.Skip(1).Select(l => (string?)l["result"]!["status"]));
+        Assert.Equal(["ok", "ok", "skipped", "ok"], lines.Select(l => (string?)l["result"]!["status"]));
+        Assert.Equal("The replay with --preview does not run save, because the tool writes files.",
+            (string?)lines[2]["reason"]);
         Assert.Null(difference);
-        Assert.Contains("pos = 10, 20, 30", ws.ReadModPatch(SceneWorkspace.Li01Path));
+        var patch = ws.ReadModPatch(SceneWorkspace.Li01Path);
+        Assert.Contains("nickname = Zone_replay", patch);
+        Assert.Contains("pos = 1, 2, 3", patch);
+        Assert.DoesNotContain("pos = 10, 20, 30", patch);
         Assert.False(File.Exists(Recovery(ws)));
     }
 }

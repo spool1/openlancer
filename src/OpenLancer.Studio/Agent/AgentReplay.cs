@@ -1,5 +1,4 @@
 using System.IO;
-using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 
@@ -34,8 +33,10 @@ public static class AgentReplay
     /// <param name="calls">The JSON lines of the calls.</param>
     /// <param name="output">Gets one JSON line for each call: the line number, the tool, the short result and the
     /// structured content.</param>
-    /// <param name="preview">True to run each edit as a preview (<c>--preview</c>). The replay then changes nothing. It
-    /// skips each call that changes data and has no preview, for example <c>save</c> and <c>undo</c>.</param>
+    /// <param name="preview">True to change no file (<c>--preview</c>). The edits then change only the data in memory, so
+    /// a later call can still use the items of an earlier call. The replay skips each call that writes files:
+    /// <c>save</c>, <c>export_mod</c> and the asset writes of the prop groups. The host must write no recovery
+    /// file.</param>
     /// <returns>Null when each result is as recorded, else why the replay stopped.</returns>
     /// <exception cref="InvalidDataException">A line is not a call. The message names the line.</exception>
     public static string? Run(AgentHost host, TextReader calls, TextWriter output, bool preview = false)
@@ -55,7 +56,7 @@ public static class AgentReplay
                 }.ToJsonString());
                 continue;
             }
-            var step = AgentTools.Run(host, call.Tool, preview && tool.Changes ? Previewed(call.Arguments) : call.Arguments);
+            var step = AgentTools.Run(host, call.Tool, call.Arguments);
             var result = (step.Result ?? step.Tail!(CancellationToken.None, ToolProgress.None).GetAwaiter().GetResult()).Limited(host.Limits);
             var outcome = result.Outcome;
             var compared = call.Expected == null || (call.Expected.Code != Limit && outcome.Code != Limit);
@@ -79,20 +80,11 @@ public static class AgentReplay
         return null;
     }
 
-    /// <summary>Why a replay with <c>--preview</c> does not run a call, or null: the call changes data and has no
-    /// preview.</summary>
+    /// <summary>Why a replay with <c>--preview</c> does not run a call, or null: the call writes files.</summary>
     private static string? PreviewSkip(StudioTool tool) =>
-        tool.Changes && tool.Input.Parameters.All(p => p.Name != EditTools.Preview.Name)
-            ? $"The replay with --preview does not run {tool.Name}, because the tool has no preview."
+        tool.Kind == ToolKind.AssetWrite || HeadlessHost.SaveTools.Contains(tool.Name)
+            ? $"The replay with --preview does not run {tool.Name}, because the tool writes files."
             : null;
-
-    /// <summary>The arguments of a call with <c>preview: true</c>.</summary>
-    private static JsonObject Previewed(JsonObject? arguments)
-    {
-        var previewed = (JsonObject?)arguments?.DeepClone() ?? [];
-        previewed[EditTools.Preview.Name] = true;
-        return previewed;
-    }
 
     /// <summary>Why the replay does not run a line, or null when it runs it.</summary>
     private static string? SkipReason(AgentHost host, StudioTool tool, AuditEntry call)

@@ -33,8 +33,9 @@ internal static class McpCommands
                                             tools, and write one result line for each call. Exit 1 at the first result
                                             that differs from the recorded result, or at an error of a call without a
                                             recorded result. The edits change the profile: give a copy. The replay saves
-                                            only at a recorded save and writes no recovery file. --preview: run each
-                                            edit as a preview, and skip the saves, the exports, undo and redo.
+                                            only at a recorded save and writes no recovery file. --preview: change no
+                                            file. The edits change only the data in memory, and the replay skips the
+                                            saves, the exports and the prop group writes.
           mcp token                         Print the header with the token of the agent server of the editor, as JSON,
                                             for the headersHelper of Claude Code. Exit 2 and print nothing when no
                                             editor server runs, or when CLAUDE_CODE_MCP_SERVER_URL names no running
