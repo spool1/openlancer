@@ -144,7 +144,7 @@ internal sealed class EditController(EditorWindow window) : IDisposable
     /// Saves the edits of the active mod and writes the report to the Console. The status bar shows the summary of the
     /// report, also when the save does not start, for example without an active mod. A save that changed files starts
     /// the reload of the game data and the validation. When files of the mod changed outside the editor, a dialog asks
-    /// to overwrite them.
+    /// to overwrite them. While an export runs, the save does not start.
     /// </summary>
     /// <returns>What the save did. A save of the Overwrite dialog comes later and is not part of it.</returns>
     public SaveOutcome Save() => Save(overwrite: false, leave: null);
@@ -179,6 +179,15 @@ internal sealed class EditController(EditorWindow window) : IDisposable
         if (session.NoEditReason is { } reason)
         {
             Log.AddStatus(ConsoleSeverity.Warning, SaveReport.Source, SaveReport.ReadOnly(mod.Id, reason));
+            return SaveOutcome.NotSaved;
+        }
+
+        // An export reads the saved files of the mod on a worker. A save during the export could change the files of
+        // its packages, or fail to move a file that the export has open. The Export dialog keeps the user out of the
+        // save. An export of the agent has no dialog, so the save stops here.
+        if (window.ExportBlock is { } exporting)
+        {
+            Log.AddStatus(ConsoleSeverity.Warning, SaveReport.Source, SaveReport.NotStarted(mod.Id, exporting));
             return SaveOutcome.NotSaved;
         }
 

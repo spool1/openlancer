@@ -58,7 +58,8 @@ internal sealed record ValidationView(int Save, int Errors, int Warnings, IReadO
 /// The tool <c>save</c> of section 7.6 of the MCP1 design (decision D713). The editor host runs the save of the editor:
 /// the gate, the report in the Console, the reload and the validation. The validation is the tail of the call. The host
 /// without a window runs the gate, then <see cref="EditSession.Save(bool)"/>. A save never replaces a file that changed
-/// outside the host: the agent gets <c>changed_on_disk</c>, and the editor asks the user.
+/// outside the host: the agent gets <c>changed_on_disk</c>, and the editor asks the user. While an export runs, the save
+/// gives <c>busy</c>, because the export reads the saved files.
 /// </summary>
 /// <remarks>The result gives at most <see cref="ShownProblems"/> problems, so its size stays below the size limit of a
 /// result. The queue replaces a larger result with the error <c>limit</c>, and that error must not hide a save that
@@ -75,6 +76,10 @@ internal static class SaveTools
     {
         var session = call.Session;
         EditTools.ReadOnlyGuard(call);
+        // An export reads the saved files of the mod on a worker. A save during the export could change the files of
+        // its packages, or fail to move a file that the export has open.
+        if (call.Host.ExportBusy is { } exporting)
+            throw new EditException(new EditError(EditErrorKind.Busy, "ExportRuns", exporting));
         var folder = session.ActiveMod!.Folder;
         AgentSave save;
         try

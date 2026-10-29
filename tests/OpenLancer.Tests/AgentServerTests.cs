@@ -616,6 +616,53 @@ public sealed class AgentControllerTests : IDisposable
         Assert.Equal(("refused", "SaveNotStarted"), (none.Code, none.Detail));
     }
 
+    /// <summary>While an export of the Export dialog or of the agent runs, the save of the editor host gives
+    /// <c>busy</c> and does not start the save of the editor. The export reads the saved files.</summary>
+    [Fact]
+    public void TheEditorSaveGivesBusyWhileAnExportRuns()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var saves = 0;
+        var editor = new FakeEditor
+        {
+            Edits = session,
+            Saving = () => SaveOutcome.Of(session.Save(), ++saves),
+            ExportBlock = "An export runs now. Wait until it ends.",
+        };
+        var host = new EditorAgentHost(editor);
+        AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""");
+
+        var busy = AgentCalls.Error(host, "save");
+
+        Assert.Equal(("busy", "ExportRuns", "An export runs now. Wait until it ends."), busy);
+        Assert.Equal(0, saves);
+        Assert.True(session.IsDirty);
+    }
+
+    /// <summary>A later save stops the validation of an earlier save, and its validation replaces it. So the tail of
+    /// the earlier save ends with the validation of the later save.</summary>
+    [Fact]
+    public async Task TheEditorSaveTakesTheValidationOfALaterSave()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var editor = new FakeEditor { Edits = session, Saving = () => SaveOutcome.Of(session.Save(), 3) };
+        var host = new EditorAgentHost(editor);
+        AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""");
+
+        var tail = AgentTools.Run(host, "save", null).Tail!(Token, ToolProgress.None);
+        editor.Validate(new ValidationState(4, true, null));
+        var running = tail.IsCompleted;
+        editor.Validate(new ValidationState(4, false, new ValidationResult(4, [], null)));
+        var result = await tail.WaitAsync(TimeSpan.FromSeconds(10), Token);
+
+        Assert.False(running);
+        Assert.Equal(3, (int)result.Content["number"]!);
+        Assert.Equal(4, (int)result.Content["validation"]!["save"]!);
+        Assert.Equal(0, editor.ValidatedHandlers);
+    }
+
     /// <summary>An export of the Export dialog stops an export of the agent in the editor host. The host shares the
     /// export of the controller, so an export of an earlier start of the server also counts (review finding R12 of
     /// MCP1-2).</summary>

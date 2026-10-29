@@ -278,6 +278,41 @@ public sealed class AgentPublishToolTests
         Assert.False(Directory.Exists(Path.Combine(ExportRoot(game), "1.2.0")));
     }
 
+    /// <summary>A save while an export of the agent runs gives <c>busy</c> and writes nothing. The export reads the saved
+    /// files, so its package has the saved files of the start of the call.</summary>
+    [Fact]
+    public async Task ASaveDuringAnExportGivesBusyAndTheExportPackagesTheFilesOfItsStart()
+    {
+        using var game = new ExportGame();
+        var (_, session) = Ready(game);
+        using var __ = session;
+        var host = new TestAgentHost(session);
+        using var release = new ManualResetEventSlim();
+        var progress = new Holding(release);
+        var patch = Path.Combine(ModFolder(game), Mod.PatchesFolder, ExportGame.GoodsPath);
+        var before = File.ReadAllText(patch);
+
+        var tail = AgentTools.Run(host, "export_mod", JsonNode.Parse("""{ "formats": ["drop_in"] }""")!.AsObject())
+            .Tail!(TestContext.Current.CancellationToken, progress);
+        Assert.True(progress.Started.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        session.Execute(EditCommand.SetLinesFromText(new SectionRef(ExportGame.GoodsPath,
+            new SectionIdentity("Good", "lf_hull")), "price", ["1"]));
+        var saved = Error(host, "save");
+        release.Set();
+        var result = await tail.WaitAsync(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
+        var unchanged = File.ReadAllText(patch);
+        var after = Ok(host, "save");
+
+        Assert.Equal(("busy", "ExportRuns", "An export runs now. Wait until it ends."), saved);
+        Assert.Equal(before, unchanged);
+        Assert.False(result.IsError, result.Text);
+        Assert.True((bool)result.Content["succeeded"]!);
+        Assert.Single(PublishHistory.Load(ExportRoot(game), "ol-test").History.Exports);
+        // After the export, the save writes the edit.
+        Assert.Equal(1, (int)after["number"]!);
+        Assert.Contains("price = 1", File.ReadAllText(patch));
+    }
+
     /// <summary>Waits for the end of the export on another thread. The cancel of the test runs on the thread of the
     /// export, so the test can continue on that thread. A wait there would wait for itself.</summary>
     private static Task WaitForTheExport(TestAgentHost host) =>
