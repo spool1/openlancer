@@ -108,6 +108,11 @@ internal sealed partial class EditorWindow : IAgentEditor
 
     string? IAgentEditor.ExportBlock => ExportBlock;
 
+    bool IAgentEditor.Paused => agentController.Paused;
+
+    /// <summary>True while the user pauses the agent edits (decision D734).</summary>
+    public bool AgentPaused => agentController.Paused;
+
     /// <summary>True while an export of the agent prepares or writes. The Export dialog and the Mods window wait for
     /// it.</summary>
     internal bool AgentExportRuns => agentController.Exports.Running;

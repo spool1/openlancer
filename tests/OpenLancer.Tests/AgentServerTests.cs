@@ -264,54 +264,6 @@ public sealed class AgentControllerTests : IDisposable
 
     private readonly string folder = Path.Combine(Path.GetTempPath(), "openlancer-tests", Guid.NewGuid().ToString("N"));
 
-    private sealed class FakeEditor : IAgentEditor
-    {
-        public OpenLancer.Data.Editing.EditSession? Edits { get; set; }
-
-        public string? EditReason { get; set; }
-
-        public string? RepoReason { get; set; }
-
-        public string Name(int ids) => ids == 1 ? "Test Name" : "";
-
-        public string InfoText(int ids) => "";
-
-        public AgentSettings Settings { get; } = new();
-
-        public ConsoleLog Log { get; } = new();
-
-        public AgentView View => new("system:Li01", null, null);
-
-        public IAgentViews Views { get; } = new FakeAgentViews();
-
-        public IAgentPlay Play { get; } = new EditorAgentPlay(new AgentPlayToolTests.FakePlayEditor());
-
-        /// <summary>The save of the test, or null for a save that does not start.</summary>
-        public Func<SaveOutcome>? Saving { get; set; }
-
-        public SaveOutcome Save() => Saving?.Invoke() ?? SaveOutcome.NotSaved;
-
-        public ValidationState? Validation { get; set; }
-
-        public event Action<ValidationState>? Validated;
-
-        /// <summary>Ends a validation, as the runner of the editor does on the UI thread.</summary>
-        public void Validate(ValidationState state)
-        {
-            Validation = state;
-            Validated?.Invoke(state);
-        }
-
-        public int ValidatedHandlers => Validated?.GetInvocationList().Length ?? 0;
-
-        /// <summary>The game links of the test.</summary>
-        public AgentGames TestGames { get; set; } = new([], [], []);
-
-        public AgentGames Games(OpenLancer.Data.Mods.ModManifest manifest) => TestGames;
-
-        public string? ExportBlock { get; set; }
-    }
-
     private string Agent => Path.Combine(folder, "agent");
 
     /// <summary>The discovery file of this test process.</summary>
@@ -326,7 +278,7 @@ public sealed class AgentControllerTests : IDisposable
     [Fact]
     public void StartWritesTheDiscoveryFileAndStopDeletesIt()
     {
-        var editor = new FakeEditor();
+        var editor = new FakeAgentEditor();
         editor.Settings.Port = FreePort();
         var ui = new QueuedUIThread();
         using var controller = new AgentController(editor, ui, () => default, Discovery, folder);
@@ -352,7 +304,7 @@ public sealed class AgentControllerTests : IDisposable
     [Fact]
     public void APortInUseStopsTheStartAndTellsTheUser()
     {
-        var editor = new FakeEditor();
+        var editor = new FakeAgentEditor();
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         try
@@ -445,7 +397,7 @@ public sealed class AgentControllerTests : IDisposable
     [Fact]
     public async Task ACallWithoutTheNameOfItsClientShowsTheAgentInTheStatusBar()
     {
-        var editor = new FakeEditor();
+        var editor = new FakeAgentEditor();
         editor.Settings.Port = FreePort();
         var ui = new QueuedUIThread();
         using var controller = new AgentController(editor, ui, () => default, Discovery, folder);
@@ -477,7 +429,9 @@ public sealed class AgentControllerTests : IDisposable
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("\"host\":\"editor\"", body.Replace(" ", ""));
-        Assert.Equal($"Agent: {AgentController.UnnamedClient}", controller.StatusText);
+        Assert.Equal($"Agent: {AgentController.UnnamedClient}, 0 edits", controller.StatusText);
+        controller.Paused = true;
+        Assert.Equal("Agent paused", controller.StatusText);
         controller.Stop();
     }
 
@@ -485,7 +439,7 @@ public sealed class AgentControllerTests : IDisposable
     public void TheEditorHostGivesTheReasonOfTheOpenProfile()
     {
         using var ws = SceneWorkspace.Create();
-        var editor = new FakeEditor { Edits = ws.Session("act") };
+        var editor = new FakeAgentEditor { Edits = ws.Session("act") };
         var host = new EditorAgentHost(editor);
 
         var open = AgentCalls.Ok(host, "studio_status");
@@ -511,7 +465,7 @@ public sealed class AgentControllerTests : IDisposable
     {
         using var ws = SceneWorkspace.Create();
         const string repo = "The mod 'act' is part of the OpenLancer repo, so its files are tracked files.";
-        var editor = new FakeEditor { Edits = ws.Session("act"), RepoReason = repo };
+        var editor = new FakeAgentEditor { Edits = ws.Session("act"), RepoReason = repo };
         var host = new EditorAgentHost(editor);
         const string move = """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""";
 
@@ -532,7 +486,7 @@ public sealed class AgentControllerTests : IDisposable
     {
         using var ws = SceneWorkspace.Create();
         var session = ws.Session("act");
-        var editor = new FakeEditor { Edits = session, Saving = () => SaveOutcome.Of(session.Save(), 3) };
+        var editor = new FakeAgentEditor { Edits = session, Saving = () => SaveOutcome.Of(session.Save(), 3) };
         var host = new EditorAgentHost(editor);
         AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""");
 
@@ -566,7 +520,7 @@ public sealed class AgentControllerTests : IDisposable
         using var ws = SceneWorkspace.Create();
         var session = ws.Session("act");
         var number = 1;
-        var editor = new FakeEditor { Edits = session, Saving = () => SaveOutcome.Of(session.Save(), number) };
+        var editor = new FakeAgentEditor { Edits = session, Saving = () => SaveOutcome.Of(session.Save(), number) };
         var host = new EditorAgentHost(editor);
         AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""");
         editor.Validation = new ValidationState(1, false, new ValidationResult(1, null, "oltool did not start."));
@@ -600,7 +554,7 @@ public sealed class AgentControllerTests : IDisposable
     {
         using var ws = SceneWorkspace.Create();
         var session = ws.Session("act");
-        var editor = new FakeEditor { Edits = session };
+        var editor = new FakeAgentEditor { Edits = session };
         var host = new EditorAgentHost(editor);
         AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "loadout": "lo_missing" } }""");
         editor.Saving = () => SaveOutcome.Blocked with { Result = session.GateRefusal() };
@@ -626,7 +580,7 @@ public sealed class AgentControllerTests : IDisposable
         using var ws = SceneWorkspace.Create();
         var session = ws.Session("act");
         var saves = 0;
-        var editor = new FakeEditor
+        var editor = new FakeAgentEditor
         {
             Edits = session,
             Saving = () => SaveOutcome.Of(session.Save(), ++saves),
@@ -649,7 +603,7 @@ public sealed class AgentControllerTests : IDisposable
     {
         using var ws = SceneWorkspace.Create();
         var session = ws.Session("act");
-        var editor = new FakeEditor { Edits = session, Saving = () => SaveOutcome.Of(session.Save(), 3) };
+        var editor = new FakeAgentEditor { Edits = session, Saving = () => SaveOutcome.Of(session.Save(), 3) };
         var host = new EditorAgentHost(editor);
         AgentCalls.Ok(host, "set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }""");
 
@@ -671,7 +625,7 @@ public sealed class AgentControllerTests : IDisposable
     [Fact]
     public void TheEditorHostWaitsForTheExportDialogAndKeepsTheExportOfTheController()
     {
-        var editor = new FakeEditor { ExportBlock = "An export runs now. Wait until it ends." };
+        var editor = new FakeAgentEditor { ExportBlock = "An export runs now. Wait until it ends." };
         editor.Settings.Port = FreePort();
         using var controller = new AgentController(editor, new QueuedUIThread(), () => default, Discovery, folder);
         var host = new EditorAgentHost(editor, controller.Exports);
@@ -697,7 +651,7 @@ public sealed class AgentControllerTests : IDisposable
     {
         var clock = new FakeClock();
         var editing = true;
-        using var dispatcher = new AgentDispatcher(new EditorAgentHost(new FakeEditor()), () => new EditorActivity(editing, false,
+        using var dispatcher = new AgentDispatcher(new EditorAgentHost(new FakeAgentEditor()), () => new EditorActivity(editing, false,
             false, false), null, clock);
 
         var call = dispatcher.Queue.CallAsync("studio_status", null, null, TestContext.Current.CancellationToken);
@@ -728,7 +682,7 @@ public sealed class AgentControllerTests : IDisposable
     [Fact]
     public void TheEditorHostGivesTheConsoleWithItsFilters()
     {
-        var editor = new FakeEditor();
+        var editor = new FakeAgentEditor();
         editor.Log.Add(ConsoleSeverity.Info, "Editor", "Opened.");
         editor.Log.Add(ConsoleSeverity.Warning, AgentController.Source, "A warning.");
         editor.Log.Add(ConsoleSeverity.Error, "Mods", "An error.");

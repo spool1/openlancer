@@ -66,6 +66,10 @@ internal interface IAgentEditor
 
     /// <summary>Why an export cannot start now, or null: an export of the Export dialog or of the agent runs.</summary>
     string? ExportBlock { get; }
+
+    /// <summary>True while the user pauses the agent edits (decision D734). The Agent menu and the status bar set
+    /// it.</summary>
+    bool Paused { get; }
 }
 
 /// <summary>
@@ -94,6 +98,9 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
         : editor.EditReason ?? (editor.RepoReason is { } repo ? $"{repo} {AgentTexts.Error("repo_mod_editor")}" : null);
 
     public override AgentLimits Limits => editor.Settings.Limits;
+
+    /// <summary>Pause of the Agent menu and of the status bar (decision D734).</summary>
+    public override bool Paused => editor.Paused;
 
     public override IReadOnlySet<ToolGroup> HiddenGroups => editor.Settings.HiddenToolGroups;
 
@@ -159,6 +166,51 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
     }
 
     public override string InfoText(int ids) => editor.InfoText(ids);
+
+    /// <summary>
+    /// The Console entry of an applied edit (section 8.5 of the MCP1 design): an Info entry with the source "Agent", the
+    /// label of the request and a link to the first item that the edit adds, renames or changes. The entry has the origin
+    /// OpenLancer, as each message of the editor has, so the toggle of the base-game messages never hides it (decision
+    /// D718).
+    /// </summary>
+    public override void Edited(string tool, EditResult result) =>
+        editor.Log.Add(ConsoleSeverity.Info, AgentController.Source, Sentence(result.Label ?? result.UndoLabel ?? tool),
+            FirstItem(result));
+
+    /// <summary>The Console entry of a refused call of a tool that changes something: a Warning "{tool}:
+    /// {message}".</summary>
+    public override void Refused(string tool, EditError error) =>
+        editor.Log.Add(ConsoleSeverity.Warning, AgentController.Source, $"{tool}: {error.Message}",
+            error.Target is { } target ? SectionOf(target) : null);
+
+    /// <summary>The Console entry of an undo or a redo of the agent, for example "Undo Agent: Create Zone_1.".</summary>
+    public override void Stepped(string tool, string label) =>
+        editor.Log.Add(ConsoleSeverity.Info, AgentController.Source, Sentence($"{(tool == "redo" ? "Redo" : "Undo")} {label}"));
+
+    /// <summary>A label as a sentence with a full stop.</summary>
+    private static string Sentence(string label) => label.TrimEnd().TrimEnd('.') + ".";
+
+    /// <summary>The section of the first item of a result that the edit view has: a new item, a renamed item, then a
+    /// changed item. A delete links to nothing, because its items are gone.</summary>
+    private SectionRef? FirstItem(EditResult result) =>
+        result.Adds.Concat(result.Renames.Select(r => r.To)).Concat(result.Changes).Select(SectionOf)
+            .FirstOrDefault(s => s != null);
+
+    /// <summary>The section of an item reference of a result, or null when the reference names no section of the edit
+    /// view now, for example a prop group.</summary>
+    private SectionRef? SectionOf(string reference)
+    {
+        if (Session is not { } session)
+            return null;
+        try
+        {
+            return ItemRefs.ResolveSection(session, ItemRefs.Parse(reference));
+        }
+        catch (Exception e) when (e is EditException or ArgumentException)
+        {
+            return null;
+        }
+    }
 
     /// <summary>The entries of the Console, oldest first. The base-game entries show only on request, as in the Console
     /// (decision D519). An engine line that waits for its origin does not show yet.</summary>

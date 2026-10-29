@@ -184,12 +184,15 @@ internal sealed class StatusBar(EditorWindow window)
         }
 
         // The agent server of the editor (section 10 of the MCP1 design). A click opens the menu "Agent".
+        // A pause of the agent edits shows the glyph of Pause in the warning color (decision D734). A click opens the
+        // menu with "Resume agent edits".
         var agentText = window.AgentStatus;
         if (agentText != agentSegment.Text)
         {
-            agentSegment = (agentText, new Segment(EditorIcons.Comments, agentText,
-                $"{agentText}\nClick to open the Agent menu.", window.AgentServerOn ? EditorTheme.Success : null,
-                window.OpenAgentMenu));
+            var paused = window.AgentServerOn && window.AgentPaused;
+            agentSegment = (agentText, new Segment(paused ? EditorIcons.Pause : EditorIcons.Comments, agentText,
+                $"{agentText}\nClick to open the Agent menu.",
+                paused ? EditorTheme.Warning : window.AgentServerOn ? EditorTheme.Success : null, window.OpenAgentMenu));
         }
 
         segments.Add(agentSegment.Segment!);

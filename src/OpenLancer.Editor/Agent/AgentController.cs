@@ -68,19 +68,34 @@ internal sealed class AgentController : IDisposable
 
     public AgentServerState State { get; private set; }
 
+    /// <summary>True while the user pauses the agent edits (decision D734). Each tool that changes data, writes files or
+    /// starts a play then gives the error <c>paused</c>. The read tools and <c>play_stop</c> still run. The pause stays
+    /// until the user resumes the edits, also across a stop and a start of the server.</summary>
+    public bool Paused { get; set; }
+
     /// <summary>The port of the running server, or of the last start.</summary>
     public int Port { get; private set; } = AgentSettings.DefaultPort;
 
-    /// <summary>The text of the status bar (section 10 of the MCP1 design).</summary>
+    /// <summary>The text of the status bar (section 10 of the MCP1 design). While a client calls, it gives the agent
+    /// edits since the last save.</summary>
     public string StatusText => State switch
     {
+        AgentServerState.On when Paused => PausedText,
         AgentServerState.On when dispatcher?.Queue is { LastCall: { } last } queue &&
                                   DateTimeOffset.UtcNow - last < ClientShown =>
-            $"Agent: {queue.LastClient ?? UnnamedClient}",
+            ClientText(queue.LastClient ?? UnnamedClient, editor.Edits?.AgentEdits ?? 0),
         AgentServerState.On => $"Agent server: on, port {Port}",
         AgentServerState.PortInUse => $"Agent server: port {Port} is in use",
         _ => "Agent server: off",
     };
+
+    /// <summary>The text of the status bar while the user pauses the agent edits.</summary>
+    internal const string PausedText = "Agent paused";
+
+    /// <summary>The text of the status bar while a client calls: "Agent: {client}, 1 edit" or "Agent: {client}, {n}
+    /// edits", with the agent edits since the last save.</summary>
+    internal static string ClientText(string client, int edits) =>
+        $"Agent: {client}, {(edits == 1 ? "1 edit" : $"{edits} edits")}";
 
     /// <summary>Starts the server on the port of the settings. The result comes in a later frame.</summary>
     public void Start()

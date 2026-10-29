@@ -13,10 +13,10 @@ using OpenLancer.Studio.Agent;
 namespace OpenLancer.Editor.Agent;
 
 /// <summary>
-/// The menu "Agent" of the editor (decision D742) and its dialogs: Start and Stop of the agent server, the data notice
-/// at the first start (decision D735), the Connect dialog with the text of <c>.mcp.json</c>, the agent settings and the
-/// segment of the status bar (section 10 of the MCP1 design). The menu items of the agent edits, for example Pause, come
-/// with the edit tools.
+/// The menu "Agent" of the editor (decision D742) and its dialogs: Start and Stop of the agent server, Pause of the agent
+/// edits (decision D734), the data notice at the first start (decision D735), the Connect dialog with the text of
+/// <c>.mcp.json</c>, the agent settings and the segment of the status bar (section 10 of the MCP1 design). A click on the
+/// segment of the status bar opens the same menu, so Pause is also in the status bar.
 /// </summary>
 internal sealed class AgentMenu(EditorWindow window, AgentController controller)
 {
@@ -41,11 +41,15 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
         var running = controller.State is AgentServerState.On or AgentServerState.Starting;
         if (Theme.IconMenuItem(EditorIcons.Play, "Start agent server", !running))
             Start();
-        ImGui.SetItemTooltip("Lets an agent program on this computer read the data of the open profile. The server accepts " +
-                             "connections from this computer only.");
+        ImGui.SetItemTooltip(StartTip);
         if (Theme.IconMenuItem(EditorIcons.Stop, "Stop agent server", running))
             controller.Stop();
         ImGui.SetItemTooltip("Stops the agent server at once.");
+        ImGui.Separator();
+        var paused = controller.Paused;
+        if (Theme.IconMenuItem(paused ? EditorIcons.Play : EditorIcons.Pause, PauseLabel(paused), true))
+            controller.Paused = !paused;
+        ImGui.SetItemTooltip(PauseTip(paused));
         ImGui.Separator();
         if (Theme.IconMenuItem(EditorIcons.Link, "Connect an agent...", true))
             connect.Show(running ? controller.Port : settings.Port);
@@ -68,6 +72,19 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
             ImGui.EndMenu();
         }
     }
+
+    /// <summary>The tooltip of "Start agent server" (section 10 of the MCP1 design).</summary>
+    internal const string StartTip =
+        "Lets an agent program on this computer read and edit the active mod. Each agent edit is one Undo step.";
+
+    /// <summary>The menu item of Pause (decision D734): "Pause agent edits", or "Resume agent edits" while the user
+    /// pauses them.</summary>
+    internal static string PauseLabel(bool paused) => paused ? "Resume agent edits" : "Pause agent edits";
+
+    /// <summary>The tooltip of the menu item of Pause.</summary>
+    internal static string PauseTip(bool paused) => paused
+        ? "Lets the agent edit the data again."
+        : "Stops all agent edits until you resume them. The agent can still read the data.";
 
     /// <summary>The segment text of the status bar.</summary>
     public string StatusText => controller.StatusText;
