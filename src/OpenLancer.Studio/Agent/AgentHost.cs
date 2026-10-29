@@ -205,22 +205,24 @@ public abstract class AgentHost
     public virtual IReadOnlyList<StudioTool> Tools => AgentTools.All;
 
     /// <summary>Tells the host that an edit call of the agent changed the data (section 8.5 of the MCP1 design). It runs
-    /// after the commit, on the thread that owns the session. A preview and a call without a change do not call
-    /// it.</summary>
+    /// after the commit, on the thread that owns the session. A preview and a call without a change do not call it. The
+    /// change is in the history then, so the hook must not throw. An exception would give the agent the error
+    /// <c>step_failed</c> for an applied edit.</summary>
     /// <param name="tool">The name of the tool, for example <c>delete_items</c>.</param>
     /// <param name="result">The result of the commit, with the label of the history entry.</param>
     public virtual void Edited(string tool, EditResult result)
     {
     }
 
-    /// <summary>Tells the host that a call of a tool that changes data gave an error, for example
-    /// <c>needs_confirmation</c> (section 8.5 of the MCP1 design). A preview and a query do not call it.</summary>
+    /// <summary>Tells the host that a call of a tool that changes data gave an error, for example <c>paused</c> (section
+    /// 8.5 of the MCP1 design). A preview, a query and the question <c>needs_confirmation</c> do not call it.</summary>
     public virtual void Refused(string tool, EditError error)
     {
     }
 
     /// <summary>Tells the host that <c>undo</c> or <c>redo</c> of the agent moved an entry of the history (section 8.5 of
-    /// the MCP1 design). It runs after the step, on the thread that owns the session.</summary>
+    /// the MCP1 design). It runs after the step, on the thread that owns the session. The hook must not throw, as
+    /// <see cref="Edited"/> must not.</summary>
     /// <param name="tool">The name of the tool: <c>undo</c> or <c>redo</c>.</param>
     /// <param name="label">The label of the entry, for example "Agent: Delete my_station_1".</param>
     public virtual void Stepped(string tool, string label)

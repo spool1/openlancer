@@ -266,7 +266,8 @@ public static class AgentTools
     /// changed.</para>
     /// <para>Pause refuses each tool that changes the data, writes files or starts a play (decision D734). The host gets
     /// each refusal of a tool that changes something, except of a preview, for its Console (section 8.5 of the MCP1
-    /// design).</para>
+    /// design). The error <c>needs_confirmation</c> asks and does not refuse (section 8.1), so the host does not get
+    /// it.</para>
     /// </remarks>
     /// <exception cref="ArgumentException">The table has no tool with the name. The SDK binding refuses an unknown
     /// tool before it queues the call.</exception>
@@ -291,7 +292,8 @@ public static class AgentTools
         }
         catch (EditException e)
         {
-            return Refuse(host, tool, e.Error, args?.Flag("preview") == true);
+            // Arguments that do not pass the input check give no args. The flag then comes from the JSON.
+            return Refuse(host, tool, e.Error, args?.Flag("preview") ?? AsksPreview(arguments));
         }
         catch (Exception e) when (e is not OutOfMemoryException)
         {
@@ -332,11 +334,11 @@ public static class AgentTools
     private static bool AsksPreview(JsonObject? arguments) =>
         arguments?["preview"] is JsonValue value && value.TryGetValue<bool>(out var preview) && preview;
 
-    /// <summary>The tool error of a refusal. The host gets the refusal of a tool that changes data, except of a preview,
-    /// for its Console.</summary>
+    /// <summary>The tool error of a refusal. The host gets the refusal of a tool that changes data, except of a preview
+    /// and of a question (<c>needs_confirmation</c>), for its Console.</summary>
     private static ToolResult Refuse(AgentHost host, StudioTool tool, EditError error, bool preview)
     {
-        if (tool.Changes && !preview)
+        if (tool.Changes && !preview && error.Kind != EditErrorKind.NeedsConfirmation)
             host.Refused(tool.Name, error);
         return ToolResult.Failure(error);
     }

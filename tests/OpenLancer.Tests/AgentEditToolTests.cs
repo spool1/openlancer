@@ -243,18 +243,22 @@ public sealed class AgentEditToolTests
         Assert.Null(session.OpenBatch);
     }
 
-    /// <summary>A refused preview and a query do not go to the Console of the host (section 8.5 of the MCP1
-    /// design).</summary>
+    /// <summary>A refused preview, a query and a question do not go to the Console of the host (section 8.5 of the MCP1
+    /// design). A preview with arguments that do not pass the input check also does not go to the host. The question
+    /// needs_confirmation asks and does not refuse (section 8.1).</summary>
     [Fact]
-    public void ARefusedPreviewAndAQueryDoNotGoToTheHost()
+    public void ARefusedPreviewAQueryAndAQuestionDoNotGoToTheHost()
     {
         var (ws, _, host) = Scene();
         using var __ = ws;
 
         Error(host, "set_fields", """{ "ref": "obj:none", "fields": { "pos": [1, 2, 3] }, "preview": true }""");
+        var bad = Error(host, "set_fields", """{ "ref": 5, "fields": { "pos": [1, 2, 3] }, "preview": true }""");
         Error(host, "get_item", """{ "ref": "obj:none" }""");
+        var asks = Error(host, "delete_items", """{ "refs": ["obj:Li01_01"] }""");
         Error(host, "set_fields", """{ "ref": "obj:none", "fields": { "pos": [1, 2, 3] } }""");
 
+        Assert.Equal(("invalid_argument", "needs_confirmation"), (bad.Code, asks.Code));
         Assert.Equal([("set_fields", EditErrorKind.NotFound)], host.Refusals.Select(r => (r.Tool, r.Error.Kind)));
     }
 

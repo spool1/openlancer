@@ -319,7 +319,7 @@ The editor shows each agent edit in the Console, in the Scene, in the Hierarchy 
 
 | Place | What it shows |
 |---|---|
-| Console | Each agent edit adds an Info entry with the source "Agent" and the label of the edit, for example "Create Zone_test_01.". Click the entry to select its item. A refused call of a tool that changes data adds a warning with the tool and the reason. An undo and a redo of the agent add an entry too. A preview and a read tool add no entry. **Agent > Show agent messages** shows only the entries of the agent. |
+| Console | Each agent edit adds an Info entry with the source "Agent" and the label of the edit, for example "Create Zone_test_01.". Click the entry to select its item. A refused call of a tool that changes data adds a warning with the tool and the reason. An undo and a redo of the agent add an entry too. A preview, a read tool and the question `needs_confirmation` add no entry. When the editor cannot show an agent edit, it adds an Error entry with the reason. The edit stays in the Undo history. **Agent > Show agent messages** shows only the entries of the agent. |
 | Scene | A pulse ring in the agent color goes around each item of an agent edit for 4 seconds. |
 | Hierarchy | A robot glyph at the right end of a row shows an item that an agent edit changed after the last save. The blue mark of the unsaved edit stays, so the row shows both marks. `list_items` gives the same mark as `agent_changed`. |
 | Status bar | The agent program and the number of its edits since the last save, or "Agent paused". |

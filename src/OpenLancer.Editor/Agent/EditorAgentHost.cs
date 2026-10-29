@@ -177,12 +177,12 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
     /// D718).
     /// </summary>
     /// <remarks>Follow mode then opens and frames the item of the edit (decision D719).</remarks>
-    public override void Edited(string tool, EditResult result)
+    public override void Edited(string tool, EditResult result) => AfterChange(() =>
     {
         editor.Log.Add(ConsoleSeverity.Info, AgentController.Source, Sentence(result.Label ?? result.UndoLabel ?? tool),
             FirstItem(result));
         editor.Follow.Edited(result);
-    }
+    });
 
     /// <summary>The Console entry of a refused call of a tool that changes something: a Warning "{tool}:
     /// {message}".</summary>
@@ -193,10 +193,30 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
     /// <summary>The Console entry of an undo or a redo of the agent, for example "Undo Agent: Create Zone_1.". The undo
     /// does not run the selection rule of an undo of the user. Only follow mode selects the item of an undone delete
     /// again.</summary>
-    public override void Stepped(string tool, string label)
+    public override void Stepped(string tool, string label) => AfterChange(() =>
     {
         editor.Log.Add(ConsoleSeverity.Info, AgentController.Source, Sentence($"{(tool == "redo" ? "Redo" : "Undo")} {label}"));
         editor.Follow.Stepped(tool, label);
+    });
+
+    /// <summary>The start of the Console entry of a fault in what the editor shows of an agent change.</summary>
+    internal const string ShowFailedText = "The editor could not show the agent change:";
+
+    /// <summary>
+    /// Runs what the editor shows of an agent change: the Console entry and follow mode. The change is in the history when
+    /// this runs. So a fault here must not give the agent an error that tells that the tool changed nothing. The Console
+    /// gets the fault as an Error entry, and the call keeps its result (review finding of MCP1-2, step 8).
+    /// </summary>
+    private void AfterChange(Action show)
+    {
+        try
+        {
+            show();
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            editor.Log.Add(ConsoleSeverity.Error, AgentController.Source, $"{ShowFailedText} {e.Message}");
+        }
     }
 
     /// <summary>A label as a sentence with a full stop.</summary>

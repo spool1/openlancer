@@ -97,6 +97,9 @@ internal sealed class FakeFollowView : IFollowView
     /// <summary>False to act as a Scene that cannot show the system, for example while the game data loads.</summary>
     public bool CanShow { get; set; } = true;
 
+    /// <summary>True to act as a Scene that throws when it shows an item.</summary>
+    public bool Fails { get; set; }
+
     public SectionRef? SectionOf(object? item) => item switch
     {
         SectionRef section => section,
@@ -106,6 +109,8 @@ internal sealed class FakeFollowView : IFollowView
 
     public bool ShowInScene(SectionRef section, string system, bool select)
     {
+        if (Fails)
+            throw new System.InvalidOperationException("The test Scene fails.");
         if (!CanShow)
             return false;
         Shown.Add((section, system, select));

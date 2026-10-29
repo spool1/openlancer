@@ -50,20 +50,25 @@ public sealed class AgentConsoleTests
     }
 
     /// <summary>A refused edit adds a Warning "{tool}: {message}" with a link to the item of the error, when the edit view
-    /// has it.</summary>
+    /// has it. A question of the agent (needs_confirmation) is not a refusal (section 8.1 of the MCP1 design), so it adds
+    /// no entry. The confirmed call then adds its Info entry.</summary>
     [Fact]
-    public void ARefusedEditAddsAWarning()
+    public void ARefusedEditAddsAWarningAndAQuestionAddsNoEntry()
     {
         var (ws, _, editor, host) = Editor();
         using var _ = ws;
 
         var missing = Error(host, "set_fields", """{ "ref": "obj:none", "fields": { "pos": [1, 2, 3] } }""");
+        var stale = Error(host, "set_fields",
+            """{ "ref": "obj:Li01_dock", "fields": { "pos": [1, 2, 3] }, "if_revision": "7" }""");
         var asks = Error(host, "delete_items", """{ "refs": ["obj:Li01_01"] }""");
+        Ok(host, "delete_items", """{ "refs": ["obj:Li01_01"], "confirm": true }""");
 
         var entries = Agent(editor);
         Assert.Equal([(ConsoleSeverity.Warning, $"set_fields: {missing.Message}"),
-            (ConsoleSeverity.Warning, $"delete_items: {asks.Message}")], entries.Select(e => (e.Severity, e.Message)));
-        Assert.Equal("needs_confirmation", asks.Code);
+                (ConsoleSeverity.Warning, $"set_fields: {stale.Message}"), (ConsoleSeverity.Info, "Delete Li01_01 and 2 more.")],
+            entries.Select(e => (e.Severity, e.Message)));
+        Assert.Equal(("stale_revision", "needs_confirmation"), (stale.Code, asks.Code));
     }
 
     /// <summary>A preview, a query and a view tool add no entry.</summary>
@@ -75,6 +80,8 @@ public sealed class AgentConsoleTests
 
         Ok(host, "scene_create_zone", Zone.Replace("}", ", \"preview\": true }"));
         Error(host, "set_fields", """{ "ref": "obj:none", "fields": { "pos": [1, 2, 3] }, "preview": true }""");
+        // Arguments that do not pass the input check: the flag preview comes from the JSON.
+        Error(host, "set_fields", """{ "ref": 5, "fields": { "pos": [1, 2, 3] }, "preview": true }""");
         Ok(host, "list_items", """{ "system": "Li01" }""");
         Error(host, "get_item", """{ "ref": "obj:none" }""");
 

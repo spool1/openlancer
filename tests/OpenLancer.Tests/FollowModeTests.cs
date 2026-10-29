@@ -118,6 +118,29 @@ public sealed class FollowModeTests
         Assert.Equal([(Dock, "Li01", true)], view.Shown);
     }
 
+    /// <summary>A fault of follow mode comes after the commit or the undo. So the call keeps its result: the agent gets
+    /// the change, and the Console gets the fault as an Error entry (review finding of MCP1-2, step 8).</summary>
+    [Fact]
+    public void AFaultOfFollowModeKeepsTheResultOfTheCall()
+    {
+        var (ws, session, editor, host) = Editor();
+        using var _ = ws;
+        editor.FollowView.Fails = true;
+
+        var created = Ok(host, "scene_create_zone", Zone);
+        Assert.Equal("applied", (string?)created["status"]);
+        Assert.NotNull(session.Get(SceneWorkspace.Zone("Zone_test_01")));
+        Ok(host, "delete_items", """{ "refs": ["zone:Zone_test_01"], "confirm": true }""");
+        Ok(host, "undo");
+        Assert.NotNull(session.Get(SceneWorkspace.Zone("Zone_test_01")));
+
+        var entries = editor.Log.Entries.Where(e => e.Source == AgentController.Source).ToArray();
+        Assert.Equal(["Create Zone_test_01.", $"{EditorAgentHost.ShowFailedText} The test Scene fails.",
+                "Delete Zone_test_01.", "Undo Agent: Delete Zone_test_01.", $"{EditorAgentHost.ShowFailedText} The test Scene fails."],
+            entries.Select(e => e.Message));
+        Assert.Equal(2, entries.Count(e => e.Severity == OpenLancer.Editor.Logs.ConsoleSeverity.Error));
+    }
+
     /// <summary>A rename keeps the selection: a selected section gets its new reference.</summary>
     [Fact]
     public void ARenameKeepsTheSelection()
@@ -274,9 +297,10 @@ public sealed class FollowModeTests
         Assert.Equal(SceneWorkspace.Zone("Zone_test_01"), editor.FollowView.Selection);
     }
 
-    /// <summary>A preview and a refused edit change nothing of the view.</summary>
+    /// <summary>A preview, a question and a refused edit change nothing of the view. Only the refusal adds a Console
+    /// entry.</summary>
     [Fact]
-    public void APreviewAndARefusalChangeNothingOfTheView()
+    public void APreviewAQuestionAndARefusalChangeNothingOfTheView()
     {
         var (ws, _, editor, host) = Editor();
         using var _ = ws;
@@ -285,10 +309,12 @@ public sealed class FollowModeTests
 
         Ok(host, "scene_create_zone", Zone.Replace("}", ", \"preview\": true }"));
         Error(host, "delete_items", """{ "refs": ["obj:Li01_01"] }""");
+        var refused = Error(host, "set_fields", """{ "ref": "obj:none", "fields": { "pos": [1, 2, 3] } }""");
 
         Assert.Empty(view.Shown);
         Assert.Equal(new FakeSceneItem(Hole), view.Selection);
         Assert.True(editor.Follow.On);
-        Assert.Single(editor.Log.Entries, e => e.Source == AgentController.Source);
+        Assert.Equal($"set_fields: {refused.Message}",
+            Assert.Single(editor.Log.Entries, e => e.Source == AgentController.Source).Message);
     }
 }
