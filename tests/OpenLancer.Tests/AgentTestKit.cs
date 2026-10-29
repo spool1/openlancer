@@ -160,11 +160,16 @@ internal sealed class FakeAgentViews : IAgentViews
 /// <summary>The calls of the agent tools for the tests, without a host thread.</summary>
 internal static class AgentCalls
 {
-    /// <summary>Runs a call: the session part, then the tail when the call has one.</summary>
+    /// <summary>Runs a call: the session part, then the tail when the call has one. The tail has the time limit of its
+    /// tool, as in the queue of a host. So a tail that waits for an answer that does not come fails the test, and the
+    /// test run does not stop.</summary>
     public static ToolResult Call(AgentHost host, string tool, string arguments = "{}")
     {
         var step = AgentTools.Run(host, tool, JsonNode.Parse(arguments)!.AsObject());
-        return step.Result ?? step.Tail!(CancellationToken.None, ToolProgress.None).GetAwaiter().GetResult();
+        if (step.Result is { } result)
+            return result;
+        using var limit = new CancellationTokenSource(AgentTools.Find(tool)!.TailLimit(host.Limits));
+        return step.Tail!(limit.Token, ToolProgress.None).WaitAsync(limit.Token).GetAwaiter().GetResult();
     }
 
     /// <summary>Runs a call that must give a result, not an error, and gives its structured content.</summary>

@@ -175,7 +175,7 @@ public sealed class AgentPlayToolTests
         editor.GameRuns = gameRuns;
         editor.UnsavedMod = "ol_mod";
 
-        var (code, detail, message) = Error(host, "play", AtBase);
+        var (code, detail, message) = Refusal(host, AtBase);
 
         Assert.Equal(("refused", "OtherPlay", "A game of Play runs, so Play did not start. Call play_stop first."),
             (code, detail, message));
@@ -200,6 +200,26 @@ public sealed class AgentPlayToolTests
         Assert.Empty(editor.Requests);
     }
 
+    /// <summary>When the save of Play stops, the agent gets the error of the save with its code (section 7.6 of the MCP1
+    /// design): the save gate found errors, files of the mod changed outside the editor, or edits came after the
+    /// request. Play gives the message.</summary>
+    [Theory]
+    [InlineData(EditErrorKind.SaveBlocked, "save_blocked", "SaveBlocked")]
+    [InlineData(EditErrorKind.ChangedOnDisk, "changed_on_disk", "ChangedOnDisk")]
+    [InlineData(EditErrorKind.Refused, "refused", PlayRequests.NotSavedDetail)]
+    public void AnErrorOfTheSaveOfPlayGivesItsCode(EditErrorKind kind, string code, string detail)
+    {
+        const string message = "The save of Play stopped.";
+        var (host, editor) = Editor();
+        editor.Result = new TaskCompletionSource<PlayRequestResult>();
+        editor.Result.SetResult(PlayRequestResult.Refused(PlayStatus.Idle, detail, message, kind));
+
+        var error = Error(host, "play", AtBase);
+
+        Assert.Equal((code, detail, message), error);
+        Assert.Single(editor.Requests);
+    }
+
     /// <summary>One dialog shows the question, so a second agent request gets busy until the first ends: while the
     /// question is open, and after "Save and continue" until Play gives the result.</summary>
     [Fact]
@@ -210,9 +230,9 @@ public sealed class AgentPlayToolTests
         editor.Result = new TaskCompletionSource<PlayRequestResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var first = Tail(host, AtBase, CancellationToken.None);
-        var waits = Error(host, "play", AtBase);
+        var waits = Refusal(host, AtBase);
         editor.Click(0);
-        var runs = Error(host, "play", AtBase);
+        var runs = Refusal(host, AtBase);
         editor.Result.SetResult(new PlayRequestResult(PlayStatus.Starting));
         await first.WaitAsync(Wait, Token);
         editor.Result = null;
@@ -362,7 +382,7 @@ public sealed class AgentPlayToolTests
         editor.Check = start => PlayChecks.StartBlock(true, items, "ol_sys", start);
         var gone = new PlayStart.InSpace("ol_gone", Vector3.Zero, Quaternion.Identity);
 
-        var (code, detail, message) = Error(host, "play", """{ "start": "space", "system": "ol_gone", "position": [0, 0, 0] }""");
+        var (code, detail, message) = Refusal(host, """{ "start": "space", "system": "ol_gone", "position": [0, 0, 0] }""");
 
         Assert.Equal(("refused", EditorAgentPlay.StartBlockedDetail), (code, detail));
         Assert.Equal("The game data of the profile has no system 'ol_gone'.", message);
@@ -397,6 +417,17 @@ public sealed class AgentPlayToolTests
     private static (string?, string?) Codes((string? Code, string? Detail, string? Message) error) => (error.Code, error.Detail);
 
     private static JsonObject Args(string json) => JsonNode.Parse(json)!.AsObject();
+
+    /// <summary>Runs a play call that the session part refuses, and gives its code, its detail and its message. A
+    /// refusal of the session part has no tail, so no question of the user waits for an answer.</summary>
+    private static (string? Code, string? Detail, string? Message) Refusal(AgentHost host, string arguments)
+    {
+        var result = AgentTools.Run(host, "play", Args(arguments)).Result;
+        Assert.NotNull(result);
+        Assert.True(result.IsError, result.Text);
+        Assert.Empty(SchemaCheck.Problems(AgentTools.Find("play")!.OutputSchema, result.Content));
+        return ((string?)result.Content["code"], (string?)result.Content["detail"], (string?)result.Content["message"]);
+    }
 
     /// <summary>Runs the session part of a play call, then starts its tail.</summary>
     private static Task<ToolResult> Tail(AgentHost host, string arguments, CancellationToken cancel)
