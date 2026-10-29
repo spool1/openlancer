@@ -240,6 +240,26 @@ public sealed class FollowModeTests
         Assert.Equal(new FakeSceneItem(Dock), view.Selection);
     }
 
+    /// <summary>A write of a prop group changes an asset and no entry of the history. So its save and its delete keep the
+    /// selection and the view, as an asset of the Unity Project window does.</summary>
+    [Fact]
+    public void AWriteOfAPropGroupKeepsTheSelection()
+    {
+        var (ws, _, editor, host) = Editor(GroupWorkspace.Create());
+        using var _ = ws;
+        var view = editor.FollowView;
+        var selected = new FakeSceneItem(SceneWorkspace.Object("Li01_14"));
+        view.Selection = selected;
+
+        Ok(host, "prop_group_save", """{ "refs": ["obj:Li01_14"], "nickname": "trio", "confirm": true }""");
+        Ok(host, "prop_group_delete", """{ "group": "group:trio", "confirm": true }""");
+
+        Assert.Equal(selected, view.Selection);
+        Assert.Empty(view.Shown);
+        Assert.Equal(["Save prop group trio.", "Delete prop group trio."],
+            editor.Log.Entries.Where(e => e.Source == AgentController.Source).Select(e => e.Message));
+    }
+
     /// <summary>A system that the Scene cannot show, for example while the game data loads, gives the Inspector the
     /// new item.</summary>
     [Fact]

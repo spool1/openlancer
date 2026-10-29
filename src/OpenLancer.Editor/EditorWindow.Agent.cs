@@ -158,9 +158,10 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
 
     /// <summary>
     /// Watches the input of the user in one frame for follow mode (decision D719): a click or a key that moves the
-    /// selection, and a camera input of the Scene. Call it after the panels draw, with the selection before them.
+    /// selection, and a camera input of the Scene. Call it after the panels draw, with the selection and the camera pose
+    /// before them.
     /// </summary>
-    private void WatchFollow(object? selectionBefore)
+    private void WatchFollow(object? selectionBefore, (Vector3, Quaternion, float) poseBefore)
     {
         var input = false;
         foreach (var button in new[] { ImGuiMouseButton.Left, ImGuiMouseButton.Right, ImGuiMouseButton.Middle })
@@ -173,7 +174,7 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
             input |= ImGui.IsKeyPressed(key);
         }
 
-        AgentFollow.Watch(selectionBefore, Selection, input, Scene.CameraInputFrame == ImGui.GetFrameCount());
+        AgentFollow.Watch(selectionBefore, Selection, input, Scene.ViewPose != poseBefore);
     }
 
     /// <summary>The keys that move the selection of a list or a tree.</summary>

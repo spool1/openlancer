@@ -784,6 +784,7 @@ internal sealed partial class EditorWindow : Game
         var position = new Vector2(0, menuHeight);
         var size = new Vector2(Width, Height - menuHeight - statusHeight);
         var selectionBefore = Selection;
+        var poseBefore = Scene.ViewPose;
         if (Session == null)
         {
             welcome.Draw(position, size);
@@ -794,7 +795,7 @@ internal sealed partial class EditorWindow : Game
         }
 
         // A selection or a camera input of the user in the panels stops follow mode of the agent edits.
-        WatchFollow(selectionBefore);
+        WatchFollow(selectionBefore, poseBefore);
 
         statusBar.Draw(new Vector2(0, Height - statusHeight), Width);
         gameLinkWindow.Draw();

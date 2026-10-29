@@ -288,9 +288,11 @@ internal sealed class SceneView : IDisposable
 
     public void Update(double elapsed) => stage?.Update(elapsed);
 
-    /// <summary>The ImGui frame of the last camera input of the user over the Scene: a move, a turn, a change of the fly
-    /// speed, or the key F. Follow mode of the agent edits stops at it (section 8.5 of the MCP1 design).</summary>
-    public int CameraInputFrame { get; private set; } = -1;
+    /// <summary>The pose and the fly speed of the camera. An agent call runs before the panels draw, so a change of the
+    /// pose while the panels draw is a camera input of the user. Follow mode of the agent edits stops at it (section 8.5
+    /// of the MCP1 design).</summary>
+    public (Vector3 Position, Quaternion Orientation, float Speed) ViewPose =>
+        (controller.Position, controller.Orientation, controller.Speed);
 
     /// <summary>Moves the camera so that the whole system is in view.</summary>
     public void FrameSystem()
@@ -391,11 +393,7 @@ internal sealed class SceneView : IDisposable
         buttonActive = active;
         var viewKeys = GizmoInput.ReadsViewKeys(owner, sceneHovered, ImGui.IsWindowHovered(),
             ImGui.IsMouseHoveringRect(origin, origin + size));
-        if (controller.HandleInput(window.Keyboard, viewKeys, active, elapsed))
-        {
-            CameraInputFrame = ImGui.GetFrameCount();
-        }
-
+        controller.HandleInput(window.Keyboard, viewKeys, active, elapsed);
         controller.Apply(camera, sky, width, height);
         var projection = new SceneProjection(camera, origin, size, ImGuiHelper.Scale);
         lastProjection = projection;
@@ -428,7 +426,6 @@ internal sealed class SceneView : IDisposable
         if (viewKeys && !ImGui.GetIO().WantTextInput && ImGui.IsKeyPressed(ImGuiKey.F))
         {
             Focus(window.Selection);
-            CameraInputFrame = ImGui.GetFrameCount();
         }
 
         transform.Keys(ImGui.IsWindowHovered() || ImGui.IsWindowFocused());

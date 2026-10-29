@@ -111,7 +111,9 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
         {
             deleted[label] = first.Ref;
         }
-        if (!On)
+        // A write of a prop group changes an asset, not the edit view, so it is not an entry of the history. Its delete
+        // keeps the selection, as a delete in the Unity Project window keeps the selection of the Scene.
+        if (!On || result.UndoLabel == null)
             return;
         if (result.Adds.Count == 0 && result.Deletes.Count > 0)
         {
