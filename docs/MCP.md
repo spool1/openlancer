@@ -197,7 +197,7 @@ When one step fails, the error `step_failed` gives its index and its error, and 
 
 One call names at most 200 items and changes at most 2000 sections. One batch has at most 100 steps, and one route has at most 50 legs. **Agent > Agent settings > Advanced** changes these limits. A call above a limit gives the error `limit` and changes nothing. The size limit of a result applies to an edit too. The edit checks the size of its result before it applies, so a larger edit also changes nothing.
 
-While you pause the agent edits, each edit tool and `save` give the error `paused`, and the read tools still work. A later version adds **Pause agent edits** to the Agent menu.
+While you pause the agent edits, each tool that changes data or writes files gives the error `paused`. Examples are the edit tools, `undo`, `redo`, `save` and `export_mod`. The read tools still work, also `publish_checklist`. A later version adds **Pause agent edits** to the Agent menu.
 
 The edit tools refuse with `read_only` when the editor takes no edits, and the message tells the reason. For example, another editor has the mod open, or the profile or the active mod is in the game folder. A mod in the OpenLancer repo also refuses until you allow its edits.
 
@@ -296,7 +296,7 @@ An export can take minutes. A client that asks for progress gets a progress noti
 
 An agent program can ask you before each tool call. A permission rule of the agent program can allow a set of tools without a question. Claude Code gives each tool of the server `openlancer` the name `mcp__openlancer__<tool>`.
 
-The name of each read tool starts with `list_`, `get_`, `find_`, `search_`, `describe_` or `check`, or is `studio_status`. So these rules allow all read tools:
+The name of a read tool starts with `list_`, `get_`, `find_`, `search_`, `describe_` or `check`, or is `studio_status`, `mission_dry_run` or `publish_checklist`. So these rules allow all read tools:
 
 ```
 mcp__openlancer__list_*
@@ -306,6 +306,8 @@ mcp__openlancer__search_*
 mcp__openlancer__describe_*
 mcp__openlancer__check
 mcp__openlancer__studio_status
+mcp__openlancer__mission_dry_run
+mcp__openlancer__publish_checklist
 ```
 
 The image tools also change nothing, but their names do not match these prefixes. Allow them only when you accept that their images go to the model service of the agent program:
