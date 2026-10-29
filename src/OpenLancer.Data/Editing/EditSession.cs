@@ -149,8 +149,10 @@ public sealed partial class EditSession : IDisposable
 
     /// <summary>
     /// The sections that the entries of an agent changed since the last save, by their references now (section 8.5 of the
-    /// MCP1 design). A later rename of such a section, also by the user, gives its new reference. An undo of the entry
-    /// removes its sections, a redo puts them back, and a save clears them. The Hierarchy marks these rows.
+    /// MCP1 design). A later rename of such a section, also by the user, gives its new reference. A section that an entry
+    /// deletes, and the old reference of a rename, lose the mark. So a later item with the same reference has no mark.
+    /// An undo of the entry removes its sections, a redo puts them back, and a save clears them. The Hierarchy marks
+    /// these rows.
     /// </summary>
     public IReadOnlySet<SectionRef> AgentSections => AgentEditsNow().Sections;
 
@@ -166,16 +168,21 @@ public sealed partial class EditSession : IDisposable
         foreach (var entry in history.SinceSave)
         {
             // The renames of each entry come first, so a section of an earlier agent entry keeps its mark under its new
-            // key. The sections of an agent rename hold the old and the new reference.
+            // key.
             foreach (var (from, to) in entry.Renames)
             {
                 if (sections.Remove(from))
                     sections.Add(to);
             }
-            if (entry.Origin != EditOrigin.Agent)
-                continue;
-            count++;
-            sections.UnionWith(entry.Change.Sections);
+            if (entry.Origin == EditOrigin.Agent)
+            {
+                count++;
+                sections.UnionWith(entry.Change.Sections);
+            }
+            // The sections of an entry hold the deleted sections and the old reference of each rename. An example is a
+            // create with a nickname: it adds the item under a free nickname, then renames it in the same entry. These
+            // references name no item now, so they lose the mark (review finding of MCP1-2, step 8).
+            sections.ExceptWith(entry.Removed);
         }
         agentEdits = (history.Version, count, sections);
         return agentEdits.Value;
@@ -681,6 +688,7 @@ public sealed partial class EditSession : IDisposable
         // A transaction whose last step threw ends in its state before, so it can change nothing.
         if (!change.ChangesState)
             return;
+        change.NoteRemoved(section => TryFind(section, out _, out _));
         Revision++;
         history.Push(change);
         foreach (var path in change.Paths)

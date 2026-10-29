@@ -206,6 +206,27 @@ public sealed class AgentEditToolTests
         Assert.False(Marked("Li01_01"));
     }
 
+    /// <summary>An agent create with a nickname first adds the zone under a free nickname. A later create of the user
+    /// gets that free nickname, and its row has no agent mark (review finding of MCP1-2, step 8).</summary>
+    [Fact]
+    public void ListItemsDoesNotMarkAnItemOfTheUserWithTheFreeNicknameOfAnAgentCreate()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+        Ok(host, "scene_create_zone", """{ "system": "Li01", "shape": "sphere", "position": [0, 0, 0], "nickname": "Zone_test_01" }""");
+        var plan = Data.Editing.Scene.ScenePlans.Create(session, "Li01", Data.Editing.Scene.SceneTemplate.Zone, null,
+            System.Numerics.Vector3.Zero, null);
+        session.Execute(plan.Command!);
+        var user = plan.Adds[0].Id.Key!;
+
+        var rows = Ok(host, "list_items", """{ "system": "Li01", "kinds": ["zone"] }""")["rows"]!.AsArray();
+        bool Marked(string nickname) =>
+            (bool)rows.Single(r => string.Equals((string?)r!["nickname"], nickname, StringComparison.OrdinalIgnoreCase))!["agent_changed"]!;
+
+        Assert.True(Marked("Zone_test_01"));
+        Assert.False(Marked(user));
+    }
+
     /// <summary>An edit call while a gesture of the user is open gives busy. The editor host waits for the end of the
     /// gesture first, so the error comes only from a host without such a wait.</summary>
     [Fact]

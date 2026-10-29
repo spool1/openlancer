@@ -43,6 +43,7 @@ internal sealed class ChangeSet(string label, EditOrigin origin = EditOrigin.Use
     private readonly List<SectionRef> sections = [];
     private readonly List<string> cutscenes = [];
     private readonly List<(SectionRef From, SectionRef To)> renames = [];
+    private readonly List<SectionRef> removed = [];
     private (ModText Before, ModText After)? text;
 
     /// <summary>The label of the entry. A batch sets it at its commit, because its label can change until
@@ -68,6 +69,13 @@ internal sealed class ChangeSet(string label, EditOrigin origin = EditOrigin.Use
 
     /// <summary>Each section that got a new key, with its old and its new reference, in order.</summary>
     public IReadOnlyList<(SectionRef From, SectionRef To)> Renames => renames;
+
+    /// <summary>
+    /// The sections of the entry that the edit view does not have after the entry: each deleted section, and the old
+    /// reference of each rename. <see cref="NoteRemoved"/> records them when the entry goes on the history. A later
+    /// section with the same reference is another item.
+    /// </summary>
+    public IReadOnlyList<SectionRef> Removed => removed;
 
     /// <summary>
     /// True when a state after the change differs from its state before. Before <see cref="Finish"/>, it is false.
@@ -115,6 +123,15 @@ internal sealed class ChangeSet(string label, EditOrigin origin = EditOrigin.Use
 
     /// <summary>Records that a section got a new key.</summary>
     public void NoteRename(SectionRef from, SectionRef to) => renames.Add((from, to));
+
+    /// <summary>Records the sections of the change set that the edit view does not have after the change (see
+    /// <see cref="Removed"/>). Call it after <see cref="Finish"/>.</summary>
+    /// <param name="exists">True when the edit view has a section now.</param>
+    public void NoteRemoved(Func<SectionRef, bool> exists)
+    {
+        removed.Clear();
+        removed.AddRange(sections.Distinct().Where(s => !exists(s)));
+    }
 
     /// <summary>Records a change of a cutscene script.</summary>
     /// <param name="path">The install path, in <see cref="VfsPath.Normalize"/> form.</param>

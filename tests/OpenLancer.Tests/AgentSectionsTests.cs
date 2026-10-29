@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Numerics;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Scene;
 using Xunit;
@@ -15,6 +16,7 @@ public sealed class AgentSectionsTests
 {
     private static readonly SectionRef Station = Object("Li01_01");
     private static readonly SectionRef Dock = Object("Li01_dock");
+    private static readonly SectionRef Hole = Zone("Zone_hole");
 
     /// <summary>Runs a command as one entry with an origin, as the agent tools and the command runner do.</summary>
     private static void Run(EditSession session, EditCommand command, EditOrigin origin)
@@ -108,5 +110,83 @@ public sealed class AgentSectionsTests
         Assert.Contains(Object("Li01_new_dock"), session.AgentSections);
         Assert.DoesNotContain(Dock, session.AgentSections);
         Assert.Equal(1, session.AgentEdits);
+    }
+
+    /// <summary>The new zone of the plan of a create, as the user and the agent tools make it.</summary>
+    private static (EditCommand Command, SectionRef Zone) NewZone(EditSession session)
+    {
+        var plan = ScenePlans.Create(session, "Li01", SceneTemplate.Zone, null, Vector3.Zero, null);
+        return (plan.Command!, plan.Adds[0]);
+    }
+
+    /// <summary>
+    /// A create with a nickname adds the item under a free nickname, then renames it in the same entry, as the Scene
+    /// create tools do. Only the new nickname has the mark. So a later create of the user, which gets the free nickname,
+    /// has no mark (review finding of MCP1-2, step 8).
+    /// </summary>
+    [Fact]
+    public void ACreateWithANicknameMarksOnlyItsNewNickname()
+    {
+        using var ws = Create();
+        var session = ws.Session("act");
+        using (var batch = session.BeginBatch("Create Zone_test_01", EditOrigin.Agent))
+        {
+            var (create, free) = NewZone(session);
+            batch.Run(create);
+            batch.Run(ScenePlans.Rename(session, free, "Zone_test_01").Command!);
+            batch.Commit();
+        }
+        Marks(session, Zone("Zone_test_01"));
+
+        var (userCreate, userZone) = NewZone(session);
+        Run(session, userCreate, EditOrigin.User);
+
+        Assert.NotNull(session.Get(userZone));
+        Marks(session, Zone("Zone_test_01"));
+    }
+
+    /// <summary>The old nickname of an agent rename loses the mark. So a later rename of the user to that nickname gives
+    /// no mark. A rename needs a nickname that the lower layer does not have, so the user first creates a zone.</summary>
+    [Fact]
+    public void TheOldNicknameOfAnAgentRenameHasNoMark()
+    {
+        using var ws = Create();
+        var session = ws.Session("act");
+        var (create, zone) = NewZone(session);
+        Run(session, create, EditOrigin.User);
+        Run(session, ScenePlans.Rename(session, zone, "Zone_agent").Command!, EditOrigin.Agent);
+        Marks(session, Zone("Zone_agent"));
+
+        Run(session, ScenePlans.Rename(session, Hole, zone.Id.Key!).Command!, EditOrigin.User);
+
+        Assert.NotNull(session.Get(zone));
+        Marks(session, Zone("Zone_agent"));
+    }
+
+    /// <summary>A section that the agent deletes, or that the user deletes after an agent edit, has no mark. A new item of
+    /// the user with its nickname has no mark either. An undo of the delete of the user gives the mark back.</summary>
+    [Fact]
+    public void ADeletedSectionHasNoMark()
+    {
+        using var ws = Create();
+        var session = ws.Session("act");
+        var (create, zone) = NewZone(session);
+        Run(session, create, EditOrigin.Agent);
+        Run(session, Move(Hole, "1, 2, 3"), EditOrigin.Agent);
+        Marks(session, zone, Hole);
+
+        Run(session, ScenePlans.Delete(session, [zone]).Command!, EditOrigin.Agent);
+        Run(session, ScenePlans.Delete(session, [Hole]).Command!, EditOrigin.User);
+        Assert.Empty(session.AgentSections);
+        Assert.Equal(3, session.AgentEdits);
+
+        var (again, sameZone) = NewZone(session);
+        Assert.Equal(zone, sameZone);
+        Run(session, again, EditOrigin.User);
+        Assert.Empty(session.AgentSections);
+
+        session.Undo();
+        session.Undo();
+        Marks(session, Hole);
     }
 }
