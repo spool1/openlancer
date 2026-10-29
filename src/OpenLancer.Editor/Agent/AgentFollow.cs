@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
@@ -23,6 +24,26 @@ internal interface IFollowView
     /// </summary>
     /// <returns>False when the Scene cannot show the item, for example while the game data loads again.</returns>
     bool ShowInScene(SectionRef section, string system, bool select);
+}
+
+/// <summary>What the panels did in one frame, for follow mode. The window reads it before and after the panels
+/// draw.</summary>
+/// <param name="SelectionBefore">The selection before the panels drew.</param>
+/// <param name="SelectionAfter">The selection after the panels drew.</param>
+/// <param name="CameraBefore">The pose and the fly speed of the Scene camera before the panels drew.</param>
+/// <param name="CameraAfter">The pose and the fly speed of the Scene camera after the panels drew.</param>
+/// <param name="Input">True when the user clicked or pressed a key that moves the selection in the frame.</param>
+internal readonly record struct FollowFrame(
+    object? SelectionBefore,
+    object? SelectionAfter,
+    (Vector3 Position, Quaternion Orientation, float Speed) CameraBefore,
+    (Vector3 Position, Quaternion Orientation, float Speed) CameraAfter,
+    bool Input)
+{
+    /// <summary>True when the user selected an item or moved the Scene camera in the frame. An agent call runs before
+    /// the panels, so a selection of <c>select_items</c> or of follow mode is not a change here. The Scene selects the
+    /// item of a pending section in a frame without input, so such a change is not a selection of the user.</summary>
+    public bool UserActed => CameraBefore != CameraAfter || Input && !Equals(SelectionBefore, SelectionAfter);
 }
 
 /// <summary>
@@ -68,18 +89,11 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
     /// keeps its value, so the next start of the editor does not surprise the user.</summary>
     public void Stop() => stopped = true;
 
-    /// <summary>
-    /// Watches the input of the user in one frame. The window calls it after the panels draw. An agent call runs before
-    /// the panels, so a selection of <c>select_items</c> or of follow mode is not a change here.
-    /// </summary>
-    /// <param name="before">The selection before the panels drew.</param>
-    /// <param name="after">The selection after the panels drew.</param>
-    /// <param name="userInput">True when the user clicked or pressed a key that moves the selection in this
-    /// frame.</param>
-    /// <param name="cameraInput">True when the user moved the camera of the Scene in this frame.</param>
-    public void Watch(object? before, object? after, bool userInput, bool cameraInput)
+    /// <summary>Watches the input of the user in one frame, and stops follow mode at a selection or a camera input of the
+    /// user. The window calls it after the panels draw.</summary>
+    public void Watch(FollowFrame frame)
     {
-        if (On && (cameraInput || userInput && !Equals(before, after)))
+        if (On && frame.UserActed)
             Stop();
     }
 

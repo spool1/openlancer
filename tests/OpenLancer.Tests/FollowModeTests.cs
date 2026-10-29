@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Numerics;
 using OpenLancer.Data.Editing;
 using OpenLancer.Editor.Agent;
 using Xunit;
@@ -191,22 +192,42 @@ public sealed class FollowModeTests
         // select_items of the agent changes the selection in the session part. The panels then draw without a change.
         Ok(host, "select_items", """{ "refs": ["obj:Li01_dock"] }""");
         view.Selection = Dock;
-        follow.Watch(Dock, Dock, userInput: true, cameraInput: false);
+        follow.Watch(Frame(Dock, Dock, input: true));
         Assert.True(follow.On);
         // The Scene selects the item of a pending section in a frame without input.
-        follow.Watch(Dock, new FakeSceneItem(Dock), userInput: false, cameraInput: false);
+        follow.Watch(Frame(Dock, new FakeSceneItem(Dock), input: false));
         Assert.True(follow.On);
 
-        follow.Watch(Dock, Hole, userInput: true, cameraInput: false);
+        follow.Watch(Frame(Dock, Hole, input: true));
         Assert.False(follow.On);
         Assert.True(editor.Settings.FollowAgent);
 
         follow.Set(true);
         Assert.True(follow.On);
-        follow.Watch(Hole, Hole, userInput: false, cameraInput: true);
+        follow.Watch(Frame(Hole, Hole, input: false) with { CameraAfter = (Vector3.One, Quaternion.Identity, 1) });
         Assert.False(follow.On);
         follow.Set(false);
         Assert.False(editor.Settings.FollowAgent);
+    }
+
+    /// <summary>A frame of the panels with a selection before and after them, and a camera that does not move.</summary>
+    private static FollowFrame Frame(object? before, object? after, bool input) =>
+        new(before, after, (Vector3.Zero, Quaternion.Identity, 1), (Vector3.Zero, Quaternion.Identity, 1), input);
+
+    /// <summary>A change of the position, the orientation or the fly speed of the Scene camera in the panels is a camera
+    /// input of the user, also without a click in the frame, for example a key that flies the camera. The same pose is
+    /// not.</summary>
+    [Fact]
+    public void EachChangeOfTheCameraPoseIsACameraInputOfTheUser()
+    {
+        var still = Frame(Dock, Dock, input: false);
+        var turned = Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.1f);
+
+        Assert.False(still.UserActed);
+        Assert.False(Frame(Dock, Dock, input: true).UserActed);
+        Assert.True((still with { CameraAfter = (Vector3.UnitX, Quaternion.Identity, 1) }).UserActed);
+        Assert.True((still with { CameraAfter = (Vector3.Zero, turned, 1) }).UserActed);
+        Assert.True((still with { CameraAfter = (Vector3.Zero, Quaternion.Identity, 2) }).UserActed);
     }
 
     /// <summary>With follow mode off, an agent create changes nothing of the view and the selection (decision
