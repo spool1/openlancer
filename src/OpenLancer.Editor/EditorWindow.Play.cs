@@ -63,8 +63,11 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
     /// <summary>The ship package of the Play menu for the open profile, or null for the default ship.</summary>
     internal string? PlayPackage => Session is { } session ? Settings.PlayPackageOf(session.Profile.FilePath) : null;
 
-    /// <summary>Why no play can start now, or null (<see cref="PlayChecks.DataBlock"/>).</summary>
-    internal string? PlayDataBlock => PlayChecks.DataBlock(Session != null, Session?.GameData?.Items);
+    /// <summary>Why Play from camera cannot run now, or null (<see cref="PlayChecks.CameraBlock"/>).</summary>
+    /// <param name="camera">The start at the camera of the Scene in the open system, or null when no system is
+    /// open.</param>
+    internal string? PlayCameraBlock(PlayStart.InSpace? camera) =>
+        PlayChecks.CameraBlock(Session != null, Session?.GameData?.Items, camera);
 
     /// <summary>Why Play cannot start at a start now, or null. The Play menu and the agent tool play share the checks
     /// (<see cref="PlayChecks.StartBlock"/>).</summary>

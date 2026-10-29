@@ -52,4 +52,14 @@ internal static class PlayChecks
                                        items.Systems.Get(system) == null => NoBase(dock.Base),
             _ => null,
         };
+
+    /// <summary>Why Play from camera cannot run now, or null: the checks of <see cref="StartBlock"/> for the start at
+    /// the camera of the Scene. Without an open system, Play from camera has no start.</summary>
+    /// <param name="items">The game data of the profile, or null when it did not load.</param>
+    /// <param name="camera">The start at the camera of the Scene in the open system, or null when no system is
+    /// open.</param>
+    public static string? CameraBlock(bool profileOpen, GameItemDb? items, PlayStart.InSpace? camera) =>
+        camera == null
+            ? DataBlock(profileOpen, items) ?? NoOpenSystem
+            : StartBlock(profileOpen, items, camera.System, camera);
 }

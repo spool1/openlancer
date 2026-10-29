@@ -371,8 +371,8 @@ public sealed class AgentPlayToolTests
     }
 
     /// <summary>The Play menu and the tool share one check (review finding R21 of MCP1-2). The tool gives the reason of
-    /// the check for a system that the game data does not have, and the check of Play from camera gives the same
-    /// reason.</summary>
+    /// the check for a system that the game data does not have, and the check of Play from camera of the menu gives the
+    /// same reason.</summary>
     [Fact]
     public void TheMenuAndTheToolGiveTheSameReasonForASystemThatDoesNotExist()
     {
@@ -387,7 +387,7 @@ public sealed class AgentPlayToolTests
         Assert.Equal(("refused", EditorAgentPlay.StartBlockedDetail), (code, detail));
         Assert.Equal("The game data of the profile has no system 'ol_gone'.", message);
         // The camera check of the menu, while the Scene shows a system that the game data does not have now.
-        Assert.Equal(message, PlayChecks.StartBlock(true, items, "ol_gone", gone));
+        Assert.Equal(message, PlayChecks.CameraBlock(true, items, gone));
         Assert.Empty(editor.Requests);
     }
 

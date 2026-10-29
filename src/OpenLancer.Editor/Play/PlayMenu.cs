@@ -258,10 +258,9 @@ internal sealed class PlayMenu(EditorWindow window)
                                        "edits do not go to the game.";
 
     /// <summary>Why Play from camera cannot run now, or null when it can: the checks that the agent tool play shares
-    /// (<see cref="PlayChecks"/>).</summary>
-    private string? CameraBlock() => window.Scene.System is { } open
-        ? window.PlayStartBlock(CameraStart(open))
-        : window.PlayDataBlock ?? PlayChecks.NoOpenSystem;
+    /// (<see cref="PlayChecks.CameraBlock"/>).</summary>
+    private string? CameraBlock() =>
+        window.PlayCameraBlock(window.Scene.System is { } open ? CameraStart(open) : null);
 
     /// <summary>The start of Play from camera in the open system.</summary>
     private PlayStart.InSpace CameraStart(StarSystem open) =>

@@ -105,6 +105,15 @@ public sealed class PlayMenuTests
         }
         Assert.Equal("The game data of the profile did not load.", PlayChecks.DataBlock(true, null));
         Assert.Null(PlayChecks.DataBlock(true, items));
+        // Play from camera: the checks of the start at the camera, and an open system.
+        var camera = new PlayStart.InSpace("ol_sys", new Vector3(1, 2, 3), Quaternion.Identity);
+        Assert.Null(PlayChecks.CameraBlock(true, items, camera));
+        Assert.Equal("No profile is open.", PlayChecks.CameraBlock(false, null, null));
+        Assert.Equal("The game data of the profile did not load.", PlayChecks.CameraBlock(true, null, camera));
+        Assert.Equal("No system is open. Play from camera starts the ship at the Scene camera.",
+            PlayChecks.CameraBlock(true, items, null));
+        Assert.Equal("The game data of the profile has no system 'ol_gone'.",
+            PlayChecks.CameraBlock(true, items, camera with { System = "ol_gone" }));
         // The Play at base list has the bases that the checks let start.
         Assert.Equal(["ol_base_01"], PlayMenu.BaseGroups(items.Systems, items.Bases, null)
             .SelectMany(g => g.Bases).Select(b => b.Nickname));
