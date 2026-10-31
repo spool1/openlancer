@@ -514,9 +514,10 @@
       "title": "Place a prefab in a mission",
       "description": "Places one linked instance of a behavior prefab in a mission script, with its triggers and items. The tool makes one Undo step. It refuses an edit that adds an error to the script. get_item with the prefab: reference gives the fields and the outputs of the prefab. Set preview to true to see the result first.",
       "fields": {
+        "script": "The mission script that gets the instance, for example msn:DATA\\MISSIONS\\M01A\\m01a.ini. A prefab cannot hold a prefab instance, so a prefab: reference gives refused.",
         "prefab": "The prefab, for example prefab:builtin:spawnWave or prefab:mod:my_ambush. get_item gives the fields, the outputs and the roles of a prefab.",
         "id": "The id of the new instance. The names of its members start with it. Use letters, digits, '_' and '-'. Without it, the editor makes a free id.",
-        "fields": "The values of the fields by field id. A field without a value takes the default of the prefab. The form of a value follows the kind of the field. A value field takes one value, or a list of numbers for a position. A list field takes a list of rows, each an object of values by column id. A trigger list takes a list of trigger nicknames. A condition field takes one line, for example {\"key\": \"Cnd_Timer\", \"values\": {\"seconds\": 5}}. A lines field takes a list of lines. null gives the field no value.",
+        "fields": "The values of the fields by field id. A field without a value takes the default of the prefab. The form of a value follows the kind of the field. A value field takes one value, or a list of numbers for a position. A list field takes a list of rows, each an object of values by column id. A trigger list takes a list of trigger nicknames or trg: references of the same script. A condition field takes one line, for example {\"key\": \"Cnd_Timer\", \"values\": {\"seconds\": 5}}. A lines field takes a list of lines. null gives the field no value.",
         "outputs": "The triggers that each output of the instance starts, by output id, for example {\"done\": [\"my_next\"]}. A trigger is a nickname or a trg: reference of the same script."
       }
     },
@@ -524,7 +525,8 @@
       "title": "Plan a play of a mission",
       "description": "Gives the plan of a play of one mission script from a start, as the Play start page of the editor shows it. The plan gives the kind of the start, the story state, the start place and the setup triggers. A plan that cannot start gives the status refused and the reason. This tool changes nothing.",
       "fields": {
-        "start": "Where the play starts: mission_start, or the trg: reference of a trigger of the script. A start at the restore trigger of a checkpoint is exact. Another trigger gives an approximate start with setup triggers.",
+        "script": "The mission script of the play, for example msn:DATA\\MISSIONS\\M01A\\m01a.ini. A prefab: reference gives invalid_argument.",
+        "start": "Where the play starts: mission_start, or the trg: or sec: reference of a trigger of the script. A start at the restore trigger of a checkpoint is exact. Another trigger gives an approximate start with setup triggers.",
         "target": "The game of the play. This version plays from a trigger only in OpenLancer.",
         "start_place": "Where the player starts. suggested is the place that the editor suggests, and camera is the Scene camera of the editor. base: and the nickname of a base starts at that base, for example base:my_base."
       }
@@ -768,11 +770,12 @@
     "prefab_field_form": "Field {field} of the prefab takes {form}.",
     "prefab_form_value": "one value, or a list of numbers for a position or a rotation",
     "prefab_form_list": "a list of rows, each an object of values by column id. The columns are {columns}",
-    "prefab_form_triggers": "a list of trigger nicknames",
+    "prefab_form_triggers": "a list of trigger nicknames or trg: references of the same script",
     "prefab_form_condition": "one condition line, for example {\"key\": \"Cnd_Timer\", \"values\": {\"seconds\": 5}}",
     "prefab_form_lines": "a list of lines, each an object with a key and its values by name",
     "prefab_field_column": "Field {field} of the prefab has no column {column}. Use these columns: {columns}.",
     "prefab_field_cell": "Give column {column} one value, or a list of numbers for a position. A row has these columns: {columns}.",
+    "mission_start_prefab": "{ref} is a prefab, not a mission script. A play starts only a mission script. Give the msn: reference of a mission script.",
     "step_unknown": "Step {index}: the server has no tool {tool}.",
     "step_kind": "Step {index}: {tool} cannot be a step of edit_batch. A step must be an edit tool, for example set_fields.",
     "step_asset_write": "Step {index}: {tool} writes files at once, outside the Undo history. Call it alone, not in edit_batch.",

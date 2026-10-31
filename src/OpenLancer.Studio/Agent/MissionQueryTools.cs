@@ -181,19 +181,25 @@ internal static class MissionQueryTools
     /// JSON host reads the arguments, so <c>mission_start_plan</c> and a play of the same start read one request in one
     /// way.
     /// </summary>
-    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a start of another script or a
-    /// place that is not valid. <see cref="EditErrorKind.NotFound"/> for a script or a trigger that does not
+    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a prefab, a start of another
+    /// script or a place that is not valid. <see cref="EditErrorKind.NotFound"/> for a script or a trigger that does not
     /// resolve.</exception>
     public static ToolStep StartPlan(ToolCall call)
     {
         var args = call.Args;
-        EditTools.At("script", () => ScriptRef.Parse(args.Text("script")!));
+        var script = EditTools.At("script", () => ScriptRef.Parse(args.Text("script")!));
+        if (MissionRefs.IsPrefab(script.Path))
+            throw ToolInput.Bad("script", AgentTexts.Error("mission_start_prefab", ("ref", script)));
         var request = new JsonObject();
-        foreach (var name in new[] { "script", "start", "target", "start_place" })
+        foreach (var name in new[] { "script", "target", "start_place" })
         {
             if (args.Text(name) is { } value)
                 request[name] = value;
         }
+        // The reader takes the trg: form. A sec: reference of a trigger section names the same trigger (section 5.6 of
+        // the MCP1 design).
+        if (args.Text("start") is { } start)
+            request["start"] = start == RunJson.MissionStartName ? start : MissionEditTools.TriggerOf(start, "start").ToString();
         // The script is valid, so an error of the reader without a field is the read of the reference of the start.
         var read = EditTools.At("start", () => RunJson.ReadStartRequest(request));
         // An unknown trigger of the start names start. Each other error of the query is an error of the script.

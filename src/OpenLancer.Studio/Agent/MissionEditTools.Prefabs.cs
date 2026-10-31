@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Editing;
@@ -57,8 +58,9 @@ internal static partial class MissionEditTools
                     // The id gives the names of the members too.
                     MissionErrors.NameInvalid or MissionErrors.NameTaken or MissionErrors.NameIdTaken => "id",
                     // A line of the compile that the game does not read as its value, for example a point that is not
-                    // whole. The value of a field gives the line.
-                    MissionErrors.TemplateLine or MissionErrors.FieldValue or MissionErrors.FieldNotFound => "fields",
+                    // whole, or a value that a line of a binary script cannot store. The value of a field gives the line.
+                    MissionErrors.TemplateLine or MissionErrors.PatchText or MissionErrors.FieldValue
+                        or MissionErrors.FieldNotFound => "fields",
                     MissionErrors.PortNotFound => "outputs",
                     _ => "script",
                 });
@@ -104,7 +106,7 @@ internal static partial class MissionEditTools
             return [];
         switch (field.Kind)
         {
-            case PrefabFieldKind.Value when MissionLineInput.IsValue(value):
+            case PrefabFieldKind.Value when IsValueOf(field.ValueKind, value):
                 return [Row(Cell(field.ValueKind, value!, argument, script), argument)];
             case PrefabFieldKind.List when value is JsonArray rows && rows.All(r => r is JsonObject):
                 return rows.Select((row, i) => ListRow(field, (JsonObject)row!, $"{argument}[{i}]", script)).ToList();
@@ -148,28 +150,38 @@ internal static partial class MissionEditTools
         foreach (var column in field.Columns)
         {
             var at = $"{argument}.{column.Id}";
-            if (row[column.Id] is not { } cell || !MissionLineInput.IsValue(cell))
+            if (row[column.Id] is not { } cell || !IsValueOf(column.Kind, cell))
                 throw ToolInput.Bad(at, AgentTexts.Error("prefab_field_cell", ("column", column.Id), ("columns", columns)));
             texts.AddRange(Cell(column.Kind, cell, at, script));
         }
         return Row(texts, argument);
     }
 
-    /// <summary>The texts of one value of a kind: a trigger by its nickname, the numbers of a position or a rotation, or
-    /// one text. The check of the field gives the reason for a value of the wrong kind.</summary>
+    /// <summary>True when a JSON value has the form of one value of a kind: one value, or a list of values only for a
+    /// kind of more than one value, a position or a rotation.</summary>
+    private static bool IsValueOf(MissionValueKind kind, JsonNode? value) =>
+        MissionLineInput.IsValue(value) && (value is not JsonArray || PrefabRow.WidthOf(kind) > 1);
+
+    /// <summary>The texts of one value of a kind (see <see cref="IsValueOf"/>): a trigger by its nickname, the numbers of
+    /// a position or a rotation, or one text. The check of the field gives the reason for a value of the wrong
+    /// kind.</summary>
     private static IReadOnlyList<string> Cell(MissionValueKind kind, JsonNode value, string argument, string script) =>
-        kind == MissionValueKind.Trigger && IsText(value) ? [PrefabTrigger(value.GetValue<string>(), script, argument)]
-        : value is JsonArray items ? items.Select(i => MissionLineInput.Value(i!).Scalar!).ToList()
+        value is JsonArray items ? items.Select(i => MissionLineInput.Value(i!).Scalar!).ToList()
+        : kind == MissionValueKind.Trigger && IsText(value) ? [PrefabTrigger(value.GetValue<string>(), script, argument)]
         : [MissionLineInput.Value(value).Scalar!];
 
     /// <summary>The text form of a row of values. Each text gets the check of a patch line first, so a comma cannot move
-    /// a value to the next column.</summary>
+    /// a value to the next column. Then the row reads back as a patch line of a text file, as the compile reads it. So a
+    /// number that a float cannot hold, for example 1e300, names the argument too. An empty text gets the reason of the
+    /// check of the field.</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.InvalidValue"/>: a text holds a comma, a semicolon or a
-    /// control character.</exception>
+    /// control character, or a patch line cannot hold a value.</exception>
     private static string Row(IReadOnlyList<string> texts, string argument)
     {
         foreach (var text in texts)
             EditTools.At(argument, () => MissionValues.CheckText(text));
+        if (texts.Count > 0 && texts.All(t => t.Length > 0))
+            EditTools.At(argument, () => MissionValues.Entry(new Section("Row"), "row", texts, null, binary: false));
         return PrefabRow.Of([.. texts]).Format();
     }
 

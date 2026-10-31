@@ -549,7 +549,7 @@ internal static partial class MissionEditTools
     /// (section 5.6 of the MCP1 design).</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/>: the text is not the reference of a
     /// trigger. The error names the argument.</exception>
-    private static TriggerRef TriggerOf(string text, string field) => EditTools.At(field, () =>
+    internal static TriggerRef TriggerOf(string text, string field) => EditTools.At(field, () =>
         ItemRefs.Parse(text) is { Kind: ItemRefKind.Section, Path: { } path, Section: { Ordinal: 0 } section } &&
         MissionIndex.Is(section.Type, "Trigger") && section.Key is { } name
             ? new TriggerRef(path, name)

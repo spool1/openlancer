@@ -242,7 +242,9 @@ public sealed partial class AgentMissionToolTests
     /// <summary>The refusals of mission_place_prefab. A prefab that does not exist gives not_found with the closest
     /// names. An id in use gives name_taken. A value that the field refuses gives invalid_value. A value in the wrong form,
     /// a field, a column or an output that the prefab does not have, and a trigger of another script give
-    /// invalid_argument. Each error names its argument, and nothing changes.</summary>
+    /// invalid_argument. A list for one value that is not a position is a wrong form, also for a trigger. A prefab as the
+    /// script gives refused, because a prefab does not go into a prefab. Each error names its argument, and nothing
+    /// changes.</summary>
     [Fact]
     public void PlacePrefabGivesItsRefusals()
     {
@@ -252,6 +254,9 @@ public sealed partial class AgentMissionToolTests
         var before = m.State();
         var revision = m.Session.Revision;
         const string relay = "prefab:mod:ol_relay";
+        const string branch = "prefab:builtin:branch";
+        static string Into(string script) =>
+            $$"""{ "script": "{{script}}", "prefab": "prefab:mod:ol_gate", "fields": { "formation": "ol_form" } }""";
 
         var refusals = new (string Arguments, string Code, string Detail, string? Field)[]
         {
@@ -292,6 +297,19 @@ public sealed partial class AgentMissionToolTests
             (Place(relay, null, "{}", """{ "done": [ "ol_nowhere" ] }"""), "new_errors", MissionErrors.NewErrors, null),
             (Place("prefab:builtin:patrol", null, """{ "waypoints": [ { "point": [0, 0, 0] }, { "point": [0, 0, 0.5] } ] }"""),
                 "invalid_value", MissionErrors.TemplateLine, "fields"),
+            (Into("prefab:mod:ol_relay"), "refused", MissionErrors.PrefabInPrefab, "script"),
+            (Into("prefab:builtin:branch"), "refused", MissionErrors.PrefabInPrefab, "script"),
+            (Place(branch, null, """{ "tests": "trg:DATA\\MISSIONS\\M02\\m02.ini#t_kill" }"""), "invalid_argument",
+                MissionEditTools.OtherItem, "fields.tests"),
+            (Place(branch, null, """{ "tests": [ "trg:C:\\x.ini#t" ] }"""), "invalid_argument", ToolInput.BadArgument,
+                "fields.tests"),
+            (Place(branch, null, $$"""{ "tests": [ "trg:{{S}}#ol_wave" ] }"""), "invalid_argument", ToolInput.BadArgument,
+                "fields.tests"),
+            (Place(relay, null, """{ "marks": [ { "ship": [ "ol_ship_1" ], "mark": 1 } ] }"""), "invalid_argument",
+                ToolInput.BadArgument, "fields.marks[0].ship"),
+            (Place(relay, null, """{ "delay": 1e300 }"""), "invalid_value", MissionErrors.PatchText, "fields.delay"),
+            (Place("prefab:builtin:patrol", null, """{ "waypoints": [ { "point": [0, 0, 1e300] } ] }"""), "invalid_value",
+                MissionErrors.PatchText, "fields.waypoints[0]"),
         };
 
         var wrong = refusals.Select(r => (r, Got: Refusal(Call(host, "mission_place_prefab", r.Arguments))))
@@ -370,6 +388,7 @@ public sealed partial class AgentMissionToolTests
         var start = Ok(host, "mission_start_plan", Plan(Story))["plan"]!;
         var refused = Ok(host, "mission_start_plan", Plan(Script, $"trg:{S}#ol_wave"))["plan"]!;
         var dock = Ok(host, "mission_start_plan", Plan(Story, $"trg:{StoryJson}#t_kill", """, "start_place": "base:ol_base_a" """))["plan"]!;
+        var section = Ok(host, "mission_start_plan", Plan(Story, $"sec:{StoryJson}#Trigger/t_kill"))["plan"]!;
 
         Assert.Equal(("ready", "approximate", "M02", $"msn:{Story}"),
             ((string?)kill["status"], (string?)kill["kind"], (string?)kill["slot"], (string?)kill["script"]));
@@ -382,13 +401,15 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal(("refused", "test_script", StartPlan.NoSlotReason),
             ((string?)refused["status"], (string?)refused["kind"], (string?)refused["reason"]));
         Assert.Equal("base", (string?)dock["place"]!["kind"]);
+        // A sec: reference of the trigger section gives the same plan.
+        Assert.Equal(kill.ToJsonString(), section.ToJsonString());
         Assert.Equal((0L, version), (m.Session.Revision, m.Missions.Version(Story)));
         Assert.False(m.Session.CanUndo);
     }
 
-    /// <summary>The refusals of mission_start_plan: a trigger of another script, a start place that is not valid and a
-    /// retail target give invalid_argument. A retail target waits for the linked game (M6c-3). A trigger that the script
-    /// does not have gives not_found. Each error names its argument.</summary>
+    /// <summary>The refusals of mission_start_plan: a trigger of another script, a start place that is not valid, a
+    /// retail target and a prefab give invalid_argument. A retail target waits for the linked game (M6c-3). A trigger that
+    /// the script does not have gives not_found. Each error names its argument.</summary>
     [Fact]
     public void StartPlanGivesItsRefusals()
     {
@@ -404,6 +425,9 @@ public sealed partial class AgentMissionToolTests
             (Plan(Script, $"trg:{S}#ol_none"), "not_found", "start"),
             (Plan(@"DATA\MISSIONS\OL_NONE\ol_none.ini"), "not_found", "script"),
             ("""{ "script": "ol_test.ini" }""", "invalid_argument", "script"),
+            ("""{ "script": "prefab:mod:ol_gate" }""", "invalid_argument", "script"),
+            (Plan(Script, $"sec:{StoryJson}#Trigger/t_kill"), "invalid_argument", "start"),
+            (Plan(Script, $"sec:{S}#ObjList/ol_orders"), "invalid_argument", "start"),
         };
 
         var wrong = refusals.Select(r => (r, Got: Refusal(Call(host, "mission_start_plan", r.Arguments))))
@@ -411,6 +435,7 @@ public sealed partial class AgentMissionToolTests
             .Select(x => $"{x.r.Arguments}: {x.Got}").ToList();
 
         Assert.True(wrong.Count == 0, string.Join("\n", wrong));
+        Assert.Contains("not a mission script", Error(host, "mission_start_plan", """{ "script": "prefab:mod:ol_gate" }""").Message);
     }
 
     /// <summary>mission_place_prefab and mission_start_plan are in the group Missions, so they refuse while the user hides

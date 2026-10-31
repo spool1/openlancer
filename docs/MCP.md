@@ -399,7 +399,7 @@ This call adds a ship with the NPC `my_pirate_npc` at a position in the system `
 
 #### The prefab tool
 
-`mission_place_prefab` places one linked instance of a behavior prefab in `script`, as a drop of the prefab on the graph does. `prefab` is a `prefab:builtin:` or `prefab:mod:` reference. Each call is one Undo step and runs in strict mode, as the trigger tools do. The tool takes `preview`, `with_patch` and `if_revision`, and it can be a step of `edit_batch`. The result gives the `trg:` reference of each member trigger and the `inst:` reference of the instance in `adds`. It also gives `inverse` and `versions`.
+`mission_place_prefab` places one linked instance of a behavior prefab in `script`, as a drop of the prefab on the graph does. `script` is a mission script. A prefab cannot hold a prefab instance, so a `prefab:` reference as `script` gives `refused` with the detail `PrefabInPrefab`. `prefab` is a `prefab:builtin:` or `prefab:mod:` reference. Each call is one Undo step and runs in strict mode, as the trigger tools do. The tool takes `preview`, `with_patch` and `if_revision`, and it can be a step of `edit_batch`. `adds` gives the members of the instance and the `inst:` reference of the instance. A member trigger has its `trg:` reference, and a member item has its `sec:` reference, for example the `[ObjList]` of the built-in prefab Patrol. The result also gives `inverse` and `versions`.
 
 `get_item` with the `prefab:` reference gives the fields, the outputs and the roles of a prefab. Each field gives its `kind` and its `default` rows. A list field also gives its `columns`. A condition field and a lines field give the `keys` that they take.
 
@@ -407,19 +407,27 @@ This call adds a ship with the NPC `my_pirate_npc` at a position in the system `
 
 | Kind of the field | Form of the value | Example |
 |---|---|---|
-| A value kind, for example `formation` or `number` | One value, or a list of numbers for a position or a rotation | `"ships": "my_wave"` |
+| A value kind, for example `formation`, `trigger` or `number` | One value, or a list of numbers for a position or a rotation | `"ships": "my_wave"` |
 | `list` | A list of rows. Each row is an object of values by column id. | `"waypoints": [{"point": [0, 0, 500]}, {"point": [1000, 0, 0]}]` |
 | `triggers` | A list of triggers | `"targets": ["my_next"]` |
 | `condition` | One condition line | `"spawnWhen": {"key": "Cnd_Timer", "values": {"seconds": 5}}` |
 | `lines` | A list of action lines or order lines | `"sides": [{"key": "Act_SetVibe", "values": {"from": "my_ship", "to": "my_other_ship", "attitude": -0.9}}]` |
 
-A line has the form of a line of the trigger tools. A trigger is a nickname or a `trg:` reference of the same script. `null` gives the field no value, and a field that needs a value then gives `invalid_value`. The editor writes the rows of the record of the instance in their text form, as the Inspector does. The agent never writes that text.
+A line has the form of a line of the trigger tools. A trigger is a nickname or a `trg:` reference of the same script. A list is the form of a value only for a position or a rotation. So a list for a trigger, a name or a number gives `invalid_argument`, also in a column of a list row. `null` gives the field no value, and a field that needs a value then gives `invalid_value`. The editor writes the rows of the record of the instance in their text form, as the Inspector does. The agent never writes that text.
 
 `outputs` gives the triggers that each output of the instance starts, by output id, for example `{"done": ["my_next"]}`. Each trigger then gets a start line in the member of the output.
 
 `id` gives the id of the instance. The names of the members start with the id, for example `my_wave_spawn`. An id has letters, digits, `_` and `-`, with at most 47 characters. Without an id, the editor makes a free id.
 
-A prefab that does not exist gives `not_found` with the closest names. An id in use, or a member name that another section of the script has, gives `name_taken`. A value that the field refuses gives `invalid_value` with the detail `FieldValue`. A value in another form gives `invalid_argument`. A field, a column or an output that the prefab does not have gives `invalid_argument` too. Each error names its argument, for example `fields.delay` or `fields.waypoints[1].point`. The game reads only the whole part of some values, for example the point of `GotoVec`. Such a value with a fraction gives `invalid_value` with the detail `TemplateLine`.
+A prefab that does not exist gives `not_found` with the closest names. An id in use, or a member name that another section of the script has, gives `name_taken`. A value that the field refuses gives `invalid_value` with the detail `FieldValue`. A value that a line of the game cannot hold gives `invalid_value` with the detail `PatchText`, for example a text with a comma or the number `1e300`. A value in another form gives `invalid_argument`. A field, a column or an output that the prefab does not have gives `invalid_argument` too.
+
+The error names its argument in `field`:
+
+- A value in another form, a column, an output or a trigger of another script: the place of the value, for example `fields.waypoints[1].point`, `fields.targets[0]` or `outputs.done[0]`.
+- `FieldValue`: the field, for example `fields.delay`. A bad value in a row of a list field names the field too, for example `fields.marks`.
+- `PatchText`: the value or the row, for example `fields.delay`, `fields.marks[0]` or `fields.sides[0]`.
+- The game reads only the whole part of some values, for example the point of `GotoVec`. Such a value with a fraction gives `invalid_value` with the detail `TemplateLine` and the field `fields`, because the compile of the prefab finds it. Each other error of the compile names `fields` too.
+- The strict check of the whole call gives `new_errors` without a field, for example for an output that starts a trigger that the script does not have.
 
 This call places the built-in prefab Spawn wave. The wave spawns 5 seconds after the trigger starts, and the trigger `my_reward` starts when all its ships are destroyed:
 
@@ -435,9 +443,9 @@ This call places the built-in prefab Spawn wave. The wave spawns 5 seconds after
 
 #### The start plan
 
-`mission_start_plan` gives the plan of a play of `script` from `start`, as the Play start page of the editor shows it. It changes nothing. `start` is `mission_start`, or the `trg:` reference of a trigger of the script. `start_place` is `suggested`, `camera`, or `base:` and the nickname of a base. `target` takes only `openlancer` in this version. A play from a trigger in a retail game comes with a later version.
+`mission_start_plan` gives the plan of a play of `script` from `start`, as the Play start page of the editor shows it. It changes nothing. `start` is `mission_start`, or the `trg:` or `sec:` reference of a trigger of the script. `start_place` is `suggested`, `camera`, or `base:` and the nickname of a base. `target` takes only `openlancer` in this version. A play from a trigger in a retail game comes with a later version.
 
-The result gives the plan in `plan`: the status, the kind of the start, the story state, the start place and the setup triggers. It also gives the replay path and the warnings. A plan that cannot start is data: `status` is `refused`, and `reason` tells why. For example, OpenLancer starts only the scripts of the 14 story slots, so the plan of another script gives `refused`. A trigger that the script does not have gives `not_found`. A trigger of another script gives `invalid_argument`.
+The result gives the plan in `plan`: the status, the kind of the start, the story state, the start place and the setup triggers. It also gives the replay path and the warnings. A plan that cannot start is data: `status` is `refused`, and `reason` tells why. For example, OpenLancer starts only the scripts of the 14 story slots, so the plan of another script gives `refused`. A trigger that the script does not have gives `not_found`. A trigger of another script gives `invalid_argument`. A `prefab:` reference as `script` gives `invalid_argument` too, because a play starts only a mission script.
 
 #### The generic tools on mission items
 

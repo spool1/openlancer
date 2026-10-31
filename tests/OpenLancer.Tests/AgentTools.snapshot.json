@@ -37800,7 +37800,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The reference of a mission script, for example msn:DATA\\MISSIONS\\M01A\\m01a.ini."
+            "description": "The mission script that gets the instance, for example msn:DATA\\MISSIONS\\M01A\\m01a.ini. A prefab cannot hold a prefab instance, so a prefab: reference gives refused."
           },
           "prefab": {
             "type": "string",
@@ -37827,7 +37827,7 @@
                 "null"
               ]
             },
-            "description": "The values of the fields by field id. A field without a value takes the default of the prefab. The form of a value follows the kind of the field. A value field takes one value, or a list of numbers for a position. A list field takes a list of rows, each an object of values by column id. A trigger list takes a list of trigger nicknames. A condition field takes one line, for example {\u0022key\u0022: \u0022Cnd_Timer\u0022, \u0022values\u0022: {\u0022seconds\u0022: 5}}. A lines field takes a list of lines. null gives the field no value."
+            "description": "The values of the fields by field id. A field without a value takes the default of the prefab. The form of a value follows the kind of the field. A value field takes one value, or a list of numbers for a position. A list field takes a list of rows, each an object of values by column id. A trigger list takes a list of trigger nicknames or trg: references of the same script. A condition field takes one line, for example {\u0022key\u0022: \u0022Cnd_Timer\u0022, \u0022values\u0022: {\u0022seconds\u0022: 5}}. A lines field takes a list of lines. null gives the field no value."
           },
           "outputs": {
             "type": "object",
@@ -38406,14 +38406,14 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The reference of a mission script, for example msn:DATA\\MISSIONS\\M01A\\m01a.ini."
+            "description": "The mission script of the play, for example msn:DATA\\MISSIONS\\M01A\\m01a.ini. A prefab: reference gives invalid_argument."
           },
           "start": {
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
             "default": "mission_start",
-            "description": "Where the play starts: mission_start, or the trg: reference of a trigger of the script. A start at the restore trigger of a checkpoint is exact. Another trigger gives an approximate start with setup triggers."
+            "description": "Where the play starts: mission_start, or the trg: or sec: reference of a trigger of the script. A start at the restore trigger of a checkpoint is exact. Another trigger gives an approximate start with setup triggers."
           },
           "target": {
             "type": "string",
