@@ -7,6 +7,7 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Editing;
+using OpenLancer.Data.Missions.Prefabs;
 
 namespace OpenLancer.Studio.Agent;
 
@@ -185,10 +186,11 @@ internal static class MissionEditTools
         new LinesParam("actions", MaxActions));
 
     /// <summary>
-    /// The tool <c>mission_add_trigger</c>: <see cref="AddTrigger"/> with the condition and the actions, then
-    /// <see cref="LinkTriggers"/> (Start) from each trigger of <c>started_by</c>, in one request. The triggers of
-    /// <c>started_by</c> must be in the script. Without a nickname, a trigger with starters gets the made name of
-    /// <see cref="MissionNaming.Free"/>, as the gesture of the graph that adds and links a trigger does.
+    /// The tool <c>mission_add_trigger</c>: <see cref="AddTrigger"/> with the condition and the actions, then a Start
+    /// link from each trigger of <c>started_by</c>, in one request. A link is the command of the link gesture of the
+    /// graph (see <see cref="StartLink"/>). The triggers of <c>started_by</c> must be in the script. Without a nickname,
+    /// a trigger with starters gets the made name of <see cref="MissionNaming.Free"/>, as the gesture of the graph that
+    /// adds and links a trigger does.
     /// </summary>
     public static ToolStep NewTrigger(ToolCall call)
     {
@@ -200,7 +202,8 @@ internal static class MissionEditTools
             .Select((text, i) => new TriggerRef(script.Path, NameIn(text, script.Path, $"started_by[{i}]"))).ToList();
         return EditTools.Apply(call, scope =>
         {
-            var nickname = args.Text("nickname") ?? (starters.Count > 0 ? FreeTriggerName(scope, script.Path) : null);
+            var analysis = scope.Session.Missions.AnalysisOf(script.Path);
+            var nickname = args.Text("nickname") ?? (starters.Count > 0 ? FreeTriggerName(analysis, script.Path) : null);
             var add = new AddTrigger(script)
             {
                 Nickname = nickname,
@@ -210,7 +213,7 @@ internal static class MissionEditTools
                 Repeats = args.Flag("repeats"),
                 System = args.Text("system"),
             };
-            MissionCommand[] commands = [add, .. starters.Select(s => new LinkTriggers(s, nickname!, LinkKind.Start))];
+            MissionCommand[] commands = [add, .. starters.Select(s => StartLink(analysis, s, nickname!, LinkKind.Start))];
             scope.RunMission(new MissionBatch(add.HistoryLabel, commands), error => error.Index is > 0 and var i
                 ? $"started_by[{i - 1}]"
                 : NameOr(error, error.Detail == MissionErrors.PatchText ? "system" : "script"));
@@ -268,18 +271,30 @@ internal static class MissionEditTools
                     : "line"));
     }
 
-    /// <summary>The tool <c>mission_link_triggers</c>: <see cref="LinkTriggers"/>, or <see cref="UnlinkTriggers"/>
-    /// with <c>remove</c>. The target is a trigger of the script of the source. The command does not look it up: a
-    /// link to a trigger that does not exist adds the error M05, and strict mode refuses it.</summary>
+    /// <summary>
+    /// The tool <c>mission_link_triggers</c>: the command of the link gesture of the graph, or of its "Remove link" with
+    /// <c>remove</c>. A plain trigger gets <see cref="LinkTriggers"/> or <see cref="UnlinkTriggers"/>. A member of a
+    /// linked prefab instance links through the output of its role with <see cref="SetPrefabPort"/> (see
+    /// <see cref="PrefabLinks.LinkCommand"/>). The target is a trigger of the script of the source. The command does not
+    /// look it up: a link to a trigger that does not exist adds the error M05, and strict mode refuses it. So a step of
+    /// <c>edit_batch</c> can link to a trigger that a later step adds.
+    /// </summary>
     public static ToolStep Link(ToolCall call)
     {
         var args = call.Args;
         var from = TriggerOf(args.Text("from")!, "from");
         var to = NameIn(args.Text("to")!, from.Script, "to");
         var kind = Enum.Parse<LinkKind>(args.Text("kind")!, ignoreCase: true);
-        MissionCommand command = args.Flag("remove") ? new UnlinkTriggers(from, to, kind) : new LinkTriggers(from, to, kind);
-        return EditTools.Apply(call, scope => scope.RunMission(new MissionBatch("", [command]),
-            error => error.Detail == MissionErrors.LinkNotFound ? "to" : "from"));
+        var remove = args.Flag("remove");
+        // The label of the plain command, also for a link through an output.
+        var label = (remove ? (MissionCommand)new UnlinkTriggers(from, to, kind) : new LinkTriggers(from, to, kind)).HistoryLabel;
+        return EditTools.Apply(call, scope =>
+        {
+            var analysis = scope.Session.Missions.AnalysisOf(from.Script);
+            var command = remove ? StopLink(analysis, from, to, kind) : StartLink(analysis, from, to, kind);
+            scope.RunMission(new MissionBatch(label, [command]),
+                error => error.Detail == MissionErrors.LinkNotFound ? "to" : "from");
+        });
     }
 
     /// <summary>
@@ -297,7 +312,8 @@ internal static class MissionEditTools
         return EditTools.Apply(call, scope =>
         {
             var script = row.Item.Script;
-            var nickname = args.Text("nickname") ?? (actions.Count > 0 ? FreeTriggerName(scope, script) : null);
+            var nickname = args.Text("nickname") ??
+                           (actions.Count > 0 ? FreeTriggerName(scope.Session.Missions.AnalysisOf(script), script) : null);
             var insert = new InsertTriggerOnLink(row, condition) { Nickname = nickname };
             MissionCommand[] commands =
             [
@@ -378,10 +394,25 @@ internal static class MissionEditTools
         string.Equals(a.Section.Key, b.Section.Key, StringComparison.OrdinalIgnoreCase) &&
         a.Section.Ordinal == b.Section.Ordinal;
 
-    /// <summary>A free made name for a new trigger of a script, by the rule of the layer (decision D683 of
-    /// M6b).</summary>
-    private static string FreeTriggerName(EditScope scope, string script) =>
-        MissionNaming.Free(script, "Trigger", (scope.Session.OpenDocument(script) is { State.Exists: true } document
-            ? MissionDraft.TriggerNames(document)
-            : []).ToHashSet(StringComparer.OrdinalIgnoreCase));
+    /// <summary>A free made name for a new trigger of a script or of the template of a prefab, by the rule of the layer
+    /// (decision D683 of M6b). The graph takes the names of the triggers of its analysis in the same way.</summary>
+    /// <param name="analysis">The analysis of the script now (see <see cref="MissionEditor.AnalysisOf"/>), or null when
+    /// it has none. The command then gives the error.</param>
+    private static string FreeTriggerName(MissionAnalysis? analysis, string script) =>
+        MissionNaming.Free(script, "Trigger",
+            (analysis?.Index.Triggers ?? []).Select(t => t.Nickname).ToHashSet(StringComparer.OrdinalIgnoreCase));
+
+    /// <summary>The command of a new link from a trigger, as the link gesture of the graph makes it (see
+    /// <see cref="PrefabLinks.LinkCommand"/>). A member without an output for the link, and a trigger that the analysis
+    /// does not have, get <see cref="LinkTriggers"/>. The command then refuses with the reason.</summary>
+    private static MissionCommand StartLink(MissionAnalysis? analysis, TriggerRef source, string target, LinkKind kind) =>
+        (analysis?.Index.Trigger(source.Name) is { } trigger ? PrefabLinks.LinkCommand(analysis, trigger, target, kind) : null) ??
+        new LinkTriggers(source, target, kind);
+
+    /// <summary>The command that removes a link from a trigger, as the gesture "Remove link" of the graph makes it (see
+    /// <see cref="PrefabLinks.UnlinkCommand"/>).</summary>
+    private static MissionCommand StopLink(MissionAnalysis? analysis, TriggerRef source, string target, LinkKind kind) =>
+        analysis?.Index.Trigger(source.Name) is { } trigger
+            ? PrefabLinks.UnlinkCommand(analysis, trigger, target, kind)
+            : new UnlinkTriggers(source, target, kind);
 }

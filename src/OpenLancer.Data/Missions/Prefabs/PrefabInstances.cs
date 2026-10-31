@@ -90,7 +90,7 @@ public sealed class LinkedInstance
 /// <summary>
 /// The linked prefab instances of a script (sections 5.1, 5.5 and 6.10 of the M6b design): the records of the graph file
 /// with their prefabs and member sections, the matched instances of the other triggers, and the warnings P01, P02 and
-/// P03.
+/// P03. It also gives the links of the members through the outputs of their prefabs (section 5.3).
 /// </summary>
 public static class PrefabLinks
 {
@@ -316,4 +316,69 @@ public static class PrefabLinks
             new PrefabCore(), roles.Select(r => new PrefabMemberRule(r, r, "linked", false, 0)).ToList(), [], steps,
             true, roles.FirstOrDefault() ?? "core");
     }
+
+    // ---- The outputs of the members (section 5.3 of the M6b design) ----
+
+    /// <summary>The reference, the linked instance and the role of a member trigger of the script of an analysis, or
+    /// null for a trigger that is not a member of a linked instance. A removed member is not a member.</summary>
+    public static (InstanceRef Instance, LinkedInstance Linked, string Role)? MemberOf(MissionAnalysis analysis,
+        MissionTrigger trigger)
+    {
+        if (analysis.Prefabs?.Of(trigger) is not { Linked: { } linked })
+            return null;
+        var role = linked.Record.Members.FirstOrDefault(m => !linked.Record.Removed.Contains(m.Role) &&
+                                                             m.Nickname.Equals(trigger.Nickname, StringComparison.OrdinalIgnoreCase))?.Role;
+        return role == null ? null : (new InstanceRef(analysis.Script.Path, linked.Record.Id), linked, role);
+    }
+
+    /// <summary>The port of a role of a template whose lines have the key of a link kind: <c>Act_ActTrig</c> for a start,
+    /// <c>Act_DeactTrig</c> for a stop. Null when the role has no such port.</summary>
+    public static PrefabPort? PortOf(PrefabTemplate template, string role, LinkKind kind)
+    {
+        var key = kind == LinkKind.Stop ? "Act_DeactTrig" : "Act_ActTrig";
+        return template.Ports.FirstOrDefault(p => p.Role == role && template.Section(role)?.Lines
+            .Any(l => MissionIndex.Is(l.Key, key) && PrefabSlot.Of(l.Value).Any(slot => slot.Port == p.Id)) == true);
+    }
+
+    /// <summary>The triggers of a port of a record, in order.</summary>
+    public static List<string> LinksOf(InstanceRecord record, string port) =>
+        record.Ports.Where(p => p.Port == port).Select(p => p.Trigger).ToList();
+
+    /// <summary>
+    /// The command of a new link from a trigger to a target, for the link gesture of the mission graph and for the
+    /// trigger tools of an agent. A plain trigger gets <see cref="LinkTriggers"/>. The lines of a member of a linked
+    /// instance come from its prefab, so the member links through the output of its role: <see cref="SetPrefabPort"/>
+    /// with the target added. Null for a member without such an output, and for a restart of a member.
+    /// </summary>
+    /// <param name="analysis">The analysis of the script of the trigger, with its linked instances.</param>
+    public static MissionCommand? LinkCommand(MissionAnalysis analysis, MissionTrigger source, string target, LinkKind kind)
+    {
+        if (MemberOf(analysis, source) is not var (instance, linked, role))
+            return new LinkTriggers(RefOf(source), target, kind);
+        return kind != LinkKind.Restart && linked.Template is { } template && PortOf(template, role, kind) is { } port
+            ? new SetPrefabPort(instance, port.Id, [.. LinksOf(linked.Record, port.Id), target])
+            : null;
+    }
+
+    /// <summary>
+    /// The command that removes the link from a trigger to a target. A member of a linked instance whose output starts or
+    /// stops the target gets <see cref="SetPrefabPort"/> without the target, as the gesture "Remove link" of the mission
+    /// graph does. Each other link gets <see cref="UnlinkTriggers"/>. That command refuses a line of a member with the
+    /// reason.
+    /// </summary>
+    /// <param name="analysis">The analysis of the script of the trigger, with its linked instances.</param>
+    public static MissionCommand UnlinkCommand(MissionAnalysis analysis, MissionTrigger source, string target, LinkKind kind)
+    {
+        if (kind != LinkKind.Restart && MemberOf(analysis, source) is var (instance, linked, role) &&
+            linked.Template is { } template && PortOf(template, role, kind) is { } port)
+        {
+            var links = LinksOf(linked.Record, port.Id);
+            if (links.RemoveAll(t => t.Equals(target.Trim(), StringComparison.OrdinalIgnoreCase)) > 0)
+                return new SetPrefabPort(instance, port.Id, links);
+        }
+        return new UnlinkTriggers(RefOf(source), target, kind);
+    }
+
+    /// <summary>The reference of a trigger by its nickname.</summary>
+    private static TriggerRef RefOf(MissionTrigger trigger) => new(trigger.Section.Ref.Path, trigger.Nickname);
 }

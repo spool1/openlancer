@@ -484,7 +484,7 @@
       "title": "Link two triggers",
       "description": "Adds a link from one trigger to another, or removes it. A link is a start action, a stop action or both. The tool makes one Undo step. It refuses an edit that adds an error to the script.",
       "fields": {
-        "from": "The trg: reference of the trigger that gets the actions of the link.",
+        "from": "The trg: reference of the trigger that gets the actions of the link. A trigger of a linked prefab instance links through the output of its prefab, as in the graph.",
         "to": "The trigger that the link starts or stops: a trg: reference or a nickname of the same script.",
         "kind": "start adds Act_ActTrig. stop adds Act_DeactTrig. restart adds both, the stop first.",
         "remove": "Remove each line of the link, in place of adding the link."

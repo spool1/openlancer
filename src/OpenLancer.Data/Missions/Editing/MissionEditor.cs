@@ -205,6 +205,24 @@ public sealed partial class MissionEditor
     }
 
     /// <summary>
+    /// The analysis of a script now, with its linked prefab instances. For a script <c>prefab:mod:&lt;id&gt;</c>, it is
+    /// the analysis of the template of the prefab in the role form, as prefab mode shows it (section 8.6 of the M6b
+    /// design). The commands take both forms of a script, so a caller that makes commands from the triggers of a script
+    /// reads them here.
+    /// </summary>
+    /// <returns>Null when the edit view has no such script, or when no mod has the prefab or its file has a
+    /// problem. A command on such a script gives the error.</returns>
+    public MissionAnalysis? AnalysisOf(string script)
+    {
+        if (MissionRefs.IsPrefab(script))
+            return PrefabRef.TryParse(script) is { } prefab ? PrefabMode(prefab)?.Analysis : null;
+        return InstallPaths.TryParse(script) is { } path &&
+               session.OpenDocument(path) is { HoldsScript: true, State.Exists: true } document
+            ? ModelOf(document, document.State).Analysis
+            : null;
+    }
+
+    /// <summary>
     /// The mission errors of the save gate (section 6.10 of the M6b design): the errors of each script that the active
     /// mod changes. When the active mod removes or renames a name of the game data, also the errors of each other
     /// script, so a line of any layer that names such a name blocks the save (decision D81). The origin rule of D551

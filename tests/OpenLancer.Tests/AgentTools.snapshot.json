@@ -35739,7 +35739,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The trg: reference of the trigger that gets the actions of the link."
+            "description": "The trg: reference of the trigger that gets the actions of the link. A trigger of a linked prefab instance links through the output of its prefab, as in the graph."
           },
           "to": {
             "type": "string",

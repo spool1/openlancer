@@ -224,46 +224,17 @@ internal sealed class GraphEditModel
 
     /// <summary>The reference, the linked instance and the role of a member trigger, or null for a trigger that is not a
     /// member of a linked instance.</summary>
-    private (InstanceRef Instance, LinkedInstance Linked, string Role)? MemberOf(MissionTrigger trigger)
-    {
-        if (Graph.Analysis.Prefabs?.Of(trigger) is not { Linked: { } linked })
-            return null;
-        var role = linked.Record.Members.FirstOrDefault(m => !linked.Record.Removed.Contains(m.Role) &&
-                                                             m.Nickname.Equals(trigger.Nickname, StringComparison.OrdinalIgnoreCase))?.Role;
-        return role == null ? null : (new InstanceRef(Script, linked.Record.Id), linked, role);
-    }
+    private (InstanceRef Instance, LinkedInstance Linked, string Role)? MemberOf(MissionTrigger trigger) =>
+        PrefabLinks.MemberOf(Graph.Analysis, trigger);
 
     /// <summary>The refusal of a link of a member trigger without an output for it.</summary>
     private string MemberRefusal(MissionTrigger trigger) =>
         MemberOf(trigger) is var (instance, _, _) ? MemberLinkRefusal(trigger.Nickname, instance.Id) : OpenFrame;
 
-    /// <summary>The port of a role of a template whose lines have the key of a link kind: <c>Act_ActTrig</c> for a start,
-    /// <c>Act_DeactTrig</c> for a stop. Null when the role has no such port.</summary>
-    private static PrefabPort? PortOf(PrefabTemplate template, string role, LinkKind kind)
-    {
-        var key = kind == LinkKind.Stop ? "Act_DeactTrig" : "Act_ActTrig";
-        return template.Ports.FirstOrDefault(p => p.Role == role && template.Section(role)?.Lines
-            .Any(l => MissionIndex.Is(l.Key, key) && PrefabSlot.Of(l.Value).Any(slot => slot.Port == p.Id)) == true);
-    }
-
-    /// <summary>The triggers of a port of a record, in order.</summary>
-    private static List<string> LinksOf(InstanceRecord record, string port) =>
-        record.Ports.Where(p => p.Port == port).Select(p => p.Trigger).ToList();
-
-    /// <summary>
-    /// The command of a new link from a trigger to a target. A plain trigger gets <see cref="LinkTriggers"/>. The lines of
-    /// a member of a linked instance come from its prefab, so the member links through the output of its role:
-    /// <see cref="SetPrefabPort"/> with the target added (section 5.3 of the M6b design). Null for a member without such
-    /// an output.
-    /// </summary>
-    private MissionCommand? LinkCommand(MissionTrigger source, string target, LinkKind kind)
-    {
-        if (MemberOf(source) is not var (instance, linked, role))
-            return new LinkTriggers(RefOf(source), target, kind);
-        return kind != LinkKind.Restart && linked.Template is { } template && PortOf(template, role, kind) is { } port
-            ? new SetPrefabPort(instance, port.Id, [.. LinksOf(linked.Record, port.Id), target])
-            : null;
-    }
+    /// <summary>The command of a new link from a trigger to a target (see <see cref="PrefabLinks.LinkCommand"/>). The
+    /// trigger tools of an agent make the same command. Null for a member without an output for the link.</summary>
+    private MissionCommand? LinkCommand(MissionTrigger source, string target, LinkKind kind) =>
+        PrefabLinks.LinkCommand(Graph.Analysis, source, target, kind);
 
     /// <summary>The command that gives a start, stop or checkpoint line another trigger: <see cref="RetargetLink"/>, or
     /// for a line of an output of a linked instance <see cref="SetPrefabPort"/> with the new trigger in place of the old
@@ -274,9 +245,9 @@ internal sealed class GraphEditModel
             return new RetargetLink(RowOf(line), target);
         var kind = MissionIndex.Is(line.Key, "Act_DeactTrig") ? LinkKind.Stop : LinkKind.Start;
         var old = line.Value(0)?.Trim() ?? "";
-        if (linked.Template is not { } template || PortOf(template, role, kind) is not { } port)
+        if (linked.Template is not { } template || PrefabLinks.PortOf(template, role, kind) is not { } port)
             return null;
-        var links = LinksOf(linked.Record, port.Id);
+        var links = PrefabLinks.LinksOf(linked.Record, port.Id);
         var at = links.FindIndex(t => t.Equals(old, StringComparison.OrdinalIgnoreCase));
         if (at < 0)
             return null;
@@ -344,11 +315,11 @@ internal sealed class GraphEditModel
             var first = group.First();
             if (first.Kind is MissionLinkKind.Start or MissionLinkKind.Stop && MemberOf(first.Source) is var (instance, linked, role) &&
                 linked.Template is { } template &&
-                PortOf(template, role, first.Kind == MissionLinkKind.Stop ? LinkKind.Stop : LinkKind.Start) is { } port &&
-                LinksOf(linked.Record, port.Id).Any(t => t.Equals(first.TargetName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                PrefabLinks.PortOf(template, role, first.Kind == MissionLinkKind.Stop ? LinkKind.Stop : LinkKind.Start) is { } port &&
+                PrefabLinks.LinksOf(linked.Record, port.Id).Any(t => t.Equals(first.TargetName.Trim(), StringComparison.OrdinalIgnoreCase)))
             {
                 if (!outputs.TryGetValue((instance, port.Id), out var links))
-                    outputs[(instance, port.Id)] = links = LinksOf(linked.Record, port.Id);
+                    outputs[(instance, port.Id)] = links = PrefabLinks.LinksOf(linked.Record, port.Id);
                 links.RemoveAll(t => t.Equals(first.TargetName.Trim(), StringComparison.OrdinalIgnoreCase));
                 continue;
             }

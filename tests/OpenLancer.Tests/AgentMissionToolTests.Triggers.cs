@@ -472,6 +472,80 @@ public sealed partial class AgentMissionToolTests
                 """);
     }
 
+    /// <summary>
+    /// A link from a member of a linked prefab instance goes through the output of its role, as the link gesture of the
+    /// graph does (section 5.3 of the M6b design). So the tool and the gesture give the same files, and the instance gets
+    /// no hand edit. A remove takes the target from the output, as "Remove link" does. A member without an output for
+    /// the link refuses with the reason, and the error names the argument.
+    /// </summary>
+    [Fact]
+    public void ALinkFromAPrefabMemberGoesThroughTheOutputOfItsRole()
+    {
+        AssertParity(model => model.Link(new GraphEnd(NodeOf(model, "ol_w1_end"), null),
+                new GraphEnd(NodeOf(model, "ol_start"), NodeOf(model, "ol_start").Pin(GraphPinKind.Start)!)).Batch,
+            "mission_link_triggers", $$"""{ "from": "trg:{{S}}#ol_w1_end", "to": "ol_start" }""", () => WithGate());
+        AssertParity(model => model.Unlink(model.Graph.Links.First(l => l.From == NodeOf(model, "ol_w1_end") &&
+                                                                         l.To == NodeOf(model, "ol_start"))),
+            "mission_link_triggers", $$"""{ "from": "trg:{{S}}#ol_w1_end", "to": "ol_start", "remove": true }""",
+            () => WithGate("ol_start"));
+
+        using var m = WithGate();
+        var host = new TestAgentHost(m.Session);
+        var added = Ok(host, "mission_add_trigger", $$"""
+            { "script": "msn:{{S}}", "nickname": "ol_after", "condition": { "key": "Cnd_True" }, "started_by": [ "ol_w1_end" ] }
+            """);
+        Assert.Equal("applied", (string?)added["status"]);
+        Assert.Equal([new InstancePort("done", "ol_after")], m.Missions.Graph(Script).Instance("ol_w1")!.Ports);
+        Assert.Contains("Act_ActTrig = ol_after", m.Lines("ol_w1_end"));
+        Assert.DoesNotContain(m.Missions.Model(Script).Problems, p => p.Rule == "P01");
+
+        var link = Call(host, "mission_link_triggers", $$"""{ "from": "trg:{{S}}#ol_w1_spawn", "to": "ol_end" }""");
+        var starter = Call(host, "mission_add_trigger", $$"""
+            { "script": "msn:{{S}}", "condition": { "key": "Cnd_True" }, "started_by": [ "ol_end", "ol_w1_spawn" ] }
+            """);
+        Assert.Equal(("refused", MissionErrors.PrefabMember, "from"),
+            ((string?)link.Content["code"], (string?)link.Content["detail"], (string?)link.Content["field"]));
+        Assert.Equal(("refused", MissionErrors.PrefabMember, "started_by[1]"),
+            ((string?)starter.Content["code"], (string?)starter.Content["detail"], (string?)starter.Content["field"]));
+    }
+
+    /// <summary>The test script with the linked instance ol_w1 of the prefab ol_gate, whose output starts the
+    /// triggers of <paramref name="outputs"/>.</summary>
+    private static MissionEdits WithGate(params string[] outputs)
+    {
+        var m = PrefabInstanceTests.Create();
+        var placed = m.Apply(new PlacePrefabInstance(new ScriptRef(Script), PrefabInstanceTests.GateRef)
+        {
+            Id = "ol_w1", Values = [new PrefabFieldInput("formation", ["ol_form"])],
+            Ports = [.. outputs.Select(t => new InstancePort("done", t))],
+        });
+        Assert.Equal(EditStatus.Applied, placed.Status);
+        return m;
+    }
+
+    /// <summary>In prefab mode, the made name of a new trigger with starters is free among the triggers of the template,
+    /// as the made name of the layer is. A later step of edit_batch sees the triggers of the steps before it.</summary>
+    [Fact]
+    public void AMadeNameInATemplateIsFreeAmongItsTriggers()
+    {
+        using var m = PrefabInstanceTests.Create();
+        var host = new TestAgentHost(m.Session);
+        const string add = """{ "script": "prefab:mod:ol_gate", "condition": { "key": "Cnd_True" }, "started_by": [ "spawn" ] }""";
+
+        var first = Ok(host, "mission_add_trigger", add);
+        var second = Ok(host, "mission_add_trigger", add);
+        var batch = Ok(host, "edit_batch", $$"""
+            { "steps": [ { "tool": "mission_add_trigger", "arguments": {{add}} },
+                         { "tool": "mission_add_trigger", "arguments": {{add}} } ] }
+            """);
+
+        Assert.Equal(["trg:prefab:mod:ol_gate#role_trigger_1", "trg:prefab:mod:ol_gate#role_trigger_2",
+                "trg:prefab:mod:ol_gate#role_trigger_3", "trg:prefab:mod:ol_gate#role_trigger_4"],
+            new[] { first, second, batch["steps"]![0]!, batch["steps"]![1]! }.Select(r => Texts(r["adds"])[0]));
+        var template = m.Missions.Prefab(PrefabInstanceTests.GateRef)!.Template!;
+        Assert.All(Enumerable.Range(1, 4), n => Assert.NotNull(template.Section($"role_trigger_{n}")));
+    }
+
     /// <summary>The graph model of the test script, at the lines level, with all frames open.</summary>
     private static GraphEditModel ModelOf(MissionEdits m) =>
         new(MissionGraph.Build(m.Missions.Model(Script).Analysis, new GraphOptions(GraphLens.Logic, ShowLines: true)));
@@ -481,16 +555,19 @@ public sealed partial class AgentMissionToolTests
 
     /// <summary>The gesture through the mission editor and the tool give the same files (see
     /// <see cref="TheTriggerToolsGiveTheTextOfTheGesturesOfTheMissionStudio"/>).</summary>
-    private static void AssertParity(Func<GraphEditModel, MissionBatch?> gesture, string tool, string arguments)
+    /// <param name="create">Makes the test profile of each side, or null for the test script.</param>
+    private static void AssertParity(Func<GraphEditModel, MissionBatch?> gesture, string tool, string arguments,
+        Func<MissionEdits>? create = null)
     {
-        using var ui = Create();
+        create ??= () => Create();
+        using var ui = create();
         var batch = gesture(ModelOf(ui));
         Assert.NotNull(batch);
         var applied = ui.Missions.Apply(batch);
         Assert.True(applied.Status == EditStatus.Applied, string.Join("\n", applied.Errors.Select(e => e.Message)));
 
-        var (agent, host) = Open();
-        using var _ = agent;
+        using var agent = create();
+        var host = new TestAgentHost(agent.Session);
         Ok(host, tool, arguments);
 
         Assert.Equal((EditOrigin.User, EditOrigin.Agent), (ui.Session.UndoOrigin, agent.Session.UndoOrigin));
