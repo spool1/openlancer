@@ -201,8 +201,16 @@ public static class AgentTools
                 Text("template", true),
                 Text("nickname", true)),
             DataEditTools.CreateFromTemplate),
-        Edit("mission_edit", ToolHints.Changing, MissionEditTools.EditInput, MissionEditTools.Edit, ToolGroup.Missions,
-            typeof(EditToolResult)),
+        Mission("mission_edit", ToolHints.Changing, MissionEditTools.EditInput, MissionEditTools.Edit),
+        Mission("mission_add_trigger", ToolHints.Adding, MissionEditTools.AddTriggerInput, MissionEditTools.NewTrigger),
+        Mission("mission_set_condition", ToolHints.Changing, MissionEditTools.SetConditionInput,
+            MissionEditTools.ChangeCondition),
+        Mission("mission_add_action", ToolHints.Adding, MissionEditTools.AddActionInput, MissionEditTools.NewAction),
+        Mission("mission_set_action", ToolHints.Changing, MissionEditTools.SetActionInput, MissionEditTools.SetActionValues),
+        Mission("mission_move_action", ToolHints.Changing, MissionEditTools.MoveActionInput, MissionEditTools.MoveAction),
+        Mission("mission_link_triggers", ToolHints.Changing, MissionEditTools.LinkTriggersInput, MissionEditTools.Link),
+        Mission("mission_insert_trigger", ToolHints.Adding, MissionEditTools.InsertTriggerInput,
+            MissionEditTools.InsertTrigger),
         SessionTool("save", ToolHints.Changing, ToolInput.None, typeof(SaveView), SaveTools.Save),
         SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
         SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),
@@ -392,11 +400,14 @@ public static class AgentTools
 
     /// <summary>An edit tool (sections 7.2 and 7.3 of the MCP1 design). Its result is the result of the command layer,
     /// and it can be a step of <c>edit_batch</c>. A generic edit tool and a data tool are in the group Studio.</summary>
-    /// <param name="output">The type of the result, or null for the result of the command layer. A mission tool gives
-    /// the result with the inverse (<see cref="EditToolResult"/>).</param>
     private static StudioTool Edit(string name, ToolHints hints, ToolInput input, Func<ToolCall, ToolStep> run,
-        ToolGroup group = ToolGroup.Studio, Type? output = null) =>
-        new(name, ToolKind.Edit, group, ToolHosts.Both, hints, input, output ?? typeof(EditResult), run);
+        ToolGroup group = ToolGroup.Studio) =>
+        new(name, ToolKind.Edit, group, ToolHosts.Both, hints, input, typeof(EditResult), run);
+
+    /// <summary>A mission edit tool (section 7.4 of the MCP1 design), in the group Missions. It is an edit tool, and
+    /// its result also gives the inverse and the row moves of its mission commands (<see cref="EditToolResult"/>).</summary>
+    private static StudioTool Mission(string name, ToolHints hints, ToolInput input, Func<ToolCall, ToolStep> run) =>
+        new(name, ToolKind.Edit, ToolGroup.Missions, ToolHosts.Both, hints, input, typeof(EditToolResult), run);
 
     /// <summary>An asset write of a prop group (section 7.3 of the MCP1 design), in the group Scene. It writes files at
     /// once, outside the edit history, so it cannot be a step of <c>edit_batch</c>. Its result has the form of the

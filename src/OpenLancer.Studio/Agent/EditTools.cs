@@ -101,7 +101,13 @@ internal sealed class EditScope
     /// <c>commands</c>. An error of a command names <c>commands[i]</c>.</param>
     /// <exception cref="EditException">The request refuses. The mission editor cancels the batch, so nothing
     /// changed.</exception>
-    public MissionEditResult RunMission(MissionBatch batch, string field)
+    public MissionEditResult RunMission(MissionBatch batch, string field) =>
+        RunMission(batch, error => error.Index is { } i ? $"{field}[{i}]" : field);
+
+    /// <inheritdoc cref="RunMission(MissionBatch, string)"/>
+    /// <param name="fieldOf">The argument of an error that names no argument, for example the argument of the
+    /// command at the index of the error. A tool that makes its commands from its arguments uses it.</param>
+    public MissionEditResult RunMission(MissionBatch batch, Func<EditError, string> fieldOf)
     {
         var result = Session.Missions.Apply(batch with
         {
@@ -112,7 +118,7 @@ internal sealed class EditScope
         if (result.Status == EditStatus.Refused)
         {
             var error = result.Errors[0];
-            throw new EditException(error with { Field = error.Field ?? (error.Index is { } i ? $"{field}[{i}]" : field) });
+            throw new EditException(error with { Field = error.Field ?? fieldOf(error) });
         }
         missionRuns.Add((result.Inverse, result.RowMoves));
         stepConfirmations.AddRange(result.Asked.Select(a => a.Message).Distinct());

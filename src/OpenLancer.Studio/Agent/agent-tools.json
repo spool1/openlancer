@@ -41,7 +41,11 @@
     "preview": "Show what the edit does, and change nothing. The revision stays the same.",
     "if_revision": "Refuse the edit when the edit view changed after this revision. Give the rev of a result that you read.",
     "with_patch": "With preview: also give the patch text of each INI file that the edit changes.",
-    "confirm": "Apply an edit that changes more than its targets. Without it, such an edit gives needs_confirmation."
+    "confirm": "Apply an edit that changes more than its targets. Without it, such an edit gives needs_confirmation.",
+    "$defs.line": "A line of a trigger: its key, and its values by name or its texts by position.",
+    "$defs.line.key": "A condition key (Cnd_...) or an action key (Act_...), for example Cnd_Timer.",
+    "$defs.line.values": "The values by their names, for example {\"seconds\": 3}. describe_mission_name gives the names and the kinds of the values.",
+    "$defs.line.texts": "The value texts by position, in place of the values by name. The editor then checks only the form of the line."
   },
   "tools": {
     "studio_status": {
@@ -429,6 +433,73 @@
         "expect_versions": "The versions of the scripts that you read, by install path. When a script has another version now, the edit gives stale_revision."
       }
     },
+    "mission_add_trigger": {
+      "title": "Add a trigger to a mission",
+      "description": "Adds one trigger with its condition and its actions to a mission script. The tool makes one Undo step. It refuses an edit that adds an error to the script. Get the value names from describe_mission_name. Set preview to true to see the result first.",
+      "fields": {
+        "nickname": "The nickname of the new trigger. Use letters, digits, '_' and '-'. Without it, the editor makes a free name.",
+        "condition": "The condition that starts the actions, for example {\"key\": \"Cnd_Timer\", \"values\": {\"seconds\": 3}}.",
+        "actions": "The actions of the trigger in order, for example {\"key\": \"Act_ActTrig\", \"values\": {\"trigger\": \"my_next\"}}.",
+        "starts_with_mission": "Start the trigger when the mission starts.",
+        "repeats": "Make the trigger repeat. It stays active after its actions, and runs again when its condition is true again.",
+        "system": "The system of the trigger, for example my_system. The editor shows it. The game does not read it.",
+        "started_by": "The triggers that start the new trigger: trg: references or nicknames of the same script. The editor adds a Start trigger action to each one."
+      }
+    },
+    "mission_set_condition": {
+      "title": "Set the condition of a trigger",
+      "description": "Replaces the condition of one trigger. The tool makes one Undo step. It refuses an edit that adds an error to the script. Get the value names from describe_mission_name. Set preview to true to see the result first.",
+      "fields": {
+        "trigger": "The trg: reference of the trigger, for example trg:DATA\\MISSIONS\\M01A\\m01a.ini#my_trigger.",
+        "condition": "The new condition, for example {\"key\": \"Cnd_Destroyed\", \"values\": {\"target\": \"my_ship\"}}."
+      }
+    },
+    "mission_add_action": {
+      "title": "Add an action to a trigger",
+      "description": "Adds one action to a trigger, at the end or before a line. The tool makes one Undo step. It refuses an edit that adds an error to the script. Get the value names from describe_mission_name.",
+      "fields": {
+        "trigger": "The trg: reference of the trigger, for example trg:DATA\\MISSIONS\\M01A\\m01a.ini#my_trigger.",
+        "action": "The new action, for example {\"key\": \"Act_SpawnShip\", \"values\": {\"ship\": \"my_ship\"}}.",
+        "before": "The line: reference of a line of the same trigger. The action goes before that line. Without it, the action goes to the end."
+      }
+    },
+    "mission_set_action": {
+      "title": "Set values of an action",
+      "description": "Sets named values of one action of a trigger. The tool makes one Undo step. It refuses an edit that adds an error to the script. Read the lines with get_trigger first.",
+      "fields": {
+        "line": "The line: reference of the action, for example line:DATA\\MISSIONS\\M01A\\m01a.ini#Trigger/my_trigger/3.",
+        "values": "The new values by their names, for example {\"ship\": \"my_ship\"}. describe_mission_name gives the names of the values of each key.",
+        "expect_key": "The key that the line must have, for example Act_SpawnShip. When the line has another key now, the edit gives stale_revision."
+      }
+    },
+    "mission_move_action": {
+      "title": "Move an action in its trigger",
+      "description": "Moves one action before another line of its trigger, or to the end of the trigger. The tool makes one Undo step. Read the lines with get_trigger first.",
+      "fields": {
+        "line": "The line: reference of the action, for example line:DATA\\MISSIONS\\M01A\\m01a.ini#Trigger/my_trigger/3.",
+        "before": "The line: reference of a line of the same trigger. The action goes before that line. Without it, the action goes to the end."
+      }
+    },
+    "mission_link_triggers": {
+      "title": "Link two triggers",
+      "description": "Adds a link from one trigger to another, or removes it. A link is a start action, a stop action or both. The tool makes one Undo step. It refuses an edit that adds an error to the script.",
+      "fields": {
+        "from": "The trg: reference of the trigger that gets the actions of the link.",
+        "to": "The trigger that the link starts or stops: a trg: reference or a nickname of the same script.",
+        "kind": "start adds Act_ActTrig. stop adds Act_DeactTrig. restart adds both, the stop first.",
+        "remove": "Remove each line of the link, in place of adding the link."
+      }
+    },
+    "mission_insert_trigger": {
+      "title": "Insert a trigger on a link",
+      "description": "Puts a new trigger on a start link. The source then starts the new trigger, and the new trigger starts the old target. The tool makes one Undo step. Read the lines with get_trigger first.",
+      "fields": {
+        "line": "The line: reference of an Act_ActTrig line, for example line:DATA\\MISSIONS\\M01A\\m01a.ini#Trigger/my_trigger/3.",
+        "nickname": "The nickname of the new trigger. Use letters, digits, '_' and '-'. Without it, the editor makes a free name.",
+        "condition": "The condition of the new trigger, for example {\"key\": \"Cnd_Timer\", \"values\": {\"seconds\": 5}}.",
+        "actions": "More actions of the new trigger, in order. They come before the start of the old target."
+      }
+    },
     "save": {
       "title": "Save the edits of the active mod",
       "description": "Saves the edits into the patch files of the active mod. The save stops when the checks find errors. Read the errors, correct them, then save again."
@@ -636,6 +707,8 @@
     "limit_steps": "One batch can have at most {max} steps. Split the batch.",
     "limit_commands": "One call of mission_edit can have at most {max} commands. Split the edit.",
     "mission_strict": "The mission tools always refuse an edit that adds an error. Remove reject_new_errors, or set it to true.",
+    "mission_other_script": "The trigger {ref} is in another script. Name a trigger of {script}.",
+    "mission_other_line": "{ref} is not a line of {item}. Name a line of the same item.",
     "step_unknown": "Step {index}: the server has no tool {tool}.",
     "step_kind": "Step {index}: {tool} cannot be a step of edit_batch. A step must be an edit tool, for example set_fields.",
     "step_asset_write": "Step {index}: {tool} writes files at once, outside the Undo history. Call it alone, not in edit_batch.",

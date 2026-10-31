@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using OpenLancer.Data.Editing.Commands;
 
 namespace OpenLancer.Studio.Agent;
@@ -31,11 +32,16 @@ internal abstract class ToolParam(string name, bool required)
 }
 
 /// <summary>A text, optionally one of a fixed set of words. A free text has at most <see cref="MaxLength"/>
-/// characters, or the length that the argument gives.</summary>
+/// characters, or the length that the argument gives. It can also have a pattern, for example the form of a new mission
+/// name.</summary>
 /// <param name="length">The most characters of a free text, for example of the text of an infocard.</param>
+/// <param name="pattern">The regular expression that a free text must match, or null. The schema gives it, so it must
+/// be a pattern of JSON Schema that .NET reads the same way.</param>
 internal sealed class TextParam(string name, bool required, IReadOnlyList<string>? choices, string? fallback,
-    int length = TextParam.MaxLength) : ToolParam(name, required)
+    int length = TextParam.MaxLength, string? pattern = null) : ToolParam(name, required)
 {
+    private readonly Regex? form = pattern == null ? null : new Regex(pattern, RegexOptions.CultureInvariant);
+
     /// <summary>The most characters of a free text. A reference, a name or a filter of the data is much shorter. The
     /// limit keeps the work of one call on the thread of the session small, for example the search for the closest
     /// names of a name that does not resolve.</summary>
@@ -57,19 +63,25 @@ internal sealed class TextParam(string name, bool required, IReadOnlyList<string
         {
             schema["minLength"] = 1;
             schema["maxLength"] = length;
+            if (pattern != null)
+                schema["pattern"] = pattern;
         }
         if (Default != null)
             schema["default"] = Default;
         return schema;
     }
 
-    public override string Expected => Choices == null
-        ? $"a text of 1 to {length} characters"
-        : "one of: " + string.Join(", ", Choices);
+    public override string Expected => Choices != null ? "one of: " + string.Join(", ", Choices)
+        : pattern != null ? $"a text of 1 to {length} characters that matches the pattern {pattern}"
+        : $"a text of 1 to {length} characters";
 
     public override bool Fits(JsonNode value) =>
         value.GetValueKind() == JsonValueKind.String && value.GetValue<string>() is { Length: > 0 } text &&
-        (Choices == null ? text.Length <= length : Choices.Contains(text, StringComparer.Ordinal));
+        (Choices == null ? text.Length <= length && Matches(text) : Choices.Contains(text, StringComparer.Ordinal));
+
+    /// <summary>True when the text has the pattern, or the argument has no pattern. In .NET, <c>$</c> also matches
+    /// before a newline at the end, and in JSON Schema it does not. So the match must cover the whole text.</summary>
+    private bool Matches(string text) => form == null || form.Match(text) is { Success: true } match && match.Length == text.Length;
 }
 
 /// <summary>A whole number from a minimum.</summary>

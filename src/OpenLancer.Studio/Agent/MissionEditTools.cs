@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.IO;
+using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Editing;
 
 namespace OpenLancer.Studio.Agent;
@@ -122,4 +124,261 @@ internal static class MissionEditTools
         options["properties"]!["reject_new_errors"]!["default"] = true;
         return options;
     }
+
+    // ---- The trigger tools ----
+
+    /// <summary>The detail code of a trigger or a line of another script or trigger than the edit needs.</summary>
+    public const string OtherItem = "OtherItem";
+
+    /// <summary>The most actions of one trigger tool call (section 7.8 of the MCP1 design).</summary>
+    public const int MaxActions = 64;
+
+    /// <summary>The form of a new mission name of section 4.3 of the M6b design: letters, digits, <c>_</c> and
+    /// <c>-</c>, at most 47 characters. The command also refuses a name that is a number.</summary>
+    private static readonly string NamePattern = $"^[A-Za-z0-9_-]{{1,{MissionNames.MaxName}}}$";
+
+    /// <summary>The row of the start line of the old target in a trigger that <see cref="InsertTriggerOnLink"/> makes:
+    /// its lines are the nickname, the condition and that start line.</summary>
+    private const int InsertedStartRow = 2;
+
+    /// <summary>The details of the errors of a named value of a line.</summary>
+    private static readonly HashSet<string> ValueDetails =
+    [
+        MissionErrors.NoSuchValue, MissionErrors.ValueKind, MissionErrors.WordNotInSet, MissionErrors.WholeNumber,
+        MissionErrors.PatchText,
+    ];
+
+    private static readonly ToolParam Nickname = new TextParam("nickname", false, null, null, MissionNames.MaxName, NamePattern);
+
+    public static ToolInput AddTriggerInput { get; } = WithLines(
+        new TextParam("script", true, null, null),
+        Nickname,
+        new LineParam("condition", true),
+        new LinesParam("actions", MaxActions),
+        new FlagParam("starts_with_mission"),
+        new FlagParam("repeats"),
+        new TextParam("system", false, null, null),
+        new TextListParam("started_by", false));
+
+    public static ToolInput SetConditionInput { get; } = WithLines(
+        new TextParam("trigger", true, null, null), new LineParam("condition", true));
+
+    public static ToolInput AddActionInput { get; } = WithLines(
+        new TextParam("trigger", true, null, null), new LineParam("action", true), new TextParam("before", false, null, null));
+
+    public static ToolInput SetActionInput { get; } = new(EditTools.Input(false,
+        new TextParam("line", true, null, null), new MissionValuesParam("values", true),
+        new TextParam("expect_key", false, null, null)).Parameters.ToArray());
+
+    public static ToolInput MoveActionInput { get; } = new(EditTools.Input(false,
+        new TextParam("line", true, null, null), new TextParam("before", false, null, null)).Parameters.ToArray());
+
+    public static ToolInput LinkTriggersInput { get; } = new(EditTools.Input(false,
+        new TextParam("from", true, null, null),
+        new TextParam("to", true, null, null),
+        new TextParam("kind", false, AgentTools.Names<LinkKind>(), "start"),
+        new FlagParam("remove")).Parameters.ToArray());
+
+    public static ToolInput InsertTriggerInput { get; } = WithLines(
+        new TextParam("line", true, null, null), Nickname, new LineParam("condition", true),
+        new LinesParam("actions", MaxActions));
+
+    /// <summary>
+    /// The tool <c>mission_add_trigger</c>: <see cref="AddTrigger"/> with the condition and the actions, then
+    /// <see cref="LinkTriggers"/> (Start) from each trigger of <c>started_by</c>, in one request. The triggers of
+    /// <c>started_by</c> must be in the script. Without a nickname, a trigger with starters gets the made name of
+    /// <see cref="MissionNaming.Free"/>, as the gesture of the graph that adds and links a trigger does.
+    /// </summary>
+    public static ToolStep NewTrigger(ToolCall call)
+    {
+        var args = call.Args;
+        var script = EditTools.At("script", () => ScriptRef.Parse(args.Text("script")!));
+        var condition = MissionLineInput.TriggerLine(args.Node("condition")!, "condition", action: false);
+        var actions = Lines(args, "actions");
+        var starters = (args.Texts("started_by") ?? [])
+            .Select((text, i) => new TriggerRef(script.Path, NameIn(text, script.Path, $"started_by[{i}]"))).ToList();
+        return EditTools.Apply(call, scope =>
+        {
+            var nickname = args.Text("nickname") ?? (starters.Count > 0 ? FreeTriggerName(scope, script.Path) : null);
+            var add = new AddTrigger(script)
+            {
+                Nickname = nickname,
+                Condition = condition,
+                Actions = actions,
+                StartsWithMission = args.Flag("starts_with_mission"),
+                Repeats = args.Flag("repeats"),
+                System = args.Text("system"),
+            };
+            MissionCommand[] commands = [add, .. starters.Select(s => new LinkTriggers(s, nickname!, LinkKind.Start))];
+            scope.RunMission(new MissionBatch(add.HistoryLabel, commands), error => error.Index is > 0 and var i
+                ? $"started_by[{i - 1}]"
+                : NameOr(error, error.Detail == MissionErrors.PatchText ? "system" : "script"));
+        });
+    }
+
+    /// <summary>The tool <c>mission_set_condition</c>: <see cref="SetCondition"/>.</summary>
+    public static ToolStep ChangeCondition(ToolCall call)
+    {
+        var args = call.Args;
+        var trigger = TriggerOf(args.Text("trigger")!, "trigger");
+        var condition = MissionLineInput.TriggerLine(args.Node("condition")!, "condition", action: false);
+        return EditTools.Apply(call, scope =>
+            scope.RunMission(new MissionBatch("", [new SetCondition(trigger, condition)]), _ => "trigger"));
+    }
+
+    /// <summary>The tool <c>mission_add_action</c>: <see cref="AddAction"/>, before a line of the same trigger or at
+    /// the end.</summary>
+    public static ToolStep NewAction(ToolCall call)
+    {
+        var args = call.Args;
+        var trigger = TriggerOf(args.Text("trigger")!, "trigger");
+        var action = MissionLineInput.TriggerLine(args.Node("action")!, "action", action: true);
+        var before = args.Text("before") is { } text ? RowIn(text, trigger, "before") : (int?)null;
+        return EditTools.Apply(call, scope =>
+            scope.RunMission(new MissionBatch("", [new AddAction(trigger, action) { Before = before }]),
+                error => error.Detail is MissionErrors.RowNotFound or MissionErrors.BadPlace ? "before" : "trigger"));
+    }
+
+    /// <summary>The tool <c>mission_set_action</c>: <see cref="SetActionValue"/> for each value, in one request. With
+    /// <c>expect_key</c>, a line with another key refuses with <c>RowChanged</c>.</summary>
+    public static ToolStep SetActionValues(ToolCall call)
+    {
+        var args = call.Args;
+        var row = EditTools.At("line", () => RowRef.Parse(args.Text("line")!)) with { ExpectKey = args.Text("expect_key") };
+        var values = args.Node("values")!.AsObject().Select(v => (Name: v.Key, Value: MissionLineInput.Value(v.Value!))).ToList();
+        var label = values.Count == 1 ? "" : "Set " + string.Join(", ", values.Select(v => v.Name));
+        return EditTools.Apply(call, scope =>
+            scope.RunMission(new MissionBatch(label, values.Select(v => (MissionCommand)new SetActionValue(row, v.Name, v.Value)).ToList()),
+                error => error.Index is { } i && ValueDetails.Contains(error.Detail ?? "") ? $"values.{values[i].Name}" : "line"));
+    }
+
+    /// <summary>The tool <c>mission_move_action</c>: <see cref="ReorderAction"/>, before a line of the same trigger or
+    /// to the end.</summary>
+    public static ToolStep MoveAction(ToolCall call)
+    {
+        var args = call.Args;
+        var row = EditTools.At("line", () => RowRef.Parse(args.Text("line")!));
+        var before = args.Text("before") is { } text ? RowIn(text, row.Item, "before") : (int?)null;
+        return EditTools.Apply(call, scope =>
+            scope.RunMission(new MissionBatch("", [new ReorderAction(row) { Before = before }]),
+                error => error.Target == null && error.Detail is MissionErrors.RowNotFound or MissionErrors.BadPlace
+                    ? "before"
+                    : "line"));
+    }
+
+    /// <summary>The tool <c>mission_link_triggers</c>: <see cref="LinkTriggers"/>, or <see cref="UnlinkTriggers"/>
+    /// with <c>remove</c>. The target is a trigger of the script of the source. The command does not look it up: a
+    /// link to a trigger that does not exist adds the error M05, and strict mode refuses it.</summary>
+    public static ToolStep Link(ToolCall call)
+    {
+        var args = call.Args;
+        var from = TriggerOf(args.Text("from")!, "from");
+        var to = NameIn(args.Text("to")!, from.Script, "to");
+        var kind = Enum.Parse<LinkKind>(args.Text("kind")!, ignoreCase: true);
+        MissionCommand command = args.Flag("remove") ? new UnlinkTriggers(from, to, kind) : new LinkTriggers(from, to, kind);
+        return EditTools.Apply(call, scope => scope.RunMission(new MissionBatch("", [command]),
+            error => error.Detail == MissionErrors.LinkNotFound ? "to" : "from"));
+    }
+
+    /// <summary>
+    /// The tool <c>mission_insert_trigger</c>: <see cref="InsertTriggerOnLink"/>, then <see cref="AddAction"/> for each
+    /// action before the start line of the old target, in one request. So the new trigger runs its actions, then starts
+    /// the old target. Without a nickname, a trigger with actions gets the made name of
+    /// <see cref="MissionNaming.Free"/>.
+    /// </summary>
+    public static ToolStep InsertTrigger(ToolCall call)
+    {
+        var args = call.Args;
+        var row = EditTools.At("line", () => RowRef.Parse(args.Text("line")!));
+        var condition = MissionLineInput.TriggerLine(args.Node("condition")!, "condition", action: false);
+        var actions = Lines(args, "actions");
+        return EditTools.Apply(call, scope =>
+        {
+            var script = row.Item.Script;
+            var nickname = args.Text("nickname") ?? (actions.Count > 0 ? FreeTriggerName(scope, script) : null);
+            var insert = new InsertTriggerOnLink(row, condition) { Nickname = nickname };
+            MissionCommand[] commands =
+            [
+                insert,
+                .. actions.Select((action, i) =>
+                    new AddAction(new TriggerRef(script, nickname!), action) { Before = InsertedStartRow + i }),
+            ];
+            scope.RunMission(new MissionBatch(insert.HistoryLabel, commands),
+                error => error.Index is > 0 and var i ? $"actions[{i - 1}]" : NameOr(error, "line"));
+        });
+    }
+
+    /// <summary>The arguments of a trigger tool, with the definition of a line at the root of the schema.</summary>
+    private static ToolInput WithLines(params ToolParam[] own) =>
+        new(EditTools.Input(false, own).Parameters.ToArray()) { Definitions = MissionLineInput.Definitions };
+
+    /// <summary>The actions of an argument, or none.</summary>
+    private static IReadOnlyList<LineSpec> Lines(ToolArgs args, string name) =>
+        args.Node(name)?.AsArray()
+            .Select((line, i) => MissionLineInput.TriggerLine(line!, $"{name}[{i}]", action: true)).ToList() ?? [];
+
+    /// <summary>The argument <c>nickname</c> for an error of the name of a new trigger, else the other argument.</summary>
+    private static string NameOr(EditError error, string other) =>
+        error.Detail is MissionErrors.NameInvalid or MissionErrors.NameTaken or MissionErrors.NameIdTaken ? "nickname" : other;
+
+    /// <summary>The trigger of a reference: a <c>trg:</c> reference, or a <c>sec:</c> reference of a trigger section
+    /// (section 5.6 of the MCP1 design).</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/>: the text is not the reference of a
+    /// trigger. The error names the argument.</exception>
+    private static TriggerRef TriggerOf(string text, string field) => EditTools.At(field, () =>
+        ItemRefs.Parse(text) is { Kind: ItemRefKind.Section, Path: { } path, Section: { Key: { } name, Ordinal: 0 } section } &&
+        MissionIndex.Is(section.Type, "Trigger")
+            ? new TriggerRef(path, name)
+            : TriggerRef.Parse(text));
+
+    /// <summary>The nickname of a trigger of a script: a nickname, or the reference of a trigger of the
+    /// script.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/>: the reference is not valid, or names a
+    /// trigger of another script.</exception>
+    private static string NameIn(string text, string script, string field)
+    {
+        if (!text.Contains(':'))
+            return text.Trim();
+        var trigger = TriggerOf(text, field);
+        if (!VfsPath.Comparer.Equals(trigger.Script, script))
+        {
+            throw new EditException(new EditError(EditErrorKind.InvalidArgument, OtherItem,
+                AgentTexts.Error("mission_other_script", ("ref", text), ("script", new ScriptRef(script)))) { Field = field });
+        }
+        return trigger.Name;
+    }
+
+    /// <summary>The row of a <c>line:</c> reference of a line of a trigger or a section, for the argument
+    /// <c>before</c>.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/>: the reference is not valid, or names a
+    /// line of another section.</exception>
+    private static int RowIn(string text, TriggerRef trigger, string field) => RowIn(text, trigger.Item, field);
+
+    /// <inheritdoc cref="RowIn(string, TriggerRef, string)"/>
+    private static int RowIn(string text, ItemRef item, string field)
+    {
+        var row = EditTools.At(field, () => RowRef.Parse(text));
+        if (!SameItem(row.Item, item))
+        {
+            // The text names a trigger in its trg: form, as the results do.
+            var name = MissionIndex.Is(item.Section.Type, "Trigger") && item.Section is { Key: { } key, Ordinal: 0 }
+                ? new TriggerRef(item.Script, key).ToString()
+                : item.ToString();
+            throw new EditException(new EditError(EditErrorKind.InvalidArgument, OtherItem,
+                AgentTexts.Error("mission_other_line", ("ref", text), ("item", name))) { Field = field });
+        }
+        return row.Row;
+    }
+
+    /// <summary>True when two items are one item. A trigger is one item by its nickname, without letter case.</summary>
+    private static bool SameItem(ItemRef a, ItemRef b) =>
+        VfsPath.Comparer.Equals(a.Script, b.Script) && MissionIndex.Is(a.Section.Type, b.Section.Type) &&
+        string.Equals(a.Section.Key, b.Section.Key, StringComparison.OrdinalIgnoreCase) && a.Section.Ordinal == b.Section.Ordinal;
+
+    /// <summary>A free made name for a new trigger of a script, by the rule of the layer (decision D683 of
+    /// M6b).</summary>
+    private static string FreeTriggerName(EditScope scope, string script) =>
+        MissionNaming.Free(script, "Trigger", (scope.Session.OpenDocument(script) is { State.Exists: true } document
+            ? MissionDraft.TriggerNames(document)
+            : []).ToHashSet(StringComparer.OrdinalIgnoreCase));
 }
