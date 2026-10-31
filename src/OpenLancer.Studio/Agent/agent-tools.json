@@ -747,7 +747,7 @@
     "limit_items": "One call can name at most {max} items in refs. Split the call.",
     "repo_mod_editor": "Allow edits of this mod in the editor first.",
     "copy_not_moved": "The copy {ref} has no position, so the offset did not move it. To move it, give it a pos with set_fields.",
-    "limit_edit_result": "The result of the edit has {size} KB of text, and one result can have at most {max} KB. The edit changed nothing. Split the edit into smaller calls.",
+    "limit_edit_result": "The result of the edit has {size} KB of text, and one result can have at most {max} KB. The edit changed nothing. Split the edit into smaller calls. The inverse of a delete holds the lines that go. So to delete a large script or trigger, first remove its sections or lines in smaller calls. Or ask the user to raise the size of a result in Agent settings.",
     "undo_nothing": "The history has no step to undo.",
     "redo_nothing": "The history has no step to redo.",
     "undo_user_entry": "The last edit is an edit of the user: {label}. The agent can undo only its own edits.",

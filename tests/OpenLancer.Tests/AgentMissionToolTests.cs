@@ -383,6 +383,9 @@ public sealed partial class AgentMissionToolTests
         var applied = Ok(host, "mission_edit", remove);
 
         Assert.Equal(("limit", ToolResult.ResultSize), ((string?)limited.Content["code"], (string?)limited.Content["detail"]));
+        // One command can have a large inverse, so the text names the way around the limit (final finding 11 of MCP1-3).
+        Assert.EndsWith("So to delete a large script or trigger, first remove its sections or lines in smaller calls. Or ask " +
+                        "the user to raise the size of a result in Agent settings.", (string?)limited.Content["message"]);
         var withoutInverse = (JsonObject)applied.DeepClone();
         withoutInverse.Remove("inverse");
         Assert.InRange(withoutInverse.ToJsonString().Length, 0, 2048);
