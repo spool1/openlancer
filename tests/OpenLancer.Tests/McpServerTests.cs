@@ -13,8 +13,12 @@ using ModelContextProtocol;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Missions;
+using OpenLancer.Data.Missions.Prefabs;
 using OpenLancer.Data.Mods;
 using OpenLancer.Mcp;
+using OpenLancer.Runtime.Missions;
 using OpenLancer.Studio.Agent;
 using Xunit;
 
@@ -203,14 +207,158 @@ public sealed class McpServerTests
         var lists = await client.ReadResourceAsync("openlancer://catalog/lists", cancellationToken: Token);
         var refs = await client.ReadResourceAsync("openlancer://guide/refs", cancellationToken: Token);
 
-        Assert.Equal(["openlancer://catalog/lists", "openlancer://guide/rules", "openlancer://guide/refs"],
-            resources.Select(r => r.Uri));
+        Assert.Equal([
+            "openlancer://schema/mission-names", "openlancer://schema/mission-sections",
+            "openlancer://schema/objlist-directives", "openlancer://catalog/prefabs", "openlancer://catalog/lists",
+            "openlancer://guide/rules", "openlancer://guide/refs",
+        ], resources.Select(r => r.Uri));
+        Assert.Equal(["application/json", "application/json", "application/json", "application/json", "application/json",
+            "text/plain", "text/plain"], resources.Select(r => r.MimeType));
         var catalog = JsonNode.Parse(Assert.IsType<TextResourceContents>(Assert.Single(lists.Contents)).Text)!;
         Assert.Equal(59, catalog["lists"]!.AsArray().Count);
         Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "object_of_system" && (bool)l["one_system"]!);
         Assert.Contains("thn:<install path>#event/<index>", Assert.IsType<TextResourceContents>(Assert.Single(refs.Contents)).Text);
         await Assert.ThrowsAsync<McpProtocolException>(() => client.ReadResourceAsync("openlancer://none", cancellationToken: Token).AsTask());
     }
+
+    /// <summary>The resources of the schema of the missions (section 9.3 of the MCP1 design): the 129 conditions and
+    /// actions with the marks of the mission runtime, the 12 section types and the ship build, and the 23 orders. They
+    /// need no profile.</summary>
+    [Fact]
+    public async Task TheMissionResourcesGiveTheSchemaOfTheMissions()
+    {
+        await using var connection = new Connection(new TestAgentHost(null));
+        var client = await connection.Client();
+
+        var names = await ReadJson(client, "openlancer://schema/mission-names");
+        var sections = await ReadJson(client, "openlancer://schema/mission-sections");
+        var directives = await ReadJson(client, "openlancer://schema/objlist-directives");
+
+        var schema = MissionSchema.Retail;
+        var rows = names["names"]!.AsArray();
+        Assert.Equal(129, rows.Count);
+        Assert.Equal(schema.Conditions.Concat(schema.Actions).Select(n => n.Name), rows.Select(r => (string?)r!["name"]));
+        Assert.All(rows, r => Assert.Equal(Snake(EngineCoverage.Instance.Of((string)r!["name"]!)), (string?)r["mark"]));
+        Assert.Contains(rows, r => (string?)r!["mark"] == "no_effect");
+        var timer = rows.Single(r => (string?)r!["name"] == "Cnd_Timer")!;
+        Assert.Equal(("condition", "seconds"), ((string?)timer["kind"], (string?)timer["values"]![0]!["name"]));
+        Assert.Contains(names["events"]!.AsArray(), e => (string?)e!["id"] == (string?)timer["group"]);
+        var spawn = rows.Single(r => (string?)r!["name"] == "Act_SpawnShip")!;
+        Assert.Contains(names["groups"]!.AsArray(), g => (string?)g!["id"] == (string?)spawn["group"]);
+        Assert.DoesNotContain("base_count", names.ToJsonString());
+
+        var types = sections["sections"]!.AsArray();
+        Assert.Equal(12, types.Count);
+        Assert.Equal(schema.Sections.Select(t => t.Type), types.Select(t => (string?)t!["type"]));
+        string? Kind(string type) => (string?)types.Single(t => (string?)t!["type"] == type)!["kind"];
+        Assert.Equal(["ship", "formation", "npc", "loot", "order_list", "random_encounter", null, null],
+            new[] { "MsnShip", "MsnFormation", "NPC", "MsnLoot", "ObjList", "MsnRandEnc", "Trigger", "Mission" }.Select(Kind));
+        var ship = types.Single(t => (string?)t!["type"] == "MsnShip")!["keys"]!.AsArray();
+        var label = ship.Single(k => (string?)k!["key"] == "label")!;
+        Assert.True((bool)label["repeats"]!);
+        var position = ship.Single(k => (string?)k!["key"] == "position")!;
+        Assert.Equal((false, 3), ((bool)position["repeats"]!, (int)position["values"]![0]!["width"]!));
+        Assert.True((bool)types.Single(t => (string?)t!["type"] == "ObjList")!["directives"]!);
+        var build = sections["ship_build"]!;
+        Assert.Equal(("NPCShipArch", "ship_build"), ((string?)build["type"], (string?)build["kind"]));
+        Assert.Contains(build["keys"]!.AsArray(), k => (string?)k!["key"] == "npc_class");
+
+        var orders = directives["directives"]!.AsArray();
+        Assert.Equal(23, orders.Count);
+        Assert.Equal(schema.Directives.Select(n => n.Name), orders.Select(r => (string?)r!["name"]));
+        Assert.All(orders, r => Assert.Equal("directive", (string?)r!["kind"]));
+    }
+
+    /// <summary>The catalog of the prefabs (section 9.3 of the MCP1 design) gives the built-in prefabs, the prefab
+    /// assets of the mods, the templates of Create, the builders and the prop groups of the profile. Without a profile,
+    /// it gives the built-in prefabs and the rule data only.</summary>
+    [Fact]
+    public async Task TheCatalogOfThePrefabsGivesThePrefabsTheTemplatesTheBuildersAndThePropGroups()
+    {
+        using var m = MissionEdits.Create(modFiles: new Dictionary<string, string>
+        {
+            [@"prefabs\missions\ol_gate.ini"] = PrefabInstanceTests.Gate,
+            [@"props\ol_props.ini"] = "[PropGroup]\nnickname = ol_props\nformat = 1\n[Object]\nmember = ol_member\narchetype = ol_arch\n",
+        });
+        await using (var connection = new Connection(new TestAgentHost(m.Session)))
+        {
+            var client = await connection.Client();
+            var catalog = await ReadJson(client, "openlancer://catalog/prefabs");
+
+            var prefabs = catalog["prefabs"]!.AsArray().Select(p => (string?)p!["ref"]).ToList();
+            Assert.Equal(BuiltinPrefabs.Ids.Select(id => "prefab:builtin:" + id).Append("prefab:mod:ol_gate"), prefabs);
+            var gate = catalog["prefabs"]!.AsArray().Single(p => (string?)p!["ref"] == "prefab:mod:ol_gate")!;
+            Assert.Equal("act", (string?)gate["mod_id"]);
+            Assert.Contains(gate["fields"]!.AsArray(), f => (string?)f!["id"] == "formation");
+            Assert.Equal(["group:ol_props"], catalog["prop_groups"]!.AsArray().Select(g => (string?)g!["ref"]));
+            AssertRuleData(catalog);
+        }
+
+        await using (var connection = new Connection(new TestAgentHost(null)))
+        {
+            var client = await connection.Client();
+            var catalog = await ReadJson(client, "openlancer://catalog/prefabs");
+
+            Assert.Equal(17, catalog["prefabs"]!.AsArray().Count);
+            Assert.All(catalog["prefabs"]!.AsArray(), p => Assert.StartsWith("prefab:builtin:", (string?)p!["ref"]));
+            Assert.Empty(catalog["prop_groups"]!.AsArray());
+            AssertRuleData(catalog);
+        }
+
+        static void AssertRuleData(JsonNode catalog)
+        {
+            Assert.Equal(SceneEditTools.ObjectTemplates, catalog["scene_templates"]!.AsArray().Select(t => (string?)t!["id"]));
+            var station = catalog["scene_templates"]![0]!;
+            Assert.Equal(("docking_sphere", "station"), ((string?)station["needs"], (string?)station["types"]![0]));
+            Assert.Equal(["scene_place_wreck", "scene_place_patrol_route"],
+                catalog["builders"]!.AsArray().Select(b => (string?)b!["tool"]));
+            Assert.Equal(AgentTexts.Tool("scene_place_wreck").Description, (string?)catalog["builders"]![0]!["description"]);
+        }
+    }
+
+    /// <summary>The catalog reads the session, so its read waits in the queue of the calls and runs on the session
+    /// thread (section 5.5 of the MCP1 design). A read of the schema needs no session and does not wait.</summary>
+    [Fact]
+    public async Task AReadOfTheCatalogWaitsForTheSessionThread()
+    {
+        using var release = new ManualResetEventSlim();
+        using var m = MissionEdits.Create();
+        var runs = 0;
+        var host = new TestAgentHost(m.Session)
+        {
+            Probe = () =>
+            {
+                Interlocked.Increment(ref runs);
+                release.Wait(TimeSpan.FromSeconds(10));
+            },
+        };
+        await using var connection = new Connection(host);
+        var client = await connection.Client();
+
+        var call = client.CallToolAsync("studio_status", cancellationToken: Token).AsTask();
+        await WaitUntil(() => Volatile.Read(ref runs) == 1);
+        var catalog = client.ReadResourceAsync("openlancer://catalog/prefabs", cancellationToken: Token).AsTask();
+        await WaitUntil(() => connection.Thread.Queue.Waiting == 1);
+        var names = await ReadJson(client, "openlancer://schema/mission-names");
+
+        Assert.False(catalog.IsCompleted);
+        Assert.Equal(129, names["names"]!.AsArray().Count);
+        release.Set();
+        Assert.NotEqual(true, (await call).IsError);
+        var text = Assert.IsType<TextResourceContents>(Assert.Single((await catalog).Contents)).Text;
+        Assert.NotEmpty(JsonNode.Parse(text)!["prefabs"]!.AsArray());
+        Assert.Equal(0, connection.Thread.Queue.Waiting);
+    }
+
+    private static async Task<JsonNode> ReadJson(McpClient client, string uri)
+    {
+        var result = await client.ReadResourceAsync(uri, cancellationToken: Token);
+        var contents = Assert.IsType<TextResourceContents>(Assert.Single(result.Contents));
+        Assert.Equal("application/json", contents.MimeType);
+        return JsonNode.Parse(contents.Text)!;
+    }
+
+    private static string Snake(EngineMark mark) => JsonSerializer.Serialize(mark, EditJson.Options).Trim('"');
 
     [Fact]
     public async Task CallsAtTheSameTimeRunOneAfterTheOtherOnTheSessionThread()

@@ -862,6 +862,30 @@
     "trace_since_play": "The argument 'since' is a sequence number in one play. Also give the play number of the last result in play, or remove since."
   },
   "resources": {
+    "openlancer://schema/mission-names": {
+      "name": "mission-names",
+      "title": "The conditions and actions of the missions",
+      "description": "The conditions and actions of a trigger with their plain names, events, groups, values and what OpenLancer does with each one. The trigger tools take these names and value names.",
+      "text": []
+    },
+    "openlancer://schema/mission-sections": {
+      "name": "mission-sections",
+      "title": "The sections of the missions",
+      "description": "The section types of a mission script and the ship build, with their keys and values. The fields of mission_add_item and set_fields take these keys.",
+      "text": []
+    },
+    "openlancer://schema/objlist-directives": {
+      "name": "objlist-directives",
+      "title": "The orders of an order list",
+      "description": "The orders of an order list with their plain names and values. The steps of mission_add_item take these orders.",
+      "text": []
+    },
+    "openlancer://catalog/prefabs": {
+      "name": "prefabs",
+      "title": "The prefabs, templates, builders and prop groups",
+      "description": "The behavior prefabs with their fields, the templates of scene_create_object, the builders of the Scene and the prop groups of the profile. Without a profile, it has the built-in prefabs and the rule data only.",
+      "text": []
+    },
     "openlancer://catalog/lists": {
       "name": "lists",
       "title": "The data lists",

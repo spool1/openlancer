@@ -4,6 +4,7 @@ using System.Linq;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Fields;
+using OpenLancer.Data.Missions.Prefabs;
 using OpenLancer.Data.Missions.Run;
 
 namespace OpenLancer.Data.Missions.Editing;
@@ -381,29 +382,14 @@ public sealed class MissionQueries
 
     /// <summary>The prefabs of the library: the built-in prefabs, then the assets of the active mod and of the lower
     /// mods, with their fields, roles, ports and steps (section 5.2 of the M6b design).</summary>
-    public IReadOnlyList<MissionPrefabView> ListPrefabs() =>
+    public IReadOnlyList<MissionPrefabView> ListPrefabs() => [.. editor.Prefabs().Select(PrefabView)];
+
+    /// <summary>The built-in prefabs of the library, as <see cref="ListPrefabs"/> gives them. They need no session, so
+    /// the catalog of the agent server gives them also without a profile (section 9.3 of the MCP1 design).</summary>
+    public static IReadOnlyList<MissionPrefabView> ListBuiltinPrefabs() =>
     [
-        .. editor.Prefabs().Select(asset =>
-        {
-            var template = asset.Template;
-            var definition = asset.Ref.Builtin ? MissionPrefabs.Retail.Definition(asset.Ref.Id) : null;
-            return new MissionPrefabView(asset.Ref.ToString(), asset.Name, template?.Kind ?? MissionPrefabKind.Beat,
-                template?.HelpText.WhatItIs ?? "",
-                [.. (template?.Fields ?? []).Select(f => new MissionPrefabFieldView(f.Id, f.Label, f.Help, f.IsList)
-                {
-                    Kind = f.KindText, PerInstance = f.PerInstance, Default = [.. f.Default.Select(r => r.Format())],
-                    Optional = f.Optional,
-                    Columns = [.. f.Columns.Select(c => new MissionPrefabColumnView(c.Id, c.Label, Prefabs.PrefabFieldDef.KindName(c.Kind)))],
-                    Keys = f.Keys,
-                })],
-                [.. (template?.Sections ?? []).Select(s => s.Role)], [.. (definition?.Steps ?? []).Select(s => s.Name)])
-            {
-                ModId = asset.ModId,
-                ReadOnly = !asset.Active,
-                Ports = [.. (template?.Ports ?? []).Select(p => p.Id)],
-                Problems = [.. asset.Problems.Select(p => p.ToString())],
-            };
-        }),
+        .. BuiltinPrefabs.Ids.Select(id =>
+            PrefabView(new PrefabAsset(PrefabRef.BuiltinOf(id), BuiltinPrefabs.Text(id)!, null, Active: false))),
     ];
 
     /// <summary>A prefab instance: the values of its fields, its members and its completeness steps.</summary>
@@ -581,7 +567,32 @@ public sealed class MissionQueries
         return baseCounts;
     }
 
-    private static MissionValueView ValueView(MissionValueSpec spec, MissionSchema schema) =>
+    /// <summary>A prefab of the library with its fields, roles, ports and steps.</summary>
+    private static MissionPrefabView PrefabView(PrefabAsset asset)
+    {
+        var template = asset.Template;
+        var definition = asset.Ref.Builtin ? MissionPrefabs.Retail.Definition(asset.Ref.Id) : null;
+        return new MissionPrefabView(asset.Ref.ToString(), asset.Name, template?.Kind ?? MissionPrefabKind.Beat,
+            template?.HelpText.WhatItIs ?? "",
+            [.. (template?.Fields ?? []).Select(f => new MissionPrefabFieldView(f.Id, f.Label, f.Help, f.IsList)
+            {
+                Kind = f.KindText, PerInstance = f.PerInstance, Default = [.. f.Default.Select(r => r.Format())],
+                Optional = f.Optional,
+                Columns = [.. f.Columns.Select(c => new MissionPrefabColumnView(c.Id, c.Label, PrefabFieldDef.KindName(c.Kind)))],
+                Keys = f.Keys,
+            })],
+            [.. (template?.Sections ?? []).Select(s => s.Role)], [.. (definition?.Steps ?? []).Select(s => s.Name)])
+        {
+            ModId = asset.ModId,
+            ReadOnly = !asset.Active,
+            Ports = [.. (template?.Ports ?? []).Select(p => p.Id)],
+            Problems = [.. asset.Problems.Select(p => p.ToString())],
+        };
+    }
+
+    /// <summary>A value of a name of the schema, with the words of its word sets. The resources of the agent server
+    /// use it too.</summary>
+    internal static MissionValueView ValueView(MissionValueSpec spec, MissionSchema schema) =>
         new(spec.Name, spec.Label, spec.Kind, spec.Index, spec.Width, spec.Optional, spec.Rest, spec.Default,
             [.. new[] { spec.Tokens, spec.Also }.OfType<string>()
                 .SelectMany(id => schema.Tokens.TryGetValue(id, out var set) ? set.Values : [])],

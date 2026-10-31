@@ -531,7 +531,7 @@ internal static class ItemQueries
     /// the host without a window has no focus. So each tool reads the folders again before it reads the groups (review
     /// finding of MCP1-2, step 4).
     /// </summary>
-    private static IReadOnlyList<PropGroup> Groups(EditSession session)
+    internal static IReadOnlyList<PropGroup> Groups(EditSession session)
     {
         PropGroups.Refresh(session);
         return PropGroups.Of(session);
@@ -542,7 +542,7 @@ internal static class ItemQueries
     internal static string GroupRef(PropGroup group) =>
         ItemRefs.Format(new ItemReference(ItemRefKind.Group, group.Nickname) { Scope = group.Editable ? null : group.ModId });
 
-    private static PropGroupRow GroupRow(EditSession session, PropGroup group) => new(
+    internal static PropGroupRow GroupRow(EditSession session, PropGroup group) => new(
         GroupRef(group),
         group.Nickname, group.Name, group.ModId ?? session.ActiveMod?.Id ?? "", group.Editable, group.Members.Count,
         group.Problems.Select(p => p.Message).ToList());

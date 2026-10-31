@@ -341,7 +341,7 @@ internal static partial class MissionEditTools
     private const int MaxSteps = MaxActions;
 
     /// <summary>The kinds of <c>mission_add_item</c> (section 7.4 of the MCP1 design).</summary>
-    private static readonly IReadOnlyList<string> ItemKinds =
+    internal static readonly IReadOnlyList<string> ItemKinds =
     [
         "ship", "formation", "npc", "ship_build", "solar", "loot", "order_list", "objective", "conversation",
         "random_encounter",
@@ -353,6 +353,10 @@ internal static partial class MissionEditTools
     {
         "npc", "system", "position", "orientation", "rel_pos", "label", "init_objectives",
     };
+
+    /// <summary>The section type of a kind of <see cref="ItemKinds"/>, for example <c>MsnShip</c> for
+    /// <c>ship</c>.</summary>
+    internal static string SectionTypeOf(string kind) => kind == "ship" ? "MsnShip" : MissionDraft.TypeOfKind(kind)!;
 
     public static ToolInput AddItemInput { get; } = WithLines(
         new TextParam("script", true, null, null),
@@ -376,7 +380,7 @@ internal static partial class MissionEditTools
         var args = call.Args;
         var script = EditTools.At("script", () => ScriptRef.Parse(args.Text("script")!));
         var kind = args.Text("kind")!;
-        var type = kind == "ship" ? "MsnShip" : MissionDraft.TypeOfKind(kind)!;
+        var type = SectionTypeOf(kind);
         var fields = Fields(args.Node("fields")?.AsObject(), type);
         if (args.Has("steps") && kind != "order_list")
         {
