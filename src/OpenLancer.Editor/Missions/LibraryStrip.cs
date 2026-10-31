@@ -12,8 +12,8 @@ using OpenLancer.Runtime.Missions;
 
 namespace OpenLancer.Editor.Missions;
 
-/// <summary>The payloads of the drags of the mission studio: an item of the library, and a row of a node at the lines
-/// level. The payload holds an index into a table, because ImGui copies its bytes.</summary>
+/// <summary>The payloads of the drags of the mission studio: an item of the library, a row of a node at the lines level,
+/// and a row of the tree of a mission. The payload holds an index into a table, because ImGui copies its bytes.</summary>
 internal static class MissionDrag
 {
     /// <summary>The payload type of an item of the library.</summary>
@@ -21,6 +21,9 @@ internal static class MissionDrag
 
     /// <summary>The payload type of an action row of the graph.</summary>
     public const string RowType = "OL_MISSION_ROW";
+
+    /// <summary>The payload type of a row of the tree of a mission in the Hierarchy.</summary>
+    public const string TreeRowType = "OL_MISSION_TREE_ROW";
 
     private static readonly Dictionary<int, object> Table = [];
     private static int next;
@@ -36,6 +39,12 @@ internal static class MissionDrag
         ImGui.SetDragDropPayload(type, (IntPtr)(&index), sizeof(int));
         ImGui.Text(preview);
     }
+
+    /// <summary>True while the user drags an item of the library, an action row of the graph or a row of the tree of a
+    /// mission. An agent call waits for the drop (section 5.5, item 3 of the MCP1 design).</summary>
+    public static bool IsDragging => ImGui.GetDragDropPayload() is { } payload &&
+                                     (payload.IsDataType(ItemType) || payload.IsDataType(RowType) ||
+                                      payload.IsDataType(TreeRowType));
 
     /// <summary>The item of the payload of a type that a drag carries now, or null.</summary>
     public static unsafe object? Payload(string type)

@@ -59,6 +59,10 @@ internal sealed class AssetsPanel : IDisposable
     // The prefab of the open rename popup, and true for a rename of the file name, false for the name.
     private (string Id, bool File)? renamingPrefab;
 
+    /// <summary>True while the rename popup of a prefab is open. An agent call waits for it (section 5.5, item 3 of the
+    /// MCP1 design).</summary>
+    internal bool PrefabRenaming => prefabRename.IsOpen;
+
     /// <param name="thumbnailFolder">The folder of the cache of the thumbnails.</param>
     public AssetsPanel(EditorWindow window, string thumbnailFolder)
     {

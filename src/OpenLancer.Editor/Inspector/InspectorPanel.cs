@@ -88,6 +88,10 @@ internal sealed class InspectorPanel : IDisposable
     /// ends it first.</summary>
     public bool IsEditing => grid.IsEditing || thnPage.IsDragging || missionPage.IsEditing;
 
+    /// <summary>True while the rename popup or quick add of the Mission page is open. An agent call waits for it (section
+    /// 5.5, item 3 of the MCP1 design).</summary>
+    public bool InMissionGesture => missionPage.InGesture;
+
     /// <summary>Ends an open field edit and keeps its text, and an open drag of a curve point, for example when the
     /// window closes.</summary>
     public void EndEdit()

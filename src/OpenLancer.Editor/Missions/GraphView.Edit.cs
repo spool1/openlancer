@@ -49,6 +49,28 @@ internal sealed partial class GraphView
     /// <summary>True while the user renames a node, or quick add is open. The keys of the graph then wait.</summary>
     public bool IsEditingText => renaming != null || quickAdd.IsOpen;
 
+    /// <summary>True while the user renames a node, quick add is open, or the user drags a node or a link. An agent call
+    /// waits for it (section 5.5, item 3 of the MCP1 design). A graph that does not draw any more has no gesture, for
+    /// example a rename in a hidden tab.</summary>
+    public bool InGesture => drawn.Recent(ImGui.GetFrameCount()) && (IsEditingText || pressedOnItem || linkDrag);
+
+    /// <summary>The press of the left button on a node or a pin after a frame. It starts at a click over a node or a pin,
+    /// and it ends at the release of the button. A drag of nodes or of a link runs only during such a press.</summary>
+    /// <param name="before">The press after the frame before.</param>
+    /// <param name="clicked">The left button went down in this frame.</param>
+    /// <param name="overItem">The mouse is over a node or a pin of the graph.</param>
+    /// <param name="down">The left button is down now.</param>
+    internal static bool Pressed(bool before, bool clicked, bool overItem, bool down) => down && (clicked ? overItem : before);
+
+    /// <summary>Follows the press of the left button on a node or a pin. Call it after the canvas, while the node editor
+    /// is current.</summary>
+    private void TrackPress()
+    {
+        var over = (IntPtr)NodeEditor.GetHoveredNode() != IntPtr.Zero || (IntPtr)NodeEditor.GetHoveredPin() != IntPtr.Zero;
+        pressedOnItem = Pressed(pressedOnItem, ImGui.IsMouseClicked(ImGuiMouseButton.Left), over,
+            ImGui.IsMouseDown(ImGuiMouseButton.Left));
+    }
+
     /// <summary>The gesture model of the graph of this frame, or null before the first draw.</summary>
     internal GraphEditModel? EditModel => edit;
 
@@ -177,6 +199,7 @@ internal sealed partial class GraphView
 
         if (NodeEditor.BeginCreate(new Color4(EditorTheme.GraphLinkLight), 1.5f))
         {
+            linkDrag = true;
             if (NodeEditor.QueryNewLink(out var startId, out var endId) &&
                 edit.End((int)(IntPtr)startId) is { } a && edit.End((int)(IntPtr)endId) is { } b)
             {

@@ -5,6 +5,7 @@ using System.Numerics;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.IO;
 
 namespace OpenLancer.Editor.Agent;
 
@@ -24,6 +25,22 @@ internal interface IFollowView
     /// </summary>
     /// <returns>False when the Scene cannot show the item, for example while the game data loads again.</returns>
     bool ShowInScene(SectionRef section, string system, bool select);
+
+    /// <summary>True while the Mission tab shows a prefab in prefab mode (section 8.6 of the M6b design). Follow mode does
+    /// not leave prefab mode, so an agent edit of a mission then shows only in the Console.</summary>
+    bool InPrefabMode { get; }
+
+    /// <summary>
+    /// Opens the script of a mission item in the Mission tab, shows the tab and moves the graph to the item. With
+    /// <paramref name="select"/>, it also selects the item, as a click does. The open of another script selects the root
+    /// of that script, as the open of a mission does.
+    /// </summary>
+    /// <param name="script">The install path of the script.</param>
+    /// <param name="reference">An item reference of a result in the script: the script, a trigger, a section, a line, a
+    /// label, an act or a prefab instance.</param>
+    /// <returns>False when the Mission tab cannot show the item, for example a section of a script that the mission run
+    /// did not read yet.</returns>
+    bool ShowInMission(string script, string reference, bool select);
 }
 
 /// <summary>What the panels did in one frame, for follow mode. The window reads it before and after the panels
@@ -48,11 +65,14 @@ internal readonly record struct FollowFrame(
 
 /// <summary>
 /// Follow mode of the agent edits (section 8.5 of the MCP1 design, decisions D719 and D720). With follow mode on, the
-/// editor opens the system of each agent edit and frames its item. The selection then follows Unity (decision D249): a
-/// create or a duplicate selects the new item, a delete clears the selection, and a rename keeps it. An item without a
-/// place in the Scene, for example a loadout, shows in the Inspector, and the view does not change. A camera input or a
-/// selection of the user stops follow mode until the user turns it on again. With follow mode off, the agent never
-/// changes the view or the selection. Only a selection of a section that an agent edit removed goes, as after an undo.
+/// editor opens the system of each agent edit and frames its item. An edit of a mission opens its script in the Mission
+/// tab and frames the item in the graph. The selection then follows Unity (decision D249): a create or a duplicate
+/// selects the new item, a delete clears the selection, and a rename keeps it. An item without a place in the Scene, for
+/// example a loadout, shows in the Inspector, and the view does not change. Follow mode does not leave prefab mode, as
+/// Unity keeps prefab mode open when the scene changes. An edit of a mission then shows only in the Console. A camera
+/// input or a selection of the user stops follow mode until the user turns it on again. With follow mode off, the agent
+/// never changes the view or the selection. Only a selection of a section that an agent edit removed goes, as after an
+/// undo.
 /// </summary>
 /// <param name="settings">The setting "Follow agent". It keeps the last value that the user clicked.</param>
 internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
@@ -131,7 +151,9 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
             return;
         if (result.Adds.Count == 0 && result.Deletes.Count > 0)
         {
-            view.Selection = null;
+            // Follow mode does not leave prefab mode, so a delete of mission items keeps the selection of prefab mode.
+            if (!(view.InPrefabMode && result.Deletes.All(d => MissionScriptOf(d.Ref) != null)))
+                view.Selection = null;
             return;
         }
         if (result.Adds.Count > 0)
@@ -152,23 +174,35 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
     /// <summary>
     /// The first item of the agent delete with the label of an entry, when the edit view has the item again, else null.
     /// The undo of the user selects it, as the undo of a delete of the user does (decision D249). This works also with
-    /// follow mode off, because the user asked for the undo.
+    /// follow mode off, because the user asked for the undo. An item of a mission script gives null: the undo of a
+    /// mission edit of the user keeps the selection of the Mission tab, so the undo of an agent edit does too.
     /// </summary>
     /// <param name="label">The label of the entry that the undo reversed.</param>
     public SectionRef? DeletedItem(string label) =>
-        session != null && deleted.TryGetValue(label, out var reference) ? SectionOf(reference) : null;
+        session != null && deleted.TryGetValue(label, out var reference) && MissionScriptOf(reference) == null
+            ? SectionOf(reference)
+            : null;
 
     /// <summary>
-    /// Shows the first item of an edit: in the Scene for an item of a system, else in the Inspector. An item of a system
-    /// that the Scene cannot show also shows in the Inspector.
+    /// Shows the first item of an edit: in the Mission tab for an item of a mission script, in the Scene for an item of a
+    /// system, else in the Inspector. An item that the Mission tab or the Scene cannot show also shows in the Inspector.
+    /// In prefab mode, an item of a mission script does not show.
     /// </summary>
-    /// <param name="select">True to select an item of the Scene. An item without a place in the Scene always gets the
-    /// selection, because the Inspector shows only the selection.</param>
+    /// <param name="select">True to select an item of the Scene or of the Mission tab. An item that shows only in the
+    /// Inspector always gets the selection, because the Inspector shows only the selection.</param>
     private void Show(IEnumerable<string> references, bool select)
     {
         SectionRef? inspector = null;
         foreach (var reference in references)
         {
+            if (MissionScriptOf(reference) is { } script)
+            {
+                // Follow mode does not leave prefab mode, so the edit shows only in the Console.
+                if (view.InPrefabMode)
+                    continue;
+                if (view.ShowInMission(script, reference, select))
+                    return;
+            }
             if (SectionOf(reference) is not { } section)
                 continue;
             if (session!.IsSystemFile(section.Path) && session.SystemNicknameOf(section.Path) is { } system &&
@@ -205,6 +239,33 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
             !change.Renames.Any(r => r.From.Equals(section)))
         {
             view.Selection = null;
+        }
+    }
+
+    /// <summary>
+    /// The install path of the mission script of an item reference of a result, or null for an item outside the scripts.
+    /// A script, a trigger, a line, a label, a prefab instance and an act are items of a script. So is a section of a
+    /// script, but not a section of a ship build file.
+    /// </summary>
+    private string? MissionScriptOf(string reference)
+    {
+        try
+        {
+            return ItemRefs.Parse(reference) switch
+            {
+                {
+                    Kind: ItemRefKind.Script or ItemRefKind.Trigger or ItemRefKind.Line or ItemRefKind.Label or ItemRefKind.Instance
+                    or ItemRefKind.Act,
+                    Path: { } path,
+                } => path,
+                { Kind: ItemRefKind.Section, Path: { } path } when session!.Missions.ScriptPaths().Contains(path, VfsPath.Comparer) =>
+                    path,
+                _ => null,
+            };
+        }
+        catch (Exception e) when (e is EditException or ArgumentException)
+        {
+            return null;
         }
     }
 

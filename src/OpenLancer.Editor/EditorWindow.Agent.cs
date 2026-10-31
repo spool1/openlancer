@@ -7,7 +7,11 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Editor.Agent;
 using OpenLancer.Editor.Editing;
+using OpenLancer.Data.IO;
+using OpenLancer.Data.Missions;
+using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Editor.Logs;
+using OpenLancer.Editor.Missions;
 using OpenLancer.Editor.Scene;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Studio.Agent;
@@ -89,8 +93,16 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
 
     /// <summary>What the editor does now: an agent call waits while the user edits or renames, a dialog is open, the
     /// data loads or an edit of the user runs (section 5.5 of the MCP1 design).</summary>
-    private EditorActivity Activity() => new(IsEditing || AssetDrag.IsDragging, DialogOpen, Session?.IsBusy == true,
-        Session?.Edits is { } edits && (edits.OpenBatch != null || edits.InTransaction), SceneEdits.Renaming != null);
+    private EditorActivity Activity() => new(IsEditing || AssetDrag.IsDragging || MissionGesture, DialogOpen,
+        Session?.IsBusy == true, Session?.Edits is { } edits && (edits.OpenBatch != null || edits.InTransaction),
+        SceneEdits.Renaming != null || hierarchy.MissionRenaming);
+
+    /// <summary>True while a gesture of the user in the mission studio is open: a rename of a node of the graph, quick add,
+    /// a drag of a node or a link of the graph, a drag of a library item or of a mission row, the rename popup or quick add
+    /// of the Mission page, or the rename popup of a prefab. An agent call waits for its end (section 5.5, item 3 of the
+    /// MCP1 design).</summary>
+    private bool MissionGesture => missionView.Graph.InGesture || MissionDrag.IsDragging || inspector.InMissionGesture ||
+                                   Assets.PrefabRenaming;
 
     EditSession? IAgentEditor.Edits => Session?.Edits;
 
@@ -150,6 +162,47 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
         }
 
         Scene.Focus(item);
+        return true;
+    }
+
+    /// <summary>Prefab mode of the Mission tab. Follow mode does not leave it.</summary>
+    bool IFollowView.InPrefabMode => Missions.OpenPrefab != null;
+
+    /// <summary>
+    /// Follow mode of the agent edits: opens the script of a mission item in the Mission tab, shows the tab and moves the
+    /// graph to the item. The open of another script selects its root, as the open of a mission does. A new script has no
+    /// analysis until the mission run reads it, so only its root shows then.
+    /// </summary>
+    bool IFollowView.ShowInMission(string script, string reference, bool select)
+    {
+        if (PrefabRef.OfScript(script) != null)
+        {
+            return false;
+        }
+
+        var item = Missions.Analysis(script) is { } analysis
+            ? MissionWorkspace.SelectionOf(analysis, reference, Missions.ActsOf(analysis))
+            : ItemRefs.Parse(reference).Kind == ItemRefKind.Script ? MissionRef.Of(script) : null;
+        if (item == null)
+        {
+            return false;
+        }
+
+        if (!VfsPath.Comparer.Equals(Missions.OpenPath, item.Script))
+        {
+            Missions.OpenMission(item.Script, show: true);
+        }
+        else
+        {
+            ShowPanel(MissionWorkspace.PanelId);
+        }
+
+        if (select)
+        {
+            SelectInTab(CenterMode.Mission, item);
+        }
+
+        missionView.Graph.FrameItem(item);
         return true;
     }
 

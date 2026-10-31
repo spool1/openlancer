@@ -20,14 +20,16 @@ internal sealed class QuickAdd
     private const float ListHeight = 300;
     private const string PopupId = "##quick-add";
 
+    private readonly DrawnFrame drawn = new();
     private QuickAddContext? context;
     private Vector2 at;
     private bool openNow;
     private string search = "";
     private int selected;
 
-    /// <summary>True while the popup is open.</summary>
-    public bool IsOpen => context != null;
+    /// <summary>True while the popup is open. An agent call waits for it (section 5.5, item 3 of the MCP1 design). A popup
+    /// whose view does not draw any more is not open.</summary>
+    public bool IsOpen => context != null && drawn.Recent(ImGui.GetFrameCount());
 
     /// <summary>Opens the popup at a screen point in the next draw.</summary>
     public void Open(QuickAddContext place, Vector2 screen)
@@ -35,6 +37,7 @@ internal sealed class QuickAdd
         context = place;
         at = screen;
         openNow = true;
+        drawn.Drew(ImGui.GetFrameCount());
         search = "";
         selected = 0;
     }
@@ -42,6 +45,7 @@ internal sealed class QuickAdd
     /// <summary>Draws the popup. Returns the place and the item of a pick, or null.</summary>
     public (QuickAddContext Context, LibraryItem Item)? Draw(IReadOnlyList<LibrarySection> sections)
     {
+        drawn.Drew(ImGui.GetFrameCount());
         if (context is not { } place)
         {
             return null;

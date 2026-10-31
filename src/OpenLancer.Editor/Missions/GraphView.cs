@@ -114,6 +114,18 @@ internal sealed partial class GraphView : IDisposable
     // the M6c design).
     private bool playButtons;
 
+    // The frames of the draws of the graph. A gesture of a graph that does not draw any more does not count.
+    private readonly DrawnFrame drawn = new();
+
+    // True from a press of the left button on a node or a pin until its release: a drag of nodes or of a link can run.
+    private bool pressedOnItem;
+
+    // True when a link drag of the node editor ran in the last draw.
+    private bool linkDrag;
+
+    // The item that the view frames at its next draw for follow mode of the agent edits, or null.
+    private MissionRef? pendingItem;
+
     /// <summary>A view move that waits for the next frame of the node editor.</summary>
     private enum Navigation
     {
@@ -124,6 +136,9 @@ internal sealed partial class GraphView : IDisposable
 
         /// <summary>Zoom in on a node, for the frame bench.</summary>
         ZoomIn,
+
+        /// <summary>The node of an item that the selection does not name, for follow mode of the agent edits.</summary>
+        Item,
     }
 
     public GraphView(EditorWindow window, MissionWorkspace missions, GraphViewState state)
@@ -234,6 +249,15 @@ internal sealed partial class GraphView : IDisposable
     /// <summary>Moves the view to the selection at the next frame (the key F).</summary>
     public void FrameSelection() => pending = Navigation.Selection;
 
+    /// <summary>Moves the view to the node of an item at the next frame, and keeps the selection (follow mode of the agent
+    /// edits, section 8.5 of the MCP1 design). An item without a node, for example a ship, does not move the view. An
+    /// item of a mission that opens in the same frame keeps its frame, so the view does not show the whole graph.</summary>
+    public void FrameItem(MissionRef item)
+    {
+        pending = Navigation.Item;
+        pendingItem = item;
+    }
+
     /// <summary>
     /// A move of the view for the frame bench (<see cref="MissionBench"/>). Each 100 frames, the view zooms to the whole
     /// graph, and in the middle of them, it zooms in on a node. In the other frames, it pans from node to node.
@@ -301,7 +325,9 @@ internal sealed partial class GraphView : IDisposable
 
         if (!string.Equals(builtAnalysis?.Script.Path, analysis.Script.Path, StringComparison.OrdinalIgnoreCase))
         {
-            pending = Navigation.Content;
+            pending = pending == Navigation.Item && ItemBlock(Graph, analysis.Script.Path) != null
+                ? Navigation.Item
+                : Navigation.Content;
             SystemFilter = null;
         }
 
@@ -385,6 +411,8 @@ internal sealed partial class GraphView : IDisposable
     public void Draw(MissionAnalysis analysis, Vector2 size)
     {
         slotTemplate = PrefabRef.OfScript(analysis.Script.Path) != null ? missions.PrefabMode?.Template : null;
+        drawn.Drew(ImGui.GetFrameCount());
+        linkDrag = false;
         Build(analysis);
         editable = missions.NoEditReason(analysis.Script.Path) == null;
         var graph = Graph!;
@@ -467,6 +495,7 @@ internal sealed partial class GraphView : IDisposable
         TakeNodeEditorSelection(analysis.Script.Path);
         CaptureSelection();
         DoubleClicks(analysis.Script.Path);
+        TrackPress();
         // The engine method takes null to clear the current editor.
         NodeEditor.SetCurrentEditor(null!);
         // The overlays are child windows after the canvas, so they draw over it and take the mouse first.
@@ -1464,10 +1493,20 @@ internal sealed partial class GraphView : IDisposable
                 NodeEditor.SelectNode(pendingCenter);
                 NodeEditor.NavigateToSelection(true, 0);
                 break;
+            case Navigation.Item when builtAnalysis != null && ItemBlock(graph, builtAnalysis.Script.Path) is { } itemBlock:
+                NodeEditor.CenterNodeOnScreen(itemBlock.Id);
+                break;
         }
 
         pending = Navigation.None;
+        pendingItem = null;
     }
+
+    /// <summary>The block of the item of follow mode in the graph of a script, or null.</summary>
+    private GraphBlock? ItemBlock(MissionGraph graph, string script) =>
+        pendingItem is { } item && string.Equals(item.Script, script, StringComparison.OrdinalIgnoreCase)
+            ? GraphViewState.BlockOf(graph, item, PlayStartTrigger(script))
+            : null;
 
     /// <summary>The node menu and the frame menu (section 13.1 of the M6a design).</summary>
     private void Menus(string script, MissionGraph graph)

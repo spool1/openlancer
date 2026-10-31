@@ -85,8 +85,12 @@ internal sealed class FakeAgentEditor : IAgentEditor
 /// gets a new nickname.</summary>
 internal sealed record FakeSceneItem(SectionRef Section);
 
-/// <summary>The views of follow mode for the tests: the selection, and each request to show an item in the
-/// Scene.</summary>
+/// <summary>An item of the Mission tab of a test: the item of a reference of a result. The Scene has no section for
+/// it, as the real Scene has none for a mission item.</summary>
+internal sealed record FakeMissionItem(string Reference);
+
+/// <summary>The views of follow mode for the tests: the selection, and each request to show an item in the Scene or in
+/// the Mission tab.</summary>
 internal sealed class FakeFollowView : IFollowView
 {
     public object? Selection { get; set; }
@@ -106,6 +110,26 @@ internal sealed class FakeFollowView : IFollowView
         FakeSceneItem scene => scene.Section,
         _ => null,
     };
+
+    /// <summary>True to act as an editor in prefab mode.</summary>
+    public bool InPrefabMode { get; set; }
+
+    /// <summary>Each request to show a mission item: the script, the reference and the selection flag.</summary>
+    public System.Collections.Generic.List<(string Script, string Reference, bool Select)> MissionShown { get; } = [];
+
+    /// <summary>False to act as a Mission tab that cannot show the item, for example before the mission run reads the
+    /// script.</summary>
+    public bool CanShowMission { get; set; } = true;
+
+    public bool ShowInMission(string script, string reference, bool select)
+    {
+        if (!CanShowMission)
+            return false;
+        MissionShown.Add((script, reference, select));
+        if (select)
+            Selection = new FakeMissionItem(reference);
+        return true;
+    }
 
     public bool ShowInScene(SectionRef section, string system, bool select)
     {

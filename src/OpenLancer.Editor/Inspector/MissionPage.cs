@@ -540,6 +540,10 @@ internal sealed partial class MissionPage(EditorWindow window, PropertyGrid grid
     /// <summary>True while the user edits the INI block or drags a field.</summary>
     public bool IsEditing => ini.IsEditing || gesture != null;
 
+    /// <summary>True while the rename popup or quick add of the page is open. An agent call waits for it (section 5.5,
+    /// item 3 of the MCP1 design).</summary>
+    public bool InGesture => rename.IsOpen || quickAdd.IsOpen;
+
     /// <summary>Ends an open edit of the INI block and an open drag of a field, for example before a save.</summary>
     public void EndEdit()
     {

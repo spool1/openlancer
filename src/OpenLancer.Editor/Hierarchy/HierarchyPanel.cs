@@ -409,11 +409,13 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
             return;
         }
 
-        // The robot glyph of an agent edit takes the right end of the row, so the text ends before it.
-        var agentMarked = section != null && window.AgentMarks.Marked(section);
+        // The robot glyph of an agent edit takes the right end of the row, so the text and the problem glyph end before
+        // it. A row of a mission shows it for its section. It has no blue mark (section 8.5 of the MCP1 design).
+        var agentSection = section ?? HierarchyModel.SectionOfMissionRow(node.Item);
+        var agentMarked = agentSection != null && window.AgentMarks.Marked(agentSection);
         var textRight = agentMarked ? right - AgentMarkWidth() : right;
         ListRow.Text(start, textStart, textRight, node.Kind.Icon, node.Kind.Abgr, node.Name, node.Detail, node.CountText);
-        ProblemMark(node.Problem, start, right);
+        ProblemMark(node.Problem, start, textRight);
         if (section != null)
         {
             Mark(HierarchyModel.MarkOf(window.Session?.Edits.Get(section)), start, textStart);

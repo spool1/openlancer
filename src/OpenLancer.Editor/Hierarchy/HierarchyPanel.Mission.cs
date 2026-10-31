@@ -19,9 +19,6 @@ namespace OpenLancer.Editor.Hierarchy;
 /// </summary>
 internal sealed partial class HierarchyPanel
 {
-    /// <summary>The payload type of a row of the tree of a mission.</summary>
-    private const string MissionRowType = "OL_MISSION_TREE_ROW";
-
     private readonly RenamePopup missionRename = new("##mission-rename");
     private MissionRef? missionRenaming;
 
@@ -29,6 +26,10 @@ internal sealed partial class HierarchyPanel
     private AssetRow? droppedShip;
     private bool openFaction;
     private string factionFilter = "";
+
+    /// <summary>True while the rename popup of a row of a mission is open. An agent call waits for it (section 5.5, item 3
+    /// of the MCP1 design).</summary>
+    internal bool MissionRenaming => missionRename.IsOpen;
 
     /// <summary>True when the session takes edits of the open mission, or of the template of prefab mode.</summary>
     private bool MissionEditable => window.Missions.ShownPath is { } path && window.Missions.NoEditReason(path) == null;
@@ -168,18 +169,18 @@ internal sealed partial class HierarchyPanel
         if (node.Item is MissionRef { Kind: MissionItemKind.Ship or MissionItemKind.Formation or MissionItemKind.Solar or
                 MissionItemKind.Trigger } source && ImGui.BeginDragDropSource())
         {
-            MissionDrag.Source(MissionRowType, source, $"{node.Kind.Icon}  {node.Name}");
+            MissionDrag.Source(MissionDrag.TreeRowType, source, $"{node.Kind.Icon}  {node.Name}");
             ImGui.EndDragDropSource();
         }
 
         if (node.Item is MissionRef { Kind: MissionItemKind.Formation or MissionItemKind.Label or MissionItemKind.Act } target &&
-            MissionDrag.Payload(MissionRowType) is MissionRef dragged && ImGui.BeginDragDropTarget())
+            MissionDrag.Payload(MissionDrag.TreeRowType) is MissionRef dragged && ImGui.BeginDragDropTarget())
         {
             if (MissionTreeEdits.DropRefusal(analysis, dragged, target) is { } refusal)
             {
                 ImGui.SetTooltip(refusal);
             }
-            else if (ImGui.AcceptDragDropPayload(MissionRowType) is { Delivery: true })
+            else if (ImGui.AcceptDragDropPayload(MissionDrag.TreeRowType) is { Delivery: true })
             {
                 RunMission(MissionTreeEdits.Drop(analysis, dragged, target, window.Missions.ActsOf(analysis)));
             }
