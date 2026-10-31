@@ -1509,7 +1509,7 @@
     "MissionTraceView.game_runs": "True while the game of a play copy runs. That game sends no changes to the editor, so the result then has no changes.",
     "MissionTraceChange.sequence": "The number of the change in its play, from 1.",
     "MissionTraceChange.time": "The time of the change since the game loaded the mission, in seconds.",
-    "MissionTraceChange.trigger": "The trg: reference of the trigger with its name in the editor now, also after a rename. When the editor does not know the script, the nickname in the game.",
+    "MissionTraceChange.trigger": "The trg: reference of the trigger with its name in the editor now, also after a rename. When the editor does not know the script, the tool gives the nickname in the game.",
     "MissionTraceChange.change": "What the trigger did: started (it became active), ran (it ran its actions) or stopped."
   }
 }
