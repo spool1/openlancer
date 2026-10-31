@@ -322,7 +322,7 @@ A line can also give its value texts by position in `texts`, in place of `values
 
 A new nickname has letters, digits, `_` and `-`, with at most 47 characters, and it cannot be a number. Without a nickname, the editor makes a free name, for example `m01a_trigger_3`.
 
-A link to a trigger that does not exist adds an error, so strict mode refuses it. So a step of `edit_batch` can link to a trigger that a later step adds. A link from a trigger of a linked prefab instance goes through the output of its prefab, as the link gesture of the graph does. The output then starts the target, and the instance keeps the lines of its prefab. With `remove: true`, the tool takes the target from the output. A trigger of an instance without such an output gives `refused` with the detail `PrefabMember`.
+A link to a trigger that does not exist adds an error, so strict mode refuses it. In `edit_batch`, the strict check runs at the end, so a step can link to a trigger that a later step adds. A link from a trigger of a linked prefab instance goes through the output of its prefab, as the link gesture of the graph does. The output then starts the target, and the instance keeps the lines of its prefab. With `remove: true`, the tool takes the target from the output. A trigger of an instance without such an output gives `refused` with the detail `PrefabMember`.
 
 Each other trigger or line that does not exist gives `not_found`, and a trigger also gives the closest names. An error names its argument in `field`, for example `actions[2]` or `values.ship`. The result names each new or changed item in its shortest form: `trg:` for a trigger and `line:` for a line.
 

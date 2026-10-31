@@ -217,6 +217,30 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal(("not_found", MissionErrors.LinkNotFound), (missing.Code, missing.Detail));
     }
 
+    /// <summary>The target of a link is not looked up, as in the mission studio. A link to a trigger that does not exist
+    /// adds the error M05, so a call gives new_errors. In edit_batch, the strict check runs at the end, so a step links
+    /// to a trigger that a later step adds.</summary>
+    [Fact]
+    public void ALinkStepCanNameATriggerThatALaterStepAdds()
+    {
+        var (m, host) = Open();
+        using var _ = m;
+        var link = $$"""{ "from": "{{End}}", "to": "ol_later" }""";
+
+        var alone = Error(host, "mission_link_triggers", link);
+        var batch = Ok(host, "edit_batch", $$"""
+            { "steps": [ { "tool": "mission_link_triggers", "arguments": {{link}} },
+                         { "tool": "mission_add_trigger",
+                           "arguments": { "script": "msn:{{S}}", "nickname": "ol_later", "condition": { "key": "Cnd_True" } } } ] }
+            """);
+
+        Assert.Equal(("new_errors", MissionErrors.NewErrors), (alone.Code, alone.Detail));
+        Assert.Contains("ol_later", alone.Message);
+        Assert.Equal("applied", (string?)batch["status"]);
+        Assert.Equal("Act_ActTrig = ol_later", m.Lines("ol_end")[^1]);
+        Assert.True(m.Has("ol_later"));
+    }
+
     /// <summary>mission_insert_trigger puts a new trigger on a start link. Its actions come before its start of the old
     /// target, in their order.</summary>
     [Fact]

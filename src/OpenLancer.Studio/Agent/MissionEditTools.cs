@@ -281,8 +281,8 @@ internal static class MissionEditTools
     /// <c>remove</c>. A plain trigger gets <see cref="LinkTriggers"/> or <see cref="UnlinkTriggers"/>. A member of a
     /// linked prefab instance links through the output of its role with <see cref="SetPrefabPort"/> (see
     /// <see cref="PrefabLinks.LinkCommand"/>). The target is a trigger of the script of the source. The command does not
-    /// look it up: a link to a trigger that does not exist adds the error M05, and strict mode refuses it. So a step of
-    /// <c>edit_batch</c> can link to a trigger that a later step adds.
+    /// look it up: a link to a trigger that does not exist adds the error M05, and strict mode refuses it. The strict
+    /// check of <c>edit_batch</c> runs at the end, so a step can link to a trigger that a later step adds.
     /// </summary>
     public static ToolStep Link(ToolCall call)
     {
