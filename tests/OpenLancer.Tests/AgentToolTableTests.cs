@@ -145,9 +145,51 @@ public sealed class AgentToolTableTests
             .Concat(AgentTexts.Resources.SelectMany(r => Problems($"{r.Key} title", r.Value.Title)
                 .Concat(Problems($"{r.Key} description", r.Value.Description))
                 .Concat(r.Value.Text.SelectMany(line => Problems(r.Key, line)))))
+            .Concat(AgentTexts.Prompts.SelectMany(p => Problems($"prompt {p.Key} title", p.Value.Title)
+                .Concat(Problems($"prompt {p.Key} description", p.Value.Description))
+                .Concat(p.Value.Arguments.SelectMany(a => Problems($"prompt {p.Key}.{a.Name}", a.Help)))
+                .Concat(p.Value.Text.SelectMany(line => Problems($"prompt {p.Key}", line, SteLint.InstructionWords)))))
             .ToList();
 
         Assert.Empty(problems);
+    }
+
+    /// <summary>The lint of the texts covers the prompts: a prompt line above the word limit of an instruction is a
+    /// problem.</summary>
+    [Fact]
+    public void TheLintCoversThePromptTexts()
+    {
+        var lines = AgentTexts.Prompts["two_trigger_mission"].Text;
+
+        Assert.NotEmpty(lines);
+        Assert.All(lines, line => Assert.Empty(SteLint.Problems(line, SteLint.InstructionWords)));
+        Assert.NotEmpty(SteLint.Problems(string.Join(" ", Enumerable.Repeat("Call", 21)) + ".", SteLint.InstructionWords));
+    }
+
+    /// <summary>A prompt gives the steps of a workflow with the names of real tools (section 9.4 of the MCP1 design).
+    /// Each <c>{name}</c> of its lines is an argument, and each argument shows in the lines. A host lists the prompt
+    /// only when it has each tool of the steps, so a host that only reads lists no prompt.</summary>
+    [Fact]
+    public void EachPromptNamesItsArgumentsAndTheToolsOfItsSteps()
+    {
+        foreach (var prompt in AgentPrompts.All)
+        {
+            var text = string.Join("\n", prompt.Lines);
+            var placeholders = System.Text.RegularExpressions.Regex.Matches(text, @"\{(\w+)\}").Select(m => m.Groups[1].Value)
+                .Distinct();
+            Assert.Equal(prompt.Arguments.Select(a => a.Name).Order(), placeholders.Order());
+            Assert.All(prompt.Tools, t => Assert.NotNull(AgentTools.Find(t)));
+        }
+        var mission = Assert.Single(AgentPrompts.All, p => p.Name == "two_trigger_mission");
+        Assert.Equal(["studio_status", "list_values", "get_mission", "mission_dry_run", "check", "mission_add_trigger",
+            "mission_add_item", "edit_batch"], mission.Tools);
+        Assert.Equal(["script"], mission.Arguments.Select(a => a.Name));
+        Assert.Equal([mission], AgentPrompts.For(AgentTools.All));
+        Assert.Empty(AgentPrompts.For(AgentTools.ReadOnly));
+        Assert.Contains(@"msn:DATA\MISSIONS\my_mission.ini 1", mission.Text(new Dictionary<string, string>
+        {
+            ["script"] = @"msn:DATA\MISSIONS\my_mission.ini 1",
+        }));
     }
 
     /// <summary>Each property of each output schema has a help of <c>agent-tools.json</c> (section 9.1 of the MCP1

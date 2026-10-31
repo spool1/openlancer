@@ -14,10 +14,17 @@ internal sealed record ToolTexts(string Title, string Description, IReadOnlyDict
 /// <param name="Text">The lines of a text resource, or none for a resource that the server makes from data.</param>
 internal sealed record ResourceTexts(string Name, string Title, string Description, IReadOnlyList<string> Text);
 
+/// <summary>The texts of one prompt.</summary>
+/// <param name="Arguments">The help of each argument, in order. Each argument of a prompt is required.</param>
+/// <param name="Text">The lines of the message of the prompt. Each <c>{name}</c> is the value of an argument.</param>
+internal sealed record PromptTexts(string Title, string Description, IReadOnlyList<(string Name, string Help)> Arguments,
+    IReadOnlyList<string> Text);
+
 /// <summary>
 /// The texts of the agent tools in <c>agent-tools.json</c> (decision D726 of the MCP1 design): the server
-/// instructions, the title and the description of each tool, the help of each argument, the texts of the host errors
-/// and the texts of the resources. A unit test checks each text with the STE rules of AGENTS.md. The texts use invented
+/// instructions, the title and the description of each tool, the help of each argument, the texts of the host errors,
+/// the texts of the resources and the texts of the prompts. A unit test checks each text with the STE rules of
+/// AGENTS.md. The texts use invented
 /// names only, so no retail text gets into the repository.
 /// </summary>
 internal static class AgentTexts
@@ -29,7 +36,8 @@ internal static class AgentTexts
     private sealed record Data(IReadOnlyDictionary<string, IReadOnlyList<string>> Instructions,
         IReadOnlyDictionary<string, string> Fields,
         IReadOnlyDictionary<string, ToolTexts> Tools, IReadOnlyDictionary<string, string> Errors,
-        IReadOnlyDictionary<string, ResourceTexts> Resources, IReadOnlyDictionary<string, string> Results);
+        IReadOnlyDictionary<string, ResourceTexts> Resources, IReadOnlyDictionary<string, PromptTexts> Prompts,
+        IReadOnlyDictionary<string, string> Results);
 
     /// <summary>The server instructions: the order of work in short STE steps (section 9.2 of the MCP1 design). The
     /// group <c>all</c> is for each host, <c>edit</c> for a host with edit tools, and <c>read_only</c> for a host
@@ -58,6 +66,9 @@ internal static class AgentTexts
 
     /// <summary>The texts of each resource, by URI.</summary>
     public static IReadOnlyDictionary<string, ResourceTexts> Resources => Loaded.Value.Resources;
+
+    /// <summary>The texts of each prompt, by prompt name, in the order of the file.</summary>
+    public static IReadOnlyDictionary<string, PromptTexts> Prompts => Loaded.Value.Prompts;
 
     /// <summary>The help of the properties of the results, by JSON name, or by the type name and the JSON name, for
     /// example <c>RawLineMark.line</c>.</summary>
@@ -120,6 +131,11 @@ internal static class AgentTexts
                 p.Value.GetProperty("name").GetString()!,
                 p.Value.GetProperty("title").GetString()!,
                 p.Value.GetProperty("description").GetString()!,
+                p.Value.GetProperty("text").EnumerateArray().Select(e => e.GetString()!).ToList())),
+            root.GetProperty("prompts").EnumerateObject().ToDictionary(p => p.Name, p => new PromptTexts(
+                p.Value.GetProperty("title").GetString()!,
+                p.Value.GetProperty("description").GetString()!,
+                p.Value.GetProperty("arguments").EnumerateObject().Select(a => (a.Name, a.Value.GetString()!)).ToList(),
                 p.Value.GetProperty("text").EnumerateArray().Select(e => e.GetString()!).ToList())),
             Strings(root.GetProperty("results")));
     }

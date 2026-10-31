@@ -1,5 +1,5 @@
 {
-  "// about": "The texts of the agent tools of milestone MCP1 (decision D726 of the MCP1 design): the server instructions, the title and the description of each tool, the help of each argument, the texts of the host errors and the resources. All texts use Simplified Technical English. A unit test checks them. The names in the examples are invented, for example my_system.",
+  "// about": "The texts of the agent tools of milestone MCP1 (decision D726 of the MCP1 design): the server instructions, the title and the description of each tool, the help of each argument, the texts of the host errors, the resources and the prompts. All texts use Simplified Technical English. A unit test checks them. The names in the examples are invented, for example my_system.",
   "instructions": {
     "all": [
       "Call studio_status first. It tells the profile, the active mod and the tool groups that you can use.",
@@ -964,6 +964,38 @@
         "A child section puts its parent first, with > between them.",
         "An install path uses \\ between its parts. A request can also use /. The tools match a path without letter case.",
         "A result gives the most specific form, for example obj: before sec:."
+      ]
+    }
+  },
+  "prompts": {
+    "two_trigger_mission": {
+      "title": "Add a pirate ambush with two triggers",
+      "description": "Gives the steps to add a pirate ambush with two triggers to a mission script, with a dry run and the checks.",
+      "arguments": {
+        "script": "The msn: reference of the mission script, for example msn:DATA\\MISSIONS\\my_mission.ini. list_missions gives the scripts."
+      },
+      "text": [
+        "Add a pirate ambush with two triggers to the mission script {script}. Do the steps in this order.",
+        "The names my_pirate_build, my_pirate_npc, my_pirate, my_ambush, my_reward and my_crate are examples. Use names that fit the mission.",
+        "",
+        "1. Call studio_status. Make sure that can_edit is true.",
+        "2. Call get_mission with the script {script} and the level summary. Find the trigger after which the ambush starts.",
+        "3. Call mission_add_item with the kind ship_build and the nickname my_pirate_build. Give the fields ship_archetype, loadout, pilot, state_graph, level and npc_class. Get each value from list_values.",
+        "4. Call mission_add_item with the kind npc and the nickname my_pirate_npc. Give the fields npc_ship_arch my_pirate_build, affiliation, voice and space_costume.",
+        "5. Call mission_add_item with the kind ship and the nickname my_pirate. Give the fields npc my_pirate_npc, system, position and label.",
+        "6. Call edit_batch with the label \"Add the pirate ambush\" and these three steps:",
+        "   - mission_add_trigger with the nickname my_ambush, the condition Cnd_Timer with seconds 3, and started_by the trigger of step 2. Give the actions Act_SpawnShip with ship my_pirate and Act_ActTrig with trigger my_reward.",
+        "   - mission_add_trigger with the nickname my_reward, the condition Cnd_Destroyed with target my_pirate, and the action Act_SpawnLoot with loot my_crate.",
+        "   - mission_add_item with the kind loot, the nickname my_crate and the fields archetype, equip_amount 1 and rel_pos_obj my_pirate.",
+        "   The strict check runs at the end of the batch. So a step can name my_reward and my_crate before a later step adds them.",
+        "7. Call mission_dry_run with the script {script} and these four inputs:",
+        "   - start_at with the trigger of step 2.",
+        "   - run_trigger with the trigger of step 2.",
+        "   - heartbeats with the count 100. A timer of 3 seconds needs 90 heartbeats.",
+        "   - event with the line Cnd_Destroyed and the target my_pirate.",
+        "   Make sure that my_reward runs.",
+        "8. Call check with the scope mission and the ref {script}. Correct each error.",
+        "9. Tell the user what you added."
       ]
     }
   },

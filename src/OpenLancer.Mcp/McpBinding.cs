@@ -46,30 +46,48 @@ public static class McpBinding
         }).ToList(),
     };
 
+    /// <summary>The prompts of <c>prompts/list</c>: the prompts of a host, in the order of the texts.</summary>
+    public static ListPromptsResult PromptList(IEnumerable<AgentPrompt> prompts) => new()
+    {
+        Prompts = prompts.Select(p => new Prompt
+        {
+            Name = p.Name,
+            Title = p.Title,
+            Description = p.Description,
+            Arguments = p.Arguments.Select(a => new PromptArgument { Name = a.Name, Description = a.Description, Required = true })
+                .ToList(),
+        }).ToList(),
+    };
+
     /// <summary>The version of OpenLancer, for the server information.</summary>
     public static string Version =>
         typeof(McpBinding).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0";
 
     /// <summary>
-    /// Sets the server information, the instructions, the capabilities and the handlers of the tools and the resources.
-    /// The tool list and the instructions follow the tools of the host. A call of a tool that the host does not have is
-    /// a protocol error, as a call of an unknown tool is. Review finding R10 of MCP1-2 asks for this rule.
+    /// Sets the server information, the instructions, the capabilities and the handlers of the tools, the resources and
+    /// the prompts. The tool list, the instructions and the prompts follow the tools of the host. A call of a tool that
+    /// the host does not have is a protocol error, as a call of an unknown tool is. Review finding R10 of MCP1-2 asks for
+    /// this rule.
     /// </summary>
     /// <param name="queue">The queue of the host. Each tool call waits in it for the thread of the session.</param>
     public static void Configure(McpServerOptions options, ToolQueue queue)
     {
         var tools = queue.Host.Tools;
+        var prompts = AgentPrompts.For(tools);
         options.ServerInfo = new Implementation { Name = ServerName, Title = Product.Name, Version = Version };
         options.ServerInstructions = AgentResources.InstructionsFor(tools, queue.Host.Kind);
         options.Capabilities = new ServerCapabilities
         {
             Tools = new ToolsCapability { ListChanged = false },
             Resources = new ResourcesCapability { ListChanged = false, Subscribe = false },
+            Prompts = new PromptsCapability { ListChanged = false },
         };
         options.Handlers.ListToolsHandler = (_, _) => ValueTask.FromResult(ToolList(tools));
         options.Handlers.CallToolHandler = (request, cancel) => Call(queue, tools, request, cancel);
         options.Handlers.ListResourcesHandler = (_, _) => ValueTask.FromResult(ResourceList());
         options.Handlers.ReadResourceHandler = (request, cancel) => Read(queue, request.Params?.Uri, cancel);
+        options.Handlers.ListPromptsHandler = (_, _) => ValueTask.FromResult(PromptList(prompts));
+        options.Handlers.GetPromptHandler = (request, _) => ValueTask.FromResult(Get(prompts, request.Params));
     }
 
     /// <summary>The result of a call in the form of the protocol: the JSON as structured content and as one text
@@ -188,6 +206,35 @@ public static class McpBinding
         return new ReadResourceResult
         {
             Contents = [new TextResourceContents { Uri = resource.Uri, MimeType = resource.MimeType, Text = text }],
+        };
+    }
+
+    /// <summary>
+    /// The message of a prompt with the values of its arguments (section 9.4 of the MCP1 design). A prompt that the host
+    /// does not list, or an argument without a value, is a protocol error, as the protocol asks.
+    /// </summary>
+    private static GetPromptResult Get(IReadOnlyList<AgentPrompt> prompts, GetPromptRequestParams? request)
+    {
+        var name = request?.Name ?? "";
+        var prompt = prompts.FirstOrDefault(p => p.Name == name) ??
+                     throw new McpProtocolException($"The server has no prompt '{name}'.", McpErrorCode.InvalidParams);
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var argument in prompt.Arguments)
+        {
+            var value = request?.Arguments?.TryGetValue(argument.Name, out var given) == true
+                ? given.ValueKind == JsonValueKind.String ? given.GetString() : given.GetRawText()
+                : null;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new McpProtocolException($"The prompt '{name}' needs the argument '{argument.Name}'.",
+                    McpErrorCode.InvalidParams);
+            }
+            values[argument.Name] = value.Trim();
+        }
+        return new GetPromptResult
+        {
+            Description = prompt.Description,
+            Messages = [new PromptMessage { Role = Role.User, Content = new TextContentBlock { Text = prompt.Text(values) } }],
         };
     }
 

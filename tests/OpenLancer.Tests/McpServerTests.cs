@@ -114,7 +114,7 @@ public sealed class McpServerTests
     }
 
     /// <summary>A host that only reads lists only the read-only tools and gets the instruction that the server only
-    /// reads (section 6.2 of the MCP1 design). A call of an edit tool is then a protocol error, as a call of an unknown
+    /// reads (section 6.2 of the MCP1 design). It lists no prompt of an edit workflow. A call of an edit tool is then a protocol error, as a call of an unknown
     /// tool is (review finding R10 of MCP1-2).</summary>
     [Fact]
     public async Task AHostThatOnlyReadsDoesNotListAnEditToolAndRefusesItsCall()
@@ -128,6 +128,9 @@ public sealed class McpServerTests
         Assert.DoesNotContain(tools, t => t.Name == "set_fields");
         Assert.Equal(AgentTools.ReadOnly.Select(t => t.Name), tools.Select(t => t.Name));
         Assert.EndsWith("This server only reads the data. It changes no file.", client.ServerInstructions);
+        Assert.Empty(await client.ListPromptsAsync(cancellationToken: Token));
+        await Assert.ThrowsAsync<McpProtocolException>(() => client.GetPromptAsync("two_trigger_mission",
+            new Dictionary<string, object?> { ["script"] = "msn:x.ini" }, cancellationToken: Token).AsTask());
         await Assert.ThrowsAsync<McpProtocolException>(() => client.CallToolAsync("set_fields",
             new Dictionary<string, object?> { ["ref"] = "obj:Li01_01", ["fields"] = new Dictionary<string, object?> { ["pos"] = 1 } },
             cancellationToken: Token).AsTask());
@@ -359,6 +362,40 @@ public sealed class McpServerTests
     }
 
     private static string Snake(EngineMark mark) => JsonSerializer.Serialize(mark, EditJson.Options).Trim('"');
+
+    /// <summary>The prompt two_trigger_mission (sections 9.4 and 9.5 of the MCP1 design) gives the steps of workflow 3
+    /// with the script of its argument. A get without the argument, or of a prompt that the server does not have, is a
+    /// protocol error.</summary>
+    [Fact]
+    public async Task ThePromptOfTheTwoTriggerMissionGivesItsStepsWithTheScript()
+    {
+        await using var connection = new Connection(new TestAgentHost(null));
+        var client = await connection.Client();
+        const string script = @"msn:DATA\MISSIONS\my_mission.ini";
+
+        var prompts = await client.ListPromptsAsync(cancellationToken: Token);
+        var result = await client.GetPromptAsync("two_trigger_mission",
+            new Dictionary<string, object?> { ["script"] = script }, cancellationToken: Token);
+
+        var prompt = Assert.Single(prompts).ProtocolPrompt;
+        Assert.Equal(("two_trigger_mission", AgentTexts.Prompts["two_trigger_mission"].Title), (prompt.Name, prompt.Title));
+        var argument = Assert.Single(prompt.Arguments!);
+        Assert.Equal(("script", true), (argument.Name, argument.Required));
+        var message = Assert.Single(result.Messages);
+        Assert.Equal(Role.User, message.Role);
+        var text = Assert.IsType<TextContentBlock>(message.Content).Text;
+        Assert.StartsWith($"Add a pirate ambush with two triggers to the mission script {script}.", text);
+        Assert.DoesNotContain("{script}", text);
+        Assert.Contains($"7. Call mission_dry_run with the script {script} and these four inputs:", text);
+        Assert.Contains("6. Call edit_batch with the label \"Add the pirate ambush\" and these three steps:", text);
+        Assert.Equal(AgentTexts.Prompts["two_trigger_mission"].Description, result.Description);
+        await Assert.ThrowsAsync<McpProtocolException>(() =>
+            client.GetPromptAsync("two_trigger_mission", cancellationToken: Token).AsTask());
+        await Assert.ThrowsAsync<McpProtocolException>(() => client.GetPromptAsync("two_trigger_mission",
+            new Dictionary<string, object?> { ["script"] = " " }, cancellationToken: Token).AsTask());
+        await Assert.ThrowsAsync<McpProtocolException>(() => client.GetPromptAsync("build_rocket",
+            new Dictionary<string, object?> { ["script"] = script }, cancellationToken: Token).AsTask());
+    }
 
     [Fact]
     public async Task CallsAtTheSameTimeRunOneAfterTheOtherOnTheSessionThread()
