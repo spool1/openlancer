@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions;
@@ -433,6 +434,61 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal(before, m.State());
         Assert.Equal(0, m.Session.Revision);
         Assert.False(m.Session.CanUndo);
+    }
+
+    /// <summary>
+    /// The mission checks check the names of each ship build of the ship build file of a script (final finding 14 of
+    /// MCP1-3): the ship archetype, the loadout and the pilot against the game data, and the state graph against its
+    /// words. So strict mode refuses a bad build, get_item gives the names of a build, and the check of the script and
+    /// the save gate give a bad build that came in without strict mode.
+    /// </summary>
+    [Fact]
+    public void TheChecksCheckTheNamesOfAShipBuild()
+    {
+        var (m, host) = OpenItems();
+        using var _ = m;
+        var before = m.State();
+        string Build(string fields) => AddItem("ship_build", "ol_bad_build", fields);
+
+        var ship = Error(host, "mission_add_item", Build("""{ "ship_archetype": "no_such_ship_x", "loadout": "ol_loadout" }"""));
+        var loadout = Error(host, "mission_add_item", Build("""{ "ship_archetype": "ol_arch", "loadout": "no_such_loadout_x" }"""));
+        var pilot = Error(host, "mission_add_item",
+            Build("""{ "ship_archetype": "ol_arch", "loadout": "ol_loadout", "pilot": "no_such_pilot_x" }"""));
+        var graph = Call(host, "mission_add_item",
+            Build("""{ "ship_archetype": "ol_arch", "loadout": "ol_loadout", "state_graph": "NO_GRAPH_X" }"""));
+
+        Assert.All([ship, loadout, pilot], e => Assert.Equal(("new_errors", MissionErrors.NewErrors), (e.Code, e.Detail)));
+        Assert.Contains("Ship build 'ol_bad_build' names ship archetype 'no_such_ship_x'. The game data has no ship archetype " +
+                        "with this name, so the game drops a mission ship with this build.", ship.Message);
+        Assert.Contains("names loadout 'no_such_loadout_x'", loadout.Message);
+        Assert.Contains("names pilot 'no_such_pilot_x'", pilot.Message);
+        // The state graph has a closed set of words, so the command refuses another word.
+        Assert.Equal(("invalid_value", MissionErrors.WordNotInSet, "fields.state_graph"),
+            ((string?)graph.Content["code"], (string?)graph.Content["detail"], (string?)graph.Content["field"]));
+        Assert.Contains("FIGHTER, TRANSPORT, GUNBOAT, CRUISER, NOTHING, PLAYER", (string?)graph.Content["message"]);
+        Assert.Equal(before, m.State());
+
+        var good = Ok(host, "mission_add_item",
+            Build("""{ "ship_archetype": "ol_arch", "loadout": "ol_loadout", "pilot": "ol_pilot", "state_graph": "fighter" }"""));
+        Assert.Equal("applied", (string?)good["status"]);
+        var item = Ok(host, "get_item", $$"""{ "ref": "sec:{{B}}#NPCShipArch/ol_bad_build" }""")["mission_item"]!;
+        var names = item["lines"]!.AsArray().SelectMany(l => l!["names"]!.AsArray())
+            .Select(n => ((string?)n!["name"], (string?)n["state"])).ToList();
+        // The command writes the word of the set, so "fighter" becomes FIGHTER.
+        Assert.Equal([("ol_arch", "found"), ("ol_loadout", "found"), ("ol_pilot", "found"), ("FIGHTER", "token")], names);
+
+        // A build that came in without strict mode, for example from a mod, gives an error of the script and of the save.
+        var loose = m.Missions.Apply(new SetItemKey(ItemRef.Of(Ships, "NPCShipArch", "ol_build_1"), "loadout",
+            [LineSpec.Raw("loadout", "no_such_loadout_x")]));
+        Assert.Equal(EditStatus.Applied, loose.Status);
+        Assert.Contains(loose.NewProblems, p => p.Severity == DiagnosticSeverity.Error && p.Message.Contains("no_such_loadout_x"));
+        var check = Ok(host, "check", $$"""{ "scope": "mission", "ref": "msn:{{S}}" }""");
+        Assert.Equal(1, (int?)check["errors"]);
+        Assert.Equal($"line:{Ships}#NPCShipArch/ol_build_1/2", (string?)check["problems"]![0]!["ref"]);
+        Assert.Contains(m.Session.SaveProblems(), p => p.Severity == DiagnosticSeverity.Error && p.Message.Contains("no_such_loadout_x"));
+        var problems = Ok(host, "get_item", $$"""{ "ref": "sec:{{B}}#NPCShipArch/ol_build_1" }""")["mission_item"]!["lines"]![2]!
+            ["problems"]!.AsArray();
+        Assert.Contains("no_such_loadout_x", (string?)Assert.Single(problems)!["message"]);
     }
 
     /// <summary>mission_add_item has a preview, and it is in the group Missions, so it refuses while the user hides the

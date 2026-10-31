@@ -982,7 +982,7 @@
         "",
         "1. Call studio_status. Make sure that can_edit is true.",
         "2. Call get_mission with the script {script} and the level summary. Find the trigger after which the ambush starts.",
-        "3. Call mission_add_item with the kind ship_build and the nickname my_pirate_build. Give the fields ship_archetype, loadout, pilot, state_graph, level and npc_class. Get each value from list_values.",
+        "3. Call mission_add_item with the kind ship_build and the nickname my_pirate_build. Give the fields ship_archetype, loadout, pilot, state_graph, level and npc_class. Get the ship archetype, the loadout and the pilot from list_values with the lists ship, loadout and pilot. Get the words of state_graph from the resource openlancer://schema/mission-sections. Copy level and npc_class from a ship build of the same kind, for example level d5 and npc_class unlawful, d5.",
         "4. Call mission_add_item with the kind npc and the nickname my_pirate_npc. Give the fields npc_ship_arch my_pirate_build, affiliation, voice and space_costume.",
         "5. Call mission_add_item with the kind ship and the nickname my_pirate. Give the fields npc my_pirate_npc, system, position and label.",
         "6. Call edit_batch with the label \"Add the pirate ambush\" and these three steps:",

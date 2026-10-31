@@ -235,7 +235,11 @@ public sealed partial class MissionEditor
         if (scripts.Count == 0)
             return [];
         var removes = world.Inputs().BaseWorld is { } names && names.RemovesNamesOf(activeMod);
-        return scripts.Where(p => removes || session.OpenDocument(p) is { } document && document.ChangesBase(document.State))
+        // A change of the ship build file of a script changes the problems of the script too (final finding 14 of
+        // MCP1-3).
+        bool Changes(string? path) =>
+            path != null && session.OpenDocument(path) is { } document && document.ChangesBase(document.State);
+        return scripts.Where(p => removes || Changes(p) || Changes(session.ShipBuildFileOf(p)))
             .SelectMany(p => Model(p).Problems.Where(d => d.Severity == DiagnosticSeverity.Error)).ToList();
     }
 
@@ -244,17 +248,20 @@ public sealed partial class MissionEditor
     /// <param name="names">The names of the game data, or null for the names now.</param>
     /// <param name="modText">Gives the text of an editor file of the active mod, or null for W now. The commit check of
     /// a batch gives the texts before the batch, so the problems before the batch have the records before it.</param>
+    /// <param name="files">The states of other mission files for the analysis, for example the state of the ship build
+    /// file of the script before a batch, or null for W now. The analysis then does not use the cache.</param>
     internal MissionModel ModelOf(EditDocument document, DocumentState state, MissionInputs? names = null,
-        Func<string, string?>? modText = null)
+        Func<string, string?>? modText = null, IReadOnlyDictionary<string, DocumentState>? files = null)
     {
         var snapshot = names ?? world.Inputs();
         cache.Use(snapshot);
         var path = document.Path;
-        var analysis = cache.Find(path, state);
+        var analysis = files == null ? cache.Find(path, state) : null;
         if (analysis == null)
         {
-            analysis = Analyze(snapshot, document, state);
-            cache.Put(path, state, analysis);
+            analysis = Analyze(snapshot, document, state, files);
+            if (files == null)
+                cache.Put(path, state, analysis);
         }
         var graphText = modText != null ? modText(GraphFile.PathOf(path)) : GraphFileText(path);
         return new MissionModel(path, Version(path), Linked(analysis, modText))
@@ -341,18 +348,41 @@ public sealed partial class MissionEditor
         throw new EditException(MissionErrors.ScriptNotFoundError(path));
     }
 
+    /// <summary>The index of W of a ship build file and its problems, with the names of the game data now (final
+    /// finding 14 of MCP1-3). A script gives the same problems when the file is its own ship build file.</summary>
+    internal (MissionIndex Index, IReadOnlyList<Diagnostic> Problems) ShipFile(EditDocument file)
+    {
+        var inputs = world.Inputs().WithOverlay(session.MissionOverlay());
+        var document = MissionDocument.Of(file.Path, file.Working, file.IsBinary);
+        return (MissionIndex.BuildShipFile(document, inputs.Schema, inputs.CheckWorld, inputs.Coverage),
+            MissionRun.ShipFileProblems(inputs, document));
+    }
+
     /// <summary>The analysis of a state of a script. A state that the session did not change since the open or the
-    /// last save is the file of the edit view, so its raw text keeps the comments of the file.</summary>
-    private MissionAnalysis Analyze(MissionInputs snapshot, EditDocument document, DocumentState state)
+    /// last save is the file of the edit view, so its raw text keeps the comments of the file. The other mission files
+    /// come from W, for example the ship build file of the script.</summary>
+    /// <param name="files">The states of other mission files in place of W, or null.</param>
+    private MissionAnalysis Analyze(MissionInputs snapshot, EditDocument document, DocumentState state,
+        IReadOnlyDictionary<string, DocumentState>? files)
     {
         var path = document.Path;
-        if (ReferenceEquals(state, document.Initial) && state.Exists &&
-            MissionRun.Analyze(snapshot, MissionRun.Info(snapshot, path), cache.BaseRun) is { } saved)
-            return saved;
-        var overlay = new Dictionary<string, MissionOverlayFile>(session.MissionOverlay(), VfsPath.Comparer)
+        var overlay = new Dictionary<string, MissionOverlayFile>(session.MissionOverlay(), VfsPath.Comparer);
+        foreach (var (file, fileState) in files ?? new Dictionary<string, DocumentState>())
         {
-            [path] = session.OverlayOf(document, state),
-        };
+            if (session.OpenedDocument(file) is not { } other)
+                continue;
+            if (ReferenceEquals(fileState, other.Initial))
+                overlay.Remove(other.Path);
+            else
+                overlay[other.Path] = session.OverlayOf(other, fileState);
+        }
+        if (ReferenceEquals(state, document.Initial) && state.Exists)
+        {
+            overlay.Remove(path);
+            if (MissionRun.Analyze(snapshot.WithOverlay(overlay), MissionRun.Info(snapshot, path), cache.BaseRun) is { } saved)
+                return saved;
+        }
+        overlay[path] = session.OverlayOf(document, state);
         return MissionRun.AnalyzeScript(snapshot.WithOverlay(overlay), path, state.Working, document.IsBinary,
             cache.BaseRun);
     }

@@ -414,6 +414,8 @@ public static class MissionRun
                 ? overlay.Exists ? MissionDocument.Of(shipFile, overlay.Sections, overlay.IsBinary) : null
                 : Read(inputs.EditView, shipFile)?.Document;
             shipBuilds = ships?.Sections.Count(s => MissionIndex.Is(s.Type, "NPCShipArch")) ?? 0;
+            if (ships != null && IsOwnShipFile(inputs, shipFile))
+                classified = [.. classified, .. ShipFileProblems(inputs, ships)];
         }
         return new MissionAnalysis(script, bytes, document, index, classified, run?.Index)
         {
@@ -423,6 +425,38 @@ public static class MissionRun
             ShipFile = shipFile,
             ShipBuilds = shipBuilds,
         };
+    }
+
+    /// <summary>True for the ship build file of a script: a file that is not directly in <c>DATA\MISSIONS</c>. A file
+    /// directly in that folder, for example <c>npcships.ini</c>, is world data that encounters and bases use too, so its
+    /// problems are not the problems of a script (review finding RB2).</summary>
+    private static bool IsOwnShipFile(MissionInputs inputs, string path) =>
+        inputs.DataPath("MISSIONS") is not { } missions ||
+        !VfsPath.Comparer.Equals(VfsPath.Normalize(System.IO.Path.GetDirectoryName(path) ?? ""), missions);
+
+    /// <summary>
+    /// The problems of the ship build file of a script (final finding 14 of MCP1-3): each name of each ship build that
+    /// the game data does not have, for example a loadout, and each word of a closed set that the game does not know.
+    /// Each problem has the origin of the file, by the rules of <see cref="MissionOrigins"/>. So a problem of a build of
+    /// the base game is a warning, and a problem of a build of the active mod is an error.
+    /// </summary>
+    internal static IReadOnlyList<Diagnostic> ShipFileProblems(MissionInputs inputs, MissionDocument ships)
+    {
+        var index = MissionIndex.BuildShipFile(ships, inputs.Schema, inputs.CheckWorld, inputs.Coverage);
+        var problems = MissionChecks.Run(index, inputs.Options);
+        if (problems.Count == 0)
+            return [];
+        var file = Info(inputs, ships.Path);
+        IReadOnlyList<Diagnostic>? baseProblems = null;
+        if (file.State != MissionScriptState.BaseGame && file.InBase && inputs.BaseView is { } baseView &&
+            Read(baseView, ships.Path) is var (_, baseShips))
+            baseProblems = MissionChecks.Run(MissionIndex.BuildShipFile(baseShips, inputs.Schema,
+                inputs.BaseWorld ?? inputs.World, inputs.Coverage), inputs.Options);
+        else if (file.State == MissionScriptState.BaseGame && inputs.BaseWorld is { } names && NamesRemovedName(index, names))
+            baseProblems = MissionChecks.Run(MissionIndex.BuildShipFile(ships, inputs.Schema, names, inputs.Coverage),
+                inputs.Options);
+        return MissionOrigins.Apply(problems, baseProblems, file, inputs.Ledger, inputs.ActiveModId,
+            problem => RemovedNameOf(index, problem, inputs.BaseWorld));
     }
 
     /// <summary>True when a name of the script does not resolve in the edit view because a mod removes or renames

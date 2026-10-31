@@ -230,13 +230,25 @@ public sealed class MissionIndex
     private readonly List<MissionLink> links = [];
     private readonly List<(MissionSection Formation, int Line, string Ship)> laterMembers = [];
 
-    private MissionIndex(MissionDocument document, MissionSchema schema, MissionWorld world, IEngineCoverage coverage)
+    private MissionIndex(MissionDocument document, MissionSchema schema, MissionWorld world, IEngineCoverage coverage,
+        bool shipFile = false)
     {
         Document = document;
         Schema = schema;
         World = world;
         Coverage = coverage;
+        IsShipFile = shipFile;
     }
+
+    /// <summary>True for the index of the ship build file of a script, not of a script. The game reads only the
+    /// <c>[NPCShipArch]</c> sections of such a file.</summary>
+    public bool IsShipFile { get; }
+
+    /// <summary>The keys of the type of a section: in a ship build file the keys of a ship build for an
+    /// <c>[NPCShipArch]</c> and none for another type, else the keys of the type in a script.</summary>
+    public MissionSectionSpec? SpecOf(MissionSection section) => IsShipFile
+        ? Is(section.Type, "NPCShipArch") ? Schema.ShipBuild : null
+        : Schema.Section(section.Type);
 
     public MissionDocument Document { get; }
 
@@ -286,9 +298,16 @@ public sealed class MissionIndex
     /// <param name="world">The names outside the script, or <see cref="MissionWorld.Empty"/>.</param>
     /// <param name="coverage">The OpenLancer marks, or <see cref="FullCoverage.Instance"/>.</param>
     public static MissionIndex Build(MissionDocument document, MissionSchema schema, MissionWorld world,
-        IEngineCoverage coverage)
+        IEngineCoverage coverage) => Build(new MissionIndex(document, schema, world, coverage));
+
+    /// <summary>Builds the index of the ship build file of a script: the names of each line of each
+    /// <c>[NPCShipArch]</c>, for example its ship archetype, its loadout and its pilot (final finding 14 of
+    /// MCP1-3).</summary>
+    public static MissionIndex BuildShipFile(MissionDocument document, MissionSchema schema, MissionWorld world,
+        IEngineCoverage coverage) => Build(new MissionIndex(document, schema, world, coverage, shipFile: true));
+
+    private static MissionIndex Build(MissionIndex index)
     {
-        var index = new MissionIndex(document, schema, world, coverage);
         index.CollectItems();
         index.CollectLines();
         index.CollectTriggers();
@@ -409,7 +428,7 @@ public sealed class MissionIndex
     {
         foreach (var section in Document.Sections)
         {
-            var spec = Schema.Section(section.Type);
+            var spec = SpecOf(section);
             for (var i = 0; i < section.Section.Count; i++)
             {
                 var key = section.Section[i].Name;

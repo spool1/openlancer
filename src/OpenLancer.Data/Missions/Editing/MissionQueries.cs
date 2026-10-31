@@ -292,13 +292,16 @@ public sealed class MissionQueries
         var users = FindReferences(reference.ToString()).Select(r => r.Line).ToList();
         if (MissionIndex.Is(reference.Section.Type, "NPCShipArch"))
         {
-            // A ship build is in the ship build file, which has no index. Its lines come from W.
-            var document = session.OpenDocument(path) is { } file && file.IndexOf(reference.Section) is var i and >= 0
-                ? (File: file, Index: i)
+            // A ship build is in a ship build file. Its lines come from W, with the names and the problems of the index
+            // of the file (final finding 14 of MCP1-3).
+            var file = session.OpenDocument(path) is { State.Exists: true } known && known.IndexOf(reference.Section) >= 0
+                ? known
                 : throw new EditException(NotFound(path, reference.Section));
-            var ships = new SectionRef(document.File.Path, reference.Section);
-            return new MissionItemView(Ref(ships), editor.Version(document.File.Path),
-                PlainLines(ships, document.File.Working[document.Index], MissionSchema.Retail.ShipBuild), users)
+            var (shipIndex, problems) = editor.ShipFile(file);
+            var build = shipIndex.Document.Find(new SectionRef(file.Path, reference.Section)) ??
+                        throw new EditException(NotFound(path, reference.Section));
+            return new MissionItemView(Ref(build.Ref), editor.Version(file.Path), Lines(shipIndex, problems, file.Path, build),
+                users)
             {
                 Type = reference.Section.Type,
             };
@@ -479,10 +482,15 @@ public sealed class MissionQueries
     internal static Problem ProblemOf(EditSession session, string script, Diagnostic problem)
     {
         string? reference = null;
-        if (problem.Target is { } target)
+        if (problem.Target is { } found)
+        {
+            // A problem of the ship build file of a script has the path of the npc_ship_file line. The reference
+            // takes the letter case of the file in the session.
+            var target = session.OpenedDocument(found.Path) is { } document ? found with { Path = document.Path } : found;
             reference = problem.EntryIndex >= 0
                 ? new RowRef(new ItemRef(target.Path, target.Id), problem.EntryIndex).Reference
                 : ItemRefs.Canonical(session, target);
+        }
         return Problem.From(problem, reference ?? new ScriptRef(script).ToString());
     }
 
@@ -507,10 +515,17 @@ public sealed class MissionQueries
             new MissionReferenceView(new RowRef(new ItemRef(u.Section.Path, u.Section.Id), u.Row).Reference, u.Key, u.Value)),
     ];
 
-    private IReadOnlyList<MissionLineView> Lines(MissionModel model, MissionSection section)
+    private IReadOnlyList<MissionLineView> Lines(MissionModel model, MissionSection section) =>
+        Lines(model.Index, model.Problems, model.Script, section);
+
+    /// <summary>The lines of a section of an index, with the named values, the names and the problems of each
+    /// line.</summary>
+    /// <param name="script">The file of the index, for a problem without a target.</param>
+    private IReadOnlyList<MissionLineView> Lines(MissionIndex index, IReadOnlyList<Diagnostic> all, string script,
+        MissionSection section)
     {
-        var problems = model.Problems.Where(p => p.Target == section.Ref && p.EntryIndex >= 0).ToList();
-        var lines = model.Index.LinesOf(section).ToDictionary(l => l.Entry);
+        var problems = all.Where(p => p.Target == section.Ref && p.EntryIndex >= 0).ToList();
+        var lines = index.LinesOf(section).ToDictionary(l => l.Entry);
         var result = new List<MissionLineView>();
         for (var row = 0; row < section.Section.Count; row++)
         {
@@ -526,31 +541,10 @@ public sealed class MissionQueries
                 entry.Name, line?.Name?.Plain ?? line?.KeySpec?.Label, values, MissionValues.TextsOf(entry),
                 [.. (line?.References ?? []).Select(r => new MissionNameView(r.ValueIndex, r.Name, r.Kind, r.State,
                     r.Section == null ? null : Ref(r.Section.Ref)))],
-                [.. problems.Where(p => p.EntryIndex == row).Select(p => ProblemOf(session, model.Script, p))]));
+                [.. problems.Where(p => p.EntryIndex == row).Select(p => ProblemOf(session, script, p))]));
         }
         return result;
     }
-
-    /// <summary>The lines of a section outside the scripts, with the named values of the keys of its type.</summary>
-    private static IReadOnlyList<MissionLineView> PlainLines(SectionRef reference, LibreLancer.Data.Ini.Section section,
-        MissionSectionSpec spec) =>
-    [
-        .. section.Select((entry, row) =>
-        {
-            var key = spec.Key(entry.Name);
-            var texts = MissionValues.TextsOf(entry);
-            var values = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var value in key?.ValueSpecs ?? [])
-            {
-                var parts = texts.Skip(value.Index).Take(Math.Min(value.End, texts.Count) - value.Index)
-                    .Where(t => t.Trim().Length > 0).ToList();
-                if (parts.Count > 0)
-                    values[value.Name] = string.Join(", ", parts);
-            }
-            return new MissionLineView(new RowRef(new ItemRef(reference.Path, reference.Id), row).Reference, row, entry.Name,
-                key?.Label, values, texts, [], []);
-        }),
-    ];
 
     private Dictionary<string, int> BaseCounts()
     {

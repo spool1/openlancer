@@ -69,9 +69,12 @@ internal static class AgentRows
         return new ItemOrigin(origin, mod, unsaved);
     }
 
-    /// <summary>A diagnostic of a check as a problem of a result, with the reference of its section.</summary>
+    /// <summary>A diagnostic of a check as a problem of a result, with the reference of its section. The reference
+    /// takes the letter case of the file in the session.</summary>
     public static Problem ProblemOf(EditSession session, Diagnostic diagnostic) =>
-        Problem.From(diagnostic, diagnostic.Target is { } target ? ItemRefs.Canonical(session, target) : null);
+        Problem.From(diagnostic, diagnostic.Target is { } target
+            ? ItemRefs.Canonical(session, session.OpenedDocument(target.Path) is { } document ? target with { Path = document.Path } : target)
+            : null);
 
     /// <summary>The diagnostics of the field checks and the list checks of a section, each with a target.</summary>
     public static IReadOnlyList<Diagnostic> DiagnosticsOf(EditSession session, SectionRef section) =>

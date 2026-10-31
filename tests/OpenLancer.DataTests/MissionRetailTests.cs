@@ -77,12 +77,17 @@ public sealed class MissionRetailTests(ITestOutputHelper output)
         var run = Run();
         var problems = run.Problems.ToList();
 
-        Assert.Equal(634, problems.Count);
+        Assert.Equal(635, problems.Count);
+        // The checks of the ship build files find one retail build that names a pilot that the game data does not have
+        // (final finding 14 of MCP1-3). It is a problem of the base game, so it is a warning.
+        var build = Assert.Single(problems, p => p.Target?.Id.Type == "NPCShipArch");
+        Assert.Equal(("M23", "pilot", @"DATA\MISSIONS\M04\NPCSHIPS.INI"),
+            (build.Rule, build.Key, build.Target!.Path.ToUpperInvariant()));
         Assert.DoesNotContain(problems, p => p.Rule == "M11");
         Assert.All(problems, p => Assert.True(p.Origin!.IsBaseGame, p.Message));
         Assert.DoesNotContain(problems, p => p.Severity == DiagnosticSeverity.Error);
         Assert.All(MissionSummary.Rows(run, showBaseGame: false), r => Assert.Equal((0, 0), (r.Errors, r.Warnings)));
-        Assert.Equal(634, MissionSummary.Rows(run, showBaseGame: false).Sum(r => r.Hidden));
+        Assert.Equal(635, MissionSummary.Rows(run, showBaseGame: false).Sum(r => r.Hidden));
     }
 
     /// <summary>The checks on the retail lines as lines of the active mod, without a base-game run, prove that the rules

@@ -1141,7 +1141,7 @@
     { "key": "ship_archetype", "label": "Ship archetype", "kind": "shipArch", "help": "The ship model of the build." },
     { "key": "loadout", "label": "Loadout", "kind": "loadout", "help": "The equipment of the ship." },
     { "key": "pilot", "label": "Pilot", "kind": "pilot", "help": "The pilot settings of the ship, for example how it aims and evades." },
-    { "key": "state_graph", "label": "State graph", "kind": "text", "hard": true, "help": "The set of AI behaviors of the ship, for example the set of a fighter." },
+    { "key": "state_graph", "label": "State graph", "kind": "token", "tokens": "stateGraph", "hard": true, "help": "The set of AI behaviors of the ship: FIGHTER, TRANSPORT, GUNBOAT, CRUISER, NOTHING or PLAYER. The game reads the name without letter case. It reads the sets from the file state_graph.db of the AI folder." },
     { "key": "level", "label": "Level", "kind": "text", "hard": true, "help": "The level of the build, for example d5." },
     { "key": "npc_class", "label": "NPC class", "kind": "text", "hard": true, "help": "The classes that encounters and missions use to pick this ship build.", "list": { "label": "NPC classes", "items": "classes", "values": true } }
   ] },
@@ -1185,7 +1185,8 @@
     "position": { "values": ["position"] },
     "musicNone": { "values": ["none", "no_params"] },
     "addFollowers": { "values": ["ADD_FOLLOWERS"] },
-    "attitude": { "values": ["REP_HOSTILE_MAXIMUM", "REP_HOSTILE_THRESHOLD", "REP_NEUTRAL_HOSTILE", "REP_NEUTRAL", "REP_NEUTRAL_FRIENDLY", "REP_FRIEND_THRESHOLD", "REP_FRIEND_MAXIMUM"] }
+    "attitude": { "values": ["REP_HOSTILE_MAXIMUM", "REP_HOSTILE_THRESHOLD", "REP_NEUTRAL_HOSTILE", "REP_NEUTRAL", "REP_NEUTRAL_FRIENDLY", "REP_FRIEND_THRESHOLD", "REP_FRIEND_MAXIMUM"] },
+    "stateGraph": { "values": ["FIGHTER", "TRANSPORT", "GUNBOAT", "CRUISER", "NOTHING", "PLAYER"] }
   },
   "buffers": [
     { "id": "object", "what": "The object name", "max": 47 },

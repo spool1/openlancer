@@ -31444,8 +31444,16 @@
                 "properties": {
                   "state_graph": {
                     "type": "string",
+                    "examples": [
+                      "FIGHTER",
+                      "TRANSPORT",
+                      "GUNBOAT",
+                      "CRUISER",
+                      "NOTHING",
+                      "PLAYER"
+                    ],
                     "title": "State graph",
-                    "description": "The set of AI behaviors of the ship, for example the set of a fighter."
+                    "description": "The set of AI behaviors of the ship: FIGHTER, TRANSPORT, GUNBOAT, CRUISER, NOTHING or PLAYER. The game reads the name without letter case. It reads the sets from the file state_graph.db of the AI folder."
                   }
                 },
                 "additionalProperties": false

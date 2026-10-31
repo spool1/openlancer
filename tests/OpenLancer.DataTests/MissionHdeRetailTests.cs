@@ -100,7 +100,10 @@ public sealed class MissionHdeRetailTests(ITestOutputHelper output)
         var problems = run.Problems.ToList();
         output.WriteLine($"{problems.Count} base-game problems.");
 
-        Assert.Equal(201, problems.Count);
+        Assert.Equal(202, problems.Count);
+        // One ship build names a pilot that the game data does not have (final finding 14 of MCP1-3).
+        var build = Assert.Single(problems, p => p.Target?.Id.Type == "NPCShipArch");
+        Assert.Equal(("M23", "pilot"), (build.Rule, build.Key));
         Assert.All(problems, p => Assert.True(p.Origin!.IsBaseGame, p.Message));
         Assert.DoesNotContain(problems, p => p.Severity == DiagnosticSeverity.Error);
         Assert.All(MissionSummary.Rows(run, showBaseGame: false), r => Assert.Equal((0, 0), (r.Errors, r.Warnings)));

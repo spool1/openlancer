@@ -323,6 +323,11 @@ public sealed partial class MissionEditor
         private readonly HashSet<string> gone = new(StringComparer.OrdinalIgnoreCase);
         private MissionEditOptions options = MissionEditOptions.Default;
 
+        /// <summary>The state before the batch of each mission file that is not a script, for example the ship build
+        /// file of a script. The problems of a script before the batch read these states (final finding 14 of
+        /// MCP1-3).</summary>
+        private readonly Dictionary<string, DocumentState> filesBefore = new(VfsPath.Comparer);
+
         public void Join(MissionEditOptions joined) => options = new MissionEditOptions(
             options.RejectNewErrors || joined.RejectNewErrors, options.RejectNewWarnings || joined.RejectNewWarnings);
 
@@ -330,13 +335,31 @@ public sealed partial class MissionEditor
         /// before the batch have the prefab records and the prefabs before it.</param>
         public void Add(MissionDraft draft, Func<string, string?> modText)
         {
+            var files = new List<string>();
+            foreach (var (path, state) in draft.Before)
+            {
+                if (!editor.IsScript(draft.Touched[path]) && SectionKeys.IsMissionFile(path) && filesBefore.TryAdd(path, state))
+                    files.Add(path);
+            }
+            // The problems of a script before the batch read its ship build file before the batch.
+            var others = filesBefore.Count > 0 ? filesBefore : null;
             foreach (var (path, state) in draft.Before)
             {
                 var document = draft.Touched[path];
                 if (!editor.IsScript(document) || scripts.ContainsKey(path))
                     continue;
-                var old = state.Exists ? editor.ModelOf(document, state, before, modText).Problems : [];
+                var old = state.Exists ? editor.ModelOf(document, state, before, modText, others).Problems : [];
                 scripts[path] = (document, state, old);
+            }
+            // A change of the ship build file of a script changes the problems of the script.
+            foreach (var path in editor.ScriptPaths())
+            {
+                if (scripts.ContainsKey(path) || editor.session.ShipBuildFileOf(path) is not { } shipFile ||
+                    !files.Contains(shipFile, VfsPath.Comparer) ||
+                    editor.session.OpenDocument(path) is not { State.Exists: true } document || !editor.IsScript(document))
+                    continue;
+                scripts[document.Path] = (document, document.State,
+                    editor.ModelOf(document, document.State, before, modText, others).Problems);
             }
             // A change of a graph file or of a prefab asset changes the prefab instances of a script without a change of
             // its lines, for example an unpack or a delete of a prefab (rules P01 to P03).

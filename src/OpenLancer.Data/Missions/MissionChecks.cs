@@ -240,6 +240,13 @@ public static class MissionChecks
                         $"Comm line '{name}' is in no voices file. The game plays no sound for this line. Pick a comm line " +
                         "from the list.", $"{owner}|{name}");
                     return;
+                case MissionKindScope.World when index.IsShipFile:
+                    var part = KindWord(reference.Kind);
+                    Add("M23", line.Section, line.Entry,
+                        $"Ship build '{owner}' names {part} '{name}'. The game data has no {part} with this name, so the " +
+                        $"game drops a mission ship with this build. Pick {WithArticle(part)} from the list.",
+                        $"{owner}|{reference.Kind}|{name}");
+                    return;
                 default:
                     var world = KindWord(reference.Kind);
                     Add("M23", line.Section, line.Entry,
@@ -421,7 +428,10 @@ public static class MissionChecks
         {
             foreach (var section in document.Sections)
             {
-                var spec = index.Schema.Section(section.Type);
+                var spec = index.SpecOf(section);
+                // The game reads only the ship builds of a ship build file, so another section type has no effect.
+                if (spec == null && index.IsShipFile)
+                    continue;
                 if (spec == null)
                 {
                     Add("M25", section, -1,
