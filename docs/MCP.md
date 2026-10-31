@@ -89,7 +89,7 @@ When another program uses the port, the server does not start. The status bar th
 | Largest page limit | 200 | The largest limit that the agent can ask for in one list result. |
 | Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
 | Calls each second | 10 | The most calls that the server takes in one second. |
-| Wait for the editor (s) | 30 | How long a call waits while you edit a field, rename an item in the Hierarchy, or a dialog is open. A longer wait gives the error `busy`. |
+| Wait for the editor (s) | 30 | How long a call waits while you edit a field, rename an item, drag an item, or a dialog is open. A longer wait gives the error `busy`. |
 | Time of a check or an image (s) | 60 | How long a check of a retail target or an image can take. |
 | Size of a request (MB) | 4 | The largest request. The change applies at the next start of the server. |
 | Largest side of an image (pixels) | 2048 | The most pixels on each side of an image. A larger panel capture becomes smaller. A `render_scene` or `render_cutscene` call with a larger `width` or `height` gives the error `limit`. |
@@ -354,14 +354,26 @@ The editor shows each agent edit in the Console, in the Scene, in the Hierarchy 
 |---|---|
 | Console | Each agent edit adds an Info entry with the source "Agent" and the label of the edit, for example "Create Zone_test_01.". Click the entry to select its item. A refused call of a tool that changes data adds a warning with the tool and the reason, also a call that waited too long. An error in the second part of a call adds no entry yet. Examples are a Play that you cancel, an export with `guard_conflict` and a save that the save gate of Play stops. An undo and a redo of the agent add an entry too. A preview, a read tool and the question `needs_confirmation` add no entry. When the editor cannot show an agent edit, it adds an Error entry with the reason. The edit stays in the Undo history. **Agent > Show agent messages** shows only the entries of the agent. |
 | Scene | A pulse ring in the agent color goes around each item of an agent edit for 4 seconds. |
-| Hierarchy | A robot glyph at the right end of a row shows an item that an agent edit changed after the last save. The blue mark of the unsaved edit stays, so the row shows both marks. `list_items` gives the same mark as `agent_changed`. |
+| Hierarchy | A robot glyph at the right end of a row shows an item that an agent edit changed after the last save. The blue mark of the unsaved edit stays, so the row shows both marks. `list_items` gives the same mark as `agent_changed`. In the tree of a mission, the row of a trigger or of another section of the script shows the glyph too. The rows of a mission have no blue mark. |
 | Status bar | The agent program and the number of its edits since the last save, or "Agent paused". |
 
 An undo of an agent edit removes its marks, and a redo puts them back. A save clears the marks.
 
+An agent call never runs during a gesture of your own. It waits while you edit a field, rename an item or drag an item, and while a dialog is open. In the mission studio, it waits while one of these is open:
+
+- The rename popup of a row of a mission in the Hierarchy.
+- The rename field of a node of the graph, and quick add.
+- A drag of a node or of a link of the graph.
+- A drag of an item of the library, of an action row of the graph or of a row of the tree of a mission.
+- The rename popup and quick add of the Mission page in the Inspector, and the rename popup of a prefab in the Assets panel.
+
+The call runs in the frame after the gesture ends. A gesture in a tab that you hide does not keep the call waiting. After the wait limit of the agent settings, the call gives the error `busy` with the reason.
+
 #### Follow mode
 
-With **Agent > Follow agent** on, the editor opens the system of each agent edit and moves the camera to its item. The selection then follows Unity. A create or a copy selects the new item, a delete clears the selection, and a rename keeps it. When the agent undoes its delete, follow mode selects the item again. When you undo an agent delete, the Scene selects the item again, as after the undo of your own delete. This is also true with follow mode off. An item without a place in the Scene, for example a loadout, shows in the Inspector, and the view does not change.
+With **Agent > Follow agent** on, the editor opens the system of each agent edit and moves the camera to its item. An agent edit of a mission opens the script in the Mission tab, and the graph moves to the item. An item without a node, for example a mission ship, shows in the Hierarchy and the Inspector when it is selected. The selection then follows Unity. A create or a copy selects the new item, a delete clears the selection, and a rename keeps it. When the agent undoes its delete, follow mode selects the item again. When you undo an agent delete, the Scene selects the item again, as after the undo of your own delete. This is also true with follow mode off. An undo of an agent delete in a mission keeps the selection of the Mission tab, as the undo of your own mission edit does. An item without a place in the Scene, for example a loadout, shows in the Inspector, and the view does not change. So does an item that the Mission tab cannot show yet, for example a trigger of a new script before the mission run reads the script.
+
+Follow mode does not leave prefab mode, as Unity keeps prefab mode open when the scene changes. While the Mission tab shows a prefab, an agent edit of a mission shows only in the Console. The selection and the view stay.
 
 When you move the camera of the Scene or select an item, follow mode stops. Click **Follow agent** to start it again. The settings keep the last value that you clicked, so follow mode is on again at the next start of the editor. With follow mode off, the agent changes the view and the selection only with `open_view` and `select_items`. When an agent edit removes the selected item, the selection goes, as after an undo.
 
