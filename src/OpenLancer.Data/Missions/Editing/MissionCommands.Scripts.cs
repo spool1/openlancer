@@ -34,8 +34,10 @@ public sealed record CreateScript(string Path) : MissionCommand
 
     internal override void Run(MissionDraft d)
     {
-        var path = d.NewFilePath(Path);
-        var shipPath = ShipBuildFile == null ? null : d.NewFilePath(ShipBuildFile, allowExisting: true);
+        var path = d.NewFilePath(Path, field: "path");
+        var shipPath = ShipBuildFile == null
+            ? null
+            : d.NewFilePath(ShipBuildFile, allowExisting: true, field: "ship_build_file", shipFile: true);
         var script = d.NewFile(path);
         IReadOnlyList<RawSection> sections = Sections ??
         [

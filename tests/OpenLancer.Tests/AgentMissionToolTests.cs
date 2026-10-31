@@ -410,6 +410,15 @@ public sealed partial class AgentMissionToolTests
 
         Assert.Equal(("refused", MissionErrors.WorldFile), (world.Code, world.Detail));
         Assert.Equal(("invalid_argument", MissionErrors.BadPath), (outside.Code, outside.Detail));
+        Assert.Equal("commands[0].path",
+            (string?)Call(host, "mission_edit", Edit("""{ "kind": "create_script", "path": "DATA\\SHIPS\\ol_new.ini" }""")).Content["field"]);
+        // A bad ship build file names its own field and tells the install path form (final finding 17 of MCP1-3).
+        var ships = Call(host, "mission_edit", Edit("""
+            { "kind": "create_script", "path": "DATA\\MISSIONS\\OL_NEW\\ol_new.ini", "ship_build_file": "missions\\ol_new\\npcships.ini" }
+            """)).Content;
+        Assert.Equal(("invalid_argument", MissionErrors.BadPath, "commands[0].ship_build_file"),
+            ((string?)ships["code"], (string?)ships["detail"], (string?)ships["field"]));
+        Assert.StartsWith(@"The editor cannot make a ship build file at missions\ol_new\npcships.ini.", (string?)ships["message"]);
         Assert.Equal(("name_taken", MissionErrors.PathInUse), (taken.Code, taken.Detail));
         Assert.Equal(("refused", MissionErrors.NotWholeFile), (baseGame.Code, baseGame.Detail));
         Assert.Equal(baseText, File.ReadAllText(Path.Combine(m.Ws.Base, Script)));

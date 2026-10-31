@@ -737,7 +737,9 @@ internal sealed partial class MissionDraft
     /// <summary>The normal form of the path of a new mission file, after the checks of a new whole file.</summary>
     /// <param name="allowExisting">True for a path that can name a file that exists, for example a ship build
     /// file.</param>
-    public string NewFilePath(string path, bool allowExisting = false)
+    /// <param name="field">The field of the command that gives the path, for an error, or null.</param>
+    /// <param name="shipFile">True for the path of a ship build file, for the text of an error.</param>
+    public string NewFilePath(string path, bool allowExisting = false, string? field = null, bool shipFile = false)
     {
         string normal;
         try
@@ -746,15 +748,18 @@ internal sealed partial class MissionDraft
         }
         catch (EditException e)
         {
-            throw Refuse(e.Error);
+            throw Refuse(e.Error with { Field = field });
         }
         if (Session.ActiveMod == null)
             throw Refuse(MissionErrors.NotEditableError("There is no active mod. Select a mod to edit."));
         if (!SectionKeys.IsMissionFile(normal) || !normal.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) ||
             Session.DataPath("MISSIONS") is { } missions && !MissionFiles.IsScanned(normal, missions))
-            throw Refuse(MissionErrors.BadPathError(normal));
+            throw Refuse((shipFile ? MissionErrors.BadShipFilePathError(path) : MissionErrors.BadPathError(normal)) with
+            {
+                Field = field,
+            });
         if (!allowExisting && Session.OpenDocument(normal) is { State.Exists: true })
-            throw Refuse(MissionErrors.PathInUseError(normal));
+            throw Refuse(MissionErrors.PathInUseError(normal) with { Field = field });
         return normal;
     }
 

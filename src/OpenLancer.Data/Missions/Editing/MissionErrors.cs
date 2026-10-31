@@ -99,6 +99,14 @@ public static class MissionErrors
         new(EditErrorKind.StaleRevision, ScriptChanged,
             $"Script {script} changed after you read it. Read the script again, then try again.") { Target = Script(script) };
 
+    /// <summary>A script reference names the ship build file of a script (final finding 19 of MCP1-3). The code stays
+    /// the code of a script that does not exist, and the text names the tools that read the file.</summary>
+    internal static EditError ShipBuildFileNotScriptError(string path) => ScriptNotFoundError(path) with
+    {
+        Message = $"{path} is the ship build file of a script, not a mission script. Read a build with get_item and its " +
+                  "sec: reference, or read the file with get_raw_ini.",
+    };
+
     internal static EditError ScriptNotFoundError(string script) =>
         new(EditErrorKind.NotFound, ScriptNotFound,
             $"The game data and the mods have no mission script {script}. Pick a script from the Missions tab.")
@@ -376,6 +384,14 @@ public static class MissionErrors
         new(EditErrorKind.InvalidArgument, BadPath,
             $"The editor cannot make a script at {path}. The game reads a mission script only from a folder under " +
             "DATA\\MISSIONS outside the encounters folder, with the extension .ini. Pick such a path.");
+
+    /// <summary>The path of a new ship build file is not an install path of a file in a folder under
+    /// <c>DATA\MISSIONS</c> (final finding 17 of MCP1-3).</summary>
+    internal static EditError BadShipFilePathError(string path) =>
+        new(EditErrorKind.InvalidArgument, BadPath,
+            $"The editor cannot make a ship build file at {path}. Give the install path of a file in a folder under " +
+            @"DATA\MISSIONS outside the encounters folder, with the extension .ini, for example " +
+            @"DATA\MISSIONS\MY_MISSION\npcships.ini. The script then names it in its npc_ship_file line.");
 
     internal static EditError NotTextIdError(string label) =>
         new(EditErrorKind.InvalidArgument, NotTextId,

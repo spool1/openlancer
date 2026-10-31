@@ -98,16 +98,21 @@ internal sealed class EditScope
     /// neither. The confirmations of the request join the confirmations of the step, as the confirmations of a plan do.
     /// </summary>
     /// <param name="field">The argument of the commands, for an error that names a command, for example
-    /// <c>commands</c>. An error of a command names <c>commands[i]</c>.</param>
+    /// <c>commands</c>. An error of a command names <c>commands[i]</c>, or <c>commands[i].name</c> for an error of a
+    /// field of the command, for example the ship build file of <c>create_script</c>.</param>
     /// <exception cref="EditException">The request refuses. The mission editor cancels the batch, so nothing
     /// changed.</exception>
     public MissionEditResult RunMission(MissionBatch batch, string field) =>
-        RunMission(batch, error => error.Index is { } i ? $"{field}[{i}]" : field);
+        RunMission(batch, error => error.Index is { } i
+            ? error.Field is { } name ? $"{field}[{i}].{name}" : $"{field}[{i}]"
+            : error.Field ?? field, ownField: true);
 
     /// <inheritdoc cref="RunMission(MissionBatch, string)"/>
     /// <param name="fieldOf">The argument of an error that names no argument, for example the argument of the
     /// command at the index of the error. A tool that makes its commands from its arguments uses it.</param>
-    public MissionEditResult RunMission(MissionBatch batch, Func<EditError, string> fieldOf)
+    /// <param name="ownField">True when <paramref name="fieldOf"/> also names the argument of an error that names a
+    /// field of a command.</param>
+    public MissionEditResult RunMission(MissionBatch batch, Func<EditError, string> fieldOf, bool ownField = false)
     {
         var result = Session.Missions.Apply(batch with
         {
@@ -118,7 +123,7 @@ internal sealed class EditScope
         if (result.Status == EditStatus.Refused)
         {
             var error = result.Errors[0];
-            throw new EditException(error with { Field = error.Field ?? fieldOf(error) });
+            throw new EditException(error with { Field = ownField ? fieldOf(error) : error.Field ?? fieldOf(error) });
         }
         missionRuns.Add((result.Inverse, result.Rows));
         stepConfirmations.AddRange(result.Asked.Select(a => a.Message).Distinct());

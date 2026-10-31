@@ -489,6 +489,12 @@ public sealed partial class AgentMissionToolTests
         var problems = Ok(host, "get_item", $$"""{ "ref": "sec:{{B}}#NPCShipArch/ol_build_1" }""")["mission_item"]!["lines"]![2]!
             ["problems"]!.AsArray();
         Assert.Contains("no_such_loadout_x", (string?)Assert.Single(problems)!["message"]);
+
+        // The ship build file is not a script, so get_mission names the tools that read it (final finding 19 of MCP1-3).
+        var notScript = Error(host, "get_mission", $$"""{ "script": "msn:{{B}}" }""");
+        Assert.Equal(("not_found", MissionErrors.ScriptNotFound), (notScript.Code, notScript.Detail));
+        Assert.Equal($"{Ships} is the ship build file of a script, not a mission script. Read a build with get_item and its " +
+                     "sec: reference, or read the file with get_raw_ini.", notScript.Message);
     }
 
     /// <summary>mission_add_item has a preview, and it is in the group Missions, so it refuses while the user hides the

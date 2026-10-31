@@ -65,7 +65,7 @@ internal static partial class MissionEditTools
                 AgentTexts.Error("mission_strict")) { Field = "options.reject_new_errors" });
         }
         var commands = args.Node("commands")!.AsArray();
-        // A command group counts as one command. The section limit and the size limit of a request bound its work.
+        // A command group counts as one command, so the limit does not count the commands in a group (see docs/MCP.md).
         if (commands.Count > call.Limits.BatchSteps)
         {
             throw new EditException(new EditError(EditErrorKind.Limit, MissionCommands,

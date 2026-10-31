@@ -345,7 +345,9 @@ public sealed partial class MissionEditor
         var path = InstallPaths.Parse(script);
         if (session.OpenDocument(path) is { HoldsScript: true, State.Exists: true } document)
             return document;
-        throw new EditException(MissionErrors.ScriptNotFoundError(path));
+        throw new EditException(session.OpenDocument(path) is { State.Exists: true } other && session.IsGuardedMissionFile(other.Path)
+            ? MissionErrors.ShipBuildFileNotScriptError(other.Path)
+            : MissionErrors.ScriptNotFoundError(path));
     }
 
     /// <summary>The index of W of a ship build file and its problems, with the names of the game data now (final
