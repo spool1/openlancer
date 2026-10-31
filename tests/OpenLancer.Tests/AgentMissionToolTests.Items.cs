@@ -227,24 +227,29 @@ public sealed partial class AgentMissionToolTests
         Assert.False(m.Session.CanUndo);
     }
 
-    /// <summary>A formation that names a ship before the ship exists takes no ship (rule M08). So a new ship that a
-    /// formation names goes before the formation in the same entry, and the patch places it with ol.before (section 6.4
-    /// of the M6b design). The formation then takes the ship. With rel_pos, the ship gets the place near an
-    /// object.</summary>
+    /// <summary>A formation that names a ship before the ship exists takes no ship (rule M08). So a new ship that two
+    /// formations name goes before the first of them in the same entry, and the patch places it with ol.before (section
+    /// 6.4 of the M6b design). Both formations then come after the ship. With rel_pos, the ship gets the place near an
+    /// object. The texts form gives the count of a cargo line. The inverse asks for confirm: true, because the ship line
+    /// of each formation then names a ship that is gone.</summary>
     [Fact]
     public void AShipThatAFormationNamesGoesBeforeTheFormation()
     {
-        var (m, host) = OpenItems(Text.Replace("formation = ol_shape", "formation = ol_shape\nship = ol_new"));
+        var (m, host) = OpenItems(Text
+            .Replace("formation = ol_shape", "formation = ol_shape\nship = ol_new")
+            .Replace("[ObjList]", "[MsnFormation]\nnickname = ol_form_b\nformation = ol_shape\nship = ol_new\n\n[ObjList]"));
         using var _ = m;
         var before = m.State();
 
         var result = Ok(host, "mission_add_item", AddItem("ship", "ol_new", """
-            { "npc": "ol_npc_1", "rel_pos": { "heading": 90, "anchor": "ol_station", "range": 500 }, "cargo": ["ol_good"] }
+            { "npc": "ol_npc_1", "rel_pos": { "heading": 90, "anchor": "ol_station", "range": 500 },
+              "cargo": [ { "texts": ["ol_good", "5"] } ] }
             """));
 
         var names = m.Session.OpenDocument(Script)!.Working.Select(s => s.Name + "/" + SectionIdentity.KeyOf(s)).ToList();
         Assert.Equal(names.IndexOf("MsnFormation/ol_form") - 1, names.IndexOf("MsnShip/ol_new"));
-        Assert.Equal(["nickname = ol_new", "npc = ol_npc_1", "rel_pos = 90, ol_station, 500", "cargo = ol_good"],
+        Assert.True(names.IndexOf("MsnFormation/ol_form_b") > names.IndexOf("MsnFormation/ol_form"));
+        Assert.Equal(["nickname = ol_new", "npc = ol_npc_1", "rel_pos = 90, ol_station, 500", "cargo = ol_good, 5"],
             m.Lines(Item("MsnShip", "ol_new")));
         Assert.Contains($"sec:{Script}#MsnShip/ol_new", Texts(result["adds"]));
         Assert.Equal("Agent: Add mission ship ol_new", (string?)result["undo_label"]);
@@ -254,6 +259,13 @@ public sealed partial class AgentMissionToolTests
         Assert.Contains("nickname = ol_new", patch);
         Assert.Contains("ol.before", patch);
 
+        var inverse = result["inverse"]!.ToJsonString();
+        var asked = Error(host, "mission_edit", Edit(inverse));
+        Assert.Equal(("needs_confirmation", EditTools.ConfirmChanges), (asked.Code, asked.Detail));
+        Assert.True(m.Has(Item("MsnShip", "ol_new")));
+        Ok(host, "mission_edit", $$"""{ "commands": [ {{inverse}} ], "confirm": true }""");
+        Assert.False(m.Has(Item("MsnShip", "ol_new")));
+        m.Session.Undo();
         m.Session.Undo();
         Assert.Equal(before, m.State());
     }

@@ -369,7 +369,7 @@ The tool writes the lines in the order of `fields`, with two exceptions:
 - The `encounter_type` line of a random encounter comes first, because the encounter reads only the keys after it.
 - The `formation` and `ship` lines of a formation come last, because the game can stop when a key of the ship comes after them.
 
-Give the nickname in `nickname`, not in `fields`.
+Give the nickname in `nickname`, not in `fields`. The schema gives the ship key `cargo` only one value name, the good. To give the count of the good too, use the texts form, for example `"cargo": [{"texts": ["my_good", "5"]}]`.
 
 A ship needs `fields.npc`, the nickname of an `[NPC]` of the script. Without it, the tool gives `invalid_argument` with the detail `NeedsNpc`. To make the build, the NPC and the ship in one Undo step, use one `edit_batch`. Its steps are `mission_add_item` calls with the kinds `ship_build`, `npc` and `ship`. `mission_edit` with `add_mission_ship` and `new_build` also makes all three.
 
@@ -379,7 +379,7 @@ A ship starts at `position`, or near an object with `rel_pos`, not at both. When
 
 A new nickname has letters, digits, `_` and `-`, with at most 47 characters. A random encounter has at most 31 characters, because the game has room for only 31 characters of that name. A longer name gives `invalid_value` with the detail `NameInvalid`. Without a nickname, the editor makes a free name, for example `m01a_ship_2`.
 
-A script that names no ship build file cannot get a ship build: the tool gives `refused` with the detail `NoShipBuildFile`. The inverse of a new NPC or ship build gives `refused` with the detail `RequiredBy` while a ship or an NPC names it. Remove the ship or the NPC first.
+A script that names no ship build file cannot get a ship build: the tool gives `refused` with the detail `NoShipBuildFile`. The inverse of a new NPC or ship build gives `refused` with the detail `RequiredBy` while a ship or an NPC names it. Remove the ship or the NPC first. The inverse of a new ship that a formation names gives `needs_confirmation`, because the `ship` line of the formation then names a ship that is gone. Call `mission_edit` again with the inverse and `confirm: true`.
 
 This call adds a ship with the NPC `my_pirate_npc` at a position in the system `my_system`:
 
