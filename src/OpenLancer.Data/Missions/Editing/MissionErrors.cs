@@ -37,6 +37,7 @@ public static class MissionErrors
     public const string RequiredBy = "RequiredBy";
     public const string NoShipBuildFile = "NoShipBuildFile";
     public const string NewErrors = "NewErrors";
+    public const string NewWarnings = "NewWarnings";
     public const string SectionChanged = "SectionChanged";
     public const string KeyLine = "KeyLine";
     public const string SharedBuildRename = "SharedBuildRename";
@@ -189,14 +190,16 @@ public static class MissionErrors
             "The mission has no ship build file. Set \"Ship build file\" on the Mission page first.");
 
     /// <summary>Strict mode refuses a batch (section 4.0.5 of the M6b design). With <c>RejectNewWarnings</c>, the new
-    /// warnings count too.</summary>
+    /// warnings count too. The code is <c>new_errors</c> for both. The detail is <see cref="NewWarnings"/> when only
+    /// new warnings refuse, so a caller can tell a refused warning from an error.</summary>
     internal static EditError NewErrorsError(int errors, int warnings, string first)
     {
         static string Count(int n, string word) => n == 1 ? $"1 {word}" : $"{Number(n)} {word}s";
         var what = errors > 0 && warnings > 0 ? $"{Count(errors, "error")} and {Count(warnings, "warning")}"
             : warnings > 0 ? Count(warnings, "warning")
             : Count(errors, "error");
-        return new(EditErrorKind.NewErrors, NewErrors, $"The edit adds {what}, so the editor did not apply it. {first}");
+        return new(EditErrorKind.NewErrors, errors == 0 && warnings > 0 ? NewWarnings : NewErrors,
+            $"The edit adds {what}, so the editor did not apply it. {first}");
     }
 
     internal static EditError SectionChangedError(string section) =>

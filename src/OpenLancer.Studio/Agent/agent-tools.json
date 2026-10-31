@@ -429,7 +429,7 @@
       "fields": {
         "label": "The label of the Undo step. Without it, the edit takes the label of its one command, or 'Mission edit'.",
         "commands": "The mission commands in order. Each command is an object with a kind, for example add_trigger. A line is {key, values} with the value names of describe_mission_name. studio_status gives the most commands of one call.",
-        "options": "reject_new_errors is always true: an edit that adds an error changes nothing. Set reject_new_warnings to true to also refuse an edit that adds a warning.",
+        "options": "reject_new_errors is always true: an edit that adds an error changes nothing. Set reject_new_warnings to true to also refuse an edit that adds a warning. Then a new warning gives new_errors with the detail NewWarnings.",
         "expect_versions": "The versions of the scripts that you read, by install path. When a script has another version now, the edit gives stale_revision."
       }
     },
@@ -1471,7 +1471,7 @@
     "EditResult.renames": "The items that got a new name, with the old and the new reference.",
     "EditResult.fixes": "The lines that the edit changed because they name an item that the edit removed.",
     "EditResult.missing": "The lines that show 'Missing' after the edit.",
-    "EditResult.warnings": "The warnings of the edit. The edit applied.",
+    "EditResult.warnings": "The warnings of the edit. A preview also tells why the edit needs confirm: true.",
     "EditResult.refusals": "The parts of the edit that the editor refused while the other parts applied.",
     "EditResult.mentions": "The files that name a renamed or removed item as text. The edit does not change them.",
     "EditResult.new_problems": "The problems of the checks that the edit adds. The edit applied.",

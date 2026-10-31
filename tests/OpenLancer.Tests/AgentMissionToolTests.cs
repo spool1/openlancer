@@ -179,7 +179,8 @@ public sealed partial class AgentMissionToolTests
             ((string?)off.Content["code"], (string?)off.Content["detail"], (string?)off.Content["field"]));
         Assert.Contains(warned["new_problems"]!.AsArray(), p => (string?)p!["severity"] == "warning");
         Assert.DoesNotContain(warned["new_problems"]!.AsArray(), p => (string?)p!["severity"] == "error");
-        Assert.Equal(("new_errors", "NewErrors"), (warnings.Code, warnings.Detail));
+        Assert.Equal(("new_errors", MissionErrors.NewWarnings), (warnings.Code, warnings.Detail));
+        Assert.StartsWith("The edit adds 1 warning, so the editor did not apply it.", warnings.Message);
         Assert.Equal(before, m.State());
         Assert.Equal(0, m.Session.Revision);
         Assert.Equal(["mission_edit", "mission_edit", "mission_edit"], host.Refusals.Select(r => r.Tool));
@@ -456,6 +457,42 @@ public sealed partial class AgentMissionToolTests
         m.Session.Undo();
         Assert.False(m.Has("ol_later"));
         Assert.DoesNotContain("Act_ActTrig = ol_later", m.Lines("ol_wave"));
+
+        // Each mission step keeps its own inverse and row moves: the same requests in their own calls give the same.
+        // So an agent that reverts one step does not revert the steps before it.
+        var later = Ok(host, "mission_edit", $$"""{ "commands": [ {{addLater}} ] }""");
+        var start = Ok(host, "mission_edit", $$"""{ "commands": [ {{startLater}} ] }""");
+        Assert.True(JsonNode.DeepEquals(start["inverse"], steps[0]!["inverse"]), steps[0]!["inverse"]!.ToJsonString());
+        Assert.True(JsonNode.DeepEquals(later["inverse"], steps[1]!["inverse"]), steps[1]!["inverse"]!.ToJsonString());
+        Assert.True(JsonNode.DeepEquals(start["row_moves"], steps[0]!["row_moves"]));
+        Assert.True(JsonNode.DeepEquals(later["row_moves"], steps[1]!["row_moves"]));
+    }
+
+    /// <summary>A batch whose mission steps cancel each other gives no_change and no history entry. No step gives an
+    /// inverse or row moves, because nothing changed.</summary>
+    [Fact]
+    public void ABatchOfMissionStepsWithNoNetChangeGivesNoInverse()
+    {
+        var (m, host) = Open();
+        using var _ = m;
+        var before = m.State();
+        var same = $$"""{ "kind": "set_condition_value", "trigger": "trg:{{S}}#ol_wave", "name": "seconds", "value": 3 }""";
+
+        var result = Ok(host, "edit_batch", $$"""
+            { "steps": [
+              { "tool": "mission_edit", "arguments": { "commands": [ {{Wait9}} ] } },
+              { "tool": "mission_edit", "arguments": { "commands": [ {{same}} ] } } ] }
+            """);
+
+        Assert.Equal("no_change", (string?)result["status"]);
+        var steps = result["steps"]!.AsArray();
+        Assert.Equal(2, steps.Count);
+        Assert.All(steps, s => Assert.Equal("no_change", (string?)s!["status"]));
+        Assert.All(steps, s => Assert.Null(s!["inverse"]));
+        Assert.All(steps, s => Assert.Null(s!["row_moves"]));
+        Assert.Equal(before, m.State());
+        Assert.Equal(0, m.Session.Revision);
+        Assert.False(m.Session.CanUndo);
     }
 
     /// <summary>Pause, a session that another editor has open and a tool group that the user hides refuse the tool

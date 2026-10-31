@@ -7321,7 +7321,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -7901,7 +7901,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -8479,7 +8479,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -9054,7 +9054,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -9633,7 +9633,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -10233,7 +10233,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -10820,7 +10820,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -11377,7 +11377,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -11942,7 +11942,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -12528,7 +12528,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -13094,7 +13094,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -13729,7 +13729,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -14419,7 +14419,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -15068,7 +15068,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -15632,7 +15632,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -16184,7 +16184,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -16727,7 +16727,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -17263,7 +17263,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -17858,7 +17858,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -18410,7 +18410,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -18625,7 +18625,7 @@
                 "default": false
               }
             },
-            "description": "reject_new_errors is always true: an edit that adds an error changes nothing. Set reject_new_warnings to true to also refuse an edit that adds a warning."
+            "description": "reject_new_errors is always true: an edit that adds an error changes nothing. Set reject_new_warnings to true to also refuse an edit that adds a warning. Then a new warning gives new_errors with the detail NewWarnings."
           },
           "expect_versions": {
             "type": "object",
@@ -32678,7 +32678,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -33334,7 +33334,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -33949,7 +33949,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -34570,7 +34570,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -35163,7 +35163,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -35735,7 +35735,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -36323,7 +36323,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -36953,7 +36953,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -37127,7 +37127,7 @@
       },
       "annotations": {
         "title": "Insert a trigger on a link",
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false,
         "openWorldHint": false,
         "readOnlyHint": false
@@ -37609,7 +37609,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -38215,7 +38215,7 @@
                 "message"
               ]
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",
@@ -40224,7 +40224,7 @@
                       "message"
                     ]
                   },
-                  "description": "The warnings of the edit. The edit applied."
+                  "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
                 },
                 "refusals": {
                   "type": "array",
@@ -40404,7 +40404,7 @@
             "items": {
               "$ref": "#/properties/steps/items/properties/warnings/items"
             },
-            "description": "The warnings of the edit. The edit applied."
+            "description": "The warnings of the edit. A preview also tells why the edit needs confirm: true."
           },
           "refusals": {
             "type": "array",

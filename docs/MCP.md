@@ -287,7 +287,7 @@ The mission tools change the mission scripts of the active mod with the commands
 |---|---|
 | `commands` | The mission commands in order. Each command is an object with a `kind`, for example `add_trigger`, `set_condition_value` or `remove_trigger`. The input schema of the tool gives each kind with its fields. |
 | `label` | The label of the Undo step. Without it, the call takes the label of its one command, or "Mission edit". |
-| `options` | `reject_new_warnings: true` also refuses an edit that adds a warning. |
+| `options` | `reject_new_warnings: true` also refuses an edit that adds a warning. Then a new warning gives the error `new_errors` with the detail `NewWarnings`. A new error gives the detail `NewErrors`. |
 | `expect_versions` | The versions of the scripts that the agent read, by install path. When a script has another version now, the call gives `stale_revision` with the detail `ScriptChanged`. |
 
 The input schema gives each command and the value names of each key of a line. So it is large: about 190 KB of JSON. An agent program can send the whole tool list to its model, and then the schema fills a part of the context of the model.

@@ -209,7 +209,7 @@ public static class AgentTools
         Mission("mission_set_action", ToolHints.Changing, MissionEditTools.SetActionInput, MissionEditTools.SetActionValues),
         Mission("mission_move_action", ToolHints.Changing, MissionEditTools.MoveActionInput, MissionEditTools.MoveAction),
         Mission("mission_link_triggers", ToolHints.Changing, MissionEditTools.LinkTriggersInput, MissionEditTools.Link),
-        Mission("mission_insert_trigger", ToolHints.Adding, MissionEditTools.InsertTriggerInput,
+        Mission("mission_insert_trigger", ToolHints.Changing, MissionEditTools.InsertTriggerInput,
             MissionEditTools.InsertTrigger),
         Mission("mission_add_item", ToolHints.Adding, MissionEditTools.AddItemInput, MissionEditTools.NewItem),
         Mission("mission_place_prefab", ToolHints.Adding, MissionEditTools.PlacePrefabInput, MissionEditTools.PlacePrefab),
