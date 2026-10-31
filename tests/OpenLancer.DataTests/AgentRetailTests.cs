@@ -310,4 +310,176 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
         Assert.NotEmpty(scripts);
         output.WriteLine($"The largest page of triggers: {largest.Bytes} bytes, {largest.Call}");
     }
+
+    /// <summary>The time of one agent mission edit (section 13.4 of the MCP1 design and section 11.4 of the M6b
+    /// design).</summary>
+    private const double MissionEditMilliseconds = 50;
+
+    /// <summary>Runs a tool and asserts that it gives no error and that the result fits the output schema of the
+    /// tool. Gives the content of the result.</summary>
+    private static JsonObject Ok(AgentHost host, string tool, JsonObject arguments)
+    {
+        var result = AgentTools.Run(host, tool, arguments).Result!;
+        Assert.False(result.IsError, $"{tool} {arguments.ToJsonString()}: {result.Text}");
+        Assert.Empty(OpenLancer.Tests.SchemaCheck.Problems(AgentTools.Find(tool)!.OutputSchema, result.Content));
+        return result.Content;
+    }
+
+    /// <summary>A host without a window that edits the mod of a workspace. It writes no recovery file.</summary>
+    private static HeadlessHost OpenToEdit(RetailWorkspace workspace) =>
+        HeadlessHost.Open(workspace.ProfilePath, workspace.ModId, new HeadlessOptions { WritesRecovery = false });
+
+    /// <summary>The msn: references of the retail story scripts, from list_missions.</summary>
+    private static List<string> StoryScripts(AgentHost host) =>
+        Ok(host, "list_missions", new JsonObject())["scripts"]!.AsArray().Where(s => s!["slot"] != null)
+            .Select(s => (string)s!["ref"]!).ToList();
+
+    /// <summary>The trigger rows of a script from get_mission, page by page.</summary>
+    private static List<JsonNode> TriggerRows(AgentHost host, string script)
+    {
+        var rows = new List<JsonNode>();
+        string? cursor = null;
+        do
+        {
+            // The arguments come from JSON text, as the arguments of a client do.
+            var arguments = JsonNode.Parse(
+                $$"""{ "script": {{JsonSerializer.Serialize(script)}}, "level": "triggers", "limit": 200 }""")!.AsObject();
+            if (cursor != null)
+                arguments["cursor"] = cursor;
+            var page = Ok(host, "get_mission", arguments)["triggers"]!;
+            rows.AddRange(page["rows"]!.AsArray().Select(r => r!));
+            cursor = (string?)page["next_cursor"];
+        }
+        while (cursor != null);
+        return rows;
+    }
+
+    /// <summary>
+    /// The mission read tools and mission_start_plan run over each retail story script (step 9 of MCP1-3). Each call
+    /// gives a result, not an error, and the result fits the output schema of its tool. The test reads each trigger,
+    /// and plans the start of the mission and a start at each trigger. A plan that cannot start is data: the status
+    /// refused and a reason, not a tool error.
+    /// </summary>
+    [Fact]
+    public void TheMissionToolsRunOverEachRetailStoryScript()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "mcp1stories");
+        using var host = HeadlessHost.OpenReadOnly(workspace.ProfilePath, workspace.ModId);
+        var scripts = StoryScripts(host);
+        var plans = new Dictionary<string, int>();
+
+        foreach (var script in scripts)
+        {
+            Ok(host, "get_mission", new JsonObject { ["script"] = script });
+            var starts = new List<string> { "mission_start" };
+            foreach (var row in TriggerRows(host, script))
+            {
+                var reference = (string)row["ref"]!;
+                Ok(host, "get_trigger", new JsonObject { ["ref"] = reference });
+                starts.Add(reference);
+            }
+            foreach (var start in starts)
+            {
+                var arguments = new JsonObject { ["script"] = script, ["start"] = start };
+                var plan = Ok(host, "mission_start_plan", arguments)["plan"]!;
+                var status = (string)plan["status"]!;
+                if (status == "refused")
+                    Assert.False(string.IsNullOrWhiteSpace((string?)plan["reason"]), $"{script} {start}: no reason");
+                else
+                    Assert.Equal("ready", status);
+                plans[status] = plans.GetValueOrDefault(status) + 1;
+            }
+        }
+
+        Assert.Equal(14, scripts.Count);
+        output.WriteLine($"{scripts.Count} story scripts: " +
+                         string.Join(", ", plans.OrderBy(p => p.Key).Select(p => $"{p.Value} plans {p.Key}")));
+    }
+
+    /// <summary>A preview of mission_add_trigger on a retail story script gives the status previewed and the result of
+    /// the add, and changes nothing: the revision, the version of the script, the unsaved state and the history stay
+    /// (section 13.3, retail variant, of the MCP1 design). The new trigger waits 3 seconds and the first start trigger
+    /// starts it.</summary>
+    [Fact]
+    public void APreviewOfANewTriggerInARetailStoryScriptChangesNothing()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "mcp1preview");
+        using var host = OpenToEdit(workspace);
+        var session = host.Session!;
+        var script = StoryScripts(host)[0];
+        var path = script["msn:".Length..];
+        var version = session.Missions.Version(path);
+
+        var preview = Ok(host, "mission_add_trigger", AddTrigger(host, script, preview: true));
+
+        Assert.Equal("previewed", (string?)preview["status"]);
+        Assert.Equal("0", (string?)preview["rev"]);
+        Assert.Contains($"trg:{path}#ol_agent_trigger", preview["adds"]!.AsArray().Select(a => (string?)a),
+            StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(version, (long?)preview["versions"]![path]);
+        Assert.Equal((0, false, false), (session.Revision, session.IsDirty, session.CanUndo));
+        Assert.Equal(version, session.Missions.Version(path));
+        Assert.Null(session.OpenBatch);
+    }
+
+    /// <summary>The arguments of a mission_add_trigger call on a script: a new trigger that waits 3 seconds and starts
+    /// the second trigger of the script. The first start trigger of the script starts it.</summary>
+    private static JsonObject AddTrigger(AgentHost host, string script, bool preview = false)
+    {
+        var summary = Ok(host, "get_mission", new JsonObject { ["script"] = script })["summary"]!;
+        var start = (string)summary["start_triggers"]![0]!;
+        var next = (string)TriggerRows(host, script)[1]["nickname"]!;
+        static string Json(string text) => JsonSerializer.Serialize(text);
+        return JsonNode.Parse($$"""
+            { "script": {{Json(script)}}, "nickname": "ol_agent_trigger",
+              "condition": { "key": "Cnd_Timer", "values": { "seconds": 3 } },
+              "actions": [ { "key": "Act_ActTrig", "values": { "trigger": {{Json(next)}} } } ],
+              "started_by": [ {{Json(start)}} ], "preview": {{(preview ? "true" : "false")}} }
+            """)!.AsObject();
+    }
+
+    /// <summary>
+    /// The mission gate of section 13.4 of the MCP1 design (the gate of section 11.4 of the M6b design) through the
+    /// agent path: one mission_add_trigger call on the largest retail story script takes less than 50 ms. The call runs
+    /// the command in the shared agent batch with the strict check, the inverse and the result. A first call warms up
+    /// the code and the caches, and the gate does not measure it. A try takes the median of five calls, and an undo
+    /// after each call brings back the state before it (see <see cref="TimingGates"/>).
+    /// </summary>
+    [Fact]
+    [Trait(Timing.Category, Timing.Performance)]
+    public void AnAgentTriggerAddOnTheLargestRetailStoryScriptFitsTheGate()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "mcp1missiongate");
+        using var host = OpenToEdit(workspace);
+        var session = host.Session!;
+        var script = StoryScripts(host).MaxBy(s => session.OpenDocument(s["msn:".Length..])!.Working.Count)!;
+        var arguments = AddTrigger(host, script);
+
+        TimeSpan Call()
+        {
+            var call = (JsonObject)arguments.DeepClone();
+            ToolResult? result = null;
+            var time = Timing.Measure(() => result = AgentTools.Run(host, "mission_add_trigger", call).Result);
+            Assert.False(result!.IsError, result.Text);
+            session.Undo();
+            return time;
+        }
+
+        var first = Call();
+        var tries = new List<List<double>>();
+        var best = new TimingGates().Gate(TimeSpan.FromMilliseconds(MissionEditMilliseconds), () =>
+        {
+            var runs = Enumerable.Range(0, 5).Select(_ => Call().TotalMilliseconds).Order().ToList();
+            tries.Add(runs);
+            return TimeSpan.FromMilliseconds(runs[2]);
+        });
+
+        var sections = session.OpenDocument(script["msn:".Length..])!.Working.Count;
+        var runs = tries.Select(t => $"median {t[2]:0.0} ms of {string.Join(", ", t.Select(r => r.ToString("0.0")))}");
+        output.WriteLine($"{script} ({sections} sections): first call {first.TotalMilliseconds:0.0} ms, tries " +
+                         string.Join("; ", runs));
+        Assert.True(best.TotalMilliseconds < MissionEditMilliseconds,
+            $"The median of one call took {best.TotalMilliseconds:0.0} ms.");
+        Assert.False(session.CanUndo);
+    }
 }
