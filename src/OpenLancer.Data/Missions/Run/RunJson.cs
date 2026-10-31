@@ -294,9 +294,21 @@ public static partial class RunJson
 
     private static string Trigger(JsonObject input, string script, int index)
     {
-        if (input["trigger"] is not JsonValue value || !value.TryGetValue(out string? text))
-            throw Bad(index, "trigger", "The input needs a trigger: the trg: reference of a trigger of the script.");
-        var trigger = TriggerRef.Parse(text);
+        if (input["trigger"] is not JsonValue value || !value.TryGetValue(out string? text) || text.Trim().Length == 0)
+            throw Bad(index, "trigger", "The input needs a trigger: the trg: reference or the nickname of a trigger of the script.");
+        // A nickname names a trigger of the script, as the field "to" of the trigger tools does (final finding 22 of
+        // MCP1-3).
+        if (!text.Contains(':', StringComparison.Ordinal))
+            return text.Trim();
+        TriggerRef trigger;
+        try
+        {
+            trigger = TriggerRef.Parse(text);
+        }
+        catch (EditException e)
+        {
+            throw Bad(index, "trigger", e.Error.Message);
+        }
         if (!VfsPath.Comparer.Equals(trigger.Script, script))
             throw Bad(index, "trigger", $"The trigger {text} is not in the script of the request. Use a trigger of {script}.");
         return trigger.Name;

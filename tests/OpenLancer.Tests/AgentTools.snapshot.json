@@ -1730,7 +1730,7 @@
                   "replaced",
                   "missing"
                 ],
-                "description": "base_game when no mod changes the script, changed, replaced or missing."
+                "description": "base_game when no mod changes the script, changed when a mod patches it, replaced when a whole file of a mod gives it, or missing. A new script of a mod is a whole file, so it is replaced too."
               },
               "read_only_reason": {
                 "type": [
@@ -3743,7 +3743,7 @@
                     "replaced",
                     "missing"
                   ],
-                  "description": "base_game when no mod changes the script, changed, replaced, or missing when no file is at the path."
+                  "description": "base_game when no mod changes the script, changed when a mod patches it, or replaced when a whole file of a mod gives it. missing tells that no file is at the path. A new script of a mod is a whole file, so it is replaced too."
                 },
                 "mod_id": {
                   "type": [
@@ -3995,7 +3995,7 @@
                   "replaced",
                   "missing"
                 ],
-                "description": "base_game when no mod changes the script, changed, replaced or missing."
+                "description": "base_game when no mod changes the script, changed when a mod patches it, replaced when a whole file of a mod gives it, or missing. A new script of a mod is a whole file, so it is replaced too."
               },
               "read_only_reason": {
                 "type": [
@@ -5291,7 +5291,7 @@
               ],
               "additionalProperties": false
             },
-            "description": "The inputs in order, at most 1000, with at most 108000 heartbeats in all. Each input is an object with a kind. The kinds are start_mission, load_checkpoint {trigger}, start_at {trigger}, run_trigger {trigger}, event {line} and fact {line, on}. The other kinds are heartbeats {count} or {until_timer: true}, player_system {system} and player_in_space {value}. A trigger is a trg: reference. A line is {key, values} with the value names of describe_mission_name. A value that the line does not give matches any value. When it matches two waiting lines, the line whose values it gives in full is the event. Else the call gives invalid_argument. start_mission, load_checkpoint and start_at start a new run and remove the inputs before them. start_at starts the triggers that wait at a trigger, as a play from that trigger does. The fact and player inputs before them stay, in their net form."
+            "description": "The inputs in order, at most 1000, with at most 108000 heartbeats in all. Each input is an object with a kind. The kinds are start_mission, load_checkpoint {trigger}, start_at {trigger}, run_trigger {trigger}, event {line} and fact {line, on}. The other kinds are heartbeats {count} or {until_timer: true}, player_system {system} and player_in_space {value}. A trigger is a trg: reference or the nickname of a trigger of the script. A line is {key, values} with the value names of describe_mission_name. A value that the line does not give matches any value. When it matches two waiting lines, the line whose values it gives in full is the event. Else the call gives invalid_argument. start_mission, load_checkpoint and start_at start a new run and remove the inputs before them. start_at starts the triggers that wait at a trigger, as a play from that trigger does. The fact and player inputs before them stay, in their net form."
           },
           "timer_bound": {
             "type": "string",

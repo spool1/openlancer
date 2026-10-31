@@ -149,7 +149,7 @@
       "title": "Dry run a mission",
       "description": "Runs the trigger rules of the retail game on one mission script, step by step, without a game world. You give the inputs. An input starts the mission, loads a checkpoint, starts at a trigger, runs an active trigger or says that an event happens. It can also set a fact or the place of the player, or advance the time in heartbeats of 1/30 s. The result gives each step with its changes in the order of the game, and the state after the last step. The query keeps no state, so send all inputs at each call. This tool changes nothing.",
       "fields": {
-        "inputs": "The inputs in order, at most 1000, with at most 108000 heartbeats in all. Each input is an object with a kind. The kinds are start_mission, load_checkpoint {trigger}, start_at {trigger}, run_trigger {trigger}, event {line} and fact {line, on}. The other kinds are heartbeats {count} or {until_timer: true}, player_system {system} and player_in_space {value}. A trigger is a trg: reference. A line is {key, values} with the value names of describe_mission_name. A value that the line does not give matches any value. When it matches two waiting lines, the line whose values it gives in full is the event. Else the call gives invalid_argument. start_mission, load_checkpoint and start_at start a new run and remove the inputs before them. start_at starts the triggers that wait at a trigger, as a play from that trigger does. The fact and player inputs before them stay, in their net form.",
+        "inputs": "The inputs in order, at most 1000, with at most 108000 heartbeats in all. Each input is an object with a kind. The kinds are start_mission, load_checkpoint {trigger}, start_at {trigger}, run_trigger {trigger}, event {line} and fact {line, on}. The other kinds are heartbeats {count} or {until_timer: true}, player_system {system} and player_in_space {value}. A trigger is a trg: reference or the nickname of a trigger of the script. A line is {key, values} with the value names of describe_mission_name. A value that the line does not give matches any value. When it matches two waiting lines, the line whose values it gives in full is the event. Else the call gives invalid_argument. start_mission, load_checkpoint and start_at start a new run and remove the inputs before them. start_at starts the triggers that wait at a trigger, as a play from that trigger does. The fact and player inputs before them stay, in their net form.",
         "timer_bound": "Which bound of a timer range the run uses. The game picks a value in the range when the mission loads.",
         "since_step": "Give only the steps after this step. The state after the last step always comes. Use it as the page of a long run."
       }
@@ -1197,7 +1197,7 @@
     "MissionsView.scripts": "The mission scripts: the story slots, then the other scripts.",
     "MissionListRow.ref": "The msn: reference of the script.",
     "MissionListRow.slot": "The story slot that loads the script, for example M02, or none.",
-    "MissionListRow.state": "base_game when no mod changes the script, changed, replaced, or missing when no file is at the path.",
+    "MissionListRow.state": "base_game when no mod changes the script, changed when a mod patches it, or replaced when a whole file of a mod gives it. missing tells that no file is at the path. A new script of a mod is a whole file, so it is replaced too.",
     "MissionListRow.mod_id": "The last mod that changes or replaces the script, or none.",
     "MissionListRow.triggers": "The number of triggers.",
     "MissionListRow.errors": "The number of errors of the active mod.",
@@ -1218,7 +1218,7 @@
     "MissionStepView.reason": "Why the step is necessary, and what is missing.",
     "MissionOverview.ref": "The msn: reference of the script.",
     "MissionOverview.slot": "The story slot that loads the script, or none.",
-    "MissionOverview.state": "base_game when no mod changes the script, changed, replaced or missing.",
+    "MissionOverview.state": "base_game when no mod changes the script, changed when a mod patches it, replaced when a whole file of a mod gives it, or missing. A new script of a mod is a whole file, so it is replaced too.",
     "MissionOverview.start_triggers": "The trg: references of the triggers that start with the mission.",
     "MissionOverview.acts": "The acts of the mission, with their triggers in file order.",
     "MissionOverview.not_started": "The trg: references of the triggers that no start trigger reaches.",

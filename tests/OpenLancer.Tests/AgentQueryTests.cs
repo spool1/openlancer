@@ -342,6 +342,19 @@ public sealed class AgentQueryTests
         Assert.Equal(("invalid_argument", "BadJson"), Code(bad));
         Assert.Equal(("invalid_argument", "BadJson"), Code(field));
         Assert.Contains("count of heartbeats", field.Message);
+
+        // A trigger input takes the nickname of a trigger of the script, as the trigger tools do. A reference that is
+        // not valid names its input (final finding 22 of MCP1-3).
+        var nickname = Ok(host, "mission_dry_run", $$"""{ "script": {{script}}, "inputs": [ { "kind": "start_at", "trigger": "ol_wave" } ] }""");
+        var reference = Ok(host, "mission_dry_run", $$"""
+            { "script": {{script}}, "inputs": [ { "kind": "start_at", "trigger": {{Json($"trg:{MissionEdits.Script}#ol_wave")}} } ] }
+            """);
+        Assert.True(JsonNode.DeepEquals(reference["state"], nickname["state"]));
+        var wrong = Call(host, "mission_dry_run", $$"""
+            { "script": {{script}}, "inputs": [ { "kind": "start_mission" }, { "kind": "run_trigger", "trigger": "obj:ol_wave" } ] }
+            """);
+        Assert.Equal(("invalid_argument", "inputs[1].trigger"), ((string?)wrong.Content["code"], (string?)wrong.Content["field"]));
+        Assert.StartsWith("Input 1: ", (string?)wrong.Content["message"]);
     }
 
     /// <summary>The tool and the JSON host read a dry run request with one reader, so they give the same result.</summary>
