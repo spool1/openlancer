@@ -415,7 +415,8 @@ public sealed partial class AgentMissionToolTests
     {
         var (m, host) = Open();
         using var _ = m;
-        var tools = AgentTools.All.Where(t => t is { Kind: ToolKind.Edit, Group: ToolGroup.Missions, Name: not "mission_edit" })
+        var tools = AgentTools.All
+            .Where(t => t is { Kind: ToolKind.Edit, Group: ToolGroup.Missions, Name: not ("mission_edit" or "mission_add_item") })
             .Select(t => t.Name).ToList();
 
         host.Hidden.Add(ToolGroup.Missions);

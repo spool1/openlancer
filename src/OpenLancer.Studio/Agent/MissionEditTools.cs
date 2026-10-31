@@ -489,8 +489,8 @@ internal static class MissionEditTools
             .ToList();
         var commands = more.Select(f => (MissionCommand)new SetItemKey(ship, f.Key, f.Lines)).ToList();
         // A formation that names the ship before the ship takes no ship (rule M08). The first one in the file wins.
-        if (scope.Session.Missions.AnalysisOf(script.Path)?.Index.LaterMembers
-                .Where(m => MissionIndex.Is(m.Ship, name)).MinBy(m => m.Formation.Index).Formation is { } formation)
+        if (scope.Session.Missions.AnalysisOf(script.Path)?.Index.LaterMembers.Where(m => MissionIndex.Is(m.Ship, name))
+                .Select(m => m.Formation).MinBy(f => f.Index) is { } formation)
             commands.Add(new MoveSection(ship) { Before = new ItemRef(script.Path, formation.Ref.Id) });
         if (commands.Count > 0)
         {

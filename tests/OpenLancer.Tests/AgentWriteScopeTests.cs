@@ -61,6 +61,7 @@ public sealed class AgentWriteScopeTests
         ("mission_link_triggers", """{ "from": REF, "to": "t" }"""),
         ("mission_link_triggers", """{ "from": "trg:DATA\\MISSIONS\\x.ini#t", "to": REF }"""),
         ("mission_insert_trigger", """{ "line": REF, "condition": { "key": "Cnd_True" } }"""),
+        ("mission_add_item", """{ "script": REF, "kind": "solar", "fields": { "system": "ol_system" } }"""),
     ];
 
     /// <summary>The paths of a call of a mission tool that are not install paths, or that leave the folder of the
@@ -82,6 +83,7 @@ public sealed class AgentWriteScopeTests
         ("mission_link_triggers", """{ "from": "trg:PATH#ol_wave", "to": "ol_end" }"""),
         ("mission_link_triggers", """{ "from": "trg:DATA\\MISSIONS\\OL_TEST\\ol_test.ini#ol_wave", "to": "trg:PATH#ol_end" }"""),
         ("mission_insert_trigger", """{ "line": "line:PATH#Trigger/ol_start/3", "condition": { "key": "Cnd_True" } }"""),
+        ("mission_add_item", """{ "script": "msn:PATH", "kind": "ship", "fields": { "npc": "ol_npc_1" } }"""),
     ];
 
     /// <summary>The details of a refused path: the install path check, and the read of a reference.</summary>

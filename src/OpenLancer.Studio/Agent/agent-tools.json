@@ -507,7 +507,7 @@
         "kind": "The kind of the new item. A ship needs fields.npc. A ship_build goes into the ship build file of the script.",
         "nickname": "The nickname of the new item. Use letters, digits, '_' and '-'. A random encounter has at most 31 characters. Without it, the editor makes a free name.",
         "fields": "The keys of the new item, for example {\"npc\": \"my_npc\", \"position\": [0, 0, 1000]}. A value is one value, a list for a position, or an object of values by name. {\"texts\": [...]} gives the value texts by position. A key that repeats, for example label, takes a list of these. null writes no line.",
-        "steps": "The orders of an order list, in order. Each step is a line of a directive, for example {\"key\": \"GotoVec\", \"values\": {\"point\": [0, 0, 1000]}}. Only the kind order_list takes steps."
+        "steps": "The orders of an order list, in order. Each step is a line of a directive, for example {\"key\": \"Delay\", \"values\": {\"seconds\": 5}}. describe_mission_name gives the values of each directive. Only the kind order_list takes steps."
       }
     },
     "save": {

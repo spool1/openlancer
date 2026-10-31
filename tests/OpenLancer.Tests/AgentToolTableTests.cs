@@ -276,6 +276,7 @@ public sealed class AgentToolTableTests
         ["mission_move_action"] = (ToolKind.Edit, new ToolHints(false, true, false)),
         ["mission_link_triggers"] = (ToolKind.Edit, new ToolHints(false, true, false)),
         ["mission_insert_trigger"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["mission_add_item"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["save"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["undo"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["redo"] = (ToolKind.Session, new ToolHints(false, true, false)),

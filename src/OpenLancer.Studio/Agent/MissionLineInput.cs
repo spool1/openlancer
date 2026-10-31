@@ -197,7 +197,7 @@ internal static class MissionLineInput
             _ when specs.Count == 1 => LineSpec.Of(key, (specs[0].Name, Value(form))),
             // A key that the schema does not know, in a section that reads keys of another grammar, has no value names.
             _ when specs.Count == 0 =>
-                LineSpec.Raw(key, [.. (form is JsonArray items ? items : [form]).Select(v => Value(v!).Scalar!)]),
+                LineSpec.Raw(key, [.. (form is JsonArray items ? items.ToList() : [form]).Select(v => Value(v!).Scalar!)]),
             _ => throw Refuse(field, AgentTexts.Error("mission_field_named", ("key", key),
                 ("names", string.Join(", ", specs.Select(s => s.Name))))),
         };
