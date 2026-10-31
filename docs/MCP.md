@@ -117,6 +117,7 @@ These tools work in both hosts. They change nothing.
 | `search_assets`, `list_prop_groups` | The assets of the Assets panel, and the prop groups of the mods. |
 | `list_missions`, `get_mission`, `get_trigger`, `describe_mission_name` | The mission scripts, one script, one trigger, and the plain name of a condition or an action. |
 | `mission_dry_run` | A dry run of one mission script, without a game world. The trigger rules of the game run step by step on the inputs that the agent gives. The result gives each step and the state after the last step. The section "The dry run" of `docs/MISSIONS.md` gives the rules. |
+| `mission_start_plan` | The plan of a play of one mission script from a start, as the Play start page shows it. A plan that cannot start gives the status `refused` and the reason. See "The start plan". |
 | `list_cutscenes`, `get_cutscene` | The cutscene scripts, and one script with its entities and events. |
 | `get_raw_ini` | The INI text of a section or a file, with the problems of each line. |
 | `check` | The problems of the checks of the editor, in pages. |
@@ -277,7 +278,7 @@ These steps build an NPC patrol and a wreck with cargo in a system.
 
 ### The mission tools
 
-The mission tools change the mission scripts of the active mod with the commands of the mission studio. They work in both hosts. `mission_edit` runs any commands of the mission studio. The trigger tools of "The trigger tools" add and change triggers and their lines with named arguments. `mission_add_item` adds a ship, an NPC or another item of a mission, as "The item tool" tells. The generic edit tools rename, delete, copy and change mission items, as "The generic tools on mission items" tells.
+The mission tools change the mission scripts of the active mod with the commands of the mission studio. They work in both hosts. `mission_edit` runs any commands of the mission studio. The trigger tools of "The trigger tools" add and change triggers and their lines with named arguments. `mission_add_item` adds a ship, an NPC or another item of a mission, as "The item tool" tells. `mission_place_prefab` places a behavior prefab, as "The prefab tool" tells. The generic edit tools rename, delete, copy and change mission items, as "The generic tools on mission items" tells.
 
 `mission_edit` runs a list of commands. Each call is one Undo step with all its commands, as each other edit tool. It takes `preview`, `with_patch`, `if_revision` and `confirm`, as the edit tools do.
 
@@ -395,6 +396,48 @@ This call adds a ship with the NPC `my_pirate_npc` at a position in the system `
   "fields": { "npc": "my_pirate_npc", "system": "my_system", "position": [8000, 0, -2000], "label": ["my_pirates"] }
 }
 ```
+
+#### The prefab tool
+
+`mission_place_prefab` places one linked instance of a behavior prefab in `script`, as a drop of the prefab on the graph does. `prefab` is a `prefab:builtin:` or `prefab:mod:` reference. Each call is one Undo step and runs in strict mode, as the trigger tools do. The tool takes `preview`, `with_patch` and `if_revision`, and it can be a step of `edit_batch`. The result gives the `trg:` reference of each member trigger and the `inst:` reference of the instance in `adds`. It also gives `inverse` and `versions`.
+
+`get_item` with the `prefab:` reference gives the fields, the outputs and the roles of a prefab. Each field gives its `kind` and its `default` rows. A list field also gives its `columns`. A condition field and a lines field give the `keys` that they take.
+
+`fields` gives the values of the fields by field id. A field without a value takes the default of the prefab. The value of a field has the form of its kind:
+
+| Kind of the field | Form of the value | Example |
+|---|---|---|
+| A value kind, for example `formation` or `number` | One value, or a list of numbers for a position or a rotation | `"ships": "my_wave"` |
+| `list` | A list of rows. Each row is an object of values by column id. | `"waypoints": [{"point": [0, 0, 500]}, {"point": [1000, 0, 0]}]` |
+| `triggers` | A list of triggers | `"targets": ["my_next"]` |
+| `condition` | One condition line | `"spawnWhen": {"key": "Cnd_Timer", "values": {"seconds": 5}}` |
+| `lines` | A list of action lines or order lines | `"sides": [{"key": "Act_SetVibe", "values": {"from": "my_ship", "to": "my_other_ship", "attitude": -0.9}}]` |
+
+A line has the form of a line of the trigger tools. A trigger is a nickname or a `trg:` reference of the same script. `null` gives the field no value, and a field that needs a value then gives `invalid_value`. The editor writes the rows of the record of the instance in their text form, as the Inspector does. The agent never writes that text.
+
+`outputs` gives the triggers that each output of the instance starts, by output id, for example `{"done": ["my_next"]}`. Each trigger then gets a start line in the member of the output.
+
+`id` gives the id of the instance. The names of the members start with the id, for example `my_wave_spawn`. An id has letters, digits, `_` and `-`, with at most 47 characters. Without an id, the editor makes a free id.
+
+A prefab that does not exist gives `not_found` with the closest names. An id in use, or a member name that another section of the script has, gives `name_taken`. A value that the field refuses gives `invalid_value` with the detail `FieldValue`. A value in another form gives `invalid_argument`. A field, a column or an output that the prefab does not have gives `invalid_argument` too. Each error names its argument, for example `fields.delay` or `fields.waypoints[1].point`. The game reads only the whole part of some values, for example the point of `GotoVec`. Such a value with a fraction gives `invalid_value` with the detail `TemplateLine`.
+
+This call places the built-in prefab Spawn wave. The wave spawns 5 seconds after the trigger starts, and the trigger `my_reward` starts when all its ships are destroyed:
+
+```json
+{
+  "script": "msn:DATA\\MISSIONS\\M01A\\m01a.ini",
+  "prefab": "prefab:builtin:spawnWave",
+  "id": "my_wave",
+  "fields": { "ships": "my_pirates", "spawnWhen": { "key": "Cnd_Timer", "values": { "seconds": 5 } } },
+  "outputs": { "done": [ "my_reward" ] }
+}
+```
+
+#### The start plan
+
+`mission_start_plan` gives the plan of a play of `script` from `start`, as the Play start page of the editor shows it. It changes nothing. `start` is `mission_start`, or the `trg:` reference of a trigger of the script. `start_place` is `suggested`, `camera`, or `base:` and the nickname of a base. `target` takes only `openlancer` in this version. A play from a trigger in a retail game comes with a later version.
+
+The result gives the plan in `plan`: the status, the kind of the start, the story state, the start place and the setup triggers. It also gives the replay path and the warnings. A plan that cannot start is data: `status` is `refused`, and `reason` tells why. For example, OpenLancer starts only the scripts of the 14 story slots, so the plan of another script gives `refused`. A trigger that the script does not have gives `not_found`. A trigger of another script gives `invalid_argument`.
 
 #### The generic tools on mission items
 
@@ -525,7 +568,7 @@ The server has no prompts yet. The prompts of the workflows and the catalog of t
 
 An agent program can ask you before each tool call. A permission rule of the agent program can allow a set of tools without a question. Claude Code gives each tool of the server `openlancer` the name `mcp__openlancer__<tool>`.
 
-The name of a read tool starts with `list_`, `get_`, `find_`, `search_`, `describe_` or `check`, or is `studio_status`, `mission_dry_run` or `publish_checklist`. So these rules allow all read tools:
+The name of a read tool starts with `list_`, `get_`, `find_`, `search_`, `describe_` or `check`, or is `studio_status`, `mission_dry_run`, `mission_start_plan` or `publish_checklist`. So these rules allow all read tools:
 
 ```
 mcp__openlancer__list_*
@@ -536,6 +579,7 @@ mcp__openlancer__describe_*
 mcp__openlancer__check
 mcp__openlancer__studio_status
 mcp__openlancer__mission_dry_run
+mcp__openlancer__mission_start_plan
 mcp__openlancer__publish_checklist
 ```
 
