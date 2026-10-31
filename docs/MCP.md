@@ -4,7 +4,7 @@ OpenLancer has an agent server. An agent program, for example Claude Code, conne
 
 The agent reads the data as the editor shows it. It reads the systems and their items, the data lists, the assets, the missions and the cutscenes. It also reads the raw INI text and the problems of the checks. In the editor, the agent can also open views, select items, and get images of a system, of a cutscene and of a panel.
 
-The agent can also edit the items of the active mod. It sets fields and texts, renames, deletes and copies items, and undoes its own edits. It creates objects, zones and lights, places assets and prop groups, moves items and makes items from templates. Each agent edit goes through the same commands, checks and Undo history as an edit of the user. An edit changes the edit view of the editor. It is not saved until you or the agent save the mod. See "The edit tools", "The Scene and data tools" and "Save". In the editor, the agent can also start and stop Play. See "Play". The editor marks each agent edit, and you can pause the agent edits. See "What you see in the editor".
+The agent can also edit the items of the active mod. It sets fields and texts, renames, deletes and copies items, and undoes its own edits. It creates objects, zones and lights, places assets and prop groups, moves items and makes items from templates. It also changes the mission scripts with the commands of the mission studio. Each agent edit goes through the same commands, checks and Undo history as an edit of the user. An edit changes the edit view of the editor. It is not saved until you or the agent save the mod. See "The edit tools", "The Scene and data tools", "The mission tools" and "Save". In the editor, the agent can also start and stop Play. See "Play". The editor marks each agent edit, and you can pause the agent edits. See "What you see in the editor".
 
 ## The two hosts
 
@@ -84,7 +84,7 @@ When another program uses the port, the server does not start. The status bar th
 |---|---|---|
 | Agent server port | 47815 | The port of the server on this computer. Stop the server to change it. |
 | Auto-save and continue when an MCP agent starts Play | Off | When an agent starts Play and the active mod has unsaved edits, the editor saves them and plays. Off: the editor asks you first. See "Agent Play" in [PLAY.md](PLAY.md). The setting applies to the tool `play`. |
-| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions, Cutscenes and Play. The `scene_` tools, the `prop_group_` tools and `render_scene` are in the group Scene. `render_cutscene` is in the group Cutscenes. `play` and `play_stop` are in the group Play. These read tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check` and `get_console`. The edit tools of "The edit tools" are always available too, and so are `save`, `export_mod`, `publish_checklist`, `create_loadout`, `create_from_template`, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene. |
+| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions, Cutscenes and Play. The `scene_` tools, the `prop_group_` tools and `render_scene` are in the group Scene. `render_cutscene` is in the group Cutscenes. `play` and `play_stop` are in the group Play. `mission_edit`, `mission_dry_run` and the read tools of the missions are in the group Missions. These read tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check` and `get_console`. The edit tools of "The edit tools" are always available too, and so are `save`, `export_mod`, `publish_checklist`, `create_loadout`, `create_from_template`, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene. |
 | Rows of a page without a limit | 50 | The rows of a list result when the agent gives no limit. |
 | Largest page limit | 200 | The largest limit that the agent can ask for in one list result. |
 | Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
@@ -95,7 +95,7 @@ When another program uses the port, the server does not start. The status bar th
 | Largest side of an image (pixels) | 2048 | The most pixels on each side of an image. A larger panel capture becomes smaller. A `render_scene` or `render_cutscene` call with a larger `width` or `height` gives the error `limit`. |
 | Items of one edit | 200 | The most items that one call of `delete_items`, `duplicate_items` or `prop_group_save` names, and the most moves of one `scene_transform` call. |
 | Sections of one edit | 2000 | The most sections that one edit call changes, adds or removes. A larger edit changes nothing and gives the error `limit`. |
-| Steps of one batch | 100 | The most steps of one `edit_batch` call. |
+| Steps of one batch | 100 | The most steps of one `edit_batch` call, and the most commands of one `mission_edit` call. |
 | Legs of one route | 50 | The most legs of one `scene_place_patrol_route` call. Each leg is one zone. A retail route has at most 12 legs. |
 | Time of an export (min) | 10 | How long one `export_mod` call can take. A longer export gives the error `limit`. A write of the packages that started goes on to its end. |
 
@@ -162,7 +162,7 @@ These tools change the data of the active mod. They work in both hosts. The olto
 
 Each edit is one Undo step. The Edit menu shows its label with "Agent: " before it, for example "Undo Agent: Delete my_station_1". You can undo and redo each agent edit, as each of your own edits. `undo` undoes only an agent edit at the top of the history. `redo` redoes only an agent edit that the agent undid. So the agent never undoes your edit, and never redoes an edit that you undid with Ctrl+Z. All agent programs of one editor have the same edit origin. So `undo` of one agent program can undo the last edit of another agent program.
 
-The edit tools change only items of INI files. A reference of a mission item or of a cutscene gives the error `not_available`. The mission tools and the cutscene tools come with a later version. A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. `delete_items` takes items of a system only: objects, zones, lights, nebulae and asteroid fields. `duplicate_items` takes objects, zones and lights of a system. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. Another section, for example a loadout, gives `refused`.
+The edit tools change only items of INI files. A reference of a mission item or of a cutscene gives the error `not_available`. Use `mission_edit` for the mission scripts. See "The mission tools". The cutscene tools come with a later version. A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. `delete_items` takes items of a system only: objects, zones, lights, nebulae and asteroid fields. `duplicate_items` takes objects, zones and lights of a system. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. Another section, for example a loadout, gives `refused`.
 
 #### Values of set_fields
 
@@ -200,7 +200,7 @@ When one step fails, the error `step_failed` gives its index and its error, and 
 
 #### Limits and pauses
 
-One call names at most 200 items and changes at most 2000 sections. One batch has at most 100 steps, and one route has at most 50 legs. **Agent > Agent settings > Advanced** changes these limits. A call above a limit gives the error `limit` and changes nothing. The size limit of a result applies to an edit too. The edit checks the size of its result before it applies, so a larger edit also changes nothing.
+One call names at most 200 items and changes at most 2000 sections. One batch has at most 100 steps, one `mission_edit` call has at most 100 commands, and one route has at most 50 legs. **Agent > Agent settings > Advanced** changes these limits. A call above a limit gives the error `limit` and changes nothing. The size limit of a result applies to an edit too. The edit checks the size of its result before it applies, so a larger edit also changes nothing.
 
 While you pause the agent edits, each tool that changes data, writes files or starts a play gives the error `paused`. Examples are the edit tools, `undo`, `redo`, `save`, `export_mod` and `play`. The read tools still work, also `publish_checklist`. `play_stop` also works. It stops each game of Play, also a game that you started. Pick **Agent > Pause agent edits** to pause the agent edits, and **Resume agent edits** to let the agent edit again.
 
@@ -270,6 +270,31 @@ These steps build an NPC patrol and a wreck with cargo in a system.
 9. Call `check`.
 10. Correct each error with `set_fields`.
 11. Save the mod in the editor.
+
+### The mission tools
+
+`mission_edit` changes the mission scripts of the active mod with the commands of the mission studio. It works in both hosts. Each call is one Undo step with all its commands, as each other edit tool. It takes `preview`, `with_patch`, `if_revision` and `confirm`, as the edit tools do.
+
+| Argument | What it does |
+|---|---|
+| `commands` | The mission commands in order. Each command is an object with a `kind`, for example `add_trigger`, `set_condition_value` or `remove_trigger`. The input schema of the tool gives each kind with its fields. |
+| `label` | The label of the Undo step. Without it, the call takes the label of its one command, or "Mission edit". |
+| `options` | `reject_new_warnings: true` also refuses an edit that adds a warning. |
+| `expect_versions` | The versions of the scripts that the agent read, by install path. When a script has another version now, the call gives `stale_revision` with the detail `ScriptChanged`. |
+
+A line of a trigger is an object with its key and its values by name, for example `{"key": "Act_ActTrig", "values": {"trigger": "my_next"}}`. `describe_mission_name` gives the value names of each condition and action. A line can also give its value texts by position in `texts`.
+
+Each command sees the result of the commands before it. So a later command can name a trigger that an earlier command added. When one command refuses, the call changes nothing, and the error names the command, for example `commands[2]`. A path of a reference must be an install path. A new script must be under `DATA\MISSIONS`. The commands do not change the shared files of the missions, for example the pilot files, because encounters and bases use them too.
+
+The mission tools always run in strict mode. An edit that adds an error to a script gives the error `new_errors` with the first new error, and nothing changes. `options` with `reject_new_errors: false` gives `invalid_argument`. A line that a delete or a rename leaves "Missing" does not count as a new error. But the delete or the rename needs `confirm: true`, as in "Preview, confirmation and revision". The other changes that the mission studio asks about need it too, for example a change of a build in the shared ship build file of the missions.
+
+The result gives `inverse`: a mission command that reverts the call. To revert the call after later edits of other items, give the inverse in `commands` of a new `mission_edit` call. The inverse checks each section that the call changed or added. When a later edit changed such a section, the inverse gives `stale_revision` with the detail `SectionChanged`, and nothing changes. `undo` reverts only the last edit of the agent. `row_moves` gives the lines whose place in their trigger changed.
+
+Each script has a version. It starts at 1 and grows at each edit, undo and redo of the script. The result of each edit call gives the versions of the scripts that it changed in `versions`. A rename of an object that changes the mission lines that name it gives them too. `list_missions` gives the version of each script.
+
+`mission_edit` can be a step of `edit_batch`. The strict check of the missions runs once, at the end of the batch. So a step can start a trigger that a later step adds. Each mission step gives its own `inverse` in `steps`, and the batch gives no inverse. One undo reverts the whole batch.
+
+One call has at most 100 commands. A `command_group` counts as one command. The limit of the sections of one edit and the size of a request bound its work.
 
 ### Save
 

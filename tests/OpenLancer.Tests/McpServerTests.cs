@@ -154,6 +154,45 @@ public sealed class McpServerTests
         Assert.Equal("Agent: Set pos", result.StructuredContent.Value.GetProperty("undo_label").GetString());
     }
 
+    /// <summary>The tool list gives mission_edit with the definitions of the mission batch at the root of its input
+    /// schema. A preview through the client gives the status previewed, the inverse and the same revision (step 1 of
+    /// MCP1-3).</summary>
+    [Fact]
+    public async Task AMissionEditPreviewGivesItsResultAndKeepsTheRevision()
+    {
+        using var m = MissionEdits.Create();
+        await using var connection = new Connection(new TestAgentHost(m.Session));
+        var client = await connection.Client();
+
+        var tools = await client.ListToolsAsync(cancellationToken: Token);
+        var result = await client.CallToolAsync("mission_edit", new Dictionary<string, object?>
+        {
+            ["commands"] = new[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["kind"] = "set_condition_value",
+                    ["trigger"] = $"trg:{MissionEdits.Script}#ol_wave",
+                    ["name"] = "seconds",
+                    ["value"] = 9,
+                },
+            },
+            ["preview"] = true,
+        }, cancellationToken: Token);
+
+        var schema = tools.Single(t => t.Name == "mission_edit").ProtocolTool.InputSchema;
+        Assert.True(schema.GetProperty("$defs").TryGetProperty("line.Cnd_Timer", out _));
+        Assert.Equal("#/$defs/command", schema.GetProperty("properties").GetProperty("commands").GetProperty("items")
+            .GetProperty("$ref").GetString());
+        Assert.NotEqual(true, result.IsError);
+        var content = result.StructuredContent!.Value;
+        Assert.Equal("previewed", content.GetProperty("status").GetString());
+        Assert.Equal("0", content.GetProperty("rev").GetString());
+        Assert.Equal("command_group", content.GetProperty("inverse").GetProperty("kind").GetString());
+        Assert.Equal(0, m.Session.Revision);
+        Assert.False(m.Session.CanUndo);
+    }
+
     [Fact]
     public async Task TheResourcesGiveTheListsAndTheGuides()
     {

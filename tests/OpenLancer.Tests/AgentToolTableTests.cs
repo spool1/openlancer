@@ -56,6 +56,33 @@ public sealed class AgentToolTableTests
         }
     }
 
+    /// <summary>The schema check of the tests resolves a <c>$ref</c> as a JSON Pointer (RFC 6901): <c>~1</c> is a
+    /// <c>/</c> and <c>~0</c> is a <c>~</c> in a name. A <c>$ref</c> that does not resolve is a problem of the schema.
+    /// <c>oneOf</c> takes exactly one match, and <c>const</c> takes one value (open alignment item 4 of the MCP1
+    /// design: the repository has no JSON Schema package).</summary>
+    [Fact]
+    public void TheSchemaCheckResolvesEachReferenceAndReadsOneOfAndConst()
+    {
+        var schema = JsonNode.Parse("""
+            {
+              "type": "object",
+              "properties": {
+                "a": { "$ref": "#/$defs/x~1y" },
+                "b": { "$ref": "#/$defs/x~0y" },
+                "c": { "oneOf": [ { "type": "number" }, { "type": "integer" } ] }
+              },
+              "$defs": { "x/y": { "const": "slash" }, "x~y": { "const": "tilde" } }
+            }
+            """)!;
+        var broken = JsonNode.Parse("""{ "properties": { "a": { "$ref": "#/$defs/x/y" } }, "$defs": { "x/y": {} } }""");
+
+        Assert.Empty(SchemaCheck.SchemaProblems(schema));
+        Assert.Empty(SchemaCheck.Problems(schema, JsonNode.Parse("""{ "a": "slash", "b": "tilde", "c": 1.5 }""")));
+        Assert.NotEmpty(SchemaCheck.Problems(schema, JsonNode.Parse("""{ "a": "tilde" }""")));
+        Assert.NotEmpty(SchemaCheck.Problems(schema, JsonNode.Parse("""{ "c": 2 }""")));
+        Assert.Equal(["#/properties/a: the reference '#/$defs/x/y' does not resolve."], SchemaCheck.SchemaProblems(broken));
+    }
+
     /// <summary>The kind and the hints of each tool (section 7.0 of the MCP1 design, review finding R7 of MCP1-2). A
     /// query changes nothing. <c>open_view</c> and <c>select_items</c> change what the user sees, so they are not
     /// read-only. An edit that can change or remove data is destructive, and only <c>set_fields</c> is idempotent,
