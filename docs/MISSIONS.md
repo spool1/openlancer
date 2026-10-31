@@ -357,6 +357,8 @@ A delete of a trigger keeps each line that names it, and the line shows "Missing
 
 The save gate stops a save when a script has an error that the edit made, for example a trigger without a condition. A problem that the base game has too is a warning. The Console lists the problems after each edit.
 
+An agent of the agent server edits a mission with the same commands. `mission_edit` runs each command of the studio. The trigger tools, `mission_add_item` and `mission_place_prefab` do the gestures with named arguments, for example `mission_add_trigger` and `mission_link_triggers`. Each agent edit is one entry of the history with "Agent: " before its label. The agent tools refuse each edit that adds an error to a script. Beside `mission_dry_run`, `mission_start_plan` gives the plan of a play from a trigger, and `mission_play` starts the play in the editor. [MCP.md](MCP.md) tells about the tools.
+
 ## Behavior prefabs
 
 A behavior prefab is a group of triggers with named fields, for example "Spawn wave" with the fields Ships, "Spawn when", Orders and Sides. The studio knows three forms:
