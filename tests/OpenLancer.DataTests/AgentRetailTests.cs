@@ -65,6 +65,8 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
             ("list_values", $$"""{ "list": "mission_trigger", "script": {{Json(script)}} }"""),
             ("get_trigger", $$"""{ "ref": {{Json(trigger)}} }"""),
             ("describe_mission_name", """{ "key": "Cnd_Timer" }"""),
+            ("mission_start_plan", $$"""{ "script": {{Json(script)}} }"""),
+            ("mission_start_plan", $$"""{ "script": {{Json(script)}}, "start": {{Json(trigger)}} }"""),
             ("list_cutscenes", "{}"),
             ("get_cutscene", $$"""{ "ref": {{Json(cutscene)}} }"""),
             ("get_raw_ini", $$"""{ "ref": {{Json(station)}} }"""),

@@ -218,7 +218,7 @@ public static class AgentTools
                 new TextParam("start", false, null, RunJson.MissionStartName),
                 new TextParam("target", false, MissionQueryTools.StartTargets, RunJson.OpenLancerTarget),
                 new TextParam("start_place", false, null, RunJson.SuggestedPlace)),
-            typeof(StartPlanView), MissionQueryTools.StartPlan),
+            typeof(StartPlanResult), MissionQueryTools.StartPlan),
         SessionTool("save", ToolHints.Changing, ToolInput.None, typeof(SaveView), SaveTools.Save),
         SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
         SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),

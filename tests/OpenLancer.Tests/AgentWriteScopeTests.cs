@@ -62,6 +62,8 @@ public sealed class AgentWriteScopeTests
         ("mission_link_triggers", """{ "from": "trg:DATA\\MISSIONS\\x.ini#t", "to": REF }"""),
         ("mission_insert_trigger", """{ "line": REF, "condition": { "key": "Cnd_True" } }"""),
         ("mission_add_item", """{ "script": REF, "kind": "solar", "fields": { "system": "ol_system" } }"""),
+        ("mission_place_prefab", """{ "script": REF, "prefab": "prefab:builtin:spawnWave" }"""),
+        ("mission_place_prefab", """{ "script": "msn:DATA\\MISSIONS\\x.ini", "prefab": "prefab:builtin:branch", "outputs": { "ifActive": [REF] } }"""),
     ];
 
     /// <summary>The paths of a call of a mission tool or of a generic edit tool on a mission item that are not install
@@ -85,6 +87,9 @@ public sealed class AgentWriteScopeTests
         ("mission_link_triggers", """{ "from": "trg:DATA\\MISSIONS\\OL_TEST\\ol_test.ini#ol_wave", "to": "trg:PATH#ol_end" }"""),
         ("mission_insert_trigger", """{ "line": "line:PATH#Trigger/ol_start/3", "condition": { "key": "Cnd_True" } }"""),
         ("mission_add_item", """{ "script": "msn:PATH", "kind": "ship", "fields": { "npc": "ol_npc_1" } }"""),
+        ("mission_place_prefab", """{ "script": "msn:PATH", "prefab": "prefab:builtin:spawnWave" }"""),
+        ("mission_place_prefab", """{ "script": "msn:DATA\\MISSIONS\\OL_TEST\\ol_test.ini", "prefab": "prefab:builtin:branch", "fields": { "tests": "trg:PATH#ol_wave" } }"""),
+        ("mission_place_prefab", """{ "script": "msn:DATA\\MISSIONS\\OL_TEST\\ol_test.ini", "prefab": "prefab:builtin:branch", "fields": { "tests": "ol_wave" }, "outputs": { "ifActive": ["trg:PATH#ol_end"] } }"""),
         ("set_fields", """{ "ref": "sec:PATH#MsnShip/ol_ship_1", "fields": { "jumper": true } }"""),
         ("set_fields", """{ "ref": "trg:PATH#ol_wave", "fields": { "jumper": true } }"""),
         ("set_text", """{ "ref": "line:PATH#Trigger/ol_end/3", "field": "text", "text": "x" }"""),

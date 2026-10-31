@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json.Nodes;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Games;
 using OpenLancer.Data.Mods;
@@ -260,5 +261,33 @@ public sealed class HeadlessHostTests
         Assert.Contains("pos = 1, 2, 3", patch);
         Assert.DoesNotContain("pos = 10, 20, 30", patch);
         Assert.False(File.Exists(Recovery(ws)));
+    }
+
+    /// <summary>The prefab place and the start plan of the missions work in the host without a window (step 6 of MCP1-3).
+    /// A host that only reads lists mission_start_plan, not mission_place_prefab, and its plan is the same.</summary>
+    [Fact]
+    public void ThePrefabPlaceAndTheStartPlanWorkInTheHostWithoutAWindow()
+    {
+        const string story = @"DATA\MISSIONS\M02\m02.ini";
+        using var m = MissionEdits.Create(setup: ws => ws.WriteBase(story, StartPlanTests.Script));
+        m.Session.Dispose();
+        var script = Json("msn:" + MissionEdits.Script);
+        var plan = $$"""{ "script": {{Json("msn:" + story)}}, "start": {{Json($"trg:{story}#t_kill")}} }""";
+
+        JsonObject place, edited;
+        using (var host = HeadlessHost.Open(m.Ws.ProfilePath, "act", new HeadlessOptions { WritesRecovery = false }))
+        {
+            place = Ok(host, "mission_place_prefab",
+                $$"""{ "script": {{script}}, "prefab": "prefab:builtin:spawnWave", "id": "ol_w1", "fields": { "ships": "ol_form" } }""");
+            edited = Ok(host, "mission_start_plan", plan);
+        }
+        using var reader = HeadlessHost.OpenReadOnly(m.Ws.ProfilePath, "act");
+        var read = Ok(reader, "mission_start_plan", plan);
+
+        Assert.Equal("applied", (string?)place["status"]);
+        Assert.Contains($"inst:{MissionEdits.Script}#ol_w1", place["adds"]!.AsArray().Select(a => (string?)a));
+        Assert.Equal(("ready", "ready"), ((string?)edited["plan"]!["status"], (string?)read["plan"]!["status"]));
+        Assert.Contains(reader.Tools, t => t.Name == "mission_start_plan");
+        Assert.DoesNotContain(reader.Tools, t => t.Name == "mission_place_prefab");
     }
 }

@@ -17,12 +17,12 @@ namespace OpenLancer.Studio.Agent;
 /// </summary>
 internal static partial class MissionEditTools
 {
-    public static ToolInput PlacePrefabInput { get; } = WithLines(
+    public static ToolInput PlacePrefabInput { get; } = new(EditTools.Input(false,
         new TextParam("script", true, null, null),
         new TextParam("prefab", true, null, null),
         new TextParam("id", false, null, null, MissionNames.MaxName, NamePattern),
         new PrefabFieldsParam("fields"),
-        new TextListsParam("outputs", false));
+        new TextListsParam("outputs", false)).Parameters.ToArray());
 
     /// <summary>
     /// The tool <c>mission_place_prefab</c>: <see cref="PlacePrefabInstance"/> with the values of the fields and the
@@ -56,6 +56,10 @@ internal static partial class MissionEditTools
                     MissionErrors.PrefabNotFound or MissionErrors.PrefabProblems => "prefab",
                     // The id gives the names of the members too.
                     MissionErrors.NameInvalid or MissionErrors.NameTaken or MissionErrors.NameIdTaken => "id",
+                    // A line of the compile that the game does not read as its value, for example a point that is not
+                    // whole. The value of a field gives the line.
+                    MissionErrors.TemplateLine or MissionErrors.FieldValue or MissionErrors.FieldNotFound => "fields",
+                    MissionErrors.PortNotFound => "outputs",
                     _ => "script",
                 });
         });

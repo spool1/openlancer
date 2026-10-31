@@ -79,6 +79,11 @@ internal sealed record MissionView(MissionOverview Summary, CompletenessView Com
     public Page<TriggerSummaryRow>? Triggers { get; init; }
 }
 
+/// <summary>The result of <c>mission_start_plan</c>: the start plan of the query. The plan is one property, because its
+/// <c>target</c> is also a property of a tool error, and the output schema has the properties of both at its
+/// root.</summary>
+internal sealed record StartPlanResult(StartPlanView Plan);
+
 /// <summary>
 /// The mission query tools of section 7.1 of the MCP1 design. Each one calls a read query of the mission layer
 /// (section 4.12 of the M6b design), so the agent and the mission studio read the same model.
@@ -192,7 +197,7 @@ internal static class MissionQueryTools
         // The script is valid, so an error of the reader without a field is the read of the reference of the start.
         var read = EditTools.At("start", () => RunJson.ReadStartRequest(request));
         // An unknown trigger of the start names start. Each other error of the query is an error of the script.
-        return ToolResult.Of(EditTools.At("script", () => call.Session.Missions.Queries.StartPlan(read)));
+        return ToolResult.Of(new StartPlanResult(EditTools.At("script", () => call.Session.Missions.Queries.StartPlan(read))));
     }
 
     /// <summary>A trigger in summary form: the sentence of its condition and one chip for each action group, in the

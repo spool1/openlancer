@@ -2332,6 +2332,43 @@
                         "type": "string"
                       },
                       "description": "The default rows of the field in their text form."
+                    },
+                    "optional": {
+                      "type": "boolean",
+                      "description": "True when a value field can have no value."
+                    },
+                    "columns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The id of the column in a row."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "The plain label of the column."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "The value kind of the column, for example position or trigger."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "kind"
+                        ]
+                      },
+                      "description": "The columns of a list field. A row of mission_place_prefab is an object of values by column id."
+                    },
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The keys that a condition field or a lines field takes. An empty list takes each condition or each action."
                     }
                   },
                   "required": [
@@ -37753,6 +37790,1093 @@
       }
     },
     {
+      "name": "mission_place_prefab",
+      "title": "Place a prefab in a mission",
+      "description": "Places one linked instance of a behavior prefab in a mission script, with its triggers and items. The tool makes one Undo step. It refuses an edit that adds an error to the script. get_item with the prefab: reference gives the fields and the outputs of the prefab. Set preview to true to see the result first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The reference of a mission script, for example msn:DATA\\MISSIONS\\M01A\\m01a.ini."
+          },
+          "prefab": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The prefab, for example prefab:builtin:spawnWave or prefab:mod:my_ambush. get_item gives the fields, the outputs and the roles of a prefab."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 47,
+            "pattern": "^[A-Za-z0-9_-]{1,47}$",
+            "description": "The id of the new instance. The names of its members start with it. Use letters, digits, \u0027_\u0027 and \u0027-\u0027. Without it, the editor makes a free id."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "number",
+                "string",
+                "boolean",
+                "array",
+                "object",
+                "null"
+              ]
+            },
+            "description": "The values of the fields by field id. A field without a value takes the default of the prefab. The form of a value follows the kind of the field. A value field takes one value, or a list of numbers for a position. A list field takes a list of rows, each an object of values by column id. A trigger list takes a list of trigger nicknames. A condition field takes one line, for example {\u0022key\u0022: \u0022Cnd_Timer\u0022, \u0022values\u0022: {\u0022seconds\u0022: 5}}. A lines field takes a list of lines. null gives the field no value."
+          },
+          "outputs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            },
+            "description": "The triggers that each output of the instance starts, by output id, for example {\u0022done\u0022: [\u0022my_next\u0022]}. A trigger is a nickname or a trg: reference of the same script."
+          },
+          "preview": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show what the edit does, and change nothing. The revision stays the same."
+          },
+          "if_revision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Refuse the edit when the edit view changed after this revision. Give the rev of a result that you read."
+          },
+          "with_patch": {
+            "type": "boolean",
+            "default": false,
+            "description": "With preview: also give the patch text of each INI file that the edit changes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "script",
+          "prefab"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inverse": {
+            "type": "object",
+            "description": "The mission command that reverts the mission commands of the call. Give it to mission_edit after later edits. It refuses when a later edit changed one of its sections."
+          },
+          "row_moves": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "trigger": {
+                  "type": "string",
+                  "description": "The trg: reference of the trigger of the line."
+                },
+                "from": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger before the edit, from 0."
+                },
+                "to": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger after the edit, from 0."
+                }
+              },
+              "required": [
+                "trigger",
+                "from",
+                "to"
+              ]
+            },
+            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+          },
+          "status": {
+            "enum": [
+              "applied",
+              "no_change",
+              "previewed",
+              "refused"
+            ],
+            "description": "applied: the data changed in one Undo step. no_change: nothing changed. previewed: a preview that changed nothing."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed"
+                  ],
+                  "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "What is wrong and how to correct it."
+                },
+                "index": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "The index of the step of a batch that failed, or none."
+                },
+                "target": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference or the text that the error is about, or none."
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The argument or the field that the error is about, or none."
+                },
+                "step_code": {
+                  "enum": [
+                    "not_found",
+                    "read_only",
+                    "invalid_argument",
+                    "invalid_value",
+                    "refused",
+                    "new_errors",
+                    "needs_confirmation",
+                    "name_taken",
+                    "stale_revision",
+                    "busy",
+                    "save_blocked",
+                    "changed_on_disk",
+                    "guard_conflict",
+                    "paused",
+                    "limit",
+                    "not_available",
+                    "not_agent_entry",
+                    "step_failed",
+                    null
+                  ],
+                  "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+                }
+              },
+              "required": [
+                "code",
+                "detail",
+                "message"
+              ]
+            },
+            "description": "The errors of a refusal. A tool error gives them as the error of the call."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the edit, for example Delete my_station_1."
+          },
+          "undo_label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label of the Undo step, for example Agent: Delete my_station_1, or none without a step."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view after the call, as text. A preview and a call without a change keep it."
+          },
+          "versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "The versions of the mission scripts that the edit changed, by install path."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The install paths of the files that the edit changed."
+          },
+          "adds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the new items."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The references of the items that the edit changed and kept."
+          },
+          "deletes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the removed item."
+                },
+                "why": {
+                  "enum": [
+                    "target",
+                    "cascade"
+                  ],
+                  "description": "target for an item of the request, cascade for an item that goes with a target."
+                },
+                "cause": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "For a cascade: the line that names the target. Else none."
+                }
+              },
+              "required": [
+                "ref",
+                "why"
+              ]
+            },
+            "description": "The items that the edit removed."
+          },
+          "renames": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "description": "The reference before the rename."
+                },
+                "to": {
+                  "type": "string",
+                  "description": "The reference after the rename."
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            },
+            "description": "The items that got a new name, with the old and the new reference."
+          },
+          "fixes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the lines."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the first line."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "What the fix does."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "text"
+              ]
+            },
+            "description": "The lines that the edit changed because they name an item that the edit removed."
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The reference of the section of the line."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the line."
+                },
+                "consequence": {
+                  "type": "string",
+                  "description": "What the game does with the line."
+                },
+                "blocks_save": {
+                  "type": "boolean",
+                  "description": "True when the line stops the save until a fix."
+                }
+              },
+              "required": [
+                "ref",
+                "key",
+                "consequence",
+                "blocks_save"
+              ]
+            },
+            "description": "The lines that show \u0027Missing\u0027 after the edit."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "warning",
+                    "error"
+                  ],
+                  "description": "error or warning. An error of the active mod stops a save."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The message of the check. The user reads the same message."
+                },
+                "ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The reference of the item or the line of the problem, or none."
+                },
+                "rule": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The id of the rule of the check, for example M05, or none."
+                },
+                "origin": {
+                  "enum": [
+                    "base_game",
+                    "mod",
+                    "some_mod",
+                    "openlancer",
+                    "unknown",
+                    "pending"
+                  ],
+                  "description": "Who causes the problem: base_game, mod, some_mod, openlancer or unknown. A base_game problem does not stop a save."
+                },
+                "mod_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The mod that causes the problem when the origin is mod, else none."
+                },
+                "fixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The ids of the fixes that the editor has for the problem."
+                }
+              },
+              "required": [
+                "severity",
+                "message"
+              ]
+            },
+            "description": "The warnings of the edit. The edit applied."
+          },
+          "refusals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The parts of the edit that the editor refused while the other parts applied."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nickname": {
+                  "type": "string",
+                  "description": "The nickname that the file names as text."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The install path of the file."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "How often the file names the nickname."
+                }
+              },
+              "required": [
+                "nickname",
+                "path",
+                "count"
+              ]
+            },
+            "description": "The files that name a renamed or removed item as text. The edit does not change them."
+          },
+          "new_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit adds. The edit applied."
+          },
+          "fixed_problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/warnings/items"
+            },
+            "description": "The problems of the checks that the edit removes."
+          },
+          "needs_confirmation": {
+            "type": "boolean",
+            "description": "True when the edit changes more than its targets. The real call then needs confirm: true."
+          },
+          "select": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The item that the editor selects after the edit, or none."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes about the edit."
+          },
+          "patch": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "With with_patch: the patch text of each changed INI file, by install path."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One sentence that tells what the call did."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Place a prefab in a mission",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "mission_start_plan",
+      "title": "Plan a play of a mission",
+      "description": "Gives the plan of a play of one mission script from a start, as the Play start page of the editor shows it. The plan gives the kind of the start, the story state, the start place and the setup triggers. A plan that cannot start gives the status refused and the reason. This tool changes nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The reference of a mission script, for example msn:DATA\\MISSIONS\\M01A\\m01a.ini."
+          },
+          "start": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "default": "mission_start",
+            "description": "Where the play starts: mission_start, or the trg: reference of a trigger of the script. A start at the restore trigger of a checkpoint is exact. Another trigger gives an approximate start with setup triggers."
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "openlancer"
+            ],
+            "default": "openlancer",
+            "description": "The game of the play. This version plays from a trigger only in OpenLancer."
+          },
+          "start_place": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "default": "suggested",
+            "description": "Where the player starts. suggested is the place that the editor suggests, and camera is the Scene camera of the editor. base: and the nickname of a base starts at that base, for example base:my_base."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "script"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "object",
+            "properties": {
+              "script": {
+                "type": "string",
+                "description": "The msn: reference of the script."
+              },
+              "version": {
+                "type": "integer",
+                "description": "The version of the script that the plan read."
+              },
+              "start": {
+                "type": "string",
+                "description": "mission_start, or the trg: reference of the trigger of the start."
+              },
+              "target": {
+                "type": "string",
+                "description": "The game of the play: openlancer."
+              },
+              "status": {
+                "enum": [
+                  "ready",
+                  "refused"
+                ],
+                "description": "ready when the play can start, else refused."
+              },
+              "kind": {
+                "enum": [
+                  "mission_start",
+                  "checkpoint",
+                  "approximate",
+                  "test_script"
+                ],
+                "description": "The kind of the start: mission_start, checkpoint, approximate or test_script. An approximate start rebuilds the state of the path with setup triggers."
+              },
+              "start_name": {
+                "type": "string",
+                "description": "The name of the start in the editor, for example \u0022Checkpoint my_restore\u0022."
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Why the play cannot start, or none."
+              },
+              "slot": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The story slot of the script, for example M02, or none."
+              },
+              "stage": {
+                "type": "integer",
+                "description": "The story stage of the start save."
+              },
+              "stage_name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The name of the story stage."
+              },
+              "accepted": {
+                "type": "boolean",
+                "description": "True when the start comes after the accept of the mission."
+              },
+              "active_set": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The trg: references of the triggers that wait at the start."
+              },
+              "saved_triggers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The nicknames of the triggers of the start save."
+              },
+              "setup": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "nickname": {
+                      "type": "string",
+                      "description": "The nickname of the setup trigger."
+                    },
+                    "lines": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The lines of the setup trigger as INI text."
+                    }
+                  },
+                  "required": [
+                    "nickname",
+                    "lines"
+                  ]
+                },
+                "description": "The setup triggers that the play adds to rebuild the state of the path."
+              },
+              "title": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "The text id of the mission title of the start save, or none."
+              },
+              "offer": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "The text id of the mission offer of the start save, or none."
+              },
+              "scenes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The base scenes of the start save."
+              },
+              "place": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "space",
+                      "base",
+                      "camera"
+                    ],
+                    "description": "The kind of the place: space, base or camera."
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "The place in the words of the Play start page."
+                  },
+                  "source": {
+                    "type": "string",
+                    "description": "Where the place comes from."
+                  },
+                  "system": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The system: reference of a start in space, or none."
+                  },
+                  "base": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The base: reference of a start at a base, or none."
+                  },
+                  "position": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "The point of a start in space, X, Y and Z in meters, or none."
+                  },
+                  "rotation": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "The heading of a start in space as angles in degrees, or none."
+                  }
+                },
+                "required": [
+                  "kind",
+                  "text",
+                  "source"
+                ],
+                "description": "The start place of the player."
+              },
+              "start_system": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The system: reference of the system whose world the setup makes, or none when the setup keeps each world line of the path."
+              },
+              "left_out": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "The sec: reference of the object, or the obj: reference of an object of a system file."
+                    },
+                    "kind": {
+                      "enum": [
+                        "ship",
+                        "formation",
+                        "solar",
+                        "loot",
+                        "fuse"
+                      ],
+                      "description": "The kind of the object: ship, formation, solar, loot or fuse."
+                    },
+                    "trigger": {
+                      "type": "string",
+                      "description": "The trg: reference of the trigger of its spawn line or its fuse line."
+                    },
+                    "system": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The system: reference of the system of the object at the trigger of the start, or none."
+                    },
+                    "fuse": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The fuse of a fuse line, or none."
+                    },
+                    "made_again_by": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The trg: reference of the trigger of the start that makes the object again, or none."
+                    }
+                  },
+                  "required": [
+                    "object",
+                    "kind",
+                    "trigger"
+                  ]
+                },
+                "description": "The objects that the setup leaves out, and the fuse lines that it removes."
+              },
+              "companions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "The sec: reference of the ship or the formation."
+                    },
+                    "signs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Why it travels with the player: orders, player_formation, jump and escort."
+                    },
+                    "point": {
+                      "enum": [
+                        "near",
+                        "jump_here",
+                        "follow",
+                        "slot",
+                        "kept"
+                      ],
+                      "description": "Where it starts: near, jump_here, follow, slot or kept."
+                    },
+                    "moved": {
+                      "type": "boolean",
+                      "description": "True when the setup moves it next to the player."
+                    },
+                    "jumped_from": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The system: reference of the system that it jumped from with the player, or none."
+                    },
+                    "point_trigger": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The trg: reference of the jump-here trigger that gives its point, or none."
+                    }
+                  },
+                  "required": [
+                    "object",
+                    "signs",
+                    "point",
+                    "moved"
+                  ]
+                },
+                "description": "The ships and formations that start next to the player."
+              },
+              "path": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The trg: references of the replay path, from the start of the mission to the trigger of the start."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The warnings of the plan, for example a place that the editor cannot find."
+              }
+            },
+            "required": [
+              "script",
+              "version",
+              "start",
+              "target",
+              "status",
+              "kind",
+              "start_name"
+            ],
+            "description": "The start plan. A plan that cannot start has the status refused and the reason."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view that the tool read, as text. A save does not change it."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "plan"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Plan a play of a mission",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
       "name": "save",
       "title": "Save the edits of the active mod",
       "description": "Saves the edits into the patch files of the active mod. The save stops when the checks find errors. Read the errors, correct them, then save again.",
@@ -38301,7 +39425,8 @@
                     "mission_move_action",
                     "mission_link_triggers",
                     "mission_insert_trigger",
-                    "mission_add_item"
+                    "mission_add_item",
+                    "mission_place_prefab"
                   ],
                   "description": "The name of an edit tool, for example set_fields."
                 },

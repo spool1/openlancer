@@ -526,7 +526,7 @@
       "fields": {
         "start": "Where the play starts: mission_start, or the trg: reference of a trigger of the script. A start at the restore trigger of a checkpoint is exact. Another trigger gives an approximate start with setup triggers.",
         "target": "The game of the play. This version plays from a trigger only in OpenLancer.",
-        "start_place": "Where the player starts: suggested for the place that the editor suggests, camera for the Scene camera of the editor, or base: and the nickname of a base, for example base:my_base."
+        "start_place": "Where the player starts. suggested is the place that the editor suggests, and camera is the Scene camera of the editor. base: and the nickname of a base starts at that base, for example base:my_base."
       }
     },
     "save": {
@@ -1307,6 +1307,7 @@
     "DryRunStateView.stop": "Why the run stopped before the end of the mission, or none.",
     "WaitingEventView.line": "The line. Give it in an event or a fact input to make it happen.",
     "WaitingEventView.sentence": "The condition in plain words, with the count of a condition that counts.",
+    "StartPlanResult.plan": "The start plan. A plan that cannot start has the status refused and the reason.",
     "StartPlanView.script": "The msn: reference of the script.",
     "StartPlanView.version": "The version of the script that the plan read.",
     "StartPlanView.start": "mission_start, or the trg: reference of the trigger of the start.",
