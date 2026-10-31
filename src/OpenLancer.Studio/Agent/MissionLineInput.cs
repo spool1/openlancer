@@ -79,11 +79,17 @@ internal static class MissionLineInput
     private static bool IsScalar(JsonNode? node) =>
         node?.GetValueKind() is JsonValueKind.Number or JsonValueKind.String or JsonValueKind.True or JsonValueKind.False;
 
+    /// <summary>The value text of a line whose key has no values, as the game data and the mission studio write
+    /// it.</summary>
+    private const string NoParams = "no_params";
+
     /// <summary>
     /// The line of a trigger in an argument, after the check of the schema of the missions for its place: the key, and
     /// each value by its kind. The command checks the line again when it runs. This check names the argument of the
     /// line in an error, for example <c>actions[2]</c>.
     /// </summary>
+    /// <remarks>A line without values and without texts whose key has no values gets the text <see cref="NoParams"/>,
+    /// as the first line of such a key in the mission studio does. Explicit texts stay as they are.</remarks>
     /// <param name="node">A value that fits <see cref="IsLine"/>.</param>
     /// <param name="action">True for an action, false for a condition.</param>
     /// <exception cref="EditException">The key is not a condition or an action of the place, or a value is not valid.
@@ -91,6 +97,8 @@ internal static class MissionLineInput
     public static LineSpec TriggerLine(JsonNode node, string field, bool action)
     {
         var line = node.Deserialize<LineSpec>(MissionJson.Options)!;
+        if (line is { Values.Count: 0, Texts: null } && MissionSchema.Retail.Name(line.Key) is { Values.Count: 0 })
+            line = line with { Texts = [NoParams] };
         EditTools.At(field, () => MissionValues.Build(MissionSchema.Retail, "Trigger",
             action ? LinePlace.Action : LinePlace.Condition, line));
         return line;

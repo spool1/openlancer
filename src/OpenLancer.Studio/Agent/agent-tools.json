@@ -44,7 +44,7 @@
     "confirm": "Apply an edit that changes more than its targets. Without it, such an edit gives needs_confirmation.",
     "$defs.line": "A line of a trigger: its key, and its values by name or its texts by position.",
     "$defs.line.key": "A condition key (Cnd_...) or an action key (Act_...), for example Cnd_Timer.",
-    "$defs.line.values": "The values by their names, for example {\"seconds\": 3}. describe_mission_name gives the names and the kinds of the values.",
+    "$defs.line.values": "The values by their names, for example {\"seconds\": 3}. describe_mission_name gives the names and the kinds of the values. A key without values, for example Cnd_True, needs none. The editor then writes no_params, as the game data does.",
     "$defs.line.texts": "The value texts by position, in place of the values by name. The editor then checks only the form of the line."
   },
   "tools": {

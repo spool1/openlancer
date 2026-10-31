@@ -32779,7 +32779,7 @@
                     ]
                   }
                 },
-                "description": "The values by their names, for example {\u0022seconds\u0022: 3}. describe_mission_name gives the names and the kinds of the values."
+                "description": "The values by their names, for example {\u0022seconds\u0022: 3}. describe_mission_name gives the names and the kinds of the values. A key without values, for example Cnd_True, needs none. The editor then writes no_params, as the game data does."
               },
               "texts": {
                 "type": "array",
@@ -33394,7 +33394,7 @@
                     ]
                   }
                 },
-                "description": "The values by their names, for example {\u0022seconds\u0022: 3}. describe_mission_name gives the names and the kinds of the values."
+                "description": "The values by their names, for example {\u0022seconds\u0022: 3}. describe_mission_name gives the names and the kinds of the values. A key without values, for example Cnd_True, needs none. The editor then writes no_params, as the game data does."
               },
               "texts": {
                 "type": "array",
@@ -34015,7 +34015,7 @@
                     ]
                   }
                 },
-                "description": "The values by their names, for example {\u0022seconds\u0022: 3}. describe_mission_name gives the names and the kinds of the values."
+                "description": "The values by their names, for example {\u0022seconds\u0022: 3}. describe_mission_name gives the names and the kinds of the values. A key without values, for example Cnd_True, needs none. The editor then writes no_params, as the game data does."
               },
               "texts": {
                 "type": "array",
@@ -36398,7 +36398,7 @@
                     ]
                   }
                 },
-                "description": "The values by their names, for example {\u0022seconds\u0022: 3}. describe_mission_name gives the names and the kinds of the values."
+                "description": "The values by their names, for example {\u0022seconds\u0022: 3}. describe_mission_name gives the names and the kinds of the values. A key without values, for example Cnd_True, needs none. The editor then writes no_params, as the game data does."
               },
               "texts": {
                 "type": "array",

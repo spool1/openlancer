@@ -93,7 +93,7 @@ public sealed partial class AgentMissionToolTests
 
     /// <summary>Without a nickname, the layer makes a free name. A trigger with starters gets the made name before the
     /// request, as the gesture of the graph does, and a starter can be a nickname. A trigger can start with the
-    /// mission.</summary>
+    /// mission. A key without values gets no_params, as the mission studio writes it.</summary>
     [Fact]
     public void AddTriggerWithoutANicknameGetsAFreeName()
     {
@@ -106,7 +106,7 @@ public sealed partial class AgentMissionToolTests
             $$"""{ "script": "msn:{{S}}", "condition": { "key": "Cnd_True" }, "started_by": [ "ol_end" ] }""");
 
         Assert.Equal([$"trg:{Script}#ol_test_trigger_1"], Texts(plain["adds"]));
-        Assert.Equal(["nickname = ol_test_trigger_1", "InitState = ACTIVE", "Cnd_True ="], m.Lines("ol_test_trigger_1"));
+        Assert.Equal(["nickname = ol_test_trigger_1", "InitState = ACTIVE", "Cnd_True = no_params"], m.Lines("ol_test_trigger_1"));
         Assert.Equal([$"trg:{Script}#ol_test_trigger_2", $"line:{Script}#Trigger/ol_end/4"], Texts(started["adds"]));
         Assert.Equal("Act_ActTrig = ol_test_trigger_2", m.Lines("ol_end")[^1]);
     }
@@ -243,7 +243,7 @@ public sealed partial class AgentMissionToolTests
         var plain = Ok(host, "mission_insert_trigger",
             $$"""{ "line": "line:{{S}}#Trigger/ol_start/4", "condition": { "key": "Cnd_True" } }""");
         Assert.Contains($"trg:{Script}#ol_test_trigger_1", Texts(plain["adds"]));
-        Assert.Equal(["nickname = ol_test_trigger_1", "Cnd_True =", "Act_ActTrig = ol_end"], m.Lines("ol_test_trigger_1"));
+        Assert.Equal(["nickname = ol_test_trigger_1", "Cnd_True = no_params", "Act_ActTrig = ol_end"], m.Lines("ol_test_trigger_1"));
     }
 
     /// <summary>The refusals of the trigger tools (section 13.1, item 8 of the MCP1 design): invalid_value for a bad
@@ -477,6 +477,13 @@ public sealed partial class AgentMissionToolTests
             "mission_insert_trigger", $$"""
                 { "line": "line:{{S}}#Trigger/ol_start/3", "nickname": "ol_test_trigger_1",
                   "condition": { "key": "Cnd_Timer", "values": { "seconds": 3 } } }
+                """);
+        // A key without values gets no_params, as the item "At once" of the link menu writes it.
+        AssertParity(model => model.InsertOnLink(model.Graph.Links.First(l => l.From == NodeOf(model, "ol_start") &&
+                                                                               l.To == NodeOf(model, "ol_wave")),
+                GraphEditModel.InsertCondition(InsertEvent.AtOnce)),
+            "mission_insert_trigger", $$"""
+                { "line": "line:{{S}}#Trigger/ol_start/3", "nickname": "ol_test_trigger_1", "condition": { "key": "Cnd_True" } }
                 """);
     }
 
