@@ -151,8 +151,10 @@ internal static class MissionLineInput
     /// <item>a value: a number, a text, true or false, or a list of these for a position, a rotation or a value that
     /// repeats in one line. It is the value of a key with one value.</item>
     /// <item>an object of values by name, for example <c>{"heading": 90, "anchor": "my_station"}</c>.</item>
-    /// <item>an object with only <c>texts</c>: the value texts by position. The layer checks only their form.</item>
-    /// <item>for a key that repeats, a list of these forms: one line for each form.</item>
+    /// <item>an object with only <c>texts</c>: the value texts by position. The layer checks only their form. An empty
+    /// list is a line without values.</item>
+    /// <item>for a key that repeats, a list of these forms: one line for each form. For a key with one position or
+    /// rotation, a list of values is one line, for example <c>[0, 0, 100]</c>.</item>
     /// <item><c>null</c>: no line.</item>
     /// </list>
     /// Each line gets the check of the schema of the missions, so an error names the field, for example
@@ -170,7 +172,8 @@ internal static class MissionLineInput
         if (node == null)
             return [];
         var repeats = SectionSpec(sectionType)?.Key(name)?.List is { Values: false };
-        var forms = repeats && node is JsonArray list
+        // A list of values for a key with one position or rotation is the value of one line, not a list of lines.
+        var forms = repeats && node is JsonArray list && !(specs is [{ Width: > 1 }] && list.Count > 0 && IsValue(list))
             ? list.Select((form, i) => (Form: form!, Field: $"{field}[{i}]")).ToList()
             : [(Form: node, Field: field)];
         return forms.Select(f => FieldLine(sectionType, name, specs, f.Form, f.Field)).ToList();
@@ -188,6 +191,9 @@ internal static class MissionLineInput
     {
         var line = form switch
         {
+            // An empty list of texts is a line without values. The schema then gives each default, or refuses a value
+            // that the key needs.
+            JsonObject named when TextsOf(named) is { Count: 0 } => new LineSpec(key),
             JsonObject named when TextsOf(named) is { } texts => LineSpec.Raw(key, [.. texts]),
             JsonObject named => new LineSpec(key)
             {

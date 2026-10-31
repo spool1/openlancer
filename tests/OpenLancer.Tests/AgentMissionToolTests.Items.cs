@@ -274,6 +274,27 @@ public sealed partial class AgentMissionToolTests
             m.Lines(Item("MsnRandEnc", "ol_enc")));
     }
 
+    /// <summary>A list of numbers for formation_position, a key of a random encounter that repeats with a position, is
+    /// one line. A list of positions gives one line for each position.</summary>
+    [Fact]
+    public void AListOfNumbersIsOnePositionOfAKeyThatRepeats()
+    {
+        var (m, host) = OpenItems();
+        using var _ = m;
+
+        Ok(host, "mission_add_item", AddItem("random_encounter", "ol_enc_1", """
+            { "encounter_type": "SP_Attack", "formation_position": [0, 0, 100] }
+            """));
+        Ok(host, "mission_add_item", AddItem("random_encounter", "ol_enc_2", """
+            { "encounter_type": "SP_Attack", "formation_position": [ [0, 0, 100], [0, 0, 200] ] }
+            """));
+
+        Assert.Equal(["nickname = ol_enc_1", "encounter_type = SP_Attack", "formation_position = 0, 0, 100"],
+            m.Lines(Item("MsnRandEnc", "ol_enc_1")));
+        Assert.Equal(["nickname = ol_enc_2", "encounter_type = SP_Attack", "formation_position = 0, 0, 100",
+            "formation_position = 0, 0, 200"], m.Lines(Item("MsnRandEnc", "ol_enc_2")));
+    }
+
     /// <summary>A random encounter name has at most 31 characters (decision D683 of M6b, MCP1 open alignment item 3). A
     /// name of 31 characters applies. A name of 32 characters gives invalid_value with NameInvalid, although the pattern
     /// of the schema takes 47 characters. A name of 48 characters does not fit the pattern.</summary>
@@ -331,8 +352,9 @@ public sealed partial class AgentMissionToolTests
 
     /// <summary>The refusals of mission_add_item: a ship without fields.npc or with two places, a key that the section
     /// does not have (with the keys of the section), a value of the wrong kind, a form that does not fit its key, the
-    /// nickname or an order in the fields, steps of another kind, an order that is not a directive, a key two times, and
-    /// a name in use. Each error names its argument, and nothing changes.</summary>
+    /// nickname or an order in the fields, steps of another kind, an order that is not a directive, a key two times, a
+    /// name in use, and an empty list of texts for a key that needs a value. Each error names its argument, and nothing
+    /// changes.</summary>
     [Fact]
     public void AddItemGivesItsRefusals()
     {
@@ -370,6 +392,8 @@ public sealed partial class AgentMissionToolTests
             (AddItem("solar", "ol_solar", "{}").Replace("\"solar\"", "\"planet\""),
                 "invalid_argument", ToolInput.BadArgument, "kind"),
             (AddItem("solar", "ol_bad name", "{}"), "invalid_argument", ToolInput.BadArgument, "nickname"),
+            (AddItem("solar", null, """{ "system": { "texts": [] } }"""), "invalid_value", MissionErrors.ValueMissing,
+                "fields.system"),
         };
 
         var wrong = new List<string>();

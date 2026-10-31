@@ -360,8 +360,8 @@ The fields are the keys of the section, as `get_item` gives them for an item of 
 - One value: a number, a text, `true` or `false`. For example, `"system": "my_system"`.
 - A list of numbers or texts for a position, a rotation or the values of one line. For example, `"position": [0, 0, 1000]` or `"npc_class": ["lawful", "d5"]`.
 - An object of values by name, for a key with more than one value. For example, `"rel_pos": {"heading": 90, "anchor": "my_station", "range": 500}`. `describe_mission_name` does not give the names of the keys of a section. Read the item with `get_item` to see them.
-- `{"texts": [...]}`: the value texts by position. The editor checks only the form of the line. For example, `"type": {"texts": ["ids", "12345"]}` for an objective.
-- For a key that repeats, for example `label`, `cargo` or the `ship` lines of a formation, a list of these forms. Each form is one line. One form without a list is one line too.
+- `{"texts": [...]}`: the value texts by position. The editor checks only the form of the line. For example, `"type": {"texts": ["ids", "12345"]}` for an objective. An empty list is a line without values: the editor gives each default value, or refuses a value that the key needs.
+- For a key that repeats, for example `label`, `cargo` or the `ship` lines of a formation, a list of these forms. Each form is one line. One form without a list is one line too. For a key that repeats with a position, a list of numbers is one position. For example, `"formation_position": [0, 0, 100]` of a random encounter is one line, and `[[0, 0, 100], [0, 0, 200]]` is two lines.
 - `null` writes no line.
 
 The tool writes the lines in the order of `fields`, with two exceptions:
