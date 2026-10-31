@@ -155,10 +155,10 @@ internal static partial class ItemEditTools
         }
         if (item.Kind != ItemRefKind.Section)
             throw KindRefusal(call, item.Text, "ref");
-        foreach (var (key, value) in fields.Where(f => !MissionLineInput.IsField(f.Value)))
+        if (fields.FirstOrDefault(f => !MissionLineInput.IsField(f.Value)) is { Key: { } bad })
         {
-            throw ToolInput.Bad($"fields.{key}",
-                AgentTexts.Error("argument_type", ("name", $"fields.{key}"), ("expected", MissionLineInput.FieldForms)));
+            throw ToolInput.Bad($"fields.{bad}",
+                AgentTexts.Error("argument_type", ("name", $"fields.{bad}"), ("expected", MissionLineInput.FieldForms)));
         }
         var type = item.Section!.Type;
         var keyLine = new EditError(EditErrorKind.Refused, MissionErrors.KeyLine, AgentTexts.Error("mission_fields_key_line"));
@@ -310,13 +310,14 @@ internal static partial class ItemEditTools
     {
         var commands = new List<MissionCommand>();
         var owners = new List<int>();
-        var label = "";
+        var label = $"Delete {items.Count} items";
         foreach (var (index, item) in items)
         {
             var (made, itemLabel) = EditTools.At($"refs[{index}]", () => DeleteCommandsOf(call, scope.Session, item));
             commands.AddRange(made);
             owners.AddRange(made.Select(_ => index));
-            label = items.Count == 1 ? itemLabel : $"Delete {items.Count} items";
+            if (items.Count == 1)
+                label = itemLabel;
         }
         scope.RunMission(new MissionBatch(label, commands),
             error => error.Index is { } i && i < owners.Count ? $"refs[{owners[i]}]" : "refs");
