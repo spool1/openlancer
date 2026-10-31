@@ -10,12 +10,17 @@ namespace OpenLancer.Studio.Agent;
 
 /// <summary>
 /// A resource of the agent server (section 9.3 of the MCP1 design): a text that the agent can read on request. The
-/// resources hold OpenLancer's own texts and the rule data only, so they need no session.
+/// resources hold OpenLancer's own texts, the rule data and, for a resource that reads the session, the data of the
+/// user.
 /// </summary>
 /// <param name="Uri">The URI, for example <c>openlancer://guide/refs</c>.</param>
 /// <param name="MimeType"><c>text/plain</c> or <c>application/json</c>.</param>
+/// <param name="Session">True when <paramref name="Read"/> reads the host, so it must run on the thread that owns the
+/// session (see <see cref="ToolQueue.ReadAsync"/>). A resource without it reads only the rule data and runs on any
+/// thread.</param>
+/// <param name="Read">Makes the text of the resource.</param>
 public sealed record AgentResource(string Uri, string Name, string Title, string Description, string MimeType,
-    Func<string> Read);
+    bool Session, Func<AgentHost, string> Read);
 
 /// <summary>The resources of this build: the data lists and the guides. The mission resources come with the mission
 /// tools (section 12.5 of the MCP1 design).</summary>
@@ -26,8 +31,8 @@ public static class AgentResources
     /// <summary>The resources in the order of <c>resources/list</c>.</summary>
     public static IReadOnlyList<AgentResource> All { get; } = AgentTexts.Resources.Select(r =>
         new AgentResource(r.Key, r.Value.Name, r.Value.Title, r.Value.Description,
-            r.Key == Lists ? "application/json" : "text/plain",
-            r.Key == Lists ? ListCatalog : () => string.Join("\n", r.Value.Text))).ToList();
+            r.Key == Lists ? "application/json" : "text/plain", false,
+            r.Key == Lists ? _ => ListCatalog() : _ => string.Join("\n", r.Value.Text))).ToList();
 
     /// <summary>The server instructions of a host with a tool set, one step on each line (section 9.2 of the MCP1
     /// design). A host with edit tools gets the steps of the edits. A host without them gets the step that the server

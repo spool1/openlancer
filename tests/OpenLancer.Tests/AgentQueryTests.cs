@@ -569,7 +569,7 @@ public sealed class AgentQueryTests
         var noScript = Error(host, "list_values", """{ "list": "mission_trigger" }""");
         var withSystem = Error(host, "list_values", $$"""{ "list": "mission_trigger", "script": {{script}}, "system": "x" }""");
         var missing = Error(host, "list_values", """{ "list": "mission_trigger", "script": "msn:DATA\\MISSIONS\\none.ini" }""");
-        var catalog = JsonNode.Parse(AgentResources.Find("openlancer://catalog/lists")!.Read())!["lists"]!.AsArray();
+        var catalog = JsonNode.Parse(AgentResources.Find("openlancer://catalog/lists")!.Read(host))!["lists"]!.AsArray();
 
         Assert.Equal(["ol_end", "ol_start", "ol_wave"], triggers["rows"]!.AsArray().Select(r => (string)r!["value"]!).Order());
         Assert.Equal(("invalid_argument", "BadArgument"), Code(noScript));

@@ -10,6 +10,7 @@ using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using OpenLancer.Data;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Studio.Agent;
 
 namespace OpenLancer.Mcp;
@@ -68,7 +69,7 @@ public static class McpBinding
         options.Handlers.ListToolsHandler = (_, _) => ValueTask.FromResult(ToolList(tools));
         options.Handlers.CallToolHandler = (request, cancel) => Call(queue, tools, request, cancel);
         options.Handlers.ListResourcesHandler = (_, _) => ValueTask.FromResult(ResourceList());
-        options.Handlers.ReadResourceHandler = (request, _) => ValueTask.FromResult(Read(request.Params?.Uri));
+        options.Handlers.ReadResourceHandler = (request, cancel) => Read(queue, request.Params?.Uri, cancel);
     }
 
     /// <summary>The result of a call in the form of the protocol: the JSON as structured content and as one text
@@ -163,14 +164,30 @@ public static class McpBinding
         }
     }
 
-    private static ReadResourceResult Read(string? uri)
+    /// <summary>
+    /// The text of a resource. A resource that reads the session waits in the queue of the host, as a tool call does, and
+    /// its read runs on the thread that owns the session. The protocol has no tool error for a read, so a read that waits
+    /// too long or comes too often gives a protocol error with the text of the error.
+    /// </summary>
+    private static async ValueTask<ReadResourceResult> Read(ToolQueue queue, string? uri, CancellationToken cancel)
     {
         var resource = uri == null ? null : AgentResources.Find(uri);
         if (resource == null)
             throw new McpProtocolException($"The server has no resource '{uri}'.", McpErrorCode.ResourceNotFound);
+        string text;
+        try
+        {
+            text = resource.Session
+                ? await queue.ReadAsync(resource.Read, cancel).ConfigureAwait(false)
+                : resource.Read(queue.Host);
+        }
+        catch (EditException e)
+        {
+            throw new McpProtocolException(e.Error.Message, McpErrorCode.InternalError);
+        }
         return new ReadResourceResult
         {
-            Contents = [new TextResourceContents { Uri = resource.Uri, MimeType = resource.MimeType, Text = resource.Read() }],
+            Contents = [new TextResourceContents { Uri = resource.Uri, MimeType = resource.MimeType, Text = text }],
         };
     }
 

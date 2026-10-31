@@ -398,6 +398,93 @@ public sealed class ToolQueueTests
         }
     }
 
+    /// <summary>A read of a resource that needs the session waits in the queue as a call does (section 9.3 of the MCP1
+    /// design). It runs in a run of the session thread, after the call before it, and it writes no line into the audit
+    /// log.</summary>
+    [Fact]
+    public async Task AReadOfAResourceRunsInTheQueueAfterTheCallBeforeIt()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "openlancer-tests", Guid.NewGuid().ToString("N"));
+        var file = Path.Combine(folder, AuditLog.FileName(new DateTime(2026, 10, 20, 14, 22, 33, DateTimeKind.Utc)));
+        var order = new List<string>();
+        var host = new TestAgentHost(null) { Probe = () => order.Add("call") };
+        try
+        {
+            using (var log = new AuditLog(file))
+            using (var queue = new ToolQueue(host, new FakeClock(), log))
+            {
+                var call = queue.CallAsync("studio_status", null, null, Token);
+                var read = queue.ReadAsync(h =>
+                {
+                    order.Add(ReferenceEquals(h, host) ? "read" : "other host");
+                    return "the text";
+                }, Token);
+
+                Assert.Equal(2, queue.Waiting);
+                Assert.True(queue.RunNext());
+                Assert.False((await Done(call)).IsError);
+                Assert.False(read.IsCompleted);
+                Assert.True(queue.RunNext());
+                Assert.Equal("the text", await read.WaitAsync(TimeSpan.FromSeconds(10), Token));
+                Assert.Equal(0, queue.Waiting);
+            }
+
+            Assert.Equal("read", order[^1]);
+            Assert.DoesNotContain("read", order[..^1]);
+            using var reader = new StreamReader(file);
+            Assert.Equal(["studio_status"], AuditLog.Read(reader).Select(e => e.Tool));
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+                Directory.Delete(folder, true);
+        }
+    }
+
+    /// <summary>A read has the rate limit, the cancel and the wait limit of a call. Its errors end the task, because a
+    /// read has no tool error. A closed queue cancels each read.</summary>
+    [Fact]
+    public async Task AReadWaitsAndEndsAsACallDoes()
+    {
+        var clock = new FakeClock();
+        var host = new TestAgentHost(null) { TestLimits = new AgentLimits { CallsPerSecond = 3 } };
+        var queue = new ToolQueue(host, clock);
+        using var cancel = new CancellationTokenSource();
+        const string reason = "The user edits a field now.";
+
+        var waits = queue.ReadAsync(_ => "x", Token);
+        var cancelled = queue.ReadAsync(_ => "x", cancel.Token);
+        var third = queue.ReadAsync(_ => "x", Token);
+        var tooOften = queue.ReadAsync(_ => "x", Token);
+        cancel.Cancel();
+
+        Assert.True(cancelled.IsCanceled);
+        var limit = await Assert.ThrowsAsync<EditException>(() => tooOften);
+        Assert.Equal((EditErrorKind.Limit, "CallRate"), (limit.Error.Kind, limit.Error.Detail));
+        Assert.Equal(2, queue.Waiting);
+        clock.Advance(TimeSpan.FromSeconds(29));
+        Assert.False(queue.RunNext(reason));
+        Assert.False(waits.IsCompleted);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.False(queue.RunNext(reason));
+        var busy = await Assert.ThrowsAsync<EditException>(() => waits.WaitAsync(TimeSpan.FromSeconds(10), Token));
+        Assert.Equal((EditErrorKind.Busy, "Waited"), (busy.Error.Kind, busy.Error.Detail));
+        Assert.Equal("The user edits a field now. The call waited 30 seconds. Try again in a few seconds.",
+            busy.Error.Message);
+        await Assert.ThrowsAsync<EditException>(() => third.WaitAsync(TimeSpan.FromSeconds(10), Token));
+        Assert.Empty(host.Refusals);
+
+        var faulty = queue.ReadAsync(_ => throw new InvalidOperationException("The read failed."), Token);
+        Assert.True(queue.RunNext());
+        var fault = await Assert.ThrowsAsync<InvalidOperationException>(() => faulty.WaitAsync(TimeSpan.FromSeconds(10), Token));
+        Assert.Equal("The read failed.", fault.Message);
+
+        var open = queue.ReadAsync(_ => "x", Token);
+        queue.Dispose();
+        Assert.True(open.IsCanceled);
+        Assert.True(queue.ReadAsync(_ => "x", Token).IsCanceled);
+    }
+
     [Fact]
     public void TheAuditLogReaderNamesTheLineOfAnError()
     {
