@@ -20,9 +20,9 @@ namespace OpenLancer.Studio.Agent;
 /// </summary>
 /// <remarks>This build has the query tools of section 7.1 (milestone MCP1-1a) and the dry run query of M6c-1. It also
 /// has the edit tools of sections 7.2, 7.3 and 7.6 and the play tools of section 7.6 (milestone MCP1-2), the view
-/// tools of section 7.7 (milestone MCP1-1b), and the mission edit tools of section 7.4 (milestone MCP1-3).
-/// The order of the rows follows the sections of the design, so a later part puts its tools at the place of its
-/// section. The view tools are tools of the editor host.</remarks>
+/// tools of section 7.7 (milestone MCP1-1b), and the mission edit tools and the start plan query of section 7.4
+/// (milestone MCP1-3). The order of the rows follows the sections of the design, so a later part puts its tools at the
+/// place of its section. The view tools are tools of the editor host.</remarks>
 public static class AgentTools
 {
     private static readonly ToolParam Cursor = new TextParam("cursor", false, null, null);
@@ -212,6 +212,13 @@ public static class AgentTools
         Mission("mission_insert_trigger", ToolHints.Adding, MissionEditTools.InsertTriggerInput,
             MissionEditTools.InsertTrigger),
         Mission("mission_add_item", ToolHints.Adding, MissionEditTools.AddItemInput, MissionEditTools.NewItem),
+        Mission("mission_place_prefab", ToolHints.Adding, MissionEditTools.PlacePrefabInput, MissionEditTools.PlacePrefab),
+        Query("mission_start_plan", ToolGroup.Missions, new ToolInput(
+                Text("script", true),
+                new TextParam("start", false, null, RunJson.MissionStartName),
+                new TextParam("target", false, MissionQueryTools.StartTargets, RunJson.OpenLancerTarget),
+                new TextParam("start_place", false, null, RunJson.SuggestedPlace)),
+            typeof(StartPlanView), MissionQueryTools.StartPlan),
         SessionTool("save", ToolHints.Changing, ToolInput.None, typeof(SaveView), SaveTools.Save),
         SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
         SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),

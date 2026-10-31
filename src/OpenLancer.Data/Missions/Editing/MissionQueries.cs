@@ -137,7 +137,21 @@ public sealed record MissionPrefabFieldView(string Id, string Label, string Help
 
     /// <summary>The default rows in their text form.</summary>
     public IReadOnlyList<string> Default { get; init; } = [];
+
+    /// <summary>True when a value field can have no value.</summary>
+    public bool Optional { get; init; }
+
+    /// <summary>The columns of a list field, in the order of their values in a row. Other fields have none.</summary>
+    public IReadOnlyList<MissionPrefabColumnView> Columns { get; init; } = [];
+
+    /// <summary>The keys that a condition field or a lines field takes. Empty takes each condition or each
+    /// action.</summary>
+    public IReadOnlyList<string> Keys { get; init; } = [];
 }
+
+/// <summary>A column of a list field of a prefab: its id in a row, its plain label and its value kind, for example
+/// <c>position</c>.</summary>
+public sealed record MissionPrefabColumnView(string Id, string Label, string Kind);
 
 /// <summary>A prefab of the library (query <c>ListPrefabs</c>): a built-in prefab or an asset of a mod (section 5.2 of
 /// the M6b design).</summary>
@@ -378,6 +392,9 @@ public sealed class MissionQueries
                 [.. (template?.Fields ?? []).Select(f => new MissionPrefabFieldView(f.Id, f.Label, f.Help, f.IsList)
                 {
                     Kind = f.KindText, PerInstance = f.PerInstance, Default = [.. f.Default.Select(r => r.Format())],
+                    Optional = f.Optional,
+                    Columns = [.. f.Columns.Select(c => new MissionPrefabColumnView(c.Id, c.Label, Prefabs.PrefabFieldDef.KindName(c.Kind)))],
+                    Keys = f.Keys,
                 })],
                 [.. (template?.Sections ?? []).Select(s => s.Role)], [.. (definition?.Steps ?? []).Select(s => s.Name)])
             {

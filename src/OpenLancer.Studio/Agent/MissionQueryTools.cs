@@ -166,6 +166,35 @@ internal static class MissionQueryTools
         return ToolResult.Of(call.Session.Missions.Queries.DryRun(RunJson.ReadRequest(request)));
     }
 
+    /// <summary>The targets of a start plan in this build. The retail targets come with the linked game (milestone
+    /// M6c-3).</summary>
+    internal static IReadOnlyList<string> StartTargets { get; } = [RunJson.OpenLancerTarget];
+
+    /// <summary>
+    /// The start plan query (section 7.2 of the M6c design): the plan of a start of a script now, as the Play start page
+    /// shows it. A plan that cannot start is data: the status <c>refused</c> and the reason. The request reader of the
+    /// JSON host reads the arguments, so <c>mission_start_plan</c> and a play of the same start read one request in one
+    /// way.
+    /// </summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a start of another script or a
+    /// place that is not valid. <see cref="EditErrorKind.NotFound"/> for a script or a trigger that does not
+    /// resolve.</exception>
+    public static ToolStep StartPlan(ToolCall call)
+    {
+        var args = call.Args;
+        EditTools.At("script", () => ScriptRef.Parse(args.Text("script")!));
+        var request = new JsonObject();
+        foreach (var name in new[] { "script", "start", "target", "start_place" })
+        {
+            if (args.Text(name) is { } value)
+                request[name] = value;
+        }
+        // The script is valid, so an error of the reader without a field is the read of the reference of the start.
+        var read = EditTools.At("start", () => RunJson.ReadStartRequest(request));
+        // An unknown trigger of the start names start. Each other error of the query is an error of the script.
+        return ToolResult.Of(EditTools.At("script", () => call.Session.Missions.Queries.StartPlan(read)));
+    }
+
     /// <summary>A trigger in summary form: the sentence of its condition and one chip for each action group, in the
     /// order of the groups of the schema, as the graph shows them.</summary>
     private static TriggerSummaryRow Summary(MissionModel model, MissionTrigger trigger, bool lines)

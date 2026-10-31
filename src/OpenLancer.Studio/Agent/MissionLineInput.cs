@@ -108,6 +108,19 @@ internal static class MissionLineInput
     /// argument.</exception>
     public static LineSpec OrderLine(JsonNode node, string field) => Line(node, field, "ObjList", LinePlace.Order);
 
+    /// <summary>The key with the letter case of the schema and the value texts of a condition, an action or an order in
+    /// an argument, after the checks of <see cref="TriggerLine"/> or <see cref="OrderLine"/>. A named value gets its text
+    /// by its kind, and a value that the line does not give gets its default.</summary>
+    /// <param name="place"><see cref="LinePlace.Condition"/>, <see cref="LinePlace.Action"/> or
+    /// <see cref="LinePlace.Order"/>.</param>
+    /// <exception cref="EditException">See <see cref="TriggerLine"/>.</exception>
+    public static (string Key, IReadOnlyList<string> Texts) LineTexts(JsonNode node, string field, LinePlace place)
+    {
+        var sectionType = place == LinePlace.Order ? "ObjList" : "Trigger";
+        var built = MissionValues.Build(MissionSchema.Retail, sectionType, place, Line(node, field, sectionType, place));
+        return (built.Key, built.Texts);
+    }
+
     private static LineSpec Line(JsonNode node, string field, string sectionType, LinePlace place)
     {
         var line = node.Deserialize<LineSpec>(MissionJson.Options)!;
@@ -282,6 +295,22 @@ internal sealed class MissionFieldsParam(string name) : ToolParam(name, false)
 
     public override bool Fits(JsonNode value) =>
         value is JsonObject fields && fields.All(field => MissionLineInput.IsField(field.Value));
+}
+
+/// <summary>The values of the fields of a prefab by field id, for example the fields of <c>mission_place_prefab</c>. The
+/// form of a value depends on the kind of its field, so the check reads only the JSON type. The tool checks each value
+/// against its field.</summary>
+internal sealed class PrefabFieldsParam(string name) : ToolParam(name, false)
+{
+    public override JsonObject Schema(string tool) => new()
+    {
+        ["type"] = "object",
+        ["additionalProperties"] = MissionLineInput.FieldSchema(),
+    };
+
+    public override string Expected => "an object of values by field id";
+
+    public override bool Fits(JsonNode value) => value is JsonObject;
 }
 
 /// <summary>Named values of a mission line, with at least one value, for example the values of

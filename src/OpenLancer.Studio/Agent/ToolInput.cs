@@ -197,6 +197,27 @@ internal sealed class TextListParam(string name, bool required) : ToolParam(name
             item?.GetValueKind() == JsonValueKind.String && item.GetValue<string>() is { Length: > 0 and <= TextParam.MaxLength });
 }
 
+/// <summary>An object of lists of texts by name, for example the triggers of each output of a prefab instance. Each text
+/// has at most <see cref="TextParam.MaxLength"/> characters. A list can be empty.</summary>
+internal sealed class TextListsParam(string name, bool required) : ToolParam(name, required)
+{
+    public override JsonObject Schema(string tool) => new()
+    {
+        ["type"] = "object",
+        ["additionalProperties"] = new JsonObject
+        {
+            ["type"] = "array",
+            ["items"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = TextParam.MaxLength },
+        },
+    };
+
+    public override string Expected => $"an object of lists of texts of 1 to {TextParam.MaxLength} characters";
+
+    public override bool Fits(JsonNode value) =>
+        value is JsonObject lists && lists.All(list => list.Value is JsonArray texts && texts.All(item =>
+            item?.GetValueKind() == JsonValueKind.String && item.GetValue<string>() is { Length: > 0 and <= TextParam.MaxLength }));
+}
+
 /// <summary>A point: three numbers, X, Y and Z in meters. Each number fits a <see cref="float"/>, and the argument can
 /// give a bound for each number.</summary>
 /// <param name="bound">The largest size of each number, or null for each number that a float holds.</param>

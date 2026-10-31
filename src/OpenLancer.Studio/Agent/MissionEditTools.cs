@@ -17,7 +17,7 @@ namespace OpenLancer.Studio.Agent;
 /// <see cref="EditScope.RunMission"/>, in the batch of the call. So a call is one Undo step with the edit origin Agent,
 /// it can be a preview or a step of <c>edit_batch</c>, and it runs in strict mode (decision D681 of M6b).
 /// </summary>
-internal static class MissionEditTools
+internal static partial class MissionEditTools
 {
     /// <summary>The detail code of a request that turns strict mode off.</summary>
     public const string StrictMode = "StrictMode";
