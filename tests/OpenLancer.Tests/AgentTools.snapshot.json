@@ -19228,7 +19228,13 @@
                   "y"
                 ]
               },
-              "act": true
+              "act": {
+                "type": "string",
+                "pattern": "^(act):",
+                "examples": [
+                  "act:DATA\\MISSIONS\\M02\\m02.ini#act_1"
+                ]
+              }
             },
             "required": [
               "kind",
@@ -20067,7 +20073,13 @@
                   "y"
                 ]
               },
-              "act": true
+              "act": {
+                "type": "string",
+                "pattern": "^(act):",
+                "examples": [
+                  "act:DATA\\MISSIONS\\M02\\m02.ini#act_1"
+                ]
+              }
             },
             "required": [
               "kind",
@@ -20082,7 +20094,13 @@
               "kind": {
                 "const": "remove_act"
               },
-              "act": true
+              "act": {
+                "type": "string",
+                "pattern": "^(act):",
+                "examples": [
+                  "act:DATA\\MISSIONS\\M02\\m02.ini#act_1"
+                ]
+              }
             },
             "required": [
               "kind",
@@ -20829,7 +20847,13 @@
               "kind": {
                 "const": "set_act"
               },
-              "act": true,
+              "act": {
+                "type": "string",
+                "pattern": "^(act):",
+                "examples": [
+                  "act:DATA\\MISSIONS\\M02\\m02.ini#act_1"
+                ]
+              },
               "name": {
                 "type": [
                   "string",
@@ -20855,7 +20879,13 @@
               "kind": {
                 "const": "set_act_members"
               },
-              "act": true,
+              "act": {
+                "type": "string",
+                "pattern": "^(act):",
+                "examples": [
+                  "act:DATA\\MISSIONS\\M02\\m02.ini#act_1"
+                ]
+              },
               "triggers": {
                 "type": "array",
                 "items": {

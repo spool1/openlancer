@@ -179,6 +179,9 @@ public sealed class MissionJsonTests
         Assert.Equal("#/$defs/command", (string?)definitions["command_group"]!["properties"]!["commands"]!["items"]!["$ref"]);
         Assert.Equal("#/$defs/line", (string?)trigger["properties"]!["condition"]!["$ref"]);
         Assert.Equal("^(trg):", (string?)definitions["remove_trigger"]!["properties"]!["trigger"]!["pattern"]);
+        // An act is a reference text too, not any value (final finding 18 of MCP1-3).
+        Assert.Equal("^(act):", (string?)trigger["properties"]!["act"]!["pattern"]);
+        Assert.Equal(["x", "y"], trigger["properties"]!["place"]!["required"]!.AsArray().Select(n => (string?)n));
         Assert.DoesNotContain("origin", schema["properties"]!.AsObject().Select(p => p.Key));
         Assert.DoesNotContain(typeof(MissionJson).Assembly.GetReferencedAssemblies(),
             a => a.Name!.Contains("Schema", StringComparison.OrdinalIgnoreCase));
