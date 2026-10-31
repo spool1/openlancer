@@ -366,6 +366,45 @@ public sealed class ToolQueueTests
         }
     }
 
+    /// <summary>A call that gives an error has its arguments in the log only up to 16 KB. So a client cannot fill the
+    /// log with large arguments that the input check refuses (final finding 8 of MCP1-3). A small refused call keeps
+    /// its arguments.</summary>
+    [Fact]
+    public async Task TheAuditLogLeavesOutTheLargeArgumentsOfACallWithAnError()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "openlancer-tests", Guid.NewGuid().ToString("N"));
+        var file = Path.Combine(folder, "agent.jsonl");
+        try
+        {
+            var host = new TestAgentHost(null);
+            var junk = new JsonObject { ["junk"] = new string('x', AuditLog.MaxErrorArgumentBytes + 1) };
+            using (var log = new AuditLog(file))
+            using (var queue = new ToolQueue(host, new FakeClock(), log))
+            {
+                foreach (var arguments in new[] { junk, JsonNode.Parse("""{ "x": 1 }""")!.AsObject() })
+                {
+                    var call = queue.CallAsync("studio_status", arguments, null, Token);
+                    queue.RunNext();
+                    await Done(call);
+                }
+            }
+
+            using var reader = new StreamReader(file);
+            var entries = AuditLog.Read(reader).ToList();
+            Assert.Equal(2, entries.Count);
+            Assert.All(entries, e => Assert.Equal(new ToolOutcome("error", "invalid_argument", "BadArgument"), e.Expected));
+            Assert.True(entries[0].ArgumentsOmitted);
+            Assert.Null(entries[0].Arguments);
+            Assert.True(new FileInfo(file).Length < 1000);
+            Assert.Equal("""{"x":1}""", entries[1].Arguments!.ToJsonString());
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+                Directory.Delete(folder, true);
+        }
+    }
+
     /// <summary>A fault of a tool ends the call with a result and writes its line of the audit log (decision D728:
     /// each call).</summary>
     [Fact]

@@ -1456,7 +1456,7 @@
     "EditError.step_code": "For the error step_failed: the code of the error of the step, for example not_found. Else none.",
     "AgentLimits.edit_items": "The most items that one call of delete_items or duplicate_items names.",
     "AgentLimits.edit_sections": "The most sections that one edit call changes, adds or removes.",
-    "AgentLimits.batch_steps": "The most steps of one edit_batch call, and the most commands of one mission_edit call.",
+    "AgentLimits.batch_steps": "The most steps of one edit_batch call, and the most commands of one mission_edit call. A command_group counts as one command.",
     "AgentLimits.route_legs": "The most legs of one route of scene_place_patrol_route.",
     "EditResult.status": "applied: the data changed in one Undo step. no_change: nothing changed. previewed: a preview that changed nothing.",
     "EditResult.errors": "The errors of a refusal. A tool error gives them as the error of the call.",

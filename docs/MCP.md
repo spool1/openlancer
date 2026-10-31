@@ -308,7 +308,7 @@ Each script has a version. It starts at 1 and grows at each edit, undo and redo 
 
 `mission_edit` can be a step of `edit_batch`. The strict check of the missions runs once, at the end of the batch. So a step can start a trigger that a later step adds. Each mission step gives its own `inverse` and `row_moves` in `steps`, and the batch gives no inverse. The `row_moves` of a step count from the rows before that step. One undo reverts the whole batch.
 
-One call has at most 100 commands. A `command_group` counts as one command. The limit of the sections of one edit and the size of a request bound its work.
+One call has at most 100 commands. A `command_group` counts as one command, so the limit does not count the commands in a group. Each step of `edit_batch` has its own limit too. The limit of the sections of one edit does not bound the commands that change the same sections again and again. The size limit of a result bounds only a call that changes something, because a call with no net change gives no inverse. So a large group runs on the UI thread for some seconds, and the editor does not respond in that time. Keep a group to the commands that the edit needs.
 
 #### The trigger tools
 
@@ -694,7 +694,7 @@ The oltool host never edits a mod in the OpenLancer repo, because it cannot ask 
 
 ## The audit log
 
-The editor writes each call of an agent into an audit log: one file for each run of the editor, for example `%LOCALAPPDATA%\OpenLancer\logs\agent-20261020-142233.jsonl`. Each line holds the time, the tool, the arguments and a summary of the result. A call that did not run, for example a call above the rate limit, has no arguments in the log. The log holds no token. At 64 MB, the log stops, and the Console tells you.
+The editor writes each call of an agent into an audit log: one file for each run of the editor, for example `%LOCALAPPDATA%\OpenLancer\logs\agent-20261020-142233.jsonl`. Each line holds the time, the tool, the arguments and a summary of the result. A call that did not run, for example a call above the rate limit, has no arguments in the log. A call that gives an error has its arguments only up to 16 KB, because it changed nothing. The log holds no token. At 64 MB, the log stops, and the Console tells you.
 
 `oltool mcp replay <profile.json> --mod <id> <log>` runs the calls of a log again and compares each result with the recorded result. It exits with the code 1 at the first result that differs. The edit calls of the log change the profile that the replay gets, so give it a copy of the profile and its mods. The replay saves only at a recorded `save` call, and it writes no recovery file. With `--preview`, the replay changes no file. The edits change only the data in memory, so a later call can still use the items of an earlier call. The replay then skips the calls that write files: `save`, `export_mod`, `prop_group_save`, `prop_group_rename` and `prop_group_delete`.
 

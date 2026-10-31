@@ -26,16 +26,22 @@ public sealed record AuditEntry(int Line, string Tool, JsonObject? Arguments, To
 /// <remarks>
 /// <para>The format of a line: <c>{"time": "...", "tool": "list_items", "arguments": {...}, "result": {"status":
 /// "ok"}}</c>. A tool error has <c>"status": "error"</c> with <c>code</c> and <c>detail</c>.</para>
-/// <para>The log keeps the arguments of each call that runs, because a replay needs them. A <c>mission_edit</c> call
-/// with many commands has large arguments. The size limit of a request of the server bounds the arguments of one
-/// call. A client can also send many calls. So the log leaves out the arguments of a call that does not run, and
-/// writes <c>"arguments_omitted": true</c> instead. The file stops at a size limit. Then the log tells its owner once
-/// and writes no more lines.</para>
+/// <para>The log keeps the arguments of each call that runs without an error, because a replay needs them. A
+/// <c>mission_edit</c> call with many commands has large arguments. The size limit of a request of the server bounds
+/// the arguments of one call. A client can also send many calls, for example calls with large arguments that the input
+/// check refuses. So the log leaves out the arguments of a call that does not run, and the arguments above
+/// <see cref="MaxErrorArgumentBytes"/> of a call that gives an error, and writes <c>"arguments_omitted": true</c>
+/// instead (final finding 8 of MCP1-3). A call that gives an error changes nothing, so a replay does not need it. The
+/// file stops at a size limit. Then the log tells its owner once and writes no more lines.</para>
 /// </remarks>
 public sealed class AuditLog : IDisposable
 {
     /// <summary>The default size limit of one file in bytes.</summary>
     public const long DefaultMaxBytes = 64L * 1024 * 1024;
+
+    /// <summary>The largest arguments of a line of a call that gives an error, as JSON text in bytes of UTF-8. The
+    /// arguments of a valid call that is not an edit are much smaller.</summary>
+    public const int MaxErrorArgumentBytes = 16 * 1024;
 
     private readonly object gate = new();
     private readonly StreamWriter writer;
@@ -78,7 +84,8 @@ public sealed class AuditLog : IDisposable
             ["time"] = time.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
             ["tool"] = tool,
         };
-        if (ran)
+        if (ran && (outcome.Status != ToolOutcome.Error || arguments == null ||
+                    Encoding.UTF8.GetByteCount(arguments.ToJsonString()) <= MaxErrorArgumentBytes))
             line["arguments"] = arguments?.DeepClone() ?? new JsonObject();
         else
             line["arguments_omitted"] = true;
