@@ -100,7 +100,8 @@ public sealed partial class AgentMissionToolTests
         var (m, host) = Open();
         using var _ = m;
 
-        var plain = Ok(host, "mission_add_trigger", $$"""{ "script": "msn:{{S}}", "condition": { "key": "Cnd_True" }, "starts_with_mission": true }""");
+        var plain = Ok(host, "mission_add_trigger",
+            $$"""{ "script": "msn:{{S}}", "condition": { "key": "Cnd_True" }, "starts_with_mission": true }""");
         var started = Ok(host, "mission_add_trigger",
             $$"""{ "script": "msn:{{S}}", "condition": { "key": "Cnd_True" }, "started_by": [ "ol_end" ] }""");
 
@@ -282,7 +283,9 @@ public sealed partial class AgentMissionToolTests
                 "invalid_value", MissionErrors.NameInvalid, "nickname"),
             ("mission_set_action", $$"""{ "line": "{{WaveLine(3)}}", "values": { "ship": "ol_ship_3" }, "expect_key": "Act_ChangeState" }""",
                 "stale_revision", MissionErrors.RowChanged, "line"),
-            ("mission_add_action", $$"""{ "trigger": "{{End}}", "action": { "key": "Act_ChangeState", "texts": [ "FAIL" ] }, "before": "{{WaveLine(3)}}" }""",
+            ("mission_add_action", $$"""
+                { "trigger": "{{End}}", "action": { "key": "Act_ChangeState", "texts": [ "FAIL" ] }, "before": "{{WaveLine(3)}}" }
+                """,
                 "invalid_argument", MissionEditTools.OtherItem, "before"),
             ("mission_add_trigger", $$"""{ "script": "msn:{{S}}", "condition": { "key": "Cnd_True" }, "started_by": [ "{{other}}" ] }""",
                 "invalid_argument", MissionEditTools.OtherItem, "started_by[0]"),
@@ -312,8 +315,9 @@ public sealed partial class AgentMissionToolTests
         Assert.True(wrong.Count == 0, string.Join(Environment.NewLine, wrong));
         var closest = Error(host, "mission_set_condition", $$"""{ "trigger": "trg:{{S}}#ol_wav", "condition": { "key": "Cnd_True" } }""");
         Assert.Contains("The closest names are: ol_wave.", closest.Message);
-        var tooMany = Error(host, "mission_add_trigger", $$"""{ "script": "msn:{{S}}", "condition": { "key": "Cnd_True" }, "actions": [ {{
-            string.Join(", ", Enumerable.Repeat("""{ "key": "Act_ChangeState", "texts": [ "FAIL" ] }""", MissionEditTools.MaxActions + 1))}} ] }""");
+        var actions = Enumerable.Repeat("""{ "key": "Act_ChangeState", "texts": [ "FAIL" ] }""", MissionEditTools.MaxActions + 1);
+        var tooMany = Error(host, "mission_add_trigger",
+            $$"""{ "script": "msn:{{S}}", "condition": { "key": "Cnd_True" }, "actions": [ {{string.Join(", ", actions)}} ] }""");
         Assert.Equal(("invalid_argument", ToolInput.BadArgument), (tooMany.Code, tooMany.Detail));
         Assert.Equal(before, m.State());
         Assert.Equal(0, m.Session.Revision);
@@ -422,7 +426,8 @@ public sealed partial class AgentMissionToolTests
         Assert.False(m.Session.CanUndo);
         var batch = Ok(host, "edit_batch", $$"""
             { "steps": [ { "tool": "mission_add_action", "arguments": {{arguments}} },
-                         { "tool": "mission_move_action", "arguments": { "line": "line:{{S}}#Trigger/ol_end/4", "before": "line:{{S}}#Trigger/ol_end/2" } } ] }
+                         { "tool": "mission_move_action",
+                           "arguments": { "line": "line:{{S}}#Trigger/ol_end/4", "before": "line:{{S}}#Trigger/ol_end/2" } } ] }
             """);
 
         Assert.Equal(Texts(preview["adds"]), Texts(batch["steps"]![0]!["adds"]));
