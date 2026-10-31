@@ -996,7 +996,7 @@
         "   - heartbeats with the count 100. A timer of 3 seconds needs 90 heartbeats.",
         "   - event with the line Cnd_Destroyed and the target my_pirate.",
         "   Make sure that my_reward runs.",
-        "8. Call check with the scope mission and the ref {script}. Correct each error.",
+        "8. Call check with the scope mission and the ref {script}. Then call check with the scope all. It also finds errors outside the mission checks, for example a loadout without an engine. Correct each error.",
         "9. Tell the user what you added."
       ]
     }

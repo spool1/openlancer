@@ -416,6 +416,8 @@ public sealed class McpServerTests
         Assert.Contains($"Give the script {script} to each mission tool and to each mission step of edit_batch.", text);
         Assert.Contains($"7. Call mission_dry_run with the script {script} and these four inputs:", text);
         Assert.Contains("6. Call edit_batch with the label \"Add the pirate ambush\" and these three steps:", text);
+        // The scope mission does not give the errors of the other checks, so the prompt also asks for the scope all.
+        Assert.Contains($"8. Call check with the scope mission and the ref {script}. Then call check with the scope all.", text);
         Assert.Equal(AgentTexts.Prompts["two_trigger_mission"].Description, result.Description);
         await Assert.ThrowsAsync<McpProtocolException>(() =>
             client.GetPromptAsync("two_trigger_mission", cancellationToken: Token).AsTask());
