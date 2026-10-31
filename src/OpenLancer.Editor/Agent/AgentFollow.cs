@@ -151,8 +151,9 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
             return;
         if (result.Adds.Count == 0 && result.Deletes.Count > 0)
         {
-            // Follow mode does not leave prefab mode, so a delete of mission items keeps the selection of prefab mode.
-            if (!(view.InPrefabMode && result.Deletes.All(d => MissionScriptOf(d.Ref) != null)))
+            // Follow mode does not leave prefab mode, so a delete of items of mission files keeps the selection of prefab
+            // mode.
+            if (!(view.InPrefabMode && result.Deletes.All(d => MissionFileOf(d.Ref) != null)))
                 view.Selection = null;
             return;
         }
@@ -174,19 +175,19 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
     /// <summary>
     /// The first item of the agent delete with the label of an entry, when the edit view has the item again, else null.
     /// The undo of the user selects it, as the undo of a delete of the user does (decision D249). This works also with
-    /// follow mode off, because the user asked for the undo. An item of a mission script gives null: the undo of a
-    /// mission edit of the user keeps the selection of the Mission tab, so the undo of an agent edit does too.
+    /// follow mode off, because the user asked for the undo. An item of a mission file gives null: the undo of a mission
+    /// edit of the user keeps the selection of the Mission tab, so the undo of an agent edit does too.
     /// </summary>
     /// <param name="label">The label of the entry that the undo reversed.</param>
     public SectionRef? DeletedItem(string label) =>
-        session != null && deleted.TryGetValue(label, out var reference) && MissionScriptOf(reference) == null
+        session != null && deleted.TryGetValue(label, out var reference) && MissionFileOf(reference) == null
             ? SectionOf(reference)
             : null;
 
     /// <summary>
     /// Shows the first item of an edit: in the Mission tab for an item of a mission script, in the Scene for an item of a
-    /// system, else in the Inspector. An item that the Mission tab or the Scene cannot show also shows in the Inspector.
-    /// In prefab mode, an item of a mission script does not show.
+    /// system, else in the Inspector. An item that the Mission tab or the Scene cannot show also shows in the Inspector,
+    /// for example a section of a ship build file. In prefab mode, an item of a mission file does not show.
     /// </summary>
     /// <param name="select">True to select an item of the Scene or of the Mission tab. An item that shows only in the
     /// Inspector always gets the selection, because the Inspector shows only the selection.</param>
@@ -195,12 +196,12 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
         SectionRef? inspector = null;
         foreach (var reference in references)
         {
-            if (MissionScriptOf(reference) is { } script)
+            if (MissionFileOf(reference) is var (path, script))
             {
                 // Follow mode does not leave prefab mode, so the edit shows only in the Console.
                 if (view.InPrefabMode)
                     continue;
-                if (view.ShowInMission(script, reference, select))
+                if (script && view.ShowInMission(path, reference, select))
                     return;
             }
             if (SectionOf(reference) is not { } section)
@@ -243,11 +244,12 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
     }
 
     /// <summary>
-    /// The install path of the mission script of an item reference of a result, or null for an item outside the scripts.
-    /// A script, a trigger, a line, a label, a prefab instance and an act are items of a script. So is a section of a
-    /// script, but not a section of a ship build file.
+    /// The mission file of an item reference of a result, or null for an item outside the mission files. A script, a
+    /// trigger, a line, a label, a prefab instance and an act are items of a script. A section is an item of a mission
+    /// file when its file is a script or the ship build file of a script.
     /// </summary>
-    private string? MissionScriptOf(string reference)
+    /// <returns>The install path of the file, and true when the file is a script that the Mission tab opens.</returns>
+    private (string Path, bool Script)? MissionFileOf(string reference)
     {
         try
         {
@@ -257,9 +259,11 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
                     Kind: ItemRefKind.Script or ItemRefKind.Trigger or ItemRefKind.Line or ItemRefKind.Label or ItemRefKind.Instance
                     or ItemRefKind.Act,
                     Path: { } path,
-                } => path,
-                { Kind: ItemRefKind.Section, Path: { } path } when session!.Missions.ScriptPaths().Contains(path, VfsPath.Comparer) =>
-                    path,
+                } => (path, true),
+                // The check of the file is fast. So only a section of a mission file reads the list of the scripts, not a
+                // section of a system, for example.
+                { Kind: ItemRefKind.Section, Path: { } path } when session!.Missions.IsMissionFile(path) =>
+                    (path, session.Missions.ScriptPaths().Contains(path, VfsPath.Comparer)),
                 _ => null,
             };
         }

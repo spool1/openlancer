@@ -526,6 +526,37 @@ public sealed class FollowModeTests
         Assert.Equal(4, editor.Log.Entries.Count(e => e.Source == AgentController.Source));
     }
 
+    /// <summary>
+    /// In prefab mode, an agent edit of the ship build file of a script shows only in the Console too. The ship build
+    /// file is a mission file, but not a script. So a change, a delete and an agent undo of an <c>[NPCShipArch]</c> keep
+    /// the selection of prefab mode. An undo of the user of the delete gives the Scene no item, as for a script.
+    /// </summary>
+    [Fact]
+    public void InPrefabModeAnEditOfAShipBuildFileShowsOnlyInTheConsole()
+    {
+        var (m, editor, host) = Missions();
+        using var _ = m;
+        var view = editor.FollowView;
+        view.InPrefabMode = true;
+        var template = new FakeMissionItem("trg:prefab:mod:ol_gate#ol_open");
+        view.Selection = template;
+        var build = $"sec:{MissionEdits.Ships.Replace(@"\", @"\\")}#NPCShipArch/ol_build_1";
+
+        Ok(host, "mission_edit", MissionEdit($$"""
+            { "kind": "set_item_key", "item": "{{build}}", "key": "level", "lines": [ { "key": "level", "texts": [ "d6" ] } ] }
+            """));
+        Assert.Equal(template, view.Selection);
+        Ok(host, "mission_edit", MissionEdit($$"""{ "kind": "remove_section", "section": "{{build}}" }""", confirm: true));
+        Assert.Equal(template, view.Selection);
+        var label = m.Session.UndoLabel!;
+        Ok(host, "undo");
+
+        Assert.Equal(template, view.Selection);
+        Assert.Empty(view.MissionShown);
+        Assert.Empty(view.Shown);
+        Assert.Null(editor.Follow.DeletedItem(label));
+    }
+
     /// <summary>A trigger that the Mission tab cannot show, for example before the mission run reads its script, shows
     /// in the Inspector. A section of the ship build file of a script is not an item of the Mission tab, so it shows in
     /// the Inspector too.</summary>
