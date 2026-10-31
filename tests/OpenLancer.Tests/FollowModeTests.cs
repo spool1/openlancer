@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Numerics;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Missions;
 using OpenLancer.Editor.Agent;
 using Xunit;
 using static OpenLancer.Tests.AgentCalls;
@@ -524,6 +525,34 @@ public sealed class FollowModeTests
         Assert.Equal(template, view.Selection);
         Assert.True(editor.Follow.On);
         Assert.Equal(4, editor.Log.Entries.Count(e => e.Source == AgentController.Source));
+    }
+
+    /// <summary>
+    /// A selected line of a trigger keeps its line when an agent edit moves its row, as at a row move of the user
+    /// (section 8.10 of the M6b design). This is also true with follow mode off, because the selection stays on the same
+    /// line. A selection of another line of the trigger does not change.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ASelectedLineKeepsItsLineWhenAnAgentEditMovesItsRow(bool follow)
+    {
+        var (m, editor, host) = Missions();
+        using var _ = m;
+        editor.Follow.Set(follow);
+        var view = editor.FollowView;
+        var wave = new SectionRef(MissionEdits.Script, new SectionIdentity("Trigger", "ol_wave"));
+        string Reorder(int row, int before) =>
+            $$"""{ "kind": "reorder_action", "row": { "ref": "line:{{S}}#Trigger/ol_wave/{{row}}" }, "before": {{before}} }""";
+        view.Selection = new MissionRef(MissionEdits.Script, MissionItemKind.Row, wave, Row: 5);
+
+        Ok(host, "mission_edit", MissionEdit(Reorder(5, 3)));
+        var moved = view.Selection;
+        view.Selection = new MissionRef(MissionEdits.Script, MissionItemKind.Row, wave, Row: 2);
+        Ok(host, "mission_edit", MissionEdit(Reorder(3, 5)));
+
+        Assert.Equal(new MissionRef(MissionEdits.Script, MissionItemKind.Row, wave, Row: 3), moved);
+        Assert.Equal(new MissionRef(MissionEdits.Script, MissionItemKind.Row, wave, Row: 2), view.Selection);
     }
 
     /// <summary>

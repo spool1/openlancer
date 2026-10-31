@@ -375,7 +375,7 @@ With **Agent > Follow agent** on, the editor opens the system of each agent edit
 
 Follow mode does not leave prefab mode, as Unity keeps prefab mode open when the scene changes. While the Mission tab shows a prefab, an agent edit of a mission script or of its ship build file shows only in the Console. The selection and the view stay.
 
-When you move the camera of the Scene or select an item, follow mode stops. Click **Follow agent** to start it again. The settings keep the last value that you clicked, so follow mode is on again at the next start of the editor. With follow mode off, the agent changes the view and the selection only with `open_view` and `select_items`. When an agent edit removes the selected item, the selection goes, as after an undo.
+When you move the camera of the Scene or select an item, follow mode stops. Click **Follow agent** to start it again. The settings keep the last value that you clicked, so follow mode is on again at the next start of the editor. With follow mode off, the agent changes the view and the selection only with `open_view` and `select_items`. When an agent edit removes the selected item, the selection goes, as after an undo. When an agent edit renames the selected item or moves the row of a selected line, the selection stays on the same item.
 
 #### Pause
 

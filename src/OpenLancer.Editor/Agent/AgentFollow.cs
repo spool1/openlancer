@@ -6,6 +6,8 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.IO;
+using OpenLancer.Editor.Missions;
+using OpenLancer.Studio.Agent;
 
 namespace OpenLancer.Editor.Agent;
 
@@ -72,7 +74,7 @@ internal readonly record struct FollowFrame(
 /// Unity keeps prefab mode open when the scene changes. An edit of a mission then shows only in the Console. A camera
 /// input or a selection of the user stops follow mode until the user turns it on again. With follow mode off, the agent
 /// never changes the view or the selection. Only a selection of a section that an agent edit removed goes, as after an
-/// undo.
+/// undo. A selected item keeps its item when an agent edit renames it or moves its row.
 /// </summary>
 /// <param name="settings">The setting "Follow agent". It keeps the last value that the user clicked.</param>
 internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
@@ -134,7 +136,7 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
     /// <summary>
     /// Follows an applied agent edit, after its commit. A delete clears the selection and keeps its first item for an
     /// undo. A create or a duplicate selects and frames the new item. A rename or a change frames the item and keeps the
-    /// selection.
+    /// selection. A selected line of a trigger keeps its line when the edit moves its row, also with follow mode off.
     /// </summary>
     public void Edited(EditResult result)
     {
@@ -144,6 +146,13 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
             (result.Deletes.FirstOrDefault(d => d.Why == DeleteReason.Target) ?? result.Deletes.FirstOrDefault()) is { } first)
         {
             deleted[label] = first.Ref;
+        }
+        // The Mission tab moves the selection with a rename of the agent. A row move of the agent moves it here, as a row
+        // move of the user does (section 8.10 of the M6b design).
+        if (result is EditToolResult { RowMoves: { Count: > 0 } moves } &&
+            MissionWorkspace.Followed(view.Selection, [], moves) is { } line)
+        {
+            view.Selection = line;
         }
         // A write of a prop group changes an asset, not the edit view, so it is not an entry of the history. Its delete
         // keeps the selection, as a delete in the Unity Project window keeps the selection of the Scene.
