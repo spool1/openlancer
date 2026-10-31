@@ -310,11 +310,11 @@ public sealed class ToolQueueTests
         }
     }
 
-    /// <summary>A client can send large arguments and many calls. The log leaves out large arguments and the
-    /// arguments of a call that the rate limit refused, and it stops at its size limit (section 8.4 of the MCP1
-    /// design).</summary>
+    /// <summary>A client can send many calls. The log leaves out the arguments of a call that the rate limit refused,
+    /// and it stops at its size limit (section 8.4 of the MCP1 design). It keeps the arguments of each call that ran,
+    /// also of a call that gave an error.</summary>
     [Fact]
-    public async Task TheAuditLogHasASizeLimitAndLeavesOutLargeArguments()
+    public async Task TheAuditLogHasASizeLimitAndLeavesOutTheArgumentsOfACallThatDidNotRun()
     {
         var folder = Path.Combine(Path.GetTempPath(), "openlancer-tests", Guid.NewGuid().ToString("N"));
         var file = Path.Combine(folder, "agent.jsonl");
@@ -323,14 +323,13 @@ public sealed class ToolQueueTests
             var full = 0;
             var clock = new FakeClock();
             var host = new TestAgentHost(null) { TestLimits = new AgentLimits { CallsPerSecond = 2 } };
-            var large = new JsonObject { ["x"] = new string('a', AuditLog.MaxArgumentBytes) };
             using (var log = new AuditLog(file, 1000, () => full++))
             using (var queue = new ToolQueue(host, clock, log))
             {
                 var calls = new[]
                 {
                     queue.CallAsync("studio_status", null, null, Token),
-                    queue.CallAsync("studio_status", large, null, Token),
+                    queue.CallAsync("studio_status", JsonNode.Parse("""{ "x": 1 }""")!.AsObject(), null, Token),
                     queue.CallAsync("studio_status", JsonNode.Parse("""{ "y": 1 }""")!.AsObject(), null, Token),
                 };
                 queue.RunNext();
@@ -355,7 +354,8 @@ public sealed class ToolQueueTests
             Assert.Null(entries[0].Arguments);
             Assert.Equal(new JsonObject().ToJsonString(), entries[1].Arguments!.ToJsonString());
             Assert.False(entries[1].ArgumentsOmitted);
-            Assert.True(entries[2].ArgumentsOmitted);
+            Assert.False(entries[2].ArgumentsOmitted);
+            Assert.Equal("""{"x":1}""", entries[2].Arguments!.ToJsonString());
             Assert.Equal(new ToolOutcome("error", "invalid_argument", "BadArgument"), entries[2].Expected);
             Assert.InRange(entries.Count, 4, 19);
         }

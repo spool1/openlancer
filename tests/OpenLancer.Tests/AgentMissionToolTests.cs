@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json.Nodes;
+using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Games;
@@ -482,6 +485,57 @@ public sealed class AgentMissionToolTests
         Assert.All(result["new_problems"]!.AsArray(), p => Assert.Matches("^[A-Z][0-9]{2}$", (string?)p!["rule"]));
         Assert.Contains(result["new_problems"]!.AsArray(), p => (string?)p!["rule"] == "M05" &&
                                                                  (string?)p["ref"] == $"line:{Script}#Trigger/ol_start/3");
+    }
+
+    /// <summary>The audit log keeps the arguments of a large mission edit, and its replay on a fresh copy gives the
+    /// same mission files (decision D728 and section 13.3, item 6 of the MCP1 design). The arguments of 100 commands are
+    /// larger than 16 KB.</summary>
+    [Fact]
+    public async Task TheAuditLogKeepsALargeMissionEditAndItsReplayGivesTheSameFiles()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var folder = Path.Combine(Path.GetTempPath(), "openlancer-tests", Guid.NewGuid().ToString("N"));
+        var file = Path.Combine(folder, "agent.jsonl");
+        var adds = Enumerable.Range(1, 100).Select(i => AddAgentTrigger.Replace("ol_agent", $"ol_agent_{i}")).ToArray();
+        var arguments = JsonNode.Parse(Edit(adds))!.AsObject();
+        try
+        {
+            string expected;
+            var (m, host) = Open();
+            using (m)
+            {
+                using (var log = new AuditLog(file))
+                using (var queue = new ToolQueue(host, new FakeClock(), log))
+                {
+                    var call = queue.CallAsync("mission_edit", arguments, null, token);
+                    queue.RunNext();
+                    var result = await call.WaitAsync(TimeSpan.FromSeconds(10), token);
+                    Assert.Equal("applied", (string?)result.Content["status"]);
+                }
+                expected = m.State();
+            }
+            List<AuditEntry> entries;
+            using (var reader = new StreamReader(file))
+                entries = AuditLog.Read(reader).ToList();
+            var (copy, copyHost) = Open();
+            using (copy)
+            {
+                using (var reader = new StreamReader(file))
+                    Assert.Null(AgentReplay.Run(copyHost, reader, new StringWriter()));
+                Assert.True(copy.Has("ol_agent_100"));
+                Assert.Equal(expected, copy.State());
+            }
+
+            var entry = Assert.Single(entries);
+            Assert.False(entry.ArgumentsOmitted);
+            Assert.Equal(arguments.ToJsonString(), entry.Arguments!.ToJsonString());
+            Assert.InRange(Encoding.UTF8.GetByteCount(arguments.ToJsonString()), 16 * 1024 + 1, int.MaxValue);
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+                Directory.Delete(folder, true);
+        }
     }
 
     /// <summary>The input schema of mission_edit has the fields of a mission batch and the definitions of

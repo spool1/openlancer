@@ -12,8 +12,8 @@ namespace OpenLancer.Studio.Agent;
 /// <param name="Line">The line number in the file, from 1.</param>
 /// <param name="Arguments">The arguments, or null when the line has none.</param>
 /// <param name="Expected">The recorded result, or null when the line has none.</param>
-/// <param name="ArgumentsOmitted">True when the log left out the arguments of the call (see
-/// <see cref="AuditLog.Write"/>). A replay cannot run such a call.</param>
+/// <param name="ArgumentsOmitted">True when the log left out the arguments of the call, because the call did not run
+/// (see <see cref="AuditLog.Write"/>). A replay cannot run such a call.</param>
 public sealed record AuditEntry(int Line, string Tool, JsonObject? Arguments, ToolOutcome? Expected,
     bool ArgumentsOmitted = false);
 
@@ -26,17 +26,14 @@ public sealed record AuditEntry(int Line, string Tool, JsonObject? Arguments, To
 /// <remarks>
 /// <para>The format of a line: <c>{"time": "...", "tool": "list_items", "arguments": {...}, "result": {"status":
 /// "ok"}}</c>. A tool error has <c>"status": "error"</c> with <c>code</c> and <c>detail</c>.</para>
-/// <para>A client can send large arguments and many calls. So the log leaves out arguments above
-/// <see cref="MaxArgumentBytes"/> and the arguments of a call that does not run, and writes
-/// <c>"arguments_omitted": true</c> instead. The file stops at a size limit. Then the log tells its owner once and
-/// writes no more lines.</para>
+/// <para>The log keeps the arguments of each call that runs, because a replay needs them. A <c>mission_edit</c> call
+/// with many commands has large arguments. The size limit of a request of the server bounds the arguments of one
+/// call. A client can also send many calls. So the log leaves out the arguments of a call that does not run, and
+/// writes <c>"arguments_omitted": true</c> instead. The file stops at a size limit. Then the log tells its owner once
+/// and writes no more lines.</para>
 /// </remarks>
 public sealed class AuditLog : IDisposable
 {
-    /// <summary>The largest arguments of one line, as JSON text in bytes of UTF-8. The arguments of a valid call are much
-    /// smaller, because a text argument has at most <see cref="TextParam.MaxLength"/> characters.</summary>
-    public const int MaxArgumentBytes = 16 * 1024;
-
     /// <summary>The default size limit of one file in bytes.</summary>
     public const long DefaultMaxBytes = 64L * 1024 * 1024;
 
@@ -71,8 +68,7 @@ public sealed class AuditLog : IDisposable
         "agent-" + startUtc.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".jsonl";
 
     /// <summary>Adds the line of one call. It can run on any thread.</summary>
-    /// <param name="arguments">The arguments of the call, or null for a call without arguments. The line leaves them
-    /// out when they are larger than <see cref="MaxArgumentBytes"/>.</param>
+    /// <param name="arguments">The arguments of the call, or null for a call without arguments.</param>
     /// <param name="ran">False for a call that did not run, for example a call that the rate limit refused. Its line
     /// leaves out the arguments.</param>
     public void Write(DateTimeOffset time, string tool, JsonObject? arguments, ToolOutcome outcome, bool ran = true)
@@ -82,9 +78,8 @@ public sealed class AuditLog : IDisposable
             ["time"] = time.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
             ["tool"] = tool,
         };
-        var text = ran ? arguments?.ToJsonString() ?? "{}" : null;
-        if (text != null && Encoding.UTF8.GetByteCount(text) <= MaxArgumentBytes)
-            line["arguments"] = JsonNode.Parse(text);
+        if (ran)
+            line["arguments"] = arguments?.DeepClone() ?? new JsonObject();
         else
             line["arguments_omitted"] = true;
         line["result"] = Outcome(outcome);
