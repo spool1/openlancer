@@ -86,10 +86,15 @@ public sealed partial class AgentMissionToolTests
         using var _ = m;
 
         var build = Ok(host, "set_fields", $$"""{ "ref": "sec:{{B}}#NPCShipArch/ol_build_1", "fields": { "level": "d7" } }""");
+        var header = Ok(host, "set_fields", $$"""{ "ref": "sec:{{S}}#Mission", "fields": { "reward": 500 } }""");
 
         Assert.Equal("Agent: Set level", (string?)build["undo_label"]);
+        Assert.Equal([$"sec:{Ships}#NPCShipArch/ol_build_1"], Texts(build["changes"]));
         Assert.Contains("level = d7", m.Lines(Item("NPCShipArch", "ol_build_1", Ships)));
         Assert.NotNull(build["inverse"]);
+        Assert.Equal("Agent: Set reward", (string?)header["undo_label"]);
+        Assert.Equal(["npc_ship_file = missions\\ol_test\\npcships.ini", "reward = 500"], m.Lines(Item("Mission", null)));
+        Assert.Equal(2, (long?)header["versions"]![Script]);
     }
 
     /// <summary>set_fields refuses a trigger, the key line and the other kinds of mission references. A key that the
@@ -261,15 +266,20 @@ public sealed partial class AgentMissionToolTests
         var arguments = $$"""{ "refs": [ "{{End}}" ] }""";
 
         var preview = Ok(host, "delete_items", $$"""{ "refs": [ "{{End}}" ], "preview": true }""");
-        var asks = Refusal(host, "delete_items", arguments);
+        var asks = Call(host, "delete_items", arguments);
         Assert.Equal(before, m.State());
         var result = Ok(host, "delete_items", $$"""{ "refs": [ "{{End}}" ], "confirm": true }""");
 
         Assert.True((bool)preview["needs_confirmation"]!);
-        Assert.Equal(("needs_confirmation", EditTools.ConfirmChanges, null), asks);
+        var message = (string)asks.Content["message"]!;
+        Assert.Equal(("needs_confirmation", EditTools.ConfirmChanges), ((string?)asks.Content["code"], (string?)asks.Content["detail"]));
+        Assert.StartsWith("After this edit, 3 lines name an item that is gone.", message);
+        Assert.Contains(preview["warnings"]!.AsArray(), w => message.StartsWith((string)w!["message"]!, StringComparison.Ordinal));
         Assert.Equal([$"trg:{Script}#ol_end"], result["deletes"]!.AsArray().Select(d => (string?)d!["ref"]));
         Assert.False(m.Has("ol_end"));
         Assert.Equal(["Act_ActTrig = ol_wave", "Act_ActTrig = ol_end"], m.Lines("ol_start")[3..]);
+        Assert.Contains(result["missing"]!.AsArray(),
+            x => (string?)x!["ref"] == $"trg:{Script}#ol_start" && (string?)x["key"] == "Act_ActTrig");
         AssertOneMissionEntry(m, result, "Delete trigger ol_end", before);
     }
 
@@ -425,6 +435,10 @@ public sealed partial class AgentMissionToolTests
             "delete_items", $$"""{ "refs": [ "{{Ship1}}" ], "confirm": true }""");
         AssertUiParity(m => GraphEditModel.DeleteInstance(Script, AnalysisOf(m).Prefabs!.Instances.Single(i => i.Id == "ol_w1")),
             "delete_items", $$"""{ "refs": [ "inst:{{S}}#ol_w1" ], "confirm": true }""", () => WithGate("ol_start"));
+        // A matched instance goes with the delete of each trigger that it claims.
+        AssertUiParity(m => GraphEditModel.DeleteInstance(Script, AnalysisOf(m).Prefabs!.Instances.Single(i => i.Id == "success/ol_win")),
+            "delete_items", $$"""{ "refs": [ "inst:{{S}}#success/ol_win" ], "confirm": true }""",
+            () => Create(PrefabStudioTests.MatchedText));
     }
 
     /// <summary>A mission item of the hidden group Missions gives not_available in each generic tool (decision D725).

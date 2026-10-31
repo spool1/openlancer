@@ -331,8 +331,8 @@ internal static partial class ItemEditTools
         switch (item.Kind)
         {
             case ItemRefKind.Instance:
-                var instance = InstanceOf(session, item);
-                return (PrefabLinks.DeleteCommands(item.Path, instance, instance.Claimed), PrefabLinks.DeleteLabel(instance));
+                var (script, instance) = InstanceOf(session, item);
+                return (PrefabLinks.DeleteCommands(script, instance, instance.Claimed), PrefabLinks.DeleteLabel(instance));
             // A duplicate trigger, which the game never runs (TR4), goes by its section, as in the Hierarchy.
             case ItemRefKind.Trigger when item.Section!.Ordinal == 0:
                 command = new RemoveTrigger(item.Trigger);
@@ -352,16 +352,18 @@ internal static partial class ItemEditTools
         return ([command], command.HistoryLabel);
     }
 
-    /// <summary>The prefab instance of an <c>inst:</c> reference in the analysis of its script now.</summary>
+    /// <summary>The prefab instance of an <c>inst:</c> reference in the analysis of its script now, with the path of
+    /// the script as the session stores it.</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.NotFound"/> with the closest ids.</exception>
-    private static MissionPrefabInstance InstanceOf(EditSession session, MissionTarget item)
+    private static (string Script, MissionPrefabInstance Instance) InstanceOf(EditSession session, MissionTarget item)
     {
         var analysis = session.Missions.AnalysisOf(item.Path) ??
                        throw new EditException(MissionErrors.ScriptNotFoundError(item.Path) with { Target = item.Text });
         var instances = analysis.Prefabs?.Instances ?? [];
-        return instances.FirstOrDefault(i => string.Equals(i.Id, item.Name, StringComparison.OrdinalIgnoreCase)) ??
-               throw new EditException(MissionErrors.ItemNotFoundError(analysis.Script.Path, "prefab instance", item.Name,
-                   ItemRefs.Hint(item.Name, instances.Select(i => i.Id))) with { Target = item.Text });
+        var instance = instances.FirstOrDefault(i => string.Equals(i.Id, item.Name, StringComparison.OrdinalIgnoreCase)) ??
+                       throw new EditException(MissionErrors.ItemNotFoundError(analysis.Script.Path, "prefab instance",
+                           item.Name, ItemRefs.Hint(item.Name, instances.Select(i => i.Id))) with { Target = item.Text });
+        return (analysis.Script.Path, instance);
     }
 
     // ---- duplicate_items ----

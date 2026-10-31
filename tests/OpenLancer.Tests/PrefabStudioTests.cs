@@ -222,7 +222,7 @@ public sealed class PrefabStudioTests
 
     // ---- Matched instances ----
 
-    private const string MatchedText = """
+    internal const string MatchedText = """
         [Mission]
 
         [Trigger]
