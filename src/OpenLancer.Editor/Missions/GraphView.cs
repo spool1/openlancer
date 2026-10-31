@@ -243,11 +243,20 @@ internal sealed partial class GraphView : IDisposable
     /// <summary>Moves the view to the selection at the next frame (the key F).</summary>
     public void FrameSelection() => pending = Navigation.Selection;
 
-    /// <summary>Moves the view to the node of an item at the next frame, and keeps the selection (follow mode of the agent
-    /// edits, section 8.5 of the MCP1 design). An item without a node, for example a ship, does not move the view. An
-    /// item of a mission that opens in the same frame keeps its frame, so the view does not show the whole graph.</summary>
+    /// <summary>
+    /// Moves the view to the node of an item at the next frame, and keeps the selection (follow mode of the agent edits,
+    /// section 8.5 of the MCP1 design). An item without a node, for example a ship, does not move the view. An item of a
+    /// mission that opens in the same frame keeps its frame, so the view does not show the whole graph. The raw view does
+    /// not draw the graph, so it takes no request. Thus a later switch to the graph never moves the view without a reason
+    /// that the user sees.
+    /// </summary>
     public void FrameItem(MissionRef item)
     {
+        if (missions.ShowRaw)
+        {
+            return;
+        }
+
         pending = Navigation.Item;
         pendingItem = item;
     }

@@ -166,8 +166,8 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
 
     /// <summary>
     /// Follow mode of the agent edits: opens the script of a mission item in the Mission tab, shows the tab and moves the
-    /// graph to the item. The open of another script selects its root, as the open of a mission does.
-    /// <see cref="MissionWorkspace.FollowItem"/> finds the item.
+    /// graph to the item. The open of another script selects its root, as the open of a mission does. The raw view does
+    /// not move. <see cref="MissionWorkspace.FollowItem"/> finds the item.
     /// </summary>
     bool IFollowView.ShowInMission(string script, string reference, bool select)
     {
