@@ -273,7 +273,7 @@ These steps build an NPC patrol and a wreck with cargo in a system.
 
 ### The mission tools
 
-The mission tools change the mission scripts of the active mod with the commands of the mission studio. They work in both hosts. `mission_edit` runs any commands of the mission studio. The trigger tools add and change triggers and their lines with named arguments. See "The trigger tools".
+The mission tools change the mission scripts of the active mod with the commands of the mission studio. They work in both hosts. `mission_edit` runs any commands of the mission studio. The trigger tools of "The trigger tools" add and change triggers and their lines with named arguments. `mission_add_item` adds a ship, an NPC or another item of a mission, as "The item tool" tells.
 
 `mission_edit` runs a list of commands. Each call is one Undo step with all its commands, as each other edit tool. It takes `preview`, `with_patch`, `if_revision` and `confirm`, as the edit tools do.
 
@@ -335,6 +335,55 @@ This call adds a trigger that the trigger `my_start` starts. The new trigger wai
   "condition": { "key": "Cnd_Timer", "values": { "seconds": 3 } },
   "actions": [ { "key": "Act_SpawnShip", "values": { "ship": "my_pirate" } } ],
   "started_by": [ "my_start" ]
+}
+```
+
+#### The item tool
+
+`mission_add_item` adds one item to `script`. `kind` tells the kind of the item, and `fields` gives its keys. Each call is one Undo step and runs in strict mode, as the trigger tools do. The tool takes `preview`, `with_patch` and `if_revision`, and it can be a step of `edit_batch`. The result gives the `sec:` reference of the new item in `adds`, and `inverse` and `versions`.
+
+| Kind | The new item |
+|---|---|
+| `ship` | A ship, `[MsnShip]`. `fields.npc` must name an `[NPC]` of the script. |
+| `formation` | A formation, `[MsnFormation]`. Its `ship` lines name ships that come before it in the script. |
+| `npc` | The pilot and the voice of a ship, `[NPC]`. `npc_ship_arch` names a ship build. |
+| `ship_build` | A ship build, `[NPCShipArch]`, in the ship build file of the script. |
+| `solar` | A solar, `[MsnSolar]`. |
+| `loot` | A loot, `[MsnLoot]`. |
+| `order_list` | An order list, `[ObjList]`. `steps` gives its orders. |
+| `objective` | An objective, `[NNObjective]`. |
+| `conversation` | A conversation, `[Dialog]`. |
+| `random_encounter` | A random encounter, `[MsnRandEnc]`. |
+
+The fields are the keys of the section, as `get_item` gives them for an item of the same kind. A key that the section does not have gives `invalid_value` with the detail `NotAKey`, and the message gives the keys of the section. The value of each field has one of these forms:
+
+- One value: a number, a text, `true` or `false`. For example, `"system": "my_system"`.
+- A list of numbers or texts for a position, a rotation or the values of one line. For example, `"position": [0, 0, 1000]` or `"npc_class": ["lawful", "d5"]`.
+- An object of values by name, for a key with more than one value. For example, `"rel_pos": {"heading": 90, "anchor": "my_station", "range": 500}`. `describe_mission_name` does not give the names of the keys of a section. Read the item with `get_item` to see them.
+- `{"texts": [...]}`: the value texts by position. The editor checks only the form of the line. For example, `"type": {"texts": ["ids", "12345"]}` for an objective.
+- For a key that repeats, for example `label`, `cargo` or the `ship` lines of a formation, a list of these forms. Each form is one line. One form without a list is one line too.
+- `null` writes no line.
+
+The tool writes the lines in the order of `fields`. The `formation` and `ship` lines of a formation come last, because the game can stop when a key of the ship comes after them. Give the nickname in `nickname`, not in `fields`.
+
+A ship needs `fields.npc`, the nickname of an `[NPC]` of the script. Without it, the tool gives `invalid_argument` with the detail `NeedsNpc`. To make the build, the NPC and the ship in one Undo step, use one `edit_batch`. Its steps are `mission_add_item` calls with the kinds `ship_build`, `npc` and `ship`. `mission_edit` with `add_mission_ship` and `new_build` also makes all three.
+
+A ship starts at `position`, or near an object with `rel_pos`, not at both. When a formation of the script names the new ship, the ship goes before the formation in the same Undo step. The game puts only an earlier ship in a formation. The save then places the ship with an `ol.before` line.
+
+`steps` gives the orders of an order list in order, as lines of the 23 directives. An example is `{"key": "GotoVec", "values": {"movement": "goto_cruise", "point": [0, 0, 1000], "range": 100}}`. `describe_mission_name` gives the values of each directive. An order without values, for example `BreakFormation`, gets `no_params`, as the game data writes it. Only the kind `order_list` takes `steps`.
+
+A new nickname has letters, digits, `_` and `-`, with at most 47 characters. A random encounter has at most 31 characters, because the game has room for only 31 characters of that name. A longer name gives `invalid_value` with the detail `NameInvalid`. Without a nickname, the editor makes a free name, for example `m01a_ship_2`.
+
+A script that names no ship build file cannot get a ship build: the tool gives `refused` with the detail `NoShipBuildFile`. The inverse of a new NPC or ship build gives `refused` with the detail `RequiredBy` while a ship or an NPC names it. Remove the ship or the NPC first.
+
+This call adds a ship with the NPC `my_pirate_npc` at a position in the system `my_system`:
+
+```json
+{
+  "script": "msn:DATA\\MISSIONS\\M01A\\m01a.ini",
+  "kind": "ship",
+  "nickname": "my_pirate",
+  "fields": { "npc": "my_pirate_npc", "system": "my_system", "position": [8000, 0, -2000], "label": ["my_pirates"] }
 }
 ```
 
