@@ -362,8 +362,8 @@ public sealed class AgentEditToolTests
         Assert.Equal(1, session.Revision);
     }
 
-    /// <summary>The edit tools of MCP1-2 do not change mission scripts and cutscenes. Their tools come with MCP1-3 and
-    /// MCP1-4.</summary>
+    /// <summary>The edit tools of MCP1-2 do not change mission scripts and cutscenes. A mission reference names the tool
+    /// mission_edit of MCP1-3. The cutscene tools come with MCP1-4.</summary>
     [Theory]
     [InlineData("msn:DATA\\MISSIONS\\M01A\\m01a.ini", EditTools.MissionEdits)]
     [InlineData("trg:DATA\\MISSIONS\\M01A\\m01a.ini#t1", EditTools.MissionEdits)]
@@ -380,6 +380,7 @@ public sealed class AgentEditToolTests
         var error = Error(host, "set_fields", $$"""{ "ref": {{Json(reference)}}, "fields": { "x": 1 } }""");
 
         Assert.Equal(("not_available", detail), (error.Code, error.Detail));
+        Assert.Equal(detail == EditTools.MissionEdits, error.Message!.Contains("Use mission_edit", StringComparison.Ordinal));
         Assert.False(session.CanUndo);
     }
 

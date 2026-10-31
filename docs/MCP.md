@@ -282,9 +282,11 @@ These steps build an NPC patrol and a wreck with cargo in a system.
 | `options` | `reject_new_warnings: true` also refuses an edit that adds a warning. |
 | `expect_versions` | The versions of the scripts that the agent read, by install path. When a script has another version now, the call gives `stale_revision` with the detail `ScriptChanged`. |
 
+The input schema gives each command and the value names of each key of a line. So it is large: about 190 KB of JSON. An agent program can send the whole tool list to its model, and then the schema fills a part of the context of the model.
+
 A line of a trigger is an object with its key and its values by name, for example `{"key": "Act_ActTrig", "values": {"trigger": "my_next"}}`. `describe_mission_name` gives the value names of each condition and action. A line can also give its value texts by position in `texts`.
 
-Each command sees the result of the commands before it. So a later command can name a trigger that an earlier command added. When one command refuses, the call changes nothing, and the error names the command, for example `commands[2]`. A path of a reference must be an install path. A new script must be under `DATA\MISSIONS`. The commands do not change the shared files of the missions, for example the pilot files, because encounters and bases use them too.
+Each command sees the result of the commands before it. So a later command can name a trigger that an earlier command added. When one command refuses, the call changes nothing, and the error names the command, for example `commands[2]`. A path of a reference must be an install path. A new script must be under `DATA\MISSIONS`. The commands do not change the world files of the missions, for example the pilot files, because encounters and bases use them too.
 
 The mission tools always run in strict mode. An edit that adds an error to a script gives the error `new_errors` with the first new error, and nothing changes. `options` with `reject_new_errors: false` gives `invalid_argument`. A line that a delete or a rename leaves "Missing" does not count as a new error. But the delete or the rename needs `confirm: true`, as in "Preview, confirmation and revision". The other changes that the mission studio asks about need it too. An example is a change of a build in the shared ship build file of the missions.
 

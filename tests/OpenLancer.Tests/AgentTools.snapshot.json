@@ -215,7 +215,7 @@
               },
               "batch_steps": {
                 "type": "integer",
-                "description": "The most steps of one edit_batch call."
+                "description": "The most steps of one edit_batch call, and the most commands of one mission_edit call."
               },
               "route_legs": {
                 "type": "integer",

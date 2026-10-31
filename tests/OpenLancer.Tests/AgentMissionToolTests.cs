@@ -469,8 +469,8 @@ public sealed class AgentMissionToolTests
         Assert.Contains(document.Working.SelectMany(s => s), e => e.Name == "Cnd_Timer" && MissionValues.TextsOf(e).SequenceEqual(["9"]));
     }
 
-    /// <summary>A trigger rename gives each new problem once. The commit check of the mission editor gives the problems
-    /// of mission scripts, and the checks of the scene skip them. A rename without the change of the references leaves
+    /// <summary>A trigger rename gives each new problem once, with the rule of the mission checks. The commit check of
+    /// the mission editor gives the problems of mission scripts. A rename without the change of the references leaves
     /// "Missing" lines, so it asks for confirm: true.</summary>
     [Fact]
     public void ATriggerRenameGivesEachNewProblemOnce()

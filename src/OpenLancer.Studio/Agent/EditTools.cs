@@ -615,8 +615,10 @@ internal static class EditTools
 /// problems with the problems of the section before the rename.</para>
 /// <para>The checks skip the sections of the mission scripts and of their ship build files. The commit check of the
 /// mission editor gives their problems, and it compares them with the problems before the batch (section 4.5 of the M6b
-/// design). These checks note a section of a mission command only at a rename, without its problems before, so they
-/// would give each problem of a renamed trigger as new.</para>
+/// design). These checks note a section of a mission command only at a rename, without its problems before. So with a
+/// field check or a list check of a mission section, they would give each problem of a renamed trigger as new. Today
+/// no such check exists, so the skip changes no result. It also keeps these checks from reading each mission section
+/// that a call changes.</para>
 /// </remarks>
 internal sealed class EditChecks(EditSession session, EditBatch batch, int sectionLimit) : IBatchCheck
 {
