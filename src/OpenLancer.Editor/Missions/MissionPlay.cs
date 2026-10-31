@@ -224,8 +224,8 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
     /// <c>refused</c> while another play runs and when its plan cannot start, and it follows the agent play rule (see
     /// <see cref="PlayRequests.WithAgentRule"/>).
     /// </summary>
-    /// <param name="cancel">Closes the question of the agent play rule as Cancel does, for example at the end of the call
-    /// of an agent. After it, "Save and continue" does not start the play. The requests of the user do not give
+    /// <param name="cancel">Closes the question of the agent play rule as Cancel does, for example at the end of the
+    /// call of an agent. After it, "Save and continue" does not start the play. The requests of the user do not give
     /// it.</param>
     /// <returns>The result, when the play started or did not start.</returns>
     public Task<PlayRequestResult> Request(MissionPlayRequest request, CancellationToken cancel = default)

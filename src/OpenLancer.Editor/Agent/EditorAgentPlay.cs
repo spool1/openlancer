@@ -43,12 +43,12 @@ internal interface IAgentPlayEditor : IAgentPlayHost
 }
 
 /// <summary>
-/// The Play of the editor for the agent tools <c>play</c> and <c>play_stop</c> (section 7.6 of the MCP1 design, decision
-/// D739), and <c>mission_play</c> and <c>mission_play_trace</c> (section 7.4). A play request of an agent runs the checks
-/// of the Play menu or of the mission play request, and the agent play rule of the user decision of 2026-10-20: it never
-/// saves on its own, and with unsaved edits the editor asks the user first. While a game runs, the request gives
-/// <c>refused</c>, and the agent stops the game with <c>play_stop</c> first. The Play menu closes the running game
-/// instead. A mission play of an agent starts a running mission play again at its start, as F5 does.
+/// The Play of the editor for the agent tools <c>play</c> and <c>play_stop</c> (section 7.6 of the MCP1 design,
+/// decision D739), and <c>mission_play</c> and <c>mission_play_trace</c> (section 7.4). A play request of an agent runs
+/// the checks of the Play menu or of the mission play request, and the agent play rule of the user decision of
+/// 2026-10-20: it never saves on its own, and with unsaved edits the editor asks the user first. While a game runs, the
+/// request gives <c>refused</c>, and the agent stops the game with <c>play_stop</c> first. The Play menu closes the
+/// running game instead. A mission play of an agent starts a running mission play again at its start, as F5 does.
 /// </summary>
 internal sealed class EditorAgentPlay(IAgentPlayEditor editor) : IAgentPlay
 {

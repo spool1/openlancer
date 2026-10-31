@@ -199,9 +199,9 @@ internal static class MissionQueryTools
         return ToolResult.Of(new StartPlanResult(EditTools.At("script", () => call.Session.Missions.Queries.StartPlan(read))));
     }
 
-    /// <summary>The request of a start of the arguments of <see cref="StartInput"/>, read with the request reader of the
-    /// JSON host (<see cref="RunJson.ReadStartRequest"/>). So <c>mission_start_plan</c> and <c>mission_play</c> read one
-    /// start in one way.</summary>
+    /// <summary>The request of a start of the arguments of <see cref="StartInput"/>, read with the request reader of
+    /// the JSON host (<see cref="RunJson.ReadStartRequest"/>). So <c>mission_start_plan</c> and <c>mission_play</c> read
+    /// one start in one way.</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a prefab, a start of another
     /// script or a place that is not valid.</exception>
     internal static StartPlanRequest StartRequest(ToolArgs args)

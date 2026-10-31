@@ -67,7 +67,8 @@ public sealed record PlayStopView(AgentPlayStopped Stopped, AgentPlayStatus Play
 /// script does not have the trigger of the request, the game plays the mission start.</param>
 /// <param name="Kind">The kind of the start of the plan of the play.</param>
 /// <param name="StartName">The name of the start in the editor, for example "Checkpoint my_restore".</param>
-public sealed record MissionPlayView(AgentPlayStatus Play, string Script, string Start, StartKind Kind, string StartName)
+public sealed record MissionPlayView(AgentPlayStatus Play, string Script, string Start, StartKind Kind,
+    string StartName)
 {
     /// <summary>The warnings of the plan of the play.</summary>
     public IReadOnlyList<string> Warnings { get; init; } = [];
@@ -86,7 +87,8 @@ public sealed record MissionTraceChange(long Sequence, double Time, string Trigg
 /// <param name="Changes">The changes of the play after the sequence number of the request, oldest first.</param>
 /// <param name="More">True when the play has more changes than the page gives.</param>
 /// <param name="Status">The state of Play in OpenLancer.</param>
-public sealed record MissionTraceView(int Play, IReadOnlyList<MissionTraceChange> Changes, bool More, AgentPlayStatus Status)
+public sealed record MissionTraceView(int Play, IReadOnlyList<MissionTraceChange> Changes, bool More,
+    AgentPlayStatus Status)
 {
     /// <summary>The name of the mission of the game, for example <c>Mission_02</c>, or null.</summary>
     public string? Mission { get; init; }
