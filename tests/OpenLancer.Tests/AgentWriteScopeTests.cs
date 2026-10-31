@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using OpenLancer.Data.Editing.Assets;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Studio.Agent;
 using OpenLancer.Studio.Commands;
 using Xunit;
@@ -83,6 +84,9 @@ public sealed class AgentWriteScopeTests
         ("mission_insert_trigger", """{ "line": "line:PATH#Trigger/ol_start/3", "condition": { "key": "Cnd_True" } }"""),
     ];
 
+    /// <summary>The details of a refused path: the install path check, and the read of a reference.</summary>
+    private static readonly string?[] PathDetails = [InstallPaths.NotInstallPath, ItemRefs.BadReference];
+
     /// <summary>The bad paths for <see cref="MissionCalls"/>: a drive, a stream name, a <c>..</c> above the root and a
     /// rooted path.</summary>
     private static readonly string[] BadMissionPaths =
@@ -92,8 +96,10 @@ public sealed class AgentWriteScopeTests
     ];
 
     /// <summary>Each path of a mission tool that is not an install path gives <c>invalid_argument</c>: a path of a
-    /// reference, the path of a new script and a key of <c>expect_versions</c>. A new script outside
-    /// <c>DATA\MISSIONS</c> gives <c>invalid_argument</c> with the detail <c>BadPath</c>. Nothing changes.</summary>
+    /// reference, the path of a new script and a key of <c>expect_versions</c>. The detail is the detail of the path
+    /// check, so the path went through the check. Another refusal of the same code, for example a trigger of another
+    /// script, does not count. A new script outside <c>DATA\MISSIONS</c> gives <c>invalid_argument</c> with the detail
+    /// <c>BadPath</c>. Nothing changes.</summary>
     [Fact]
     public void TheMissionToolsRefuseEachPathThatIsNotAnInstallPath()
     {
@@ -105,7 +111,7 @@ public sealed class AgentWriteScopeTests
             from path in BadMissionPaths
             let arguments = call.Arguments.Replace("PATH", Json(path)[1..^1])
             let error = Error(host, call.Tool, arguments)
-            where error.Code != "invalid_argument"
+            where error.Code != "invalid_argument" || !PathDetails.Contains(error.Detail)
             select $"{call.Tool} {arguments}: {error.Code} {error.Detail} {error.Message}").ToList();
         var tools = MissionCalls.Select(c => c.Tool).Distinct().Order();
         var outside = Error(host, "mission_edit", """{ "commands": [ { "kind": "create_script", "path": "DATA\\SHIPS\\ol_new.ini" } ] }""");

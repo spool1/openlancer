@@ -318,7 +318,7 @@ A line is `{key, values}` with the value names of `describe_mission_name`, as in
 
 A line can also give its value texts by position in `texts`, in place of `values`. A line with both gives `invalid_argument`. The editor checks only the form of a line with texts. A key without values, for example `Cnd_True`, needs no values. The editor then writes `Cnd_True = no_params`, as the game data and the mission studio do.
 
-`trigger` and `from` take a `trg:` reference, or the `sec:` reference of a trigger section. `line` and `before` take a `line:` reference, for example `line:DATA\MISSIONS\M01A\m01a.ini#Trigger/my_trigger/3`. `get_trigger` with `include_lines` gives the reference of each line. `before` must name a line of the same trigger. `to` and each trigger of `started_by` take a nickname or a `trg:` reference of the same script. A trigger of another script gives `invalid_argument`.
+`trigger` and `from` take a `trg:` reference, or the `sec:` reference of a trigger section. `line` and `before` take a `line:` reference, for example `line:DATA\MISSIONS\M01A\m01a.ini#Trigger/my_trigger/3`. `get_trigger` gives the reference of each line. `before` must name a line of the same trigger. `to` and each trigger of `started_by` take a nickname or a `trg:` reference of the same script. A trigger of another script gives `invalid_argument`.
 
 A new nickname has letters, digits, `_` and `-`, with at most 47 characters, and it cannot be a number. Without a nickname, the editor makes a free name, for example `m01a_trigger_3`.
 
