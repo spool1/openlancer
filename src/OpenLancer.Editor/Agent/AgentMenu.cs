@@ -92,7 +92,7 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
     /// <summary>The tooltip of the menu item of Pause.</summary>
     internal static string PauseTip(bool paused) => paused
         ? "Lets the agent edit the data again."
-        : "Stops all agent edits until you resume them. The agent can still read the data.";
+        : "Stops all agent edits until you resume them. The agent can still read the data and stop each game of Play.";
 
     /// <summary>The segment text of the status bar.</summary>
     public string StatusText => controller.StatusText;

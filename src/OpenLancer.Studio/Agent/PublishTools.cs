@@ -59,8 +59,13 @@ internal sealed record ExportView(string Version, string Folder, bool Succeeded,
     IReadOnlyList<PackageRow> Packages, IReadOnlyList<TargetCheckRow> Checks, IReadOnlyList<Problem> Problems,
     int ProblemCount)
 {
-    /// <summary>What the publish history recorded.</summary>
+    /// <summary>The messages of the record in the publish history, for example about an earlier export with the same
+    /// packages. A new record has no message.</summary>
     public IReadOnlyList<string> History { get; init; } = [];
+
+    /// <summary>True when the publish history recorded the export. An export with a failed package records the
+    /// packages that it wrote too.</summary>
+    public bool Recorded { get; init; }
 
     /// <summary>The problems of the reads and writes of <c>publish.json</c> and of the publish history.</summary>
     public IReadOnlyList<string> Warnings { get; init; } = [];
@@ -211,7 +216,10 @@ internal static class PublishTools
         var replaced = guard.Kind == GuardKind.Exported;
         var (record, recordWarnings) = export.RecordExport(result, replaced);
         progress.Report(new ToolProgress(ExportSteps, ExportSteps, null));
-        return new ExportOutcome(null, result, replaced, record?.Messages(result.Version).ToList() ?? [], recordWarnings);
+        return new ExportOutcome(null, result, replaced, record?.Messages(result.Version).ToList() ?? [], recordWarnings)
+        {
+            Recorded = record != null,
+        };
     }
 
     /// <summary>The targets of an export: the argument, or each target of <c>mod.json</c> that has a base. The Export
@@ -265,6 +273,9 @@ internal static class PublishTools
     private sealed record ExportOutcome(EditError? Failure, ExportResult? Written, bool Replaced,
         IReadOnlyList<string> History, IReadOnlyList<string> Warnings)
     {
+        /// <summary>True when the publish history recorded the export.</summary>
+        public bool Recorded { get; init; }
+
         public static ExportOutcome Error(EditErrorKind kind, string detail, string message,
             IReadOnlyList<string>? warnings = null) =>
             new(new EditError(kind, detail, message), null, false, [], warnings ?? []);
@@ -287,6 +298,7 @@ internal static class PublishTools
                 problems.Count)
             {
                 History = History,
+                Recorded = Recorded,
                 Warnings = [.. publishProblems, .. Warnings],
             });
         }

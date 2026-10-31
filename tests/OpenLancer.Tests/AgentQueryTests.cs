@@ -211,6 +211,38 @@ public sealed class AgentQueryTests
         Assert.Equal(("invalid_argument", ItemRefs.BadReference), Code(Error(host, "find_references")));
     }
 
+    /// <summary>A base has its name in strid_name, as a system has. So list_values and get_item give the name of a base,
+    /// and the text of list_values finds a base by its name (final finding of MCP1-2).</summary>
+    [Fact]
+    public void ABaseGivesTheNameOfItsStridName()
+    {
+        using var ws = SceneWorkspace.Create();
+        ws.WriteBase(ListWorkspace.UniversePath, """
+            [system]
+            nickname = Li01
+            file = systems\Li01\li01.ini
+            [system]
+            nickname = Li02
+            file = systems\Li02\li02.ini
+            [Base]
+            nickname = Li01_01_Base
+            system = Li01
+            strid_name = 1234
+            [Base]
+            nickname = Li02_01_Base
+            system = Li02
+            """);
+        var host = new TestAgentHost(ws.Session("act"));
+        host.Names[1234] = "Ol Harbor";
+
+        var rows = Ok(host, "list_values", """{ "list": "base", "text": "harbor" }""");
+        var item = Ok(host, "get_item", """{ "ref": "base:Li01_01_Base" }""")["section"]!;
+
+        Assert.Equal([("Li01_01_Base", "Ol Harbor")],
+            rows["rows"]!.AsArray().Select(r => ((string?)r!["value"], (string?)r["label"])));
+        Assert.Equal("Ol Harbor", (string?)item["name"]);
+    }
+
     [Fact]
     public void ListValuesFindsTheDetailAndNeedsTheSystemOfAListOfOneSystem()
     {

@@ -152,7 +152,7 @@ public sealed class AgentConsoleTests
     public void TheMenuTextsOfPauseAndTheStart()
     {
         Assert.Equal(("Pause agent edits", "Resume agent edits"), (AgentMenu.PauseLabel(false), AgentMenu.PauseLabel(true)));
-        Assert.Equal("Stops all agent edits until you resume them. The agent can still read the data.",
+        Assert.Equal("Stops all agent edits until you resume them. The agent can still read the data and stop each game of Play.",
             AgentMenu.PauseTip(false));
         Assert.Equal("Lets an agent program on this computer read and edit the active mod. Each agent edit is one Undo step.",
             AgentMenu.StartTip);

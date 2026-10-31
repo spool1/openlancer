@@ -13,7 +13,7 @@ Two programs can host the server. They give the same tools, with the same names 
 | Host | How it starts | Transport | Tools |
 |---|---|---|---|
 | The editor | **Agent > Start agent server** in the editor | HTTP on `http://127.0.0.1:<port>/mcp` | All tools |
-| oltool | The agent program starts `oltool mcp serve` | Standard input and output (stdio). It opens no port. | All tools. The tools of the editor give `not_available`. |
+| oltool | The agent program starts `oltool mcp serve` | Standard input and output (stdio). It opens no port. | All tools. The tools of the editor give `not_available`. `--read-only` and `--no-save` leave out tools. See "The oltool host". |
 
 Use the editor host when you work in the editor. The agent then sees your unsaved edits, and the view tools show its work to you. Use the oltool host for a script or for an agent that works without the editor. An editor-only tool gives the error `not_available` in the oltool host.
 
@@ -67,8 +67,8 @@ Else the helper prints no token and exits with the code 2. It writes the reason 
 |---|---|
 | Start agent server | Starts the server on the port of the settings. At the first start, a notice tells what the agent reads. |
 | Stop agent server | Stops the server at once. |
-| Pause agent edits | Stops all agent edits until you pick **Resume agent edits**. The agent can still read the data. |
-| Follow agent | Opens and frames the item of each agent edit. It is on by default. It stops when you move the camera or select an item. |
+| Pause agent edits | Stops all agent edits until you pick **Resume agent edits**. The agent can still read the data and stop each game of Play. |
+| Follow agent | Opens and frames the item of each agent edit. It is on by default. It stops when you move the camera of the Scene or select an item. |
 | Connect an agent... | Shows the text for `.mcp.json` and a Copy button. |
 | Show agent messages | Shows the messages of the server in the Console. |
 | Start the agent server with the editor | Starts the server when the editor starts. The server is off by default. |
@@ -89,7 +89,7 @@ When another program uses the port, the server does not start. The status bar th
 | Largest page limit | 200 | The largest limit that the agent can ask for in one list result. |
 | Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
 | Calls each second | 10 | The most calls that the server takes in one second. |
-| Wait for the editor (s) | 30 | How long a call waits while you edit a field or a dialog is open. |
+| Wait for the editor (s) | 30 | How long a call waits while you edit a field, rename an item in the Hierarchy, or a dialog is open. A longer wait gives the error `busy`. |
 | Time of a check or an image (s) | 60 | How long a check of a retail target or an image can take. |
 | Size of a request (MB) | 4 | The largest request. The change applies at the next start of the server. |
 | Largest side of an image (pixels) | 2048 | The most pixels on each side of an image. A larger panel capture becomes smaller. A `render_scene` or `render_cutscene` call with a larger `width` or `height` gives the error `limit`. |
@@ -160,9 +160,9 @@ These tools change the data of the active mod. They work in both hosts. The olto
 | `redo` | Redoes the last edit that the agent undid. |
 | `edit_batch` | Runs edit steps as one Undo step, all or nothing. |
 
-Each edit is one Undo step. The Edit menu shows its label with "Agent: " before it, for example "Undo Agent: Delete my_station_1". You can undo and redo each agent edit, as each of your own edits. `undo` undoes only an agent edit at the top of the history. `redo` redoes only an agent edit that the agent undid. So the agent never undoes your edit, and never redoes an edit that you undid with Ctrl+Z.
+Each edit is one Undo step. The Edit menu shows its label with "Agent: " before it, for example "Undo Agent: Delete my_station_1". You can undo and redo each agent edit, as each of your own edits. `undo` undoes only an agent edit at the top of the history. `redo` redoes only an agent edit that the agent undid. So the agent never undoes your edit, and never redoes an edit that you undid with Ctrl+Z. All agent programs of one editor have the same edit origin. So `undo` of one agent program can undo the last edit of another agent program.
 
-The edit tools change only items of INI files. A mission script and a cutscene give the error `not_available`. The mission tools and the cutscene tools come with a later version. `delete_items` takes items of a system only: objects, zones, lights, nebulae and asteroid fields. `duplicate_items` takes objects, zones and lights of a system.
+The edit tools change only items of INI files. A reference of a mission item or of a cutscene gives the error `not_available`. The mission tools and the cutscene tools come with a later version. A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. `delete_items` takes items of a system only: objects, zones, lights, nebulae and asteroid fields. `duplicate_items` takes objects, zones and lights of a system. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. Another section, for example a loadout, gives `refused`.
 
 #### Values of set_fields
 
@@ -186,13 +186,15 @@ Each edit tool takes these arguments:
 | `if_revision` | Refuses the edit with `stale_revision` when the edit view changed after this revision. Each result gives the revision as `rev`. A save does not change it. |
 | `confirm` | `rename_item` and `delete_items`: applies an edit that changes more than its targets. The prop group writes: writes the files. |
 
-When you would see a dialog for a delete or a rename, the tool gives `needs_confirmation`, and nothing changes. A delete or a rename that leaves "Missing" lines also needs it. The agent then calls the tool again with `confirm: true`. A preview tells it in `needs_confirmation`.
+When you would see a dialog for a delete or a rename, the tool gives `needs_confirmation`, and nothing changes. A delete or a rename that leaves "Missing" lines also needs it. The server tells the agent to show the changes to you and to ask you first. When you agree, the agent calls the tool again with `confirm: true`. A preview tells it in `needs_confirmation`.
 
-The result of an edit gives the new items (`adds`), the changed items (`changes`), the removed items (`deletes`) and the renamed items (`renames`). It also gives the "Missing" lines, the warnings, the text mentions, and the problems that the edit adds and removes. A call that changes nothing gives the status `no_change` and no Undo step.
+The result of an edit gives the new items (`adds`), the changed items (`changes`), the removed items (`deletes`) and the renamed items (`renames`). It also gives the "Missing" lines, the warnings, the text mentions, and the problems that the edit adds and removes. Each reference names the item as it is after the call. So an item that a call adds and then deletes is not in the result, and two renames of one item are one rename. A call that changes nothing gives the status `no_change`, an empty `changes` list and no Undo step.
 
 #### Batches
 
 `edit_batch` takes a list of steps. Each step names an edit tool and its arguments. All steps are one Undo step with the label of the batch. Each step sees the result of the steps before it, so a later step can name an item that an earlier step made or renamed.
+
+The result also gives the result of each step, with the revision and the files of the batch. A step can delete items, so `edit_batch` has the destructive hint of the protocol, as `delete_items` has.
 
 When one step fails, the error `step_failed` gives its index and its error, and the batch changes nothing. A step that needs a confirmation fails unless its arguments have `confirm: true`. `undo`, `redo`, `edit_batch`, the read tools and the tools of the editor cannot be steps. `prop_group_save`, `prop_group_rename` and `prop_group_delete` cannot be steps either, because they write files at once.
 
@@ -200,7 +202,7 @@ When one step fails, the error `step_failed` gives its index and its error, and 
 
 One call names at most 200 items and changes at most 2000 sections. One batch has at most 100 steps, and one route has at most 50 legs. **Agent > Agent settings > Advanced** changes these limits. A call above a limit gives the error `limit` and changes nothing. The size limit of a result applies to an edit too. The edit checks the size of its result before it applies, so a larger edit also changes nothing.
 
-While you pause the agent edits, each tool that changes data, writes files or starts a play gives the error `paused`. Examples are the edit tools, `undo`, `redo`, `save`, `export_mod` and `play`. The read tools still work, also `publish_checklist`. `play_stop` also works, so the agent can stop its game. Pick **Agent > Pause agent edits** to pause the agent edits, and **Resume agent edits** to let the agent edit again.
+While you pause the agent edits, each tool that changes data, writes files or starts a play gives the error `paused`. Examples are the edit tools, `undo`, `redo`, `save`, `export_mod` and `play`. The read tools still work, also `publish_checklist`. `play_stop` also works. It stops each game of Play, also a game that you started. Pick **Agent > Pause agent edits** to pause the agent edits, and **Resume agent edits** to let the agent edit again.
 
 The edit tools refuse with `read_only` when the editor takes no edits, and the message tells the reason. For example, another editor has the mod open, or the profile or the active mod is in the game folder. A mod in the OpenLancer repo also refuses until you allow its edits.
 
@@ -246,8 +248,8 @@ A station archetype with a docking sphere needs a base, because the Create menu 
 
 A value of a row that names other data must be an entry of its list, as a picker of the Inspector gives it. Examples are an equipment, a cargo good, a faction and an encounter. The tool writes each value as the list spells it. A value that its list does not have gives `invalid_value`. The error names each such row, for example `encounters[1].factions[0].faction`, and gives the closest names.
 
-- `create_loadout` adds the loadout to the first loadout file of `freelancer.ini`, the ship loadout file in retail. Its archetype is a ship or a solar archetype. A hardpoint has no list in the rule data. So a hardpoint that the `hp_type` lines of the ship do not name gives a warning, not an error.
-- `scene_place_wreck` takes a solar archetype of the type `MISSION_SATELLITE` and the ship that the wreck was. It adds a loadout with that ship, the `equip` rows and the `cargo` rows. It also adds the object with the `loadout` line and `visit = 16`, as most retail wrecks have. The loadout gets the nickname of the wreck with `_loadout`. Without `name`, the wreck gets the name "Wreck". It always gets a short infocard.
+- `create_loadout` adds the loadout to the first loadout file of `freelancer.ini`, the ship loadout file in retail. Its archetype is a ship or a solar archetype. A hardpoint has no list in the rule data. So a hardpoint that the `hp_type` lines of the ship do not name gives a warning, not an error. The editor does not edit the loadout file, so only undo can change or remove the new loadout. To correct a warning, undo the call and call the tool again.
+- `scene_place_wreck` takes a solar archetype of the type `MISSION_SATELLITE` and the ship that the wreck was. It adds a loadout with that ship, the `equip` rows and the `cargo` rows. It also adds the object with the `loadout` line and `visit = 16`, as most retail wrecks have. The loadout gets the nickname of the wreck with `_loadout`. Only undo can change the new loadout. Without `name`, the wreck gets the name "Wreck". It always gets a short infocard.
 - `scene_place_patrol_route` adds one cylinder zone for each leg between two next points. The zone has its center at the middle of the leg, and its local Y axis goes along the leg. Its `size` is the radius and the length of the leg. Its `path_label` is the name of the route and the number of the leg, from 1. The other keys come from the route template of the usage, `patrol` or `trade`. `fields` changes these keys on each zone. It cannot give a key that the tool writes itself, for example `pos`, `size`, `usage` or `encounter`. Such a key gives `invalid_argument`, and the error names the argument to use. Each coordinate of a point is from -10000000 to 10000000 meters, as the position of a wreck. A path label that the system has gives `name_taken`.
 - `scene_set_encounters` writes the `faction_weight` and the `density_restriction` lines before the first `encounter` line. Then each `encounter` line comes with its `faction` lines, because the game gives a faction line to the encounter line before it. Without `faction_weights` or `density_restrictions`, the zone keeps these lines. A kept `density_restriction` line after an `encounter` line moves before the first `encounter` line, because the game reads it at each place in the zone. A `faction_weight` line after an `encounter` line belongs to that encounter, so the new groups replace it. An empty `encounters` list removes the encounter groups.
 
@@ -258,7 +260,7 @@ An encounter must have an `[EncounterParameters]` section in the system file. Wh
 These steps build an NPC patrol and a wreck with cargo in a system.
 
 1. Find a free area with `list_items`, the system and the kind `zone`.
-2. Find a faction with `list_values`, the list `faction` and a text, for example "pirate".
+2. Find a faction with `list_values` and the list `faction`. Read the label of each row.
 3. Find a patrol encounter with `list_values`, the list `encounter_of_system` and the system.
 4. Call `scene_place_patrol_route` with a name, three points, a radius of 750 and one encounter group with the faction.
 5. Find a wreck archetype with `list_values`, the list `solar_archetype` and the text "MISSION_SATELLITE".
@@ -287,6 +289,10 @@ The result gives the written and the deleted files, relative to the folder of th
 | `formats` | The package forms of a retail target: `drop_in`, `flmm` or both. Without it, the export makes both. |
 | `replace_version` | Replaces an earlier export of the same version with other game files, as **Replace version** of the Export dialog does. |
 
+The result tells each package and if the export wrote it. `recorded` tells if the publish history recorded the export. An export with a failed package also records the packages that it wrote.
+
+A mod with an infocard needs the drop-in form now. An infocard of the editor starts with an XML header with quotes, and the FLMM form has no known escape for a quote. So an FLMM package of such a mod fails, and the export tells it. `scene_place_wreck` always writes an infocard. Give `"formats": ["drop_in"]` for such a mod.
+
 The export refuses unsaved edits, because it uses the saved files. Save first. It also refuses while another export runs, a version that is not safe in a path and a publish history that does not load. A version with the mark "published" always gives the error `guard_conflict`. An earlier export of the version with other game files gives `guard_conflict` without `replace_version`.
 
 An export can take minutes. A client that asks for progress gets a progress notification at each step, before the result of the call. The time limit of an export is 10 minutes. When the call stops before the write, for example at a cancel of the client, the export writes nothing. A write that started always goes on to its end, and the publish history records it. While an export of the agent runs, the Export dialog and the Mods window wait for it. **File > Save** also writes nothing while an export of the agent runs, and the Console tells why.
@@ -307,7 +313,7 @@ An export can take minutes. A client that asks for progress gets a progress noti
 
 A play of an agent never saves on its own. When the active mod has unsaved edits, the editor asks you to save them, with the buttons "Save and continue" and "Cancel". Cancel gives the agent the error `refused`, and Play does not start. The setting "Auto-save and continue when an MCP agent starts Play" skips the question. When the call ends before you answer, for example at its time limit, the question closes as Cancel does. "Agent Play" in [PLAY.md](PLAY.md) gives each case.
 
-While a game runs, `play` gives `refused`, and the agent calls `play_stop` first. The Play menu closes the running game instead. `play` also gives `refused` when the checks of the Play menu refuse the start, for example for a system that the game data does not have. These checks are the same for the menu and the agent.
+While a game runs, `play` gives `refused`, and the agent calls `play_stop` first. The Play menu closes the running game instead. `play` also gives `refused` when the checks of the Play menu refuse the start. An example is a system that the game data does not have. These checks are the same for the menu and the agent.
 
 When Play saves the active mod, the save gate runs first, as for `save`. When the save stops, `play` gives `save_blocked` or `changed_on_disk`, and the game does not start. A second play request of an agent gives `busy` until the earlier request ends, because one dialog shows the question. Without an open profile, `play` gives `not_available`, as the tools that read the profile do. `play_stop` also works without a profile.
 
@@ -319,7 +325,7 @@ The editor shows each agent edit in the Console, in the Scene, in the Hierarchy 
 
 | Place | What it shows |
 |---|---|
-| Console | Each agent edit adds an Info entry with the source "Agent" and the label of the edit, for example "Create Zone_test_01.". Click the entry to select its item. A refused call of a tool that changes data adds a warning with the tool and the reason. An undo and a redo of the agent add an entry too. A preview, a read tool and the question `needs_confirmation` add no entry. When the editor cannot show an agent edit, it adds an Error entry with the reason. The edit stays in the Undo history. **Agent > Show agent messages** shows only the entries of the agent. |
+| Console | Each agent edit adds an Info entry with the source "Agent" and the label of the edit, for example "Create Zone_test_01.". Click the entry to select its item. A refused call of a tool that changes data adds a warning with the tool and the reason, also a call that waited too long. An error in the second part of a call adds no entry yet. Examples are a Play that you cancel, an export with `guard_conflict` and a save that the save gate of Play stops. An undo and a redo of the agent add an entry too. A preview, a read tool and the question `needs_confirmation` add no entry. When the editor cannot show an agent edit, it adds an Error entry with the reason. The edit stays in the Undo history. **Agent > Show agent messages** shows only the entries of the agent. |
 | Scene | A pulse ring in the agent color goes around each item of an agent edit for 4 seconds. |
 | Hierarchy | A robot glyph at the right end of a row shows an item that an agent edit changed after the last save. The blue mark of the unsaved edit stays, so the row shows both marks. `list_items` gives the same mark as `agent_changed`. |
 | Status bar | The agent program and the number of its edits since the last save, or "Agent paused". |
@@ -335,6 +341,18 @@ When you move the camera of the Scene or select an item, follow mode stops. Clic
 #### Pause
 
 **Agent > Pause agent edits** stops each agent edit until you pick **Resume agent edits**. A click on the agent segment of the status bar opens the same menu. While you pause, each tool that changes data, writes files or starts a play gives the error `paused`. The read tools, the view tools, `publish_checklist` and `play_stop` still work. The pause stays when you stop and start the server again.
+
+## Resources and prompts
+
+The server gives these resources. An agent program can read them before its first call.
+
+| Resource | What it gives |
+|---|---|
+| `openlancer://catalog/lists` | The data lists with their ids and labels. `list_values` takes the ids. |
+| `openlancer://guide/rules` | The rules of the editor and what they mean for an agent. |
+| `openlancer://guide/refs` | The forms of the item references. |
+
+The server has no prompts yet. The prompts of the workflows and the catalog of the prefabs come with a later version.
 
 ## Permission rules for the agent program
 
@@ -390,7 +408,7 @@ The oltool host writes the unsaved edits to the recovery file of the mod 2 secon
 | Option | What it does |
 |---|---|
 | `--read-only` | Opens the profile only to read. The server takes no lock, writes no file and lists only the read tools. |
-| `--no-save` | Leaves out `save` and `export_mod`. The edits stay unsaved. The recovery file still keeps them. |
+| `--no-save` | Leaves out `save` and `export_mod`. The edits stay unsaved. The recovery file still keeps them. The prop group tools stay, so `prop_group_save`, `prop_group_rename` and `prop_group_delete` still write and delete the files of a group at once. |
 | `--restore-recovery` | Restores the unsaved edits of an earlier session from the recovery file at the start. |
 | `--discard-recovery` | Deletes the unsaved edits of an earlier session at the start. |
 

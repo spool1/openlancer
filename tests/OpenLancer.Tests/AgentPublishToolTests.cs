@@ -117,6 +117,9 @@ public sealed class AgentPublishToolTests
             ((string?)package["target"], (string?)package["form"], (bool)package["written"]!));
         Assert.True(File.Exists(Path.Combine(ExportRoot(game), "1.2.0", (string)package["file"]!)));
         Assert.Single(PublishHistory.Load(ExportRoot(game), "ol-test").History.Exports);
+        // The result tells the record. A new record has no message.
+        Assert.True((bool)result["recorded"]!);
+        Assert.Empty(result["history"]!.AsArray());
         Assert.False(host.Exports.Running);
         Assert.Equal("0", (string?)result["rev"]);
         Assert.Empty(host.Edits);

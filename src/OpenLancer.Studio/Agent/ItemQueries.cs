@@ -388,7 +388,7 @@ internal static class ItemQueries
         var isObject = SceneSections.KindOf(session, section) == SceneKind.Object;
         var nickname = section.Id.Key;
         var item = new SectionItemView(ItemRefs.Canonical(session, section), view.Type, section.Path,
-            call.Texts.TextOf(section, view.Type.Equals("system", StringComparison.OrdinalIgnoreCase) ? "strid_name" : "ids_name"),
+            call.Texts.TextOf(section, ItemTexts.NameKey(section)),
             AgentRows.OriginOf(session, section, view, FieldCommands.KeyLine(session, section, view)))
         {
             ReadOnlyReason = view.ReadOnlyReason,

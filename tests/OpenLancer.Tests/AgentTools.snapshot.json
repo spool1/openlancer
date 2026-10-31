@@ -19836,7 +19836,11 @@
             "items": {
               "type": "string"
             },
-            "description": "What the publish history recorded."
+            "description": "The messages of the record in the publish history, for example about an earlier export with the same packages. A new record has no message."
+          },
+          "recorded": {
+            "type": "boolean",
+            "description": "True when the publish history recorded the export. An export with a failed package also records the packages that it wrote."
           },
           "warnings": {
             "type": "array",

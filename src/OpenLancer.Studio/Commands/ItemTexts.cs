@@ -25,9 +25,19 @@ internal sealed class ItemTexts(EditSession edits, Func<int, string> name, Func<
     /// <summary>Gives the section of a scene item in W, or null. The scene sets it while a system is open.</summary>
     public Func<object, SectionRef?>? SceneSections { get; set; }
 
-    /// <summary>The name of an item: its <c>ids_name</c>, or the <c>strid_name</c> of a system. An empty string when
-    /// it has no name.</summary>
-    public string NameOf(object? item) => TextOf(item, item is StarSystem ? "strid_name" : "ids_name");
+    /// <summary>The name of an item: its <c>ids_name</c>, or the <c>strid_name</c> of a system or a base. An empty
+    /// string when it has no name.</summary>
+    public string NameOf(object? item) => TextOf(item, NameKey(item));
+
+    /// <summary>The key of the name of an item: <c>strid_name</c> for a system and for the <c>[system]</c> and
+    /// <c>[Base]</c> sections of <c>universe.ini</c>, else <c>ids_name</c>.</summary>
+    public static string NameKey(object? item) => item switch
+    {
+        StarSystem => "strid_name",
+        SectionRef section when section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase) ||
+                                section.Id.Type.Equals("Base", StringComparison.OrdinalIgnoreCase) => "strid_name",
+        _ => "ids_name",
+    };
 
     /// <summary>The name of a section: the text of its <c>ids_name</c>, or an empty string.</summary>
     public string NameOf(SectionView view) => TextOf(view, "ids_name", StringKind.String);
