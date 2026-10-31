@@ -115,6 +115,35 @@ public sealed class MissionGuardTests
                      "Change the file in the Inspector.", error.Message);
     }
 
+    /// <summary>A batch that points the script at a file directly in DATA\MISSIONS, changes that file and points the
+    /// script back gets the same refusals as a direct change (final finding 5 of MCP1-3).</summary>
+    [Fact]
+    public void AScriptThatNamesAWorldFileDoesNotMakeItAMissionFile()
+    {
+        const string pilots = @"DATA\MISSIONS\pilots_population.ini";
+        using var m = Create(setup: ws => ws.WriteBase(pilots, "[Pilot]\nnickname = ol_pilot\ngun_id = ol_gun\n"));
+        var mission = ItemRef.Of(Script, "Mission", null);
+        SetItemKey ShipFile(string file) => new(mission, "npc_ship_file", [LineSpec.Raw("npc_ship_file", file)]);
+        var shared = ItemRef.Of(SharedShips, "NPCShipArch", "ol_shared_build");
+        var pilot = ItemRef.Of(pilots, "Pilot", "ol_pilot");
+        var before = m.State();
+        MissionEditResult Trick(string file, MissionCommand change) =>
+            m.Missions.Apply(new MissionBatch("Trick", [ShipFile(file), change, ShipFile(@"missions\ol_test\npcships.ini")]));
+
+        var changed = Trick(@"missions\npcships.ini", new SetItemKey(shared, "loadout", [LineSpec.Raw("loadout", "ol_loadout_2")]));
+        Assert.Equal((EditStatus.Refused, MissionErrors.SharedBuildChange), (changed.Status, changed.Errors[0].Detail));
+        var removed = Trick(@"missions\npcships.ini", new RemoveSection(shared));
+        Assert.Equal((EditStatus.Refused, MissionErrors.WorldFile), (removed.Status, removed.Errors[0].Detail));
+        var renamed = Trick(@"missions\npcships.ini", new RenameItem(shared, "ol_other_build"));
+        Assert.Equal((EditStatus.Refused, MissionErrors.SharedBuildRename), (renamed.Status, renamed.Errors[0].Detail));
+        var pilotKey = Trick(@"missions\pilots_population.ini", new SetItemKey(pilot, "gun_id", [LineSpec.Raw("gun_id", "ol_gun_2")]));
+        Assert.Equal((EditStatus.Refused, MissionErrors.WorldFile), (pilotKey.Status, pilotKey.Errors[0].Detail));
+        var pilotGone = Trick(@"missions\pilots_population.ini", new RemoveSection(pilot));
+        Assert.Equal((EditStatus.Refused, MissionErrors.WorldFile), (pilotGone.Status, pilotGone.Errors[0].Detail));
+        Assert.Equal(before, m.State());
+        Assert.False(m.Session.CanUndo);
+    }
+
     [Fact]
     public void ALineOfABuildOfTheSharedShipBuildFileNeedsAConfirmation()
     {
