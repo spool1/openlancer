@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data;
+using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions;
+using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Data.Missions.Run;
 using OpenLancer.Editor.Play;
 using OpenLancer.Runtime.Play;
@@ -16,7 +18,8 @@ internal sealed record LiveChange(long Sequence, double Time, string Trigger, Mi
 
 /// <summary>The result of the live trace query of the shared command layer (section 7.2 of the M6c design).</summary>
 /// <param name="Play">The number of the play of the changes, or 0 before the first mission event.</param>
-/// <param name="Changes">The changes of the play after the sequence number of the request.</param>
+/// <param name="Changes">The changes of the play after the sequence number of the request. With a script, each change
+/// names its trigger as the session names it now (RF19 of the MCP1 design).</param>
 /// <param name="Status">The Play status of OpenLancer.</param>
 internal sealed record LiveTraceResult(int Play, IReadOnlyList<LiveChange> Changes, PlayStatus Status)
 {
@@ -45,6 +48,11 @@ internal sealed class MissionLive(Func<double> clock)
 {
     private readonly List<LiveChange> changes = [];
     private readonly HashSet<string> stalled = new(StringComparer.OrdinalIgnoreCase);
+
+    // The trigger renames of the session since the game loaded the mission of the current play, in order, also by Undo
+    // and Redo.
+    private readonly List<(TriggerRef From, TriggerRef To)> renames = [];
+
     private double loadedAt;
     private long sequence;
 
@@ -94,6 +102,7 @@ internal sealed class MissionLive(Func<double> clock)
     public void Started()
     {
         Play++;
+        renames.Clear();
         Mission = null;
         NewTrace();
         Setup = new HashSet<string>();
@@ -125,8 +134,13 @@ internal sealed class MissionLive(Func<double> clock)
             return;
         if (e.Reset || Play == 0)
         {
+            // Another load of the mission, for example a reload after a save. The game then has the names of the
+            // session.
             if (!waitsForReset)
+            {
                 Play++;
+                renames.Clear();
+            }
             waitsForReset = false;
             NewTrace();
             Setup = setup ?? new HashSet<string>();
@@ -169,7 +183,7 @@ internal sealed class MissionLive(Func<double> clock)
     }
 
     /// <summary>Removes the trace ("Clear"). The play number and the sequence numbers stay, so the live trace query
-    /// does not give a number twice in one play.</summary>
+    /// does not give a number twice in one play. The renames stay, because the game keeps its names.</summary>
     public void Clear()
     {
         Mission = null;
@@ -180,6 +194,14 @@ internal sealed class MissionLive(Func<double> clock)
         Version++;
         ChangedAt = double.NegativeInfinity;
     }
+
+    /// <summary>
+    /// Records the trigger renames of a change of the history, also an Undo or a Redo of a rename (RF19 of the MCP1
+    /// design). The game keeps the names of its load, so the live trace query moves each name of the game through these
+    /// renames. Play saves before it starts the game, so at the load the game has the names of the session.
+    /// </summary>
+    public void Renamed(MissionScriptsChange change) =>
+        renames.AddRange(change.Renames.Where(r => VfsPath.Comparer.Equals(r.From.Script, r.To.Script)));
 
     /// <summary>The triggers that wait for the stall time of <see cref="MissionTrace"/> now and did not stall before in
     /// this play (section 6.3 of the M6c design). Each trigger comes once in a play.</summary>
@@ -205,7 +227,8 @@ internal sealed class MissionLive(Func<double> clock)
     /// <summary>
     /// The result of the live trace query of the shared command layer (section 7.2 of the M6c design): the play number,
     /// the changes of the play after a sequence number, and the Play status. While only the game of a play copy runs,
-    /// the result has no changes, because the real game has no channel to the editor.
+    /// the result has no changes, because the real game has no channel to the editor. With a script, each change names
+    /// its trigger as the session names it now, so a reference of the change finds the trigger after a rename.
     /// </summary>
     /// <param name="play">The play number of the last result of the caller, or 0.</param>
     /// <param name="since">The last sequence number that the caller has, or 0.</param>
@@ -213,13 +236,30 @@ internal sealed class MissionLive(Func<double> clock)
     /// <param name="gameRuns">True while the game of a play copy runs.</param>
     /// <param name="script">The install path of the script of the mission of the trace, or null.</param>
     public LiveTraceResult Result(int play, long since, PlayStatus status, bool gameRuns, string? script) =>
-        new(Play, gameRuns && status == PlayStatus.Idle ? [] : Since(play, since), status)
+        new(Play, gameRuns && status == PlayStatus.Idle ? [] : NamesNow(Since(play, since), script), status)
         {
             Mission = Mission,
             Script = script,
             Dropped = Dropped,
             GameRuns = gameRuns,
         };
+
+    /// <summary>The changes with the names of their triggers now in a script.</summary>
+    private IReadOnlyList<LiveChange> NamesNow(IReadOnlyList<LiveChange> list, string? script) =>
+        script == null || renames.Count == 0
+            ? list
+            : list.Select(c => c with { Trigger = NameNow(script, c.Trigger) }).ToList();
+
+    /// <summary>The name in the session now of a trigger of a script that the game names.</summary>
+    private string NameNow(string script, string trigger)
+    {
+        foreach (var (from, to) in renames)
+        {
+            if (VfsPath.Comparer.Equals(from.Script, script) && MissionIndex.Is(trigger, from.Name))
+                trigger = to.Name;
+        }
+        return trigger;
+    }
 
     /// <summary>Starts an empty trace for a new play: no change, no stall, and the time from now.</summary>
     private void NewTrace()

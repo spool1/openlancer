@@ -302,7 +302,8 @@ public sealed partial class AgentPlayToolTests
             (string?)noTrigger.Content["code"], (string?)noTrigger.Content["detail"],
             (string?)noTrigger.Content["field"]));
         Assert.Equal(("not_found", MissionErrors.ScriptNotFound, "script"), (
-            (string?)noScript.Content["code"], (string?)noScript.Content["detail"], (string?)noScript.Content["field"]));
+            (string?)noScript.Content["code"], (string?)noScript.Content["detail"],
+            (string?)noScript.Content["field"]));
         Assert.Empty(editor.MissionRequests);
     }
 
@@ -507,6 +508,28 @@ public sealed partial class AgentPlayToolTests
                 ((string?)refused.Content["code"], (string?)refused.Content["field"]));
         }
         Assert.Equal(("3 4", true), Page(page));
+    }
+
+    /// <summary>The trace names each trigger as the session names it now (RF19 of the MCP1 design). So after a rename,
+    /// also its Undo, the reference of a change finds the trigger.</summary>
+    [Fact]
+    public void TheTraceGivesTheNameOfEachTriggerNowAfterARenameAndItsUndo()
+    {
+        var (host, editor) = Editor();
+        editor.LiveScript = MissionTestData.Path;
+        editor.Live.Started();
+        editor.Live.Take(new PlayEvent.MissionChanges("Mission_99", true, 0,
+            [new MissionChange(100, "t_start", MissionChangeKind.Ran)]));
+        var from = new TriggerRef(MissionTestData.Path, "t_start");
+        var to = new TriggerRef(MissionTestData.Path, "t_begin");
+
+        editor.Live.Renamed(new MissionScriptsChange(new Dictionary<string, long>(), [(from, to)]));
+        var renamed = Ok(host, "mission_play_trace");
+        editor.Live.Renamed(new MissionScriptsChange(new Dictionary<string, long>(), [(to, from)]));
+        var undone = Ok(host, "mission_play_trace");
+
+        Assert.Equal(Trigger("t_begin"), Changes(renamed).Single().Trigger);
+        Assert.Equal(Trigger("t_start"), Changes(undone).Single().Trigger);
     }
 
     /// <summary>Without a known script of the mission, a change names its trigger by nickname. While only the game of a

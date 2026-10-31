@@ -39119,7 +39119,7 @@
                 },
                 "trigger": {
                   "type": "string",
-                  "description": "The trg: reference of the trigger, or its nickname when the editor does not know the script."
+                  "description": "The trg: reference of the trigger with its name in the editor now, also after a rename. When the editor does not know the script, the nickname in the game."
                 },
                 "change": {
                   "enum": [

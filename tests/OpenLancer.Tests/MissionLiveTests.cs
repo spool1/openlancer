@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Missions;
+using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Data.Missions.Run;
 using OpenLancer.Editor.Missions;
 using OpenLancer.Editor.Play;
@@ -198,6 +199,49 @@ public sealed class MissionLiveTests
         Assert.True(real.GameRuns);
         Assert.Equal(2, live.Result(1, 0, PlayStatus.Idle, gameRuns: false, Path).Changes.Count);
     }
+
+    /// <summary>
+    /// The query result names each trigger as the session names it now (RF19 of the MCP1 design): the names of the game
+    /// move through the renames since the load of the mission, in order, also an Undo. A rename in another script does
+    /// not count. A new load of the mission, by a start or a reload, starts with the names of the session, and Clear
+    /// keeps the renames, because the game still runs.
+    /// </summary>
+    [Fact]
+    public void TheQueryResultFollowsTheRenamesSinceTheLoadOfTheMission()
+    {
+        var live = Live();
+        live.Started();
+        live.Renamed(Renames(("t_start", "t_first")));
+        live.Take(Event(true, (100, "t_start", MissionChangeKind.Ran), (100, "t_wait", MissionChangeKind.Started)));
+        IReadOnlyList<string> Names() => live.Result(0, 0, PlayStatus.Running, gameRuns: false, Path).Changes
+            .Select(c => c.Trigger).ToList();
+
+        Assert.Equal(["t_first", "t_wait"], Names());
+        // The two triggers change names: t_wait takes the old name of t_start.
+        live.Renamed(Renames(("t_first", "t_begin"), ("t_wait", "t_start")));
+        Assert.Equal(["t_begin", "t_start"], Names());
+        live.Renamed(Renames(("t_start", "t_wait"), ("t_begin", "t_first")));
+        live.Renamed(new MissionScriptsChange(new Dictionary<string, long>(),
+            [(new TriggerRef("missions/other.ini", "t_wait"), new TriggerRef("missions/other.ini", "t_other"))]));
+        Assert.Equal(["t_first", "t_wait"], Names());
+        Assert.Equal(["t_start", "t_wait"],
+            live.Result(0, 0, PlayStatus.Running, gameRuns: false, null).Changes.Select(c => c.Trigger));
+
+        live.Clear();
+        live.Take(Event(false, (900, "t_start", MissionChangeKind.Stopped)));
+        Assert.Equal(["t_first"], Names());
+        live.Take(Event(true, (100, "t_start", MissionChangeKind.Ran)));
+        Assert.Equal(["t_start"], Names());
+        live.Renamed(Renames(("t_start", "t_first")));
+        live.Started();
+        live.Take(Event(true, (100, "t_start", MissionChangeKind.Ran)));
+        Assert.Equal(["t_start"], Names());
+    }
+
+    /// <summary>A change of the history with trigger renames in the test script.</summary>
+    private static MissionScriptsChange Renames(params (string From, string To)[] renames) =>
+        new(new Dictionary<string, long>(),
+            renames.Select(r => (new TriggerRef(Path, r.From), new TriggerRef(Path, r.To))).ToList());
 
     /// <summary>A trigger that waits for 10 minutes stalls once in a play.</summary>
     [Fact]

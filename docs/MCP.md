@@ -547,6 +547,8 @@ The result gives the state of Play, the start, the kind and the name of the star
 
 `mission_play_trace` gives the trigger changes of the mission of the OpenLancer game, oldest first: each trigger that starts, runs or stops. It works only in the editor host, and it changes nothing. Each change has a sequence number in its play, its time in seconds and the `trg:` reference of its trigger. The number of the play grows at each start of a game and at each start again of a mission play.
 
+The reference gives the name of the trigger now. When you rename a trigger after the game loaded the mission, the trace gives the new name. This is also true after an undo or a redo of the rename. So `get_trigger` and the mission tools find the trigger of each change. Play saves before it starts the game, so at the load the game has the names of the editor. Play > Restart the mission does not save. After a rename that you did not save, the game then loads the old name again, and the trace gives the old name.
+
 | Argument | What it does |
 |---|---|
 | `play` | The play number of the last result, or 0. Another number than the current play gives all changes of the current play. |

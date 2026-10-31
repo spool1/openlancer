@@ -590,9 +590,11 @@ internal sealed class MissionWorkspace
     private void ScriptsChanged(MissionScriptsChange change)
     {
         // The dry run moves its inputs with the renames at its next fold (section 4.2 of the M6c design). The play start
-        // follows the rename, also its Undo and its Redo (section 5.2).
+        // follows the rename, also its Undo and its Redo (section 5.2). So does the live trace query (RF19 of the MCP1
+        // design).
         DryRuns.ScriptsChanged(change);
         Plays.Renamed(change);
+        Live.Renamed(change);
         changedDuringRun.UnionWith(change.Versions.Keys);
         if (Result is not { } result || followed is not { } edits)
         {
