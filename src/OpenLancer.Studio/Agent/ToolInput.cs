@@ -379,6 +379,28 @@ internal sealed class StepsParam(string name, Func<IEnumerable<string>> tools) :
             step.All(p => p.Key == "tool" || p.Key == "arguments" && p.Value is null or JsonObject));
 }
 
+/// <summary>
+/// An argument with the JSON Schema of another layer, as that layer gives it, for example the commands of
+/// <c>mission_edit</c> with the schema of <c>MissionJson.Schema()</c>. The check reads only the JSON type, because the
+/// reader of that layer checks the value and gives the reason for a value that does not fit.
+/// </summary>
+/// <param name="schema">Gives the schema of the value, without the help text. The tool table reads it at the first use
+/// of the input schema, so a large schema does not load with the table.</param>
+internal sealed class SchemaParam(string name, bool required, JsonValueKind type, Func<JsonObject> schema)
+    : ToolParam(name, required)
+{
+    public override JsonObject Schema(string tool) => (JsonObject)schema().DeepClone();
+
+    public override string Expected => type switch
+    {
+        JsonValueKind.Array => "a list",
+        JsonValueKind.Object => "an object",
+        _ => "a value of the schema",
+    };
+
+    public override bool Fits(JsonNode value) => value.GetValueKind() == type;
+}
+
 /// <summary>An object with arguments of its own.</summary>
 internal sealed class GroupParam(string name, IReadOnlyList<ToolParam> members) : ToolParam(name, false)
 {
@@ -408,8 +430,21 @@ internal sealed class ToolInput(params ToolParam[] parameters)
     /// <summary>The most characters of the name of an unknown argument in an error.</summary>
     private const int MaxShownName = 64;
 
-    /// <summary>The schema of the arguments, with the help of each argument.</summary>
-    public JsonObject Schema(string tool) => ObjectSchema(tool, Parameters);
+    /// <summary>
+    /// The definitions that the schemas of the arguments name with <c>$ref</c>, or null. A <c>$ref</c> of the form
+    /// <c>#/$defs/&lt;name&gt;</c> resolves only at the root of the schema, so the input schema gives them at its root.
+    /// The tool table reads them at the first use of the input schema.
+    /// </summary>
+    public Func<JsonObject>? Definitions { get; init; }
+
+    /// <summary>The schema of the arguments, with the help of each argument, and the definitions at the root.</summary>
+    public JsonObject Schema(string tool)
+    {
+        var schema = ObjectSchema(tool, Parameters);
+        if (Definitions != null)
+            schema["$defs"] = Definitions().DeepClone();
+        return schema;
+    }
 
     /// <param name="list">The name of the list of a row, for the help of its members, or null.</param>
     internal static JsonObject ObjectSchema(string tool, IReadOnlyList<ToolParam> parameters, string? list = null)

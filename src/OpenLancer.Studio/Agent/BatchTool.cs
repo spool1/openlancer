@@ -6,17 +6,18 @@ using OpenLancer.Data.Editing.Commands;
 
 namespace OpenLancer.Studio.Agent;
 
-/// <summary>The result of <c>edit_batch</c>: the result of the batch, and the result of each step.</summary>
+/// <summary>The result of <c>edit_batch</c>: the result of the batch, and the result of each step. The batch gives no
+/// inverse. Each step with mission commands gives its own inverse.</summary>
 internal sealed record BatchResult : EditResult
 {
-    public BatchResult(EditResult result, IReadOnlyList<EditResult> steps) : base(result)
+    public BatchResult(EditResult result, IReadOnlyList<EditToolResult> steps) : base(result)
     {
         Steps = steps;
     }
 
-    /// <summary>The result of each step, in order. A step has the status, the revision and the files of the batch, so
-    /// the revision of a step is a valid <c>if_revision</c> for the next call.</summary>
-    public IReadOnlyList<EditResult> Steps { get; init; }
+    /// <summary>The result of each step, in order. A step has the status, the revision, the files and the script
+    /// versions of the batch, so the revision of a step is a valid <c>if_revision</c> for the next call.</summary>
+    public IReadOnlyList<EditToolResult> Steps { get; init; }
 }
 
 /// <summary>
@@ -76,9 +77,21 @@ internal static class BatchTool
                     throw Failed(i, JsonSerializer.Deserialize<EditError>(error.Content, EditJson.Options)!);
                 results.Add(scope.StepResult());
             }
-        }, result => ToolResult.Of(new BatchResult(result,
-            results.Select(r => r with { Status = result.Status, Revision = result.Revision, Files = result.Files })
-                .ToList())));
+        }, result => ToolResult.Of(new BatchResult(result, results.Select(r => Step(r, result)).ToList())));
+    }
+
+    /// <summary>The result of a step with the status, the revision, the files and the script versions of the batch. A
+    /// step of a batch that changed nothing gives no inverse.</summary>
+    private static EditToolResult Step(EditResult step, EditResult batch)
+    {
+        var result = (step as EditToolResult ?? new EditToolResult(step)) with
+        {
+            Status = batch.Status,
+            Revision = batch.Revision,
+            Files = batch.Files,
+            Versions = batch.Versions,
+        };
+        return batch.Status is EditStatus.Applied or EditStatus.Previewed ? result : result with { Inverse = null, RowMoves = null };
     }
 
     /// <summary>The tool and the arguments of a step, after the checks that need no session.</summary>

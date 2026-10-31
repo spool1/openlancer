@@ -93,6 +93,14 @@ public sealed record MissionEditResult(EditStatus Status) : EditResult(Status)
     /// <summary>The lines whose row index changed, so the studio keeps a selection on the same line.</summary>
     public IReadOnlyList<RowMove> RowMoves { get; init; } = [];
 
+    /// <summary>
+    /// The confirmations of a request with <see cref="MissionBatch.Confirm"/> in the batch of a caller, as data. The
+    /// request does not refuse for them. The caller asks for them as for the confirmations of its other plans, for
+    /// example an agent call (decision D712 of the MCP1 design). Empty for each other request.
+    /// </summary>
+    [JsonIgnore]
+    internal IReadOnlyList<EditError> Asked { get; init; } = [];
+
     /// <summary>The mission result of a shared result.</summary>
     internal static MissionEditResult From(EditResult result) => new(result.Status)
     {

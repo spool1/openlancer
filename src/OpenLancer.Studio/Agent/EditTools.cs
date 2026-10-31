@@ -12,6 +12,25 @@ using OpenLancer.Data.Missions.Editing;
 namespace OpenLancer.Studio.Agent;
 
 /// <summary>
+/// The result of an edit tool that ran mission commands, and of a step of <c>edit_batch</c>: the result of the command
+/// layer with the inverse and the row moves of the mission commands (section 4.4 of the M6b design, section 7.4 of the
+/// MCP1 design). Without mission commands, the inverse and the row moves are null, so the JSON leaves them out.
+/// </summary>
+internal sealed record EditToolResult : EditResult
+{
+    public EditToolResult(EditResult result) : base(result)
+    {
+    }
+
+    /// <summary>The mission command that reverts the mission commands of the call after later edits, or null. The
+    /// agent gives it to <c>mission_edit</c>.</summary>
+    public MissionCommand? Inverse { get; init; }
+
+    /// <summary>The lines whose row index the mission commands changed, or null without mission commands.</summary>
+    public IReadOnlyList<RowMove>? RowMoves { get; init; }
+}
+
+/// <summary>
 /// The batch of one edit call of an agent, or of one <c>edit_batch</c> call with all its steps (section 8.3 of the MCP1
 /// design). Each command of the call runs its plan in the batch. So all commands give one entry of the edit history,
 /// with the edit origin Agent.
@@ -24,6 +43,12 @@ internal sealed class EditScope
     private int stepStart;
 
     private readonly List<string> stepConfirmations = [];
+
+    /// <summary>The inverse and the row moves of each mission request of the call, in order.</summary>
+    private readonly List<(MissionCommand? Inverse, IReadOnlyList<RowMove> RowMoves)> missionRuns = [];
+
+    /// <summary>The index in <see cref="missionRuns"/> of the first mission request of the step.</summary>
+    private int stepMissionStart;
 
     internal EditScope(EditSession session, EditBatch batch, AgentLimits limits)
     {
@@ -46,19 +71,76 @@ internal sealed class EditScope
     internal void StartStep()
     {
         stepStart = Batch.Parts.Count;
+        stepMissionStart = missionRuns.Count;
         stepConfirmations.Clear();
     }
 
-    /// <summary>The result of the commands of the step until now.</summary>
+    /// <summary>The result of the commands of the step until now. A step with mission commands gives their inverse and
+    /// their row moves (decision H of the MCP1-3 plan: each mission step keeps its own inverse).</summary>
     internal EditResult StepResult()
     {
         var step = Batch.Parts.Skip(stepStart).ToList();
-        return EditTools.Shaped(EditResult.Merge(EditStatus.Applied, step), step);
+        return WithMission(EditTools.Shaped(EditResult.Merge(EditStatus.Applied, step), step),
+            missionRuns.Skip(stepMissionStart).ToList());
     }
 
     /// <summary>The net result of all commands of the call. Its adds, renames and changes come from the parts of the
-    /// batch in their order (see <see cref="EditTools.Shaped"/>).</summary>
-    internal EditResult CallResult(EditResult batchResult) => EditTools.Shaped(batchResult, Batch.Parts);
+    /// batch in their order (see <see cref="EditTools.Shaped"/>). A call with mission commands gives their inverse and
+    /// their row moves when the call applied or is a preview.</summary>
+    internal EditResult CallResult(EditResult batchResult) =>
+        WithMission(EditTools.Shaped(batchResult, Batch.Parts),
+            batchResult.Status is EditStatus.Applied or EditStatus.Previewed ? missionRuns : null);
+
+    /// <summary>
+    /// Runs a mission request in the batch of the call, on top of the commands before it (section 7.4 of the MCP1
+    /// design). The request runs in strict mode (decision D681 of M6b), so the commit check of the mission editor
+    /// refuses the batch when it adds an error. The batch gives the edit origin Agent and the label, so this call sets
+    /// neither. The confirmations of the request join the confirmations of the step, as the confirmations of a plan do.
+    /// </summary>
+    /// <param name="field">The argument of the commands, for an error that names a command, for example
+    /// <c>commands</c>. An error of a command names <c>commands[i]</c>.</param>
+    /// <exception cref="EditException">The request refuses. The mission editor cancels the batch, so nothing
+    /// changed.</exception>
+    public MissionEditResult RunMission(MissionBatch batch, string field)
+    {
+        var result = Session.Missions.Apply(batch with
+        {
+            Origin = EditOrigin.Agent,
+            Options = batch.Options with { RejectNewErrors = true },
+            Confirm = true,
+        });
+        if (result.Status == EditStatus.Refused)
+        {
+            var error = result.Errors[0];
+            throw new EditException(error with { Field = error.Field ?? (error.Index is { } i ? $"{field}[{i}]" : field) });
+        }
+        missionRuns.Add((result.Inverse, result.RowMoves));
+        stepConfirmations.AddRange(result.Asked.Select(a => a.Message).Distinct());
+        return result;
+    }
+
+    /// <summary>A result with the inverse and the row moves of mission requests, or the result as it is without
+    /// mission requests.</summary>
+    /// <param name="runs">The mission requests, or null for a result that gives no inverse, for example
+    /// <c>no_change</c>.</param>
+    private static EditResult WithMission(EditResult result,
+        IReadOnlyList<(MissionCommand? Inverse, IReadOnlyList<RowMove> RowMoves)>? runs)
+    {
+        if (runs is not { Count: > 0 })
+            return result;
+        // Later requests revert first. A group of the inverses runs each inverse with its own body guards.
+        var inverses = runs.Select(r => r.Inverse).OfType<MissionCommand>().Reverse().ToList();
+        return new EditToolResult(result)
+        {
+            Inverse = inverses.Count switch
+            {
+                0 => null,
+                1 => inverses[0],
+                _ => new CommandGroup(inverses),
+            },
+            RowMoves = runs.SelectMany(r => r.RowMoves).ToList(),
+        };
+    }
 
     /// <summary>
     /// Runs the session command of a plan in the batch, on top of the commands before it. Then it reports the part of
@@ -161,7 +243,7 @@ internal static class EditTools
             body(batch);
             if (batch.Confirmations.Count > 0 && !args.Flag("confirm"))
                 throw new EditException(NeedsConfirmation(batch.Confirmations));
-            return ToolResult.Of(batch.StepResult());
+            return Output(batch.StepResult());
         }
         var preview = args.Flag("preview");
         var withPatch = args.Flag("with_patch");
@@ -169,7 +251,25 @@ internal static class EditTools
             throw ToolInput.Bad("with_patch", AgentTexts.Error("with_patch_preview"));
         ReadOnlyGuard(call);
         Guard(call);
-        return Commit(call, null, preview, withPatch, args.Flag("confirm"), body, result => ToolResult.Of(result));
+        return Commit(call, null, preview, withPatch, args.Flag("confirm"), body, Output);
+    }
+
+    /// <summary>The result of an edit tool in the JSON form of its type, so the result of mission commands gives its
+    /// inverse and its row moves (see <see cref="EditToolResult"/>).</summary>
+    internal static ToolResult Output(EditResult result) => ToolResult.Of<object>(result);
+
+    /// <summary>The versions of the mission scripts among the files of a result, by the path that the session stores
+    /// (section 4.2 of the M6b design). So each call that changes a script gives its version, also a rename of an
+    /// object that changes the mission lines that name it.</summary>
+    internal static IReadOnlyDictionary<string, long> VersionsOf(EditSession session, IEnumerable<string> files)
+    {
+        var versions = new Dictionary<string, long>(OpenLancer.Data.IO.VfsPath.Comparer);
+        foreach (var file in files)
+        {
+            if (session.Missions.ScriptPathOf(file) is { } script)
+                versions[script] = session.Missions.Version(script);
+        }
+        return versions;
     }
 
     /// <summary>
@@ -216,6 +316,9 @@ internal static class EditTools
                     Changes = result.Status == EditStatus.NoChange ? [] : shaped.Changes,
                     NeedsConfirmation = result.NeedsConfirmation || confirmations.Count > 0,
                     Patch = patch ?? result.Patch,
+                    // After a commit, the versions of the scripts are the new versions. A preview gives the versions
+                    // now, because it changes no version (decision D764).
+                    Versions = VersionsOf(session, result.Files),
                     Summary = result.Status switch
                     {
                         EditStatus.Applied => AgentTexts.Error("edit_applied", ("label", result.UndoLabel ?? "")),
@@ -232,9 +335,11 @@ internal static class EditTools
                 throw new EditException(finished.Errors[0]);
             if (preview)
                 return Fitted(Final(batch.Preview()));
-            // The revision after the commit is not known yet. The longest revision gives the longest text, so the
-            // result of the commit is never larger than this result.
-            Fitted(Final(finished with { UndoLabel = batch.UndoLabel, Revision = long.MaxValue }));
+            // The revision and the script versions after the commit are not known yet. The longest numbers give the
+            // longest text, so the result of the commit is never larger than this result. The result counts the
+            // inverse of the mission commands too.
+            var longest = Final(finished with { UndoLabel = batch.UndoLabel, Revision = long.MaxValue });
+            Fitted(longest with { Versions = longest.Versions.ToDictionary(v => v.Key, _ => long.MaxValue) });
             var result = Final(batch.Commit());
             if (result.Status == EditStatus.Applied)
                 call.Host.Edited(call.Tool, result);
@@ -500,8 +605,14 @@ internal static class EditTools
 /// list checks of the sections that the commands name, before and after the batch. They are data, not errors. So the
 /// edit applies, as an edit of the user applies.
 /// </summary>
-/// <remarks>The problems of a section that the batch removes do not count as fixed. A renamed section compares its
-/// problems with the problems of the section before the rename.</remarks>
+/// <remarks>
+/// <para>The problems of a section that the batch removes do not count as fixed. A renamed section compares its
+/// problems with the problems of the section before the rename.</para>
+/// <para>The checks skip the sections of the mission scripts and of their ship build files. The commit check of the
+/// mission editor gives their problems, and it compares them with the problems before the batch (section 4.5 of the M6b
+/// design). These checks note a section of a mission command only at a rename, without its problems before, so they
+/// would give each problem of a renamed trigger as new.</para>
+/// </remarks>
 internal sealed class EditChecks(EditSession session, EditBatch batch, int sectionLimit) : IBatchCheck
 {
     private readonly Dictionary<SectionRef, IReadOnlyList<Diagnostic>> before = [];
@@ -517,7 +628,8 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
             .Concat(plan.Fixes.Select(f => f.Section)).Concat(plan.Missing.Select(m => m.Reference.Section));
         foreach (var section in sections)
         {
-            Touch(section);
+            if (!Touch(section))
+                continue;
             if (!added.Contains(section) && !before.ContainsKey(section) && session.Get(section) != null)
                 before[section] = AgentRows.DiagnosticsOf(session, section);
         }
@@ -588,10 +700,15 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
         return new EditResult(EditStatus.Applied) { NewProblems = newProblems, FixedProblems = fixedProblems };
     }
 
-    private void Touch(SectionRef section)
+    /// <summary>Notes a section that the batch touches. Gives false for a section of a mission file, which the checks
+    /// skip.</summary>
+    private bool Touch(SectionRef section)
     {
+        if (session.IsGuardedMissionFile(section.Path))
+            return false;
         if (seen.Add(section))
             touched.Add(section);
+        return true;
     }
 
     private static (DiagnosticSeverity Severity, string? Key, string? Rule, string Message) Key(Diagnostic problem) =>

@@ -5,6 +5,7 @@ using System.Text.Json.Schema;
 using System.Text.Json.Serialization.Metadata;
 using System.Text.Json;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Missions.Editing;
 
 namespace OpenLancer.Studio.Agent;
 
@@ -235,6 +236,10 @@ public sealed class StudioTool
                     return node;
                 if (property.CustomConverter is EditJson.LongAsText)
                     node = new JsonObject { ["type"] = "string" };
+                // The exporter gives the schema "true" for a type with its own converter. The command layer writes a
+                // mission command as an object with its kind, and a mission reference as a text.
+                if (node is JsonValue && ConverterSchema(property.PropertyType) is { } written)
+                    node = written;
                 return node is JsonObject obj && !obj.ContainsKey("$ref")
                     ? Described(obj, property.DeclaringType, property.Name)
                     : node;
@@ -243,6 +248,13 @@ public sealed class StudioTool
         OptionalNulls(schema);
         return schema;
     }
+
+    /// <summary>The schema of a type that the command layer writes with its own converter, or null for another
+    /// type.</summary>
+    private static JsonObject? ConverterSchema(Type type) =>
+        typeof(MissionCommand).IsAssignableFrom(type) ? new JsonObject { ["type"] = "object" }
+        : typeof(IMissionRef).IsAssignableFrom(type) ? new JsonObject { ["type"] = "string" }
+        : null;
 
     /// <summary>A schema with the help of a property of <c>agent-tools.json</c>, when the file has it. A unit test
     /// checks that each property of each output schema has a help.</summary>

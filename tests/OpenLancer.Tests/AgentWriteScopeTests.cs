@@ -48,7 +48,50 @@ public sealed class AgentWriteScopeTests
         ("prop_group_rename", """{ "group": REF, "nickname": "quay", "confirm": true }"""),
         ("prop_group_delete", """{ "group": REF, "confirm": true }"""),
         ("create_from_template", """{ "kind": "equipment", "template": REF, "nickname": "gun9" }"""),
+        ("mission_edit", """{ "commands": [ { "kind": "set_item_key", "item": REF, "key": "pos", "lines": [] } ] }"""),
     ];
+
+    /// <summary>The paths of a <c>mission_edit</c> call that are not install paths, or that leave the folder of the
+    /// missions (section 8.2, item 4 of the MCP1 design). <c>PATH</c> marks the path, as JSON text.</summary>
+    private static readonly string[] MissionCalls =
+    [
+        """{ "commands": [ { "kind": "add_trigger", "script": "msn:PATH", "nickname": "ol_new" } ] }""",
+        """{ "commands": [ { "kind": "remove_trigger", "trigger": "trg:PATH#ol_end" } ], "confirm": true }""",
+        """{ "commands": [ { "kind": "create_script", "path": "PATH" } ] }""",
+        """{ "commands": [ { "kind": "set_condition_value", "trigger": "trg:DATA\\MISSIONS\\OL_TEST\\ol_test.ini#ol_wave", "name": "seconds", "value": 9 } ], "expect_versions": { "PATH": 1 } }""",
+    ];
+
+    /// <summary>The bad paths for <see cref="MissionCalls"/>: a drive, a stream name, a <c>..</c> above the root and a
+    /// rooted path.</summary>
+    private static readonly string[] BadMissionPaths =
+    [
+        @"C:\x.ini", @"C:x.ini", @"DATA\MISSIONS\x.ini:stream", @"..\x.ini", @"DATA\..\..\x.ini", @"\x.ini",
+        @"\\server\share\x.ini",
+    ];
+
+    /// <summary>Each path of <c>mission_edit</c> that is not an install path gives <c>invalid_argument</c>: a path of
+    /// a reference, the path of a new script and a key of <c>expect_versions</c>. A new script outside
+    /// <c>DATA\MISSIONS</c> gives <c>invalid_argument</c> with the detail <c>BadPath</c>. Nothing changes.</summary>
+    [Fact]
+    public void MissionEditRefusesEachPathThatIsNotAnInstallPath()
+    {
+        using var m = MissionEdits.Create();
+        var host = new TestAgentHost(m.Session);
+        var before = m.State();
+
+        var wrong = (from call in MissionCalls
+            from path in BadMissionPaths
+            let arguments = call.Replace("PATH", Json(path)[1..^1])
+            let error = Error(host, "mission_edit", arguments)
+            where error.Code != "invalid_argument"
+            select $"{arguments}: {error.Code} {error.Detail} {error.Message}").ToList();
+        var outside = Error(host, "mission_edit", """{ "commands": [ { "kind": "create_script", "path": "DATA\\SHIPS\\ol_new.ini" } ] }""");
+
+        Assert.True(wrong.Count == 0, string.Join(Environment.NewLine, wrong));
+        Assert.Equal(("invalid_argument", "BadPath"), (outside.Code, outside.Detail));
+        Assert.Equal(before, m.State());
+        Assert.False(m.Session.CanUndo);
+    }
 
     [Fact]
     public void EachToolWithAReferenceRefusesAPathThatIsNotAnInstallPath()

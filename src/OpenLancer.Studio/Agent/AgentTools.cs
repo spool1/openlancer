@@ -19,8 +19,8 @@ namespace OpenLancer.Studio.Agent;
 /// for another milestone is not in the table of this build (section 7.9).
 /// </summary>
 /// <remarks>This build has the query tools of section 7.1 (milestone MCP1-1a) and the dry run query of M6c-1. It also
-/// has the edit tools of sections 7.2, 7.3 and 7.6 and the play tools of section 7.6 (milestone MCP1-2), and the view
-/// tools of section 7.7 (milestone MCP1-1b).
+/// has the edit tools of sections 7.2, 7.3 and 7.6 and the play tools of section 7.6 (milestone MCP1-2), the view
+/// tools of section 7.7 (milestone MCP1-1b), and the mission edit tools of section 7.4 (milestone MCP1-3).
 /// The order of the rows follows the sections of the design, so a later part puts its tools at the place of its
 /// section. The view tools are tools of the editor host.</remarks>
 public static class AgentTools
@@ -201,6 +201,8 @@ public static class AgentTools
                 Text("template", true),
                 Text("nickname", true)),
             DataEditTools.CreateFromTemplate),
+        Edit("mission_edit", ToolHints.Changing, MissionEditTools.EditInput, MissionEditTools.Edit, ToolGroup.Missions,
+            typeof(EditToolResult)),
         SessionTool("save", ToolHints.Changing, ToolInput.None, typeof(SaveView), SaveTools.Save),
         SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
         SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),
@@ -390,9 +392,11 @@ public static class AgentTools
 
     /// <summary>An edit tool (sections 7.2 and 7.3 of the MCP1 design). Its result is the result of the command layer,
     /// and it can be a step of <c>edit_batch</c>. A generic edit tool and a data tool are in the group Studio.</summary>
+    /// <param name="output">The type of the result, or null for the result of the command layer. A mission tool gives
+    /// the result with the inverse (<see cref="EditToolResult"/>).</param>
     private static StudioTool Edit(string name, ToolHints hints, ToolInput input, Func<ToolCall, ToolStep> run,
-        ToolGroup group = ToolGroup.Studio) =>
-        new(name, ToolKind.Edit, group, ToolHosts.Both, hints, input, typeof(EditResult), run);
+        ToolGroup group = ToolGroup.Studio, Type? output = null) =>
+        new(name, ToolKind.Edit, group, ToolHosts.Both, hints, input, output ?? typeof(EditResult), run);
 
     /// <summary>An asset write of a prop group (section 7.3 of the MCP1 design), in the group Scene. It writes files at
     /// once, outside the edit history, so it cannot be a step of <c>edit_batch</c>. Its result has the form of the

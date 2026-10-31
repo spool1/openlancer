@@ -419,6 +419,16 @@
         "nickname": "The nickname of the new item. The copies of its goods get names from it. A refusal tells why a nickname is not valid."
       }
     },
+    "mission_edit": {
+      "title": "Run mission commands",
+      "description": "Runs mission commands as one Undo step, all or nothing. Each command sees the result of the commands before it. The tool refuses an edit that adds an error to a script. The result gives the inverse: give it to this tool to revert the edit after later edits. Read get_mission and describe_mission_name first. Set preview to true to see the result first.",
+      "fields": {
+        "label": "The label of the Undo step. Without it, the edit takes the label of its one command, or 'Mission edit'.",
+        "commands": "The mission commands in order. Each command is an object with a kind, for example add_trigger. A line is {key, values} with the value names of describe_mission_name. studio_status gives the most commands of one call.",
+        "options": "reject_new_errors is always true: an edit that adds an error changes nothing. Set reject_new_warnings to true to also refuse an edit that adds a warning.",
+        "expect_versions": "The versions of the scripts that you read, by install path. When a script has another version now, the edit gives stale_revision."
+      }
+    },
     "save": {
       "title": "Save the edits of the active mod",
       "description": "Saves the edits into the patch files of the active mod. The save stops when the checks find errors. Read the errors, correct them, then save again."
@@ -624,6 +634,8 @@
     "redo_recovery_entry": "The next step to redo restores the unsaved edits of an earlier session: {label}. The agent can redo only its own edits.",
     "redo_user_undid": "The user undid this edit: {label}. The agent cannot redo it.",
     "limit_steps": "One batch can have at most {max} steps. Split the batch.",
+    "limit_commands": "One call of mission_edit can have at most {max} commands. Split the edit.",
+    "mission_strict": "The mission tools always refuse an edit that adds an error. Remove reject_new_errors, or set it to true.",
     "step_unknown": "Step {index}: the server has no tool {tool}.",
     "step_kind": "Step {index}: {tool} cannot be a step of edit_batch. A step must be an edit tool, for example set_fields.",
     "step_asset_write": "Step {index}: {tool} writes files at once, outside the Undo history. Call it alone, not in edit_batch.",
@@ -1215,7 +1227,12 @@
     "NamedMention.path": "The install path of the file.",
     "NamedMention.count": "How often the file names the nickname.",
     "HistoryStepView.label": "The label of the step that the tool undid or redid, for example Agent: Delete my_station_1.",
-    "BatchResult.steps": "The result of each step, in order. Each step has the status, the revision and the files of the batch.",
+    "BatchResult.steps": "The result of each step, in order. Each step has the status, the revision, the files and the versions of the batch. A step with mission commands also has its inverse.",
+    "EditToolResult.inverse": "The mission command that reverts the mission commands of the call. Give it to mission_edit after later edits. It refuses when a later edit changed one of its sections.",
+    "EditToolResult.row_moves": "The lines of triggers whose place in their trigger changed, with the place before and after.",
+    "RowMove.trigger": "The trg: reference of the trigger of the line.",
+    "RowMove.from": "The index of the line in the trigger before the edit, from 0.",
+    "RowMove.to": "The index of the line in the trigger after the edit, from 0.",
     "SaveView.saved": "True when the save wrote its files. A save without unsaved edits also gives true.",
     "SaveView.number": "The number of the save in this session, or 0 when the save changed no file.",
     "SaveView.written": "The files that the save wrote, relative to the folder of the mod.",

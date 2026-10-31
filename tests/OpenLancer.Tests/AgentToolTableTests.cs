@@ -213,8 +213,9 @@ public sealed class AgentToolTableTests
     }
 
     /// <summary>The edit tools, the tools of the session and the play tools of this build in the order of the table,
-    /// with their kinds and hints. The tools of section 7.3 follow the tools of section 7.2, and the tools of section
-    /// 7.6 follow them. A tool that adds data is not destructive, and a tool that can change or remove data is (review
+    /// with their kinds and hints. The tools of section 7.3 follow the tools of section 7.2, the mission tools of section
+    /// 7.4 follow them, and the tools of section 7.6 come next. mission_edit can remove triggers and items, so it is
+    /// destructive. A tool that adds data is not destructive, and a tool that can change or remove data is (review
     /// finding R7 of MCP1-2). edit_batch can have a step that removes data, so it is destructive (final finding of
     /// MCP1-2). play can save the mod, so it is destructive (section 7.0). play_stop removes no data.</summary>
     private static readonly Dictionary<string, (ToolKind Kind, ToolHints Hints)> Edits = new()
@@ -239,6 +240,7 @@ public sealed class AgentToolTableTests
         ["prop_group_delete"] = (ToolKind.AssetWrite, new ToolHints(false, true, false)),
         ["create_loadout"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["create_from_template"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["mission_edit"] = (ToolKind.Edit, new ToolHints(false, true, false)),
         ["save"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["undo"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["redo"] = (ToolKind.Session, new ToolHints(false, true, false)),

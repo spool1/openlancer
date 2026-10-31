@@ -9,9 +9,10 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// The check of a JSON value against a JSON Schema, for the subset that the tool table uses: the keywords of the input
-/// schemas of <c>ToolInput</c> and of the output schemas that <c>JsonSchemaExporter</c> writes. An unknown keyword is a
-/// problem, so the check never passes a schema that it does not read. The repository has no JSON Schema package (MCP1
-/// open alignment item 4).
+/// schemas of <c>ToolInput</c>, of the output schemas that <c>JsonSchemaExporter</c> writes, and of the batch schema of
+/// <c>MissionJson.Schema()</c>. An unknown keyword is a problem, so the check never passes a schema that it does not
+/// read. A <c>$ref</c> resolves as a JSON Pointer (RFC 6901) in the root schema, and a <c>$ref</c> that does not resolve
+/// is a problem. The repository has no JSON Schema package (MCP1 open alignment item 4).
 /// </summary>
 internal static class SchemaCheck
 {
@@ -19,14 +20,16 @@ internal static class SchemaCheck
     [
         "type", "properties", "additionalProperties", "required", "items", "enum", "minimum", "maximum", "minLength",
         "maxLength", "minItems", "maxItems", "uniqueItems", "default", "description", "$ref", "anyOf", "pattern", "$schema",
-        "minProperties",
+        "minProperties", "$defs", "oneOf", "const", "title", "examples",
     ];
 
     private static readonly HashSet<string> Types = ["object", "array", "string", "integer", "number", "boolean", "null"];
 
-    /// <summary>The problems of a schema itself: an unknown keyword or type. Empty for a valid schema of the
-    /// subset.</summary>
-    public static List<string> SchemaProblems(JsonNode? schema, string path = "#")
+    /// <summary>The problems of a schema itself: an unknown keyword or type, or a <c>$ref</c> that does not resolve.
+    /// Empty for a valid schema of the subset.</summary>
+    public static List<string> SchemaProblems(JsonNode? schema) => SchemaProblems(schema, schema, "#");
+
+    private static List<string> SchemaProblems(JsonNode? root, JsonNode? schema, string path)
     {
         var problems = new List<string>();
         if (schema is JsonValue v && v.GetValueKind() is JsonValueKind.True or JsonValueKind.False)
@@ -43,16 +46,20 @@ internal static class SchemaCheck
                     var names = value is JsonArray a ? a.Select(t => (string?)t) : [(string?)value];
                     problems.AddRange(names.Where(n => n == null || !Types.Contains(n)).Select(n => $"{path}: the type '{n}' is not valid."));
                     break;
-                case "properties":
+                case "properties" or "$defs":
                     foreach (var (name, property) in value!.AsObject())
-                        problems.AddRange(SchemaProblems(property, $"{path}/properties/{name}"));
+                        problems.AddRange(SchemaProblems(root, property, $"{path}/{key}/{name}"));
                     break;
                 case "items" or "additionalProperties":
-                    problems.AddRange(SchemaProblems(value, $"{path}/{key}"));
+                    problems.AddRange(SchemaProblems(root, value, $"{path}/{key}"));
                     break;
-                case "anyOf":
+                case "anyOf" or "oneOf":
                     foreach (var option in value!.AsArray())
-                        problems.AddRange(SchemaProblems(option, $"{path}/anyOf"));
+                        problems.AddRange(SchemaProblems(root, option, $"{path}/{key}"));
+                    break;
+                case "$ref":
+                    if (value?.GetValueKind() != JsonValueKind.String || Resolve(root!, (string)value!) == null)
+                        problems.Add($"{path}: the reference '{value}' does not resolve.");
                     break;
             }
         }
@@ -79,12 +86,16 @@ internal static class SchemaCheck
         var obj = schema.AsObject();
         if (obj["$ref"] is { } reference)
         {
-            Check(root, Resolve(root, (string)reference!), value, path, problems);
+            Check(root, Resolve(root, (string)reference!)!, value, path, problems);
             return;
         }
-        // anyOf applies together with the other keywords of the schema.
+        // anyOf and oneOf apply together with the other keywords of the schema.
         if (obj["anyOf"] is JsonArray anyOf && !anyOf.Any(option => Fits(root, option!, value)))
             problems.Add($"{path}: the value fits no schema of anyOf.");
+        if (obj["oneOf"] is JsonArray oneOf && oneOf.Count(option => Fits(root, option!, value)) is var fits and not 1)
+            problems.Add($"{path}: the value fits {fits} schemas of oneOf, not exactly one.");
+        if (obj.TryGetPropertyValue("const", out var constant) && !JsonNode.DeepEquals(constant, value))
+            problems.Add($"{path}: the value is not the constant {constant?.ToJsonString()}.");
         if (obj["type"] is { } type)
         {
             var types = type is JsonArray a ? a.Select(t => (string)t!).ToList() : [(string)type!];
@@ -136,12 +147,25 @@ internal static class SchemaCheck
         return problems.Count == 0;
     }
 
-    private static JsonNode Resolve(JsonNode root, string reference)
+    /// <summary>The schema of a <c>$ref</c> in the root schema, or null when it does not resolve. The reference is a
+    /// JSON Pointer in a URI fragment (RFC 6901): <c>/</c> splits the path, <c>~1</c> is a <c>/</c> and <c>~0</c> is a
+    /// <c>~</c> in a name.</summary>
+    private static JsonNode? Resolve(JsonNode root, string reference)
     {
         Assert.StartsWith("#", reference);
         var node = root;
-        foreach (var part in reference[1..].Split('/', StringSplitOptions.RemoveEmptyEntries))
-            node = node is JsonArray a ? a[int.Parse(part)]! : node[part]!;
+        foreach (var part in reference[1..].Split('/').Skip(1))
+        {
+            var name = part.Replace("~1", "/").Replace("~0", "~");
+            node = node switch
+            {
+                JsonArray a when int.TryParse(name, out var index) && index >= 0 && index < a.Count => a[index],
+                JsonObject o when o.TryGetPropertyValue(name, out var child) => child,
+                _ => null,
+            };
+            if (node == null)
+                return null;
+        }
         return node;
     }
 

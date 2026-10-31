@@ -116,12 +116,14 @@ public sealed partial class MissionEditor
                     Applied?.Invoke(Final(result, draft, inverse));
             }
             editBatch.Committed += Committed;
+            // With Confirm, the caller asks for the confirmations of the plan, so the result gives them as data.
             return MissionEditResult.From(Part(draft)) with
             {
                 Label = batch.EntryLabel,
                 Inverse = inverse,
                 RowMoves = draft.RowMoves,
                 Revision = session.Revision,
+                Asked = confirmations,
             };
         }
         var final = Final(preview ? editBatch.Preview() : editBatch.Commit(), draft, inverse);
@@ -269,6 +271,12 @@ public sealed partial class MissionEditor
     /// <summary>True for a document that is a mission script now, or that was one in this session. A new script has
     /// no sections after an undo of its create or after its delete, but its version still changes.</summary>
     private bool IsScript(EditDocument document) => document.HoldsScript || versions.ContainsKey(document.Path);
+
+    /// <summary>The path of a file as the session stores it, when the file is a mission script now or was one in this
+    /// session, else null. A result gives the versions of such files (section 4.2 of the M6b design).</summary>
+    /// <param name="path">An install path in normal form, for example a path of <see cref="EditResult.Files"/>.</param>
+    internal string? ScriptPathOf(string path) =>
+        session.OpenedDocument(path) is { } document && IsScript(document) ? document.Path : null;
 
     /// <summary>Gives the new versions and the trigger renames of each change of the history (section 4.2 of the M6b
     /// design). A step of a transaction, a preview and a cancel do not change the revision, so they change no

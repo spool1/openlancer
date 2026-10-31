@@ -168,8 +168,9 @@ public sealed class MissionJsonTests
         Assert.Equal(MissionJson.Kinds.Count, definitions["command"]!["oneOf"]!.AsArray().Count);
         var lines = MissionSchema.Retail.Conditions.Concat(MissionSchema.Retail.Actions).Concat(MissionSchema.Retail.Directives)
             .Select(n => n.Name).ToList();
-        Assert.All(lines, key => Assert.True(definitions.ContainsKey("line:" + key), key));
-        var timer = definitions["line:Cnd_Timer"]!;
+        Assert.All(lines, key => Assert.True(definitions.ContainsKey("line." + key), key));
+        Assert.True(definitions.ContainsKey("key.MsnShip.npc"));
+        var timer = definitions["line.Cnd_Timer"]!;
         Assert.Equal("Cnd_Timer", (string?)timer["properties"]!["key"]!["const"]);
         Assert.True(timer["properties"]!["values"]!["properties"]!.AsObject().ContainsKey("seconds"));
         var trigger = definitions["add_trigger"]!;
@@ -181,6 +182,32 @@ public sealed class MissionJsonTests
         Assert.DoesNotContain("origin", schema["properties"]!.AsObject().Select(p => p.Key));
         Assert.DoesNotContain(typeof(MissionJson).Assembly.GetReferencedAssemblies(),
             a => a.Name!.Contains("Schema", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Each <c>$ref</c> of the schema resolves as a JSON Pointer (RFC 6901), because each definition name has
+    /// only letters, digits, '_', '.' and '-'. A '/' in a name would split the path. The schema has no problem of the
+    /// subset that the tests read, and a sample batch fits it.</summary>
+    [Fact]
+    public void EachReferenceOfTheSchemaResolvesAndASampleBatchFits()
+    {
+        var schema = MissionJson.Schema();
+        var sample = JsonNode.Parse($$"""
+            {
+              "label": "Add a delay",
+              "commands": [
+                { "kind": "add_trigger", "script": "msn:{{Script.Replace(@"\", @"\\")}}", "nickname": "ol_delay",
+                  "condition": { "key": "Cnd_Timer", "values": { "seconds": 3 } },
+                  "actions": [ { "key": "Act_ActTrig", "values": { "trigger": "ol_end" } } ] },
+                { "kind": "set_item_key", "item": "sec:{{Script.Replace(@"\", @"\\")}}#MsnShip/ol_ship_1", "key": "npc",
+                  "lines": [ { "key": "npc", "texts": [ "ol_npc_shared" ] } ] }
+              ]
+            }
+            """);
+
+        Assert.All(schema["$defs"]!.AsObject(), d => Assert.Matches("^[A-Za-z0-9_.-]+$", d.Key));
+        Assert.Empty(SchemaCheck.SchemaProblems(schema));
+        Assert.Empty(SchemaCheck.Problems(schema, sample));
+        Assert.NotEmpty(SchemaCheck.Problems(schema, JsonNode.Parse("""{ "label": "x", "commands": [ { "kind": "launch_rocket" } ] }""")));
     }
 
     /// <summary>A field that the batch or its options do not have refuses, so a typo cannot turn off a guard. The host

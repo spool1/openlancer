@@ -133,15 +133,15 @@ public static class MissionJson
         foreach (var name in schema.Conditions.Concat(schema.Actions).Concat(schema.Directives)
                      .DistinctBy(n => n.Name, StringComparer.OrdinalIgnoreCase))
         {
-            lines.Add("line:" + name.Name);
-            definitions["line:" + name.Name] = LineSchema(name.Name, name.Plain, name.Values, schema);
+            lines.Add(LineDefinition(name.Name));
+            definitions[LineDefinition(name.Name)] = LineSchema(name.Name, name.Plain, name.Values, schema);
         }
         foreach (var section in schema.Sections.Append(schema.ShipBuild))
         {
             foreach (var key in section.Keys)
             {
-                lines.Add($"key:{section.Type}/{key.Key}");
-                definitions[$"key:{section.Type}/{key.Key}"] = LineSchema(key.Key, key.Label, key.ValueSpecs, schema);
+                lines.Add(KeyDefinition(section.Type, key.Key));
+                definitions[KeyDefinition(section.Type, key.Key)] = LineSchema(key.Key, key.Label, key.ValueSpecs, schema);
             }
         }
         definitions["line"] = new JsonObject
@@ -178,13 +178,41 @@ public static class MissionJson
         foreach (var parameter in type.GetConstructors().OrderByDescending(c => c.GetParameters().Length).First()
                      .GetParameters().Where(p => !p.HasDefaultValue))
             required.Add(JsonNamingPolicy.SnakeCaseLower.ConvertName(parameter.Name!));
-        return new JsonObject
+        var schema = new JsonObject
         {
             ["type"] = "object",
             ["properties"] = properties,
             ["required"] = required,
             ["additionalProperties"] = false,
         };
+        Relocate(schema, "#/$defs/" + kind);
+        return schema;
+    }
+
+    /// <summary>
+    /// Moves each <c>$ref</c> that the exporter wrote to the place of a definition. The exporter names a type that its
+    /// schema has two times with a <c>$ref</c> from the root of that schema, for example <c>#/properties/sections/items</c>.
+    /// The schema of a command is a definition of the batch, so such a <c>$ref</c> must start at the definition. A
+    /// <c>$ref</c> to a definition of the batch stays.
+    /// </summary>
+    /// <param name="root">The JSON Pointer of the definition, for example <c>#/$defs/create_script</c>.</param>
+    private static void Relocate(JsonNode? node, string root)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                if (obj["$ref"] is JsonValue value && value.GetValueKind() == JsonValueKind.String &&
+                    value.GetValue<string>() is { } reference && reference.StartsWith('#') &&
+                    !reference.StartsWith("#/$defs/", StringComparison.Ordinal))
+                    obj["$ref"] = root + reference[1..];
+                foreach (var (_, child) in obj.ToList())
+                    Relocate(child, root);
+                break;
+            case JsonArray array:
+                foreach (var child in array)
+                    Relocate(child, root);
+                break;
+        }
     }
 
     /// <summary>The schema of a line key with its named values.</summary>
@@ -306,6 +334,17 @@ public static class MissionJson
             };
         return null;
     }
+
+    /// <summary>The name of the definition of a condition, an action or an order, for example
+    /// <c>line.Cnd_Timer</c>.</summary>
+    /// <remarks>A definition name has only the characters A to Z, a to z, 0 to 9, <c>_</c>, <c>.</c> and <c>-</c>. In a
+    /// JSON Pointer, <c>/</c> splits the path, and <c>~</c> starts an escape (RFC 6901). So each <c>$ref</c> resolves as
+    /// it is.</remarks>
+    internal static string LineDefinition(string key) => "line." + key;
+
+    /// <summary>The name of the definition of a key of a section type, for example <c>key.MsnShip.npc</c>. See
+    /// <see cref="LineDefinition"/> for the characters.</summary>
+    internal static string KeyDefinition(string type, string key) => $"key.{type}.{key}";
 
     private static JsonObject Ref(string definition) => new() { ["$ref"] = "#/$defs/" + definition };
 
