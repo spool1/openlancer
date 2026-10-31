@@ -88,8 +88,8 @@ When another program uses the port, the server does not start. The status bar th
 | Rows of a page without a limit | 50 | The rows of a list result when the agent gives no limit. |
 | Largest page limit | 200 | The largest limit that the agent can ask for in one list result. |
 | Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
-| Calls each second | 10 | The most calls that the server takes in one second. |
-| Wait for the editor (s) | 30 | How long a call waits while you edit a field, rename an item, drag an item, or a dialog is open. A longer wait gives the error `busy`. |
+| Calls each second | 10 | The most calls that the server takes in one second. A read of the catalog of the prefabs counts as a call. |
+| Wait for the editor (s) | 30 | How long a call waits while you edit a field, rename an item, drag an item, or a dialog is open. A longer wait gives the error `busy`. A read of the catalog of the prefabs has the same wait. |
 | Time of a check or an image (s) | 60 | How long a check of a retail target or an image can take. |
 | Size of a request (MB) | 4 | The largest request. The change applies at the next start of the server. |
 | Largest side of an image (pixels) | 2048 | The most pixels on each side of an image. A larger panel capture becomes smaller. A `render_scene` or `render_cutscene` call with a larger `width` or `height` gives the error `limit`. |
@@ -596,15 +596,27 @@ When you move the camera of the Scene or select an item, follow mode stops. Clic
 
 ## Resources and prompts
 
-The server gives these resources. An agent program can read them before its first call.
+The server gives these resources. An agent program can read them before its first call. The resources hold the texts and the rule data of OpenLancer. The catalog of the prefabs also holds the prefab assets and the prop groups of the open profile.
 
 | Resource | What it gives |
 |---|---|
+| `openlancer://schema/mission-names` | The 129 conditions and actions of a trigger. Each one has its plain name, its event or action group, its values with their kinds and help, and what OpenLancer does with it. These are the rows of `describe_mission_name` without the counts of the base game. |
+| `openlancer://schema/mission-sections` | The 12 section types of a mission script and the ship build (`[NPCShipArch]`), with their keys and values. A type that `mission_add_item` adds has its kind, for example `ship` for `[MsnShip]`. |
+| `openlancer://schema/objlist-directives` | The 23 orders of an order list, with their values. The `steps` of `mission_add_item` take them. |
+| `openlancer://catalog/prefabs` | The behavior prefabs with their fields: the built-in prefabs and the prefab assets of the mods. Also the templates of `scene_create_object`, the builders `scene_place_wreck` and `scene_place_patrol_route`, and the prop groups of the profile. Without a profile, it gives the built-in prefabs and the rule data only. |
 | `openlancer://catalog/lists` | The data lists with their ids and labels. `list_values` takes the ids. |
 | `openlancer://guide/rules` | The rules of the editor and what they mean for an agent. |
 | `openlancer://guide/refs` | The forms of the item references. |
 
-The server has no prompts yet. The prompts of the workflows and the catalog of the prefabs come with a later version.
+The catalog of the prefabs reads the open profile, so its read waits in the queue of the tool calls. It waits while you edit a field or do a gesture, as a call does. It counts in the calls each second. After the wait limit, the read gives a protocol error with the reason. The other resources read only the rule data, so they do not wait.
+
+The server gives one prompt. An agent program shows a prompt as a command. In Claude Code, the command is `/mcp__openlancer__two_trigger_mission`.
+
+| Prompt | Argument | What it gives |
+|---|---|---|
+| `two_trigger_mission` | `script`: the `msn:` reference of a mission script. `list_missions` gives the scripts. | The steps to add a pirate ambush with two triggers. The agent adds the ship build, the NPC and the ship with `mission_add_item`. It adds the two triggers and the loot in one `edit_batch`. Then it runs `mission_dry_run` and `check`. The names in the steps are examples. |
+
+The prompt needs the edit tools. So a host that only reads, for example `oltool mcp serve --read-only`, lists no prompt. The prompts `build_outpost` and `patrol_and_wreck` and the resource `openlancer://guide/workflows` wait for a decision of the project. The prompt `short_cutscene` comes with the cutscene tools.
 
 ## Permission rules for the agent program
 
