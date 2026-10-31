@@ -225,15 +225,24 @@ internal sealed partial class MissionDraft
 
     /// <summary>
     /// Puts new lines into the section at an index when they differ from its lines. With <paramref name="inverse"/>, the
-    /// command gets the line commands that give the old lines back, and the change of the section is in the report.
+    /// command gets the line commands that give the old lines back, and the change of the section is in the report. The
+    /// row map of the request gets the change of the lines of a trigger, so the row moves follow each command (final
+    /// finding 1 of MCP1-3).
     /// </summary>
+    /// <param name="origins">For each new line, its row in the old lines, or -1 for a new line. A command that inserts,
+    /// removes or moves a line at a known row gives them, because two same lines can make the compare of the lines pick
+    /// the wrong one. Null compares the lines (<see cref="LineDiff.Origins"/>).</param>
     /// <returns>True when the lines changed.</returns>
-    public bool SetLines(EditDocument document, int index, IReadOnlyList<Entry> entries, bool inverse = true)
+    public bool SetLines(EditDocument document, int index, IReadOnlyList<Entry> entries, bool inverse = true,
+        IReadOnlyList<int>? origins = null)
     {
         var old = document.Working[index].ToList();
         if (LineDiff.Same(old, entries))
             return false;
+        var trigger = RowTrigger(document, index);
         SetBody(document, index, entries);
+        if (trigger != null)
+            rowMap.Changed(trigger, origins ?? LineDiff.Origins(old, entries), old.Count, StartCount);
         if (inverse)
         {
             Changes.Add(RefOf(document, index));
@@ -346,10 +355,7 @@ internal sealed partial class MissionDraft
             var removed = rows.Select(r => entries[r]).ToList();
             foreach (var row in rows.AsEnumerable().Reverse())
                 entries.RemoveAt(row);
-            SetLines(document, group.Key, entries, inverse: false);
-            var count = entries.Count + rows.Count;
-            foreach (var row in rows.AsEnumerable().Reverse())
-                RowRemoved(document, group.Key, row, count--);
+            SetLines(document, group.Key, entries, inverse: false, RowMap.OfRemoval(entries.Count + rows.Count, rows));
             var item = ItemOf(document, group.Key);
             for (var i = 0; i < rows.Count; i++)
                 inverse.Add(new InsertLine(item, RawLine(removed[i])) { Before = rows[i] });
@@ -364,24 +370,6 @@ internal sealed partial class MissionDraft
         GoneNames.Add(name);
         foreach (var (section, row) in lines)
             Missing.Add(new ResultMissing(RefOf(document, section), document.Working[section][row].Name, consequence, true));
-    }
-
-    /// <summary>Notes a new line of a trigger at a row, after the insert. The lines after it move one row down.</summary>
-    public void RowInserted(EditDocument document, int index, int row)
-    {
-        if (RowTrigger(document, index) is { } trigger)
-            rowMap.Inserted(trigger, row, document.Working[index].Count - 1, StartCount);
-    }
-
-    /// <summary>Notes a removed line of a trigger, after the removal. The lines after it move one row up.</summary>
-    public void RowRemoved(EditDocument document, int index, int row) =>
-        RowRemoved(document, index, row, document.Working[index].Count + 1);
-
-    /// <param name="count">The number of lines before the removal.</param>
-    private void RowRemoved(EditDocument document, int index, int row, int count)
-    {
-        if (RowTrigger(document, index) is { } trigger)
-            rowMap.Removed(trigger, row, count, StartCount);
     }
 
     /// <summary>Notes a rename of a trigger, so the row moves name the trigger by its new name.</summary>
@@ -432,12 +420,10 @@ internal sealed partial class MissionDraft
         if (actionsOnly && !TriggerRules.ActionPlace(entries, to))
             throw Refuse(MissionErrors.BadPlaceError());
         entries.Insert(to, line);
-        if (!SetLines(document, index, entries, inverse: false))
+        if (!SetLines(document, index, entries, inverse: false, RowMap.OfMove(entries.Count, row, to)))
             return;
         var moved = RowOf(document, index, to);
         Changes.Add(moved.Reference);
-        if (RowTrigger(document, index) is { } trigger)
-            rowMap.Moved(trigger, row, to, entries.Count, StartCount);
         var back = row < to ? row : row + 1;
         Inverse(new MoveLine(moved) { Before = back >= entries.Count ? null : back });
     }

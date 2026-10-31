@@ -207,6 +207,41 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal("Act_SpawnShip = ol_ship_1", m.Lines("ol_wave")[^1]);
     }
 
+    /// <summary>Each command that adds or removes a line of a trigger gives the row moves of the later lines, also the
+    /// commands that only compare the lines. The moves of two commands of one call join, so a link at the end keeps the
+    /// moves of an add before it (final finding 1 of MCP1-3).</summary>
+    [Fact]
+    public void EachCommandThatAddsOrRemovesATriggerLineGivesTheRowMoves()
+    {
+        var (m, host) = Open();
+        using var _ = m;
+        var before = m.State();
+        (string?, int?, int?)[] Moves(JsonObject result) =>
+            [.. result["row_moves"]!.AsArray().Select(r => ((string?)r!["trigger"], (int?)r["from"], (int?)r["to"]))];
+        (string?, int?, int?)[] Down(int first, int last, int by) =>
+            [.. Enumerable.Range(first, last - first + 1).Select(r => ((string?)$"trg:{Script}#ol_wave", (int?)r, (int?)(r + by)))];
+
+        var start = Ok(host, "mission_edit", Edit($$"""{ "kind": "set_trigger_start", "trigger": "{{Wave}}", "starts": true }"""));
+        Assert.Equal("InitState = ACTIVE", m.Lines("ol_wave")[2]);
+        Assert.Equal(Down(2, 5, 1), Moves(start));
+        m.Session.Undo();
+
+        var link = Ok(host, "mission_edit", Edit(
+            $$"""{ "kind": "link_triggers", "source": "{{Wave}}", "target": "ol_start", "link_kind": "restart", "before": 3 }"""));
+        Assert.Equal(["Act_DeactTrig = ol_start", "Act_ActTrig = ol_start"], m.Lines("ol_wave")[3..5]);
+        Assert.Equal(Down(3, 5, 2), Moves(link));
+        m.Session.Undo();
+
+        var both = Ok(host, "mission_edit", Edit(
+            $$"""{ "kind": "add_action", "trigger": "{{Wave}}", "line": { "key": "Act_SpawnShip", "values": { "ship": "ol_ship_3" } }, "before": 4 }""",
+            $$"""{ "kind": "link_triggers", "source": "{{Wave}}", "target": "ol_start", "link_kind": "stop" }"""));
+        Assert.Equal(["Act_SpawnShip = ol_ship_3", "Act_DeactTrig = ol_end", "Act_ActTrig = ol_end", "Act_DeactTrig = ol_start"],
+            m.Lines("ol_wave")[4..]);
+        Assert.Equal(Down(4, 5, 1), Moves(both));
+        m.Session.Undo();
+        Assert.Equal(before, m.State());
+    }
+
     /// <summary>mission_link_triggers adds the lines of a link, and removes them with remove. A restart writes the stop
     /// first. The target can be a trg: reference of the same script.</summary>
     [Fact]

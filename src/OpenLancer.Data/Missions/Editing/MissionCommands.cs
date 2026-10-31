@@ -239,6 +239,30 @@ internal static class LineDiff
         return commands.Count == 1 ? commands[0] : new CommandGroup(commands);
     }
 
+    /// <summary>
+    /// For each new line, the row of the same line in the old lines, or -1 for a new line (see
+    /// <see cref="RowMap.Changed"/>). The lines that the longest common order keeps are the same lines. Between two kept
+    /// lines, the old lines and the new lines that the order does not keep pair by their order. So a changed line keeps
+    /// its row, and only an extra line is new or gone.
+    /// </summary>
+    public static int[] Origins(IReadOnlyList<Entry> before, IReadOnlyList<Entry> after)
+    {
+        var (keptOld, keptNew) = CommonOrder.Kept(before.Select(Text).ToList(), after.Select(Text).ToList(),
+            StringComparer.Ordinal);
+        var origins = new int[after.Count];
+        for (int i = 0, j = 0; j < after.Count;)
+        {
+            var first = i;
+            while (i < before.Count && !keptOld[i])
+                i++;
+            for (var old = first; j < after.Count && !keptNew[j]; old++)
+                origins[j++] = old < i ? old : -1;
+            if (j < after.Count)
+                origins[j++] = i++;
+        }
+        return origins;
+    }
+
     /// <summary>True when two lists of lines have the same keys and value texts.</summary>
     public static bool Same(IReadOnlyList<Entry> a, IReadOnlyList<Entry> b) =>
         a.Count == b.Count && a.Select(Text).SequenceEqual(b.Select(Text));

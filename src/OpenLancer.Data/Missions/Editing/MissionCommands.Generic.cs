@@ -30,10 +30,9 @@ public sealed record InsertLine(ItemRef Section, LineSpec Line) : MissionCommand
         var entries = section.ToList();
         var at = d.Place(document, index, Before, entries.Count);
         entries.Insert(at, d.NewEntry(document, index, line.Key, line.Texts, entries.Take(at)));
-        d.SetLines(document, index, entries, inverse: false);
+        d.SetLines(document, index, entries, inverse: false, RowMap.OfInsert(entries.Count - 1, at));
         var row = MissionDraft.RowOf(document, index, at);
         d.Adds.Add(row.Reference);
-        d.RowInserted(document, index, at);
         d.Inverse(new RemoveLine(row));
     }
 }
@@ -52,8 +51,7 @@ public sealed record RemoveLine(RowRef Row) : MissionCommand
         var entries = section.ToList();
         var old = entries[row];
         entries.RemoveAt(row);
-        d.SetLines(document, index, entries, inverse: false);
-        d.RowRemoved(document, index, row);
+        d.SetLines(document, index, entries, inverse: false, RowMap.OfRemoval(entries.Count + 1, [row]));
         d.Inverse(new InsertLine(MissionDraft.ItemOf(document, index), MissionDraft.RawLine(old)) { Before = row });
     }
 }

@@ -435,10 +435,9 @@ public sealed record AddAction(TriggerRef Trigger, LineSpec Line) : MissionComma
         if (!TriggerRules.ActionPlace(entries, at))
             throw d.Refuse(MissionErrors.BadPlaceError());
         entries.Insert(at, d.NewEntry(document, index, line.Key, line.Texts, entries.Take(at)));
-        d.SetLines(document, index, entries, inverse: false);
+        d.SetLines(document, index, entries, inverse: false, RowMap.OfInsert(entries.Count - 1, at));
         var row = MissionDraft.RowOf(document, index, at);
         d.Adds.Add(row.Reference);
-        d.RowInserted(document, index, at);
         d.Inverse(new RemoveAction(row));
     }
 }
@@ -456,8 +455,7 @@ public sealed record RemoveAction(RowRef Row) : MissionCommand
         d.RequireAction(document, index, entries, row);
         var old = entries[row];
         entries.RemoveAt(row);
-        d.SetLines(document, index, entries, inverse: false);
-        d.RowRemoved(document, index, row);
+        d.SetLines(document, index, entries, inverse: false, RowMap.OfRemoval(entries.Count + 1, [row]));
         d.Inverse(new InsertLine(MissionDraft.ItemOf(document, index), MissionDraft.RawLine(old)) { Before = row });
     }
 }
@@ -550,7 +548,7 @@ public sealed record LinkTriggers(TriggerRef Source, string Target, LinkKind Lin
             entries.Insert(at, d.NewEntry(document, index, key, [target], entries.Take(at)));
             rows.Add(at++);
         }
-        d.SetLines(document, index, entries, inverse: false);
+        d.SetLines(document, index, entries, inverse: false, RowMap.OfInsert(entries.Count - rows.Count, rows[0], rows.Count));
         foreach (var row in rows)
             d.Adds.Add(MissionDraft.RowOf(document, index, row).Reference);
         var inverse = rows.AsEnumerable().Reverse()

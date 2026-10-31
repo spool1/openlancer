@@ -76,26 +76,39 @@ internal sealed class RowMap
         return rows.Origins;
     }
 
-    /// <summary>Notes a new line at a row.</summary>
+    /// <summary>Notes a change of the lines of a trigger. Each change of the lines of a trigger comes here, so the map
+    /// follows each command (final finding 1 of MCP1-3).</summary>
+    /// <param name="origins">For each line after the change, its row before the change, or -1 for a new line.</param>
+    /// <param name="count">The number of lines before the change.</param>
+    public void Changed(TriggerRef trigger, IReadOnlyList<int> origins, int count, Func<TriggerRef, int?> startCount)
+    {
+        if (Origins(trigger, count, startCount) is not { } rows)
+            return;
+        var next = origins.Select(o => o >= 0 ? rows[o] : -1).ToList();
+        rows.Clear();
+        rows.AddRange(next);
+    }
+
+    /// <summary>The origins of an insert of new lines at a row (see <see cref="Changed"/>).</summary>
     /// <param name="count">The number of lines before the insert.</param>
-    public void Inserted(TriggerRef trigger, int row, int count, Func<TriggerRef, int?> startCount) =>
-        Origins(trigger, count, startCount)?.Insert(row, -1);
+    /// <param name="lines">The number of new lines.</param>
+    public static int[] OfInsert(int count, int row, int lines = 1) =>
+        [.. Enumerable.Range(0, row), .. Enumerable.Repeat(-1, lines), .. Enumerable.Range(row, count - row)];
 
-    /// <summary>Notes a removed line.</summary>
+    /// <summary>The origins of the removal of some rows (see <see cref="Changed"/>).</summary>
     /// <param name="count">The number of lines before the removal.</param>
-    public void Removed(TriggerRef trigger, int row, int count, Func<TriggerRef, int?> startCount) =>
-        Origins(trigger, count, startCount)?.RemoveAt(row);
+    public static int[] OfRemoval(int count, IReadOnlyCollection<int> rows) =>
+        [.. Enumerable.Range(0, count).Where(r => !rows.Contains(r))];
 
-    /// <summary>Notes a line that moved from a row to another row.</summary>
+    /// <summary>The origins of a move of a line from a row to another row (see <see cref="Changed"/>).</summary>
     /// <param name="to">The row of the line after the move.</param>
     /// <param name="count">The number of lines.</param>
-    public void Moved(TriggerRef trigger, int row, int to, int count, Func<TriggerRef, int?> startCount)
+    public static int[] OfMove(int count, int row, int to)
     {
-        if (Origins(trigger, count, startCount) is not { } origins)
-            return;
-        var line = origins[row];
+        var origins = Enumerable.Range(0, count).ToList();
         origins.RemoveAt(row);
-        origins.Insert(to, line);
+        origins.Insert(to, row);
+        return [.. origins];
     }
 
     /// <summary>Notes a rename of a trigger, so a later change and the net moves use the new name.</summary>
