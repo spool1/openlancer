@@ -258,17 +258,22 @@ internal static class MissionEditTools
     }
 
     /// <summary>The tool <c>mission_move_action</c>: <see cref="ReorderAction"/>, before a line of the same trigger or
-    /// to the end.</summary>
+    /// to the end. An error names <c>before</c> when its row is the cause: a row that the trigger does not have, a
+    /// place before the condition, or a line that is not an action.</summary>
     public static ToolStep MoveAction(ToolCall call)
     {
         var args = call.Args;
         var row = EditTools.At("line", () => RowRef.Parse(args.Text("line")!));
         var before = args.Text("before") is { } text ? RowIn(text, row.Item, "before") : (int?)null;
         return EditTools.Apply(call, scope =>
-            scope.RunMission(new MissionBatch("", [new ReorderAction(row) { Before = before }]),
-                error => error.Target == null && error.Detail is MissionErrors.RowNotFound or MissionErrors.BadPlace
-                    ? "before"
-                    : "line"));
+            scope.RunMission(new MissionBatch("", [new ReorderAction(row) { Before = before }]), error => error.Detail switch
+            {
+                // The command names the line of the argument line in the target, and the row of before in no target.
+                MissionErrors.RowNotFound or MissionErrors.BadPlace when error.Target == null => "before",
+                // The command checks the line first, so a line that is not an action and is not that line is before.
+                MissionErrors.NotAnAction when error.Target is { } target && RowRef.Parse(target).Row != row.Row => "before",
+                _ => "line",
+            }));
     }
 
     /// <summary>

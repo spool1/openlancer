@@ -103,11 +103,15 @@ internal sealed partial class MissionDraft
         return at;
     }
 
-    /// <summary>Refuses a row that is not an action of a trigger.</summary>
+    /// <summary>Refuses a row that is not an action of a trigger. The error names the line in its target, so a caller
+    /// with two rows can tell which one is not an action.</summary>
     public void RequireAction(EditDocument document, int index, IReadOnlyList<Entry> entries, int row)
     {
         if (row <= TriggerRules.NicknameLine(entries) || !TriggerRules.IsAction(entries[row].Name))
-            throw Refuse(MissionErrors.NotAnActionError(Owner(document, index), row));
+            throw Refuse(MissionErrors.NotAnActionError(Owner(document, index), row) with
+            {
+                Target = RowOf(document, index, row).Reference,
+            });
     }
 
     // ---- Names ----
