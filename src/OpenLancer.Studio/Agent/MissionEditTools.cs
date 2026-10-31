@@ -338,10 +338,10 @@ internal static class MissionEditTools
     public const string NeedsNpc = "NeedsNpc";
 
     /// <summary>The most steps of one order list of <c>mission_add_item</c>, as the most actions of a trigger.</summary>
-    public const int MaxSteps = MaxActions;
+    private const int MaxSteps = MaxActions;
 
     /// <summary>The kinds of <c>mission_add_item</c> (section 7.4 of the MCP1 design).</summary>
-    public static readonly IReadOnlyList<string> ItemKinds =
+    private static readonly IReadOnlyList<string> ItemKinds =
     [
         "ship", "formation", "npc", "ship_build", "solar", "loot", "order_list", "objective", "conversation",
         "random_encounter",
