@@ -409,6 +409,14 @@ internal static class EditTools
             parts.Add(AgentTexts.Error("confirm_cascade", ("refs", Shown(cascade))));
         if (plan.Fixes.Count > 0)
             parts.Add(AgentTexts.Error("confirm_fixes", ("refs", Shown(plan.Fixes.Select(f => Ref(f.Section)).Distinct().ToList()))));
+        // A rename also changes the mission lines that name the item. The question names these scripts.
+        var missions = plan.Changes.Where(c => SectionKeys.IsMissionFile(c.Path)).ToList();
+        if (missions.Count > 0)
+        {
+            var files = Shown(missions.Select(m => m.Path).Distinct(OpenLancer.Data.IO.VfsPath.Comparer).ToList());
+            parts.Add(AgentTexts.Error(missions.Count == 1 ? "confirm_mission" : "confirm_missions",
+                ("count", missions.Count), ("files", files)));
+        }
         var missing = plan.Missing.Select(m => Ref(m.Reference.Section)).Concat(plan.MissionMissing.Select(m => m.Ref))
             .Distinct().ToList();
         if (missing.Count > 0)

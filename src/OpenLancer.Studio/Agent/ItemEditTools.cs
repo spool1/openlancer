@@ -71,6 +71,9 @@ internal static class ItemEditTools
     /// (decisions D12, D231 and D257). Another item calls the rename of the Database, which changes only an item that the
     /// active mod adds (review finding R4 of MCP1-2). The result gives the old and the new reference.
     /// </summary>
+    /// <summary>The detail code of a rename of a section that the editor cannot rename, for example a loadout.</summary>
+    public const string NotRenamable = "NotRenamable";
+
     public static ToolStep RenameItem(ToolCall call) => EditTools.Apply(call, scope =>
     {
         var session = scope.Session;
@@ -79,6 +82,12 @@ internal static class ItemEditTools
         var scene = SceneSections.KindOf(session, section) != null;
         var item = scene ? ScenePlans.RenameTarget(session, section) : section;
         var from = ItemRefs.Canonical(session, item);
+        // The Database renames only the sections of the ship, equipment and goods files, for example not a loadout.
+        if (!scene && session.Items.KindOf(item.Path) == null)
+        {
+            throw new EditException(new EditError(EditErrorKind.Refused, NotRenamable,
+                AgentTexts.Error("rename_kind", ("ref", from))) { Target = from, Field = "ref" });
+        }
         var plan = scene ? SceneCommands.Rename(session, section, name) : DatabaseCommands.Rename(session, item, name);
         scope.Run(plan, [item]);
         var renamed = plan.SelectAfter ?? item with { Id = item.Id with { Key = name.Trim() } };

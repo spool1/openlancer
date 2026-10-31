@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using LibreLancer.Data.Ini;
 using LibreLancer.Data.Schema.Universe;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Ini;
 using OpenLancer.Data.Overlay;
 using OpenLancer.Data.Strings;
@@ -131,4 +132,10 @@ public sealed partial class EditSession
     /// <summary>The document of an install path, or null when the edit view has no such INI file. It opens the file at
     /// its first use.</summary>
     internal EditDocument? OpenDocument(string path) => TryDocument(path, out var document) ? document : null;
+
+    /// <summary>The install path of an open INI file in the letter case that the session stores (section 4.0.7 of the
+    /// M6b design), or the path itself when the file is not open. It opens no file. For example, a path that
+    /// <c>freelancer.ini</c> spells in lowercase gives the letter case of the files.</summary>
+    internal string StoredPath(string path) =>
+        InstallPaths.TryParse(path) is { } normal && documents.TryGetValue(normal, out var document) ? document.Path : path;
 }

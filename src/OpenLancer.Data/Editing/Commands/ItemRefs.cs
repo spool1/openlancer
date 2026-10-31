@@ -254,7 +254,8 @@ public static class ItemRefs
                     return Format(new ItemReference(k, key));
             }
         }
-        return Of(section);
+        // A section reference has the path in the letter case of the files, so one item has one reference.
+        return Of(section with { Path = session.StoredPath(section.Path) });
     }
 
     /// <summary>

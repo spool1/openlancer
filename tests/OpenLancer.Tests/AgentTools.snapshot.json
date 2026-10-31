@@ -6903,7 +6903,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The reference of the item, for example obj:my_station_1 or list:loadout/my_loadout."
+            "description": "The reference of the item, for example obj:my_station_1 or list:ship/my_ship."
           },
           "fields": {
             "type": "object",
@@ -13093,7 +13093,7 @@
     {
       "name": "scene_place_wreck",
       "title": "Place a wreck with cargo",
-      "description": "Places a wreck in a system: a solar of a wreck type with a new loadout of a ship. The player shoots the wreck to free its cargo. The tool makes one Undo step.",
+      "description": "Places a wreck in a system: a solar of a wreck type with a new loadout of a ship. The player shoots the wreck to free its cargo. The tool makes one Undo step. The editor does not edit the loadout file, so only undo can change the new loadout.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -17262,7 +17262,7 @@
     {
       "name": "create_loadout",
       "title": "Make a loadout",
-      "description": "Makes a new loadout with an archetype, equipment and cargo, in the first loadout file of the data. The tool makes one Undo step.",
+      "description": "Makes a new loadout with an archetype, equipment and cargo, in the first loadout file of the data. The tool makes one Undo step. The editor does not edit the loadout file, so only undo can change the new loadout.",
       "inputSchema": {
         "type": "object",
         "properties": {

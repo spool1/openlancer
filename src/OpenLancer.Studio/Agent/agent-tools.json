@@ -196,7 +196,7 @@
       "title": "Set the fields of an item",
       "description": "Sets fields of one section by their INI keys. The tool makes one Undo step. Use get_item to see the keys and the values first. A value that a list check refuses applies, and the result gives the new problem.",
       "fields": {
-        "ref": "The reference of the item, for example obj:my_station_1 or list:loadout/my_loadout.",
+        "ref": "The reference of the item, for example obj:my_station_1 or list:ship/my_ship.",
         "fields": "The new values by INI key. A text, a number or true or false is one line with one value. An array of values is one line, for example [1, 2, 3]. An array of arrays gives one line for each array. null or [] removes the key. A text cannot hold ','."
       }
     },
@@ -303,7 +303,7 @@
     },
     "scene_place_wreck": {
       "title": "Place a wreck with cargo",
-      "description": "Places a wreck in a system: a solar of a wreck type with a new loadout of a ship. The player shoots the wreck to free its cargo. The tool makes one Undo step.",
+      "description": "Places a wreck in a system: a solar of a wreck type with a new loadout of a ship. The player shoots the wreck to free its cargo. The tool makes one Undo step. The editor does not edit the loadout file, so only undo can change the new loadout.",
       "fields": {
         "position": "The position in meters. The editor rounds each value to a whole number.",
         "rotation": "The rotation in degrees about X, Y and Z.",
@@ -398,7 +398,7 @@
     },
     "create_loadout": {
       "title": "Make a loadout",
-      "description": "Makes a new loadout with an archetype, equipment and cargo, in the first loadout file of the data. The tool makes one Undo step.",
+      "description": "Makes a new loadout with an archetype, equipment and cargo, in the first loadout file of the data. The tool makes one Undo step. The editor does not edit the loadout file, so only undo can change the new loadout.",
       "fields": {
         "nickname": "The nickname of the new loadout. Another loadout cannot have it.",
         "archetype": "The ship or the solar archetype of the loadout. Get the values from list_values with the list ship or solar_archetype.",
@@ -601,6 +601,8 @@
     "confirm_cascade": "It also removes {refs}.",
     "confirm_fixes": "It also changes the lines of {refs} that name the targets.",
     "confirm_missing": "After the edit, lines of {refs} show 'Missing'.",
+    "confirm_mission": "It also changes 1 mission trigger that names the item, in {files}.",
+    "confirm_missions": "It also changes {count} mission triggers that name the item, in {files}.",
     "confirm_mentions": "These files name the item as text: {files}.",
     "confirm_more": " and {count} more",
     "confirm_end": "Use preview: true to see all changes. Show the changes to the user and ask the user. When the user agrees, call the tool again with confirm: true.",
@@ -617,6 +619,7 @@
     "redo_nothing": "The history has no step to redo.",
     "undo_user_entry": "The last edit is an edit of the user: {label}. The agent can undo only its own edits.",
     "redo_user_entry": "The next step to redo is an edit of the user: {label}. The agent can redo only its own edits.",
+    "rename_kind": "The tool can rename an item of a system. It can also rename a ship, equipment or a good that the active mod adds. {ref} is not such an item, so the editor cannot rename it.",
     "undo_recovery_entry": "The last step restored the unsaved edits of an earlier session: {label}. The agent can undo only its own edits.",
     "redo_recovery_entry": "The next step to redo restores the unsaved edits of an earlier session: {label}. The agent can redo only its own edits.",
     "redo_user_undid": "The user undid this edit: {label}. The agent cannot redo it.",

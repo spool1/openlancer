@@ -302,6 +302,10 @@ public sealed class AgentBuilderTests
 
         var loadout = BuilderWorkspace.Loadout("my_loadout");
         Assert.Equal([LoadoutRef(session, "my_loadout")], Texts(result["adds"]));
+        // The add has the reference that get_item gives, with the letter case of the files.
+        Assert.Equal(@"sec:DATA\SHIPS\loadouts.ini#Loadout/my_loadout", Texts(result["adds"]).Single());
+        Assert.Equal(Texts(result["adds"]).Single(),
+            (string?)Ok(host, "get_item", $$"""{ "ref": {{Json(Texts(result["adds"]).Single())}} }""")["section"]!["ref"]);
         Assert.Equal("Agent: Create my_loadout", (string?)result["undo_label"]);
         Assert.Equal(("ship1", "gun1, HpWeapon02", "commodity_gold, 1"),
             (Line(session, loadout, "archetype"), Line(session, loadout, "equip"), Line(session, loadout, "cargo")));
@@ -309,6 +313,29 @@ public sealed class AgentBuilderTests
         Assert.Equal(("invalid_value", "FieldValue"), (row.Code, row.Detail));
         Assert.StartsWith("equipment[1].equipment: No equipment has the name 'x1'.", row.Message);
         Assert.Equal(1, session.Revision);
+    }
+
+    /// <summary>The editor does not edit the loadout file. So set_fields, rename_item and delete_items refuse the new
+    /// loadout of create_loadout, each with a reason, and only undo removes it (final finding of MCP1-2).</summary>
+    [Fact]
+    public void OnlyUndoChangesTheLoadoutOfCreateLoadout()
+    {
+        var (ws, session, host) = Builders();
+        using var _ = ws;
+        Ok(host, "create_loadout", """{ "nickname": "my_loadout", "archetype": "ship1" }""");
+        var reference = LoadoutRef(session, "my_loadout");
+
+        var set = Error(host, "set_fields", $$"""{ "ref": {{Json(reference)}}, "fields": { "cargo": [["commodity_gold", 2]] } }""");
+        var rename = Error(host, "rename_item", $$"""{ "ref": {{Json(reference)}}, "new_name": "my_cargo" }""");
+        var delete = Error(host, "delete_items", $$"""{ "refs": [{{Json(reference)}}] }""");
+        Ok(host, "undo");
+
+        Assert.Equal(("refused", "ReadOnlySection"), (set.Code, set.Detail));
+        Assert.Equal(("refused", ItemEditTools.NotRenamable), (rename.Code, rename.Detail));
+        Assert.Equal($"The tool can rename an item of a system. It can also rename a ship, equipment or a good that the " +
+                     $"active mod adds. {reference} is not such an item, so the editor cannot rename it.", rename.Message);
+        Assert.Equal("refused", delete.Code);
+        Assert.Null(session.Get(BuilderWorkspace.Loadout("my_loadout")));
     }
 
     /// <summary>
@@ -418,8 +445,8 @@ public sealed class AgentBuilderTests
         Assert.Equal(errors, (int)Ok(host, "check")["errors"]!);
     }
 
-    /// <summary>The reference of a loadout of the first loadout file, as a result gives it: the install path as the
-    /// session reads it from freelancer.ini.</summary>
+    /// <summary>The reference of a loadout of the first loadout file, as a result gives it: the install path in the
+    /// letter case of the files, also when freelancer.ini spells it in another letter case.</summary>
     private static string LoadoutRef(EditSession session, string nickname) => ItemRefs.Canonical(session,
         new SectionRef(LoadoutCommands.File(session)!, new SectionIdentity("Loadout", nickname)));
 

@@ -207,6 +207,33 @@ public sealed class AgentItemToolTests
         Assert.False(session.CanUndo);
     }
 
+    /// <summary>A rename of a Scene item also changes the mission lines that name it (decision D668). The question and
+    /// the changes of the result name the mission scripts and the triggers (final finding of MCP1-2).</summary>
+    [Fact]
+    public void TheQuestionOfARenameNamesTheMissionScriptsThatItChanges()
+    {
+        using var ws = SceneWorkspace.Create();
+        ws.WriteBase(@"DATA\MISSIONS\OL_REF\ol_ref.ini", """
+            [Mission]
+
+            [Trigger]
+            nickname = ol_lock
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_LockDock = Player, Li01_01, lock
+            """);
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+
+        var preview = Ok(host, "rename_item", """{ "ref": "obj:Li01_01", "new_name": "Li01_station", "preview": true }""");
+        var asks = Error(host, "rename_item", """{ "ref": "obj:Li01_01", "new_name": "Li01_station" }""");
+
+        Assert.Contains(@"It also changes 1 mission trigger that names the item, in DATA\MISSIONS\OL_REF\ol_ref.ini.",
+            asks.Message);
+        Assert.Contains(Texts(preview["changes"]), c => c.Contains("ol_lock", StringComparison.Ordinal));
+        Assert.False(session.CanUndo);
+    }
+
     /// <summary>
     /// The preview and the result of delete_items give the fixes and the "Missing" lines of the plan of the Scene
     /// delete (issue #21). The delete of the ring zone removes its exclusion in the cloud file. Two planets with one
