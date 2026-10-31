@@ -297,31 +297,60 @@ internal static class SceneEditTools
         scope.Run(plan);
         // The plan of a static prop archetype adds the archetype too, and selects the object.
         var item = plan.SelectAfter ?? plan.Adds[^1];
+        var created = item;
         if (nickname != null && !nickname.Equals(item.Id.Key, StringComparison.Ordinal))
         {
             var from = ItemRefs.Canonical(session, item);
             var rename = SceneCommands.Rename(session, item, nickname);
-            EditTools.At("nickname", () => scope.Run(rename, asks: false));
+            Part(session, created, nickname, "nickname", () => scope.Run(rename, asks: false));
             item = rename.SelectAfter!;
             scope.Report(new EditResult(EditStatus.Applied)
             {
                 Renames = [new ResultRename(from, ItemRefs.Canonical(session, item))],
             });
         }
+        var target = item;
         if (rotation != null || size != null)
         {
             var change = new TransformChange(Rotation: rotation, Size: size);
-            EditTools.At(size != null ? "size" : "rotation", () =>
-                scope.Run(SceneCommands.Transform(session, [new TransformMove(item, change)], TransformMode.Absolute)));
+            Part(session, created, nickname, size != null ? "size" : "rotation", () =>
+                scope.Run(SceneCommands.Transform(session, [new TransformMove(target, change)], TransformMode.Absolute)));
         }
         if (args.Text("name") is { } name)
         {
             var key = ItemEditTools.TextKey(session, item, "name");
-            EditTools.At("name", () => scope.Run(FieldCommands.SetText(session, item, key, name)));
+            Part(session, created, nickname, "name", () => scope.Run(FieldCommands.SetText(session, target, key, name)));
         }
         if (args.Node("fields") is JsonObject fields)
-            Fields(scope, item, fields);
+            Part(session, created, nickname, null, () => Fields(scope, target, fields));
         return item;
+    }
+
+    /// <summary>
+    /// Runs a part of a create on the new item, and gives its errors the argument of the part. The call cancels at an
+    /// error, so the new item does not exist after the call. So the error names no target. A nickname that another item
+    /// has gives name_taken with that item as the target.
+    /// </summary>
+    /// <param name="created">The new item before the rename to its nickname.</param>
+    /// <param name="nickname">The nickname of the request, or null.</param>
+    /// <param name="field">The argument of the part, or null for a part that names its own arguments.</param>
+    private static void Part(EditSession session, SectionRef created, string? nickname, string? field, Action part)
+    {
+        try
+        {
+            if (field == null)
+                part();
+            else
+                EditTools.At(field, part);
+        }
+        catch (EditException e)
+        {
+            var holder = e.Error.Kind == EditErrorKind.NameTaken && nickname != null
+                ? session.Sections(created.Path).FirstOrDefault(s =>
+                    !s.Equals(created) && string.Equals(s.Id.Key, nickname, StringComparison.OrdinalIgnoreCase))
+                : null;
+            throw new EditException(e.Error with { Target = holder == null ? null : ItemRefs.Canonical(session, holder) });
+        }
     }
 
     /// <summary>Sets the fields of a request on a new item, in the batch of the request. Each error names its field,

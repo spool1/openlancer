@@ -119,26 +119,15 @@ public sealed class ToolQueue : IDisposable
     /// <returns>True when a session part ran.</returns>
     public bool RunNext(string? waitReason = null)
     {
+        if (waitReason != null)
+        {
+            foreach (var pending in Expired())
+                Expire(pending, waitReason);
+            return false;
+        }
         Pending? next;
         lock (gate)
         {
-            if (waitReason != null)
-            {
-                var limit = TimeSpan.FromSeconds(host.Limits.WaitSeconds);
-                var now = clock.GetTimestamp();
-                for (var node = waiting.First; node != null;)
-                {
-                    var after = node.Next;
-                    if (clock.GetElapsedTime(node.Value.Queued, now) >= limit)
-                    {
-                        waiting.Remove(node);
-                        node.Value.Node = null;
-                        Expire(node.Value, waitReason);
-                    }
-                    node = after;
-                }
-                return false;
-            }
             if (waiting.First is not { } first)
                 return false;
             next = first.Value;
@@ -194,11 +183,40 @@ public sealed class ToolQueue : IDisposable
         pending.Done.TrySetCanceled(pending.Cancel);
     }
 
+    /// <summary>Removes the calls that waited longer than the wait limit.</summary>
+    private List<Pending> Expired()
+    {
+        var expired = new List<Pending>();
+        lock (gate)
+        {
+            var limit = TimeSpan.FromSeconds(host.Limits.WaitSeconds);
+            var now = clock.GetTimestamp();
+            for (var node = waiting.First; node != null;)
+            {
+                var after = node.Next;
+                if (clock.GetElapsedTime(node.Value.Queued, now) >= limit)
+                {
+                    waiting.Remove(node);
+                    node.Value.Node = null;
+                    expired.Add(node.Value);
+                }
+                node = after;
+            }
+        }
+        return expired;
+    }
+
+    /// <summary>Ends a call that waited too long with <c>busy</c>. The host learns the refusal of a tool that changes
+    /// data for its Console, as for each other refusal (section 8.5, item 1 of the MCP1 design). It runs outside the
+    /// lock of the queue, on the thread that owns the session.</summary>
     private void Expire(Pending pending, string reason)
     {
         pending.Registration.Dispose();
-        Finish(pending, ToolResult.Failure(EditErrorKind.Busy, "Waited",
-            AgentTexts.Error("busy", ("reason", reason), ("seconds", host.Limits.WaitSeconds))));
+        var error = new EditError(EditErrorKind.Busy, "Waited",
+            AgentTexts.Error("busy", ("reason", reason), ("seconds", host.Limits.WaitSeconds)));
+        if (AgentTools.Find(pending.Tool) is { Changes: true } tool && !AgentTools.AsksPreview(pending.Arguments))
+            host.Refused(tool.Name, error);
+        Finish(pending, ToolResult.Failure(error));
     }
 
     /// <summary>Runs the tail of a call on a worker, with the time limit of the tail of its tool (section 8.4 of the MCP1

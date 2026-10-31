@@ -185,8 +185,9 @@ public sealed class HeadlessHostTests
         Assert.False(host.Session.HoldsLock);
     }
 
-    /// <summary>When an editor has the mod open, the host takes no edits (section 5.4 of the MCP1 design). The reason
-    /// names the agent server of that editor.</summary>
+    /// <summary>When an editor has the mod open, the host takes no edits (section 5.4 of the MCP1 design). The host
+    /// cannot tell the kind of the process with the lock. So the reason tells that it can be another oltool mcp serve,
+    /// and names the agent server of an editor.</summary>
     [Fact]
     public void AModThatAnEditorHasOpenGivesReadOnlyWithTheServerOfTheEditor()
     {
@@ -197,7 +198,8 @@ public sealed class HeadlessHostTests
 
         Assert.True(editor.HoldsLock);
         Assert.StartsWith("Another editor has mod 'act' open", host.NoEditReason);
-        Assert.EndsWith("Or use the agent server of the editor that has the mod open.", host.NoEditReason);
+        Assert.EndsWith("That process can also be another oltool mcp serve. When the process is an editor, you can use " +
+                        "the agent server of that editor.", host.NoEditReason);
         Assert.Equal("read_only", Error(host, "set_fields", Move).Code);
     }
 

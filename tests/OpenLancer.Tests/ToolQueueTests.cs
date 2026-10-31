@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Studio.Agent;
 using Xunit;
 
@@ -136,6 +137,30 @@ public sealed class ToolQueueTests
         Assert.Equal("The user edits a field now. The call waited 30 seconds. Try again in a few seconds.",
             (string?)result.Content["message"]);
         Assert.Equal(0, queue.Waiting);
+    }
+
+    /// <summary>An edit call that ends with busy after the wait tells the host, so the Console shows why the edit did not
+    /// run (section 8.5, item 1 of the MCP1 design). A query and a preview that wait too long do not tell it.</summary>
+    [Fact]
+    public async Task AnEditThatWaitsTooLongTellsTheHostAndAQueryDoesNot()
+    {
+        var clock = new FakeClock();
+        var (ws, _, host) = AgentEditToolTests.Scene();
+        using var __ = ws;
+        using var queue = new ToolQueue(host, clock);
+        JsonObject Move(bool preview) => JsonNode.Parse(
+            $$"""{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] }, "preview": {{(preview ? "true" : "false")}} }""")!.AsObject();
+
+        var edit = queue.CallAsync("set_fields", Move(false), null, Token);
+        var preview = queue.CallAsync("set_fields", Move(true), null, Token);
+        var query = queue.CallAsync("studio_status", null, null, Token);
+        clock.Advance(TimeSpan.FromSeconds(30));
+        Assert.False(queue.RunNext("The user edits a field now."));
+
+        Assert.All(await Task.WhenAll(edit, preview, query), r => Assert.Equal(("busy", "Waited"), Code(r)));
+        var refusal = Assert.Single(host.Refusals);
+        Assert.Equal(("set_fields", EditErrorKind.Busy), (refusal.Tool, refusal.Error.Kind));
+        Assert.StartsWith("The user edits a field now.", refusal.Error.Message);
     }
 
     [Fact]

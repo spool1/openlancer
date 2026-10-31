@@ -332,7 +332,7 @@ public static class AgentTools
     }
 
     /// <summary>True when the arguments of a call ask for a preview: <c>"preview": true</c>.</summary>
-    private static bool AsksPreview(JsonObject? arguments) =>
+    internal static bool AsksPreview(JsonObject? arguments) =>
         arguments?["preview"] is JsonValue value && value.TryGetValue<bool>(out var preview) && preview;
 
     /// <summary>The tool error of a refusal. The host gets the refusal of a tool that changes data, except of a preview

@@ -257,7 +257,7 @@ public sealed class BuilderCommandsTests
             "mission_eligible = true", "faction_weight = li_p_grp, 0.5", "density_restriction = 3, unlawful",
             "encounter = patrol_a, 4, 0.4", "faction = li_n_grp, 1"], Lines(session, first));
         Assert.Equal("path_label = my_patrol, 2", Lines(session, second).Single(l => l.StartsWith("path_label")));
-        Assert.Empty(session.Lists.Problems(first).Where(p => p.IsError));
+        Assert.DoesNotContain(session.Lists.Problems(first), p => p.IsError);
     }
 
     [Fact]
@@ -430,7 +430,7 @@ public sealed class BuilderCommandsTests
         Assert.Equal(["nickname = patrol_b", @"filename = missions\encounters\patrol_b.ini"], Lines(session, parameters));
         Assert.Equal(["encounter = patrol_b, 1, 0.5", "faction = li_n_grp, 1"],
             Lines(session, Pop).Where(l => l.StartsWith("encounter") || l.StartsWith("faction")));
-        Assert.Empty(session.Lists.Problems(Pop).Where(p => p.IsError));
+        Assert.DoesNotContain(session.Lists.Problems(Pop), p => p.IsError);
         Assert.Equal("encounters[0].factions[0].faction", unknown.Error.Field);
         Assert.Contains("encounters[1].encounter: No [EncounterParameters] section of a system has the encounter " +
                         "'patrol_z'.", unknown.Error.Message);

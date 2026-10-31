@@ -99,7 +99,7 @@ public sealed class ExportTargetTests
         using var game = new ExportGame();
         var mod = game.GoodsMod("[Good]\nnickname = lf_hull\nprice = 5600\n");
         PublishSettings.Write(mod.Folder, PublishSettings.Empty with { Summary = "From publish.json." });
-        var noGame = GameDetector.CheckRoot(Path.Combine(game.Root, "none"));
+        var noGame = GameDetector.CheckRoot(Path.Combine(game.Root, "none"), cancel: TestContext.Current.CancellationToken);
         var report = game.Report();
         IReadOnlyList<GameReport> reports = [noGame, report];
         var folder = Path.Combine(game.Root, "out");

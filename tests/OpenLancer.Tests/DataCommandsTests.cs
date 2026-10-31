@@ -292,7 +292,7 @@ internal static class DataParity
             Xunit.Assert.Equal(W(expected, file), W(session, file));
         Xunit.Assert.Equal(expected.UndoLabel, session.UndoLabel);
         Xunit.Assert.Equal(EditOrigin.User, session.UndoOrigin);
-        Xunit.Assert.Empty(host.Log.Entries.Where(e => e.Severity == ConsoleSeverity.Error));
+        Xunit.Assert.DoesNotContain(host.Log.Entries, e => e.Severity == ConsoleSeverity.Error);
     }
 
     /// <summary>Each section of a file of W with its lines, in file order.</summary>

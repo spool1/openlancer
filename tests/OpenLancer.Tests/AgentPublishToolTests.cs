@@ -243,7 +243,7 @@ public sealed class AgentPublishToolTests
 
         var tail = AgentTools.Run(host, "export_mod", JsonNode.Parse("""{ "formats": ["drop_in"] }""")!.AsObject())
             .Tail!(TestContext.Current.CancellationToken, progress);
-        Assert.True(progress.Started.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        await progress.Started.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var close = Task.Run(host.Dispose, TestContext.Current.CancellationToken);
         var waited = await Task.WhenAny(close, Task.Delay(300, TestContext.Current.CancellationToken)) != close;
         release.Set();
@@ -316,7 +316,7 @@ public sealed class AgentPublishToolTests
 
         var call = queue.CallAsync("export_mod", null, null, TestContext.Current.CancellationToken, progress);
         Assert.True(queue.RunNext());
-        progress.Started.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await progress.Started.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         clock.Advance(TimeSpan.FromSeconds(61));
         await Task.Delay(100, TestContext.Current.CancellationToken);
         var afterCheckLimit = call.IsCompleted;
@@ -350,7 +350,7 @@ public sealed class AgentPublishToolTests
 
         var tail = AgentTools.Run(host, "export_mod", JsonNode.Parse("""{ "formats": ["drop_in"] }""")!.AsObject())
             .Tail!(TestContext.Current.CancellationToken, progress);
-        Assert.True(progress.Started.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        await progress.Started.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         session.Execute(EditCommand.SetLinesFromText(new SectionRef(ExportGame.GoodsPath,
             new SectionIdentity("Good", "lf_hull")), "price", ["1"]));
         var saved = Error(host, "save");
@@ -386,15 +386,17 @@ public sealed class AgentPublishToolTests
 
     /// <summary>A progress that holds the export at a step until the test releases it. Step 0 is the check of the mod,
     /// and step 1 is the start of the write.</summary>
+    /// <remarks>The test awaits <see cref="Started"/> and blocks no thread of the pool. So a test run with a high load
+    /// still gives a thread to the export (final finding of MCP1-2).</remarks>
     private sealed class Holding(ManualResetEventSlim release, int step = 0) : IProgress<ToolProgress>
     {
-        public ManualResetEventSlim Started { get; } = new();
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void Report(ToolProgress value)
         {
             if (value.Progress != step)
                 return;
-            Started.Set();
+            Started.TrySetResult();
             release.Wait(TimeSpan.FromSeconds(30));
         }
     }

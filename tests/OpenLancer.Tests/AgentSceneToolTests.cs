@@ -71,13 +71,16 @@ public sealed class AgentSceneToolTests
         var (ws, session, host) = Scene();
         using var _ = ws;
 
-        var count = Error(host, "scene_create_zone", """{ "system": "Li01", "position": [0, 0, 0], "size": [1, 2] }""");
+        var countCall = Call(host, "scene_create_zone", """{ "system": "Li01", "position": [0, 0, 0], "size": [1, 2] }""");
+        var count = ((string?)countCall.Content["code"], (string?)countCall.Content["detail"], (string?)countCall.Content["message"]);
         var small = Error(host, "scene_create_zone",
             """{ "system": "system:Li01", "shape": "box", "position": [0, 0, 0], "size": [10, 0.5, 10] }""");
         var made = Ok(host, "scene_create_zone", """{ "system": "Li01", "position": [0, 0, 0] }""");
 
-        Assert.Equal(("invalid_value", "FieldValue"), (count.Code, count.Detail));
-        Assert.Equal("The size of a sphere zone has one value. Give one value.", count.Message);
+        Assert.Equal(("invalid_value", "FieldValue"), (count.Item1, count.Item2));
+        Assert.Equal("The size of a sphere zone has one value. Give one value.", count.Item3);
+        // The call cancelled the new zone, so the error names no target.
+        Assert.Null(countCall.Content["target"]);
         Assert.Equal(("invalid_value", "FieldValue", "A size value must be 1 or more."), small);
         Assert.Equal(["zone:li01_zone_1"], Texts(made["adds"]));
         Assert.Equal("Agent: Create li01_zone_1", (string?)made["undo_label"]);
@@ -183,6 +186,9 @@ public sealed class AgentSceneToolTests
         Assert.Contains("planet1", unknown.Message);
         Assert.Equal(("name_taken", "NameTaken", "nickname"),
             ((string?)taken.Content["code"], (string?)taken.Content["detail"], (string?)taken.Content["field"]));
+        // The target is the item that holds the nickname, not the new item that the call cancelled.
+        Assert.Equal("obj:Li01_dock", (string?)taken.Content["target"]);
+        Assert.Null(field.Content["target"]);
         Assert.Equal(("invalid_argument", SceneEditTools.ParentNotInSystem), (parent.Code, parent.Detail));
         Assert.Equal("The parent obj:Li02_01 is not in the system Li01. Give an object of the same system.", parent.Message);
         Assert.Equal(("invalid_argument", ToolInput.BadArgument), (notObject.Code, notObject.Detail));
