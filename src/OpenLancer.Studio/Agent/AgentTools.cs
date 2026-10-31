@@ -20,8 +20,8 @@ namespace OpenLancer.Studio.Agent;
 /// </summary>
 /// <remarks>This build has the query tools of section 7.1 (milestone MCP1-1a) and the dry run query of M6c-1. It also
 /// has the edit tools of sections 7.2, 7.3 and 7.6 and the play tools of section 7.6 (milestone MCP1-2), the view
-/// tools of section 7.7 (milestone MCP1-1b), and the mission edit tools and the start plan query of section 7.4
-/// (milestone MCP1-3). The order of the rows follows the sections of the design, so a later part puts its tools at the
+/// tools of section 7.7 (milestone MCP1-1b), and the mission edit tools, the start plan query, the mission play and the
+/// live trace of section 7.4 (milestone MCP1-3). The order of the rows follows the sections of the design, so a later part puts its tools at the
 /// place of its section. The view tools are tools of the editor host.</remarks>
 public static class AgentTools
 {
@@ -213,12 +213,13 @@ public static class AgentTools
             MissionEditTools.InsertTrigger),
         Mission("mission_add_item", ToolHints.Adding, MissionEditTools.AddItemInput, MissionEditTools.NewItem),
         Mission("mission_place_prefab", ToolHints.Adding, MissionEditTools.PlacePrefabInput, MissionEditTools.PlacePrefab),
-        Query("mission_start_plan", ToolGroup.Missions, new ToolInput(
-                Text("script", true),
-                new TextParam("start", false, null, RunJson.MissionStartName),
-                new TextParam("target", false, MissionQueryTools.StartTargets, RunJson.OpenLancerTarget),
-                new TextParam("start_place", false, null, RunJson.SuggestedPlace)),
-            typeof(StartPlanResult), MissionQueryTools.StartPlan),
+        Query("mission_start_plan", ToolGroup.Missions, MissionQueryTools.StartInput, typeof(StartPlanResult),
+            MissionQueryTools.StartPlan),
+        PlayTool("mission_play", ToolHints.Changing, MissionQueryTools.StartInput, typeof(MissionPlayView),
+            PlayTools.MissionPlay),
+        Query("mission_play_trace", ToolGroup.Missions,
+            new ToolInput(new WholeParam("play", 0, 0), new WholeParam("since", 0, 0), Limit),
+            typeof(MissionTraceView), PlayTools.MissionTrace, ToolHosts.Editor),
         SessionTool("save", ToolHints.Changing, ToolInput.None, typeof(SaveView), SaveTools.Save),
         SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
         SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),
@@ -399,7 +400,7 @@ public static class AgentTools
             TailLimit = tail ?? StudioTool.TailOfLimits,
         };
 
-    /// <summary>A play tool of section 7.6 of the MCP1 design, in the group Play. Only the editor host can play
+    /// <summary>A play tool of sections 7.4 and 7.6 of the MCP1 design, in the group Play. Only the editor host can play
     /// (decision D739).</summary>
     /// <param name="runsInPause">True for a tool that Pause does not refuse (see <see cref="StudioTool.RunsInPause"/>).</param>
     private static StudioTool PlayTool(string name, ToolHints hints, ToolInput input, Type output,

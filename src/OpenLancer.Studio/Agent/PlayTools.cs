@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using LibreLancer;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Missions.Editing;
+using OpenLancer.Data.Missions.Run;
 using OpenLancer.Runtime.Play;
 
 namespace OpenLancer.Studio.Agent;
@@ -58,9 +60,50 @@ public sealed record PlayRequestView(AgentPlayStatus Play);
 /// <param name="Play">The state of Play after the stop.</param>
 public sealed record PlayStopView(AgentPlayStopped Stopped, AgentPlayStatus Play);
 
+/// <summary>The result of <c>mission_play</c>: the state of Play and the start that the game plays.</summary>
+/// <param name="Play">The state of Play when the request ended.</param>
+/// <param name="Script">The <c>msn:</c> reference of the script.</param>
+/// <param name="Start"><c>mission_start</c>, or the <c>trg:</c> reference of the trigger of the start. When the saved
+/// script does not have the trigger of the request, the game plays the mission start.</param>
+/// <param name="Kind">The kind of the start of the plan of the play.</param>
+/// <param name="StartName">The name of the start in the editor, for example "Checkpoint my_restore".</param>
+public sealed record MissionPlayView(AgentPlayStatus Play, string Script, string Start, StartKind Kind, string StartName)
+{
+    /// <summary>The warnings of the plan of the play.</summary>
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+}
+
+/// <summary>A change of a trigger in the live trace of a mission play.</summary>
+/// <param name="Sequence">The number of the change in its play, from 1.</param>
+/// <param name="Time">The time of the change since the game loaded the mission, in seconds.</param>
+/// <param name="Trigger">The <c>trg:</c> reference of the trigger, or its nickname when the editor does not know the
+/// script of the mission.</param>
+public sealed record MissionTraceChange(long Sequence, double Time, string Trigger, MissionChangeKind Change);
+
+/// <summary>The result of <c>mission_play_trace</c>: one page of the live trace of the mission of the OpenLancer game
+/// (section 7.4 of the MCP1 design).</summary>
+/// <param name="Play">The number of the play of the changes, or 0 before the first mission event.</param>
+/// <param name="Changes">The changes of the play after the sequence number of the request, oldest first.</param>
+/// <param name="More">True when the play has more changes than the page gives.</param>
+/// <param name="Status">The state of Play in OpenLancer.</param>
+public sealed record MissionTraceView(int Play, IReadOnlyList<MissionTraceChange> Changes, bool More, AgentPlayStatus Status)
+{
+    /// <summary>The name of the mission of the game, for example <c>Mission_02</c>, or null.</summary>
+    public string? Mission { get; init; }
+
+    /// <summary>The <c>msn:</c> reference of the script of the mission, or null.</summary>
+    public string? Script { get; init; }
+
+    /// <summary>The changes that the game dropped in the play because its queue was full.</summary>
+    public int Dropped { get; init; }
+
+    /// <summary>True while the game of a play copy runs. That game has no channel to the editor.</summary>
+    public bool GameRuns { get; init; }
+}
+
 /// <summary>
-/// The Play of the editor for the play tools (section 7.6 of the MCP1 design, decision D739). Only the editor host has
-/// it. Each member runs on the UI thread, in the session part of a call.
+/// The Play of the editor for the play tools (section 7.6 of the MCP1 design, decision D739) and the mission play tools
+/// of section 7.4. Only the editor host has it. Each member runs on the UI thread, in the session part of a call.
 /// </summary>
 public interface IAgentPlay
 {
@@ -76,15 +119,35 @@ public interface IAgentPlay
     /// play cannot start now, for example because another play runs.</exception>
     Func<CancellationToken, Task<PlayRequestView>> Start(PlayStart start);
 
+    /// <summary>
+    /// Asks for a mission play of a start of a script (the mission play request of section 7.2 of the M6c design), with
+    /// the agent play rule. The request plays the start of the request and never changes the play start of the user.
+    /// While a mission play runs, the game starts again at the new start.
+    /// </summary>
+    /// <returns>The wait for the result of the request, as for <see cref="Start"/>.</returns>
+    /// <exception cref="EditException"><see cref="EditErrorKind.Refused"/>, <see cref="EditErrorKind.Busy"/> or
+    /// <see cref="EditErrorKind.NotFound"/>: the play cannot start, for example because another play runs or the plan of
+    /// the start refuses.</exception>
+    Func<CancellationToken, Task<MissionPlayView>> StartMission(StartPlanRequest request);
+
+    /// <summary>One page of the live trace of the mission of the OpenLancer game: the changes of the current play after
+    /// a sequence number. A request with another play number gets the changes of the current play from its
+    /// start.</summary>
+    /// <param name="play">The play number of the last result of the caller, or 0.</param>
+    /// <param name="since">The last sequence number that the caller has, or 0.</param>
+    /// <param name="limit">The most changes of the page.</param>
+    MissionTraceView Trace(int play, long since, int limit);
+
     /// <summary>Stops the game of Play in OpenLancer when one runs, else the game of a play copy, as Shift+F5
     /// does.</summary>
     PlayStopView Stop();
 }
 
 /// <summary>
-/// The tools <c>play</c> and <c>play_stop</c> of section 7.6 of the MCP1 design. Only the editor host has them. The
-/// handler checks the arguments and makes the start. The Play of the editor then runs the checks of the Play menu and
-/// the agent play rule.
+/// The tools <c>play</c> and <c>play_stop</c> of section 7.6 of the MCP1 design, and <c>mission_play</c> and
+/// <c>mission_play_trace</c> of section 7.4. Only the editor host has them. The handler checks the arguments and makes
+/// the start. The Play of the editor then runs the checks of the Play menu or of the mission play request, and the
+/// agent play rule.
 /// </summary>
 internal static class PlayTools
 {
@@ -106,6 +169,36 @@ internal static class PlayTools
     }
 
     public static ToolStep Stop(ToolCall call) => ToolResult.Of(PlayOf(call).Stop());
+
+    /// <summary>
+    /// The mission play of an agent. The reader of <c>mission_start_plan</c> reads the start, so one request plans and
+    /// plays the same start. The tool is in the group Play, and its script is an item of the group Missions. So it also
+    /// refuses while the user hides the group Missions (the item rule of decision D725).
+    /// </summary>
+    public static ToolStep MissionPlay(ToolCall call)
+    {
+        var play = PlayOf(call);
+        var request = MissionQueryTools.StartRequest(call.Args);
+        _ = call.Session;
+        if (call.Host.HiddenGroups.Contains(ToolGroup.Missions))
+        {
+            throw new EditException(AgentTools.GroupHidden(ToolGroup.Missions) with
+            {
+                Target = new ScriptRef(request.Script).ToString(),
+            });
+        }
+        var wait = play.StartMission(request);
+        return ToolStep.Then(async cancel => ToolResult.Of(await wait(cancel).ConfigureAwait(false)));
+    }
+
+    /// <summary>One page of the live trace. The page has the default rows of the limits, or the rows of
+    /// <c>limit</c>.</summary>
+    public static ToolStep MissionTrace(ToolCall call)
+    {
+        var args = call.Args;
+        var number = (int)Math.Min(args.Whole("play") ?? 0, int.MaxValue);
+        return ToolResult.Of(PlayOf(call).Trace(number, args.Whole("since") ?? 0, call.RowLimit()));
+    }
 
     /// <summary>The start of the arguments: a point with a heading in a system, or a base.</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/>: an argument of the other kind of

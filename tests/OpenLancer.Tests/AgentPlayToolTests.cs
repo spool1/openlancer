@@ -19,9 +19,10 @@ namespace OpenLancer.Tests;
 /// <summary>
 /// The tools <c>play</c> and <c>play_stop</c> (section 7.6 of the MCP1 design, decision D739) with the agent play rule of
 /// the user decision of 2026-10-20: the Play of the editor with a fake editor, the checks that the Play menu shares, the
-/// question of the user, and its close at the time limit and at a cancel of the client.
+/// question of the user, and its close at the time limit and at a cancel of the client. The second part of the class has
+/// the tools <c>mission_play</c> and <c>mission_play_trace</c> of section 7.4.
 /// </summary>
-public sealed class AgentPlayToolTests : IDisposable
+public sealed partial class AgentPlayToolTests : IDisposable
 {
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
 
@@ -339,7 +340,7 @@ public sealed class AgentPlayToolTests : IDisposable
         Assert.Empty(editor.Requests);
     }
 
-    /// <summary>Only the editor host can play (decision D739).</summary>
+    /// <summary>Only the editor host can play and has the live trace (decision D739).</summary>
     [Fact]
     public void TheHostWithoutAWindowGivesNotAvailable()
     {
@@ -347,6 +348,8 @@ public sealed class AgentPlayToolTests : IDisposable
 
         Assert.Equal(("not_available", "EditorOnly"), Codes(Error(host, "play", AtBase)));
         Assert.Equal(("not_available", "EditorOnly"), Codes(Error(host, "play_stop")));
+        Assert.Equal(("not_available", "EditorOnly"), Codes(Error(host, "mission_play", MissionStart)));
+        Assert.Equal(("not_available", "EditorOnly"), Codes(Error(host, "mission_play_trace")));
     }
 
     /// <summary>Without an open profile, play gives the error of each tool that reads the profile, with the text of
@@ -375,14 +378,17 @@ public sealed class AgentPlayToolTests : IDisposable
 
         Assert.Equal(("not_available", "GroupHidden"), Codes(Error(host, "play", AtBase)));
         Assert.Equal(("not_available", "GroupHidden"), Codes(Error(host, "play_stop")));
+        Assert.Equal(("not_available", "GroupHidden"), Codes(Error(host, "mission_play", MissionStart)));
         Assert.Equal(0, editor.Stops);
+        Assert.Empty(editor.MissionRequests);
         Assert.DoesNotContain(ToolGroup.Play, host.ShownGroups);
     }
 
-    /// <summary>A play request is not an edit, so edit_batch refuses play and play_stop as steps.</summary>
+    /// <summary>A play request is not an edit, so edit_batch refuses play, play_stop and mission_play as steps.</summary>
     [Theory]
     [InlineData("play")]
     [InlineData("play_stop")]
+    [InlineData("mission_play")]
     public void EditBatchRefusesAPlayToolAsAStep(string tool)
     {
         var (scene, session, host) = AgentEditToolTests.Scene();
@@ -444,27 +450,28 @@ public sealed class AgentPlayToolTests : IDisposable
 
     private static JsonObject Args(string json) => JsonNode.Parse(json)!.AsObject();
 
-    /// <summary>Runs a play call that the session part refuses, and gives its code, its detail and its message. A
-    /// refusal of the session part has no tail, so no question of the user waits for an answer.</summary>
-    private static (string? Code, string? Detail, string? Message) Refusal(AgentHost host, string arguments)
+    /// <summary>Runs a call of a play tool that the session part refuses, and gives its code, its detail and its
+    /// message. A refusal of the session part has no tail, so no question of the user waits for an answer.</summary>
+    private static (string? Code, string? Detail, string? Message) Refusal(AgentHost host, string arguments,
+        string tool = "play")
     {
-        var result = AgentTools.Run(host, "play", Args(arguments)).Result;
+        var result = AgentTools.Run(host, tool, Args(arguments)).Result;
         Assert.NotNull(result);
         Assert.True(result.IsError, result.Text);
-        Assert.Empty(SchemaCheck.Problems(AgentTools.Find("play")!.OutputSchema, result.Content));
+        Assert.Empty(SchemaCheck.Problems(AgentTools.Find(tool)!.OutputSchema, result.Content));
         return ((string?)result.Content["code"], (string?)result.Content["detail"], (string?)result.Content["message"]);
     }
 
-    /// <summary>Runs the session part of a play call, then starts its tail.</summary>
-    private static Task<ToolResult> Tail(AgentHost host, string arguments, CancellationToken cancel)
+    /// <summary>Runs the session part of a call of a play tool, then starts its tail.</summary>
+    private static Task<ToolResult> Tail(AgentHost host, string arguments, CancellationToken cancel, string tool = "play")
     {
-        var step = AgentTools.Run(host, "play", Args(arguments));
+        var step = AgentTools.Run(host, tool, Args(arguments));
         Assert.Null(step.Result);
         return step.Tail!(cancel, ToolProgress.None);
     }
 
     /// <summary>The Play of a test editor: it keeps each request and each stop.</summary>
-    internal sealed class FakePlayEditor : PlayRequestsTests.FakeAgentHost, IAgentPlayEditor
+    internal sealed partial class FakePlayEditor : PlayRequestsTests.FakeAgentHost, IAgentPlayEditor
     {
         public PlayStatus PlayStatus { get; set; } = PlayStatus.Idle;
 

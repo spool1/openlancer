@@ -92,7 +92,7 @@ public sealed class AgentToolTableTests
     public void EachToolHasTheKindAndTheHintsOfWhatItChanges()
     {
         string[] views = ["open_view", "select_items", "render_scene", "render_cutscene", "capture_panel"];
-        string[] editor = ["get_console", "play", "play_stop", .. views];
+        string[] editor = ["get_console", "mission_play", "mission_play_trace", "play", "play_stop", .. views];
         var query = new ToolHints(ReadOnly: true, Destructive: false, Idempotent: true);
 
         foreach (var tool in AgentTools.All)
@@ -241,11 +241,11 @@ public sealed class AgentToolTableTests
 
     /// <summary>The edit tools, the tools of the session and the play tools of this build in the order of the table,
     /// with their kinds and hints. The tools of section 7.3 follow the tools of section 7.2, the mission tools of section
-    /// 7.4 follow them, and the tools of section 7.6 come next. mission_edit can remove triggers and items, so it is
+    /// 7.4 follow them with the mission play and its live trace at their end, and the tools of section 7.6 come next. mission_edit can remove triggers and items, so it is
     /// destructive. A tool that adds data is not destructive, and a tool that can change or remove data is (review
     /// finding R7 of MCP1-2). So a mission tool that sets, moves or links lines is destructive. edit_batch can have a
-    /// step that removes data, so it is destructive (final finding of MCP1-2). play can save the mod, so it is
-    /// destructive (section 7.0). play_stop removes no data.</summary>
+    /// step that removes data, so it is destructive (final finding of MCP1-2). play and mission_play can save the mod, so
+    /// they are destructive (section 7.0). play_stop removes no data. mission_play_trace only reads.</summary>
     private static readonly Dictionary<string, (ToolKind Kind, ToolHints Hints)> Edits = new()
     {
         ["set_fields"] = (ToolKind.Edit, new ToolHints(false, true, true)),
@@ -279,6 +279,8 @@ public sealed class AgentToolTableTests
         ["mission_add_item"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["mission_place_prefab"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["mission_start_plan"] = (ToolKind.Query, new ToolHints(true, false, true)),
+        ["mission_play"] = (ToolKind.Play, new ToolHints(false, true, false)),
+        ["mission_play_trace"] = (ToolKind.Query, new ToolHints(true, false, true)),
         ["save"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["undo"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["redo"] = (ToolKind.Session, new ToolHints(false, true, false)),

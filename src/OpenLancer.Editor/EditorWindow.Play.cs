@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
@@ -256,4 +257,9 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
         Play.Request(start, PlayPackage, save, EditOrigin.Agent);
 
     PlayStopped IAgentPlayEditor.Stop() => PlayRequests.Stop(Play, GamePlay);
+
+    Task<PlayRequestResult> IAgentPlayEditor.PlayMission(MissionPlayRequest request, CancellationToken cancel) =>
+        Missions.Plays.Request(request, cancel);
+
+    LiveTraceResult IAgentPlayEditor.LiveTrace(int play, long since) => Missions.LiveTrace(play, since);
 }

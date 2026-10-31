@@ -175,6 +175,14 @@ internal static class MissionQueryTools
     /// M6c-3).</summary>
     internal static IReadOnlyList<string> StartTargets { get; } = [RunJson.OpenLancerTarget];
 
+    /// <summary>The arguments of a start of a mission play: the input of <c>mission_start_plan</c> and of
+    /// <c>mission_play</c>.</summary>
+    internal static ToolInput StartInput { get; } = new(
+        new TextParam("script", true, null, null),
+        new TextParam("start", false, null, RunJson.MissionStartName),
+        new TextParam("target", false, StartTargets, RunJson.OpenLancerTarget),
+        new TextParam("start_place", false, null, RunJson.SuggestedPlace));
+
     /// <summary>
     /// The start plan query (section 7.2 of the M6c design): the plan of a start of a script now, as the Play start page
     /// shows it. A plan that cannot start is data: the status <c>refused</c> and the reason. The request reader of the
@@ -186,7 +194,18 @@ internal static class MissionQueryTools
     /// resolve.</exception>
     public static ToolStep StartPlan(ToolCall call)
     {
-        var args = call.Args;
+        var read = StartRequest(call.Args);
+        // An unknown trigger of the start names start. Each other error of the query is an error of the script.
+        return ToolResult.Of(new StartPlanResult(EditTools.At("script", () => call.Session.Missions.Queries.StartPlan(read))));
+    }
+
+    /// <summary>The request of a start of the arguments of <see cref="StartInput"/>, read with the request reader of the
+    /// JSON host (<see cref="RunJson.ReadStartRequest"/>). So <c>mission_start_plan</c> and <c>mission_play</c> read one
+    /// start in one way.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a prefab, a start of another
+    /// script or a place that is not valid.</exception>
+    internal static StartPlanRequest StartRequest(ToolArgs args)
+    {
         var script = EditTools.At("script", () => ScriptRef.Parse(args.Text("script")!));
         if (MissionRefs.IsPrefab(script.Path))
             throw ToolInput.Bad("script", AgentTexts.Error("mission_start_prefab", ("ref", script)));
@@ -201,9 +220,7 @@ internal static class MissionQueryTools
         if (args.Text("start") is { } start)
             request["start"] = start == RunJson.MissionStartName ? start : MissionEditTools.TriggerOf(start, "start").ToString();
         // The script is valid, so an error of the reader without a field is the read of the reference of the start.
-        var read = EditTools.At("start", () => RunJson.ReadStartRequest(request));
-        // An unknown trigger of the start names start. Each other error of the query is an error of the script.
-        return ToolResult.Of(new StartPlanResult(EditTools.At("script", () => call.Session.Missions.Queries.StartPlan(read))));
+        return EditTools.At("start", () => RunJson.ReadStartRequest(request));
     }
 
     /// <summary>A trigger in summary form: the sentence of its condition and one chip for each action group, in the

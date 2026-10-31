@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
@@ -151,14 +152,14 @@ public sealed class MissionPlayTests : IDisposable
     {
         editor.UnsavedMod = "act";
 
-        var cancelled = plays.Request(AgentRequest("t_kill"));
+        var cancelled = Request(AgentRequest("t_kill"));
         editor.Asked!.Value.Choices.Single(c => c.Label == "Cancel").Action();
 
         Assert.True(cancelled.Wait(Wait));
         Assert.Equal("The user did not save. Play did not start.", cancelled.Result.Error!.Message);
         Assert.Empty(editor.Requests);
 
-        var saved = plays.Request(AgentRequest("t_kill"));
+        var saved = Request(AgentRequest("t_kill"));
         editor.Asked!.Value.Choices.Single(c => c.Label == "Save and continue").Action();
 
         Assert.True(saved.Wait(Wait));
@@ -167,16 +168,35 @@ public sealed class MissionPlayTests : IDisposable
         Assert.Equal([PlaySaveRule.Save], editor.Saves);
     }
 
+    /// <summary>The cancel of an agent request, for example at the end of the call of the agent, closes its question as
+    /// Cancel does. "Save and continue" after the cancel does not start the play.</summary>
+    [Fact]
+    public async Task TheCancelOfAnAgentRequestClosesItsQuestion()
+    {
+        editor.UnsavedMod = "act";
+        using var cancel = new CancellationTokenSource();
+        var result = plays.Request(AgentRequest("t_kill"), cancel.Token);
+        var question = editor.Asked!.Value;
+
+        cancel.Cancel();
+        question.Choices.Single(c => c.Label == "Save and continue").Action();
+
+        Assert.Same(question.Choices, Assert.Single(editor.Withdrawn));
+        var done = await result.WaitAsync(Wait, TestContext.Current.CancellationToken);
+        Assert.Equal(PlayRequests.NotSavedDetail, done.Error!.Detail);
+        Assert.Empty(editor.Requests);
+    }
+
     /// <summary>A second agent request while the question of the first is open gives busy, so the first question stays
     /// and its agent gets its answer. After the answer, a new request asks again.</summary>
     [Fact]
     public void ASecondAgentRequestWhileTheQuestionIsOpenGivesBusy()
     {
         editor.UnsavedMod = "act";
-        var first = plays.Request(AgentRequest("t_kill"));
+        var first = Request(AgentRequest("t_kill"));
         var question = editor.Asked!.Value;
 
-        var second = plays.Request(AgentRequest(null));
+        var second = Request(AgentRequest(null));
 
         Assert.True(second.Wait(Wait));
         Assert.Equal(EditErrorKind.Busy, second.Result.Error!.Kind);
@@ -185,7 +205,7 @@ public sealed class MissionPlayTests : IDisposable
         question.Cancel();
         Assert.True(first.Wait(Wait));
 
-        plays.Request(AgentRequest(null));
+        Request(AgentRequest(null));
         Assert.NotSame(question.Choices, editor.Asked!.Value.Choices);
     }
 
@@ -199,10 +219,10 @@ public sealed class MissionPlayTests : IDisposable
         editor.UnsavedMod = "act";
         var running = new TaskCompletionSource<PlayRequestResult>();
         editor.Result = running;
-        var first = plays.Request(AgentRequest("t_kill"));
+        var first = Request(AgentRequest("t_kill"));
         editor.Asked!.Value.Choices.Single(c => c.Label == "Save and continue").Action();
 
-        var second = await plays.Request(AgentRequest(null)).WaitAsync(Wait, cancel);
+        var second = await Request(AgentRequest(null)).WaitAsync(Wait, cancel);
 
         Assert.Equal(EditErrorKind.Busy, second.Error!.Kind);
         Assert.Equal(PlayRequests.AgentWaitsDetail, second.Error.Detail);
@@ -213,7 +233,7 @@ public sealed class MissionPlayTests : IDisposable
         Assert.True((await first.WaitAsync(Wait, cancel)).Started);
         editor.Result = null;
         editor.UnsavedMod = null;
-        var third = await plays.Request(AgentRequest(null)).WaitAsync(Wait, cancel);
+        var third = await Request(AgentRequest(null)).WaitAsync(Wait, cancel);
 
         Assert.True(third.Started);
         Assert.Equal(2, editor.Requests.Count);
@@ -239,7 +259,7 @@ public sealed class MissionPlayTests : IDisposable
     public void SaveAndContinueChecksTheRuleOfAnotherPlayAgain()
     {
         editor.UnsavedMod = "act";
-        var result = plays.Request(AgentRequest("t_kill"));
+        var result = Request(AgentRequest("t_kill"));
         editor.PlayStatus = PlayStatus.Running;
 
         editor.Asked!.Value.Choices.Single(c => c.Label == "Save and continue").Action();
@@ -258,7 +278,7 @@ public sealed class MissionPlayTests : IDisposable
         editor.UnsavedMod = unsaved;
         editor.AutoSaveAgentPlay = autoSave;
 
-        var result = plays.Request(AgentRequest("t_kill"));
+        var result = Request(AgentRequest("t_kill"));
 
         Assert.Null(editor.Asked);
         Assert.Single(editor.Requests);
@@ -274,14 +294,14 @@ public sealed class MissionPlayTests : IDisposable
     public void AnAgentRequestWhileAnotherPlayRunsIsRefused()
     {
         editor.GameRuns = true;
-        Assert.Equal(MissionPlay.OtherPlayDetail, plays.Request(AgentRequest(null)).Result.Error!.Detail);
+        Assert.Equal(MissionPlay.OtherPlayDetail, Request(AgentRequest(null)).Result.Error!.Detail);
 
         editor.GameRuns = false;
         editor.PlayStatus = PlayStatus.Running;
-        Assert.Equal(MissionPlay.OtherPlayDetail, plays.Request(AgentRequest(null)).Result.Error!.Detail);
+        Assert.Equal(MissionPlay.OtherPlayDetail, Request(AgentRequest(null)).Result.Error!.Detail);
 
         editor.RunningMission = new MissionPlayStart(plays, new MissionPlayRequest(ScriptPath, MissionStartPoint.MissionStart));
-        Assert.Null(plays.Request(AgentRequest(null)).Result.Error);
+        Assert.Null(Request(AgentRequest(null)).Result.Error);
         Assert.Single(editor.Requests);
     }
 
@@ -293,16 +313,16 @@ public sealed class MissionPlayTests : IDisposable
         editor.UnsavedMod = "act";
         editor.Slot = null;
 
-        var noSlot = plays.Request(AgentRequest("t_kill")).Result;
+        var noSlot = Request(AgentRequest("t_kill")).Result;
 
         Assert.Equal(EditErrorKind.Refused, noSlot.Error!.Kind);
         Assert.Equal(StartPlan.NoSlotReason, noSlot.Error.Message);
         Assert.Equal(StartRefusal.NoSlot, noSlot.Plan!.Refusal);
         editor.Slot = StartPlanTests.Slot;
-        Assert.Equal(EditErrorKind.NotFound, plays.Request(AgentRequest("t_gone")).Result.Error!.Kind);
-        Assert.Equal(StartPlan.NoTriggerReason("t_gone"), plays.Request(AgentRequest("t_gone")).Result.Error!.Message);
+        Assert.Equal(EditErrorKind.NotFound, Request(AgentRequest("t_gone")).Result.Error!.Kind);
+        Assert.Equal(StartPlan.NoTriggerReason("t_gone"), Request(AgentRequest("t_gone")).Result.Error!.Message);
         editor.Missing = "The session has no such mission script.";
-        var noScript = plays.Request(AgentRequest(null)).Result.Error!;
+        var noScript = Request(AgentRequest(null)).Result.Error!;
         Assert.Equal((EditErrorKind.NotFound, MissionErrors.ScriptNotFound), (noScript.Kind, noScript.Detail));
         Assert.Null(editor.Asked);
         Assert.Empty(editor.Requests);
@@ -341,7 +361,7 @@ public sealed class MissionPlayTests : IDisposable
     {
         editor.Index = MissionTestData.Index(StartWorldTests.Script(), StartWorldTests.World());
         editor.Camera = new StartSavePlace("ol_sys_b", null, new Vector3(-5000, 0, 0), Quaternion.Identity);
-        plays.Request(new MissionPlayRequest(ScriptPath, MissionStartPoint.At("t_chosen")) { Place = StartPlaceChoice.Camera });
+        Request(new MissionPlayRequest(ScriptPath, MissionStartPoint.At("t_chosen")) { Place = StartPlaceChoice.Camera });
         var start = (MissionPlayStart)editor.Requests[0];
 
         var fromSave = start.Prepare();
@@ -514,6 +534,10 @@ public sealed class MissionPlayTests : IDisposable
         Assert.NotEqual(MissionRef.Of(MissionTestData.Path), item);
     }
 
+    /// <summary>A mission play request. The cancel of the test closes the question of an agent request.</summary>
+    private Task<PlayRequestResult> Request(MissionPlayRequest request) =>
+        plays.Request(request, TestContext.Current.CancellationToken);
+
     private static MissionPlayRequest AgentRequest(string? trigger) =>
         new(ScriptPath, trigger == null ? MissionStartPoint.MissionStart : MissionStartPoint.At(trigger))
         {
@@ -595,9 +619,10 @@ public sealed class MissionPlayTests : IDisposable
         public void Ask(string title, string message, IReadOnlyList<Choice> choices, Action cancel) =>
             Asked = (title, message, choices, cancel);
 
-        public void Withdraw(IReadOnlyList<Choice> choices)
-        {
-        }
+        /// <summary>The buttons of each question that a cancel closed.</summary>
+        public List<IReadOnlyList<Choice>> Withdrawn { get; } = [];
+
+        public void Withdraw(IReadOnlyList<Choice> choices) => Withdrawn.Add(choices);
 
         public AgentPlayRule AgentPlays { get; } = new();
     }

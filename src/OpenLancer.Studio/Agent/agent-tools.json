@@ -531,6 +531,25 @@
         "start_place": "Where the player starts. suggested is the place that the editor suggests, and camera is the Scene camera of the editor. base: and the nickname of a base starts at that base, for example base:my_base."
       }
     },
+    "mission_play": {
+      "title": "Play a mission in OpenLancer",
+      "description": "When the active mod has unsaved edits, the editor asks the user to save them first. When the user turned on the automatic save for an agent Play, the editor saves without a question. Then the tool plays one mission script in OpenLancer from a start, with the plan of mission_start_plan. When the user cancels, or the plan cannot start, Play does not start. While a mission play runs, the game starts again at the new start. While another play runs, the tool refuses. Call play_stop first. The tool does not change the play start of the user. Only the editor host can play.",
+      "fields": {
+        "script": "The mission script of the play, for example msn:DATA\\MISSIONS\\M01A\\m01a.ini. OpenLancer plays only the scripts of the 14 story slots. A prefab: reference gives invalid_argument.",
+        "start": "Where the play starts: mission_start, or the trg: or sec: reference of a trigger of the script. mission_start_plan with the same arguments gives the plan of the start.",
+        "target": "The game of the play. This version plays a mission only in OpenLancer.",
+        "start_place": "Where the player starts. suggested is the place that the editor suggests, and camera is the Scene camera of the editor. base: and the nickname of a base starts at that base, for example base:my_base."
+      }
+    },
+    "mission_play_trace": {
+      "title": "Read the live trace of a mission play",
+      "description": "Gives the trigger changes of the mission of the OpenLancer game, oldest first: each trigger that starts, runs or stops. Each change has a sequence number in its play. Give the play number and the sequence number of the last change that you have. The tool then gives only the later changes. A new play gives all its changes. This tool changes nothing. Only the editor host has a live trace.",
+      "fields": {
+        "play": "The play number of the last result, or 0. Another play number than the current play gives all changes of the current play.",
+        "since": "Give only the changes after this sequence number. Use the sequence of the last change of the previous result.",
+        "limit": "The most changes of the result. studio_status gives the default and the largest value. When the play has more changes, more is true. Call the tool again with since."
+      }
+    },
     "save": {
       "title": "Save the edits of the active mod",
       "description": "Saves the edits into the patch files of the active mod. The save stops when the checks find errors. Read the errors, correct them, then save again."
@@ -1472,6 +1491,24 @@
     "TargetCheckRow.warnings": "The number of warnings of the checks of the target.",
     "PlayRequestView.play": "The state of Play in OpenLancer when the request ended: idle, starting, validating, running, reloading, not_responding or stopping.",
     "PlayStopView.stopped": "The game that the stop stopped: openlancer for Play in OpenLancer, game for the game of a play copy, or nothing.",
-    "PlayStopView.play": "The state of Play in OpenLancer after the stop. A game that stops gives stopping until it exits."
+    "PlayStopView.play": "The state of Play in OpenLancer after the stop. A game that stops gives stopping until it exits.",
+    "MissionPlayView.play": "The state of Play in OpenLancer when the request ended: idle, starting, validating, running, reloading, not_responding or stopping.",
+    "MissionPlayView.script": "The msn: reference of the script of the play.",
+    "MissionPlayView.start": "mission_start, or the trg: reference of the trigger of the start. When the saved script does not have the trigger of the request, the game plays the mission start.",
+    "MissionPlayView.kind": "The kind of the start: mission_start, checkpoint, approximate or test_script.",
+    "MissionPlayView.start_name": "The name of the start in the editor, for example \"Checkpoint my_restore\".",
+    "MissionPlayView.warnings": "The warnings of the plan of the play, for example a place that the editor cannot find.",
+    "MissionTraceView.play": "The number of the play of the changes, or 0 before the first mission event.",
+    "MissionTraceView.changes": "The changes of the play after since, oldest first.",
+    "MissionTraceView.more": "True when the play has more changes than the result gives. Call the tool again with the sequence of the last change.",
+    "MissionTraceView.status": "The state of Play in OpenLancer: idle, starting, validating, running, reloading, not_responding or stopping.",
+    "MissionTraceView.mission": "The name of the mission of the game, for example Mission_02, or none.",
+    "MissionTraceView.script": "The msn: reference of the script of the mission, or none.",
+    "MissionTraceView.dropped": "The changes that the game dropped in the play because its queue was full.",
+    "MissionTraceView.game_runs": "True while the game of a play copy runs. That game sends no changes to the editor, so the result then has no changes.",
+    "MissionTraceChange.sequence": "The number of the change in its play, from 1.",
+    "MissionTraceChange.time": "The time of the change since the game loaded the mission, in seconds.",
+    "MissionTraceChange.trigger": "The trg: reference of the trigger, or its nickname when the editor does not know the script.",
+    "MissionTraceChange.change": "What the trigger did: started (it became active), ran (it ran its actions) or stopped."
   }
 }

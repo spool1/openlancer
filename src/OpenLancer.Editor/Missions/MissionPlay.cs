@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 using LibreLancer.Data;
 using OpenLancer.Data.Editing;
@@ -223,8 +224,11 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
     /// <c>refused</c> while another play runs and when its plan cannot start, and it follows the agent play rule (see
     /// <see cref="PlayRequests.WithAgentRule"/>).
     /// </summary>
+    /// <param name="cancel">Closes the question of the agent play rule as Cancel does, for example at the end of the call
+    /// of an agent. After it, "Save and continue" does not start the play. The requests of the user do not give
+    /// it.</param>
     /// <returns>The result, when the play started or did not start.</returns>
-    public Task<PlayRequestResult> Request(MissionPlayRequest request)
+    public Task<PlayRequestResult> Request(MissionPlayRequest request, CancellationToken cancel = default)
     {
         if (editor.ProfilePath == null)
         {
@@ -242,7 +246,7 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
         // the answer.
         return editor.AgentPlays.Run(editor, request.Origin, () => editor.PlayStatus,
             () => AgentRefusal(request, afterQuestion: true),
-            save => editor.RequestMission(new MissionPlayStart(this, request), editor.PlayPackage, save));
+            save => editor.RequestMission(new MissionPlayStart(this, request), editor.PlayPackage, save), cancel);
     }
 
     /// <summary>

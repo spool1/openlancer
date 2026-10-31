@@ -38877,6 +38877,416 @@
       }
     },
     {
+      "name": "mission_play",
+      "title": "Play a mission in OpenLancer",
+      "description": "When the active mod has unsaved edits, the editor asks the user to save them first. When the user turned on the automatic save for an agent Play, the editor saves without a question. Then the tool plays one mission script in OpenLancer from a start, with the plan of mission_start_plan. When the user cancels, or the plan cannot start, Play does not start. While a mission play runs, the game starts again at the new start. While another play runs, the tool refuses. Call play_stop first. The tool does not change the play start of the user. Only the editor host can play.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The mission script of the play, for example msn:DATA\\MISSIONS\\M01A\\m01a.ini. OpenLancer plays only the scripts of the 14 story slots. A prefab: reference gives invalid_argument."
+          },
+          "start": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "default": "mission_start",
+            "description": "Where the play starts: mission_start, or the trg: or sec: reference of a trigger of the script. mission_start_plan with the same arguments gives the plan of the start."
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "openlancer"
+            ],
+            "default": "openlancer",
+            "description": "The game of the play. This version plays a mission only in OpenLancer."
+          },
+          "start_place": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "default": "suggested",
+            "description": "Where the player starts. suggested is the place that the editor suggests, and camera is the Scene camera of the editor. base: and the nickname of a base starts at that base, for example base:my_base."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "script"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "play": {
+            "enum": [
+              "idle",
+              "starting",
+              "validating",
+              "running",
+              "reloading",
+              "not_responding",
+              "stopping"
+            ],
+            "description": "The state of Play in OpenLancer when the request ended: idle, starting, validating, running, reloading, not_responding or stopping."
+          },
+          "script": {
+            "type": "string",
+            "description": "The msn: reference of the script of the play."
+          },
+          "start": {
+            "type": "string",
+            "description": "mission_start, or the trg: reference of the trigger of the start. When the saved script does not have the trigger of the request, the game plays the mission start."
+          },
+          "kind": {
+            "enum": [
+              "mission_start",
+              "checkpoint",
+              "approximate",
+              "test_script"
+            ],
+            "description": "The kind of the start: mission_start, checkpoint, approximate or test_script."
+          },
+          "start_name": {
+            "type": "string",
+            "description": "The name of the start in the editor, for example \u0022Checkpoint my_restore\u0022."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The warnings of the plan of the play, for example a place that the editor cannot find."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view that the tool read, as text. A save does not change it."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "play",
+              "script",
+              "start",
+              "kind",
+              "start_name"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Play a mission in OpenLancer",
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "mission_play_trace",
+      "title": "Read the live trace of a mission play",
+      "description": "Gives the trigger changes of the mission of the OpenLancer game, oldest first: each trigger that starts, runs or stops. Each change has a sequence number in its play. Give the play number and the sequence number of the last change that you have. The tool then gives only the later changes. A new play gives all its changes. This tool changes nothing. Only the editor host has a live trace.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "play": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "The play number of the last result, or 0. Another play number than the current play gives all changes of the current play."
+          },
+          "since": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Give only the changes after this sequence number. Use the sequence of the last change of the previous result."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The most changes of the result. studio_status gives the default and the largest value. When the play has more changes, more is true. Call the tool again with since."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "play": {
+            "type": "integer",
+            "description": "The number of the play of the changes, or 0 before the first mission event."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sequence": {
+                  "type": "integer",
+                  "description": "The number of the change in its play, from 1."
+                },
+                "time": {
+                  "type": "number",
+                  "description": "The time of the change since the game loaded the mission, in seconds."
+                },
+                "trigger": {
+                  "type": "string",
+                  "description": "The trg: reference of the trigger, or its nickname when the editor does not know the script."
+                },
+                "change": {
+                  "enum": [
+                    "started",
+                    "ran",
+                    "stopped"
+                  ],
+                  "description": "What the trigger did: started (it became active), ran (it ran its actions) or stopped."
+                }
+              },
+              "required": [
+                "sequence",
+                "time",
+                "trigger",
+                "change"
+              ]
+            },
+            "description": "The changes of the play after since, oldest first."
+          },
+          "more": {
+            "type": "boolean",
+            "description": "True when the play has more changes than the result gives. Call the tool again with the sequence of the last change."
+          },
+          "status": {
+            "enum": [
+              "idle",
+              "starting",
+              "validating",
+              "running",
+              "reloading",
+              "not_responding",
+              "stopping"
+            ],
+            "description": "The state of Play in OpenLancer: idle, starting, validating, running, reloading, not_responding or stopping."
+          },
+          "mission": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of the mission of the game, for example Mission_02, or none."
+          },
+          "script": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The msn: reference of the script of the mission, or none."
+          },
+          "dropped": {
+            "type": "integer",
+            "description": "The changes that the game dropped in the play because its queue was full."
+          },
+          "game_runs": {
+            "type": "boolean",
+            "description": "True while the game of a play copy runs. That game sends no changes to the editor, so the result then has no changes."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view that the tool read, as text. A save does not change it."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "play",
+              "changes",
+              "more",
+              "status"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Read the live trace of a mission play",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
       "name": "save",
       "title": "Save the edits of the active mod",
       "description": "Saves the edits into the patch files of the active mod. The save stops when the checks find errors. Read the errors, correct them, then save again.",
