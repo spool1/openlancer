@@ -221,7 +221,11 @@ public sealed class McpServerTests
         var catalog = JsonNode.Parse(Assert.IsType<TextResourceContents>(Assert.Single(lists.Contents)).Text)!;
         Assert.Equal(59, catalog["lists"]!.AsArray().Count);
         Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "object_of_system" && (bool)l["one_system"]!);
-        Assert.Contains("thn:<install path>#event/<index>", Assert.IsType<TextResourceContents>(Assert.Single(refs.Contents)).Text);
+        var guide = Assert.IsType<TextResourceContents>(Assert.Single(refs.Contents)).Text;
+        Assert.Contains("thn:<install path>#event/<index>", guide);
+        // The catalog of the prefabs gives the references of both forms.
+        Assert.Contains("prefab:builtin:<id>", guide);
+        Assert.Contains("prefab:mod:<id>", guide);
         await Assert.ThrowsAsync<McpProtocolException>(() => client.ReadResourceAsync("openlancer://none", cancellationToken: Token).AsTask());
     }
 
