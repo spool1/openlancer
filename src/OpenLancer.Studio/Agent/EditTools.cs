@@ -44,8 +44,8 @@ internal sealed class EditScope
 
     private readonly List<string> stepConfirmations = [];
 
-    /// <summary>The inverse and the row moves of each mission request of the call, in order.</summary>
-    private readonly List<(MissionCommand? Inverse, IReadOnlyList<RowMove> RowMoves)> missionRuns = [];
+    /// <summary>The inverse and the row map of each mission request of the call, in order.</summary>
+    private readonly List<(MissionCommand? Inverse, RowMap? Rows)> missionRuns = [];
 
     /// <summary>The index in <see cref="missionRuns"/> of the first mission request of the step.</summary>
     private int stepMissionStart;
@@ -120,17 +120,17 @@ internal sealed class EditScope
             var error = result.Errors[0];
             throw new EditException(error with { Field = error.Field ?? fieldOf(error) });
         }
-        missionRuns.Add((result.Inverse, result.RowMoves));
+        missionRuns.Add((result.Inverse, result.Rows));
         stepConfirmations.AddRange(result.Asked.Select(a => a.Message).Distinct());
         return result;
     }
 
     /// <summary>A result with the inverse and the row moves of mission requests, or the result as it is without
-    /// mission requests.</summary>
+    /// mission requests. The row moves are the net moves of all the requests: each line once, with its row before the
+    /// first request and its row after the last request (final finding 1 of MCP1-3).</summary>
     /// <param name="runs">The mission requests, or null for a result that gives no inverse, for example
     /// <c>no_change</c>.</param>
-    private static EditResult WithMission(EditResult result,
-        IReadOnlyList<(MissionCommand? Inverse, IReadOnlyList<RowMove> RowMoves)>? runs)
+    private static EditResult WithMission(EditResult result, IReadOnlyList<(MissionCommand? Inverse, RowMap? Rows)>? runs)
     {
         if (runs is not { Count: > 0 })
             return result;
@@ -144,7 +144,7 @@ internal sealed class EditScope
                 1 => inverses[0],
                 _ => new CommandGroup(inverses),
             },
-            RowMoves = runs.SelectMany(r => r.RowMoves).ToList(),
+            RowMoves = runs.Select(r => r.Rows).OfType<RowMap>().Aggregate(new RowMap(), (all, next) => all.Then(next)).Moves,
         };
     }
 

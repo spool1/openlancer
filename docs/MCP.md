@@ -300,11 +300,11 @@ The mission tools always run in strict mode. An edit that adds an error to a scr
 
 Strict mode compares the problems of the mission checks before and after the edit. The save gate also has other rules. For example, in a mod that names a retail target, the loadout of a ship build must have an engine. `check` with the scope `mission` does not give the errors of these rules. `check` with the scope `all` gives each error that stops a save, so call it before `save`.
 
-The result gives `inverse`: a mission command that reverts the call. To revert the call after later edits of other items, give the inverse in `commands` of a new `mission_edit` call. The inverse checks each section that the call changed or added. When a later edit changed such a section, the inverse gives `stale_revision` with the detail `SectionChanged`, and nothing changes. `undo` reverts only the last edit of the agent. `row_moves` gives the lines whose place in their trigger changed.
+The result gives `inverse`: a mission command that reverts the call. To revert the call after later edits of other items, give the inverse in `commands` of a new `mission_edit` call. The inverse checks each section that the call changed or added. When a later edit changed such a section, the inverse gives `stale_revision` with the detail `SectionChanged`, and nothing changes. `undo` reverts only the last edit of the agent. `row_moves` gives the lines whose place in their trigger changed. Each line comes once, with its row before the call and its row after the call. So an agent can map each `line:` reference that it read before the call to its new row.
 
 Each script has a version. It starts at 1 and grows at each edit, undo and redo of the script. The result of each edit call gives the versions of the scripts that it changed in `versions`. A rename of an object that changes the mission lines that name it gives them too. `list_missions` gives the version of each script.
 
-`mission_edit` can be a step of `edit_batch`. The strict check of the missions runs once, at the end of the batch. So a step can start a trigger that a later step adds. Each mission step gives its own `inverse` in `steps`, and the batch gives no inverse. One undo reverts the whole batch.
+`mission_edit` can be a step of `edit_batch`. The strict check of the missions runs once, at the end of the batch. So a step can start a trigger that a later step adds. Each mission step gives its own `inverse` and `row_moves` in `steps`, and the batch gives no inverse. The `row_moves` of a step count from the rows before that step. One undo reverts the whole batch.
 
 One call has at most 100 commands. A `command_group` counts as one command. The limit of the sections of one edit and the size of a request bound its work.
 

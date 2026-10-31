@@ -332,6 +332,9 @@ internal sealed partial class MissionDraft
             foreach (var row in rows.AsEnumerable().Reverse())
                 entries.RemoveAt(row);
             SetLines(document, group.Key, entries, inverse: false);
+            var count = entries.Count + rows.Count;
+            foreach (var row in rows.AsEnumerable().Reverse())
+                RowRemoved(document, group.Key, row, count--);
             var item = ItemOf(document, group.Key);
             for (var i = 0; i < rows.Count; i++)
                 inverse.Add(new InsertLine(item, RawLine(removed[i])) { Before = rows[i] });
@@ -348,17 +351,57 @@ internal sealed partial class MissionDraft
             Missing.Add(new ResultMissing(RefOf(document, section), document.Working[section][row].Name, consequence, true));
     }
 
-    /// <summary>Records the row moves of the lines of a trigger after an insert or a removal: the rows from
-    /// <paramref name="from"/> to <paramref name="to"/> before the edit move by <paramref name="delta"/>.</summary>
-    public void MovedRows(EditDocument document, int index, int from, int to, int delta)
+    /// <summary>Notes a new line of a trigger at a row, after the insert. The lines after it move one row down.</summary>
+    public void RowInserted(EditDocument document, int index, int row)
+    {
+        if (RowTrigger(document, index) is { } trigger)
+            rowMap.Inserted(trigger, row, document.Working[index].Count - 1, StartCount);
+    }
+
+    /// <summary>Notes a removed line of a trigger, after the removal. The lines after it move one row up.</summary>
+    public void RowRemoved(EditDocument document, int index, int row) =>
+        RowRemoved(document, index, row, document.Working[index].Count + 1);
+
+    /// <param name="count">The number of lines before the removal.</param>
+    private void RowRemoved(EditDocument document, int index, int row, int count)
+    {
+        if (RowTrigger(document, index) is { } trigger)
+            rowMap.Removed(trigger, row, count, StartCount);
+    }
+
+    /// <summary>Notes a rename of a trigger, so the row moves name the trigger by its new name.</summary>
+    public void TriggerRenamed(EditDocument document, string from, string to)
+    {
+        rowDocuments[document.Path] = document;
+        rowMap.Renamed(new TriggerRef(document.Path, from), new TriggerRef(document.Path, to));
+    }
+
+    /// <summary>The row map of the request, checked against W now.</summary>
+    internal RowMap NetRows()
+    {
+        rowMap.Check(trigger => rowDocuments.TryGetValue(trigger.Script, out var document) &&
+                              TriggerIndex(document, trigger.Name) is >= 0 and var at
+            ? document.Working[at].Count
+            : null);
+        return rowMap;
+    }
+
+    /// <summary>The trigger of a section by its name now, or null for a section that is not a trigger.</summary>
+    private TriggerRef? RowTrigger(EditDocument document, int index)
     {
         if (!MissionIndex.Is(document.Working[index].Name, "Trigger") ||
             TriggerRules.Nickname(document.Working[index]) is not { } name)
-            return;
-        var trigger = new TriggerRef(document.Path, name);
-        for (var row = from; row <= to; row++)
-            RowMoves.Add(new RowMove(trigger, row, row + delta));
+            return null;
+        rowDocuments[document.Path] = document;
+        return new TriggerRef(document.Path, name);
     }
+
+    /// <summary>The number of lines of a trigger before the request, -1 when the trigger did not exist then, or null
+    /// for a document without a state before the request, for example the template of a prefab.</summary>
+    private int? StartCount(TriggerRef trigger) =>
+        Before.TryGetValue(trigger.Script, out var state)
+            ? TriggerIndex(state.Working, trigger.Name) is >= 0 and var at ? state.Working[at].Count : -1
+            : null;
 
     /// <summary>
     /// Moves a line before another row of the section before the move, or to the end. The inverse moves it back. With
@@ -378,8 +421,8 @@ internal sealed partial class MissionDraft
             return;
         var moved = RowOf(document, index, to);
         Changes.Add(moved.Reference);
-        if (MissionIndex.Is(document.Working[index].Name, "Trigger") && TriggerRules.Nickname(document.Working[index]) is { } name)
-            RowMoves.Add(new RowMove(new TriggerRef(document.Path, name), row, to));
+        if (RowTrigger(document, index) is { } trigger)
+            rowMap.Moved(trigger, row, to, entries.Count, StartCount);
         var back = row < to ? row : row + 1;
         Inverse(new MoveLine(moved) { Before = back >= entries.Count ? null : back });
     }

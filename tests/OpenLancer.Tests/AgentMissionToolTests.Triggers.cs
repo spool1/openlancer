@@ -187,8 +187,9 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal(["system = ol_system", "nickname = ol_wave", "Cnd_Timer = 3", "Act_ActTrig = ol_end",
             "Act_SpawnShip = ol_ship_1", "Act_DeactTrig = ol_end"], m.Lines("ol_wave"));
         Assert.Equal([$"line:{Script}#Trigger/ol_wave/3"], Texts(result["changes"]));
-        var move = Assert.Single(result["row_moves"]!.AsArray());
-        Assert.Equal(($"trg:{Script}#ol_wave", 5, 3), ((string?)move!["trigger"], (int?)move["from"], (int?)move["to"]));
+        // Each line whose row changed comes once, with its row before and after the call (final finding 1 of MCP1-3).
+        Assert.Equal([($"trg:{Script}#ol_wave", 3, 4), ($"trg:{Script}#ol_wave", 4, 5), ($"trg:{Script}#ol_wave", 5, 3)],
+            result["row_moves"]!.AsArray().Select(r => ((string?)r!["trigger"], (int?)r["from"], (int?)r["to"])));
         AssertOneEntry(m, result, "Move action", before);
 
         Ok(host, "mission_move_action", $$"""{ "line": "{{WaveLine(3)}}" }""");

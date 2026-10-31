@@ -233,6 +233,7 @@ public sealed record RenameTrigger(TriggerRef Trigger, string NewName) : Mission
             .Append(new RenameTrigger(renamed, old) { ChangeReferences = false })
             .ToList();
         d.Renames.Add(new ResultRename(before, d.RefOf(document, index)));
+        d.TriggerRenamed(document, old, name);
         d.GoneNames.Add(old);
         d.Select = d.RefOf(document, index);
         d.Inverse(back.Count == 1 ? back[0] : new CommandGroup(back));
@@ -437,7 +438,7 @@ public sealed record AddAction(TriggerRef Trigger, LineSpec Line) : MissionComma
         d.SetLines(document, index, entries, inverse: false);
         var row = MissionDraft.RowOf(document, index, at);
         d.Adds.Add(row.Reference);
-        d.MovedRows(document, index, at, entries.Count - 2, +1);
+        d.RowInserted(document, index, at);
         d.Inverse(new RemoveAction(row));
     }
 }
@@ -456,7 +457,7 @@ public sealed record RemoveAction(RowRef Row) : MissionCommand
         var old = entries[row];
         entries.RemoveAt(row);
         d.SetLines(document, index, entries, inverse: false);
-        d.MovedRows(document, index, row + 1, entries.Count, -1);
+        d.RowRemoved(document, index, row);
         d.Inverse(new InsertLine(MissionDraft.ItemOf(document, index), MissionDraft.RawLine(old)) { Before = row });
     }
 }

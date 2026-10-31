@@ -33,7 +33,7 @@ public sealed record InsertLine(ItemRef Section, LineSpec Line) : MissionCommand
         d.SetLines(document, index, entries, inverse: false);
         var row = MissionDraft.RowOf(document, index, at);
         d.Adds.Add(row.Reference);
-        d.MovedRows(document, index, at, entries.Count - 2, +1);
+        d.RowInserted(document, index, at);
         d.Inverse(new RemoveLine(row));
     }
 }
@@ -53,7 +53,7 @@ public sealed record RemoveLine(RowRef Row) : MissionCommand
         var old = entries[row];
         entries.RemoveAt(row);
         d.SetLines(document, index, entries, inverse: false);
-        d.MovedRows(document, index, row + 1, entries.Count, -1);
+        d.RowRemoved(document, index, row);
         d.Inverse(new InsertLine(MissionDraft.ItemOf(document, index), MissionDraft.RawLine(old)) { Before = row });
     }
 }
@@ -281,6 +281,9 @@ public sealed record RevertSection(ItemRef Section) : MissionCommand
             if (!document.IdentityAt(index).Equals(id))
             {
                 d.Renames.Add(new ResultRename(before, d.RefOf(document, index)));
+                if (MissionIndex.Is(id.Type, "Trigger") && id.Key != null &&
+                    TriggerRules.Nickname(document.Working[index]) is { } name)
+                    d.TriggerRenamed(document, id.Key, name);
                 d.Inverse(new CommandGroup(
                 [
                     d.RenameBack(document, index, id.Key!),

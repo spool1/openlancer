@@ -90,8 +90,13 @@ public sealed record MissionEditResult(EditStatus Status) : EditResult(Status)
     /// nothing.</summary>
     public MissionCommand? Inverse { get; init; }
 
-    /// <summary>The lines whose row index changed, so the studio keeps a selection on the same line.</summary>
+    /// <summary>The lines whose row index changed, so the studio keeps a selection on the same line. Each line comes
+    /// once, with its row before the request and its row after it.</summary>
     public IReadOnlyList<RowMove> RowMoves { get; init; } = [];
+
+    /// <summary>The row map of <see cref="RowMoves"/>, or null. A caller that runs more requests in one batch joins the
+    /// maps, so its row moves are the net moves of all requests.</summary>
+    internal RowMap? Rows { get; init; }
 
     /// <summary>
     /// The confirmations of a request with <see cref="MissionBatch.Confirm"/> in the batch of a caller, as data. The

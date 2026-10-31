@@ -555,6 +555,47 @@ public sealed class FollowModeTests
         Assert.Equal(new MissionRef(MissionEdits.Script, MissionItemKind.Row, wave, Row: 2), view.Selection);
     }
 
+    /// <summary>A selected line between the old and the new place of a moved line moves one row too. A call with more
+    /// requests gives the net move of each line, so the selection follows its line over all requests (final finding
+    /// 1 of MCP1-3).</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ASelectedLineFollowsTheNetMoveOfItsRow(bool follow)
+    {
+        var (m, editor, host) = Missions();
+        using var _ = m;
+        editor.Follow.Set(follow);
+        var view = editor.FollowView;
+        var wave = new SectionRef(MissionEdits.Script, new SectionIdentity("Trigger", "ol_wave"));
+        MissionRef Row(int row) => new(MissionEdits.Script, MissionItemKind.Row, wave, Row: row);
+        string Line(int row) => $"line:{S}#Trigger/ol_wave/{row}";
+        string AddBefore3(string target) => $$"""
+            { "tool": "mission_add_action", "arguments": { "trigger": "trg:{{S}}#ol_wave",
+              "action": { "key": "Act_ActTrig", "values": { "trigger": "{{target}}" } }, "before": "{{Line(3)}}" } }
+            """;
+
+        // Line 3 (Act_SpawnShip) is between the old and the new place of line 5, so it moves to row 4.
+        view.Selection = Row(3);
+        var reorder = Ok(host, "mission_move_action", $$"""{ "line": "{{Line(5)}}", "before": "{{Line(3)}}" }""");
+        Assert.Equal(Row(4), view.Selection);
+        Assert.Equal("Act_SpawnShip = ol_ship_1", m.Lines("ol_wave")[4]);
+        Assert.Equal([(3, 4), (4, 5), (5, 3)],
+            reorder["row_moves"]!.AsArray().Select(r => ((int)r!["from"]!, (int)r["to"]!)));
+
+        // Two steps insert a line before row 3 each. The line of row 3 before the call is at row 5 after it.
+        m.Session.Undo();
+        view.Selection = Row(3);
+        var batch = Ok(host, "edit_batch", $$"""{ "steps": [ {{AddBefore3("ol_end")}}, {{AddBefore3("ol_start")}} ] }""");
+        // With follow mode on, the agent add selects the new line, as an add of the user does.
+        if (!follow)
+            Assert.Equal(Row(5), view.Selection);
+        Assert.Equal("Act_SpawnShip = ol_ship_1", m.Lines("ol_wave")[5]);
+        // Each step gives the net moves of its own request. The second step starts after the first insert.
+        Assert.Equal([(3, 4), (4, 5), (5, 6), (6, 7)],
+            batch["steps"]![1]!["row_moves"]!.AsArray().Select(r => ((int)r!["from"]!, (int)r["to"]!)));
+    }
+
     /// <summary>
     /// In prefab mode, an agent edit of the ship build file of a script shows only in the Console too. The ship build
     /// file is a mission file, but not a script. So a change, a delete and an agent undo of an <c>[NPCShipArch]</c> keep

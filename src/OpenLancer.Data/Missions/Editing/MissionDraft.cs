@@ -42,7 +42,15 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     public List<ResultMissing> Missing { get; } = [];
     public List<string> Notes { get; } = [];
     public List<Problem> Warnings { get; } = [];
-    public List<RowMove> RowMoves { get; } = [];
+
+    /// <summary>The rows of the trigger lines that the commands moved, and the document of each trigger.</summary>
+    private readonly RowMap rowMap = new();
+
+    private readonly Dictionary<string, EditDocument> rowDocuments = new(VfsPath.Comparer);
+
+    /// <summary>The net row moves of the request: each line whose row changed, once, from its row before the request
+    /// to its row after it (final finding 1 of MCP1-3).</summary>
+    public IReadOnlyList<RowMove> RowMoves => NetRows().Moves;
     public string? Select { get; set; }
 
     /// <summary>The names that a delete or a rename of the batch takes away, by the kind of their lines. A "Missing"
@@ -160,9 +168,11 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     }
 
     /// <summary>The index of the first trigger with a nickname, without letter case (TR4), or -1.</summary>
-    public static int TriggerIndex(EditDocument document, string name)
+    public static int TriggerIndex(EditDocument document, string name) => TriggerIndex(document.Working, name);
+
+    /// <inheritdoc cref="TriggerIndex(EditDocument, string)"/>
+    private static int TriggerIndex(IReadOnlyList<Section> working, string name)
     {
-        var working = document.Working;
         for (var i = 0; i < working.Count; i++)
         {
             if (working[i].Name.Equals("Trigger", StringComparison.OrdinalIgnoreCase) &&

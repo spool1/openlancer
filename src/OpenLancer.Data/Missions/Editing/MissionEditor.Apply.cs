@@ -122,6 +122,7 @@ public sealed partial class MissionEditor
                 Label = batch.EntryLabel,
                 Inverse = inverse,
                 RowMoves = draft.RowMoves,
+                Rows = draft.NetRows(),
                 Revision = session.Revision,
                 Asked = confirmations,
             };

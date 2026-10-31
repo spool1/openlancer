@@ -6991,11 +6991,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -7004,7 +7004,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -7571,11 +7571,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -7584,7 +7584,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -8149,11 +8149,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -8162,7 +8162,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -8724,11 +8724,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -8737,7 +8737,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -9303,11 +9303,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -9316,7 +9316,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -32348,11 +32348,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -32361,7 +32361,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -33004,11 +33004,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -33017,7 +33017,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -33619,11 +33619,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -33632,7 +33632,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -34240,11 +34240,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -34253,7 +34253,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -34833,11 +34833,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -34846,7 +34846,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -35405,11 +35405,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -35418,7 +35418,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -35993,11 +35993,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -36006,7 +36006,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -36623,11 +36623,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -36636,7 +36636,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -37279,11 +37279,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -37292,7 +37292,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -37885,11 +37885,11 @@
                 },
                 "from": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger before the edit, from 0."
+                  "description": "The index of the line in the trigger before the call, from 0."
                 },
                 "to": {
                   "type": "integer",
-                  "description": "The index of the line in the trigger after the edit, from 0."
+                  "description": "The index of the line in the trigger after the call, from 0."
                 }
               },
               "required": [
@@ -37898,7 +37898,7 @@
                 "to"
               ]
             },
-            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+            "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
           },
           "status": {
             "enum": [
@@ -39894,11 +39894,11 @@
                       },
                       "from": {
                         "type": "integer",
-                        "description": "The index of the line in the trigger before the edit, from 0."
+                        "description": "The index of the line in the trigger before the call, from 0."
                       },
                       "to": {
                         "type": "integer",
-                        "description": "The index of the line in the trigger after the edit, from 0."
+                        "description": "The index of the line in the trigger after the call, from 0."
                       }
                     },
                     "required": [
@@ -39907,7 +39907,7 @@
                       "to"
                     ]
                   },
-                  "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+                  "description": "The lines of triggers whose place in their trigger changed. Each line comes once, with its place before the call and its place after the call."
                 },
                 "status": {
                   "enum": [
