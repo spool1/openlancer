@@ -195,11 +195,18 @@ internal static class PlayTools
 
     /// <summary>One page of the live trace. The page has the default rows of the limits, or the rows of
     /// <c>limit</c>.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/>: <c>since</c> without
+    /// <c>play</c>.</exception>
     public static ToolStep MissionTrace(ToolCall call)
     {
         var args = call.Args;
         var number = (int)Math.Min(args.Whole("play") ?? 0, int.MaxValue);
-        return ToolResult.Of(PlayOf(call).Trace(number, args.Whole("since") ?? 0, call.RowLimit()));
+        var since = args.Whole("since") ?? 0;
+        // A sequence number belongs to one play. The live trace gives all changes of the current play for another play
+        // number, so a page call without play would give the first page again.
+        if (since > 0 && number == 0)
+            throw ToolInput.Bad("since", AgentTexts.Error("trace_since_play"));
+        return ToolResult.Of(PlayOf(call).Trace(number, since, call.RowLimit()));
     }
 
     /// <summary>The start of the arguments: a point with a heading in a system, or a base.</summary>

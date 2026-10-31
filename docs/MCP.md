@@ -550,8 +550,8 @@ The result gives the state of Play, the start, the kind and the name of the star
 | Argument | What it does |
 |---|---|
 | `play` | The play number of the last result, or 0. Another number than the current play gives all changes of the current play. |
-| `since` | Give only the changes after this sequence number. Use the sequence of the last change of the previous result. |
-| `limit` | The most changes of the result. When the play has more changes, `more` is true. Call the tool again with the last sequence as `since`. |
+| `since` | Give only the changes after this sequence number. Use the sequence of the last change of the previous result. A value above 0 needs `play`, else the tool gives `invalid_argument`. |
+| `limit` | The most changes of the result. When the play has more changes, `more` is true. Call the tool again with the play number of the result as `play` and the last sequence as `since`. |
 
 The result also gives the state of Play, the mission and its script. `dropped` gives the number of changes that the game dropped because its queue was full. While only the game of a play copy runs, the result has no changes, because that game sends no changes to the editor. `game_runs` is then true.
 

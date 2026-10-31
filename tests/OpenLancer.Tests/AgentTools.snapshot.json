@@ -39087,12 +39087,12 @@
             "type": "integer",
             "minimum": 0,
             "default": 0,
-            "description": "Give only the changes after this sequence number. Use the sequence of the last change of the previous result."
+            "description": "Give only the changes after this sequence number. Use the sequence of the last change of the previous result. A value above 0 needs play."
           },
           "limit": {
             "type": "integer",
             "minimum": 1,
-            "description": "The most changes of the result. studio_status gives the default and the largest value. When the play has more changes, more is true. Call the tool again with since."
+            "description": "The most changes of the result. studio_status gives the default and the largest value. When the play has more changes, more is true. Call the tool again with play and since."
           }
         },
         "additionalProperties": false
@@ -39141,7 +39141,7 @@
           },
           "more": {
             "type": "boolean",
-            "description": "True when the play has more changes than the result gives. Call the tool again with the sequence of the last change."
+            "description": "True when the play has more changes than the result gives. Call the tool again with this play number and the sequence of the last change."
           },
           "status": {
             "enum": [

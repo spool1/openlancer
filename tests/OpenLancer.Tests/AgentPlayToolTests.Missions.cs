@@ -486,6 +486,29 @@ public sealed partial class AgentPlayToolTests
         Assert.Equal(("limit", "ListRows"), Codes(over));
     }
 
+    /// <summary>A sequence number belongs to one play, and another play number gives all changes of the current play.
+    /// So since without play would give the first page again in a loop. The tool refuses it.</summary>
+    [Fact]
+    public void SinceWithoutAPlayNumberGivesInvalidArgument()
+    {
+        var (host, editor) = Editor();
+        editor.Live.Started();
+        editor.Live.Take(new PlayEvent.MissionChanges("Mission_99", true, 0,
+            Enumerable.Range(1, 5).Select(i => new MissionChange(i * 1000, $"t_{i}", MissionChangeKind.Ran)).ToList()));
+
+        var noPlay = Call(host, "mission_play_trace", """{ "since": 2, "limit": 2 }""");
+        var playZero = Call(host, "mission_play_trace", """{ "play": 0, "since": 2 }""");
+        var page = Ok(host, "mission_play_trace", """{ "play": 1, "since": 2, "limit": 2 }""");
+
+        foreach (var refused in new[] { noPlay, playZero })
+        {
+            Assert.True(refused.IsError, refused.Text);
+            Assert.Equal(("invalid_argument", "since"),
+                ((string?)refused.Content["code"], (string?)refused.Content["field"]));
+        }
+        Assert.Equal(("3 4", true), Page(page));
+    }
+
     /// <summary>Without a known script of the mission, a change names its trigger by nickname. While only the game of a
     /// play copy runs, the trace gives only the status, because that game has no channel to the editor.</summary>
     [Fact]

@@ -546,8 +546,8 @@
       "description": "Gives the trigger changes of the mission of the OpenLancer game, oldest first: each trigger that starts, runs or stops. Each change has a sequence number in its play. Give the play number and the sequence number of the last change that you have. The tool then gives only the later changes. A new play gives all its changes. This tool changes nothing. Only the editor host has a live trace.",
       "fields": {
         "play": "The play number of the last result, or 0. Another play number than the current play gives all changes of the current play.",
-        "since": "Give only the changes after this sequence number. Use the sequence of the last change of the previous result.",
-        "limit": "The most changes of the result. studio_status gives the default and the largest value. When the play has more changes, more is true. Call the tool again with since."
+        "since": "Give only the changes after this sequence number. Use the sequence of the last change of the previous result. A value above 0 needs play.",
+        "limit": "The most changes of the result. studio_status gives the default and the largest value. When the play has more changes, more is true. Call the tool again with play and since."
       }
     },
     "save": {
@@ -858,7 +858,8 @@
     "headless_recovery_lost": "The recovery file does not keep this edit: {problem}",
     "play_space_only": "The argument '{name}' is only for a start in space. Remove it, or use start: space.",
     "play_base_only": "The argument 'base' is only for a start at a base. Remove it, or use start: base.",
-    "play_ref": "The argument '{name}' takes a nickname or a {name}: reference, not {ref}."
+    "play_ref": "The argument '{name}' takes a nickname or a {name}: reference, not {ref}.",
+    "trace_since_play": "The argument 'since' is a sequence number in one play. Also give the play number of the last result in play, or remove since."
   },
   "resources": {
     "openlancer://catalog/lists": {
@@ -1500,7 +1501,7 @@
     "MissionPlayView.warnings": "The warnings of the plan of the play, for example a place that the editor cannot find.",
     "MissionTraceView.play": "The number of the play of the changes, or 0 before the first mission event.",
     "MissionTraceView.changes": "The changes of the play after since, oldest first.",
-    "MissionTraceView.more": "True when the play has more changes than the result gives. Call the tool again with the sequence of the last change.",
+    "MissionTraceView.more": "True when the play has more changes than the result gives. Call the tool again with this play number and the sequence of the last change.",
     "MissionTraceView.status": "The state of Play in OpenLancer: idle, starting, validating, running, reloading, not_responding or stopping.",
     "MissionTraceView.mission": "The name of the mission of the game, for example Mission_02, or none.",
     "MissionTraceView.script": "The msn: reference of the script of the mission, or none.",
