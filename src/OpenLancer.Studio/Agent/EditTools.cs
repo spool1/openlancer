@@ -123,6 +123,10 @@ internal sealed class EditScope
         if (result.Status == EditStatus.Refused)
         {
             var error = result.Errors[0];
+            // The text of the mission editor sends the user to the Inspector. An agent changes a section of a world file
+            // with the generic tools, so it gets the text of those tools (final finding 7 of MCP1-3).
+            if (error is { Detail: MissionErrors.WorldFile, Target: { } file })
+                error = error with { Message = AgentTexts.Error("edit_mission_world_file", ("path", ScriptRef.Parse(file).Path)) };
             throw new EditException(error with { Field = ownField ? fieldOf(error) : error.Field ?? fieldOf(error) });
         }
         missionRuns.Add((result.Inverse, result.Rows));

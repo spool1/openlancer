@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using LibreLancer;
+using LibreLancer.Data.Ini;
 using LibreLancer.Data.IO;
 using OpenLancer.Data.Editing.Assets;
 using OpenLancer.Data.Editing.Lists;
@@ -88,8 +89,8 @@ public sealed partial class EditSession
     /// <summary>
     /// True when the guard of the mission files covers a file (section 4.1 of the M6b design, decision D660): a mission
     /// script, and each ship build file that a <c>[Mission] npc_ship_file</c> line of a script names. The shared files
-    /// directly in <c>DATA\MISSIONS</c>, for example <c>npcships.ini</c> and the pilot files, are world data (review
-    /// finding RB2).
+    /// directly in <c>DATA\MISSIONS</c>, for example <c>npcships.ini</c> and the pilot files, and the encounter files
+    /// are world data (review finding RB2, final finding 5 of MCP1-3).
     /// </summary>
     /// <param name="path">An install path in normal form.</param>
     internal bool IsGuardedMissionFile(string path)
@@ -98,7 +99,7 @@ public sealed partial class EditSession
             return false;
         if (OpenDocument(path) is { HoldsScript: true })
             return true;
-        if (MissionFiles.IsDirectlyIn(path, DataPath("MISSIONS")))
+        if (!MissionFiles.CanBeOwnShipFile(path, DataPath("MISSIONS")))
             return false;
         return ShipBuildFilesOfScripts().Contains(path);
     }
@@ -125,8 +126,12 @@ public sealed partial class EditSession
     /// <summary>The install path of the ship build file that the <c>[Mission] npc_ship_file</c> line of W of a script
     /// names, or null.</summary>
     internal string? ShipBuildFileOf(string script) =>
-        OpenDocument(script) is { } document &&
-        document.Working.FirstOrDefault(s => s.Name.Equals("Mission", StringComparison.OrdinalIgnoreCase)) is { } mission &&
+        OpenDocument(script) is { } document ? ShipBuildFileOf(document.Working) : null;
+
+    /// <summary>The install path of the ship build file that the <c>[Mission] npc_ship_file</c> line of the sections of
+    /// a script names, or null.</summary>
+    internal string? ShipBuildFileOf(IReadOnlyList<Section> sections) =>
+        sections.FirstOrDefault(s => s.Name.Equals("Mission", StringComparison.OrdinalIgnoreCase)) is { } mission &&
         ItemIndex.First(mission, "npc_ship_file") is { } relative && MissionFiles.RelativeOf(relative) is { } normal
             ? DataPath(normal)
             : null;

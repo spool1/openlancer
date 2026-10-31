@@ -116,7 +116,8 @@ public sealed class MissionGuardTests
     }
 
     /// <summary>A batch that points the script at a file directly in DATA\MISSIONS, changes that file and points the
-    /// script back gets the same refusals as a direct change (final finding 5 of MCP1-3).</summary>
+    /// script back gets the same refusals as a direct change (final finding 5 of MCP1-3). The shared ship build file is a
+    /// ship build file, so the script can name it. A pilot file is not, so the first command refuses.</summary>
     [Fact]
     public void AScriptThatNamesAWorldFileDoesNotMakeItAMissionFile()
     {
@@ -137,11 +138,80 @@ public sealed class MissionGuardTests
         var renamed = Trick(@"missions\npcships.ini", new RenameItem(shared, "ol_other_build"));
         Assert.Equal((EditStatus.Refused, MissionErrors.SharedBuildRename), (renamed.Status, renamed.Errors[0].Detail));
         var pilotKey = Trick(@"missions\pilots_population.ini", new SetItemKey(pilot, "gun_id", [LineSpec.Raw("gun_id", "ol_gun_2")]));
-        Assert.Equal((EditStatus.Refused, MissionErrors.WorldFile), (pilotKey.Status, pilotKey.Errors[0].Detail));
+        Assert.Equal((EditStatus.Refused, MissionErrors.NotShipBuildFile, 0),
+            (pilotKey.Status, pilotKey.Errors[0].Detail, pilotKey.Errors[0].Index));
         var pilotGone = Trick(@"missions\pilots_population.ini", new RemoveSection(pilot));
-        Assert.Equal((EditStatus.Refused, MissionErrors.WorldFile), (pilotGone.Status, pilotGone.Errors[0].Detail));
+        Assert.Equal((EditStatus.Refused, MissionErrors.NotShipBuildFile), (pilotGone.Status, pilotGone.Errors[0].Detail));
         Assert.Equal(before, m.State());
         Assert.False(m.Session.CanUndo);
+    }
+
+    /// <summary>
+    /// An encounter file is world data, also in a folder below DATA\MISSIONS (final finding 5 of MCP1-3). A command that
+    /// points the script at it refuses with NotShipBuildFile, so a later command of the call cannot add a build to it.
+    /// A script that already names it, for example after a change of the file outside the editor, does not make it a
+    /// mission file: a second call gets WorldFile, as a direct change does.
+    /// </summary>
+    [Fact]
+    public void AnEncounterFileIsNeverTheShipBuildFileOfAScript()
+    {
+        const string encounter = @"DATA\MISSIONS\ENCOUNTERS\ol_encounter.ini";
+        var encounterText = "[EncounterFormation]\nship_by_class = 1, 1, ol_fighters\n";
+        using var m = Create(setup: ws => ws.WriteBase(encounter, encounterText));
+        var mission = ItemRef.Of(Script, "Mission", null);
+        SetItemKey ShipFile(string file) => new(mission, "npc_ship_file", [LineSpec.Raw("npc_ship_file", file)]);
+        var build = new AddItem(TestScript, "ship_build") { Nickname = "ol_enc_build" };
+        var section = new AddSection(new ScriptRef(encounter), "NPCShipArch", [LineSpec.Raw("nickname", "ol_enc_build")]);
+        var before = m.State();
+
+        foreach (MissionCommand change in new MissionCommand[] { build, section })
+        {
+            var trick = m.Missions.Apply(new MissionBatch("Trick",
+                [ShipFile(@"missions\encounters\ol_encounter.ini"), change, ShipFile(@"missions\ol_test\npcships.ini")]));
+            Assert.Equal((EditStatus.Refused, MissionErrors.NotShipBuildFile, 0),
+                (trick.Status, trick.Errors[0].Detail, trick.Errors[0].Index));
+        }
+        var error = m.Refuse(ShipFile(@"missions\encounters\ol_encounter.ini"), MissionErrors.NotShipBuildFile);
+        Assert.Equal(EditErrorKind.InvalidValue, error.Kind);
+        Assert.Equal($"The npc_ship_file line of {Script} cannot name {encounter}, because that file is not a ship build " +
+            @"file. Other data of the game can use its sections. Name a file in a folder under DATA\MISSIONS outside the " +
+            "encounters folder, with only [NPCShipArch] sections. Or name a new file.", error.Message);
+        Assert.Equal(before, m.State());
+        Assert.False(m.Session.CanUndo);
+
+        using var named = Create(Text.Replace(@"missions\ol_test\npcships.ini", @"missions\encounters\ol_encounter.ini"),
+            setup: ws => ws.WriteBase(encounter, encounterText));
+        Assert.False(named.Session.IsGuardedMissionFile(encounter));
+        named.Refuse(build, MissionErrors.WorldFile);
+        named.Refuse(section, MissionErrors.WorldFile);
+    }
+
+    /// <summary>The npc_ship_file line can name a ship build file of another script, the shared ship build file or a new
+    /// file. It cannot name a script or another file with a section that is not a ship build (final finding 5 of
+    /// MCP1-3).</summary>
+    [Fact]
+    public void TheShipBuildFileOfAScriptIsAFileOfShipBuildsOnly()
+    {
+        const string other = @"DATA\MISSIONS\OL_OTHER\ol_other.ini";
+        const string scene = @"DATA\MISSIONS\OL_TEST\ol_scene.ini";
+        using var m = Create(setup: ws =>
+        {
+            ws.WriteBase(other, "[Mission]\nnpc_ship_file = missions\\ol_other\\npcships.ini\n");
+            ws.WriteBase(@"DATA\MISSIONS\OL_OTHER\npcships.ini", "[NPCShipArch]\nnickname = ol_other_build\n");
+            ws.WriteBase(scene, "[Room]\nnickname = ol_room\n");
+        });
+        var mission = ItemRef.Of(Script, "Mission", null);
+        SetItemKey ShipFile(string file) => new(mission, "npc_ship_file", [LineSpec.Raw("npc_ship_file", file)]);
+
+        m.Refuse(ShipFile(@"missions\ol_other\ol_other.ini"), MissionErrors.NotShipBuildFile);
+        m.Refuse(ShipFile(@"missions\ol_test\ol_scene.ini"), MissionErrors.NotShipBuildFile);
+        m.Refuse(ShipFile(@"ships\ol_ships.ini"), MissionErrors.NotShipBuildFile);
+        m.Apply(ShipFile(@"missions\ol_other\npcships.ini"));
+        m.Apply(ShipFile(@"missions\npcships.ini"));
+        m.Apply(ShipFile(@"missions\ol_test\ol_new_ships.ini"));
+        Assert.Equal([@"npc_ship_file = missions\ol_test\ol_new_ships.ini"], m.Lines(mission));
+        // A command that keeps the line of the script does not check its file again.
+        m.Apply(new SetItemKey(mission, "reward", [LineSpec.Raw("reward", "500")]));
     }
 
     [Fact]

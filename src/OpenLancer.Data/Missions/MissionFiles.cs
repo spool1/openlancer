@@ -122,6 +122,14 @@ public static class MissionFiles
         missionsFolder != null &&
         VfsPath.Comparer.Equals(VfsPath.Normalize(System.IO.Path.GetDirectoryName(path) ?? "") ?? "", missionsFolder);
 
+    /// <summary>True for a path that can be the own ship build file of a script: a file in a folder below the missions
+    /// folder, outside the encounters folder. A file directly in the missions folder and an encounter file are world
+    /// data that encounters and bases use too (review finding RB2, final finding 5 of MCP1-3).</summary>
+    /// <param name="path">An install path.</param>
+    /// <param name="missionsFolder">The install path of <c>DATA\MISSIONS</c>, or null when the data has none.</param>
+    internal static bool CanBeOwnShipFile(string path, string? missionsFolder) =>
+        missionsFolder == null || IsScanned(path, missionsFolder) && !IsDirectlyIn(path, missionsFolder);
+
     /// <summary>True for the section types that only a mission script has.</summary>
     internal static bool IsScriptSection(string type) =>
         type.Equals("Mission", StringComparison.OrdinalIgnoreCase) || type.Equals("Trigger", StringComparison.OrdinalIgnoreCase);

@@ -427,11 +427,11 @@ public static class MissionRun
         };
     }
 
-    /// <summary>True for the ship build file of a script: a file that is not directly in <c>DATA\MISSIONS</c>. A file
-    /// directly in that folder, for example <c>npcships.ini</c>, is world data that encounters and bases use too, so its
-    /// problems are not the problems of a script (review finding RB2).</summary>
+    /// <summary>True for the own ship build file of a script (see <see cref="MissionFiles.CanBeOwnShipFile"/>). A file
+    /// directly in <c>DATA\MISSIONS</c>, for example <c>npcships.ini</c>, is world data that encounters and bases use
+    /// too, so its problems are not the problems of a script (review finding RB2).</summary>
     private static bool IsOwnShipFile(MissionInputs inputs, string path) =>
-        !MissionFiles.IsDirectlyIn(path, inputs.DataPath("MISSIONS"));
+        MissionFiles.CanBeOwnShipFile(path, inputs.DataPath("MISSIONS"));
 
     /// <summary>
     /// The problems of the ship build file of a script (final finding 14 of MCP1-3): each name of each ship build that

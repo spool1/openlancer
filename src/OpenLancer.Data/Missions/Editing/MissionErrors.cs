@@ -58,6 +58,7 @@ public static class MissionErrors
     public const string NotALink = "NotALink";
     public const string NotInBase = "NotInBase";
     public const string NoBaseDifference = "NoBaseDifference";
+    public const string NotShipBuildFile = "NotShipBuildFile";
     public const string NotWholeFile = "NotWholeFile";
     public const string PathInUse = "PathInUse";
     public const string NotTextId = "NotTextId";
@@ -373,7 +374,15 @@ public static class MissionErrors
     internal static EditError WorldFileError(string path) =>
         new(EditErrorKind.Refused, WorldFile,
             $"The mission commands cannot change {path}. Encounters and bases use the data of this file too. Change the " +
-            "file in the Inspector.");
+            "file in the Inspector.") { Target = Script(path) };
+
+    /// <summary>A command points the <c>npc_ship_file</c> line of a script at a file that is not a ship build file
+    /// (final finding 5 of MCP1-3).</summary>
+    internal static EditError NotShipBuildFileError(string script, string file) =>
+        new(EditErrorKind.InvalidValue, NotShipBuildFile,
+            $"The npc_ship_file line of {script} cannot name {file}, because that file is not a ship build file. Other " +
+            @"data of the game can use its sections. Name a file in a folder under DATA\MISSIONS outside the encounters " +
+            "folder, with only [NPCShipArch] sections. Or name a new file.");
 
     internal static EditError PathInUseError(string path) =>
         new(EditErrorKind.NameTaken, PathInUse,

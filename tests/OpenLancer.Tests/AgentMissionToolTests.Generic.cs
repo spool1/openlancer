@@ -744,5 +744,8 @@ public sealed partial class AgentMissionToolTests
         var mission = Error(host, "mission_edit",
             Edit($$"""{ "kind": "remove_section", "section": "{{pilot}}" }"""));
         Assert.Equal(("refused", MissionErrors.WorldFile), (mission.Code, mission.Detail));
+        // The text names the generic tools, as for a line: reference of the file, not the Inspector of the studio.
+        Assert.Equal(AgentTexts.Error("edit_mission_world_file", ("path", pilots)), mission.Message);
+        Assert.Contains("generic tools", mission.Message);
     }
 }
