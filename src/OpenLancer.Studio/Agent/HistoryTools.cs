@@ -4,8 +4,8 @@ using OpenLancer.Data.Editing.Commands;
 
 namespace OpenLancer.Studio.Agent;
 
-/// <summary>The result of <c>undo</c> and <c>redo</c>: the step of the history that the tool took back or did
-/// again.</summary>
+/// <summary>The result of <c>undo</c> and <c>redo</c>: the step of the history that the tool undid or
+/// redid.</summary>
 /// <param name="Label">The label of the step, for example "Agent: Delete my_station_1".</param>
 internal sealed record HistoryStepView(string Label);
 
@@ -24,7 +24,7 @@ internal static class HistoryTools
         if (session.UndoOrigin is not { } origin)
             throw Refused("NothingToUndo", "undo_nothing");
         if (origin != EditOrigin.Agent)
-            throw NotAgentEntry("UserEntry", "undo_user_entry", session.UndoLabel!);
+            throw NotAgent(origin, "undo", session.UndoLabel!);
         var label = session.UndoLabel!;
         Step(() => session.Undo(EditOrigin.Agent));
         call.Host.Stepped(call.Tool, label);
@@ -38,7 +38,7 @@ internal static class HistoryTools
         if (session.RedoOrigin is not { } origin)
             throw Refused("NothingToRedo", "redo_nothing");
         if (origin != EditOrigin.Agent)
-            throw NotAgentEntry("UserEntry", "redo_user_entry", session.RedoLabel!);
+            throw NotAgent(origin, "redo", session.RedoLabel!);
         if (session.RedoUndoneBy != EditOrigin.Agent)
             throw NotAgentEntry("UserUndid", "redo_user_undid", session.RedoLabel!);
         var label = session.RedoLabel!;
@@ -63,6 +63,14 @@ internal static class HistoryTools
 
     private static EditException Refused(string detail, string text) =>
         new(new EditError(EditErrorKind.Refused, detail, AgentTexts.Error(text)));
+
+    /// <summary>The refusal of an entry that is not an agent entry. An entry of the restore of the recovery file has its
+    /// own detail and text, because the user did not make it with an edit.</summary>
+    /// <param name="tool">undo or redo.</param>
+    private static EditException NotAgent(EditOrigin origin, string tool, string label) =>
+        origin == EditOrigin.Recovery
+            ? NotAgentEntry("RecoveryEntry", tool + "_recovery_entry", label)
+            : NotAgentEntry("UserEntry", tool + "_user_entry", label);
 
     private static EditException NotAgentEntry(string detail, string text, string label) =>
         new(new EditError(EditErrorKind.NotAgentEntry, detail, AgentTexts.Error(text, ("label", label))));

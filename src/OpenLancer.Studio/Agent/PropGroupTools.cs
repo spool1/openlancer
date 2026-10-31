@@ -120,7 +120,8 @@ internal static class PropGroupTools
     /// <param name="shape">The result without the group, for its label.</param>
     /// <param name="write">Writes the files.</param>
     /// <param name="written">The result after the write, from the group that the write gives.</param>
-    /// <exception cref="EditException">The write refuses, or the call has no <c>confirm: true</c>.</exception>
+    /// <exception cref="EditException">The write refuses, the call has no <c>confirm: true</c>, or the result is
+    /// larger than the size limit of a result. Nothing changed.</exception>
     private static ToolResult Write(ToolCall call, EditError? problem, EditResult shape, Func<PropGroupWrite> write,
         Func<PropGroup?, EditResult> written)
     {
@@ -144,14 +145,13 @@ internal static class PropGroupTools
             throw new EditException(new EditError(EditErrorKind.NeedsConfirmation, EditTools.ConfirmChanges,
                 AgentTexts.Error("asset_write_confirm", ("label", shape.Label ?? call.Tool))));
         }
+        var summary = AgentTexts.Error("asset_write_applied", ("label", shape.Label ?? call.Tool));
+        // The result must fit the size limit before the files change. The longest revision gives the longest text.
+        EditTools.Fitted(call, ToolResult.Of(written(null) with { Summary = summary, Revision = long.MaxValue }));
         var done = write();
         if (done.Error is { } error)
             throw new EditException(error);
-        var result = written(done.Group) with
-        {
-            Summary = AgentTexts.Error("asset_write_applied", ("label", shape.Label ?? call.Tool)),
-            Revision = revision,
-        };
+        var result = written(done.Group) with { Summary = summary, Revision = revision };
         call.Host.Edited(call.Tool, result);
         return ToolResult.Of(result);
     }

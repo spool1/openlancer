@@ -204,7 +204,8 @@ public static class AgentTools
         SessionTool("save", ToolHints.Changing, ToolInput.None, typeof(SaveView), SaveTools.Save),
         SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
         SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),
-        SessionTool("edit_batch", ToolHints.Adding, new ToolInput(Text("label"),
+        // A step can remove data, so the hints of the batch are the hints of its worst step.
+        SessionTool("edit_batch", ToolHints.Changing, new ToolInput(Text("label"),
                 new StepsParam("steps", () => BatchTool.StepTools), EditTools.Preview, EditTools.WithPatch),
             typeof(BatchResult), BatchTool.Run),
         SessionTool("export_mod", ToolHints.Changing, new ToolInput(

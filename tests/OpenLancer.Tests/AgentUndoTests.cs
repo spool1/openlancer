@@ -80,6 +80,30 @@ public sealed class AgentUndoTests
         Assert.Equal("4, 5, 6", Line(session, Station, "pos"));
     }
 
+    /// <summary>The restore of the recovery file is not an edit of the user. So undo refuses it with its own detail and
+    /// text (final finding of MCP1-2).</summary>
+    [Fact]
+    public void UndoRefusesTheRestoreOfTheRecoveryFileWithItsOwnText()
+    {
+        using var ws = SceneWorkspace.Create();
+        using (var first = ws.Session("act"))
+        {
+            first.Execute(EditCommand.SetLinesFromText(Station, "pos", ["4, 5, 6"]));
+            Assert.Empty(first.WriteRecovery());
+            first.Abandon();
+        }
+        var session = ws.Session("act");
+        Assert.Empty(session.RestoreRecovery());
+        var host = new TestAgentHost(session);
+
+        var error = Error(host, "undo");
+
+        Assert.Equal(("not_agent_entry", "RecoveryEntry"), (error.Code, error.Detail));
+        Assert.Equal("The last step restored the unsaved edits of an earlier session: Restore unsaved edits. The agent can " +
+                     "undo only its own edits.", error.Message);
+        Assert.Equal("4, 5, 6", Line(session, Station, "pos"));
+    }
+
     /// <summary>After the user undid an agent entry with Ctrl+Z, the agent cannot redo it (section 14.3, step 27 of the
     /// MCP1 design). Nor can it redo an edit of the user.</summary>
     [Fact]

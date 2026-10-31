@@ -101,8 +101,8 @@ public sealed class AgentPropGroupToolTests
         Assert.Equal("The group has 3 members: 14, 14_large_transport_1, large_transport_2.",
             Texts(preview["notes"]).Single());
         Assert.Equal(("needs_confirmation", EditTools.ConfirmChanges), (asks.Code, asks.Detail));
-        Assert.Equal("The edit 'Save prop group trio' writes files at once. This change is not on the undo stack. To write " +
-                     "the files, call the tool again with confirm: true.", asks.Message);
+        Assert.Equal("The edit 'Save prop group trio' writes files at once. This change is not on the undo stack. Tell the " +
+                     "user and ask the user. When the user agrees, call the tool again with confirm: true.", asks.Message);
         Assert.Equal(("applied", "The editor wrote the files: Save prop group trio. This change is not on the undo stack."),
             ((string?)saved["status"], (string?)saved["summary"]));
         Assert.Equal(["group:trio"], Texts(saved["adds"]));
@@ -113,6 +113,25 @@ public sealed class AgentPropGroupToolTests
         Assert.False(session.CanUndo);
         Assert.Equal(0, session.Revision);
         Assert.Equal(["prop_group_save", "prop_group_rename", "prop_group_delete"], host.Edits.Select(e => e.Tool));
+    }
+
+    /// <summary>An asset write whose result is larger than the size limit of a result gives limit and writes no file.
+    /// The queue replaces a larger result with limit, and that error must not hide a write (final finding of
+    /// MCP1-2).</summary>
+    [Fact]
+    public void AnAssetWriteAboveTheSizeLimitOfAResultWritesNothing()
+    {
+        using var ws = GroupWorkspace.Create();
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session) { TestLimits = new AgentLimits { ResultKilobytes = 0 } };
+        var folder = GroupWorkspace.PropsFolder(ws);
+
+        var error = Error(host, "prop_group_save", """{ "refs": ["obj:Li01_14"], "nickname": "trio", "confirm": true }""");
+
+        Assert.Equal(("limit", ToolResult.ResultSize), (error.Code, error.Detail));
+        Assert.Contains("The edit changed nothing.", error.Message);
+        Assert.False(Directory.Exists(folder) && Directory.GetFiles(folder).Length > 0);
+        Assert.Empty(host.Edits);
     }
 
     /// <summary>

@@ -215,8 +215,8 @@ public sealed class AgentToolTableTests
     /// <summary>The edit tools, the tools of the session and the play tools of this build in the order of the table,
     /// with their kinds and hints. The tools of section 7.3 follow the tools of section 7.2, and the tools of section
     /// 7.6 follow them. A tool that adds data is not destructive, and a tool that can change or remove data is (review
-    /// finding R7 of MCP1-2). play can save the mod, so it is destructive (section 7.0). play_stop removes no
-    /// data.</summary>
+    /// finding R7 of MCP1-2). edit_batch can have a step that removes data, so it is destructive (final finding of
+    /// MCP1-2). play can save the mod, so it is destructive (section 7.0). play_stop removes no data.</summary>
     private static readonly Dictionary<string, (ToolKind Kind, ToolHints Hints)> Edits = new()
     {
         ["set_fields"] = (ToolKind.Edit, new ToolHints(false, true, true)),
@@ -242,7 +242,7 @@ public sealed class AgentToolTableTests
         ["save"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["undo"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["redo"] = (ToolKind.Session, new ToolHints(false, true, false)),
-        ["edit_batch"] = (ToolKind.Session, new ToolHints(false, false, false)),
+        ["edit_batch"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["export_mod"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["publish_checklist"] = (ToolKind.Session, new ToolHints(true, false, true)),
         ["play"] = (ToolKind.Play, new ToolHints(false, true, false)),

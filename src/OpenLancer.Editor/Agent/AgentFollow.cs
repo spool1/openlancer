@@ -154,7 +154,7 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
     /// The undo of the user selects it, as the undo of a delete of the user does (decision D249). This works also with
     /// follow mode off, because the user asked for the undo.
     /// </summary>
-    /// <param name="label">The label of the entry that the undo took back.</param>
+    /// <param name="label">The label of the entry that the undo reversed.</param>
     public SectionRef? DeletedItem(string label) =>
         session != null && deleted.TryGetValue(label, out var reference) ? SectionOf(reference) : null;
 

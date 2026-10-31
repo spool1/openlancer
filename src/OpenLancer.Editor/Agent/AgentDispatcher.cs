@@ -8,7 +8,9 @@ namespace OpenLancer.Editor.Agent;
 /// <param name="Dialog">A dialog of the editor is open.</param>
 /// <param name="Loading">The game data loads, or loads again after a save.</param>
 /// <param name="UserEdit">A batch or a transaction of the user is open.</param>
-internal readonly record struct EditorActivity(bool Editing, bool Dialog, bool Loading, bool UserEdit);
+/// <param name="Renaming">The rename field of the Hierarchy is open, for example after a create of the user. Its rename
+/// applies to the item of its start, so an agent edit must not change that item first.</param>
+internal readonly record struct EditorActivity(bool Editing, bool Dialog, bool Loading, bool UserEdit, bool Renaming = false);
 
 /// <summary>
 /// The UI-thread side of the agent calls of the editor (decision D708): the queue of the calls, the host, and the
@@ -43,6 +45,7 @@ internal sealed class AgentDispatcher : IDisposable
     /// <c>busy</c> after the wait limit. The texts are in <c>agent-tools.json</c> (decision D726).</summary>
     internal static string? WaitReason(EditorActivity now) =>
         now.Editing ? AgentTexts.Error("wait_editing")
+        : now.Renaming ? AgentTexts.Error("wait_renaming")
         : now.Dialog ? AgentTexts.Error("wait_dialog")
         : now.Loading ? AgentTexts.Error("wait_loading")
         : now.UserEdit ? AgentTexts.Error("wait_user_edit")

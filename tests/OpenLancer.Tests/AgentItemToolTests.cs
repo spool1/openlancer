@@ -76,7 +76,8 @@ public sealed class AgentItemToolTests
         Assert.Equal(("needs_confirmation", EditTools.ConfirmChanges), (asks.Code, asks.Detail));
         Assert.StartsWith("The edit 'Rename Li01_01 to Li01_01b' changes more than its targets.", asks.Message);
         Assert.Contains("KnowledgeMap.ini", asks.Message);
-        Assert.EndsWith("To apply the edit, call the tool again with confirm: true.", asks.Message);
+        Assert.EndsWith("Show the changes to the user and ask the user. When the user agrees, call the tool again with " +
+                        "confirm: true.", asks.Message);
         Assert.Equal("applied", (string?)done["status"]);
         Assert.Equal(1, session.Revision);
     }
@@ -204,6 +205,44 @@ public sealed class AgentItemToolTests
         session.Undo();
         Assert.Equal(before, session.Sections(SceneWorkspace.Li01Path).Select(s => session.WorkingSection(s)));
         Assert.False(session.CanUndo);
+    }
+
+    /// <summary>
+    /// The preview and the result of delete_items give the fixes and the "Missing" lines of the plan of the Scene
+    /// delete (issue #21). The delete of the ring zone removes its exclusion in the cloud file. Two planets with one
+    /// nickname name the ring. The editor cannot change their sections, so their ring lines show "Missing". The question
+    /// names both kinds.
+    /// </summary>
+    [Fact]
+    public void ADeleteGivesTheFixesAndTheMissingLinesOfThePlan()
+    {
+        var (ws, session, host) = Scene(SceneWorkspace.Li01Text +
+                                        "\n[Object]\nnickname = Li01_planet\narchetype = planet1\nring = Zone_ring\n");
+        using var _ = ws;
+        var report = ScenePlans.Delete(session, [SceneWorkspace.Zone("Zone_ring")]).Report(session);
+        static (string?, string?)[] Fixes(JsonObject result) =>
+            result["fixes"]!.AsArray().Select(f => ((string?)f!["ref"], (string?)f["key"])).ToArray();
+        static (string?, string?)[] Missing(JsonObject result) =>
+            result["missing"]!.AsArray().Select(m => ((string?)m!["ref"], (string?)m["key"])).ToArray();
+
+        var preview = Ok(host, "delete_items", """{ "refs": ["zone:Zone_ring"], "preview": true }""");
+        var asks = Error(host, "delete_items", """{ "refs": ["zone:Zone_ring"] }""");
+        var done = Ok(host, "delete_items", """{ "refs": ["zone:Zone_ring"], "confirm": true }""");
+
+        var fixes = report.Fixes.Select(f => ((string?)f.Ref, (string?)f.Key)).ToArray();
+        var missing = report.Missing.Select(m => ((string?)m.Ref, (string?)m.Key)).ToArray();
+        Assert.Contains(fixes, f => f.Item1!.Contains("cloud.ini", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(2, missing.Length);
+        Assert.All(missing, m => Assert.Equal("ring", m.Item2));
+        foreach (var result in new[] { preview, done })
+        {
+            Assert.Equal(fixes, Fixes(result));
+            Assert.Equal(missing, Missing(result));
+        }
+        Assert.Equal(("needs_confirmation", EditTools.ConfirmChanges), (asks.Code, asks.Detail));
+        Assert.Contains("It also changes", asks.Message);
+        Assert.Contains("show 'Missing'", asks.Message);
+        Assert.Null(session.Get(SceneWorkspace.Zone("Zone_ring")));
     }
 
     /// <summary>For an agent, a plan that leaves "Missing" lines needs confirm: true, also when the editor does not ask

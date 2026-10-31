@@ -184,6 +184,31 @@ public sealed class AgentEditToolTests
         Assert.Equal(0, session.Revision);
     }
 
+    /// <summary>Without an open profile, each kind of tool that changes data gives not_available with NoProfile, as the
+    /// queries do. The reason of the host is the text of the editor without a profile (final finding of
+    /// MCP1-2).</summary>
+    [Fact]
+    public void WithoutAProfileEachEditToolGivesNotAvailable()
+    {
+        var host = new TestAgentHost(null, AgentHostKind.Editor) { Reason = "No profile is open." };
+        var calls = new (string Tool, string Arguments)[]
+        {
+            ("set_fields", """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } }"""),
+            ("scene_create_zone", """{ "system": "Li01", "position": [0, 0, 0] }"""),
+            ("edit_batch", """{ "steps": [{ "tool": "set_fields", "arguments": { "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] } } }] }"""),
+            ("prop_group_delete", """{ "group": "trio", "confirm": true }"""),
+            ("undo", "{}"),
+            ("redo", "{}"),
+            ("save", "{}"),
+        };
+
+        foreach (var (tool, arguments) in calls)
+        {
+            var error = Error(host, tool, arguments);
+            Assert.True(("not_available", "NoProfile") == (error.Code, error.Detail), $"{tool}: {error}");
+        }
+    }
+
     /// <summary>A preview that Pause or a hidden group refuses does not go to the Console of the host either (section 8.5
     /// of the MCP1 design). The refusal comes before the check of the arguments, so it reads the flag from the
     /// JSON.</summary>

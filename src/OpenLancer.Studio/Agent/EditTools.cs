@@ -225,16 +225,7 @@ internal static class EditTools
                 };
             }
 
-            ToolResult Fitted(EditResult result)
-            {
-                var text = output(result);
-                if (text.SizeAboveLimit(call.Limits) is { } size)
-                {
-                    throw new EditException(new EditError(EditErrorKind.Limit, ToolResult.ResultSize,
-                        AgentTexts.Error("limit_edit_result", ("size", size), ("max", call.Limits.ResultKilobytes))));
-                }
-                return text;
-            }
+            ToolResult Fitted(EditResult result) => EditTools.Fitted(call, output(result));
 
             var finished = batch.Finish();
             if (finished.Status == EditStatus.Refused)
@@ -249,6 +240,20 @@ internal static class EditTools
                 call.Host.Edited(call.Tool, result);
             return output(result);
         }
+    }
+
+    /// <summary>Refuses a result that is larger than the size limit of a result (section 8.4 of the MCP1 design). An
+    /// edit calls it before its change, because the queue replaces a larger result with the error <c>limit</c>, and
+    /// that error must not hide a change that applied.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.Limit"/>: the change did not run.</exception>
+    internal static ToolResult Fitted(ToolCall call, ToolResult text)
+    {
+        if (text.SizeAboveLimit(call.Limits) is { } size)
+        {
+            throw new EditException(new EditError(EditErrorKind.Limit, ToolResult.ResultSize,
+                AgentTexts.Error("limit_edit_result", ("size", size), ("max", call.Limits.ResultKilobytes))));
+        }
+        return text;
     }
 
     /// <summary>
@@ -422,13 +427,15 @@ internal static class EditTools
 
     /// <summary>Refuses an edit while the host takes no edits, with the reason of the host (section 8.2 of the MCP1
     /// design). The reason is the reason of the session, for example the lock or a profile in a game folder. It can
-    /// also be the rule of the mods in the OpenLancer repo.</summary>
-    /// <exception cref="EditException"><see cref="EditErrorKind.ReadOnly"/>.</exception>
+    /// also be the rule of the mods in the OpenLancer repo. Without an open profile, the edit gives
+    /// <c>not_available</c>, as each other tool that reads the profile does.</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.NotAvailable"/> without a profile, else
+    /// <see cref="EditErrorKind.ReadOnly"/>.</exception>
     internal static void ReadOnlyGuard(ToolCall call)
     {
+        _ = call.Session;
         if (call.Host.NoEditReason is { } reason)
             throw new EditException(new EditError(EditErrorKind.ReadOnly, MissionErrors.NotEditable, reason));
-        _ = call.Session;
     }
 
     /// <summary>The refusal of a reference of a mission item or of a cutscene: the edit tools of this version do not

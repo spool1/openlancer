@@ -96,7 +96,7 @@
               "label",
               "origin"
             ],
-            "description": "The step that Undo takes back, or none."
+            "description": "The step that Undo reverses, or none."
           },
           "redo": {
             "type": [
@@ -18678,7 +18678,7 @@
         "properties": {
           "label": {
             "type": "string",
-            "description": "The label of the step that the tool undid or did again, for example Agent: Delete my_station_1."
+            "description": "The label of the step that the tool undid or redid, for example Agent: Delete my_station_1."
           },
           "rev": {
             "type": "string",
@@ -18800,7 +18800,7 @@
         "properties": {
           "label": {
             "type": "string",
-            "description": "The label of the step that the tool undid or did again, for example Agent: Delete my_station_1."
+            "description": "The label of the step that the tool undid or redid, for example Agent: Delete my_station_1."
           },
           "rev": {
             "type": "string",
@@ -19642,7 +19642,7 @@
       },
       "annotations": {
         "title": "Run edits as one Undo step",
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false,
         "openWorldHint": false,
         "readOnlyHint": false
@@ -20160,7 +20160,7 @@
     {
       "name": "play",
       "title": "Start Play in OpenLancer",
-      "description": "When the active mod has unsaved edits, the editor asks the user to save them first. Then the tool starts the game in OpenLancer at a point in space or at a base. When the user cancels, Play does not start. While a game runs, the tool refuses. Call play_stop first. Only the editor host can play.",
+      "description": "When the active mod has unsaved edits, the editor asks the user to save them first. When the user turned on the automatic save for an agent Play, the editor saves without a question. Then the tool starts the game in OpenLancer at a point in space or at a base. When the user cancels, Play does not start. While a game runs, the tool refuses. Call play_stop first. Only the editor host can play.",
       "inputSchema": {
         "type": "object",
         "properties": {

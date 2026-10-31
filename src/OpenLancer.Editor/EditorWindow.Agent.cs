@@ -87,10 +87,10 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
         layout.Show(ConsolePanel.PanelId);
     }
 
-    /// <summary>What the editor does now: an agent call waits while the user edits, a dialog is open, the data loads
-    /// or an edit of the user runs (section 5.5 of the MCP1 design).</summary>
+    /// <summary>What the editor does now: an agent call waits while the user edits or renames, a dialog is open, the
+    /// data loads or an edit of the user runs (section 5.5 of the MCP1 design).</summary>
     private EditorActivity Activity() => new(IsEditing || AssetDrag.IsDragging, DialogOpen, Session?.IsBusy == true,
-        Session?.Edits is { } edits && (edits.OpenBatch != null || edits.InTransaction));
+        Session?.Edits is { } edits && (edits.OpenBatch != null || edits.InTransaction), SceneEdits.Renaming != null);
 
     EditSession? IAgentEditor.Edits => Session?.Edits;
 

@@ -677,6 +677,26 @@ public sealed class AgentControllerTests : IDisposable
         Assert.Equal("A dialog of the editor is open.", AgentDispatcher.WaitReason(new EditorActivity(false, true, false, false)));
         Assert.Equal("The editor loads the game data now.", AgentDispatcher.WaitReason(new EditorActivity(false, false, true, false)));
         Assert.Equal("An edit of the user runs now.", AgentDispatcher.WaitReason(new EditorActivity(false, false, false, true)));
+        Assert.Equal("The user renames an item in the Hierarchy now.",
+            AgentDispatcher.WaitReason(new EditorActivity(false, false, false, false, Renaming: true)));
+    }
+
+    /// <summary>An agent call waits while the rename field of the Hierarchy is open. The rename of the field applies to
+    /// the item of its start, so an agent edit must not change that item first (section 5.5, item 3 of the MCP1
+    /// design).</summary>
+    [Fact]
+    public async Task ACallWaitsWhileTheRenameFieldIsOpen()
+    {
+        var renaming = true;
+        using var dispatcher = new AgentDispatcher(new EditorAgentHost(new FakeAgentEditor()),
+            () => new EditorActivity(false, false, false, false, renaming), null, new FakeClock());
+
+        var call = dispatcher.Queue.CallAsync("studio_status", null, null, TestContext.Current.CancellationToken);
+        Assert.False(dispatcher.Frame());
+        renaming = false;
+        Assert.True(dispatcher.Frame());
+
+        Assert.False((await call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)).IsError);
     }
 
     [Fact]

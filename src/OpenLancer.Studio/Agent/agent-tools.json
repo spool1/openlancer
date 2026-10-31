@@ -13,7 +13,8 @@
       "Read the items before you edit them.",
       "Use preview: true for a large edit or a delete.",
       "Use edit_batch for steps that belong together. The batch is one Undo step.",
-      "Give each new item a nickname, so that later steps can name it."
+      "Give each new item a nickname, so that later steps can name it.",
+      "Before you set confirm: true, show the changes to the user and ask the user."
     ],
     "read_only": [
       "This server only reads the data. It changes no file."
@@ -457,7 +458,7 @@
     },
     "play": {
       "title": "Start Play in OpenLancer",
-      "description": "When the active mod has unsaved edits, the editor asks the user to save them first. Then the tool starts the game in OpenLancer at a point in space or at a base. When the user cancels, Play does not start. While a game runs, the tool refuses. Call play_stop first. Only the editor host can play.",
+      "description": "When the active mod has unsaved edits, the editor asks the user to save them first. When the user turned on the automatic save for an agent Play, the editor saves without a question. Then the tool starts the game in OpenLancer at a point in space or at a base. When the user cancels, Play does not start. While a game runs, the tool refuses. Call play_stop first. Only the editor host can play.",
       "fields": {
         "start": "Where the player starts: space for a point in a system, or base for a dock at a base.",
         "system": "The system of a start in space: its nickname or its system: reference. The Scene must show the system, because Play checks the start point with the shapes of the Scene.",
@@ -560,6 +561,7 @@
     "system_ref": "The argument 'system' takes a nickname or a system: reference, not {ref}.",
     "tool_failed": "The tool {tool} stopped because of an error of the server: {reason} The tool changed nothing.",
     "wait_editing": "The user edits a field or drags an item now.",
+    "wait_renaming": "The user renames an item in the Hierarchy now.",
     "wait_dialog": "A dialog of the editor is open.",
     "wait_loading": "The editor loads the game data now.",
     "wait_user_edit": "An edit of the user runs now.",
@@ -601,7 +603,7 @@
     "confirm_missing": "After the edit, lines of {refs} show 'Missing'.",
     "confirm_mentions": "These files name the item as text: {files}.",
     "confirm_more": " and {count} more",
-    "confirm_end": "Use preview: true to see all changes. To apply the edit, call the tool again with confirm: true.",
+    "confirm_end": "Use preview: true to see all changes. Show the changes to the user and ask the user. When the user agrees, call the tool again with confirm: true.",
     "limit_sections": "The edit changes {count} sections, and one call can change at most {max}. Split the edit.",
     "edit_applied": "The editor applied the edit as one Undo step: {label}.",
     "edit_previewed": "The preview changed nothing. Call the tool again without preview to apply the edit.",
@@ -615,6 +617,8 @@
     "redo_nothing": "The history has no step to redo.",
     "undo_user_entry": "The last edit is an edit of the user: {label}. The agent can undo only its own edits.",
     "redo_user_entry": "The next step to redo is an edit of the user: {label}. The agent can redo only its own edits.",
+    "undo_recovery_entry": "The last step restored the unsaved edits of an earlier session: {label}. The agent can undo only its own edits.",
+    "redo_recovery_entry": "The next step to redo restores the unsaved edits of an earlier session: {label}. The agent can redo only its own edits.",
     "redo_user_undid": "The user undid this edit: {label}. The agent cannot redo it.",
     "limit_steps": "One batch can have at most {max} steps. Split the batch.",
     "step_unknown": "Step {index}: the server has no tool {tool}.",
@@ -643,7 +647,7 @@
     "group_members": "The group has {count} members: {members}.",
     "group_member": "The group has 1 member: {members}.",
     "asset_write_previewed": "The preview wrote nothing. To write the files, call the tool again with confirm: true.",
-    "asset_write_confirm": "The edit '{label}' writes files at once. This change is not on the undo stack. To write the files, call the tool again with confirm: true.",
+    "asset_write_confirm": "The edit '{label}' writes files at once. This change is not on the undo stack. Tell the user and ask the user. When the user agrees, call the tool again with confirm: true.",
     "asset_write_applied": "The editor wrote the files: {label}. This change is not on the undo stack.",
     "template_none": "The list {list} has no item {template}.",
     "template_kind": "{ref} is not an item of the list {list}. Give a nickname of the list {list}.",
@@ -804,7 +808,7 @@
     "StudioStatus.reason": "Why the host takes no edits now, or none.",
     "StudioStatus.dirty": "True when the session has edits that it did not save.",
     "StudioStatus.rev": "The revision of the edit view, as text. Each edit, undo and redo increases it. A save does not change it.",
-    "StudioStatus.undo": "The step that Undo takes back, or none.",
+    "StudioStatus.undo": "The step that Undo reverses, or none.",
     "StudioStatus.redo": "The step that Redo does again, or none.",
     "StudioStatus.view": "What the editor shows now, or none in the host without a window.",
     "StudioStatus.paused": "True while the user pauses the edits of the agent.",
@@ -1207,7 +1211,7 @@
     "NamedMention.nickname": "The nickname that the file names as text.",
     "NamedMention.path": "The install path of the file.",
     "NamedMention.count": "How often the file names the nickname.",
-    "HistoryStepView.label": "The label of the step that the tool undid or did again, for example Agent: Delete my_station_1.",
+    "HistoryStepView.label": "The label of the step that the tool undid or redid, for example Agent: Delete my_station_1.",
     "BatchResult.steps": "The result of each step, in order. Each step has the status, the revision and the files of the batch.",
     "SaveView.saved": "True when the save wrote its files. A save without unsaved edits also gives true.",
     "SaveView.number": "The number of the save in this session, or 0 when the save changed no file.",
