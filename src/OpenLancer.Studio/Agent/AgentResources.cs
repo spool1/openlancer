@@ -189,8 +189,8 @@ public static class AgentResources
 
     /// <summary>A name of the schema with the mark of the mission runtime of OpenLancer, as the editor loads it.</summary>
     private static MissionNameRow Row(MissionName name) => new(name.Name, name.Plain, name.Kind, name.Group,
-        [.. name.Values.Select(v => MissionQueries.ValueView(v, MissionSchema.Retail))], EngineCoverage.Instance.Of(name.Name),
-        name.NoRetailExample, name.Checked);
+        [.. name.Values.Select(v => MissionQueries.ValueView(v, MissionSchema.Retail))],
+        EngineCoverage.Instance.Of(name.Name), name.NoRetailExample, name.Checked);
 
     private static string Json<T>(T value) => JsonSerializer.Serialize(value, Compact);
 }

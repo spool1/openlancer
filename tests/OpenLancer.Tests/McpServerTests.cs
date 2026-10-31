@@ -386,6 +386,7 @@ public sealed class McpServerTests
         var text = Assert.IsType<TextContentBlock>(message.Content).Text;
         Assert.StartsWith($"Add a pirate ambush with two triggers to the mission script {script}.", text);
         Assert.DoesNotContain("{script}", text);
+        Assert.Contains($"Give the script {script} to each mission tool and to each mission step of edit_batch.", text);
         Assert.Contains($"7. Call mission_dry_run with the script {script} and these four inputs:", text);
         Assert.Contains("6. Call edit_batch with the label \"Add the pirate ambush\" and these three steps:", text);
         Assert.Equal(AgentTexts.Prompts["two_trigger_mission"].Description, result.Description);

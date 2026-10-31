@@ -976,6 +976,7 @@
       },
       "text": [
         "Add a pirate ambush with two triggers to the mission script {script}. Do the steps in this order.",
+        "Give the script {script} to each mission tool and to each mission step of edit_batch.",
         "The names my_pirate_build, my_pirate_npc, my_pirate, my_ambush, my_reward and my_crate are examples. Use names that fit the mission.",
         "",
         "1. Call studio_status. Make sure that can_edit is true.",

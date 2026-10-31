@@ -54,7 +54,8 @@ public static class McpBinding
             Name = p.Name,
             Title = p.Title,
             Description = p.Description,
-            Arguments = p.Arguments.Select(a => new PromptArgument { Name = a.Name, Description = a.Description, Required = true })
+            Arguments = p.Arguments
+                .Select(a => new PromptArgument { Name = a.Name, Description = a.Description, Required = true })
                 .ToList(),
         }).ToList(),
     };
