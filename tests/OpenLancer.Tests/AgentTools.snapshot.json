@@ -32786,7 +32786,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "The value texts by position, in place of the values by name. The editor then checks only the form of the line."
+                "description": "The value texts by position, in place of the values by name. Do not give both. The editor then checks only the form of the line."
               }
             },
             "required": [
@@ -33401,7 +33401,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "The value texts by position, in place of the values by name. The editor then checks only the form of the line."
+                "description": "The value texts by position, in place of the values by name. Do not give both. The editor then checks only the form of the line."
               }
             },
             "required": [
@@ -34022,7 +34022,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "The value texts by position, in place of the values by name. The editor then checks only the form of the line."
+                "description": "The value texts by position, in place of the values by name. Do not give both. The editor then checks only the form of the line."
               }
             },
             "required": [
@@ -36405,7 +36405,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "The value texts by position, in place of the values by name. The editor then checks only the form of the line."
+                "description": "The value texts by position, in place of the values by name. Do not give both. The editor then checks only the form of the line."
               }
             },
             "required": [

@@ -60,11 +60,13 @@ internal static class MissionLineInput
         ["items"] = new JsonObject { ["type"] = new JsonArray("number", "string", "boolean") },
     };
 
-    /// <summary>True when a JSON value has the form of a line: a key, and optional values by name and texts by
-    /// position, with no other field.</summary>
+    /// <summary>True when a JSON value has the form of a line: a key, and optional values by name or texts by
+    /// position, with no other field. A line with both has no form, because the layer uses the texts and drops the
+    /// values.</summary>
     public static bool IsLine(JsonNode? node) =>
         node is JsonObject line && line["key"] is JsonValue key && key.GetValueKind() == JsonValueKind.String &&
         key.GetValue<string>() is { Length: > 0 and <= TextParam.MaxLength } &&
+        !(line.ContainsKey("values") && line.ContainsKey("texts")) &&
         line.All(field => field.Key switch
         {
             "key" => true,
@@ -114,7 +116,7 @@ internal sealed class LineParam(string name, bool required) : ToolParam(name, re
 {
     public override JsonObject Schema(string tool) => new() { ["$ref"] = MissionLineInput.LineRef };
 
-    public override string Expected => "a line: an object with a key, and values by name or texts by position";
+    public override string Expected => "a line: an object with a key, and values by name or texts by position, not both";
 
     public override bool Fits(JsonNode value) => MissionLineInput.IsLine(value);
 }
@@ -131,7 +133,7 @@ internal sealed class LinesParam(string name, int maxItems) : ToolParam(name, fa
     };
 
     public override string Expected =>
-        $"a list of at most {maxItems} lines, each an object with a key, and values by name or texts by position";
+        $"a list of at most {maxItems} lines, each an object with a key, and values by name or texts by position, not both";
 
     public override bool Fits(JsonNode value) =>
         value is JsonArray lines && lines.Count <= maxItems && lines.All(MissionLineInput.IsLine);

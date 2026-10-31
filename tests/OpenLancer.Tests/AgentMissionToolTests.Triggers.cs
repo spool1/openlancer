@@ -305,6 +305,14 @@ public sealed partial class AgentMissionToolTests
                 "invalid_argument", ToolInput.BadArgument, "nickname"),
             ("mission_add_trigger", $$"""{ "script": "msn:{{S}}", "condition": { "key": "Cnd_True", "valus": {} } }""",
                 "invalid_argument", ToolInput.BadArgument, "condition"),
+            // The layer uses the texts of a line and drops its values, so a line with both refuses.
+            ("mission_add_action", $$"""
+                { "trigger": "{{End}}", "action": { "key": "Act_SpawnShip", "values": { "ship": "ol_nope" }, "texts": [ "ol_ship_3" ] } }
+                """, "invalid_argument", ToolInput.BadArgument, "action"),
+            ("mission_insert_trigger", $$"""
+                { "line": "line:{{S}}#Trigger/ol_start/3", "condition": { "key": "Cnd_True" },
+                  "actions": [ { "key": "Act_ChangeState", "values": {}, "texts": [ "FAIL" ] } ] }
+                """, "invalid_argument", ToolInput.BadArgument, "actions"),
             ("mission_set_condition", $$"""{ "trigger": "{{WaveLine(2)}}", "condition": { "key": "Cnd_True" } }""",
                 "invalid_argument", "BadReference", "trigger"),
             ("mission_insert_trigger", $$"""{ "line": "{{WaveLine(3)}}", "condition": { "key": "Cnd_True" } }""",
