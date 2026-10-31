@@ -4,10 +4,10 @@ using OpenLancer.Editor.Ui;
 namespace OpenLancer.Editor.Missions;
 
 /// <summary>
-/// The gestures of the user in the mission graph that an agent call waits for (section 5.5, item 3 of the MCP1 design):
-/// a rename of a node, quick add, and a drag of nodes or of a link. A drag of nodes or of a link runs only while the left
-/// button stays down after a click on a node or a pin. A gesture of a graph that does not draw any more does not count,
-/// for example a rename in a hidden tab.
+/// The gestures of the user in the mission graph that an agent call waits for (section 5.5, item 3 of the MCP1 design).
+/// They are a rename of a node, quick add, and a drag of nodes or of a link. A drag of nodes or of a link runs only while
+/// the left button stays down after a click on a node or a pin. A gesture of a graph that does not draw any more does not
+/// count, for example a rename in a hidden tab.
 /// </summary>
 /// <param name="frames">Gives the number of the frame now. The default is the frame count of ImGui. The tests give a fake
 /// count.</param>
