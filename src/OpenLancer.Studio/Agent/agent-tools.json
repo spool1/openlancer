@@ -722,7 +722,7 @@
     "mission_field_list": "{key} does not repeat. Give one value, one list of numbers or texts, or one object of values by name.",
     "mission_field_named": "{key} has more than one value. Give its values by name in an object, with these names: {names}.",
     "mission_field_twice": "The key {key} is in fields two times. Give each key one time.",
-    "mission_item_key": "The game does not read {key} in a {kind}. Use one of these keys: {keys}.",
+    "mission_item_key": "The game does not read {key} in {kind}. Use one of these keys: {keys}.",
     "mission_item_nickname": "Give the nickname of the new item in the argument nickname, not in fields.",
     "mission_item_order": "Give each order of an order list in steps, not in fields.",
     "mission_item_steps": "Only the kind order_list takes steps. Give the keys of the {kind} in fields.",

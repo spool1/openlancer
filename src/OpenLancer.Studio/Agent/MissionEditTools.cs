@@ -431,7 +431,8 @@ internal static class MissionEditTools
                     ? new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument, AgentTexts.Error("mission_item_order"))
                     : MissionErrors.NotAKeyError(key, $"[{type}]") with
                     {
-                        Message = AgentTexts.Error("mission_item_key", ("key", key), ("kind", MissionNames.KindWord(type)),
+                        Message = AgentTexts.Error("mission_item_key", ("key", key),
+                            ("kind", MissionChecks.WithArticle(MissionNames.KindWord(type))),
                             ("keys", string.Join(", ", section.Keys.Select(k => k.Key).Where(k => !MissionIndex.Is(k, "nickname"))))),
                     };
                 throw new EditException(error with { Field = field });

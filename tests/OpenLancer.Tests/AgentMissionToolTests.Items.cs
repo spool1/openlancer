@@ -170,6 +170,7 @@ public sealed partial class AgentMissionToolTests
         var result = Ok(host, "mission_add_item", arguments);
 
         Assert.Equal([reference], Texts(result["adds"]));
+        Assert.Empty(Texts(result["changes"]));
         Assert.Equal(reference, ItemRefs.Format(item));
         Assert.Equal(lines, m.Lines(new ItemRef(item.Path!, item.Section!)));
         Assert.Equal(("applied", "Agent: " + label), ((string?)result["status"], (string?)result["undo_label"]));
@@ -366,6 +367,7 @@ public sealed partial class AgentMissionToolTests
 
         Assert.True(wrong.Count == 0, string.Join(Environment.NewLine, wrong));
         var key = Error(host, "mission_add_item", AddItem("ship", "ol_new", """{ "npc": "ol_npc_1", "pilot": "ol_pilot" }"""));
+        Assert.StartsWith("The game does not read pilot in a ship.", key.Message);
         Assert.Contains("init_objectives", key.Message);
         Assert.DoesNotContain("nickname", key.Message);
         var npc = Error(host, "mission_add_item", AddItem("ship", "ol_new", "{}"));
