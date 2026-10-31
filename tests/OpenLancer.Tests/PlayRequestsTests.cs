@@ -153,13 +153,14 @@ public sealed class PlayRequestsTests : IDisposable
     }
 
     /// <summary>The setting of agent Play shows only when an agent tool can start Play (UI rule 4). This build has the
-    /// tool play of MCP1-2. MCP1-3 adds mission_play.</summary>
+    /// tool play of MCP1-2 and the tool mission_play of MCP1-3, and the setting applies to both.</summary>
     [Fact]
     public void TheSettingOfAgentPlayShowsWithThePlayTool()
     {
         Assert.True(Editor.Agent.AgentMenu.AgentCanPlay);
-        Assert.NotNull(OpenLancer.Studio.Agent.AgentTools.Find("play"));
-        Assert.Contains("play", Editor.Agent.AgentMenu.PlayTools);
+        foreach (var tool in Editor.Agent.AgentMenu.PlayTools)
+            Assert.Equal(OpenLancer.Studio.Agent.ToolKind.Play, OpenLancer.Studio.Agent.AgentTools.Find(tool)?.Kind);
+        Assert.Equal(["play", "mission_play"], Editor.Agent.AgentMenu.PlayTools);
     }
 
     /// <summary>A cancel closes the open question as Cancel does (MCP1-2 step 7). The close waits for the UI thread, and a

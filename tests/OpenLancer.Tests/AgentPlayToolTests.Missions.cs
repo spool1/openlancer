@@ -65,6 +65,20 @@ public sealed partial class AgentPlayToolTests
         Assert.Empty(host.Refusals);
     }
 
+    /// <summary>The first sentence of the description of each tool that starts Play tells the agent play rule of the user
+    /// decision of 2026-10-20 (section 7.4 of the MCP1 design). The decision replaces the text of section 9.1 that saves
+    /// first.</summary>
+    [Fact]
+    public void TheDescriptionOfEachToolThatStartsPlayTellsTheAgentPlayRuleFirst()
+    {
+        foreach (var tool in AgentMenu.PlayTools)
+        {
+            Assert.StartsWith("When the active mod has unsaved edits, the editor asks the user to save them first. ",
+                AgentTools.Find(tool)!.Description);
+        }
+        Assert.Contains("does not change the play start of the user", AgentTools.Find("mission_play")!.Description);
+    }
+
     /// <summary>mission_play reads its start as mission_start_plan does: the mission start by default, the sec: form of a
     /// trigger, and the start place.</summary>
     [Fact]
