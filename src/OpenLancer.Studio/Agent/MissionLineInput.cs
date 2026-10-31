@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -96,15 +98,116 @@ internal static class MissionLineInput
     /// <param name="action">True for an action, false for a condition.</param>
     /// <exception cref="EditException">The key is not a condition or an action of the place, or a value is not valid.
     /// The error names the argument.</exception>
-    public static LineSpec TriggerLine(JsonNode node, string field, bool action)
+    public static LineSpec TriggerLine(JsonNode node, string field, bool action) =>
+        Line(node, field, "Trigger", action ? LinePlace.Action : LinePlace.Condition);
+
+    /// <summary>An order of an order list in an argument: a line of one of the 23 directives, checked as
+    /// <see cref="TriggerLine"/> checks a line of a trigger.</summary>
+    /// <exception cref="EditException">The key is not a directive, or a value is not valid. The error names the
+    /// argument.</exception>
+    public static LineSpec OrderLine(JsonNode node, string field) => Line(node, field, "ObjList", LinePlace.Order);
+
+    private static LineSpec Line(JsonNode node, string field, string sectionType, LinePlace place)
     {
         var line = node.Deserialize<LineSpec>(MissionJson.Options)!;
-        if (line is { Values.Count: 0, Texts: null } && MissionSchema.Retail.Name(line.Key) is { Values.Count: 0 })
+        var name = place == LinePlace.Order ? MissionSchema.Retail.Directive(line.Key) : MissionSchema.Retail.Name(line.Key);
+        if (line is { Values.Count: 0, Texts: null } && name is { Values.Count: 0 })
             line = line with { Texts = [NoParams] };
-        EditTools.At(field, () => MissionValues.Build(MissionSchema.Retail, "Trigger",
-            action ? LinePlace.Action : LinePlace.Condition, line));
+        EditTools.At(field, () => MissionValues.Build(MissionSchema.Retail, sectionType, place, line));
         return line;
     }
+
+    // ---- Fields of mission items ----
+
+    /// <summary>The name of the form of a field value with its texts by position.</summary>
+    private const string TextsForm = "texts";
+
+    /// <summary>The schema of a field value of a mission item (see <see cref="FieldLines"/>).</summary>
+    public static JsonObject FieldSchema() => new()
+    {
+        ["type"] = new JsonArray("number", "string", "boolean", "array", "object", "null"),
+    };
+
+    /// <summary>True when a JSON value has a form of a field value of a mission item (see
+    /// <see cref="FieldLines"/>).</summary>
+    public static bool IsField(JsonNode? node) =>
+        node is not JsonArray list ? node == null || IsForm(node) : list.All(item => item != null && IsForm(item));
+
+    /// <summary>True when a JSON value is the form of one line: a value, an object of values by name, or an object with
+    /// only the texts by position.</summary>
+    private static bool IsForm(JsonNode node) => node is JsonObject named
+        ? TextsOf(named) != null || named.All(value => IsValue(value.Value))
+        : IsValue(node);
+
+    /// <summary>The texts of the form <c>{"texts": [...]}</c>, or null for another form.</summary>
+    private static IReadOnlyList<string>? TextsOf(JsonObject form) =>
+        form.Count == 1 && form[TextsForm] is JsonArray texts && texts.All(t => t?.GetValueKind() == JsonValueKind.String)
+            ? texts.Select(t => t!.GetValue<string>()).ToList()
+            : null;
+
+    /// <summary>
+    /// The lines of one key of a mission item, from a field value in one of these forms:
+    /// <list type="bullet">
+    /// <item>a value: a number, a text, true or false, or a list of these for a position, a rotation or a value that
+    /// repeats in one line. It is the value of a key with one value.</item>
+    /// <item>an object of values by name, for example <c>{"heading": 90, "anchor": "my_station"}</c>.</item>
+    /// <item>an object with only <c>texts</c>: the value texts by position. The layer checks only their form.</item>
+    /// <item>for a key that repeats, a list of these forms: one line for each form.</item>
+    /// <item><c>null</c>: no line.</item>
+    /// </list>
+    /// Each line gets the check of the schema of the missions, so an error names the field, for example
+    /// <c>fields.label[1]</c>. The command checks each line again when it runs.
+    /// </summary>
+    /// <param name="sectionType">The section type of the item, for example <c>MsnShip</c> or <c>NPCShipArch</c>.</param>
+    /// <param name="node">A value that fits <see cref="IsField"/>.</param>
+    /// <param name="field">The name of the field in an error, for example <c>fields.label</c>.</param>
+    /// <exception cref="EditException">The key is not a key of the section, the form does not fit the key, or a value is
+    /// not valid. The error names the field.</exception>
+    public static IReadOnlyList<LineSpec> FieldLines(string sectionType, string key, JsonNode? node, string field)
+    {
+        var (name, specs) = EditTools.At(field, () =>
+            MissionValues.Key(MissionSchema.Retail, sectionType, LinePlace.Section, key));
+        if (node == null)
+            return [];
+        var repeats = SectionSpec(sectionType)?.Key(name)?.List is { Values: false };
+        var forms = repeats && node is JsonArray list
+            ? list.Select((form, i) => (Form: form!, Field: $"{field}[{i}]")).ToList()
+            : [(Form: node, Field: field)];
+        return forms.Select(f => FieldLine(sectionType, name, specs, f.Form, f.Field)).ToList();
+    }
+
+    /// <summary>The keys of a section type in the schema of the missions, or null for a type that it does not
+    /// know.</summary>
+    public static MissionSectionSpec? SectionSpec(string sectionType) => MissionIndex.Is(sectionType, "NPCShipArch")
+        ? MissionSchema.Retail.ShipBuild
+        : MissionSchema.Retail.Section(sectionType);
+
+    /// <summary>The line of one form of a field value (see <see cref="FieldLines"/>).</summary>
+    private static LineSpec FieldLine(string sectionType, string key, IReadOnlyList<MissionValueSpec> specs, JsonNode form,
+        string field)
+    {
+        var line = form switch
+        {
+            JsonObject named when TextsOf(named) is { } texts => LineSpec.Raw(key, [.. texts]),
+            JsonObject named => new LineSpec(key)
+            {
+                Values = named.ToDictionary(v => v.Key, v => Value(v.Value!), StringComparer.OrdinalIgnoreCase),
+            },
+            _ when !IsValue(form) => throw Refuse(field, AgentTexts.Error("mission_field_list", ("key", key))),
+            _ when specs.Count == 1 => LineSpec.Of(key, (specs[0].Name, Value(form))),
+            // A key that the schema does not know, in a section that reads keys of another grammar, has no value names.
+            _ when specs.Count == 0 =>
+                LineSpec.Raw(key, [.. (form is JsonArray items ? items : [form]).Select(v => Value(v!).Scalar!)]),
+            _ => throw Refuse(field, AgentTexts.Error("mission_field_named", ("key", key),
+                ("names", string.Join(", ", specs.Select(s => s.Name))))),
+        };
+        EditTools.At(field, () => MissionValues.Build(MissionSchema.Retail, sectionType, LinePlace.Section, line));
+        return line;
+    }
+
+    /// <summary>The error of a field value whose form does not fit its key.</summary>
+    private static EditException Refuse(string field, string message) =>
+        new(new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument, message) { Field = field });
 
     /// <summary>The named value of a value that fits <see cref="IsValue"/>.</summary>
     public static MissionValue Value(JsonNode node) => node.Deserialize<MissionValue>(MissionJson.Options)!;
@@ -137,6 +240,24 @@ internal sealed class LinesParam(string name, int maxItems) : ToolParam(name, fa
 
     public override bool Fits(JsonNode value) =>
         value is JsonArray lines && lines.Count <= maxItems && lines.All(MissionLineInput.IsLine);
+}
+
+/// <summary>The fields of a mission item by the keys of its section, for example the fields of
+/// <c>mission_add_item</c>. Each value has one of the forms of <see cref="MissionLineInput.FieldLines"/>.</summary>
+internal sealed class MissionFieldsParam(string name) : ToolParam(name, false)
+{
+    public override JsonObject Schema(string tool) => new()
+    {
+        ["type"] = "object",
+        ["additionalProperties"] = MissionLineInput.FieldSchema(),
+    };
+
+    public override string Expected =>
+        "an object of fields by key, each a value, an object of values by name, an object with texts, a list of these " +
+        "for a key that repeats, or null";
+
+    public override bool Fits(JsonNode value) =>
+        value is JsonObject fields && fields.All(field => MissionLineInput.IsField(field.Value));
 }
 
 /// <summary>Named values of a mission line, with at least one value, for example the values of

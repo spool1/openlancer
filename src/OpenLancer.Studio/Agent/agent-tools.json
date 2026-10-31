@@ -42,8 +42,8 @@
     "if_revision": "Refuse the edit when the edit view changed after this revision. Give the rev of a result that you read.",
     "with_patch": "With preview: also give the patch text of each INI file that the edit changes.",
     "confirm": "Apply an edit that changes more than its targets. Without it, such an edit gives needs_confirmation.",
-    "$defs.line": "A line of a trigger: its key, and its values by name or its texts by position.",
-    "$defs.line.key": "A condition key (Cnd_...) or an action key (Act_...), for example Cnd_Timer.",
+    "$defs.line": "A line of a trigger or of an order list: its key, and its values by name or its texts by position.",
+    "$defs.line.key": "A condition key (Cnd_...), an action key (Act_...) or an order key, for example Cnd_Timer or GotoVec.",
     "$defs.line.values": "The values by their names, for example {\"seconds\": 3}. describe_mission_name gives the names and the kinds of the values. A key without values, for example Cnd_True, needs none. The editor then writes no_params, as the game data does.",
     "$defs.line.texts": "The value texts by position, in place of the values by name. Do not give both. The editor then checks only the form of the line."
   },
@@ -500,6 +500,16 @@
         "actions": "More actions of the new trigger, in order. They come before the start of the old target."
       }
     },
+    "mission_add_item": {
+      "title": "Add an item to a mission",
+      "description": "Adds one item of a kind to a mission script, for example a ship, an NPC or an order list. The tool makes one Undo step. It refuses an edit that adds an error to the script. The fields are the keys of the section, as get_item gives them for an item of the same kind. Set preview to true to see the result first.",
+      "fields": {
+        "kind": "The kind of the new item. A ship needs fields.npc. A ship_build goes into the ship build file of the script.",
+        "nickname": "The nickname of the new item. Use letters, digits, '_' and '-'. A random encounter has at most 31 characters. Without it, the editor makes a free name.",
+        "fields": "The keys of the new item, for example {\"npc\": \"my_npc\", \"position\": [0, 0, 1000]}. A value is one value, a list for a position, or an object of values by name. {\"texts\": [...]} gives the value texts by position. A key that repeats, for example label, takes a list of these. null writes no line.",
+        "steps": "The orders of an order list, in order. Each step is a line of a directive, for example {\"key\": \"GotoVec\", \"values\": {\"point\": [0, 0, 1000]}}. Only the kind order_list takes steps."
+      }
+    },
     "save": {
       "title": "Save the edits of the active mod",
       "description": "Saves the edits into the patch files of the active mod. The save stops when the checks find errors. Read the errors, correct them, then save again."
@@ -709,6 +719,14 @@
     "mission_strict": "The mission tools always refuse an edit that adds an error. Remove reject_new_errors, or set it to true.",
     "mission_other_script": "The trigger {ref} is in another script. Name a trigger of {script}.",
     "mission_other_line": "{ref} is not a line of {item}. Name a line of the same item.",
+    "mission_field_list": "{key} does not repeat. Give one value, one list of numbers or texts, or one object of values by name.",
+    "mission_field_named": "{key} has more than one value. Give its values by name in an object, with these names: {names}.",
+    "mission_field_twice": "The key {key} is in fields two times. Give each key one time.",
+    "mission_item_key": "The game does not read {key} in a {kind}. Use one of these keys: {keys}.",
+    "mission_item_nickname": "Give the nickname of the new item in the argument nickname, not in fields.",
+    "mission_item_order": "Give each order of an order list in steps, not in fields.",
+    "mission_item_steps": "Only the kind order_list takes steps. Give the keys of the {kind} in fields.",
+    "mission_ship_npc": "A ship needs fields.npc: the nickname of an [NPC] of the script. Add a ship_build and an npc first, or use mission_edit with add_mission_ship and new_build.",
     "step_unknown": "Step {index}: the server has no tool {tool}.",
     "step_kind": "Step {index}: {tool} cannot be a step of edit_batch. A step must be an edit tool, for example set_fields.",
     "step_asset_write": "Step {index}: {tool} writes files at once, outside the Undo history. Call it alone, not in edit_batch.",

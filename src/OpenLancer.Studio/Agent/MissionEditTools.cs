@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -330,6 +331,178 @@ internal static class MissionEditTools
                 error => error.Index is > 0 and var i ? $"actions[{i - 1}]" : NameOr(error, "line"));
         });
     }
+
+    // ---- The item tool ----
+
+    /// <summary>The detail code of a mission ship without the <c>npc</c> field.</summary>
+    public const string NeedsNpc = "NeedsNpc";
+
+    /// <summary>The most steps of one order list of <c>mission_add_item</c>, as the most actions of a trigger.</summary>
+    public const int MaxSteps = MaxActions;
+
+    /// <summary>The kinds of <c>mission_add_item</c> (section 7.4 of the MCP1 design).</summary>
+    public static readonly IReadOnlyList<string> ItemKinds =
+    [
+        "ship", "formation", "npc", "ship_build", "solar", "loot", "order_list", "objective", "conversation",
+        "random_encounter",
+    ];
+
+    /// <summary>The keys of a ship that <see cref="AddMissionShip"/> writes. The tool sets each other key with
+    /// <see cref="SetItemKey"/>.</summary>
+    private static readonly HashSet<string> ShipCommandKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "npc", "system", "position", "orientation", "rel_pos", "label", "init_objectives",
+    };
+
+    public static ToolInput AddItemInput { get; } = WithLines(
+        new TextParam("script", true, null, null),
+        new TextParam("kind", true, ItemKinds, null),
+        Nickname,
+        new MissionFieldsParam("fields"),
+        new LinesParam("steps", MaxSteps));
+
+    /// <summary>
+    /// The tool <c>mission_add_item</c>: a new item of a kind with the lines of its fields, as one request. A ship gets
+    /// <see cref="AddMissionShip"/> with an existing <c>[NPC]</c>, then <see cref="SetItemKey"/> for each key that the
+    /// command does not write. When a formation of the script names the new ship, a <see cref="MoveSection"/> puts the
+    /// ship before it, so the formation takes the ship (rule M08). Each other kind gets <see cref="AddItem"/>. An order
+    /// list also gets the orders of <c>steps</c>.
+    /// </summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a field that does not fit its key,
+    /// a ship without <c>fields.npc</c>, or steps of another kind. <see cref="EditErrorKind.InvalidValue"/> for a key that
+    /// the section does not have or a value that is not valid. Each error of the edit call.</exception>
+    public static ToolStep NewItem(ToolCall call)
+    {
+        var args = call.Args;
+        var script = EditTools.At("script", () => ScriptRef.Parse(args.Text("script")!));
+        var kind = args.Text("kind")!;
+        var type = kind == "ship" ? "MsnShip" : MissionDraft.TypeOfKind(kind)!;
+        var fields = Fields(args.Node("fields")?.AsObject(), type, kind);
+        if (args.Has("steps") && kind != "order_list")
+        {
+            throw new EditException(new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument,
+                AgentTexts.Error("mission_item_steps", ("kind", kind))) { Field = "steps" });
+        }
+        var orders = args.Node("steps")?.AsArray()
+            .Select((line, i) => MissionLineInput.OrderLine(line!, $"steps[{i}]")).ToList() ?? [];
+        var nickname = args.Text("nickname");
+        if (kind == "ship")
+            return EditTools.Apply(call, scope => AddShip(scope, script, nickname, fields));
+        var add = new AddItem(script, kind)
+        {
+            Nickname = nickname,
+            Lines = [.. fields.SelectMany(f => f.Lines), .. orders],
+        };
+        var label = $"Add {MissionNames.KindWord(type)} {nickname}".TrimEnd();
+        return EditTools.Apply(call, scope =>
+            scope.RunMission(new MissionBatch(label, [add]), error => NameOr(error, "script")));
+    }
+
+    /// <summary>
+    /// The lines of the fields of a new item, by key. The <c>formation</c> and <c>ship</c> lines of a formation come
+    /// last, so each ship key comes before them (rule M09), as <see cref="SetItemKey"/> puts it. The other lines keep
+    /// the order of the fields.
+    /// </summary>
+    /// <exception cref="EditException">See <see cref="NewItem"/>. A <c>nickname</c> field, or an order in the fields of
+    /// an order list, gives <see cref="EditErrorKind.InvalidArgument"/>.</exception>
+    private static List<(string Key, string Field, IReadOnlyList<LineSpec> Lines)> Fields(JsonObject? fields, string type,
+        string kind)
+    {
+        var section = MissionLineInput.SectionSpec(type)!;
+        var result = new List<(string Key, string Field, IReadOnlyList<LineSpec> Lines)>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in fields ?? [])
+        {
+            var field = $"fields.{key}";
+            if (!seen.Add(key.Trim()))
+            {
+                throw new EditException(new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument,
+                    AgentTexts.Error("mission_field_twice", ("key", key))) { Field = field });
+            }
+            var spec = section.Key(key);
+            if (spec != null && MissionIndex.Is(spec.Key, "nickname"))
+            {
+                throw new EditException(new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument,
+                    AgentTexts.Error("mission_item_nickname")) { Field = field });
+            }
+            if (spec == null && !section.OpenKeys)
+            {
+                var error = MissionSchema.Retail.Directive(key) != null && kind == "order_list"
+                    ? new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument, AgentTexts.Error("mission_item_order"))
+                    : MissionErrors.NotAKeyError(key, $"[{type}]") with
+                    {
+                        Message = AgentTexts.Error("mission_item_key", ("key", key), ("kind", MissionNames.KindWord(type)),
+                            ("keys", string.Join(", ", section.Keys.Select(k => k.Key).Where(k => !MissionIndex.Is(k, "nickname"))))),
+                    };
+                throw new EditException(error with { Field = field });
+            }
+            var lines = MissionLineInput.FieldLines(type, key, value, field);
+            result.Add((lines.Count > 0 ? lines[0].Key : spec?.Key ?? key, field, lines));
+        }
+        return [.. result.OrderBy(f => MissionIndex.Is(type, "MsnFormation") &&
+                                     (MissionIndex.Is(f.Key, "formation") || MissionIndex.Is(f.Key, "ship")))];
+    }
+
+    /// <summary>
+    /// Adds a mission ship in the scope: <see cref="AddMissionShip"/> with the keys that it writes, then one request with
+    /// <see cref="SetItemKey"/> for each other key and the move before a formation that names the ship. The second
+    /// request needs the name of the ship, and the layer makes a name when the call gives none.
+    /// </summary>
+    /// <exception cref="EditException">The field <c>npc</c> is missing, or a request refuses.</exception>
+    private static void AddShip(EditScope scope, ScriptRef script, string? nickname,
+        IReadOnlyList<(string Key, string Field, IReadOnlyList<LineSpec> Lines)> fields)
+    {
+        IReadOnlyList<string> TextsOf(LineSpec line) =>
+            MissionValues.Build(MissionSchema.Retail, "MsnShip", LinePlace.Section, line).Texts;
+
+        var byKey = fields.ToDictionary(f => f.Key, f => f.Lines, StringComparer.OrdinalIgnoreCase);
+        if (byKey.GetValueOrDefault("npc") is not [var npc])
+        {
+            throw new EditException(new EditError(EditErrorKind.InvalidArgument, NeedsNpc, AgentTexts.Error("mission_ship_npc"))
+            {
+                Field = "fields.npc",
+            });
+        }
+        var near = byKey.GetValueOrDefault("rel_pos") is [var rel] ? TextsOf(rel) : null;
+        var add = new AddMissionShip(script)
+        {
+            Nickname = nickname,
+            Npc = TextsOf(npc)[0],
+            System = byKey.GetValueOrDefault("system") is [var system] ? TextsOf(system)[0] : null,
+            Labels = byKey.GetValueOrDefault("label")?.Select(l => TextsOf(l)[0]).ToList() ?? [],
+            Orders = byKey.GetValueOrDefault("init_objectives") is [var orders] ? TextsOf(orders)[0] : null,
+            Position = near == null && byKey.GetValueOrDefault("position") is [var position] ? Numbers(TextsOf(position)) : null,
+            Rotation = byKey.GetValueOrDefault("orientation") is [var rotation] ? Numbers(TextsOf(rotation)) : null,
+            Near = near == null ? null : new NearSpec(near[1])
+            {
+                Heading = Number(near[0]),
+                Range = near.Count > 2 ? Number(near[2]) : null,
+            },
+        };
+        var added = scope.RunMission(new MissionBatch(add.HistoryLabel, [add]), error => NameOr(error, "script"));
+        var name = added.Adds.Select(ItemRefs.Parse).First(r => r.Section is { } s && MissionIndex.Is(s.Type, "MsnShip"))
+            .Section!.Key!;
+        var ship = ItemRef.Of(script.Path, "MsnShip", name);
+        // A key with lines that the command did not write: a key that it does not take, and a position beside rel_pos.
+        var more = fields.Where(f => f.Lines.Count > 0 && (!ShipCommandKeys.Contains(f.Key) ||
+                                                          near != null && MissionIndex.Is(f.Key, "position")))
+            .ToList();
+        var commands = more.Select(f => (MissionCommand)new SetItemKey(ship, f.Key, f.Lines)).ToList();
+        // A formation that names the ship before the ship takes no ship (rule M08). The first one in the file wins.
+        if (scope.Session.Missions.AnalysisOf(script.Path)?.Index.LaterMembers
+                .Where(m => MissionIndex.Is(m.Ship, name)).MinBy(m => m.Formation.Index).Formation is { } formation)
+            commands.Add(new MoveSection(ship) { Before = new ItemRef(script.Path, formation.Ref.Id) });
+        if (commands.Count > 0)
+        {
+            scope.RunMission(new MissionBatch(add.HistoryLabel, commands),
+                error => error.Index is { } i && i < more.Count ? more[i].Field : "script");
+        }
+    }
+
+    /// <summary>The numbers of the texts of a position or a rotation, which the schema checked.</summary>
+    private static MissionValue Numbers(IReadOnlyList<string> texts) => MissionValue.Of([.. texts.Select(Number)]);
+
+    private static double Number(string text) => double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture);
 
     /// <summary>The arguments of a trigger tool, with the definition of a line at the root of the schema.</summary>
     private static ToolInput WithLines(params ToolParam[] own) =>

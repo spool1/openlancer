@@ -211,6 +211,7 @@ public static class AgentTools
         Mission("mission_link_triggers", ToolHints.Changing, MissionEditTools.LinkTriggersInput, MissionEditTools.Link),
         Mission("mission_insert_trigger", ToolHints.Adding, MissionEditTools.InsertTriggerInput,
             MissionEditTools.InsertTrigger),
+        Mission("mission_add_item", ToolHints.Adding, MissionEditTools.AddItemInput, MissionEditTools.NewItem),
         SessionTool("save", ToolHints.Changing, ToolInput.None, typeof(SaveView), SaveTools.Save),
         SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
         SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),
