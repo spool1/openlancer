@@ -19387,7 +19387,7 @@
                 "status"
               ]
             },
-            "description": "The result of each step, in order. Each step has the status of the batch."
+            "description": "The result of each step, in order. Each step has the status, the revision and the files of the batch."
           },
           "status": {
             "enum": [

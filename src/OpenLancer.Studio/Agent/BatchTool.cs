@@ -14,7 +14,8 @@ internal sealed record BatchResult : EditResult
         Steps = steps;
     }
 
-    /// <summary>The result of each step, in order. A step has the status of the batch.</summary>
+    /// <summary>The result of each step, in order. A step has the status, the revision and the files of the batch, so
+    /// the revision of a step is a valid <c>if_revision</c> for the next call.</summary>
     public IReadOnlyList<EditResult> Steps { get; init; }
 }
 
@@ -76,7 +77,8 @@ internal static class BatchTool
                 results.Add(scope.StepResult());
             }
         }, result => ToolResult.Of(new BatchResult(result,
-            results.Select(r => r with { Status = result.Status }).ToList())));
+            results.Select(r => r with { Status = result.Status, Revision = result.Revision, Files = result.Files })
+                .ToList())));
     }
 
     /// <summary>The tool and the arguments of a step, after the checks that need no session.</summary>

@@ -1208,7 +1208,7 @@
     "NamedMention.path": "The install path of the file.",
     "NamedMention.count": "How often the file names the nickname.",
     "HistoryStepView.label": "The label of the step that the tool undid or did again, for example Agent: Delete my_station_1.",
-    "BatchResult.steps": "The result of each step, in order. Each step has the status of the batch.",
+    "BatchResult.steps": "The result of each step, in order. Each step has the status, the revision and the files of the batch.",
     "SaveView.saved": "True when the save wrote its files. A save without unsaved edits also gives true.",
     "SaveView.number": "The number of the save in this session, or 0 when the save changed no file.",
     "SaveView.written": "The files that the save wrote, relative to the folder of the mod.",

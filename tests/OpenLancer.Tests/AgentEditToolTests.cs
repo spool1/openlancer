@@ -118,6 +118,7 @@ public sealed class AgentEditToolTests
         Assert.Equal("no_change", (string?)result["status"]);
         Assert.Equal("0", (string?)result["rev"]);
         Assert.Equal("The data has these values already, so the edit changed nothing.", (string?)result["summary"]);
+        Assert.Empty(Texts(result["changes"]));
         Assert.False(session.CanUndo);
         Assert.Empty(host.Edits);
     }
@@ -159,6 +160,28 @@ public sealed class AgentEditToolTests
         Assert.True((bool)status["paused"]!);
         Assert.False(session.CanUndo);
         Assert.Equal([("set_fields", EditErrorKind.Paused)], host.Refusals.Select(r => (r.Tool, r.Error.Kind)));
+    }
+
+    /// <summary>The checks of an edit call run in order: Pause, then the reason why the host takes no edits, then the
+    /// revision guard of if_revision (section 12.4, item 2 of the MCP1 design). So the first check that refuses gives
+    /// the error.</summary>
+    [Fact]
+    public void PauseComesBeforeReadOnlyAndReadOnlyComesBeforeAStaleRevision()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+        const string Stale = """{ "ref": "obj:Li01_01", "fields": { "pos": [1, 2, 3] }, "if_revision": "7" }""";
+        host.Reason = "The user did not allow the edits.";
+
+        var readOnly = Error(host, "set_fields", Stale);
+        var readOnlyBatch = Error(host, "edit_batch", $$"""{ "steps": [{ "tool": "set_fields", "arguments": {{Stale}} }] }""");
+        host.TestPaused = true;
+        var paused = Error(host, "set_fields", Stale);
+
+        Assert.Equal(("read_only", "NotEditable"), (readOnly.Code, readOnly.Detail));
+        Assert.Equal(("read_only", "NotEditable"), (readOnlyBatch.Code, readOnlyBatch.Detail));
+        Assert.Equal(("paused", "Paused"), (paused.Code, paused.Detail));
+        Assert.Equal(0, session.Revision);
     }
 
     /// <summary>A preview that Pause or a hidden group refuses does not go to the Console of the host either (section 8.5

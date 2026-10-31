@@ -207,17 +207,23 @@ internal static class EditTools
             if (confirmations.Count > 0 && !confirm && !preview)
                 throw new EditException(NeedsConfirmation(confirmations));
             var patch = withPatch ? batch.PatchTexts() : null;
-            EditResult Final(EditResult result) => scope.CallResult(result) with
+            EditResult Final(EditResult result)
             {
-                NeedsConfirmation = result.NeedsConfirmation || confirmations.Count > 0,
-                Patch = patch ?? result.Patch,
-                Summary = result.Status switch
+                var shaped = scope.CallResult(result);
+                return shaped with
                 {
-                    EditStatus.Applied => AgentTexts.Error("edit_applied", ("label", result.UndoLabel ?? "")),
-                    EditStatus.Previewed => AgentTexts.Error("edit_previewed"),
-                    _ => AgentTexts.Error("edit_no_change"),
-                },
-            };
+                    // A call with no net change changed no item, also when its plans name items.
+                    Changes = result.Status == EditStatus.NoChange ? [] : shaped.Changes,
+                    NeedsConfirmation = result.NeedsConfirmation || confirmations.Count > 0,
+                    Patch = patch ?? result.Patch,
+                    Summary = result.Status switch
+                    {
+                        EditStatus.Applied => AgentTexts.Error("edit_applied", ("label", result.UndoLabel ?? "")),
+                        EditStatus.Previewed => AgentTexts.Error("edit_previewed"),
+                        _ => AgentTexts.Error("edit_no_change"),
+                    },
+                };
+            }
 
             ToolResult Fitted(EditResult result)
             {
@@ -246,47 +252,76 @@ internal static class EditTools
     }
 
     /// <summary>
-    /// The net result of the commands of a call. A step can add an item and a later step can change it, for example the
-    /// move of a copy. So the changes leave out the items that the call adds. An item that the call adds and then renames
-    /// is one new item with its last reference, and no rename. An example is a new object with the nickname of its
-    /// request.
+    /// The net result of the commands of a call, so that each reference of the result resolves after the call (section
+    /// 5.6 of the MCP1 design). A step can add an item and a later step can change, rename or delete it. These are the
+    /// rules:
+    /// <list type="bullet">
+    /// <item>An item that the call adds is an add with its last reference. The changes and the renames leave it out.
+    /// An example is a new object with the nickname of its request.</item>
+    /// <item>An item that the call adds and then deletes is not in the result, because it did not exist before the
+    /// call.</item>
+    /// <item>Two renames of one item are one rename from its first to its last reference. A rename back to the first
+    /// reference is no rename.</item>
+    /// <item>A change gives the last reference of the item. An item that the call deletes is not a change.</item>
+    /// <item>A delete of an item that the call renamed gives the reference before the call, and no rename.</item>
+    /// </list>
     /// </summary>
     /// <remarks>The walk reads the parts in order. A rename changes an add only when the add came before it. So an
     /// existing item that a step renames stays a rename. This is also true when a later step adds an item with its old
-    /// nickname (review finding of MCP1-2, step 4). The renames of a part apply before its adds, because they name the
-    /// items before the part.</remarks>
+    /// nickname (review finding of MCP1-2, step 4). In a part, the renames and the deletes name the items before the
+    /// part, and the adds and the changes name the items after it. So the renames and the deletes apply first.</remarks>
     /// <param name="result">The merged result of the parts, with the lists of the other kinds.</param>
     /// <param name="parts">The parts of the commands, in order.</param>
     internal static EditResult Shaped(EditResult result, IReadOnlyList<EditResult> parts)
     {
         var adds = new List<string>();
         var renames = new List<ResultRename>();
-        var renamedAdds = new List<string>();
+        var changes = new List<string>();
+        var deletes = new List<ResultDelete>();
         foreach (var part in parts)
         {
             foreach (var rename in part.Renames)
             {
-                var at = adds.IndexOf(rename.From);
+                Replace(changes, rename.From, rename.To);
+                if (Replace(adds, rename.From, rename.To))
+                    continue;
+                var at = renames.FindIndex(r => r.To == rename.From);
+                if (at < 0)
+                    renames.Add(rename);
+                else if (renames[at].From == rename.To)
+                    renames.RemoveAt(at);
+                else
+                    renames[at] = renames[at] with { To = rename.To };
+            }
+            foreach (var delete in part.Deletes)
+            {
+                changes.Remove(delete.Ref);
+                if (adds.Remove(delete.Ref))
+                    continue;
+                var at = renames.FindIndex(r => r.To == delete.Ref);
                 if (at < 0)
                 {
-                    renames.Add(rename);
+                    deletes.Add(delete);
                     continue;
                 }
-                adds[at] = rename.To;
-                renamedAdds.Add(rename.From);
+                deletes.Add(delete with { Ref = renames[at].From });
+                renames.RemoveAt(at);
             }
-            foreach (var add in part.Adds)
-            {
-                if (!adds.Contains(add))
-                    adds.Add(add);
-            }
+            adds.AddRange(part.Adds.Where(add => !adds.Contains(add)));
+            changes.AddRange(part.Changes.Where(change => !adds.Contains(change) && !changes.Contains(change)));
         }
-        return result with
-        {
-            Adds = adds,
-            Renames = renames,
-            Changes = result.Changes.Except(adds).Except(renamedAdds).ToList(),
-        };
+        return result with { Adds = adds, Renames = renames, Changes = changes, Deletes = deletes };
+    }
+
+    /// <summary>Replaces a reference in a list with its new reference. Gives false when the list does not have
+    /// it.</summary>
+    private static bool Replace(List<string> refs, string from, string to)
+    {
+        var at = refs.IndexOf(from);
+        if (at < 0)
+            return false;
+        refs[at] = to;
+        return true;
     }
 
     /// <summary>

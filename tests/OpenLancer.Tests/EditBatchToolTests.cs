@@ -88,6 +88,13 @@ public sealed class EditBatchToolTests
         Assert.Equal("Agent: Move the new dock", (string?)result["undo_label"]);
         Assert.Equal("obj:Li01_dock_new", (string?)result["steps"]![0]!["renames"]![0]!["to"]);
         Assert.Equal(["obj:Li01_dock_new"], Texts(result["steps"]![1]!["changes"]));
+        // Each step has the revision and the files of the batch, so its revision is a valid if_revision.
+        Assert.NotEmpty(Texts(result["files"]));
+        Assert.All(result["steps"]!.AsArray(), s =>
+        {
+            Assert.Equal("1", (string?)s!["rev"]);
+            Assert.Equal(Texts(result["files"]), Texts(s["files"]));
+        });
         Assert.Equal("7, 0, 0", Line(session, SceneWorkspace.Object("Li01_dock_new"), "pos"));
         session.Undo();
         Assert.NotNull(session.Get(SceneWorkspace.Object("Li01_dock")));
@@ -133,6 +140,70 @@ public sealed class EditBatchToolTests
         // An add before the rename is one new item with its last nickname.
         Assert.Equal(["zone:patrol_b"], Texts(later["adds"]));
         Assert.Empty(later["renames"]!.AsArray());
+    }
+
+    /// <summary>
+    /// Each reference of the result of a batch resolves after the batch (section 5.6 of the MCP1 design, final finding
+    /// of MCP1-2). A zone that the batch adds and then deletes is not in the result. Two renames of one item are one
+    /// rename, and a rename back is no rename. An item that a step changes and a later step deletes is only a delete. A
+    /// delete of an item that the batch renamed gives the reference before the batch.
+    /// </summary>
+    [Fact]
+    public void TheResultOfABatchGivesTheNetAddsRenamesChangesAndDeletes()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+        string Delete(string item) => $$"""{ "tool": "delete_items", "arguments": { "refs": [{{Json(item)}}], "confirm": true } }""";
+        string Rename(string item, string name) =>
+            $$"""{ "tool": "rename_item", "arguments": { "ref": {{Json(item)}}, "new_name": {{Json(name)}} } }""";
+        string Zone(string name, int z) =>
+            $$"""{ "tool": "scene_create_zone", "arguments": { "system": "Li01", "position": [0, 0, {{z}}], "nickname": {{Json(name)}} } }""";
+        static string[] Deletes(JsonObject result) => result["deletes"]!.AsArray().Select(d => (string)d!["ref"]!).ToArray();
+        static (string?, string?)[] Renames(JsonObject result) =>
+            result["renames"]!.AsArray().Select(r => ((string?)r!["from"], (string?)r["to"])).ToArray();
+
+        var added = Ok(host, "edit_batch", Batch(Zone("probe_a", 0), Zone("probe_b", 100), Delete("zone:probe_a")));
+        var renamed = Ok(host, "edit_batch", Batch(Rename("obj:Li01_dock", "probe_d2"), Rename("obj:probe_d2", "probe_d3")));
+        var deleted = Ok(host, "edit_batch", Batch(Move("obj:probe_d3", 5), Delete("obj:probe_d3")));
+        var renamedAndDeleted = Ok(host, "edit_batch", Batch(Rename("zone:Zone_hole", "probe_h"), Delete("zone:probe_h")));
+        var back = Ok(host, "edit_batch", Batch(Rename("zone:Zone_cloud", "probe_c"), Move("zone:probe_c", 9),
+            Rename("zone:probe_c", "Zone_cloud")));
+
+        Assert.Equal(["zone:probe_b"], Texts(added["adds"]));
+        Assert.Empty(Deletes(added));
+        Assert.Null(session.Get(SceneWorkspace.Zone("probe_a")));
+        Assert.NotNull(session.Get(SceneWorkspace.Zone("probe_b")));
+        Assert.Equal([("obj:Li01_dock", "obj:probe_d3")], Renames(renamed));
+        Assert.DoesNotContain("obj:probe_d2", Texts(renamed["changes"]));
+        Assert.Equal(["obj:probe_d3"], Deletes(deleted));
+        Assert.DoesNotContain("obj:probe_d3", Texts(deleted["changes"]));
+        Assert.Empty(Renames(renamedAndDeleted));
+        Assert.Contains("zone:Zone_hole", Deletes(renamedAndDeleted));
+        Assert.DoesNotContain("zone:probe_h", Deletes(renamedAndDeleted));
+        Assert.Empty(Renames(back));
+        Assert.Contains("zone:Zone_cloud", Texts(back["changes"]));
+        Assert.DoesNotContain("zone:probe_c", Texts(back["changes"]));
+        // The result of each step still gives the items of that step.
+        Assert.Equal(["zone:probe_a"], Deletes(added["steps"]![2]!.AsObject()));
+    }
+
+    /// <summary>A step of a tool of a group that the user hides gives not_available (decision D725), also when the step
+    /// names no item. The batch changes nothing.</summary>
+    [Fact]
+    public void AStepOfAHiddenGroupGivesNotAvailable()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+        host.Hidden.Add(ToolGroup.Scene);
+
+        var result = Call(host, "edit_batch",
+            """{ "steps": [{ "tool": "scene_create_zone", "arguments": { "system": "Li01", "position": [0, 0, 0], "nickname": "hidden_zone" } }] }""");
+
+        Assert.True(result.IsError);
+        Assert.Equal(("step_failed", "not_available", "GroupHidden"),
+            ((string?)result.Content["code"], (string?)result.Content["step_code"], (string?)result.Content["detail"]));
+        Assert.Equal(0, session.Revision);
+        Assert.Null(session.Get(SceneWorkspace.Zone("hidden_zone")));
     }
 
     /// <summary>A step that needs a confirmation fails unless its arguments have confirm: true.</summary>
