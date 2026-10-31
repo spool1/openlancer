@@ -608,7 +608,7 @@ The server gives these resources. An agent program can read them before its firs
 | `openlancer://guide/rules` | The rules of the editor and what they mean for an agent. |
 | `openlancer://guide/refs` | The forms of the item references. |
 
-The catalog of the prefabs reads the open profile, so its read waits in the queue of the tool calls. It waits while you edit a field or do a gesture, as a call does. It counts in the calls each second. After the wait limit, the read gives a protocol error with the reason. The other resources read only the rule data, so they do not wait.
+The catalog of the prefabs reads the open profile, so its read waits in the queue of the tool calls. It waits while you edit a field or do a gesture, as a call does. It counts in the calls each second. Above the calls each second or after the wait limit, the read gives a protocol error with the reason. The other resources read only the rule data, so they do not wait.
 
 The server gives one prompt. An agent program shows a prompt as a command. In Claude Code, the command is `/mcp__openlancer__two_trigger_mission`.
 

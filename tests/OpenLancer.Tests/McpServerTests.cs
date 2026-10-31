@@ -42,9 +42,10 @@ public sealed class McpServerTests
         private readonly Pipe toServer = new();
         private readonly Pipe toClient = new();
 
-        public Connection(AgentHost host)
+        /// <param name="clock">The clock of the queue, or null for the clock of the system.</param>
+        public Connection(AgentHost host, TimeProvider? clock = null)
         {
-            Thread = SessionThread.Start(() => host);
+            Thread = SessionThread.Start(() => host, clock);
             server = McpServe.ServeAsync(Thread, toServer.Reader.AsStream(), toClient.Writer.AsStream(), stop.Token);
         }
 
@@ -350,6 +351,28 @@ public sealed class McpServerTests
         Assert.NotEqual(true, (await call).IsError);
         var text = Assert.IsType<TextResourceContents>(Assert.Single((await catalog).Contents)).Text;
         Assert.NotEmpty(JsonNode.Parse(text)!["prefabs"]!.AsArray());
+        Assert.Equal(0, connection.Thread.Queue.Waiting);
+    }
+
+    /// <summary>The protocol has no tool error for a read. So a read of the catalog that the queue refuses gives a
+    /// protocol error with the text of the error. The clock of the queue does not move, so the second read is above the
+    /// calls each second. A read of the schema does not go into the queue, so it does not count.</summary>
+    [Fact]
+    public async Task AReadOfTheCatalogAboveTheRateGivesAProtocolErrorWithTheReason()
+    {
+        var host = new TestAgentHost(null) { TestLimits = new AgentLimits { CallsPerSecond = 1 } };
+        await using var connection = new Connection(host, new FakeClock());
+        var client = await connection.Client();
+
+        var first = await ReadJson(client, "openlancer://catalog/prefabs");
+        var refused = await Assert.ThrowsAsync<McpProtocolException>(() =>
+            client.ReadResourceAsync("openlancer://catalog/prefabs", cancellationToken: Token).AsTask());
+        var names = await ReadJson(client, "openlancer://schema/mission-names");
+
+        Assert.NotEmpty(first["prefabs"]!.AsArray());
+        Assert.Equal(McpErrorCode.InternalError, refused.ErrorCode);
+        Assert.Contains(AgentTexts.Error("limit_calls", ("max", 1)), refused.Message);
+        Assert.Equal(129, names["names"]!.AsArray().Count);
         Assert.Equal(0, connection.Thread.Queue.Waiting);
     }
 
