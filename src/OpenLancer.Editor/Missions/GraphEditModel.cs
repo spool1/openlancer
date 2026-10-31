@@ -427,7 +427,7 @@ internal sealed class GraphEditModel
         foreach (var frame in frames.Where(f => f is { Kind: GraphFrameKind.Prefab, Instance: not null }))
         {
             var triggers = frame.Triggers.Where(t => !removed.Contains(t)).ToList();
-            commands.AddRange(DeleteCommands(Script, frame.Instance!, triggers));
+            commands.AddRange(PrefabLinks.DeleteCommands(Script, frame.Instance!, triggers));
             removed.UnionWith(frame.Triggers);
         }
 
@@ -556,22 +556,10 @@ internal sealed class GraphEditModel
     /// trigger.</summary>
     internal static MissionBatch? DeleteInstance(string script, MissionPrefabInstance instance)
     {
-        var commands = DeleteCommands(script, instance, instance.Claimed);
+        var commands = PrefabLinks.DeleteCommands(script, instance, instance.Claimed);
         return commands.Count == 0 ? null
-            : new MissionBatch(instance.Linked is { } linked ? $"Delete instance {linked.Record.Id}"
-                : $"Delete {instance.Definition.Name} {instance.Name}", commands);
+            : new MissionBatch(PrefabLinks.DeleteLabel(instance), commands);
     }
-
-    /// <summary>The commands that delete a prefab instance: <see cref="RemovePrefabInstance"/> of a linked instance, or
-    /// the delete of each trigger of a matched instance. A duplicate trigger, which the game never runs (TR4), goes by its
-    /// section.</summary>
-    private static IReadOnlyList<MissionCommand> DeleteCommands(string script, MissionPrefabInstance instance,
-        IEnumerable<MissionTrigger> triggers) =>
-        instance.Linked is { } linked
-            ? [new RemovePrefabInstance(new InstanceRef(script, linked.Record.Id))]
-            : triggers.Distinct()
-                .Select(t => t.IsDuplicate ? (MissionCommand)new RemoveSection(ItemOf(t.Section)) : new RemoveTrigger(RefOf(t)))
-                .ToList();
 
     /// <summary>
     /// The items of the frame menu of a prefab instance (section 8.11 of the M6b design): "Open prefab", "Select prefab

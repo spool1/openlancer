@@ -379,6 +379,29 @@ public static class PrefabLinks
         return new UnlinkTriggers(RefOf(source), target, kind);
     }
 
+    // ---- The delete of an instance (section 4.9 of the M6b design) ----
+
+    /// <summary>
+    /// The commands that delete a prefab instance of a script, for the graph, the Hierarchy and the tool
+    /// <c>delete_items</c> of an agent: <see cref="RemovePrefabInstance"/> of a linked instance, or the delete of each
+    /// trigger of a matched instance. A duplicate trigger, which the game never runs (TR4), goes by its section.
+    /// </summary>
+    /// <param name="triggers">The triggers of a matched instance to delete, for example the triggers that it
+    /// claims.</param>
+    public static IReadOnlyList<MissionCommand> DeleteCommands(string script, MissionPrefabInstance instance,
+        IEnumerable<MissionTrigger> triggers) =>
+        instance.Linked is { } linked
+            ? [new RemovePrefabInstance(new InstanceRef(script, linked.Record.Id))]
+            : triggers.Distinct()
+                .Select(t => t.IsDuplicate
+                    ? (MissionCommand)new RemoveSection(new ItemRef(t.Section.Ref.Path, t.Section.Ref.Id))
+                    : new RemoveTrigger(RefOf(t)))
+                .ToList();
+
+    /// <summary>The label of the Undo step of the delete of a prefab instance.</summary>
+    public static string DeleteLabel(MissionPrefabInstance instance) =>
+        instance.Linked is { } linked ? $"Delete instance {linked.Record.Id}" : $"Delete {instance.Definition.Name} {instance.Name}";
+
     /// <summary>The reference of a trigger by its nickname.</summary>
     private static TriggerRef RefOf(MissionTrigger trigger) => new(trigger.Section.Ref.Path, trigger.Nickname);
 }
