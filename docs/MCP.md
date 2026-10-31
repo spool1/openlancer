@@ -4,7 +4,7 @@ OpenLancer has an agent server. An agent program, for example Claude Code, conne
 
 The agent reads the data as the editor shows it. It reads the systems and their items, the data lists, the assets, the missions and the cutscenes. It also reads the raw INI text and the problems of the checks. In the editor, the agent can also open views, select items, and get images of a system, of a cutscene and of a panel.
 
-The agent can also edit the items of the active mod. It sets fields and texts, renames, deletes and copies items, and undoes its own edits. It creates objects, zones and lights, places assets and prop groups, moves items and makes items from templates. It also changes the mission scripts with the commands of the mission studio. Each agent edit goes through the same commands, checks and Undo history as an edit of the user. An edit changes the edit view of the editor. It is not saved until you or the agent save the mod. See "The edit tools", "The Scene and data tools", "The mission tools" and "Save". In the editor, the agent can also start and stop Play. See "Play". The editor marks each agent edit, and you can pause the agent edits. See "What you see in the editor".
+The agent can also edit the items of the active mod. It sets fields and texts, renames, deletes and copies items, and undoes its own edits. It creates objects, zones and lights, places assets and prop groups, moves items and makes items from templates. It also changes the mission scripts with the commands of the mission studio. Each agent edit goes through the same commands, checks and Undo history as an edit of the user. An edit changes the edit view of the editor. It is not saved until you or the agent save the mod. See "The edit tools", "The Scene and data tools", "The mission tools" and "Save". In the editor, the agent can also start and stop Play, also a play of a mission from a trigger. See "Play". The editor marks each agent edit, and you can pause the agent edits. See "What you see in the editor".
 
 ## The two hosts
 
@@ -83,8 +83,8 @@ When another program uses the port, the server does not start. The status bar th
 | Setting | Default | What it does |
 |---|---|---|
 | Agent server port | 47815 | The port of the server on this computer. Stop the server to change it. |
-| Auto-save and continue when an MCP agent starts Play | Off | When an agent starts Play and the active mod has unsaved edits, the editor saves them and plays. Off: the editor asks you first. See "Agent Play" in [PLAY.md](PLAY.md). The setting applies to the tool `play`. |
-| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions, Cutscenes and Play. The `scene_` tools, the `prop_group_` tools and `render_scene` are in the group Scene. `render_cutscene` is in the group Cutscenes. `play` and `play_stop` are in the group Play. The `mission_` tools and the read tools of the missions are in the group Missions. These read tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check` and `get_console`. The edit tools of "The edit tools" are always available too, and so are `save`, `export_mod`, `publish_checklist`, `create_loadout`, `create_from_template`, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene. |
+| Auto-save and continue when an MCP agent starts Play | Off | When an agent starts Play and the active mod has unsaved edits, the editor saves them and plays. Off: the editor asks you first. See "Agent Play" in [PLAY.md](PLAY.md). The setting applies to the tools `play` and `mission_play`. |
+| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions, Cutscenes and Play. The `scene_` tools, the `prop_group_` tools and `render_scene` are in the group Scene. `render_cutscene` is in the group Cutscenes. `play`, `play_stop` and `mission_play` are in the group Play. The other `mission_` tools and the read tools of the missions are in the group Missions. `mission_play` plays a mission script, so it also refuses when you clear the group Missions. These read tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check` and `get_console`. The edit tools of "The edit tools" are always available too, and so are `save`, `export_mod`, `publish_checklist`, `create_loadout`, `create_from_template`, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene. |
 | Rows of a page without a limit | 50 | The rows of a list result when the agent gives no limit. |
 | Largest page limit | 200 | The largest limit that the agent can ask for in one list result. |
 | Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
@@ -133,6 +133,7 @@ These tools work only in the editor host.
 - `render_cutscene` gives an image of a cutscene at a time. The preview in the Cutscene tab does not change. A space script shows without its system.
 - `capture_panel` gives an image of a panel as you see it, with its marks and labels.
 - `play` and `play_stop` start and stop Play in OpenLancer. See "Play".
+- `mission_play` plays a mission script from a start in OpenLancer, and `mission_play_trace` gives the trigger changes of that play. See "Mission play".
 
 `open_view` and `select_items` change what the editor shows. They do not change the data. The image tools change nothing.
 
@@ -207,7 +208,7 @@ When one step fails, the error `step_failed` gives its index and its error, and 
 
 One call names at most 200 items and changes at most 2000 sections. One batch has at most 100 steps, one `mission_edit` call has at most 100 commands, and one route has at most 50 legs. **Agent > Agent settings > Advanced** changes these limits. A call above a limit gives the error `limit` and changes nothing. The size limit of a result applies to an edit too. The edit checks the size of its result before it applies, so a larger edit also changes nothing.
 
-While you pause the agent edits, each tool that changes data, writes files or starts a play gives the error `paused`. Examples are the edit tools, `undo`, `redo`, `save`, `export_mod` and `play`. The read tools still work, also `publish_checklist`. `play_stop` also works. It stops each game of Play, also a game that you started. Pick **Agent > Pause agent edits** to pause the agent edits, and **Resume agent edits** to let the agent edit again.
+While you pause the agent edits, each tool that changes data, writes files or starts a play gives the error `paused`. Examples are the edit tools, `undo`, `redo`, `save`, `export_mod`, `play` and `mission_play`. The read tools still work, also `publish_checklist` and `mission_play_trace`. `play_stop` also works. It stops each game of Play, also a game that you started. Pick **Agent > Pause agent edits** to pause the agent edits, and **Resume agent edits** to let the agent edit again.
 
 The edit tools refuse with `read_only` when the editor takes no edits, and the message tells the reason. For example, another editor has the mod open, or the profile or the active mod is in the game folder. A mod in the OpenLancer repo also refuses until you allow its edits.
 
@@ -278,7 +279,7 @@ These steps build an NPC patrol and a wreck with cargo in a system.
 
 ### The mission tools
 
-The mission tools change the mission scripts of the active mod with the commands of the mission studio. They work in both hosts. `mission_edit` runs any commands of the mission studio. The trigger tools of "The trigger tools" add and change triggers and their lines with named arguments. `mission_add_item` adds a ship, an NPC or another item of a mission, as "The item tool" tells. `mission_place_prefab` places a behavior prefab, as "The prefab tool" tells. The generic edit tools rename, delete, copy and change mission items, as "The generic tools on mission items" tells.
+The mission tools change the mission scripts of the active mod with the commands of the mission studio. They work in both hosts. `mission_edit` runs any commands of the mission studio. The trigger tools of "The trigger tools" add and change triggers and their lines with named arguments. `mission_add_item` adds a ship, an NPC or another item of a mission, as "The item tool" tells. `mission_place_prefab` places a behavior prefab, as "The prefab tool" tells. The generic edit tools rename, delete, copy and change mission items, as "The generic tools on mission items" tells. In the editor, `mission_play` plays a mission from a start, as "Mission play" tells.
 
 `mission_edit` runs a list of commands. Each call is one Undo step with all its commands, as each other edit tool. It takes `preview`, `with_patch`, `if_revision` and `confirm`, as the edit tools do.
 
@@ -521,7 +522,38 @@ While a game runs, `play` gives `refused`, and the agent calls `play_stop` first
 
 When Play saves the active mod, the save gate runs first, as for `save`. When the save stops, `play` gives `save_blocked` or `changed_on_disk`, and the game does not start. A second play request of an agent gives `busy` until the earlier request ends, because one dialog shows the question. Without an open profile, `play` gives `not_available`, as the tools that read the profile do. `play_stop` also works without a profile.
 
-`play_stop` stops the game of Play in OpenLancer, else the game of a play copy, as Shift+F5 does. It gives what it stopped and the state of Play. A play and a stop are not Undo steps.
+`play_stop` stops the game of Play in OpenLancer, else the game of a play copy, as Shift+F5 does. It also stops a mission play. It gives what it stopped and the state of Play. A play and a stop are not Undo steps.
+
+#### Mission play
+
+`mission_play` plays one mission script in OpenLancer from a start. It works only in the editor host. It takes the arguments of `mission_start_plan`: `script`, `start`, `target` and `start_place`. So `mission_start_plan` with the same arguments gives the plan of the play first. OpenLancer plays only the scripts of the 14 story slots. `target` takes only `openlancer` in this version.
+
+The rules of `play` apply to `mission_play` too:
+
+- The play never saves on its own. When the active mod has unsaved edits, the editor asks you first, and Cancel gives `refused`. The setting "Auto-save and continue when an MCP agent starts Play" skips the question.
+- When the call ends before you answer, the question closes as Cancel does.
+- One dialog shows the question for both tools. So a second request of either tool gives `busy` until the first request ends.
+- When the save gate stops the save of Play, the tool gives `save_blocked` or `changed_on_disk`.
+- Without an open profile, the tool gives `not_available`. `mission_play_trace` also works without a profile.
+
+These cases are special to `mission_play`:
+
+- While a mission play runs, the game starts again at the new start, as F5 does. While another play runs, the tool gives `refused`, and the agent calls `play_stop` first.
+- When the plan of the start cannot start, the tool gives `refused` with the reason of the plan. A trigger or a script that does not exist gives `not_found`.
+- The play never changes the play start of the script in your settings. F5 still plays your play start.
+- When you clear the group Missions or the group Play, the tool gives `not_available`.
+
+The result gives the state of Play, the start, the kind and the name of the start, and the warnings of the plan. Play makes the plan from the saved script. When the saved script does not have the trigger of the start, the game plays the mission start, and `start` is `mission_start`.
+
+`mission_play_trace` gives the trigger changes of the mission of the OpenLancer game, oldest first: each trigger that starts, runs or stops. It works only in the editor host, and it changes nothing. Each change has a sequence number in its play, its time in seconds and the `trg:` reference of its trigger. The number of the play grows at each start of a game and at each start again of a mission play.
+
+| Argument | What it does |
+|---|---|
+| `play` | The play number of the last result, or 0. Another number than the current play gives all changes of the current play. |
+| `since` | Give only the changes after this sequence number. Use the sequence of the last change of the previous result. |
+| `limit` | The most changes of the result. When the play has more changes, `more` is true. Call the tool again with the last sequence as `since`. |
+
+The result also gives the state of Play, the mission and its script. `dropped` gives the number of changes that the game dropped because its queue was full. While only the game of a play copy runs, the result has no changes, because that game sends no changes to the editor. `game_runs` is then true.
 
 ### What you see in the editor
 
@@ -576,7 +608,7 @@ The server has no prompts yet. The prompts of the workflows and the catalog of t
 
 An agent program can ask you before each tool call. A permission rule of the agent program can allow a set of tools without a question. Claude Code gives each tool of the server `openlancer` the name `mcp__openlancer__<tool>`.
 
-The name of a read tool starts with `list_`, `get_`, `find_`, `search_`, `describe_` or `check`, or is `studio_status`, `mission_dry_run`, `mission_start_plan` or `publish_checklist`. So these rules allow all read tools:
+The name of a read tool starts with `list_`, `get_`, `find_`, `search_`, `describe_` or `check`, or is `studio_status`, `mission_dry_run`, `mission_start_plan`, `mission_play_trace` or `publish_checklist`. So these rules allow all read tools:
 
 ```
 mcp__openlancer__list_*
@@ -588,6 +620,7 @@ mcp__openlancer__check
 mcp__openlancer__studio_status
 mcp__openlancer__mission_dry_run
 mcp__openlancer__mission_start_plan
+mcp__openlancer__mission_play_trace
 mcp__openlancer__publish_checklist
 ```
 

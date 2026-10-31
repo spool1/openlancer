@@ -234,7 +234,7 @@ When you rename the trigger of the start, the start of the running play follows 
 
 ### Agent Play
 
-An agent of the agent server can start Play with the tool `play`, at a point in space or at a base. The tool `play_stop` stops each kind of play, as Shift+F5 does. A later version of the agent server adds the tool `mission_play` for a mission play. [MCP.md](MCP.md) tells about the tools. A request of an agent never saves on its own:
+An agent of the agent server can start Play with the tool `play`, at a point in space or at a base. The tool `mission_play` starts a mission play from a start of a mission script, and it never changes your play start. The tool `play_stop` stops each kind of play, as Shift+F5 does. [MCP.md](MCP.md) tells about the tools. A request of an agent never saves on its own:
 
 | Case | What the editor does |
 |---|---|
