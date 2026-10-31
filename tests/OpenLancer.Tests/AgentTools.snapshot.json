@@ -6936,6 +6936,39 @@
       "outputSchema": {
         "type": "object",
         "properties": {
+          "inverse": {
+            "type": "object",
+            "description": "The mission command that reverts the mission commands of the call. Give it to mission_edit after later edits. It refuses when a later edit changed one of its sections."
+          },
+          "row_moves": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "trigger": {
+                  "type": "string",
+                  "description": "The trg: reference of the trigger of the line."
+                },
+                "from": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger before the edit, from 0."
+                },
+                "to": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger after the edit, from 0."
+                }
+              },
+              "required": [
+                "trigger",
+                "from",
+                "to"
+              ]
+            },
+            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+          },
           "status": {
             "enum": [
               "applied",
@@ -7411,9 +7444,6 @@
         },
         "anyOf": [
           {
-            "required": [
-              "status"
-            ],
             "description": "A result of the tool. The structured content of a call is a result or a tool error."
           },
           {
@@ -7486,6 +7516,39 @@
       "outputSchema": {
         "type": "object",
         "properties": {
+          "inverse": {
+            "type": "object",
+            "description": "The mission command that reverts the mission commands of the call. Give it to mission_edit after later edits. It refuses when a later edit changed one of its sections."
+          },
+          "row_moves": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "trigger": {
+                  "type": "string",
+                  "description": "The trg: reference of the trigger of the line."
+                },
+                "from": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger before the edit, from 0."
+                },
+                "to": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger after the edit, from 0."
+                }
+              },
+              "required": [
+                "trigger",
+                "from",
+                "to"
+              ]
+            },
+            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+          },
           "status": {
             "enum": [
               "applied",
@@ -7961,9 +8024,6 @@
         },
         "anyOf": [
           {
-            "required": [
-              "status"
-            ],
             "description": "A result of the tool. The structured content of a call is a result or a tool error."
           },
           {
@@ -8034,6 +8094,39 @@
       "outputSchema": {
         "type": "object",
         "properties": {
+          "inverse": {
+            "type": "object",
+            "description": "The mission command that reverts the mission commands of the call. Give it to mission_edit after later edits. It refuses when a later edit changed one of its sections."
+          },
+          "row_moves": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "trigger": {
+                  "type": "string",
+                  "description": "The trg: reference of the trigger of the line."
+                },
+                "from": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger before the edit, from 0."
+                },
+                "to": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger after the edit, from 0."
+                }
+              },
+              "required": [
+                "trigger",
+                "from",
+                "to"
+              ]
+            },
+            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+          },
           "status": {
             "enum": [
               "applied",
@@ -8509,9 +8602,6 @@
         },
         "anyOf": [
           {
-            "required": [
-              "status"
-            ],
             "description": "A result of the tool. The structured content of a call is a result or a tool error."
           },
           {
@@ -8579,6 +8669,39 @@
       "outputSchema": {
         "type": "object",
         "properties": {
+          "inverse": {
+            "type": "object",
+            "description": "The mission command that reverts the mission commands of the call. Give it to mission_edit after later edits. It refuses when a later edit changed one of its sections."
+          },
+          "row_moves": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "trigger": {
+                  "type": "string",
+                  "description": "The trg: reference of the trigger of the line."
+                },
+                "from": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger before the edit, from 0."
+                },
+                "to": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger after the edit, from 0."
+                }
+              },
+              "required": [
+                "trigger",
+                "from",
+                "to"
+              ]
+            },
+            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+          },
           "status": {
             "enum": [
               "applied",
@@ -9054,9 +9177,6 @@
         },
         "anyOf": [
           {
-            "required": [
-              "status"
-            ],
             "description": "A result of the tool. The structured content of a call is a result or a tool error."
           },
           {
@@ -9128,6 +9248,39 @@
       "outputSchema": {
         "type": "object",
         "properties": {
+          "inverse": {
+            "type": "object",
+            "description": "The mission command that reverts the mission commands of the call. Give it to mission_edit after later edits. It refuses when a later edit changed one of its sections."
+          },
+          "row_moves": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "trigger": {
+                  "type": "string",
+                  "description": "The trg: reference of the trigger of the line."
+                },
+                "from": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger before the edit, from 0."
+                },
+                "to": {
+                  "type": "integer",
+                  "description": "The index of the line in the trigger after the edit, from 0."
+                }
+              },
+              "required": [
+                "trigger",
+                "from",
+                "to"
+              ]
+            },
+            "description": "The lines of triggers whose place in their trigger changed, with the place before and after."
+          },
           "status": {
             "enum": [
               "applied",
@@ -9603,9 +9756,6 @@
         },
         "anyOf": [
           {
-            "required": [
-              "status"
-            ],
             "description": "A result of the tool. The structured content of a call is a result or a tool error."
           },
           {

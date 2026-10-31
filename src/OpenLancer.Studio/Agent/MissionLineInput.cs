@@ -137,6 +137,11 @@ internal static class MissionLineInput
     /// <summary>The name of the form of a field value with its texts by position.</summary>
     private const string TextsForm = "texts";
 
+    /// <summary>The forms of a field value of a mission item (see <see cref="FieldLines"/>), for the error of a value
+    /// that has no such form.</summary>
+    public const string FieldForms =
+        "a value, an object of values by name, an object with texts, a list of these for a key that repeats, or null";
+
     /// <summary>The schema of a field value of a mission item (see <see cref="FieldLines"/>).</summary>
     public static JsonObject FieldSchema() => new()
     {
@@ -170,7 +175,7 @@ internal static class MissionLineInput
     /// list is a line without values.</item>
     /// <item>for a key that repeats, a list of these forms: one line for each form. For a key with one position or
     /// rotation, a list of values is one line, for example <c>[0, 0, 100]</c>.</item>
-    /// <item><c>null</c>: no line.</item>
+    /// <item><c>null</c> or an empty list: no line. So <c>set_fields</c> removes the key.</item>
     /// </list>
     /// Each line gets the check of the schema of the missions, so an error names the field, for example
     /// <c>fields.label[1]</c>. The command checks each line again when it runs.
@@ -184,7 +189,7 @@ internal static class MissionLineInput
     {
         var (name, specs) = EditTools.At(field, () =>
             MissionValues.Key(MissionSchema.Retail, sectionType, LinePlace.Section, key));
-        if (node == null)
+        if (node is null or JsonArray { Count: 0 })
             return [];
         var repeats = SectionSpec(sectionType)?.Key(name)?.List is { Values: false };
         // A list of values for a key with one position or rotation is the value of one line, not a list of lines.
@@ -273,9 +278,7 @@ internal sealed class MissionFieldsParam(string name) : ToolParam(name, false)
         ["additionalProperties"] = MissionLineInput.FieldSchema(),
     };
 
-    public override string Expected =>
-        "an object of fields by key, each a value, an object of values by name, an object with texts, a list of these " +
-        "for a key that repeats, or null";
+    public override string Expected => "an object of fields by key, each " + MissionLineInput.FieldForms;
 
     public override bool Fits(JsonNode value) =>
         value is JsonObject fields && fields.All(field => MissionLineInput.IsField(field.Value));

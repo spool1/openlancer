@@ -205,8 +205,9 @@ internal static class EditTools
     /// <summary>The detail code of a plan that needs <c>confirm: true</c>.</summary>
     public const string ConfirmChanges = "ConfirmChanges";
 
-    /// <summary>The detail code of a reference of a mission item before the mission tools.</summary>
-    public const string MissionEdits = "MissionEdits";
+    /// <summary>The detail code of a reference of a mission item that a tool does not change. The mission tools and the
+    /// generic edit tools change mission items.</summary>
+    public const string MissionItem = "MissionItem";
 
     /// <summary>The detail code of a reference of a cutscene before the cutscene tools.</summary>
     public const string CutsceneEdits = "CutsceneEdits";
@@ -446,47 +447,59 @@ internal static class EditTools
     }
 
     /// <summary>
-    /// The section of a reference argument of an edit tool. The edit tools of this version change sections of INI
-    /// files that are not mission scripts. A reference of a mission item gives <c>not_available</c> until the mission
-    /// tools (MCP1-3), and a reference of a cutscene until the cutscene tools (MCP1-4). An item of a tool group that the
-    /// user hides gives <c>not_available</c> too (decision D725).
+    /// The section of a reference argument of an edit tool that changes sections of INI files that are not mission
+    /// files, for example a scene tool or a builder. A reference of a mission item gives <c>invalid_argument</c> with
+    /// the detail <see cref="MissionItem"/>: the mission tools and the generic edit tools change mission items (see
+    /// <see cref="ItemEditTools.Target"/>). A reference of a cutscene gives <c>not_available</c> until the cutscene
+    /// tools (MCP1-4). An item of a tool group that the user hides gives <c>not_available</c> too (decision D725).
     /// </summary>
     /// <param name="field">The argument, for the error.</param>
-    /// <exception cref="EditException">The reference is not valid, does not resolve, or names an item that the tools
-    /// cannot change now.</exception>
-    public static SectionRef Section(ToolCall call, string text, string field)
+    /// <exception cref="EditException">The reference is not valid, does not resolve, or names an item that the tool
+    /// does not change.</exception>
+    public static SectionRef Section(ToolCall call, string text, string field) => At(field, () =>
     {
         var session = call.Session;
-        try
-        {
-            var reference = ItemRefs.Parse(text);
-            switch (reference.Kind)
-            {
-                case ItemRefKind.Script or ItemRefKind.Trigger or ItemRefKind.Line or ItemRefKind.Label
-                    or ItemRefKind.Instance or ItemRefKind.Act or ItemRefKind.Prefab:
-                    throw Later(MissionEdits, "edit_missions_later", text);
-                case ItemRefKind.Cutscene or ItemRefKind.CutsceneEntity or ItemRefKind.CutsceneEvent:
-                    throw Later(CutsceneEdits, "edit_cutscenes_later", text);
-            }
-            var section = ItemRefs.ResolveSection(session, reference);
-            if (SectionKeys.IsMissionFile(section.Path))
-                throw Later(MissionEdits, "edit_missions_later", text);
-            if (GroupOf(session, section) is { } group && call.Host.HiddenGroups.Contains(group))
-                throw new EditException(AgentTools.GroupHidden(group) with { Target = text });
-            return section;
-        }
-        catch (EditException e) when (e.Error.Field == null)
-        {
-            throw new EditException(e.Error with { Field = field });
-        }
+        var reference = ItemRefs.Parse(text);
+        if (IsCutscene(reference.Kind))
+            throw CutsceneLater(text);
+        if (IsMission(reference))
+            throw MissionItemRefusal(call, text);
+        var section = ItemRefs.ResolveSection(session, reference);
+        if (SectionKeys.IsMissionFile(section.Path))
+            throw session.Missions.IsMissionFile(section.Path) ? MissionItemRefusal(call, text) : WorldFileRefusal(section, text);
+        RequireGroup(call, section, text);
+        return section;
+    });
+
+    /// <summary>True for a reference that names an item of a mission script or of the template of a prefab, or a
+    /// prefab: <c>msn:</c>, <c>trg:</c>, <c>line:</c>, <c>label:</c>, <c>inst:</c>, <c>act:</c>, <c>prefab:</c>, and a
+    /// <c>sec:</c> reference of a template in prefab mode.</summary>
+    internal static bool IsMission(ItemReference reference) =>
+        reference.Kind is ItemRefKind.Script or ItemRefKind.Trigger or ItemRefKind.Line or ItemRefKind.Label or
+            ItemRefKind.Instance or ItemRefKind.Act or ItemRefKind.Prefab ||
+        reference is { Kind: ItemRefKind.Section, Path: { } path } && MissionRefs.IsPrefab(path);
+
+    /// <summary>True for a reference that names a cutscene or an element of a cutscene.</summary>
+    internal static bool IsCutscene(ItemRefKind kind) =>
+        kind is ItemRefKind.Cutscene or ItemRefKind.CutsceneEntity or ItemRefKind.CutsceneEvent;
+
+    /// <summary>Refuses an item of a tool group that the user hides (decision D725).</summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.NotAvailable"/> with the detail
+    /// <c>GroupHidden</c>.</exception>
+    internal static void RequireGroup(ToolCall call, SectionRef section, string text)
+    {
+        if (GroupOf(call.Session, section) is { } group && call.Host.HiddenGroups.Contains(group))
+            throw new EditException(AgentTools.GroupHidden(group) with { Target = text });
     }
 
     /// <summary>The tool group of a section, or null for a section of no group, for example a loadout. A section of a
-    /// system file and the <c>[system]</c> sections of <c>universe.ini</c> are in the group Scene.</summary>
+    /// system file and the <c>[system]</c> sections of <c>universe.ini</c> are in the group Scene. A section of a file
+    /// under <c>DATA\MISSIONS</c> is in the group Missions.</summary>
     internal static ToolGroup? GroupOf(EditSession session, SectionRef section) =>
-        session.IsSystemFile(section.Path) ||
-        session.UniversePath is { } universe && OpenLancer.Data.IO.VfsPath.Comparer.Equals(universe, section.Path) &&
-        section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase)
+        SectionKeys.IsMissionFile(section.Path) ? ToolGroup.Missions
+        : session.IsSystemFile(section.Path) ||
+          session.UniversePath is { } universe && OpenLancer.Data.IO.VfsPath.Comparer.Equals(universe, section.Path) &&
+          section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase)
             ? ToolGroup.Scene
             : null;
 
@@ -562,10 +575,26 @@ internal static class EditTools
             throw new EditException(new EditError(EditErrorKind.ReadOnly, MissionErrors.NotEditable, reason));
     }
 
-    /// <summary>The refusal of a reference of a mission item or of a cutscene: the edit tools of this version do not
-    /// change them.</summary>
-    private static EditException Later(string detail, string text, string reference) =>
-        new(new EditError(EditErrorKind.NotAvailable, detail, AgentTexts.Error(text)) { Target = reference });
+    /// <summary>The refusal of a reference of a cutscene: the edit tools of this version do not change
+    /// cutscenes.</summary>
+    internal static EditException CutsceneLater(string reference) =>
+        new(new EditError(EditErrorKind.NotAvailable, CutsceneEdits, AgentTexts.Error("edit_cutscenes_later"))
+        {
+            Target = reference,
+        });
+
+    /// <summary>The refusal of a reference of a mission item in a tool that does not change mission items. The text
+    /// names the tools that change them.</summary>
+    internal static EditException MissionItemRefusal(ToolCall call, string reference) =>
+        new(new EditError(EditErrorKind.InvalidArgument, MissionItem,
+            AgentTexts.Error("edit_mission_item", ("tool", call.Tool))) { Target = reference });
+
+    /// <summary>The refusal of a section of a file under <c>DATA\MISSIONS</c> that is not a mission script and not the
+    /// ship build file of a script, for example a pilot file. Encounters and bases use its data too (review finding RB2
+    /// of the M6b design), so the agent tools do not change it.</summary>
+    internal static EditException WorldFileRefusal(SectionRef section, string reference) =>
+        new(new EditError(EditErrorKind.Refused, MissionErrors.WorldFile,
+            AgentTexts.Error("edit_mission_world_file", ("path", section.Path))) { Target = reference });
 
     /// <summary>The revision guard of <c>if_revision</c> (decision D723 of the MCP1 design). Inside a batch, the
     /// revision is the revision before the batch, because the batch changes it only at its commit.</summary>

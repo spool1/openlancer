@@ -377,7 +377,7 @@ internal static class MissionEditTools
         var script = EditTools.At("script", () => ScriptRef.Parse(args.Text("script")!));
         var kind = args.Text("kind")!;
         var type = kind == "ship" ? "MsnShip" : MissionDraft.TypeOfKind(kind)!;
-        var fields = Fields(args.Node("fields")?.AsObject(), type, kind);
+        var fields = Fields(args.Node("fields")?.AsObject(), type);
         if (args.Has("steps") && kind != "order_list")
         {
             throw new EditException(new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument,
@@ -404,8 +404,25 @@ internal static class MissionEditTools
     /// </summary>
     /// <exception cref="EditException">See <see cref="NewItem"/>. A <c>nickname</c> field, or an order in the fields of
     /// an order list, gives <see cref="EditErrorKind.InvalidArgument"/>.</exception>
-    private static List<(string Key, string Field, IReadOnlyList<LineSpec> Lines)> Fields(JsonObject? fields, string type,
-        string kind)
+    private static List<(string Key, string Field, IReadOnlyList<LineSpec> Lines)> Fields(JsonObject? fields, string type) =>
+    [
+        .. ItemFields(fields, type,
+                new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument, AgentTexts.Error("mission_item_nickname")),
+                AgentTexts.Error("mission_item_order"))
+            .OrderBy(f => Rank(type, f.Key)),
+    ];
+
+    /// <summary>
+    /// The lines of the fields of a mission item of a section type, by key, in the order of the fields. Each value has
+    /// a form of <see cref="MissionLineInput.FieldLines"/>. <c>mission_add_item</c> and <c>set_fields</c> use it.
+    /// </summary>
+    /// <param name="keyLine">The error of the key line of the item, the <c>nickname</c> field.</param>
+    /// <param name="orderText">The message of an order in the fields of an order list.</param>
+    /// <exception cref="EditException">The fields name a key two times, name the key line, or name a key that the
+    /// section does not have. Or a value does not fit its key. The error names the field, for example
+    /// <c>fields.label</c>.</exception>
+    internal static List<(string Key, string Field, IReadOnlyList<LineSpec> Lines)> ItemFields(JsonObject? fields,
+        string type, EditError keyLine, string orderText)
     {
         var section = MissionLineInput.SectionSpec(type)!;
         var result = new List<(string Key, string Field, IReadOnlyList<LineSpec> Lines)>();
@@ -420,14 +437,11 @@ internal static class MissionEditTools
             }
             var spec = section.Key(key);
             if (spec != null && MissionIndex.Is(spec.Key, "nickname"))
-            {
-                throw new EditException(new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument,
-                    AgentTexts.Error("mission_item_nickname")) { Field = field });
-            }
+                throw new EditException(keyLine with { Field = field });
             if (spec == null && !section.OpenKeys)
             {
-                var error = MissionSchema.Retail.Directive(key) != null && kind == "order_list"
-                    ? new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument, AgentTexts.Error("mission_item_order"))
+                var error = MissionSchema.Retail.Directive(key) != null && MissionIndex.Is(type, "ObjList")
+                    ? new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument, orderText)
                     : MissionErrors.NotAKeyError(key, $"[{type}]") with
                     {
                         Message = AgentTexts.Error("mission_item_key", ("key", key),
@@ -439,7 +453,7 @@ internal static class MissionEditTools
             var lines = MissionLineInput.FieldLines(type, key, value, field);
             result.Add((lines.Count > 0 ? lines[0].Key : spec?.Key ?? key, field, lines));
         }
-        return [.. result.OrderBy(f => Rank(type, f.Key))];
+        return result;
     }
 
     /// <summary>

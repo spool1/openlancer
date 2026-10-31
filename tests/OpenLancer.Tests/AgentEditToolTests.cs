@@ -362,25 +362,25 @@ public sealed class AgentEditToolTests
         Assert.Equal(1, session.Revision);
     }
 
-    /// <summary>The edit tools of MCP1-2 do not change mission scripts and cutscenes. A mission reference names the tool
-    /// mission_edit of MCP1-3. The cutscene tools come with MCP1-4.</summary>
+    /// <summary>The edit tools of this version do not change cutscenes, so a cutscene reference gives not_available
+    /// until the cutscene tools of MCP1-4. A mission script, an act and a prefab are not items of the generic tools, so
+    /// set_fields refuses them with the detail MissionItem and names mission_edit (step 5 of MCP1-3).</summary>
     [Theory]
-    [InlineData("msn:DATA\\MISSIONS\\M01A\\m01a.ini", EditTools.MissionEdits)]
-    [InlineData("trg:DATA\\MISSIONS\\M01A\\m01a.ini#t1", EditTools.MissionEdits)]
-    [InlineData("sec:DATA\\MISSIONS\\M01A\\m01a.ini#Trigger/t1", EditTools.MissionEdits)]
-    [InlineData("line:DATA\\MISSIONS\\M01A\\m01a.ini#Trigger/t1/1", EditTools.MissionEdits)]
-    [InlineData("prefab:builtin:patrol", EditTools.MissionEdits)]
-    [InlineData("thn:DATA\\MODS\\act\\CUTSCENES\\x.thn", EditTools.CutsceneEdits)]
-    [InlineData("thn:DATA\\MODS\\act\\CUTSCENES\\x.thn#entity/Camera_01", EditTools.CutsceneEdits)]
-    public void AMissionOrACutsceneReferenceGivesNotAvailable(string reference, string detail)
+    [InlineData(@"msn:DATA\MISSIONS\M01A\m01a.ini", "invalid_argument", EditTools.MissionItem)]
+    [InlineData(@"act:DATA\MISSIONS\M01A\m01a.ini#act_1", "invalid_argument", EditTools.MissionItem)]
+    [InlineData("prefab:builtin:patrol", "invalid_argument", EditTools.MissionItem)]
+    [InlineData(@"thn:DATA\MODS\act\CUTSCENES\x.thn", "not_available", EditTools.CutsceneEdits)]
+    [InlineData(@"thn:DATA\MODS\act\CUTSCENES\x.thn#entity/Camera_01", "not_available", EditTools.CutsceneEdits)]
+    public void AScriptAPrefabOrACutsceneReferenceRefuses(string reference, string code, string detail)
     {
         var (ws, session, host) = Scene();
         using var _ = ws;
 
         var error = Error(host, "set_fields", $$"""{ "ref": {{Json(reference)}}, "fields": { "x": 1 } }""");
+        var field = (string?)Call(host, "set_fields", $$"""{ "ref": {{Json(reference)}}, "fields": { "x": 1 } }""").Content["field"];
 
-        Assert.Equal(("not_available", detail), (error.Code, error.Detail));
-        Assert.Equal(detail == EditTools.MissionEdits, error.Message!.Contains("Use mission_edit", StringComparison.Ordinal));
+        Assert.Equal((code, detail, "ref"), (error.Code, error.Detail, field));
+        Assert.Equal(detail == EditTools.MissionItem, error.Message!.Contains("mission_edit", StringComparison.Ordinal));
         Assert.False(session.CanUndo);
     }
 

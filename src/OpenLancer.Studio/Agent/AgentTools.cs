@@ -100,16 +100,16 @@ public static class AgentTools
                 new WholeParam("since", 0),
                 Limit),
             typeof(ConsoleView), CheckQueries.Console, ToolHosts.Editor),
-        Edit("set_fields", ToolHints.ChangingIdempotent,
+        Item("set_fields", ToolHints.ChangingIdempotent,
             EditTools.Input(false, Text("ref", true), new FieldsParam("fields", true)), ItemEditTools.SetFields),
-        Edit("set_text", ToolHints.Changing, EditTools.Input(false,
+        Item("set_text", ToolHints.Changing, EditTools.Input(false,
                 Text("ref", true), Text("field", true), new TextParam("text", true, null, null, ItemEditTools.MaxText)),
             ItemEditTools.SetText),
-        Edit("rename_item", ToolHints.Changing, EditTools.Input(true, Text("ref", true), Text("new_name", true)),
+        Item("rename_item", ToolHints.Changing, EditTools.Input(true, Text("ref", true), Text("new_name", true)),
             ItemEditTools.RenameItem),
-        Edit("delete_items", ToolHints.Changing, EditTools.Input(true, new TextListParam("refs", true)),
+        Item("delete_items", ToolHints.Changing, EditTools.Input(true, new TextListParam("refs", true)),
             ItemEditTools.DeleteItems),
-        Edit("duplicate_items", ToolHints.Adding,
+        Item("duplicate_items", ToolHints.Adding,
             EditTools.Input(false, new TextListParam("refs", true), new PointParam("offset", false)),
             ItemEditTools.DuplicateItems),
         Edit("scene_create_object", ToolHints.Adding, EditTools.Input(false,
@@ -399,11 +399,17 @@ public static class AgentTools
         Func<ToolCall, ToolStep> run, bool runsInPause = false) =>
         new(name, ToolKind.Play, ToolGroup.Play, ToolHosts.Editor, hints, input, output, run) { RunsInPause = runsInPause };
 
-    /// <summary>An edit tool (sections 7.2 and 7.3 of the MCP1 design). Its result is the result of the command layer,
-    /// and it can be a step of <c>edit_batch</c>. A generic edit tool and a data tool are in the group Studio.</summary>
+    /// <summary>An edit tool (section 7.3 of the MCP1 design). Its result is the result of the command layer, and it
+    /// can be a step of <c>edit_batch</c>. A data tool is in the group Studio.</summary>
     private static StudioTool Edit(string name, ToolHints hints, ToolInput input, Func<ToolCall, ToolStep> run,
         ToolGroup group = ToolGroup.Studio) =>
         new(name, ToolKind.Edit, group, ToolHosts.Both, hints, input, typeof(EditResult), run);
+
+    /// <summary>A generic edit tool (section 7.2 of the MCP1 design), in the group Studio. It takes items of each kind,
+    /// also mission items. So its result also gives the inverse and the row moves of the mission commands that it ran
+    /// (<see cref="EditToolResult"/>).</summary>
+    private static StudioTool Item(string name, ToolHints hints, ToolInput input, Func<ToolCall, ToolStep> run) =>
+        new(name, ToolKind.Edit, ToolGroup.Studio, ToolHosts.Both, hints, input, typeof(EditToolResult), run);
 
     /// <summary>A mission edit tool (section 7.4 of the MCP1 design), in the group Missions. It is an edit tool, and
     /// its result also gives the inverse and the row moves of its mission commands (<see cref="EditToolResult"/>).</summary>
