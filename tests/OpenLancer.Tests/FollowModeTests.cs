@@ -358,4 +358,194 @@ public sealed class FollowModeTests
         Assert.Equal($"set_fields: {refused.Message}",
             Assert.Single(editor.Log.Entries, e => e.Source == AgentController.Source).Message);
     }
+
+    // ---- Mission edits (step 2 of MCP1-3) ----
+
+    /// <summary>The install path of the test script as JSON text.</summary>
+    private static readonly string S = MissionEdits.Script.Replace(@"\", @"\\");
+
+    private static readonly string AddTrigger = $$"""
+        { "kind": "add_trigger", "script": "msn:{{S}}", "nickname": "ol_agent",
+          "condition": { "key": "Cnd_Timer", "values": { "seconds": 2 } },
+          "actions": [ { "key": "Act_ActTrig", "values": { "trigger": "ol_end" } } ] }
+        """;
+
+    private static readonly string Wait9 =
+        $$"""{ "kind": "set_condition_value", "trigger": "trg:{{S}}#ol_wave", "name": "seconds", "value": 9 }""";
+
+    private static readonly string RemoveEnd = $$"""{ "kind": "remove_trigger", "trigger": "trg:{{S}}#ol_end" }""";
+
+    private static readonly string Added = $"trg:{MissionEdits.Script}#ol_agent";
+
+    /// <summary>A selected item of the Mission tab that the edits of the tests keep.</summary>
+    private static readonly FakeMissionItem Start = new($"trg:{MissionEdits.Script}#ol_start");
+
+    /// <summary>The editor host of a session of the mission test profile.</summary>
+    private static (MissionEdits M, FakeAgentEditor Editor, EditorAgentHost Host) Missions()
+    {
+        var m = MissionEdits.Create();
+        var editor = new FakeAgentEditor { Edits = m.Session };
+        return (m, editor, new EditorAgentHost(editor));
+    }
+
+    private static string MissionEdit(string command, bool confirm = false) =>
+        $$"""{ "commands": [ {{command}} ]{{(confirm ? ", \"confirm\": true" : "")}} }""";
+
+    /// <summary>An agent create of a trigger opens its script in the Mission tab and selects the new trigger, as a create
+    /// of the user selects the new item (decision D249). The Scene does not change.</summary>
+    [Fact]
+    public void AnAgentMissionCreateOpensTheMissionTabAndSelectsTheNewTrigger()
+    {
+        var (m, editor, host) = Missions();
+        using var _ = m;
+        var view = editor.FollowView;
+        view.Selection = Start;
+
+        Ok(host, "mission_edit", MissionEdit(AddTrigger));
+
+        var (script, reference, select) = Assert.Single(view.MissionShown);
+        Assert.True(OpenLancer.Data.IO.VfsPath.Comparer.Equals(MissionEdits.Script, script));
+        Assert.Equal((Added, true), (reference, select));
+        Assert.Equal(new FakeMissionItem(Added), view.Selection);
+        Assert.Empty(view.Shown);
+    }
+
+    /// <summary>A change of a line frames its trigger in the Mission tab and keeps the selection. So does a change of
+    /// another section of the script, for example a mission ship.</summary>
+    [Fact]
+    public void AMissionChangeFramesTheItemAndKeepsTheSelection()
+    {
+        var (m, editor, host) = Missions();
+        using var _ = m;
+        var view = editor.FollowView;
+        view.Selection = Start;
+
+        Ok(host, "mission_edit", MissionEdit(Wait9));
+        Ok(host, "mission_edit", MissionEdit($$"""
+            { "kind": "set_item_key", "item": "sec:{{S}}#MsnShip/ol_ship_1", "key": "npc",
+              "lines": [ { "key": "npc", "texts": [ "ol_npc_shared" ] } ] }
+            """));
+
+        Assert.Equal([($"line:{MissionEdits.Script}#Trigger/ol_wave/2", false), ($"sec:{MissionEdits.Script}#MsnShip/ol_ship_1", false)],
+            view.MissionShown.Select(s => (s.Reference, s.Select)));
+        Assert.Equal(Start, view.Selection);
+    }
+
+    /// <summary>A rename of a trigger frames it under its new name and keeps the selection.</summary>
+    [Fact]
+    public void AMissionRenameKeepsTheSelection()
+    {
+        var (m, editor, host) = Missions();
+        using var _ = m;
+        var view = editor.FollowView;
+        view.Selection = Start;
+
+        Ok(host, "mission_edit", MissionEdit($$"""{ "kind": "rename_trigger", "trigger": "trg:{{S}}#ol_wave", "new_name": "ol_wave_2" }"""));
+
+        Assert.Equal(($"trg:{MissionEdits.Script}#ol_wave_2", false), (view.MissionShown[0].Reference, view.MissionShown[0].Select));
+        Assert.Equal(Start, view.Selection);
+    }
+
+    /// <summary>An agent delete of a trigger clears the selection. An undo of the agent then selects the trigger again in
+    /// the Mission tab.</summary>
+    [Fact]
+    public void AMissionDeleteClearsTheSelectionAndAnAgentUndoSelectsTheTriggerAgain()
+    {
+        var (m, editor, host) = Missions();
+        using var _ = m;
+        var view = editor.FollowView;
+        view.Selection = new FakeMissionItem($"trg:{MissionEdits.Script}#ol_end");
+
+        Ok(host, "mission_edit", MissionEdit(RemoveEnd, confirm: true));
+        Assert.Null(view.Selection);
+
+        Ok(host, "undo");
+        var end = $"trg:{MissionEdits.Script}#ol_end";
+        Assert.Equal([(end, true)], view.MissionShown.Select(s => (s.Reference, s.Select)));
+        Assert.Equal(new FakeMissionItem(end), view.Selection);
+    }
+
+    /// <summary>An undo of the user of an agent delete of a trigger gives the Scene no item to select. The undo of a
+    /// mission edit of the user keeps the selection of the Mission tab, so the undo of an agent mission edit does
+    /// too.</summary>
+    [Fact]
+    public void AnUndoOfTheUserOfAnAgentMissionDeleteGivesTheSceneNoItem()
+    {
+        var (m, editor, host) = Missions();
+        using var _ = m;
+        editor.Follow.Set(false);
+
+        Ok(host, "mission_edit", MissionEdit(RemoveEnd, confirm: true));
+        var label = m.Session.UndoLabel!;
+        m.Session.Undo();
+
+        Assert.NotNull(m.Session.Get(new SectionRef(MissionEdits.Script, new SectionIdentity("Trigger", "ol_end"))));
+        Assert.Null(editor.Follow.DeletedItem(label));
+    }
+
+    /// <summary>With follow mode off, an agent mission edit changes nothing of the view and the selection.</summary>
+    [Fact]
+    public void WithFollowModeOffAMissionEditChangesNothing()
+    {
+        var (m, editor, host) = Missions();
+        using var _ = m;
+        editor.Follow.Set(false);
+        var view = editor.FollowView;
+        view.Selection = Start;
+
+        Ok(host, "mission_edit", MissionEdit(AddTrigger));
+        Ok(host, "mission_edit", MissionEdit(Wait9));
+
+        Assert.Empty(view.MissionShown);
+        Assert.Empty(view.Shown);
+        Assert.Equal(Start, view.Selection);
+    }
+
+    /// <summary>Follow mode does not leave prefab mode, as Unity keeps prefab mode open when the scene changes. An agent
+    /// mission edit then shows only in the Console: no view changes, and a create, a delete and an undo keep the
+    /// selection of prefab mode. Follow mode stays on.</summary>
+    [Fact]
+    public void InPrefabModeAMissionEditShowsOnlyInTheConsole()
+    {
+        var (m, editor, host) = Missions();
+        using var _ = m;
+        var view = editor.FollowView;
+        view.InPrefabMode = true;
+        var template = new FakeMissionItem("trg:prefab:mod:ol_gate#ol_open");
+        view.Selection = template;
+
+        Ok(host, "mission_edit", MissionEdit(AddTrigger));
+        Ok(host, "mission_edit", MissionEdit(Wait9));
+        Ok(host, "mission_edit", MissionEdit(RemoveEnd, confirm: true));
+        Ok(host, "undo");
+
+        Assert.Empty(view.MissionShown);
+        Assert.Empty(view.Shown);
+        Assert.Equal(template, view.Selection);
+        Assert.True(editor.Follow.On);
+        Assert.Equal(4, editor.Log.Entries.Count(e => e.Source == AgentController.Source));
+    }
+
+    /// <summary>A trigger that the Mission tab cannot show, for example before the mission run reads its script, shows
+    /// in the Inspector. A section of the ship build file of a script is not an item of the Mission tab, so it shows in
+    /// the Inspector too.</summary>
+    [Fact]
+    public void AMissionItemThatTheMissionTabCannotShowGoesToTheInspector()
+    {
+        var (m, editor, host) = Missions();
+        using var _ = m;
+        var view = editor.FollowView;
+        view.CanShowMission = false;
+
+        Ok(host, "mission_edit", MissionEdit(AddTrigger));
+        Assert.Equal(new SectionRef(MissionEdits.Script, new SectionIdentity("Trigger", "ol_agent")), view.Selection);
+
+        view.CanShowMission = true;
+        Ok(host, "mission_edit", MissionEdit($$"""
+            { "kind": "set_item_key", "item": "sec:{{MissionEdits.Ships.Replace(@"\", @"\\")}}#NPCShipArch/ol_build_1",
+              "key": "level", "lines": [ { "key": "level", "texts": [ "d6" ] } ] }
+            """));
+        Assert.Empty(view.MissionShown);
+        Assert.Equal(new SectionRef(MissionEdits.Ships, new SectionIdentity("NPCShipArch", "ol_build_1")), view.Selection);
+    }
 }

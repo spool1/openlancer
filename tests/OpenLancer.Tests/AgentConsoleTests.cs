@@ -71,6 +71,34 @@ public sealed class AgentConsoleTests
         Assert.Equal(("stale_revision", "needs_confirmation"), (stale.Code, asks.Code));
     }
 
+    /// <summary>The entry of an agent mission edit links to the section of the mission: the new trigger of a create, and
+    /// the trigger of a changed line. A click on the entry then opens the mission in the Mission tab at the section
+    /// (section 12.4 of the M6a design), because the link names the whole section.</summary>
+    [Fact]
+    public void TheEntryOfAMissionEditLinksToTheMissionSection()
+    {
+        using var m = MissionEdits.Create();
+        var editor = new FakeAgentEditor { Edits = m.Session };
+        var host = new EditorAgentHost(editor);
+        var script = MissionEdits.Script.Replace(@"\", @"\\");
+
+        Ok(host, "mission_edit", $$"""
+            { "commands": [ { "kind": "add_trigger", "script": "msn:{{script}}", "nickname": "ol_agent",
+                              "condition": { "key": "Cnd_Timer", "values": { "seconds": 2 } } } ] }
+            """);
+        Ok(host, "mission_edit", $$"""
+            { "label": "Wait longer",
+              "commands": [ { "kind": "set_condition_value", "trigger": "trg:{{script}}#ol_wave", "name": "seconds", "value": 9 } ] }
+            """);
+
+        var entries = Agent(editor);
+        Assert.Equal([new SectionRef(MissionEdits.Script, new SectionIdentity("Trigger", "ol_agent")),
+                new SectionRef(MissionEdits.Script, new SectionIdentity("Trigger", "ol_wave"))],
+            entries.Select(e => e.Target));
+        Assert.Equal("Wait longer.", entries[1].Message);
+        Assert.All(entries, e => Assert.Equal((ConsoleSeverity.Info, -1), (e.Severity, e.EntryIndex)));
+    }
+
     /// <summary>A preview, a query and a view tool add no entry.</summary>
     [Fact]
     public void APreviewAndAQueryAddNoEntry()

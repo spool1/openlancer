@@ -699,6 +699,112 @@ public sealed class AgentControllerTests : IDisposable
         Assert.False((await call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)).IsError);
     }
 
+    /// <summary>A state of a view counts only when the view drew in this frame or in the frame before. An agent call runs
+    /// before the panels draw, so it reads the draw of the frame before. A view that does not draw any more, for example
+    /// a hidden tab, has no open gesture.</summary>
+    [Fact]
+    public void AViewCountsOnlyWhileItDraws()
+    {
+        var drawn = new OpenLancer.Editor.Ui.DrawnFrame();
+
+        Assert.False(drawn.Recent(1));
+        drawn.Drew(5);
+        Assert.True(drawn.Recent(5));
+        Assert.True(drawn.Recent(6));
+        Assert.False(drawn.Recent(7));
+    }
+
+    /// <summary>The press of the left button on a node or a pin of the mission graph starts at a click over the item and
+    /// ends at the release. A drag of nodes or of a link runs only during it. A click on the background is not a
+    /// press.</summary>
+    [Fact]
+    public void APressOnAGraphItemLastsUntilTheRelease()
+    {
+        Assert.True(OpenLancer.Editor.Missions.GraphView.Pressed(false, clicked: true, overItem: true, down: true));
+        Assert.False(OpenLancer.Editor.Missions.GraphView.Pressed(false, clicked: true, overItem: false, down: true));
+        Assert.True(OpenLancer.Editor.Missions.GraphView.Pressed(true, clicked: false, overItem: false, down: true));
+        Assert.False(OpenLancer.Editor.Missions.GraphView.Pressed(true, clicked: false, overItem: true, down: false));
+        Assert.False(OpenLancer.Editor.Missions.GraphView.Pressed(false, clicked: false, overItem: true, down: true));
+    }
+
+    /// <summary>
+    /// An agent call waits while a gesture of the mission studio is open, and runs after it ends (section 5.5, item 3 of
+    /// the MCP1 design, step 2 of MCP1-3). The gestures are the rename popup of a mission row in the Hierarchy, a rename
+    /// of a node of the graph and a drag of a node. The test runs the frames as the editor runs them: the call before the
+    /// panels, then the draws of the panels. A rename in a graph that does not draw any more does not keep the call
+    /// waiting.
+    /// </summary>
+    [Fact]
+    public async Task ACallWaitsWhileAMissionGestureIsOpenAndRunsAfterIt()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var frame = 1;
+        var hierarchy = new OpenLancer.Editor.Ui.DrawnFrame();
+        var graph = new OpenLancer.Editor.Ui.DrawnFrame();
+        bool renaming = false, graphText = false, pressed = false;
+        EditorActivity Now() => new(graph.Recent(frame) && (graphText || pressed), false, false, false,
+            hierarchy.Recent(frame) && renaming);
+        using var dispatcher = new AgentDispatcher(new EditorAgentHost(new FakeAgentEditor()), Now, null, new FakeClock());
+        var reasons = new List<string?>();
+
+        // One frame of the editor: the agent call before the panels, then the draws of the panels.
+        bool Step(Action? panels = null)
+        {
+            frame++;
+            reasons.Add(AgentDispatcher.WaitReason(Now()));
+            var ran = dispatcher.Frame();
+            panels?.Invoke();
+            return ran;
+        }
+
+        async Task<bool> Ran(Task<ToolResult> call) => !(await call.WaitAsync(TimeSpan.FromSeconds(10), token)).IsError;
+
+        // The user opens the rename popup of a mission row in the Hierarchy, then presses Enter.
+        renaming = true;
+        hierarchy.Drew(frame);
+        var first = dispatcher.Queue.CallAsync("studio_status", null, null, token);
+        Assert.False(Step(() => hierarchy.Drew(frame)));
+        Assert.False(Step(() =>
+        {
+            renaming = false;
+            hierarchy.Drew(frame);
+        }));
+        Assert.True(Step());
+        Assert.True(await Ran(first));
+
+        // The user renames a node of the graph, then shows another tab. The graph does not draw any more.
+        graphText = true;
+        graph.Drew(frame);
+        var second = dispatcher.Queue.CallAsync("studio_status", null, null, token);
+        Assert.False(Step(() => graph.Drew(frame)));
+        Assert.False(Step());
+        Assert.True(Step());
+        Assert.True(await Ran(second));
+
+        // The user presses the button on a node, drags it off the node and lets the button go.
+        graphText = false;
+        pressed = OpenLancer.Editor.Missions.GraphView.Pressed(false, clicked: true, overItem: true, down: true);
+        graph.Drew(frame);
+        var third = dispatcher.Queue.CallAsync("studio_status", null, null, token);
+        Assert.False(Step(() =>
+        {
+            pressed = OpenLancer.Editor.Missions.GraphView.Pressed(pressed, clicked: false, overItem: false, down: true);
+            graph.Drew(frame);
+        }));
+        Assert.False(Step(() =>
+        {
+            pressed = OpenLancer.Editor.Missions.GraphView.Pressed(pressed, clicked: false, overItem: false, down: false);
+            graph.Drew(frame);
+        }));
+        Assert.True(Step());
+        Assert.True(await Ran(third));
+
+        Assert.Equal(["The user renames an item in the Hierarchy now.", "The user renames an item in the Hierarchy now.", null,
+                "The user edits a field or drags an item now.", "The user edits a field or drags an item now.", null,
+                "The user edits a field or drags an item now.", "The user edits a field or drags an item now.", null],
+            reasons);
+    }
+
     [Fact]
     public void TheEditorHostGivesTheConsoleWithItsFilters()
     {

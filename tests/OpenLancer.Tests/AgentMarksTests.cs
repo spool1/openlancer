@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Missions;
 using OpenLancer.Editor.Agent;
+using OpenLancer.Editor.Hierarchy;
 using Xunit;
 using static OpenLancer.Tests.SceneWorkspace;
 
@@ -116,4 +119,43 @@ public sealed class AgentMarksTests
         marks.Track(null);
         Assert.False(marks.Marked(Station));
     }
+
+    /// <summary>A row of the tree of a mission shows the robot glyph after an agent edit of its section, and loses it at
+    /// the undo. A line row has no section of its own, so it never has the glyph (section 8.5 of the MCP1 design, step 2
+    /// of MCP1-3).</summary>
+    [Fact]
+    public void AMissionRowHasTheGlyphAfterAnAgentEditAndLosesItAtTheUndo()
+    {
+        using var m = MissionEdits.Create();
+        var marks = Marks();
+        marks.Track(m.Session);
+        var host = new TestAgentHost(m.Session);
+        var script = MissionEdits.Script.Replace(@"\", @"\\");
+
+        AgentCalls.Ok(host, "mission_edit", $$"""
+            { "commands": [ { "kind": "set_condition_value", "trigger": "trg:{{script}}#ol_wave", "name": "seconds", "value": 9 } ] }
+            """);
+        var edited = MarkedRows(m, marks);
+        m.Session.Undo();
+        var undone = MarkedRows(m, marks);
+
+        Assert.Equal(["ol_wave"], edited);
+        Assert.Empty(undone);
+        var wave = new SectionRef(MissionEdits.Script, new SectionIdentity("Trigger", "ol_wave"));
+        Assert.Equal(wave, HierarchyModel.SectionOfMissionRow(new MissionRef(MissionEdits.Script, MissionItemKind.Trigger, wave)));
+        Assert.Null(HierarchyModel.SectionOfMissionRow(new MissionRef(MissionEdits.Script, MissionItemKind.Row, wave, Row: 2)));
+        Assert.Null(HierarchyModel.SectionOfMissionRow(new MissionRef(MissionEdits.Script, MissionItemKind.Label, Key: "ol_wing")));
+    }
+
+    /// <summary>The names of the rows of the tree of the test mission that show the robot glyph.</summary>
+    private static string[] MarkedRows(MissionEdits m, AgentMarks marks)
+    {
+        var tree = HierarchyModel.ForMission(m.Missions.Model(MissionEdits.Script).Analysis, _ => "", false, null);
+        return Rows(tree.Root)
+            .Where(n => HierarchyModel.SectionOfMissionRow(n.Item) is { } section && marks.Marked(section))
+            .Select(n => n.Name)
+            .ToArray();
+    }
+
+    private static IEnumerable<HierarchyNode> Rows(HierarchyNode node) => node.Children.SelectMany(c => Rows(c).Prepend(c));
 }
