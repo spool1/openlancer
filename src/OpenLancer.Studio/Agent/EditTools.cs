@@ -275,7 +275,7 @@ internal static class EditTools
     /// <summary>
     /// Opens a batch with the edit origin Agent, runs the commands, and gives a preview or commits. A batch that needs a
     /// confirmation without <paramref name="confirm"/> cancels and refuses. A preview gives
-    /// <c>needs_confirmation: true</c> in its result instead.
+    /// <c>needs_confirmation: true</c> in its result instead, with the text of each confirmation as a warning.
     /// </summary>
     /// <remarks>The batch commits only when the result of the tool fits the size limit of a result (section 8.4 of the
     /// MCP1 design). The queue replaces a larger result with the error <c>limit</c>. That error must not hide an edit
@@ -315,6 +315,11 @@ internal static class EditTools
                     // A call with no net change changed no item, also when its plans name items.
                     Changes = result.Status == EditStatus.NoChange ? [] : shaped.Changes,
                     NeedsConfirmation = result.NeedsConfirmation || confirmations.Count > 0,
+                    // A preview tells why the edit needs confirm: true, as the preview of the mission studio does
+                    // (section 4.0.1 of the M6b design). So the agent can ask the user before it calls again.
+                    Warnings = preview && confirmations.Count > 0
+                        ? [.. shaped.Warnings, .. confirmations.Select(c => new Problem(DiagnosticSeverity.Warning, c))]
+                        : shaped.Warnings,
                     Patch = patch ?? result.Patch,
                     // After a commit, the versions of the scripts are the new versions. A preview gives the versions
                     // now, because it changes no version (decision D764).

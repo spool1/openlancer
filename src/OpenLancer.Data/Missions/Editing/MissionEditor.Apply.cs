@@ -180,7 +180,7 @@ public sealed partial class MissionEditor
             if (session.OpenDocument(path) is not { HoldsScript: true } document)
                 return MissionErrors.ScriptNotFoundError(path) with { Field = "expect_versions" };
             if (Version(document.Path) != expected)
-                return MissionErrors.ScriptChangedError(document.Path);
+                return MissionErrors.ScriptChangedError(document.Path) with { Field = "expect_versions" };
         }
         return null;
     }

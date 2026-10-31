@@ -186,7 +186,8 @@ public sealed class AgentMissionToolTests
     }
 
     /// <summary>A delete that leaves "Missing" lines asks for confirm: true (decision D712 of the MCP1 design). A
-    /// preview tells it with needs_confirmation, and the call with confirm: true applies.</summary>
+    /// preview tells it with needs_confirmation, and its warnings tell why, as the preview of the mission studio does
+    /// (section 4.0.1 of the M6b design). The call with confirm: true applies.</summary>
     [Fact]
     public void ADeleteThatLeavesMissingLinesNeedsAConfirmation()
     {
@@ -203,6 +204,8 @@ public sealed class AgentMissionToolTests
         Assert.EndsWith("call the tool again with confirm: true.", asked.Message);
         Assert.Empty(host.Refusals);
         Assert.Equal(("previewed", true), ((string?)preview["status"], (bool?)preview["needs_confirmation"]));
+        Assert.Contains(preview["warnings"]!.AsArray(), w =>
+            ((string?)w!["message"])!.StartsWith("After this edit, 3 lines name an item that is gone.", StringComparison.Ordinal));
         Assert.Equal("applied", (string?)confirmed["status"]);
         Assert.Equal(3, confirmed["missing"]!.AsArray().Count);
         Assert.False(m.Has("ol_end"));
@@ -241,7 +244,8 @@ public sealed class AgentMissionToolTests
         Assert.Contains("Cnd_Timer = 7", m.Lines("ol_wave"));
     }
 
-    /// <summary>The guards of the revision and of the script versions refuse an edit after a change.</summary>
+    /// <summary>The guards of the revision and of the script versions refuse an edit after a change. The error of a
+    /// script version names the argument expect_versions.</summary>
     [Fact]
     public void TheRevisionAndTheVersionGuardsRefuse()
     {
@@ -250,10 +254,11 @@ public sealed class AgentMissionToolTests
         Ok(host, "mission_edit", Edit(Wait9));
 
         var stale = Error(host, "mission_edit", $$"""{ "commands": [ {{AddAgentTrigger}} ], "if_revision": "0" }""");
-        var version = Error(host, "mission_edit", $$"""{ "commands": [ {{AddAgentTrigger}} ], "expect_versions": { "{{S}}": 1 } }""");
+        var version = Call(host, "mission_edit", $$"""{ "commands": [ {{AddAgentTrigger}} ], "expect_versions": { "{{S}}": 1 } }""");
 
         Assert.Equal(("stale_revision", EditSession.RevisionChanged), (stale.Code, stale.Detail));
-        Assert.Equal(("stale_revision", MissionErrors.ScriptChanged), (version.Code, version.Detail));
+        Assert.Equal(("stale_revision", MissionErrors.ScriptChanged, "expect_versions"),
+            ((string?)version.Content["code"], (string?)version.Content["detail"], (string?)version.Content["field"]));
         Assert.False(m.Has("ol_agent"));
         Assert.Equal(1, m.Session.Revision);
     }
