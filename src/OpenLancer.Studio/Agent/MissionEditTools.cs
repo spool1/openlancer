@@ -445,52 +445,55 @@ internal static class MissionEditTools
 
     /// <summary>
     /// Adds a mission ship in the scope: <see cref="AddMissionShip"/> with the keys that it writes, then one request with
-    /// <see cref="SetItemKey"/> for each other key and the move before a formation that names the ship. The second
-    /// request needs the name of the ship, and the layer makes a name when the call gives none.
+    /// <see cref="SetItemKey"/> for each other key and the move before a formation that names the ship. The command
+    /// takes a key in the form of values by name. A key in the form of texts by position goes through
+    /// <see cref="SetItemKey"/> as it is. The second request needs the name of the ship, and the layer makes a name when
+    /// the call gives none.
     /// </summary>
-    /// <exception cref="EditException">The field <c>npc</c> is missing, or a request refuses.</exception>
+    /// <exception cref="EditException">The field <c>npc</c> is missing, the fields give both a position and
+    /// <c>rel_pos</c>, or a request refuses.</exception>
     private static void AddShip(EditScope scope, ScriptRef script, string? nickname,
         IReadOnlyList<(string Key, string Field, IReadOnlyList<LineSpec> Lines)> fields)
     {
         IReadOnlyList<string> TextsOf(LineSpec line) =>
             MissionValues.Build(MissionSchema.Retail, "MsnShip", LinePlace.Section, line).Texts;
 
-        var byKey = fields.ToDictionary(f => f.Key, f => f.Lines, StringComparer.OrdinalIgnoreCase);
-        if (byKey.GetValueOrDefault("npc") is not [var npc])
-        {
-            throw new EditException(new EditError(EditErrorKind.InvalidArgument, NeedsNpc, AgentTexts.Error("mission_ship_npc"))
+        var npc = fields.FirstOrDefault(f => MissionIndex.Is(f.Key, "npc")).Lines is [var line] && TextsOf(line) is [var name]
+            ? name
+            : throw new EditException(new EditError(EditErrorKind.InvalidArgument, NeedsNpc, AgentTexts.Error("mission_ship_npc"))
             {
                 Field = "fields.npc",
             });
+        // The texts of each line of each key that the command takes, by key.
+        var taken = fields.Where(f => ShipCommandKeys.Contains(f.Key) && !MissionIndex.Is(f.Key, "npc") &&
+                                      f.Lines.Count > 0 && f.Lines.All(l => l.Texts == null))
+            .ToDictionary(f => f.Key, f => f.Lines.Select(TextsOf).ToList(), StringComparer.OrdinalIgnoreCase);
+        if (fields.Count(f => f.Lines.Count > 0 && (MissionIndex.Is(f.Key, "position") || MissionIndex.Is(f.Key, "rel_pos"))) > 1)
+        {
+            throw new EditException(new EditError(EditErrorKind.InvalidArgument, ToolInput.BadArgument,
+                AgentTexts.Error("mission_ship_place")) { Field = "fields.rel_pos" });
         }
-        var near = byKey.GetValueOrDefault("rel_pos") is [var rel] ? TextsOf(rel) : null;
         var add = new AddMissionShip(script)
         {
             Nickname = nickname,
-            Npc = TextsOf(npc)[0],
-            System = byKey.GetValueOrDefault("system") is [var system] ? TextsOf(system)[0] : null,
-            Labels = byKey.GetValueOrDefault("label")?.Select(l => TextsOf(l)[0]).ToList() ?? [],
-            Orders = byKey.GetValueOrDefault("init_objectives") is [var orders] ? TextsOf(orders)[0] : null,
-            Position = near == null && byKey.GetValueOrDefault("position") is [var position] ? Numbers(TextsOf(position)) : null,
-            Rotation = byKey.GetValueOrDefault("orientation") is [var rotation] ? Numbers(TextsOf(rotation)) : null,
-            Near = near == null ? null : new NearSpec(near[1])
-            {
-                Heading = Number(near[0]),
-                Range = near.Count > 2 ? Number(near[2]) : null,
-            },
+            Npc = npc,
+            System = taken.GetValueOrDefault("system") is [[var system]] ? system : null,
+            Labels = taken.GetValueOrDefault("label")?.Select(l => l[0]).ToList() ?? [],
+            Orders = taken.GetValueOrDefault("init_objectives") is [[var orders]] ? orders : null,
+            Position = taken.GetValueOrDefault("position") is [var position] ? Numbers(position) : null,
+            Rotation = taken.GetValueOrDefault("orientation") is [var rotation] ? Numbers(rotation) : null,
+            Near = taken.GetValueOrDefault("rel_pos") is [var near]
+                ? new NearSpec(near[1]) { Heading = Number(near[0]), Range = near.Count > 2 ? Number(near[2]) : null }
+                : null,
         };
         var added = scope.RunMission(new MissionBatch(add.HistoryLabel, [add]), error => NameOr(error, "script"));
-        var name = added.Adds.Select(ItemRefs.Parse).First(r => r.Section is { } s && MissionIndex.Is(s.Type, "MsnShip"))
-            .Section!.Key!;
-        var ship = ItemRef.Of(script.Path, "MsnShip", name);
-        // A key with lines that the command did not write: a key that it does not take, and a position beside rel_pos.
-        var more = fields.Where(f => f.Lines.Count > 0 && (!ShipCommandKeys.Contains(f.Key) ||
-                                                          near != null && MissionIndex.Is(f.Key, "position")))
-            .ToList();
+        var ship = ItemRef.Of(script.Path, "MsnShip", nickname ?? added.Adds.Select(ItemRefs.Parse)
+            .First(r => r.Section is { } s && MissionIndex.Is(s.Type, "MsnShip")).Section!.Key!);
+        var more = fields.Where(f => f.Lines.Count > 0 && !MissionIndex.Is(f.Key, "npc") && !taken.ContainsKey(f.Key)).ToList();
         var commands = more.Select(f => (MissionCommand)new SetItemKey(ship, f.Key, f.Lines)).ToList();
         // A formation that names the ship before the ship takes no ship (rule M08). The first one in the file wins.
-        if (scope.Session.Missions.AnalysisOf(script.Path)?.Index.LaterMembers.Where(m => MissionIndex.Is(m.Ship, name))
-                .Select(m => m.Formation).MinBy(f => f.Index) is { } formation)
+        if (scope.Session.Missions.AnalysisOf(script.Path)?.Index.LaterMembers
+                .Where(m => MissionIndex.Is(m.Ship, ship.Section.Key!)).Select(m => m.Formation).MinBy(f => f.Index) is { } formation)
             commands.Add(new MoveSection(ship) { Before = new ItemRef(script.Path, formation.Ref.Id) });
         if (commands.Count > 0)
         {
@@ -499,7 +502,8 @@ internal static class MissionEditTools
         }
     }
 
-    /// <summary>The numbers of the texts of a position or a rotation, which the schema checked.</summary>
+    /// <summary>The numbers of the texts of a position or a rotation in the form of values, which the schema
+    /// checked.</summary>
     private static MissionValue Numbers(IReadOnlyList<string> texts) => MissionValue.Of([.. texts.Select(Number)]);
 
     private static double Number(string text) => double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture);

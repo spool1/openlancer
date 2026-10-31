@@ -726,6 +726,7 @@
     "mission_item_nickname": "Give the nickname of the new item in the argument nickname, not in fields.",
     "mission_item_order": "Give each order of an order list in steps, not in fields.",
     "mission_item_steps": "Only the kind order_list takes steps. Give the keys of the {kind} in fields.",
+    "mission_ship_place": "A ship starts at a position, or near an object with rel_pos. Give one of the two keys, not both.",
     "mission_ship_npc": "A ship needs fields.npc: the nickname of an [NPC] of the script. Add a ship_build and an npc first, or use mission_edit with add_mission_ship and new_build.",
     "step_unknown": "Step {index}: the server has no tool {tool}.",
     "step_kind": "Step {index}: {tool} cannot be a step of edit_batch. A step must be an edit tool, for example set_fields.",

@@ -191,7 +191,8 @@ public sealed partial class AgentMissionToolTests
 
     /// <summary>The automated form of steps 3 to 5 of workflow 3 (section 9.5 of the MCP1 design): an edit_batch adds a
     /// ship build, an NPC that names it and a ship that names the NPC. The batch is one entry, and one undo removes the
-    /// ship, its NPC and its build. Without a nickname, the layer makes a free name for the ship.</summary>
+    /// ship, its NPC and its build. Without a nickname, the layer makes a free name for the ship. A key in the form of
+    /// texts by position comes after the keys of the command of the ship, as a later edit of the key puts it.</summary>
     [Fact]
     public void ABatchOfABuildAnNpcAndAShipIsOneEntry()
     {
@@ -206,14 +207,17 @@ public sealed partial class AgentMissionToolTests
               { "tool": "mission_add_item", "arguments": {{AddItem("npc", "ol_pirate_npc",
                   """{ "npc_ship_arch": "ol_pirate_build", "affiliation": "ol_faction", "voice": "ol_voice" }""")}} },
               { "tool": "mission_add_item", "arguments": {{AddItem("ship", null,
-                  """{ "npc": "ol_pirate_npc", "system": "ol_system", "position": [0, 0, 3000], "random_name": true }""")}} } ] }
+                  """
+                  { "npc": "ol_pirate_npc", "system": "ol_system", "position": [0, 0, 3000], "random_name": true,
+                    "label": { "texts": ["ol_pirates"] } }
+                  """)}} } ] }
             """);
 
         Assert.Equal("applied", (string?)result["status"]);
         Assert.Equal([$"sec:{Ships}#NPCShipArch/ol_pirate_build", $"sec:{Script}#NPC/ol_pirate_npc",
             $"sec:{Script}#MsnShip/ol_test_ship_1"], Texts(result["adds"]));
         Assert.Equal(["nickname = ol_test_ship_1", "system = ol_system", "npc = ol_pirate_npc", "position = 0, 0, 3000",
-            "random_name = true"], m.Lines(Item("MsnShip", "ol_test_ship_1")));
+            "random_name = true", "label = ol_pirates"], m.Lines(Item("MsnShip", "ol_test_ship_1")));
         Assert.Equal((EditOrigin.Agent, "Agent: Add the pirate"), (m.Session.UndoOrigin, m.Session.UndoLabel));
         Assert.Single(host.Edits);
 
@@ -308,10 +312,10 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal(state, m.State());
     }
 
-    /// <summary>The refusals of mission_add_item: a ship without fields.npc, a key that the section does not have (with
-    /// the keys of the section), a value of the wrong kind, a form that does not fit its key, the nickname or an order in
-    /// the fields, steps of another kind, an order that is not a directive, a key two times, and a name in use. Each
-    /// error names its argument, and nothing changes.</summary>
+    /// <summary>The refusals of mission_add_item: a ship without fields.npc or with two places, a key that the section
+    /// does not have (with the keys of the section), a value of the wrong kind, a form that does not fit its key, the
+    /// nickname or an order in the fields, steps of another kind, an order that is not a directive, a key two times, and
+    /// a name in use. Each error names its argument, and nothing changes.</summary>
     [Fact]
     public void AddItemGivesItsRefusals()
     {
@@ -327,6 +331,8 @@ public sealed partial class AgentMissionToolTests
             (AddItem("ship", "ol_new", """{ "npc": "ol_npc_1", "pilot": "ol_pilot" }"""), "invalid_value", MissionErrors.NotAKey,
                 "fields.pilot"),
             (AddItem("solar", null, """{ "position": "far" }"""), "invalid_value", MissionErrors.ValueKind, "fields.position"),
+            (AddItem("ship", "ol_new", """{ "npc": "ol_npc_1", "position": [0, 0, 0], "rel_pos": { "heading": 0, "anchor": "ol_station" } }"""),
+                "invalid_argument", ToolInput.BadArgument, "fields.rel_pos"),
             (AddItem("ship", "ol_new", """{ "npc": "ol_npc_1", "hit_points": "many" }"""), "invalid_value",
                 MissionErrors.ValueKind, "fields.hit_points"),
             (AddItem("npc", null, """{ "space_costume": "ol_head" }"""), "invalid_argument", ToolInput.BadArgument,
