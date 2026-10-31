@@ -409,7 +409,7 @@ internal static class EditTools
             parts.Add(AgentTexts.Error("confirm_cascade", ("refs", Shown(cascade))));
         if (plan.Fixes.Count > 0)
             parts.Add(AgentTexts.Error("confirm_fixes", ("refs", Shown(plan.Fixes.Select(f => Ref(f.Section)).Distinct().ToList()))));
-        // A rename also changes the mission lines that name the item. The question names these scripts.
+        // A rename also changes the mission lines that name the item. The question names their sections and scripts.
         var missions = plan.Changes.Where(c => SectionKeys.IsMissionFile(c.Path)).ToList();
         if (missions.Count > 0)
         {

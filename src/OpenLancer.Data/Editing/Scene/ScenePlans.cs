@@ -592,13 +592,13 @@ public static partial class ScenePlans
         if (SceneSections.IsNamed(kind))
             warnings.AddRange(DanglingWarnings(session, name, item.Path));
         // The mission lines that name the object follow the rename in the same entry (decision D668). The plan gives
-        // their triggers as changes, so a question names the mission scripts that the rename changes.
-        var triggers = new List<SectionRef>();
+        // their sections as changes, so a question names the mission scripts that the rename changes.
+        var missionSections = new List<SectionRef>();
         var mission = kind == SceneKind.Object
             ? session.Missions.References.Rename(Missions.Editing.MissionReferences.ObjectKinds, old, name, warnings,
-                triggers)
+                missionSections)
             : null;
-        plan.Changes = triggers;
+        plan.Changes = missionSections;
 
         var renamed = item with { Id = item.Id with { Key = name } };
         plan.Label = $"Rename {old} to {name}";

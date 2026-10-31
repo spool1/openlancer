@@ -59,7 +59,8 @@ public sealed class MissionReferences
     /// The session command that gives the mission lines of a name its new name, or null when no line names it. A line of
     /// a section that the editor cannot change stays, and a warning tells it.
     /// </summary>
-    /// <param name="changed">Gets each trigger whose lines the command changes, once. Null drops them.</param>
+    /// <param name="changed">Gets each section of a mission script whose lines the command changes, once, for example a
+    /// trigger. Null drops them.</param>
     internal EditCommand? Rename(IReadOnlyCollection<MissionValueKind> kinds, string oldName, string newName,
         List<Diagnostic> warnings, List<SectionRef>? changed = null)
     {

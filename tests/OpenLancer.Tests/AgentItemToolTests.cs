@@ -208,7 +208,7 @@ public sealed class AgentItemToolTests
     }
 
     /// <summary>A rename of a Scene item also changes the mission lines that name it (decision D668). The question and
-    /// the changes of the result name the mission scripts and the triggers (final finding of MCP1-2).</summary>
+    /// the changes of the result name the mission scripts and their sections (final finding of MCP1-2).</summary>
     [Fact]
     public void TheQuestionOfARenameNamesTheMissionScriptsThatItChanges()
     {
@@ -228,7 +228,7 @@ public sealed class AgentItemToolTests
         var preview = Ok(host, "rename_item", """{ "ref": "obj:Li01_01", "new_name": "Li01_station", "preview": true }""");
         var asks = Error(host, "rename_item", """{ "ref": "obj:Li01_01", "new_name": "Li01_station" }""");
 
-        Assert.Contains(@"It also changes 1 mission trigger that names the item, in DATA\MISSIONS\OL_REF\ol_ref.ini.",
+        Assert.Contains(@"It also changes 1 section of a mission script that names the item, in DATA\MISSIONS\OL_REF\ol_ref.ini.",
             asks.Message);
         Assert.Contains(Texts(preview["changes"]), c => c.Contains("ol_lock", StringComparison.Ordinal));
         Assert.False(session.CanUndo);
