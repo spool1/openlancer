@@ -77,11 +77,14 @@ internal sealed class TextParam(string name, bool required, IReadOnlyList<string
 
     public override bool Fits(JsonNode value) =>
         value.GetValueKind() == JsonValueKind.String && value.GetValue<string>() is { Length: > 0 } text &&
-        (Choices == null ? text.Length <= length && Matches(text) : Choices.Contains(text, StringComparer.Ordinal));
+        (Choices == null
+            ? text.Length <= length && Matches(text)
+            : Choices.Contains(text, StringComparer.Ordinal));
 
     /// <summary>True when the text has the pattern, or the argument has no pattern. In .NET, <c>$</c> also matches
     /// before a newline at the end, and in JSON Schema it does not. So the match must cover the whole text.</summary>
-    private bool Matches(string text) => form == null || form.Match(text) is { Success: true } match && match.Length == text.Length;
+    private bool Matches(string text) =>
+        form == null || form.Match(text) is { Success: true } match && match.Length == text.Length;
 }
 
 /// <summary>A whole number from a minimum.</summary>

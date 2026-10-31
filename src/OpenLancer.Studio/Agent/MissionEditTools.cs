@@ -148,7 +148,8 @@ internal static class MissionEditTools
         MissionErrors.PatchText,
     ];
 
-    private static readonly ToolParam Nickname = new TextParam("nickname", false, null, null, MissionNames.MaxName, NamePattern);
+    private static readonly ToolParam Nickname =
+        new TextParam("nickname", false, null, null, MissionNames.MaxName, NamePattern);
 
     public static ToolInput AddTriggerInput { get; } = WithLines(
         new TextParam("script", true, null, null),
@@ -245,11 +246,12 @@ internal static class MissionEditTools
     {
         var args = call.Args;
         var row = EditTools.At("line", () => RowRef.Parse(args.Text("line")!)) with { ExpectKey = args.Text("expect_key") };
-        var values = args.Node("values")!.AsObject().Select(v => (Name: v.Key, Value: MissionLineInput.Value(v.Value!))).ToList();
+        var values = args.Node("values")!.AsObject()
+            .Select(v => (Name: v.Key, Value: MissionLineInput.Value(v.Value!))).ToList();
         var label = values.Count == 1 ? "" : "Set " + string.Join(", ", values.Select(v => v.Name));
-        return EditTools.Apply(call, scope =>
-            scope.RunMission(new MissionBatch(label, values.Select(v => (MissionCommand)new SetActionValue(row, v.Name, v.Value)).ToList()),
-                error => error.Index is { } i && ValueDetails.Contains(error.Detail ?? "") ? $"values.{values[i].Name}" : "line"));
+        var commands = values.Select(v => (MissionCommand)new SetActionValue(row, v.Name, v.Value)).ToList();
+        return EditTools.Apply(call, scope => scope.RunMission(new MissionBatch(label, commands),
+            error => error.Index is { } i && ValueDetails.Contains(error.Detail ?? "") ? $"values.{values[i].Name}" : "line"));
     }
 
     /// <summary>The tool <c>mission_move_action</c>: <see cref="ReorderAction"/>, before a line of the same trigger or
@@ -326,8 +328,8 @@ internal static class MissionEditTools
     /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/>: the text is not the reference of a
     /// trigger. The error names the argument.</exception>
     private static TriggerRef TriggerOf(string text, string field) => EditTools.At(field, () =>
-        ItemRefs.Parse(text) is { Kind: ItemRefKind.Section, Path: { } path, Section: { Key: { } name, Ordinal: 0 } section } &&
-        MissionIndex.Is(section.Type, "Trigger")
+        ItemRefs.Parse(text) is { Kind: ItemRefKind.Section, Path: { } path, Section: { Ordinal: 0 } section } &&
+        MissionIndex.Is(section.Type, "Trigger") && section.Key is { } name
             ? new TriggerRef(path, name)
             : TriggerRef.Parse(text));
 
@@ -373,7 +375,8 @@ internal static class MissionEditTools
     /// <summary>True when two items are one item. A trigger is one item by its nickname, without letter case.</summary>
     private static bool SameItem(ItemRef a, ItemRef b) =>
         VfsPath.Comparer.Equals(a.Script, b.Script) && MissionIndex.Is(a.Section.Type, b.Section.Type) &&
-        string.Equals(a.Section.Key, b.Section.Key, StringComparison.OrdinalIgnoreCase) && a.Section.Ordinal == b.Section.Ordinal;
+        string.Equals(a.Section.Key, b.Section.Key, StringComparison.OrdinalIgnoreCase) &&
+        a.Section.Ordinal == b.Section.Ordinal;
 
     /// <summary>A free made name for a new trigger of a script, by the rule of the layer (decision D683 of
     /// M6b).</summary>

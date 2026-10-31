@@ -289,6 +289,9 @@ public sealed partial class AgentMissionToolTests
             ("mission_link_triggers", $$"""{ "from": "{{Wave}}", "to": "{{other}}" }""", "invalid_argument", MissionEditTools.OtherItem, "to"),
             ("mission_add_trigger", $$"""{ "script": "msn:{{S}}", "nickname": "ol bad", "condition": { "key": "Cnd_True" } }""",
                 "invalid_argument", ToolInput.BadArgument, "nickname"),
+            // In .NET, '$' also matches before a newline at the end. The pattern of JSON Schema does not.
+            ("mission_add_trigger", $$"""{ "script": "msn:{{S}}", "nickname": "ol_bad\n", "condition": { "key": "Cnd_True" } }""",
+                "invalid_argument", ToolInput.BadArgument, "nickname"),
             ("mission_add_trigger", $$"""{ "script": "msn:{{S}}", "condition": { "key": "Cnd_True", "valus": {} } }""",
                 "invalid_argument", ToolInput.BadArgument, "condition"),
             ("mission_set_condition", $$"""{ "trigger": "{{WaveLine(2)}}", "condition": { "key": "Cnd_True" } }""",
@@ -359,6 +362,29 @@ public sealed partial class AgentMissionToolTests
         m.Session.Undo();
         Assert.Equal(before, m.State());
         Assert.False(m.Session.CanUndo);
+    }
+
+    /// <summary>The trigger tools are in the group Missions, so they refuse while the user hides the group (decision
+    /// D725 of the MCP1 design). Pause refuses them too.</summary>
+    [Fact]
+    public void AHiddenGroupAndPauseRefuseTheTriggerTools()
+    {
+        var (m, host) = Open();
+        using var _ = m;
+        var tools = AgentTools.All.Where(t => t is { Kind: ToolKind.Edit, Group: ToolGroup.Missions, Name: not "mission_edit" })
+            .Select(t => t.Name).ToList();
+
+        host.Hidden.Add(ToolGroup.Missions);
+        var hidden = tools.Select(t => Error(host, t, $$"""{ "trigger": "{{End}}", "condition": { "key": "Cnd_True" } }""")).ToList();
+        host.Hidden.Clear();
+        host.TestPaused = true;
+        var paused = tools.Select(t => Error(host, t, "{}")).ToList();
+
+        Assert.Equal(["mission_add_trigger", "mission_set_condition", "mission_add_action", "mission_set_action",
+            "mission_move_action", "mission_link_triggers", "mission_insert_trigger"], tools);
+        Assert.All(hidden, e => Assert.Equal(("not_available", "GroupHidden"), (e.Code, e.Detail)));
+        Assert.All(paused, e => Assert.Equal(("paused", "Paused"), (e.Code, e.Detail)));
+        Assert.Equal(0, m.Session.Revision);
     }
 
     /// <summary>The automated form of manual step 42 (section 14.4 of the MCP1 design): an action that starts a trigger
