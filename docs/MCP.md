@@ -355,7 +355,7 @@ This call adds a trigger that the trigger `my_start` starts. The new trigger wai
 | `conversation` | A conversation, `[Dialog]`. |
 | `random_encounter` | A random encounter, `[MsnRandEnc]`. |
 
-The fields are the keys of the section, as `get_item` gives them for an item of the same kind. A key that the section does not have gives `invalid_value` with the detail `NotAKey`, and the message gives the keys of the section. The value of each field has one of these forms:
+The fields are the keys of the section, as `get_item` gives them for an item of the same kind. A key that the section does not have gives `invalid_value` with the detail `NotAKey`, and the message gives the keys of the section. A random encounter takes each key, because the encounter reads the keys of its own grammar. The editor checks only the keys of a random encounter that it knows. The value of each field has one of these forms:
 
 - One value: a number, a text, `true` or `false`. For example, `"system": "my_system"`.
 - A list of numbers or texts for a position, a rotation or the values of one line. For example, `"position": [0, 0, 1000]` or `"npc_class": ["lawful", "d5"]`.
@@ -364,7 +364,12 @@ The fields are the keys of the section, as `get_item` gives them for an item of 
 - For a key that repeats, for example `label`, `cargo` or the `ship` lines of a formation, a list of these forms. Each form is one line. One form without a list is one line too.
 - `null` writes no line.
 
-The tool writes the lines in the order of `fields`. The `formation` and `ship` lines of a formation come last, because the game can stop when a key of the ship comes after them. Give the nickname in `nickname`, not in `fields`.
+The tool writes the lines in the order of `fields`, with two exceptions:
+
+- The `encounter_type` line of a random encounter comes first, because the encounter reads only the keys after it.
+- The `formation` and `ship` lines of a formation come last, because the game can stop when a key of the ship comes after them.
+
+Give the nickname in `nickname`, not in `fields`.
 
 A ship needs `fields.npc`, the nickname of an `[NPC]` of the script. Without it, the tool gives `invalid_argument` with the detail `NeedsNpc`. To make the build, the NPC and the ship in one Undo step, use one `edit_batch`. Its steps are `mission_add_item` calls with the kinds `ship_build`, `npc` and `ship`. `mission_edit` with `add_mission_ship` and `new_build` also makes all three.
 

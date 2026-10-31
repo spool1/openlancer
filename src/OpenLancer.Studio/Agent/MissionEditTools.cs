@@ -399,8 +399,7 @@ internal static class MissionEditTools
     }
 
     /// <summary>
-    /// The lines of the fields of a new item, by key. The <c>formation</c> and <c>ship</c> lines of a formation come
-    /// last, so each ship key comes before them (rule M09), as <see cref="SetItemKey"/> puts it. The other lines keep
+    /// The lines of the fields of a new item, by key, in the order of <see cref="Rank"/>. Lines with the same rank keep
     /// the order of the fields.
     /// </summary>
     /// <exception cref="EditException">See <see cref="NewItem"/>. A <c>nickname</c> field, or an order in the fields of
@@ -440,9 +439,19 @@ internal static class MissionEditTools
             var lines = MissionLineInput.FieldLines(type, key, value, field);
             result.Add((lines.Count > 0 ? lines[0].Key : spec?.Key ?? key, field, lines));
         }
-        return [.. result.OrderBy(f => MissionIndex.Is(type, "MsnFormation") &&
-                                     (MissionIndex.Is(f.Key, "formation") || MissionIndex.Is(f.Key, "ship")))];
+        return [.. result.OrderBy(f => Rank(type, f.Key))];
     }
+
+    /// <summary>
+    /// The place of a line of a new item: a line with a lower rank comes first. The <c>encounter_type</c> line of a
+    /// random encounter comes first, because the encounter reads only the keys after it. The <c>formation</c> and
+    /// <c>ship</c> lines of a formation come last, so each ship key comes before them (rule M09), as
+    /// <see cref="SetItemKey"/> puts it.
+    /// </summary>
+    private static int Rank(string type, string key) =>
+        MissionIndex.Is(type, "MsnRandEnc") && MissionIndex.Is(key, "encounter_type") ? 0
+        : MissionIndex.Is(type, "MsnFormation") && (MissionIndex.Is(key, "formation") || MissionIndex.Is(key, "ship")) ? 2
+        : 1;
 
     /// <summary>
     /// Adds a mission ship in the scope: <see cref="AddMissionShip"/> with the keys that it writes, then one request with

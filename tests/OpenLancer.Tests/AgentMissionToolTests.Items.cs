@@ -258,6 +258,22 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal(before, m.State());
     }
 
+    /// <summary>The encounter of a random encounter reads only the keys after its encounter_type line. So the tool writes
+    /// that line first, also when fields gives it last. The other lines keep the order of the fields.</summary>
+    [Fact]
+    public void TheEncounterTypeOfARandomEncounterComesFirst()
+    {
+        var (m, host) = OpenItems();
+        using var _ = m;
+
+        Ok(host, "mission_add_item", AddItem("random_encounter", "ol_enc", """
+            { "attacker_rep_name": "ol_faction", "num_forms": { "fewest": 1, "most": 2 }, "encounter_type": "SP_Attack" }
+            """));
+
+        Assert.Equal(["nickname = ol_enc", "encounter_type = SP_Attack", "attacker_rep_name = ol_faction", "num_forms = 1, 2"],
+            m.Lines(Item("MsnRandEnc", "ol_enc")));
+    }
+
     /// <summary>A random encounter name has at most 31 characters (decision D683 of M6b, MCP1 open alignment item 3). A
     /// name of 31 characters applies. A name of 32 characters gives invalid_value with NameInvalid, although the pattern
     /// of the schema takes 47 characters. A name of 48 characters does not fit the pattern.</summary>
