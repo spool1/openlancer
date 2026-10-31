@@ -166,6 +166,21 @@ public sealed class PrefabInstanceTests
         m.Refuse(new PlacePrefabInstance(TestScript, PrefabRef.ModOf("ol_none")), MissionErrors.PrefabNotFound);
     }
 
+    /// <summary>A prefab does not go into a prefab: the template of a prefab of the mod and of a built-in prefab refuse
+    /// a place, and nothing changes. A template has no graph file for the record of an instance.</summary>
+    [Fact]
+    public void APrefabDoesNotGoIntoAPrefab()
+    {
+        using var m = Create();
+
+        var error = m.Refuse(new PlacePrefabInstance(new ScriptRef("prefab:mod:ol_gate"), GateRef) { Id = "ol_w1" },
+            MissionErrors.PrefabInPrefab);
+        m.Refuse(new PlacePrefabInstance(new ScriptRef("prefab:builtin:spawnWave"), GateRef), MissionErrors.PrefabInPrefab);
+
+        Assert.Equal(EditErrorKind.Refused, error.Kind);
+        Assert.False(m.Session.CanUndo);
+    }
+
     [Fact]
     public void EachBuiltInPrefabPlacesWithItsDefaults()
     {

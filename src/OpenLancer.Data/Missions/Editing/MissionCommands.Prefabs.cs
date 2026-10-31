@@ -19,7 +19,8 @@ public sealed record PrefabFieldInput(string Field, IReadOnlyList<string> Rows)
 }
 
 /// <summary>Places a linked instance of a prefab in a script (section 5.1 of the M6b design): the compiled sections at
-/// the end of the script, and the <c>[Instance]</c> record in the graph file. Without an id, the layer makes one.</summary>
+/// the end of the script, and the <c>[Instance]</c> record in the graph file. Without an id, the layer makes one. The
+/// template of a prefab refuses, because a prefab does not go into a prefab.</summary>
 public sealed record PlacePrefabInstance(ScriptRef Script, PrefabRef Prefab) : MissionCommand
 {
     /// <summary>The id of the instance, or null for a made id.</summary>
@@ -48,6 +49,9 @@ public sealed record PlacePrefabInstance(ScriptRef Script, PrefabRef Prefab) : M
 
     internal override void Run(MissionDraft d)
     {
+        // A template has no graph file, so it cannot keep the record of an instance.
+        if (MissionRefs.IsPrefab(Script.Path))
+            throw d.Refuse(MissionErrors.PrefabInPrefabError(Script.Path));
         var document = d.Script(Script);
         var asset = d.Prefab(Prefab);
         var template = d.TemplateOf(asset);

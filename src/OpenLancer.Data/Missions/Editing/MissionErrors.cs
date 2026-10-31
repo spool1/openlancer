@@ -83,6 +83,7 @@ public static class MissionErrors
     public const string PrefabInUse = "PrefabInUse";
     public const string FieldInUse = "FieldInUse";
     public const string NotATemplate = "NotATemplate";
+    public const string PrefabInPrefab = "PrefabInPrefab";
 
     internal static EditError NotEditableError(string reason) => new(EditErrorKind.ReadOnly, NotEditable, NotEditableMessage(reason));
 
@@ -293,6 +294,12 @@ public static class MissionErrors
 
     internal static EditError NotATemplateError(string what) =>
         new(EditErrorKind.InvalidArgument, NotATemplate, $"{what} Open the prefab, then try again.");
+
+    /// <summary>A prefab instance in the template of a prefab. The library of prefab mode does not show the prefabs for
+    /// this reason.</summary>
+    internal static EditError PrefabInPrefabError(string prefab) =>
+        new(EditErrorKind.Refused, PrefabInPrefab,
+            $"{prefab} is a prefab. A prefab cannot hold a prefab instance. Place the prefab in a mission script.");
 
     internal static EditError UnknownCommandError(string kind) =>
         new(EditErrorKind.InvalidArgument, UnknownCommand, $"'{kind}' is not a mission command.");
