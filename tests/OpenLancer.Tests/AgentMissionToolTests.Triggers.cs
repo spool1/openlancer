@@ -604,17 +604,24 @@ public sealed partial class AgentMissionToolTests
     private static GraphNode NodeOf(GraphEditModel model, string trigger) =>
         model.Graph.TriggerNode(model.Graph.Index.Trigger(trigger)!)!;
 
-    /// <summary>The gesture through the mission editor and the tool give the same files (see
+    /// <summary>The gesture of the graph through the mission editor and the tool give the same files (see
     /// <see cref="TheTriggerToolsGiveTheTextOfTheGesturesOfTheMissionStudio"/>).</summary>
     /// <param name="create">Makes the test profile of each side, or null for the test script.</param>
     private static void AssertParity(Func<GraphEditModel, MissionBatch?> gesture, string tool, string arguments,
+        Func<MissionEdits>? create = null) =>
+        AssertUiParity(m => gesture(ModelOf(m)), tool, arguments, create);
+
+    /// <summary>A gesture of the mission studio through the mission editor and the tool give the same files. The
+    /// gesture runs with the confirmation of its dialog, as the tool runs with <c>confirm: true</c>.</summary>
+    /// <param name="create">Makes the test profile of each side, or null for the test script.</param>
+    private static void AssertUiParity(Func<MissionEdits, MissionBatch?> gesture, string tool, string arguments,
         Func<MissionEdits>? create = null)
     {
         create ??= () => Create();
         using var ui = create();
-        var batch = gesture(ModelOf(ui));
+        var batch = gesture(ui);
         Assert.NotNull(batch);
-        var applied = ui.Missions.Apply(batch);
+        var applied = ui.Missions.Apply(batch with { Confirm = true });
         Assert.True(applied.Status == EditStatus.Applied, string.Join("\n", applied.Errors.Select(e => e.Message)));
 
         using var agent = create();

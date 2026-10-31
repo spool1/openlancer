@@ -240,6 +240,87 @@ public sealed class AgentItemToolTests
         Assert.Single(renamed["versions"]!.AsObject());
     }
 
+    /// <summary>The scene workspace with a mission script whose trigger ol_lock names the station Li01_01, and the
+    /// trigger ol_spare.</summary>
+    private static (TestWorkspace Ws, EditSession Session, TestAgentHost Host) SceneWithMission()
+    {
+        var ws = SceneWorkspace.Create();
+        ws.WriteBase(MissionScript, """
+            [Mission]
+
+            [Trigger]
+            nickname = ol_lock
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_LockDock = Player, Li01_01, lock
+
+            [Trigger]
+            nickname = ol_spare
+            Cnd_True = no_params
+            """);
+        var session = ws.Session("act");
+        return (ws, session, new TestAgentHost(session));
+    }
+
+    private const string MissionScript = @"DATA\MISSIONS\OL_REF\ol_ref.ini";
+
+    /// <summary>True when the mission script has the trigger.</summary>
+    private static bool HasTrigger(EditSession session, string name) =>
+        session.OpenDocument(MissionScript)!.IndexOf(new SectionIdentity("Trigger", name)) >= 0;
+
+    /// <summary>One delete_items call with an item of a system and a mission item runs all commands in one batch (section
+    /// 7.2 of the MCP1 design). So it is one entry with the label "Delete 2 items", and the result gives the version of
+    /// the script. One undo puts back both items.</summary>
+    [Fact]
+    public void ADeleteOfAnItemOfASystemAndOfAMissionItemIsOneEntry()
+    {
+        var (ws, session, host) = SceneWithMission();
+        using var _ = ws;
+        var script = MissionScript.Replace(@"\", @"\\");
+
+        var result = Ok(host, "delete_items", $$"""{ "refs": [ "obj:Li01_dock", "trg:{{script}}#ol_spare" ], "confirm": true }""");
+
+        Assert.Equal((EditOrigin.Agent, "Agent: Delete 2 items"), (session.UndoOrigin, session.UndoLabel));
+        Assert.Equal(["obj:Li01_dock", $"trg:{MissionScript}#ol_spare"], result["deletes"]!.AsArray().Select(d => (string?)d!["ref"]));
+        Assert.Equal(2, (long?)result["versions"]![MissionScript]);
+        Assert.NotNull(result["inverse"]);
+        Assert.Null(session.Get(SceneWorkspace.Object("Li01_dock")));
+        Assert.False(HasTrigger(session, "ol_spare"));
+        Assert.Equal(1, session.Revision);
+
+        session.Undo();
+        Assert.NotNull(session.Get(SceneWorkspace.Object("Li01_dock")));
+        Assert.True(HasTrigger(session, "ol_spare"));
+        Assert.False(session.CanUndo);
+    }
+
+    /// <summary>One duplicate_items call with an item of a system and a mission item is one entry. The offset moves no
+    /// copy here, and the result warns about the copy of the station without a position and about the copy of the
+    /// trigger.</summary>
+    [Fact]
+    public void ADuplicateOfAnItemOfASystemAndOfAMissionItemIsOneEntry()
+    {
+        var (ws, session, host) = SceneWithMission();
+        using var _ = ws;
+        var script = MissionScript.Replace(@"\", @"\\");
+
+        var result = Ok(host, "duplicate_items", $$"""{ "refs": [ "obj:Li01_01", "trg:{{script}}#ol_spare" ], "offset": [100, 0, 0] }""");
+
+        var adds = Texts(result["adds"]);
+        Assert.Equal("Agent: Duplicate 2 items", session.UndoLabel);
+        Assert.Equal($"trg:{MissionScript}#ol_spare_2", adds[^1]);
+        var warning = Assert.Single(result["warnings"]!.AsArray(), w => (string?)w!["ref"] == adds[^1])!;
+        Assert.Contains("is an item of a mission", (string?)warning["message"]);
+        Assert.Contains(result["warnings"]!.AsArray(), w => (string?)w!["ref"] == adds[0] &&
+                                                            ((string?)w["message"])!.Contains("has no position", StringComparison.Ordinal));
+        Assert.True(HasTrigger(session, "ol_spare_2"));
+        Assert.Equal(1, session.Revision);
+
+        session.Undo();
+        Assert.False(HasTrigger(session, "ol_spare_2"));
+        Assert.All(adds.SkipLast(1), a => Assert.Throws<EditException>(() => ItemRefs.ResolveSection(session, ItemRefs.Parse(a))));
+    }
+
     /// <summary>
     /// The preview and the result of delete_items give the fixes and the "Missing" lines of the plan of the Scene
     /// delete (issue #21). The delete of the ring zone removes its exclusion in the cloud file. Two planets with one

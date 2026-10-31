@@ -64,9 +64,10 @@ public sealed class AgentWriteScopeTests
         ("mission_add_item", """{ "script": REF, "kind": "solar", "fields": { "system": "ol_system" } }"""),
     ];
 
-    /// <summary>The paths of a call of a mission tool that are not install paths, or that leave the folder of the
-    /// missions (section 8.2, item 4 of the MCP1 design): the msn:, trg: and line: references, the path of a new script
-    /// and the keys of the versions. <c>PATH</c> marks the path, as JSON text.</summary>
+    /// <summary>The paths of a call of a mission tool or of a generic edit tool on a mission item that are not install
+    /// paths, or that leave the folder of the missions (section 8.2, item 4 of the MCP1 design): the msn:, trg:, sec:,
+    /// line:, label: and inst: references, the path of a new script and the keys of the versions. <c>PATH</c> marks the
+    /// path, as JSON text.</summary>
     private static readonly (string Tool, string Arguments)[] MissionCalls =
     [
         ("mission_edit", """{ "commands": [ { "kind": "add_trigger", "script": "msn:PATH", "nickname": "ol_new" } ] }"""),
@@ -84,7 +85,17 @@ public sealed class AgentWriteScopeTests
         ("mission_link_triggers", """{ "from": "trg:DATA\\MISSIONS\\OL_TEST\\ol_test.ini#ol_wave", "to": "trg:PATH#ol_end" }"""),
         ("mission_insert_trigger", """{ "line": "line:PATH#Trigger/ol_start/3", "condition": { "key": "Cnd_True" } }"""),
         ("mission_add_item", """{ "script": "msn:PATH", "kind": "ship", "fields": { "npc": "ol_npc_1" } }"""),
+        ("set_fields", """{ "ref": "sec:PATH#MsnShip/ol_ship_1", "fields": { "jumper": true } }"""),
+        ("set_fields", """{ "ref": "trg:PATH#ol_wave", "fields": { "jumper": true } }"""),
+        ("set_text", """{ "ref": "line:PATH#Trigger/ol_end/3", "field": "text", "text": "x" }"""),
+        ("rename_item", """{ "ref": "trg:PATH#ol_end", "new_name": "ol_finish" }"""),
+        ("delete_items", """{ "refs": ["trg:DATA\\MISSIONS\\OL_TEST\\ol_test.ini#ol_end", "inst:PATH#ol_w1"], "confirm": true }"""),
+        ("delete_items", """{ "refs": ["label:PATH#ol_wing"], "confirm": true }"""),
+        ("duplicate_items", """{ "refs": ["trg:PATH#ol_wave"] }"""),
     ];
+
+    /// <summary>The generic edit tools, which also take mission items (step 5 of MCP1-3).</summary>
+    private static readonly string[] GenericTools = ["set_fields", "set_text", "rename_item", "delete_items", "duplicate_items"];
 
     /// <summary>The details of a refused path: the install path check, and the read of a reference.</summary>
     private static readonly string?[] PathDetails = [InstallPaths.NotInstallPath, ItemRefs.BadReference];
@@ -119,7 +130,8 @@ public sealed class AgentWriteScopeTests
         var outside = Error(host, "mission_edit", """{ "commands": [ { "kind": "create_script", "path": "DATA\\SHIPS\\ol_new.ini" } ] }""");
 
         Assert.True(wrong.Count == 0, string.Join(Environment.NewLine, wrong));
-        Assert.Equal(EditToolNames().Where(t => t.StartsWith("mission_", StringComparison.Ordinal)).Order(), tools);
+        Assert.Equal(EditToolNames().Where(t => t.StartsWith("mission_", StringComparison.Ordinal) || GenericTools.Contains(t))
+            .Order(), tools);
         Assert.Equal(("invalid_argument", "BadPath"), (outside.Code, outside.Detail));
         Assert.Equal(before, m.State());
         Assert.False(m.Session.CanUndo);
