@@ -57,9 +57,12 @@ internal static partial class ItemEditTools
     /// item and gives its error. Each tool takes some of these kinds and refuses the others with the detail
     /// <see cref="EditTools.MissionItem"/>.
     /// </summary>
-    /// <remarks>A section of another file under <c>DATA\MISSIONS</c>, for example a pilot file, refuses with the
-    /// detail <c>WorldFile</c>. An item of a tool group that the user hides gives <c>not_available</c> (decision D725):
-    /// a mission item is in the group Missions.</remarks>
+    /// <remarks>A section of another file under <c>DATA\MISSIONS</c>, for example a pilot file, is a section of an INI
+    /// file: the tools change it with the commands of the Inspector, as the user does (section 8.1 of the MCP1 design,
+    /// final finding 7 of MCP1-3). A section of the shared ship build file refuses with the detail
+    /// <c>SharedBuildChange</c>, because random encounters can use its builds and only <c>mission_edit</c> asks for the
+    /// confirmation. An item of a tool group that the user hides gives <c>not_available</c> (decision D725): a mission
+    /// item is in the group Missions.</remarks>
     /// <param name="field">The argument, for the error.</param>
     /// <exception cref="EditException">The reference is not valid, does not resolve, or names an item that the generic
     /// tools do not change.</exception>
@@ -73,10 +76,10 @@ internal static partial class ItemEditTools
         {
             var section = ItemRefs.ResolveSection(session, reference);
             EditTools.RequireGroup(call, section, text);
-            if (!SectionKeys.IsMissionFile(section.Path))
-                return new ItemTarget(section, null);
-            if (!session.Missions.IsMissionFile(section.Path))
+            if (session.Missions.IsSharedBuildFile(section.Path))
                 throw EditTools.WorldFileRefusal(call, section, text);
+            if (!session.Missions.IsMissionFile(section.Path))
+                return new ItemTarget(section, null);
             return new ItemTarget(null, new MissionTarget(KindOf(section.Id), section.Path, text) { Section = section.Id });
         }
         if (call.Host.HiddenGroups.Contains(ToolGroup.Missions))

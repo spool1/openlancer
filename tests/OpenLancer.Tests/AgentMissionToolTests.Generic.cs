@@ -628,12 +628,11 @@ public sealed partial class AgentMissionToolTests
         Assert.False(m.Session.CanUndo);
     }
 
-    /// <summary>Each edit tool except mission_edit refuses a section of another file under DATA\MISSIONS. A pilot file
-    /// gives WorldFile, as in mission_edit. A shared ship build file gives SharedBuildChange, and the text names
-    /// mission_edit with confirm: true. mission_edit then changes a line of the build after the confirmation, as the text
-    /// tells.</summary>
+    /// <summary>Each edit tool except mission_edit refuses a section of the shared ship build file with SharedBuildChange,
+    /// and the text names mission_edit with confirm: true. mission_edit then changes a line of the build after the
+    /// confirmation, as the text tells. A line: reference of a pilot file gives WorldFile.</summary>
     [Fact]
-    public void TheEditToolsRefuseAWorldFileOfTheMissions()
+    public void TheEditToolsRefuseTheSharedShipBuildFile()
     {
         const string pilots = @"DATA\MISSIONS\pilots_population.ini";
         var (m, host) = Open(setup: ws => ws.WriteBase(pilots, "[Pilot]\nnickname = ol_pilot\n"));
@@ -660,12 +659,11 @@ public sealed partial class AgentMissionToolTests
             Assert.Contains($"so {tool} does not change it.", message);
             Assert.Contains("use mission_edit with set_item_key or set_line and confirm: true.", message);
         }
-        foreach (var (tool, arguments) in Calls(pilot))
-        {
-            var result = Call(host, tool, arguments);
-            Assert.True(result.IsError, result.Text);
-            Assert.Equal(("refused", MissionErrors.WorldFile), ((string?)result.Content["code"], (string?)result.Content["detail"]));
-        }
+        // A line: reference of a pilot file is not a mission line, so the mission tools refuse it.
+        var line = Call(host, "set_fields", $$"""{ "ref": "line:{{pilots.Replace(@"\", @"\\")}}#Pilot/ol_pilot/1", "fields": { "gun_id": "ol_gun_2" } }""");
+        Assert.True(line.IsError, line.Text);
+        Assert.Equal(("refused", MissionErrors.WorldFile), ((string?)line.Content["code"], (string?)line.Content["detail"]));
+        Assert.Contains("The generic tools take a sec: or list: reference of a section of the file", (string?)line.Content["message"]);
         Assert.Equal(before, m.State());
         Assert.False(m.Session.CanUndo);
 
@@ -677,5 +675,36 @@ public sealed partial class AgentMissionToolTests
         Assert.Contains("is in a shared file", (string?)asks.Content["message"]);
         Ok(host, "mission_edit", $$"""{ "commands": [ {{level}} ], "confirm": true }""");
         Assert.Contains("level = d7", m.Lines(Item("NPCShipArch", "ol_shared_build", SharedShips)));
+    }
+
+    /// <summary>The generic tools take a section of a world file of the missions, for example a pilot file, through the
+    /// commands of the Inspector (section 8.1 of the MCP1 design, final finding 7 of MCP1-3). So they give the reasons of
+    /// the editor: the editor reads a pilot file only for its lists, and the Scene does not rename or delete a pilot. The
+    /// mission commands refuse the file with WorldFile.</summary>
+    [Fact]
+    public void TheGenericToolsTakeAWorldFileOfTheMissionsAsTheInspectorDoes()
+    {
+        const string pilots = @"DATA\MISSIONS\pilots_population.ini";
+        var (m, host) = Open(setup: ws => ws.WriteBase(pilots, "[Pilot]\nnickname = ol_pilot\ngun_id = ol_gun\n"));
+        using var _ = m;
+        var pilot = $"sec:{pilots.Replace(@"\", @"\\")}#Pilot/ol_pilot";
+        var before = m.State();
+
+        var results = new[]
+        {
+            Call(host, "set_fields", $$"""{ "ref": "{{pilot}}", "fields": { "gun_id": "ol_gun_2" } }"""),
+            Call(host, "set_fields", $$"""{ "ref": "list:pilot/ol_pilot", "fields": { "gun_id": "ol_gun_2" } }"""),
+            Call(host, "rename_item", $$"""{ "ref": "{{pilot}}", "new_name": "ol_other_pilot" }"""),
+            Call(host, "delete_items", $$"""{ "refs": [ "{{pilot}}" ], "confirm": true }"""),
+        };
+        Assert.Equal([("refused", "ReadOnlySection"), ("refused", "ReadOnlySection"), ("refused", "NotRenamable"),
+                ("refused", EditPlan.PlanRefused)],
+            results.Select(r => ((string?)r.Content["code"], (string?)r.Content["detail"])));
+        Assert.Equal("The editor cannot edit this file yet. It reads it for the lists.", (string?)results[0].Content["message"]);
+        Assert.Equal(before, m.State());
+        Assert.False(m.Session.CanUndo);
+        var mission = Error(host, "mission_edit",
+            Edit($$"""{ "kind": "remove_section", "section": "{{pilot}}" }"""));
+        Assert.Equal(("refused", MissionErrors.WorldFile), (mission.Code, mission.Detail));
     }
 }

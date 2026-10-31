@@ -727,7 +727,7 @@
     "with_patch_preview": "The argument 'with_patch' works only with preview: true. Add preview: true, or remove with_patch.",
     "step_preview": "A step of edit_batch cannot have the argument '{name}'. Give preview and with_patch to edit_batch.",
     "edit_mission_item": "{tool} does not change items of mission files. Use the mission tools, for example mission_edit. The tools set_fields, set_text, rename_item, delete_items and duplicate_items also change mission items.",
-    "edit_mission_world_file": "{path} is a world file of the missions. Encounters and bases use its data too, so the agent tools do not change it. Ask the user to change it in the Inspector.",
+    "edit_mission_world_file": "{path} is a world file of the missions, not a mission script. The mission tools do not change its lines. The generic tools take a sec: or list: reference of a section of the file, as the Inspector does.",
     "edit_mission_shared_build": "{path} is a shared file of ship builds. Random encounters and bases can use its builds too, so {tool} does not change it. To change a line of a build, ask the user first. Then use mission_edit with set_item_key or set_line and confirm: true. The mission commands do not rename, delete or copy a build of this file.",
     "edit_cutscenes_later": "The edit tools of this version do not change cutscenes. The cutscene tools come with a later version.",
     "confirm_intro": "The edit '{label}' changes more than its targets.",

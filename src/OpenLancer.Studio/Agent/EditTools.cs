@@ -465,8 +465,10 @@ internal static class EditTools
         if (IsMission(reference))
             throw MissionItemRefusal(call, text);
         var section = ItemRefs.ResolveSection(session, reference);
-        if (SectionKeys.IsMissionFile(section.Path))
-            throw session.Missions.IsMissionFile(section.Path) ? MissionItemRefusal(call, text) : WorldFileRefusal(call, section, text);
+        if (session.Missions.IsMissionFile(section.Path))
+            throw MissionItemRefusal(call, text);
+        if (session.Missions.IsSharedBuildFile(section.Path))
+            throw WorldFileRefusal(call, section, text);
         RequireGroup(call, section, text);
         return section;
     });
@@ -591,10 +593,11 @@ internal static class EditTools
 
     /// <summary>
     /// The refusal of a section of a file under <c>DATA\MISSIONS</c> that is not a mission script and not the ship build
-    /// file of a script. Encounters and bases use its data too (review finding RB2 of the M6b design), so the tool does
-    /// not change it. A pilot file and the other world files give the detail <c>WorldFile</c>, as in
-    /// <c>mission_edit</c>. A shared ship build file gives the detail <c>SharedBuildChange</c>: <c>mission_edit</c>
-    /// changes the lines of its builds after a confirmation, and the text tells it.
+    /// file of a script, for a tool that does not change it. A shared ship build file gives the detail
+    /// <c>SharedBuildChange</c>: random encounters can use its builds, so <c>mission_edit</c> changes the lines of its
+    /// builds after a confirmation, and the text tells it. A <c>line:</c> or <c>trg:</c> reference of a pilot file or
+    /// another world file gives the detail <c>WorldFile</c>, and the text names the tools that change its sections. The
+    /// generic tools change a section of such a file with the commands of the Inspector (final finding 7 of MCP1-3).
     /// </summary>
     internal static EditException WorldFileRefusal(ToolCall call, SectionRef section, string reference) =>
         new(call.Session.Missions.IsSharedBuildFile(section.Path)
