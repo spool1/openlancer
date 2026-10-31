@@ -229,6 +229,8 @@ public sealed class FollowModeTests
         Assert.True((still with { CameraAfter = (Vector3.UnitX, Quaternion.Identity, 1) }).UserActed);
         Assert.True((still with { CameraAfter = (Vector3.Zero, turned, 1) }).UserActed);
         Assert.True((still with { CameraAfter = (Vector3.Zero, Quaternion.Identity, 2) }).UserActed);
+        // A pan or a zoom of the mission graph is a view input of the user too (final finding 10 of MCP1-3).
+        Assert.True((still with { GraphMoved = true }).UserActed);
     }
 
     /// <summary>With follow mode off, an agent create changes nothing of the view and the selection (decision

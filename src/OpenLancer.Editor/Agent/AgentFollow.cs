@@ -52,17 +52,20 @@ internal interface IFollowView
 /// <param name="CameraBefore">The pose and the fly speed of the Scene camera before the panels drew.</param>
 /// <param name="CameraAfter">The pose and the fly speed of the Scene camera after the panels drew.</param>
 /// <param name="Input">True when the user clicked or pressed a key that moves the selection in the frame.</param>
+/// <param name="GraphMoved">True when the user panned or zoomed the graph of the Mission tab in the frame.</param>
 internal readonly record struct FollowFrame(
     object? SelectionBefore,
     object? SelectionAfter,
     (Vector3 Position, Quaternion Orientation, float Speed) CameraBefore,
     (Vector3 Position, Quaternion Orientation, float Speed) CameraAfter,
-    bool Input)
+    bool Input,
+    bool GraphMoved = false)
 {
-    /// <summary>True when the user selected an item or moved the Scene camera in the frame. An agent call runs before
-    /// the panels, so a selection of <c>select_items</c> or of follow mode is not a change here. The Scene selects the
-    /// item of a pending section in a frame without input, so such a change is not a selection of the user.</summary>
-    public bool UserActed => CameraBefore != CameraAfter || Input && !Equals(SelectionBefore, SelectionAfter);
+    /// <summary>True when the user selected an item, moved the Scene camera or moved the view of the mission graph in
+    /// the frame (final finding 10 of MCP1-3). An agent call runs before the panels, so a selection of
+    /// <c>select_items</c> or of follow mode is not a change here. The Scene selects the item of a pending section in a
+    /// frame without input, so such a change is not a selection of the user.</summary>
+    public bool UserActed => CameraBefore != CameraAfter || GraphMoved || Input && !Equals(SelectionBefore, SelectionAfter);
 }
 
 /// <summary>
@@ -72,7 +75,8 @@ internal readonly record struct FollowFrame(
 /// selects the new item, a delete clears the selection, and a rename keeps it. An item without a place in the Scene, for
 /// example a loadout, shows in the Inspector, and the view does not change. Follow mode does not leave prefab mode, as
 /// Unity keeps prefab mode open when the scene changes. An edit of a mission then shows only in the Console. A camera
-/// input or a selection of the user stops follow mode until the user turns it on again. With follow mode off, the agent
+/// input, a pan or a zoom of the mission graph, or a selection of the user stops follow mode until the user turns it on
+/// again. With follow mode off, the agent
 /// never changes the view or the selection. Only a selection of a section that an agent edit removed goes, as after an
 /// undo. A selected item keeps its item when an agent edit renames it or moves its row.
 /// </summary>
@@ -84,7 +88,8 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
 
     /// <summary>The tooltip of the menu item (section 10 of the MCP1 design).</summary>
     internal const string Tip =
-        "Opens and frames the item of each agent edit. Follow mode stops when you move the camera or select an item.";
+        "Opens and frames the item of each agent edit. Follow mode stops when you move the camera or the mission graph, " +
+        "or select an item.";
 
     /// <summary>The first removed item of each agent delete, by the label of its entry, so an undo of the delete selects
     /// the item again (decision D249).</summary>

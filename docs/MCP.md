@@ -68,7 +68,7 @@ Else the helper prints no token and exits with the code 2. It writes the reason 
 | Start agent server | Starts the server on the port of the settings. At the first start, a notice tells what the agent reads. |
 | Stop agent server | Stops the server at once. |
 | Pause agent edits | Stops all agent edits until you pick **Resume agent edits**. The agent can still read the data and stop each game of Play. |
-| Follow agent | Opens and frames the item of each agent edit. It is on by default. It stops when you move the camera of the Scene or select an item. |
+| Follow agent | Opens and frames the item of each agent edit. It is on by default. It stops when you move the camera of the Scene or the graph of the Mission tab, or select an item. |
 | Connect an agent... | Shows the text for `.mcp.json` and a Copy button. |
 | Show agent messages | Shows the messages of the server in the Console. |
 | Start the agent server with the editor | Starts the server when the editor starts. The server is off by default. |
@@ -600,7 +600,7 @@ The selection follows Unity. A create or a copy selects the new item, a delete c
 
 Follow mode does not leave prefab mode, as Unity keeps prefab mode open when the scene changes. While the Mission tab shows a prefab, an agent edit of a mission script or of its ship build file shows only in the Console. The selection and the view stay.
 
-When you move the camera of the Scene or select an item, follow mode stops. Click **Follow agent** to start it again. The settings keep the last value that you clicked, so follow mode is on again at the next start of the editor. With follow mode off, the agent changes the view and the selection only with `open_view` and `select_items`. When an agent edit removes the selected item, the selection goes, as after an undo. When an agent edit renames the selected item or moves the row of a selected line, the selection stays on the same item.
+When you move the camera of the Scene, pan or zoom the graph of the Mission tab, or select an item, follow mode stops. Click **Follow agent** to start it again. The settings keep the last value that you clicked, so follow mode is on again at the next start of the editor. With follow mode off, the agent changes the view and the selection only with `open_view` and `select_items`. When an agent edit removes the selected item, the selection goes, as after an undo. When an agent edit renames the selected item or moves the row of a selected line, the selection stays on the same item.
 
 #### Pause
 

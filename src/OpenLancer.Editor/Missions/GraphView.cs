@@ -157,6 +157,13 @@ internal sealed partial class GraphView : IDisposable
     /// <summary>The visible canvas rectangle and the zoom of the last frame (1 at 100 percent).</summary>
     public (Vector2 Min, Vector2 Max, float Scale) View { get; private set; }
 
+    // The frame in which the user last panned or zoomed the graph.
+    private int navigatedFrame = -1;
+
+    /// <summary>True when the user panned or zoomed the graph in this frame: a turn of the mouse wheel or a drag with the
+    /// right or the middle mouse button over the graph. Follow mode of the agent edits then stops.</summary>
+    public bool NavigatedThisFrame => navigatedFrame == ImGui.GetFrameCount();
+
     /// <summary>The screen rectangles of the rows of the lines level in the last frame, by node key and line
     /// index.</summary>
     public IReadOnlyDictionary<(string Node, int Entry), (Vector2 Min, Vector2 Max)> RowRects => rowRects;
@@ -422,6 +429,10 @@ internal sealed partial class GraphView : IDisposable
         RunState(analysis, graph);
         var origin = ImGui.GetCursorScreenPos();
         Screen = (origin, origin + size);
+        if (ImGui.IsMouseHoveringRect(origin, origin + size) &&
+            (ImGui.GetIO().MouseWheel != 0 || ImGui.IsMouseDragging(ImGuiMouseButton.Right) ||
+             ImGui.IsMouseDragging(ImGuiMouseButton.Middle)))
+            navigatedFrame = ImGui.GetFrameCount();
         rowRects.Clear();
         chipRects.Clear();
         pendingTooltip = null;

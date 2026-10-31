@@ -758,7 +758,10 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
     }
 
     /// <summary>Notes a section that the batch touches. Gives false for a section of a mission file, which the checks
-    /// skip.</summary>
+    /// skip: the mission checks give its problems, and the compare of the mission editor follows a trigger rename.</summary>
+    /// <remarks>No field check and no list check gives a problem for a section of a mission file now, so no test can
+    /// show the skip yet (final finding 4 of MCP1-3). The first such check must add a test that a renamed trigger gives
+    /// its problems once.</remarks>
     private bool Touch(SectionRef section)
     {
         if (session.IsGuardedMissionFile(section.Path))

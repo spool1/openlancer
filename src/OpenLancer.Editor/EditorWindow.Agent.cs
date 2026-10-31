@@ -218,7 +218,8 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
             input |= ImGui.IsKeyPressed(key);
         }
 
-        AgentFollow.Watch(new FollowFrame(selectionBefore, Selection, poseBefore, Scene.ViewPose, input));
+        AgentFollow.Watch(new FollowFrame(selectionBefore, Selection, poseBefore, Scene.ViewPose, input,
+            missionView.Graph.NavigatedThisFrame));
     }
 
     /// <summary>The keys that move the selection of a list or a tree.</summary>
