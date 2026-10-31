@@ -278,6 +278,34 @@ public sealed partial class AgentPlayToolTests
         Assert.Empty(editor.MissionRequests);
     }
 
+    /// <summary>The request checks the script and the trigger again after "Save and continue", because the user can
+    /// delete or rename them while the question is open. That refusal also gives the argument as the field, as the
+    /// refusal before the question does.</summary>
+    [Fact]
+    public async Task AScriptOrATriggerThatGoesWhileTheQuestionIsOpenGivesNotFoundWithItsArgument()
+    {
+        var (host, editor) = Editor();
+        editor.UnsavedMod = "ol_mod";
+
+        var trigger = Tail(host, MissionAt("t_kill"), CancellationToken.None, "mission_play");
+        editor.Index = MissionTestData.Index(StartPlanTests.Script.Replace("nickname = t_kill", "nickname = t_kill_2",
+            StringComparison.Ordinal));
+        editor.Click(0);
+        var noTrigger = await trigger.WaitAsync(Wait, Token);
+        editor.Index = MissionTestData.Index(StartPlanTests.Script);
+        var script = Tail(host, MissionAt("t_kill"), CancellationToken.None, "mission_play");
+        editor.Missing = "The session has no such mission script.";
+        editor.Click(0);
+        var noScript = await script.WaitAsync(Wait, Token);
+
+        Assert.Equal(("not_found", MissionErrors.TriggerNotFound, "start"), (
+            (string?)noTrigger.Content["code"], (string?)noTrigger.Content["detail"],
+            (string?)noTrigger.Content["field"]));
+        Assert.Equal(("not_found", MissionErrors.ScriptNotFound, "script"), (
+            (string?)noScript.Content["code"], (string?)noScript.Content["detail"], (string?)noScript.Content["field"]));
+        Assert.Empty(editor.MissionRequests);
+    }
+
     /// <summary>When the save of Play stops, mission_play gives the error of the save with its code.</summary>
     [Theory]
     [InlineData(EditErrorKind.SaveBlocked, "save_blocked", "SaveBlocked")]

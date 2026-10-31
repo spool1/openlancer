@@ -539,7 +539,7 @@ The rules of `play` apply to `mission_play` too:
 These cases are special to `mission_play`:
 
 - While a mission play runs, the game starts again at the new start, as F5 does. While another play runs, the tool gives `refused`, and the agent calls `play_stop` first.
-- When the plan of the start cannot start, the tool gives `refused` with the reason of the plan. A trigger or a script that does not exist gives `not_found`.
+- When the plan of the start cannot start, the tool gives `refused` with the reason of the plan. A trigger or a script that does not exist gives `not_found`, and `field` is `start` or `script`. The editor does this check again after you answer the question.
 - The play never changes the play start of the script in your settings. F5 still plays your play start.
 - When you clear the group Missions or the group Play, the tool gives `not_available`.
 

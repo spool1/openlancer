@@ -72,7 +72,7 @@ internal sealed class EditorAgentPlay(IAgentPlayEditor editor) : IAgentPlay
         var withdraw = new CancellationTokenSource();
         var result = editor.AgentPlays.Run(editor, EditOrigin.Agent, () => editor.PlayStatus, () => Refusal(start),
             save => editor.Request(start, save), withdraw.Token);
-        return Wait(result, withdraw, done => new PlayRequestView(StatusOf(done.Play)));
+        return Wait(result, withdraw, done => new PlayRequestView(StatusOf(done.Play)), static error => new(error));
     }
 
     public Func<CancellationToken, Task<MissionPlayView>> StartMission(StartPlanRequest request)
@@ -91,9 +91,9 @@ internal sealed class EditorAgentPlay(IAgentPlayEditor editor) : IAgentPlay
         if (result.IsCompletedSuccessfully && result.Result.Error is { } refused)
         {
             withdraw.Dispose();
-            throw new EditException(refused with { Field = refused.Field ?? FieldOf(refused.Detail) });
+            throw MissionRefusal(refused);
         }
-        return Wait(result, withdraw, done => MissionView(play, done));
+        return Wait(result, withdraw, done => MissionView(play, done), MissionRefusal);
     }
 
     public MissionTraceView Trace(int play, long since, int limit)
@@ -135,37 +135,45 @@ internal sealed class EditorAgentPlay(IAgentPlayEditor editor) : IAgentPlay
         _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
     };
 
-    /// <summary>The argument of a refusal of the mission play request, or null: a script or a trigger of the start that
-    /// does not resolve.</summary>
-    private static string? FieldOf(string detail) => detail switch
+    /// <summary>The error of a refusal of the mission play request, before or after the question. A script or a trigger
+    /// of the start that does not resolve gives its argument as the field. The request checks them again after the
+    /// answer of the user, because the user can delete or rename them while the question is open.</summary>
+    private static EditException MissionRefusal(EditError error) => new(error with
     {
-        MissionErrors.ScriptNotFound => "script",
-        MissionErrors.TriggerNotFound => "start",
-        _ => null,
-    };
+        Field = error.Field ?? error.Detail switch
+        {
+            MissionErrors.ScriptNotFound => "script",
+            MissionErrors.TriggerNotFound => "start",
+            _ => null,
+        },
+    });
 
     /// <summary>The wait for the result of a play request, as the tail of the call. The end of the wait by its time
     /// limit or by a cancel of the client cancels <paramref name="withdraw"/>, so the open question closes as Cancel
     /// does, and a later click of the user does not start the play.</summary>
+    /// <param name="refusal">The error of the call for a play that did not start.</param>
     private static Func<CancellationToken, Task<T>> Wait<T>(Task<PlayRequestResult> result,
-        CancellationTokenSource withdraw, Func<PlayRequestResult, T> view) => async cancel =>
+        CancellationTokenSource withdraw, Func<PlayRequestResult, T> view, Func<EditError, EditException> refusal)
     {
-        try
+        return async cancel =>
         {
-            var done = await result.WaitAsync(cancel).ConfigureAwait(false);
-            return done.Error is { } error ? throw new EditException(error) : view(done);
-        }
-        catch (OperationCanceledException)
-        {
-            // No agent waits for the play now, so a later click of the user must not start it.
-            withdraw.Cancel();
-            throw;
-        }
-        finally
-        {
-            withdraw.Dispose();
-        }
-    };
+            try
+            {
+                var done = await result.WaitAsync(cancel).ConfigureAwait(false);
+                return done.Error is { } error ? throw refusal(error) : view(done);
+            }
+            catch (OperationCanceledException)
+            {
+                // No agent waits for the play now, so a later click of the user must not start it.
+                withdraw.Cancel();
+                throw;
+            }
+            finally
+            {
+                withdraw.Dispose();
+            }
+        };
+    }
 
     /// <summary>The result of a mission play that started: the start of the plan of the play. Play makes the plan after
     /// its save, so the start is the mission start when the saved script does not have the trigger of the
