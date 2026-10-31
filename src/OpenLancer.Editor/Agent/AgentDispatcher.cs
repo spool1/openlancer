@@ -5,8 +5,7 @@ namespace OpenLancer.Editor.Agent;
 
 /// <summary>What the editor does now, for the waits of the agent calls (section 5.5, item 3 of the MCP1 design).</summary>
 /// <param name="Editing">A field edit, a drag of the gizmo or a drag of the Timeline is open. So is a gesture of the
-/// mission studio: a rename of a graph node, quick add, a drag of a node, a link, a library item or a mission row, and the
-/// rename popups of the Mission page and of a prefab.</param>
+/// mission studio, for example a rename of a graph node or a drag of a node.</param>
 /// <param name="Dialog">A dialog of the editor is open.</param>
 /// <param name="Loading">The game data loads, or loads again after a save.</param>
 /// <param name="UserEdit">A batch or a transaction of the user is open.</param>

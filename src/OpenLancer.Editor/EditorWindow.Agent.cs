@@ -97,10 +97,10 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
         Session?.IsBusy == true, Session?.Edits is { } edits && (edits.OpenBatch != null || edits.InTransaction),
         SceneEdits.Renaming != null || hierarchy.MissionRenaming);
 
-    /// <summary>True while a gesture of the user in the mission studio is open: a rename of a node of the graph, quick add,
-    /// a drag of a node or a link of the graph, a drag of a library item or of a mission row, the rename popup or quick add
-    /// of the Mission page, or the rename popup of a prefab. An agent call waits for its end (section 5.5, item 3 of the
-    /// MCP1 design).</summary>
+    /// <summary>True while a gesture of the user in the mission studio is open. An agent call waits for its end (section
+    /// 5.5, item 3 of the MCP1 design). The graph has the rename of a node, quick add and the drag of a node or a link.
+    /// The Mission page has its rename popup and quick add. The drags of library items and mission rows and the rename
+    /// popup of a prefab count too.</summary>
     private bool MissionGesture => missionView.Graph.InGesture || MissionDrag.IsDragging || inspector.InMissionGesture ||
                                    Assets.PrefabRenaming;
 
