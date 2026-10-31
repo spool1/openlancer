@@ -84,7 +84,7 @@ When another program uses the port, the server does not start. The status bar th
 |---|---|---|
 | Agent server port | 47815 | The port of the server on this computer. Stop the server to change it. |
 | Auto-save and continue when an MCP agent starts Play | Off | When an agent starts Play and the active mod has unsaved edits, the editor saves them and plays. Off: the editor asks you first. See "Agent Play" in [PLAY.md](PLAY.md). The setting applies to the tool `play`. |
-| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions, Cutscenes and Play. The `scene_` tools, the `prop_group_` tools and `render_scene` are in the group Scene. `render_cutscene` is in the group Cutscenes. `play` and `play_stop` are in the group Play. `mission_edit`, `mission_dry_run` and the read tools of the missions are in the group Missions. These read tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check` and `get_console`. The edit tools of "The edit tools" are always available too, and so are `save`, `export_mod`, `publish_checklist`, `create_loadout`, `create_from_template`, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene. |
+| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions, Cutscenes and Play. The `scene_` tools, the `prop_group_` tools and `render_scene` are in the group Scene. `render_cutscene` is in the group Cutscenes. `play` and `play_stop` are in the group Play. The `mission_` tools and the read tools of the missions are in the group Missions. These read tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check` and `get_console`. The edit tools of "The edit tools" are always available too, and so are `save`, `export_mod`, `publish_checklist`, `create_loadout`, `create_from_template`, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene. |
 | Rows of a page without a limit | 50 | The rows of a list result when the agent gives no limit. |
 | Largest page limit | 200 | The largest limit that the agent can ask for in one list result. |
 | Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
@@ -162,7 +162,7 @@ These tools change the data of the active mod. They work in both hosts. The olto
 
 Each edit is one Undo step. The Edit menu shows its label with "Agent: " before it, for example "Undo Agent: Delete my_station_1". You can undo and redo each agent edit, as each of your own edits. `undo` undoes only an agent edit at the top of the history. `redo` redoes only an agent edit that the agent undid. So the agent never undoes your edit, and never redoes an edit that you undid with Ctrl+Z. All agent programs of one editor have the same edit origin. So `undo` of one agent program can undo the last edit of another agent program.
 
-The edit tools change only items of INI files. A reference of a mission item or of a cutscene gives the error `not_available`. Use `mission_edit` for the mission scripts. See "The mission tools". The cutscene tools come with a later version. A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. `delete_items` takes items of a system only: objects, zones, lights, nebulae and asteroid fields. `duplicate_items` takes objects, zones and lights of a system. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. Another section, for example a loadout, gives `refused`.
+The edit tools change only items of INI files. A reference of a mission item or of a cutscene gives the error `not_available`. Use the mission tools for the mission scripts. See "The mission tools". The cutscene tools come with a later version. A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. `delete_items` takes items of a system only: objects, zones, lights, nebulae and asteroid fields. `duplicate_items` takes objects, zones and lights of a system. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. Another section, for example a loadout, gives `refused`.
 
 #### Values of set_fields
 
@@ -273,7 +273,9 @@ These steps build an NPC patrol and a wreck with cargo in a system.
 
 ### The mission tools
 
-`mission_edit` changes the mission scripts of the active mod with the commands of the mission studio. It works in both hosts. Each call is one Undo step with all its commands, as each other edit tool. It takes `preview`, `with_patch`, `if_revision` and `confirm`, as the edit tools do.
+The mission tools change the mission scripts of the active mod with the commands of the mission studio. They work in both hosts. `mission_edit` runs any commands of the mission studio. The trigger tools add and change triggers and their lines with named arguments. See "The trigger tools".
+
+`mission_edit` runs a list of commands. Each call is one Undo step with all its commands, as each other edit tool. It takes `preview`, `with_patch`, `if_revision` and `confirm`, as the edit tools do.
 
 | Argument | What it does |
 |---|---|
@@ -297,6 +299,38 @@ Each script has a version. It starts at 1 and grows at each edit, undo and redo 
 `mission_edit` can be a step of `edit_batch`. The strict check of the missions runs once, at the end of the batch. So a step can start a trigger that a later step adds. Each mission step gives its own `inverse` in `steps`, and the batch gives no inverse. One undo reverts the whole batch.
 
 One call has at most 100 commands. A `command_group` counts as one command. The limit of the sections of one edit and the size of a request bound its work.
+
+#### The trigger tools
+
+Each trigger tool changes one trigger or its lines. It runs the commands of the gestures of the mission studio in one request, so the text of the files is the same as after the gesture. Each call is one Undo step and runs in strict mode, as `mission_edit` does. Each tool takes `preview`, `with_patch` and `if_revision`, and it can be a step of `edit_batch`. The result gives `inverse`, `row_moves` and `versions`, as the result of `mission_edit` does.
+
+| Tool | What it does |
+|---|---|
+| `mission_add_trigger` | Adds a trigger to `script` with `condition` and at most 64 `actions`. `starts_with_mission`, `repeats` and `system` set the state lines of the trigger. Each trigger of `started_by` gets an action that starts the new trigger. |
+| `mission_set_condition` | Replaces the condition of `trigger`. |
+| `mission_add_action` | Adds `action` to `trigger`, before the line `before`, or at the end. |
+| `mission_set_action` | Sets each value of `values` in the action `line`, by the name of the value. With `expect_key`, a line with another key gives `stale_revision` with the detail `RowChanged`. |
+| `mission_move_action` | Moves the action `line` before the line `before` of its trigger, or to the end. |
+| `mission_link_triggers` | Adds a link from the trigger `from` to the trigger `to`. `start` adds `Act_ActTrig`, `stop` adds `Act_DeactTrig`, and `restart` adds both, the stop first. With `remove: true`, the tool removes the lines of the link. |
+| `mission_insert_trigger` | Puts a new trigger on the start line `line`. The trigger of the line then starts the new trigger, and the new trigger starts the old target. The `actions` of the new trigger come before its start of the old target. |
+
+A line is `{key, values}` with the value names of `describe_mission_name`, as in `mission_edit`. For example, `{"key": "Cnd_Timer", "values": {"seconds": 3}}` waits 3 seconds. A value is a number, a text, true or false, or a list for a position or a value that repeats. A line can also give its value texts by position in `texts`. The editor then checks only the form of the line. A key without values, for example `Cnd_True`, gets no value text. To write `no_params`, as the game data does, give `"texts": ["no_params"]`.
+
+`trigger` and `from` take a `trg:` reference, or the `sec:` reference of a trigger section. `line` and `before` take a `line:` reference, for example `line:DATA\MISSIONS\M01A\m01a.ini#Trigger/my_trigger/3`. `get_trigger` with `include_lines` gives the reference of each line. `before` must name a line of the same trigger. `to` and each trigger of `started_by` take a nickname or a `trg:` reference of the same script. A trigger of another script gives `invalid_argument`.
+
+A new nickname has letters, digits, `_` and `-`, with at most 47 characters, and it cannot be a number. Without a nickname, the editor makes a free name, for example `m01a_trigger_3`. A link to a trigger that does not exist adds an error, so strict mode refuses it. A trigger or a line that does not exist gives `not_found`, and a trigger also gives the closest names. An error names its argument in `field`, for example `actions[2]` or `values.ship`. The result names each new or changed item in its shortest form: `trg:` for a trigger and `line:` for a line.
+
+This call adds a trigger that the trigger `my_start` starts. The new trigger waits 3 seconds, then spawns a ship:
+
+```json
+{
+  "script": "msn:DATA\\MISSIONS\\M01A\\m01a.ini",
+  "nickname": "my_ambush",
+  "condition": { "key": "Cnd_Timer", "values": { "seconds": 3 } },
+  "actions": [ { "key": "Act_SpawnShip", "values": { "ship": "my_pirate" } } ],
+  "started_by": [ "my_start" ]
+}
+```
 
 ### Save
 
