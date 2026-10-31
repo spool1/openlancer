@@ -53,7 +53,12 @@ internal sealed record MissionDirectivesView(IReadOnlyList<MissionNameRow> Direc
 /// <param name="Unused">True for a key that the game reads but does not use.</param>
 /// <param name="ShipKey">True for a ship key that must come before the formation and ship lines.</param>
 internal sealed record MissionKeyRow(string Key, string Label, MissionValueKind Kind, IReadOnlyList<MissionValueView> Values,
-    string? Help, bool Repeats, bool Unused, bool ShipKey);
+    string? Help, bool Repeats, bool Unused, bool ShipKey)
+{
+    /// <summary>The values of each form of a key whose first value picks the form, for example the type of an objective,
+    /// or null. <see cref="Values"/> are the values of the default form.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<MissionValueView>>? Forms { get; init; }
+}
 
 /// <summary>A mission section type with its keys.</summary>
 /// <param name="Kind">The kind of <c>mission_add_item</c> that adds a section of the type, or null.</param>
@@ -148,7 +153,11 @@ public static class AgentResources
         MissionSectionRow Section(MissionSectionSpec spec) => new(spec.Type, kinds.GetValueOrDefault(spec.Type),
             [.. spec.Keys.Select(k => new MissionKeyRow(k.Key, k.Label, k.Kind,
                 [.. k.ValueSpecs.Select(v => MissionQueries.ValueView(v, schema))], k.Help, k.List is { Values: false },
-                k.Unused, k.ShipKey))],
+                k.Unused, k.ShipKey)
+            {
+                Forms = k.Forms?.ToDictionary(f => f.Key,
+                    f => (IReadOnlyList<MissionValueView>)[.. f.Value.Select(v => MissionQueries.ValueView(v, schema))]),
+            })],
             spec.OpenKeys, spec.Directives, spec.OrderSensitive);
         return Json(new MissionSectionsView([.. schema.Sections.Select(Section)], Section(schema.ShipBuild)));
     }

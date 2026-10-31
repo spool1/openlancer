@@ -141,7 +141,7 @@ public static class MissionJson
             foreach (var key in section.Keys)
             {
                 lines.Add(KeyDefinition(section.Type, key.Key));
-                definitions[KeyDefinition(section.Type, key.Key)] = LineSchema(key.Key, key.Label, key.ValueSpecs, schema);
+                definitions[KeyDefinition(section.Type, key.Key)] = LineSchema(key.Key, key.Label, key.AllValueSpecs, schema);
             }
         }
         definitions["line"] = new JsonObject

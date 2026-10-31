@@ -175,6 +175,44 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal("Well done.", TextOf(m.Lines("ol_end")[3]));
     }
 
+    /// <summary>An objective gets its own text (final finding 15 of MCP1-3). Each form of the type line names its values,
+    /// so set_text writes the text id at the place of the form: value 1 of ids, value 2 of navmarker. get_item gives the
+    /// named values of the form.</summary>
+    [Fact]
+    public void SetTextGivesAnObjectiveItsOwnText()
+    {
+        var (m, host) = Open();
+        using var _ = m;
+        var goal = $"sec:{S}#NNObjective/ol_goal";
+        var mark = $"sec:{S}#NNObjective/ol_mark";
+        string TextOf(string line) => m.Session.Text(new StringPlaceholder(StringKind.String,
+            line[(line.IndexOf("$str:", StringComparison.Ordinal) + 5)..].Split(',')[0]))!;
+
+        // An objective needs a type, so the add and the text are one batch: the strict check runs at its end.
+        Ok(host, "edit_batch", $$"""
+            { "steps": [
+              { "tool": "mission_add_item", "arguments": { "script": "msn:{{S}}", "kind": "objective", "nickname": "ol_goal", "fields": { "state": "HIDDEN" } } },
+              { "tool": "set_text", "arguments": { "ref": "{{goal}}", "field": "type", "text": "Destroy the pirate ambusher." } } ] }
+            """);
+        var type = Assert.Single(m.Lines(Item("NNObjective", "ol_goal")), l => l.StartsWith("type", StringComparison.Ordinal));
+        Assert.StartsWith("type = ids, $str:", type);
+        Assert.Equal("Destroy the pirate ambusher.", TextOf(type));
+
+        Ok(host, "mission_add_item", $$"""
+            { "script": "msn:{{S}}", "kind": "objective", "nickname": "ol_mark",
+              "fields": { "type": { "form": "navmarker", "system": "ol_system", "text_id": 1, "explanation_id": 2, "position": [1, 2, 3] } } }
+            """);
+        Ok(host, "set_text", $$"""{ "ref": "{{mark}}", "field": "type", "text": "Fly to the marker." }""");
+        var marker = Assert.Single(m.Lines(Item("NNObjective", "ol_mark")), l => l.StartsWith("type", StringComparison.Ordinal));
+        Assert.StartsWith("type = navmarker, ol_system, $str:", marker);
+        Assert.EndsWith(", 2, 1, 2, 3", marker);
+        Assert.Equal("Fly to the marker.", TextOf(marker));
+        var values = Ok(host, "get_item", $$"""{ "ref": "{{mark}}" }""")["mission_item"]!["lines"]!.AsArray()
+            .Single(l => (string?)l!["key"] == "type")!["values"]!.AsObject();
+        Assert.Equal(["form", "system", "text_id", "explanation_id", "position"], values.Select(v => v.Key));
+        Assert.Equal("ol_system", (string?)values["system"]);
+    }
+
     /// <summary>set_text refuses a key without a text id, a trigger without the line of the key, a value name that the
     /// line does not have and a label. Nothing changes.</summary>
     [Fact]

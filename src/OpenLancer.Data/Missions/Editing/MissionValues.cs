@@ -59,8 +59,33 @@ internal static class MissionValues
             return new BuiltLine(key, spec.Texts.ToList(), []);
         }
         var notes = new List<string>();
-        var texts = Texts(schema, key, specs, spec.Values, notes, old);
+        var texts = Texts(schema, key, FormSpecs(schema, sectionType, key, specs, spec.Values, old), spec.Values, notes, old);
         return new BuiltLine(key, texts, notes);
+    }
+
+    /// <summary>The specs of the form of a line of a key with forms: the form of the first named value, else the form
+    /// of the old line, else the default form (see <see cref="MissionKeySpec.Forms"/>).</summary>
+    private static IReadOnlyList<MissionValueSpec> FormSpecs(MissionSchema schema, string sectionType, string key,
+        IReadOnlyList<MissionValueSpec> specs, IReadOnlyDictionary<string, MissionValue> values, Entry? old)
+    {
+        var section = MissionIndex.Is(sectionType, "NPCShipArch") ? schema.ShipBuild : schema.Section(sectionType);
+        if (section?.Key(key) is not { Forms: not null } keySpec || specs.FirstOrDefault(s => s.Index == 0) is not { } first)
+            return specs;
+        var form = values.FirstOrDefault(v => v.Key.Equals(first.Name, StringComparison.OrdinalIgnoreCase)).Value is
+            { Type: MissionValueType.Text } given
+            ? given.Text
+            : old is { Count: > 0 } ? MissionIndex.Text(old[0]) : null;
+        return keySpec.ValueSpecsOf(form);
+    }
+
+    /// <summary>The specs of the values of a line, with the form of its first value for a key with forms.</summary>
+    public static IReadOnlyList<MissionValueSpec> SpecsOf(MissionSchema schema, string sectionType, Entry entry)
+    {
+        var specs = Key(schema, sectionType, LinePlace.Section, entry.Name).Specs;
+        var section = MissionIndex.Is(sectionType, "NPCShipArch") ? schema.ShipBuild : schema.Section(sectionType);
+        return section?.Key(entry.Name) is { Forms: not null } keySpec && entry.Count > 0
+            ? keySpec.ValueSpecsOf(MissionIndex.Text(entry[0]))
+            : specs;
     }
 
     /// <summary>The key with the letter case of the schema, and the specs of its values.</summary>

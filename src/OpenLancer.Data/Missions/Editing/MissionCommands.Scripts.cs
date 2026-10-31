@@ -121,9 +121,9 @@ public sealed record SetLineText(RowRef Row, string Name, string Text) : Mission
         d.Editable(document, index);
         var section = document.Working[index];
         var entry = section[row];
-        var spec = d.SpecsOf(section.Name, entry.Name).FirstOrDefault(s => s.Name.Equals(Name, StringComparison.OrdinalIgnoreCase))
-                   ?? throw d.Refuse(MissionErrors.NoSuchValueError(entry.Name, Name,
-                       d.SpecsOf(section.Name, entry.Name).Select(s => s.Name)));
+        var specs = d.SpecsOf(section.Name, entry);
+        var spec = specs.FirstOrDefault(s => s.Name.Equals(Name, StringComparison.OrdinalIgnoreCase))
+                   ?? throw d.Refuse(MissionErrors.NoSuchValueError(entry.Name, Name, specs.Select(s => s.Name)));
         if (spec.Kind != MissionValueKind.TextId)
             throw d.Refuse(MissionErrors.NotTextIdError(spec.Label));
         if (string.IsNullOrEmpty(Text))
@@ -142,7 +142,7 @@ public sealed record SetLineText(RowRef Row, string Name, string Text) : Mission
         }
         var texts = MissionValues.TextsOf(entry).ToList();
         while (texts.Count < spec.Index)
-            texts.Add(d.Gap(section.Name, entry.Name, texts.Count));
+            texts.Add(d.Gap(specs, texts.Count));
         var value = MissionValues.TextPrefix + key;
         if (spec.Index == texts.Count)
             texts.Add(value);

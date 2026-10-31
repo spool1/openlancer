@@ -48,6 +48,20 @@ internal sealed partial class MissionDraft
         }
     }
 
+    /// <summary>The specs of the values of a line of a section type, with the form of its first value for a key with
+    /// forms, for example the type of an objective.</summary>
+    public IReadOnlyList<MissionValueSpec> SpecsOf(string sectionType, Entry entry)
+    {
+        try
+        {
+            return MissionValues.SpecsOf(Schema, sectionType, entry);
+        }
+        catch (EditException)
+        {
+            return [];
+        }
+    }
+
     /// <summary>The type of a section with the letter case of the schema, or as given for another type.</summary>
     public string TypeName(string type)
     {
@@ -248,7 +262,7 @@ internal sealed partial class MissionDraft
     {
         var section = document.Working[index];
         var entry = section[row];
-        var specs = SpecsOf(section.Name, entry.Name);
+        var specs = SpecsOf(section.Name, entry);
         var spec = specs.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) ??
                    throw Refuse(MissionErrors.NoSuchValueError(entry.Name, name, specs.Select(s => s.Name)));
         IReadOnlyList<string> converted;
@@ -284,7 +298,8 @@ internal sealed partial class MissionDraft
     /// index.</summary>
     public string Gap(string sectionType, string key, int at) => Gap(SpecsOf(sectionType, key), at);
 
-    private string Gap(IReadOnlyList<MissionValueSpec> specs, int at)
+    /// <inheritdoc cref="Gap(string, string, int)"/>
+    public string Gap(IReadOnlyList<MissionValueSpec> specs, int at)
     {
         var spec = specs.FirstOrDefault(s => s.Covers(at));
         if (spec?.Default != null && spec.Width == 1)

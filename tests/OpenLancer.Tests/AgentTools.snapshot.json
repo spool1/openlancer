@@ -30782,10 +30782,57 @@
               "values": {
                 "type": "object",
                 "properties": {
-                  "type": {
+                  "form": {
                     "type": "string",
-                    "title": "Type",
-                    "description": "How the game shows the objective: ids (a text), navmarker (a point), rep_inst (an object) or base (a base)."
+                    "examples": [
+                      "ids",
+                      "navmarker",
+                      "rep_inst",
+                      "base"
+                    ],
+                    "title": "Form",
+                    "description": "ids shows a text. navmarker also shows a point, rep_inst an object and base a base."
+                  },
+                  "text_id": {
+                    "type": [
+                      "number",
+                      "string"
+                    ],
+                    "title": "Text",
+                    "description": "The text id of the text of the objective."
+                  },
+                  "system": {
+                    "type": "string",
+                    "title": "System",
+                    "description": "The system of the point."
+                  },
+                  "explanation_id": {
+                    "type": [
+                      "number",
+                      "string"
+                    ],
+                    "title": "Explanation",
+                    "description": "The text id of the explanation of the objective."
+                  },
+                  "position": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "title": "Point",
+                    "description": "The point of the marker."
+                  },
+                  "object": {
+                    "type": "string",
+                    "title": "Object",
+                    "description": "The object that the marker shows."
+                  },
+                  "base": {
+                    "type": "string",
+                    "title": "Base",
+                    "description": "The base of the objective."
                   }
                 },
                 "additionalProperties": false

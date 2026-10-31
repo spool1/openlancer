@@ -354,6 +354,22 @@ public sealed record MissionKeySpec(string Key, string Label, MissionValueKind K
     /// <summary>The list field of the lines of the key, or null for a key with one line (decision D540).</summary>
     public MissionListInfo? List { get; init; }
 
+    /// <summary>The value specs of each form of a key whose first value picks the form, by the form word, or null. An
+    /// example is the <c>type</c> of an objective: <c>ids</c>, <c>navmarker</c>, <c>rep_inst</c> or <c>base</c> (final
+    /// finding 15 of MCP1-3). <see cref="Values"/> are the values of the default form.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<MissionValueSpec>>? Forms { get; init; }
+
+    /// <summary>The specs of the values of a line whose first value is a form word: the specs of the form, or
+    /// <see cref="ValueSpecs"/> for a key without forms or a word that is not a form.</summary>
+    public IReadOnlyList<MissionValueSpec> ValueSpecsOf(string? form) =>
+        Forms != null && form != null && Forms.TryGetValue(form.Trim(), out var specs) ? specs : ValueSpecs;
+
+    /// <summary>The specs of the values of all forms, each name once, in the order of the forms. The input schema of a
+    /// line gives these names.</summary>
+    public IReadOnlyList<MissionValueSpec> AllValueSpecs => Forms == null
+        ? ValueSpecs
+        : [.. ValueSpecs.Concat(Forms.Values.SelectMany(f => f)).DistinctBy(s => s.Name, StringComparer.OrdinalIgnoreCase)];
+
     /// <summary>The specs of the values of a line of the key.</summary>
     public IReadOnlyList<MissionValueSpec> ValueSpecs => Values.Count > 0
         ? Values
@@ -921,6 +937,11 @@ public sealed class MissionSchema
             NoneToken = Optional(k, "noneToken"),
             Hard = Bool(k, "hard"),
             List = ReadList(k, "list"),
+            Forms = k.TryGetProperty("forms", out var forms)
+                ? forms.EnumerateObject().ToDictionary(f => f.Name,
+                    f => (IReadOnlyList<MissionValueSpec>)f.Value.EnumerateArray().Select(ReadValue).ToList(),
+                    StringComparer.OrdinalIgnoreCase)
+                : null,
         }).ToList(),
         Bool(e, "openKeys"), Bool(e, "directives"))
     {

@@ -84,7 +84,7 @@ public sealed class MissionLine
     public bool Known => Name != null || KeySpec != null;
 
     /// <summary>The specs of the values of the line.</summary>
-    public IReadOnlyList<MissionValueSpec> Specs => Name?.Values ?? KeySpec?.ValueSpecs ?? [];
+    public IReadOnlyList<MissionValueSpec> Specs => Name?.Values ?? KeySpec?.ValueSpecsOf(Value(0)) ?? [];
 
     /// <summary>The names in the line, in value order.</summary>
     public IReadOnlyList<MissionReference> References => references;

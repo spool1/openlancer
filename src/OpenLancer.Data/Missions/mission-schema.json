@@ -1003,7 +1003,37 @@
       { "key": "tl_attack_chance", "label": "Attack chance", "kind": "wholeNumber", "help": "The chance of an attack in percent." } ] },
     { "type": "NNObjective", "keys": [
       { "key": "nickname", "label": "Nickname", "kind": "text", "help": "The name that the objective lines use." },
-      { "key": "type", "label": "Type", "kind": "text", "hard": true, "help": "How the game shows the objective: ids (a text), navmarker (a point), rep_inst (an object) or base (a base)." },
+      { "key": "type", "label": "Type", "kind": "text", "hard": true, "help": "How the game shows the objective: ids (a text), navmarker (a point), rep_inst (an object) or base (a base). The first value is the form, and the form sets the values after it.",
+        "values": [
+          { "index": 0, "name": "form", "label": "Form", "kind": "token", "tokens": "objectiveForm", "default": "ids", "help": "ids shows a text. navmarker also shows a point, rep_inst an object and base a base." },
+          { "index": 1, "name": "text_id", "label": "Text", "kind": "textId", "help": "The text id of the text of the objective." }
+        ],
+        "forms": {
+          "ids": [
+            { "index": 0, "name": "form", "label": "Form", "kind": "token", "tokens": "objectiveForm", "default": "ids", "help": "ids shows a text." },
+            { "index": 1, "name": "text_id", "label": "Text", "kind": "textId", "help": "The text id of the text of the objective." }
+          ],
+          "navmarker": [
+            { "index": 0, "name": "form", "label": "Form", "kind": "token", "tokens": "objectiveForm", "help": "navmarker shows a text and a point in a system." },
+            { "index": 1, "name": "system", "label": "System", "kind": "system", "help": "The system of the point." },
+            { "index": 2, "name": "text_id", "label": "Text", "kind": "textId", "help": "The text id of the text of the objective." },
+            { "index": 3, "name": "explanation_id", "label": "Explanation", "kind": "textId", "help": "The text id of the explanation of the objective." },
+            { "index": 4, "name": "position", "label": "Point", "kind": "position", "help": "The point of the marker." }
+          ],
+          "rep_inst": [
+            { "index": 0, "name": "form", "label": "Form", "kind": "token", "tokens": "objectiveForm", "help": "rep_inst shows a text and an object in a system." },
+            { "index": 1, "name": "system", "label": "System", "kind": "system", "help": "The system of the object." },
+            { "index": 2, "name": "text_id", "label": "Text", "kind": "textId", "help": "The text id of the text of the objective." },
+            { "index": 3, "name": "explanation_id", "label": "Explanation", "kind": "textId", "help": "The text id of the explanation of the objective." },
+            { "index": 4, "name": "position", "label": "Point", "kind": "position", "help": "The point of the marker near the object." },
+            { "index": 7, "name": "object", "label": "Object", "kind": "object", "help": "The object that the marker shows." }
+          ],
+          "base": [
+            { "index": 0, "name": "form", "label": "Form", "kind": "token", "tokens": "objectiveForm", "help": "base shows a text and a base." },
+            { "index": 1, "name": "base", "label": "Base", "kind": "base", "help": "The base of the objective." },
+            { "index": 2, "name": "text_id", "label": "Text", "kind": "textId", "help": "The text id of the text of the objective." }
+          ]
+        } },
       { "key": "state", "label": "State", "kind": "text", "hard": true, "help": "ACTIVE shows the objective. HIDDEN hides it until a line shows it." },
       { "key": "hidden", "label": "Hidden", "kind": "bool", "help": "True hides the objective." } ] },
     { "type": "Dialog", "orderSensitive": true, "keys": [
@@ -1186,7 +1216,8 @@
     "musicNone": { "values": ["none", "no_params"] },
     "addFollowers": { "values": ["ADD_FOLLOWERS"] },
     "attitude": { "values": ["REP_HOSTILE_MAXIMUM", "REP_HOSTILE_THRESHOLD", "REP_NEUTRAL_HOSTILE", "REP_NEUTRAL", "REP_NEUTRAL_FRIENDLY", "REP_FRIEND_THRESHOLD", "REP_FRIEND_MAXIMUM"] },
-    "stateGraph": { "values": ["FIGHTER", "TRANSPORT", "GUNBOAT", "CRUISER", "NOTHING", "PLAYER"] }
+    "stateGraph": { "values": ["FIGHTER", "TRANSPORT", "GUNBOAT", "CRUISER", "NOTHING", "PLAYER"] },
+    "objectiveForm": { "values": ["ids", "navmarker", "rep_inst", "base"] }
   },
   "buffers": [
     { "id": "object", "what": "The object name", "max": 47 },

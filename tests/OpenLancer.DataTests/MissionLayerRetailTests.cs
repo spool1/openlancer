@@ -72,7 +72,10 @@ public sealed class MissionLayerRetailTests(ITestOutputHelper output)
         // A line outside a trigger, for example the arrival object of a mission ship or a dock order, names its section.
         Assert.All(lines, u => Assert.NotNull(u.Line.Trigger?.Nickname ?? u.Line.Section.Nickname));
         Assert.All(lines, u => Assert.StartsWith($"{u.Script.Slot!.Slot}: ", u.Text));
-        Assert.Equal((47, 335, 275), (named, lines.Count, inTriggers));
+        // The rep_inst objectives name their object too, since the type line of an objective has named values for each
+        // form (final finding 15 of MCP1-3). They name objects that a trigger line names too, so the count of the
+        // objects stays.
+        Assert.Equal((47, 360, 275), (named, lines.Count, inTriggers));
     }
 
     [Fact]
