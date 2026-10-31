@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Editing;
@@ -113,9 +114,23 @@ internal static class MissionLineInput
         var name = place == LinePlace.Order ? MissionSchema.Retail.Directive(line.Key) : MissionSchema.Retail.Name(line.Key);
         if (line is { Values.Count: 0, Texts: null } && name is { Values.Count: 0 })
             line = line with { Texts = [NoParams] };
-        EditTools.At(field, () => MissionValues.Build(MissionSchema.Retail, sectionType, place, line));
+        Check(sectionType, place, line, field);
         return line;
     }
+
+    /// <summary>
+    /// The checks of a line before the command runs: the check of the schema of the missions for its place, and the
+    /// check that a patch line of a text file holds its values, for example a number that a float can hold. So the error
+    /// names the argument of the line. The command checks the line again when it runs.
+    /// </summary>
+    /// <remarks>A binary script can refuse more values, for example a large whole number that it cannot store exactly.
+    /// The command then gives the error.</remarks>
+    /// <exception cref="EditException">The line is not valid. The error names <paramref name="field"/>.</exception>
+    private static void Check(string sectionType, LinePlace place, LineSpec line, string field) => EditTools.At(field, () =>
+    {
+        var built = MissionValues.Build(MissionSchema.Retail, sectionType, place, line);
+        MissionValues.Entry(new Section("Line"), built.Key, built.Texts, null, binary: false);
+    });
 
     // ---- Fields of mission items ----
 
@@ -207,7 +222,7 @@ internal static class MissionLineInput
             _ => throw Refuse(field, AgentTexts.Error("mission_field_named", ("key", key),
                 ("names", string.Join(", ", specs.Select(s => s.Name))))),
         };
-        EditTools.At(field, () => MissionValues.Build(MissionSchema.Retail, sectionType, LinePlace.Section, line));
+        Check(sectionType, LinePlace.Section, line, field);
         return line;
     }
 

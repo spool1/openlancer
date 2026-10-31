@@ -353,8 +353,8 @@ public sealed partial class AgentMissionToolTests
     /// <summary>The refusals of mission_add_item: a ship without fields.npc or with two places, a key that the section
     /// does not have (with the keys of the section), a value of the wrong kind, a form that does not fit its key, the
     /// nickname or an order in the fields, steps of another kind, an order that is not a directive, a key two times, a
-    /// name in use, and an empty list of texts for a key that needs a value. Each error names its argument, and nothing
-    /// changes.</summary>
+    /// name in use, a number that a patch line cannot hold, and an empty list of texts for a key that needs a value.
+    /// Each error names its argument, and nothing changes.</summary>
     [Fact]
     public void AddItemGivesItsRefusals()
     {
@@ -392,6 +392,12 @@ public sealed partial class AgentMissionToolTests
             (AddItem("solar", "ol_solar", "{}").Replace("\"solar\"", "\"planet\""),
                 "invalid_argument", ToolInput.BadArgument, "kind"),
             (AddItem("solar", "ol_bad name", "{}"), "invalid_argument", ToolInput.BadArgument, "nickname"),
+            (AddItem("solar", null, """{ "position": [1e300, 0, 0] }"""), "invalid_value", MissionErrors.PatchText,
+                "fields.position"),
+            (AddItem("ship", "ol_new", """{ "npc": "ol_npc_1", "position": [1e300, 0, 0] }"""), "invalid_value",
+                MissionErrors.PatchText, "fields.position"),
+            (AddItem("order_list", null, "{}", """[ { "key": "Delay", "values": { "seconds": 1e300 } } ]"""), "invalid_value",
+                MissionErrors.PatchText, "steps[0]"),
             (AddItem("solar", null, """{ "system": { "texts": [] } }"""), "invalid_value", MissionErrors.ValueMissing,
                 "fields.system"),
         };

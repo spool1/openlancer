@@ -294,6 +294,9 @@ public sealed partial class AgentMissionToolTests
                 """, "invalid_argument", MissionErrors.NoSuchValue, "actions[1]"),
             ("mission_set_condition", $$"""{ "trigger": "{{End}}", "condition": { "key": "Cnd_Timer", "values": { "seconds": "soon" } } }""",
                 "invalid_value", MissionErrors.ValueKind, "condition"),
+            // A float cannot hold the number, so a patch line cannot hold it.
+            ("mission_add_trigger", $$"""{ "script": "msn:{{S}}", "condition": { "key": "Cnd_Timer", "values": { "seconds": 1e300 } } }""",
+                "invalid_value", MissionErrors.PatchText, "condition"),
             ("mission_set_action", $$"""{ "line": "{{WaveLine(3)}}", "values": { "shp": "ol_ship_3" } }""",
                 "invalid_argument", MissionErrors.NoSuchValue, "values.shp"),
             ("mission_set_condition", $$"""{ "trigger": "trg:{{S}}#ol_wav", "condition": { "key": "Cnd_True" } }""",
