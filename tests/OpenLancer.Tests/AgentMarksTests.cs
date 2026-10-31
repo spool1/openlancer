@@ -141,18 +141,47 @@ public sealed class AgentMarksTests
 
         Assert.Equal(["ol_wave"], edited);
         Assert.Empty(undone);
+        var tree = Tree(m);
         var wave = new SectionRef(MissionEdits.Script, new SectionIdentity("Trigger", "ol_wave"));
-        Assert.Equal(wave, HierarchyModel.SectionOfMissionRow(new MissionRef(MissionEdits.Script, MissionItemKind.Trigger, wave)));
-        Assert.Null(HierarchyModel.SectionOfMissionRow(new MissionRef(MissionEdits.Script, MissionItemKind.Row, wave, Row: 2)));
-        Assert.Null(HierarchyModel.SectionOfMissionRow(new MissionRef(MissionEdits.Script, MissionItemKind.Label, Key: "ol_wing")));
+        Assert.Equal(wave, tree.SectionOfMissionRow(new MissionRef(MissionEdits.Script, MissionItemKind.Trigger, wave)));
+        Assert.Null(tree.SectionOfMissionRow(new MissionRef(MissionEdits.Script, MissionItemKind.Row, wave, Row: 2)));
+        Assert.Null(tree.SectionOfMissionRow(new MissionRef(MissionEdits.Script, MissionItemKind.Label, Key: "ol_wing")));
     }
 
-    /// <summary>The names of the rows of the tree of the test mission that show the robot glyph.</summary>
+    /// <summary>The header row of the tree of a mission is the mission. It shows the robot glyph after an agent edit of
+    /// the <c>[Mission]</c> section, and loses it at the undo (section 8.5 of the MCP1 design).</summary>
+    [Fact]
+    public void TheHeaderRowOfAMissionHasTheGlyphAfterAnAgentEditOfTheMissionSection()
+    {
+        using var m = MissionEdits.Create();
+        var marks = Marks();
+        marks.Track(m.Session);
+        var host = new TestAgentHost(m.Session);
+        var script = MissionEdits.Script.Replace(@"\", @"\\");
+        var header = Tree(m).Root.Name;
+
+        AgentCalls.Ok(host, "mission_edit", $$"""
+            { "commands": [ { "kind": "set_item_key", "item": "sec:{{script}}#Mission", "key": "npc_ship_file",
+              "lines": [ { "key": "npc_ship_file", "texts": [ "MISSIONS\\OL_TEST\\NPCSHIPS.INI" ] } ] } ] }
+            """);
+        var edited = MarkedRows(m, marks);
+        m.Session.Undo();
+
+        Assert.Equal([header], edited);
+        Assert.Empty(MarkedRows(m, marks));
+    }
+
+    /// <summary>The tree of the test mission now.</summary>
+    private static HierarchyModel Tree(MissionEdits m) =>
+        HierarchyModel.ForMission(m.Missions.Model(MissionEdits.Script).Analysis, _ => "", false, null);
+
+    /// <summary>The names of the rows of the tree of the test mission that show the robot glyph, the header row
+    /// first.</summary>
     private static string[] MarkedRows(MissionEdits m, AgentMarks marks)
     {
-        var tree = HierarchyModel.ForMission(m.Missions.Model(MissionEdits.Script).Analysis, _ => "", false, null);
-        return Rows(tree.Root)
-            .Where(n => HierarchyModel.SectionOfMissionRow(n.Item) is { } section && marks.Marked(section))
+        var tree = Tree(m);
+        return Rows(tree.Root).Prepend(tree.Root)
+            .Where(n => tree.SectionOfMissionRow(n.Item) is { } section && marks.Marked(section))
             .Select(n => n.Name)
             .ToArray();
     }

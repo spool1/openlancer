@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Editor.Missions;
@@ -103,13 +104,20 @@ internal sealed partial class HierarchyModel
     public IReadOnlySet<Data.Editing.SectionRef> SystemUnknown { get; private init; } = new HashSet<Data.Editing.SectionRef>();
 
     /// <summary>
-    /// The section of a row of the tree of a mission: a trigger or another section of the script. A line row, a label,
-    /// an act and a prefab instance have no section of their own, so they give null. The robot glyph of an agent edit
-    /// uses it (section 8.5 of the MCP1 design).
+    /// The section of a row of this tree of a mission: a trigger or another section of the script. The header row is the
+    /// mission, so it gives the <c>[Mission]</c> section. A line row, a label, an act and a prefab instance have no
+    /// section of their own, so they give null. The robot glyph of an agent edit uses it (section 8.5 of the MCP1
+    /// design).
     /// </summary>
     /// <param name="item">The item of the row.</param>
-    public static SectionRef? SectionOfMissionRow(object? item) =>
-        item is MissionRef { Section: { } section, Row: < 0 } ? section : null;
+    public SectionRef? SectionOfMissionRow(object? item) => item switch
+    {
+        MissionRef { Section: { } section, Row: < 0 } => section,
+        MissionRef { Kind: MissionItemKind.Mission, Section: null, Key: null } mission
+            when Analysis is { } analysis && VfsPath.Comparer.Equals(mission.Script, analysis.Script.Path) =>
+            analysis.Document.OfKind(MissionSectionKind.Mission).FirstOrDefault()?.Ref,
+        _ => null,
+    };
 
     /// <summary>
     /// The tree of a mission (section 9 of the M6a design). It has the header row, then the groups Logic, Cast, Labels,
