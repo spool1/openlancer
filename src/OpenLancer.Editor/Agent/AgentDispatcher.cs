@@ -14,6 +14,25 @@ namespace OpenLancer.Editor.Agent;
 /// first.</param>
 internal readonly record struct EditorActivity(bool Editing, bool Dialog, bool Loading, bool UserEdit, bool Renaming = false);
 
+/// <summary>The gestures of the user in the mission studio that an agent call waits for (section 5.5, item 3 of the MCP1
+/// design).</summary>
+/// <param name="TreeRename">The rename popup of a row of a mission in the Hierarchy is open.</param>
+/// <param name="Graph">The graph has an open rename of a node or quick add, or the user drags a node or a link.</param>
+/// <param name="Drag">The user drags an item of the library, an action row of the graph or a row of the tree of a
+/// mission.</param>
+/// <param name="Page">The rename popup or quick add of the Mission page in the Inspector is open.</param>
+/// <param name="PrefabRename">The rename popup of a prefab in the Assets panel is open.</param>
+internal readonly record struct MissionGestures(bool TreeRename, bool Graph, bool Drag, bool Page, bool PrefabRename)
+{
+    /// <summary>The activity of the editor with these gestures. The rename popup of a row of a mission is a rename in the
+    /// Hierarchy. Each other gesture is an edit.</summary>
+    public EditorActivity AddTo(EditorActivity activity) => activity with
+    {
+        Editing = activity.Editing || Graph || Drag || Page || PrefabRename,
+        Renaming = activity.Renaming || TreeRename,
+    };
+}
+
 /// <summary>
 /// The UI-thread side of the agent calls of the editor (decision D708): the queue of the calls, the host, and the
 /// waits. The HTTP host puts each call into the queue on a worker thread. The editor calls <see cref="Frame"/> once in

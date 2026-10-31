@@ -92,17 +92,13 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
     }
 
     /// <summary>What the editor does now: an agent call waits while the user edits or renames, a dialog is open, the
-    /// data loads or an edit of the user runs (section 5.5 of the MCP1 design).</summary>
-    private EditorActivity Activity() => new(IsEditing || AssetDrag.IsDragging || MissionGesture, DialogOpen,
-        Session?.IsBusy == true, Session?.Edits is { } edits && (edits.OpenBatch != null || edits.InTransaction),
-        SceneEdits.Renaming != null || hierarchy.MissionRenaming);
-
-    /// <summary>True while a gesture of the user in the mission studio is open. An agent call waits for its end (section
-    /// 5.5, item 3 of the MCP1 design). The graph has the rename of a node, quick add and the drag of a node or a link.
-    /// The Mission page has its rename popup and quick add. The drags of library items and mission rows and the rename
-    /// popup of a prefab count too.</summary>
-    private bool MissionGesture => missionView.Graph.InGesture || MissionDrag.IsDragging || inspector.InMissionGesture ||
-                                   Assets.PrefabRenaming;
+    /// data loads or an edit of the user runs (section 5.5 of the MCP1 design). The gestures of the mission studio count
+    /// too.</summary>
+    private EditorActivity Activity() =>
+        new MissionGestures(hierarchy.MissionRenaming, missionView.Graph.InGesture, MissionDrag.IsDragging,
+            inspector.InMissionGesture, Assets.PrefabRenaming).AddTo(new EditorActivity(IsEditing || AssetDrag.IsDragging,
+            DialogOpen, Session?.IsBusy == true,
+            Session?.Edits is { } edits && (edits.OpenBatch != null || edits.InTransaction), SceneEdits.Renaming != null));
 
     EditSession? IAgentEditor.Edits => Session?.Edits;
 
@@ -170,20 +166,15 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
 
     /// <summary>
     /// Follow mode of the agent edits: opens the script of a mission item in the Mission tab, shows the tab and moves the
-    /// graph to the item. The open of another script selects its root, as the open of a mission does. A new script has no
-    /// analysis until the mission run reads it, so only its root shows then.
+    /// graph to the item. The open of another script selects its root, as the open of a mission does.
+    /// <see cref="MissionWorkspace.FollowItem"/> finds the item.
     /// </summary>
     bool IFollowView.ShowInMission(string script, string reference, bool select)
     {
-        if (PrefabRef.OfScript(script) != null)
-        {
-            return false;
-        }
-
-        var item = Missions.Analysis(script) is { } analysis
-            ? MissionWorkspace.SelectionOf(analysis, reference, Missions.ActsOf(analysis))
-            : ItemRefs.Parse(reference).Kind == ItemRefKind.Script ? MissionRef.Of(script) : null;
-        if (item == null)
+        // A template of a prefab has the analysis of prefab mode, and follow mode does not open prefab mode.
+        var analysis = PrefabRef.OfScript(script) == null ? Missions.Analysis(script) : null;
+        if (MissionWorkspace.FollowItem(script, reference, analysis, analysis != null ? Missions.ActsOf(analysis) : null) is
+            not { } item)
         {
             return false;
         }

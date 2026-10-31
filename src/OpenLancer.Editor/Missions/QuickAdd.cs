@@ -13,14 +13,16 @@ namespace OpenLancer.Editor.Missions;
 /// and a drag from a pin to an empty place open it. Up, Down, Enter and Esc work. From a pin, it shows only the items
 /// that fit the pin.
 /// </summary>
-internal sealed class QuickAdd
+/// <param name="frames">Gives the number of the frame now. The default is the frame count of ImGui. The tests give a fake
+/// count.</param>
+internal sealed class QuickAdd(Func<int>? frames = null)
 {
     // Sizes in unscaled points.
     private const float PopupWidth = 320;
     private const float ListHeight = 300;
     private const string PopupId = "##quick-add";
 
-    private readonly DrawnFrame drawn = new();
+    private readonly DrawnFrame drawn = new(frames);
     private QuickAddContext? context;
     private Vector2 at;
     private bool openNow;
@@ -29,7 +31,7 @@ internal sealed class QuickAdd
 
     /// <summary>True while the popup is open. An agent call waits for it (section 5.5, item 3 of the MCP1 design). A popup
     /// whose view does not draw any more is not open.</summary>
-    public bool IsOpen => context != null && drawn.Recent(ImGui.GetFrameCount());
+    public bool IsOpen => context != null && drawn.Recent;
 
     /// <summary>Opens the popup at a screen point in the next draw.</summary>
     public void Open(QuickAddContext place, Vector2 screen)
@@ -37,7 +39,7 @@ internal sealed class QuickAdd
         context = place;
         at = screen;
         openNow = true;
-        drawn.Drew(ImGui.GetFrameCount());
+        drawn.Drew();
         search = "";
         selected = 0;
     }
@@ -45,7 +47,7 @@ internal sealed class QuickAdd
     /// <summary>Draws the popup. Returns the place and the item of a pick, or null.</summary>
     public (QuickAddContext Context, LibraryItem Item)? Draw(IReadOnlyList<LibrarySection> sections)
     {
-        drawn.Drew(ImGui.GetFrameCount());
+        drawn.Drew();
         if (context is not { } place)
         {
             return null;

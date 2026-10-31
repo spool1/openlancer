@@ -114,14 +114,8 @@ internal sealed partial class GraphView : IDisposable
     // the M6c design).
     private bool playButtons;
 
-    // The frames of the draws of the graph. A gesture of a graph that does not draw any more does not count.
-    private readonly DrawnFrame drawn = new();
-
-    // True from a press of the left button on a node or a pin until its release: a drag of nodes or of a link can run.
-    private bool pressedOnItem;
-
-    // True when a link drag of the node editor ran in the last draw.
-    private bool linkDrag;
+    // The gestures of the user that an agent call waits for.
+    private readonly GraphGesture gesture = new();
 
     // The item that the view frames at its next draw for follow mode of the agent edits, or null.
     private MissionRef? pendingItem;
@@ -411,8 +405,7 @@ internal sealed partial class GraphView : IDisposable
     public void Draw(MissionAnalysis analysis, Vector2 size)
     {
         slotTemplate = PrefabRef.OfScript(analysis.Script.Path) != null ? missions.PrefabMode?.Template : null;
-        drawn.Drew(ImGui.GetFrameCount());
-        linkDrag = false;
+        gesture.Drew();
         Build(analysis);
         editable = missions.NoEditReason(analysis.Script.Path) == null;
         var graph = Graph!;

@@ -31,6 +31,30 @@ public sealed class MissionWorkspaceTests
         Assert.Equal(MissionRef.Of(Script), MissionRef.OfSection(mission, 0));
     }
 
+    /// <summary>
+    /// Follow mode shows the item of a reference of an agent edit in the Mission tab (section 8.5 of the MCP1 design): a
+    /// trigger, a line or a section of the script. Before the mission run reads a script, only the reference of the
+    /// script shows, as its root. A template of a prefab and a bad reference show nothing.
+    /// </summary>
+    [Fact]
+    public void FollowModeFindsTheItemOfAReferenceInTheMissionTab()
+    {
+        using var m = MissionEdits.Create();
+        var script = MissionEdits.Script;
+        var analysis = m.Missions.Model(script).Analysis;
+        var wave = new SectionRef(script, new SectionIdentity("Trigger", "ol_wave"));
+
+        Assert.Equal(new MissionRef(script, MissionItemKind.Trigger, wave),
+            MissionWorkspace.FollowItem(script, $"trg:{script}#ol_wave", analysis, null));
+        Assert.Equal(new MissionRef(script, MissionItemKind.Row, wave, Row: 2),
+            MissionWorkspace.FollowItem(script, $"line:{script}#Trigger/ol_wave/2", analysis, null));
+        Assert.Equal(MissionItemKind.Ship, MissionWorkspace.FollowItem(script, $"sec:{script}#MsnShip/ol_ship_1", analysis, null)?.Kind);
+        Assert.Equal(MissionRef.Of(script), MissionWorkspace.FollowItem(script, $"msn:{script}", null, null));
+        Assert.Null(MissionWorkspace.FollowItem(script, $"trg:{script}#ol_wave", null, null));
+        Assert.Null(MissionWorkspace.FollowItem("prefab:mod:ol_gate", "trg:prefab:mod:ol_gate#ol_open", analysis, null));
+        Assert.Null(MissionWorkspace.FollowItem(script, "trg:", null, null));
+    }
+
     [Fact]
     public void AKeptSelectionStaysWhileTheRunHasItsSection()
     {

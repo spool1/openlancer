@@ -818,6 +818,38 @@ internal sealed class MissionWorkspace
     }
 
     /// <summary>
+    /// The item of the Mission tab that follow mode shows for a reference of an agent edit (section 8.5 of the MCP1
+    /// design), or null. A script that the mission run did not read yet has no analysis, so only its root shows then. A
+    /// template of a prefab gives null, because follow mode does not open prefab mode.
+    /// </summary>
+    /// <param name="script">The install path of the script of the reference.</param>
+    /// <param name="analysis">The analysis of the script, or null before the mission run reads it.</param>
+    /// <param name="acts">The acts of the graph file, for the reference of an act, or null.</param>
+    internal static MissionRef? FollowItem(string script, string reference, MissionAnalysis? analysis, MissionActs? acts)
+    {
+        if (PrefabRef.OfScript(script) != null)
+        {
+            return null;
+        }
+
+        if (analysis != null)
+        {
+            return SelectionOf(analysis, reference, acts);
+        }
+
+        try
+        {
+            return ItemRefs.Parse(reference) is { Kind: ItemRefKind.Script, Path: { } path } && VfsPath.Comparer.Equals(path, script)
+                ? MissionRef.Of(script)
+                : null;
+        }
+        catch (EditException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// A selection after renames and row moves: a selected item that a rename renamed gets its new name, and a selected
     /// line of a trigger keeps its line when the rows before it moved (section 8.10 of the M6b design). Null when nothing
     /// changes it.
