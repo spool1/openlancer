@@ -152,17 +152,19 @@ These tools change the data of the active mod. They work in both hosts. The olto
 | Tool | What it does |
 |---|---|
 | `set_fields` | Sets fields of one item by their INI keys. |
-| `set_text` | Sets the name, the infocard or another text of one item. The text goes into the `strings.json` of the active mod. |
+| `set_text` | Sets the name, the infocard or another text of one item, or a text id of a mission line. The text goes into the `strings.json` of the active mod. |
 | `rename_item` | Gives an item a new nickname, and changes each line that names it. A line that the active mod cannot change keeps the old nickname and shows "Missing". A data item must be an item that the active mod adds. |
-| `delete_items` | Deletes items of a system with their children. Other lines that name them show "Missing". |
-| `duplicate_items` | Copies items of a system with their children. With `offset`, the copies move by the offset. A copy without a position does not move, and the result warns about it. |
+| `delete_items` | Deletes items of a system with their children, and mission items. Other lines that name them show "Missing". |
+| `duplicate_items` | Copies items of a system with their children, and mission items. With `offset`, the copies of a system move by the offset. A copy without a position does not move, and the result warns about it. |
 | `undo` | Undoes the last edit of the agent. |
 | `redo` | Redoes the last edit that the agent undid. |
 | `edit_batch` | Runs edit steps as one Undo step, all or nothing. |
 
 Each edit is one Undo step. The Edit menu shows its label with "Agent: " before it, for example "Undo Agent: Delete my_station_1". You can undo and redo each agent edit, as each of your own edits. `undo` undoes only an agent edit at the top of the history. `redo` redoes only an agent edit that the agent undid. So the agent never undoes your edit, and never redoes an edit that you undid with Ctrl+Z. All agent programs of one editor have the same edit origin. So `undo` of one agent program can undo the last edit of another agent program.
 
-The edit tools change only items of INI files. A reference of a mission item or of a cutscene gives the error `not_available`. Use the mission tools for the mission scripts. See "The mission tools". The cutscene tools come with a later version. A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. `delete_items` takes items of a system only: objects, zones, lights, nebulae and asteroid fields. `duplicate_items` takes objects, zones and lights of a system. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. Another section, for example a loadout, gives `refused`.
+The five tools `set_fields`, `set_text`, `rename_item`, `delete_items` and `duplicate_items` also change mission items. "The generic tools on mission items" tells which references each tool takes. The other edit tools change only items of INI files that are not mission files. A reference of a mission item gives them `invalid_argument` with the detail `MissionItem`. A reference of a cutscene gives the error `not_available`, because the cutscene tools come with a later version.
+
+A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. Of the items of a system, `delete_items` takes objects, zones, lights, nebulae and asteroid fields. `duplicate_items` takes objects, zones and lights of a system. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. Another section, for example a loadout, gives `refused`.
 
 #### Values of set_fields
 
@@ -174,6 +176,8 @@ The edit tools change only items of INI files. A reference of a mission item or 
 - `null` or `[]` removes the key. The engine then uses its default.
 
 A value never holds a comma. The key line, a key of linked lines and the `file` of a system are locked, and `get_item` marks them. Use `rename_item` for the nickname. A value that a list check refuses still applies, as in the Inspector. The result gives the problem in `new_problems`.
+
+A mission item takes the field forms of `mission_add_item` in place of these forms, and it runs in strict mode. See "The generic tools on mission items".
 
 #### Preview, confirmation and revision
 
@@ -273,7 +277,7 @@ These steps build an NPC patrol and a wreck with cargo in a system.
 
 ### The mission tools
 
-The mission tools change the mission scripts of the active mod with the commands of the mission studio. They work in both hosts. `mission_edit` runs any commands of the mission studio. The trigger tools of "The trigger tools" add and change triggers and their lines with named arguments. `mission_add_item` adds a ship, an NPC or another item of a mission, as "The item tool" tells.
+The mission tools change the mission scripts of the active mod with the commands of the mission studio. They work in both hosts. `mission_edit` runs any commands of the mission studio. The trigger tools of "The trigger tools" add and change triggers and their lines with named arguments. `mission_add_item` adds a ship, an NPC or another item of a mission, as "The item tool" tells. The generic edit tools rename, delete, copy and change mission items, as "The generic tools on mission items" tells.
 
 `mission_edit` runs a list of commands. Each call is one Undo step with all its commands, as each other edit tool. It takes `preview`, `with_patch`, `if_revision` and `confirm`, as the edit tools do.
 
@@ -362,7 +366,7 @@ The fields are the keys of the section, as `get_item` gives them for an item of 
 - An object of values by name, for a key with more than one value. For example, `"rel_pos": {"heading": 90, "anchor": "my_station", "range": 500}`. `describe_mission_name` does not give the names of the keys of a section. Read the item with `get_item` to see them.
 - `{"texts": [...]}`: the value texts by position. The editor checks only the form of the line. For example, `"type": {"texts": ["ids", "12345"]}` for an objective. An empty list is a line without values: the editor gives each default value, or refuses a value that the key needs.
 - For a key that repeats, for example `label`, `cargo` or the `ship` lines of a formation, a list of these forms. Each form is one line. One form without a list is one line too. For a key that repeats with a position, a list of numbers is one position. For example, `"formation_position": [0, 0, 100]` of a random encounter is one line, and `[[0, 0, 100], [0, 0, 200]]` is two lines.
-- `null` writes no line.
+- `null` or an empty list writes no line.
 
 The tool writes the lines in the order of `fields`, with two exceptions:
 
@@ -391,6 +395,28 @@ This call adds a ship with the NPC `my_pirate_npc` at a position in the system `
   "fields": { "npc": "my_pirate_npc", "system": "my_system", "position": [8000, 0, -2000], "label": ["my_pirates"] }
 }
 ```
+
+#### The generic tools on mission items
+
+`set_fields`, `set_text`, `rename_item`, `delete_items` and `duplicate_items` also change the items of a mission script and of the ship build file of a script. Each call runs the commands of the mission studio in one Undo step and in strict mode, as the mission tools do. One call can name items of a system and mission items together. All its commands are then one Undo step. The result gives `versions`, and `inverse` and `row_moves` when the call changed a mission item.
+
+| Tool | Mission references | What it does with them |
+|---|---|---|
+| `set_fields` | `sec:` of an item, for example a ship, an NPC, a ship build or the `[Mission]` section | Sets each key with the field forms of `mission_add_item`. `null` or `[]` removes the key. |
+| `set_text` | `line:`, `trg:` and `sec:` | Puts the text into the `strings.json` of the active mod, and the line gets its placeholder. See below. |
+| `rename_item` | `trg:` and `sec:` | Renames the trigger or the item, as F2 does. Each line that names it changes too. |
+| `delete_items` | `trg:`, `inst:` and `sec:` | Deletes as Delete in the graph and the Hierarchy does. See below. |
+| `duplicate_items` | `trg:` and `sec:` | Copies as Ctrl+D does. A trigger copy gets the name of the trigger with `_2`, `_3` and so on. Each copy goes to the end of its file. |
+
+`set_fields` does not change a trigger, because its lines are conditions and actions: it gives `refused`. Use the trigger tools or `mission_edit` for them. The key line `nickname` gives `refused` too. Use `rename_item` for the name. A key that the section does not have gives `invalid_value` with the detail `NotAKey`, and the message gives the keys of the section. The orders of an order list are not fields: use `mission_edit` with `set_orders`.
+
+With a `line:` reference, `field` of `set_text` is the name of the value, for example `text` of `Act_ChangeState`. With a `trg:` or `sec:` reference, `field` is the key of a line, for example `individual_name` of an `[NPC]`. The tool then sets the first text id of the first line of the key. An item without such a line gets the line in the same Undo step, as the mission studio does. A trigger without such a line gives `invalid_argument`: add the action first. A key without a text id gives `invalid_argument` with the detail `NotTextId`. The message then gives the keys of the item that hold a text id.
+
+`delete_items` deletes a trigger, a prefab instance with its members, and each other item. A mission ship goes with its NPC and its ship build when nothing else uses them. When lines name a deleted item, they stay and show "Missing", and the delete needs `confirm: true`. An `[NPC]` that a ship names and a ship build that an `[NPC]` names give `refused` with the detail `RequiredBy`. The `[Mission]` section gives `refused`. To delete a whole script, use `mission_edit` with `delete_script`.
+
+`duplicate_items` with `offset` moves no mission copy. The result warns about each mission copy. Set the position of a copy with `set_fields`.
+
+Each tool refuses the other mission references with `invalid_argument` and the detail `MissionItem`. Examples are a `label:` reference, a `line:` reference in `delete_items`, and a `msn:` or `act:` reference. The message names the tool for the change, for example `mission_edit` with `remove_action` to delete a line. Each edit tool refuses a section of another file under `DATA\MISSIONS`, for example a pilot file or the shared ship build file. It gives `refused` with the detail `WorldFile`, because encounters and bases use the data of these files too.
 
 ### Save
 

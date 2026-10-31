@@ -198,18 +198,18 @@
     },
     "set_fields": {
       "title": "Set the fields of an item",
-      "description": "Sets fields of one section by their INI keys. The tool makes one Undo step. Use get_item to see the keys and the values first. A value that a list check refuses applies, and the result gives the new problem.",
+      "description": "Sets fields of one section by their INI keys. The tool makes one Undo step. Use get_item to see the keys and the values first. A value that a list check refuses applies, and the result gives the new problem. A mission item runs in strict mode, so an edit that adds an error to its script refuses.",
       "fields": {
-        "ref": "The reference of the item, for example obj:my_station_1 or list:ship/my_ship.",
-        "fields": "The new values by INI key. A text, a number or true or false is one line with one value. An array of values is one line, for example [1, 2, 3]. An array of arrays gives one line for each array. null or [] removes the key. A text cannot hold ','."
+        "ref": "The reference of the item, for example obj:my_station_1 or list:ship/my_ship. A mission item takes its sec: reference, for example of a ship or an NPC. A trigger refuses. Use the mission tools for its lines.",
+        "fields": "The new values by INI key. A text, a number or true or false is one line with one value. An array of values is one line, for example [1, 2, 3]. An array of arrays gives one line for each array. null or [] removes the key. A text cannot hold ','. A mission item takes the field forms of mission_add_item."
       }
     },
     "set_text": {
       "title": "Set a text of an item",
-      "description": "Sets the name, the infocard or another text of one section. The text goes into the strings.json of the active mod. The tool makes one Undo step.",
+      "description": "Sets the name, the infocard or another text of one section, or a text id of a mission line. The text goes into the strings.json of the active mod. The tool makes one Undo step.",
       "fields": {
-        "ref": "The reference of the item, for example obj:my_station_1.",
-        "field": "name for the name, info for the infocard, or the INI key of another text, for example ids_short_name.",
+        "ref": "The reference of the item, for example obj:my_station_1. A mission item takes a line: reference, a trg: reference or its sec: reference.",
+        "field": "name for the name, info for the infocard, or the INI key of another text, for example ids_short_name. With a line: reference, the name of the value, for example text. With a trigger or another mission item, the key of the line, for example individual_name.",
         "text": "The plain text. An infocard gets one paragraph for each line."
       }
     },
@@ -217,7 +217,7 @@
       "title": "Rename an item",
       "description": "Gives an item a new nickname and changes each line that names it. The tool makes one Undo step. When the rename warns, cannot change a line that names the item, or other files name it as text, the tool asks for confirm: true.",
       "fields": {
-        "ref": "The reference of the item, for example obj:my_station_1. A data item must be an item that the active mod adds.",
+        "ref": "The reference of the item, for example obj:my_station_1. A data item must be an item that the active mod adds. A trigger takes its trg: reference, and another mission item its sec: reference.",
         "new_name": "The new nickname. A refusal tells why a nickname is not valid."
       }
     },
@@ -225,15 +225,15 @@
       "title": "Delete items",
       "description": "Deletes items with their children. Other lines that name them show 'Missing'. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true.",
       "fields": {
-        "refs": "The references of the items, for example obj:my_station_1. The tool deletes objects, zones, lights, nebulae and asteroid fields of a system. studio_status gives the most items of one call."
+        "refs": "The references of the items, for example obj:my_station_1. The tool deletes objects, zones, lights, nebulae and asteroid fields of a system. It also deletes triggers, prefab instances and other mission items: trg:, inst: and sec: references. studio_status gives the most items of one call."
       }
     },
     "duplicate_items": {
       "title": "Copy items",
-      "description": "Copies items of a system with their children. Each copy gets the next free nickname. The tool makes one Undo step. The result gives the references of the copies.",
+      "description": "Copies items of a system with their children, and mission items. Each copy gets the next free nickname. The tool makes one Undo step. The result gives the references of the copies.",
       "fields": {
-        "refs": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. studio_status gives the most items of one call.",
-        "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position does not move, and the result warns about it. Without it, each copy is at the place of its item."
+        "refs": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. It also copies triggers and other mission items: trg: and sec: references. studio_status gives the most items of one call.",
+        "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position and a mission copy do not move, and the result warns about them. Without it, each copy is at the place of its item."
       }
     },
     "scene_create_object": {
