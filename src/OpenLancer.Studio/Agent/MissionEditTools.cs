@@ -268,9 +268,9 @@ internal static class MissionEditTools
         return EditTools.Apply(call, scope =>
             scope.RunMission(new MissionBatch("", [new ReorderAction(row) { Before = before }]), error => error.Detail switch
             {
-                // The command names the line of the argument line in the target, and the row of before in no target.
+                // A row error of the argument line has a target. A row error of before has none.
                 MissionErrors.RowNotFound or MissionErrors.BadPlace when error.Target == null => "before",
-                // The command checks the line first, so a line that is not an action and is not that line is before.
+                // The command checks the line first. So a refused line with another row is the line of before.
                 MissionErrors.NotAnAction when error.Target is { } target && RowRef.Parse(target).Row != row.Row => "before",
                 _ => "line",
             }));
