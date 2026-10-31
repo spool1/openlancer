@@ -368,7 +368,7 @@ This call adds a trigger that the trigger `my_start` starts. The new trigger wai
 The fields are the keys of the section, as `get_item` gives them for an item of the same kind. A key that the section does not have gives `invalid_value` with the detail `NotAKey`, and the message gives the keys of the section. A random encounter takes each key, because the encounter reads the keys of its own grammar. The editor checks only the keys of a random encounter that it knows. The value of each field has one of these forms:
 
 - One value: a number, a text, `true` or `false`. For example, `"system": "my_system"`.
-- A list of numbers or texts for a position, a rotation or the values of one line. For example, `"position": [0, 0, 1000]` or `"npc_class": ["lawful", "d5"]`.
+- A list of numbers or texts for a position, a rotation or the values of one line. For example, `"position": [0, 0, 1000]` or `"npc_class": ["lawful", "d5"]`. A position or a rotation also takes the text with commas that `get_trigger` and `get_item` give, for example `"position": "0, 0, 1000"`. So an agent can read a line, change one value and write the values back.
 - An object of values by name, for a key with more than one value. For example, `"rel_pos": {"heading": 90, "anchor": "my_station", "range": 500}`. `describe_mission_name` does not give the names of the keys of a section. Read the item with `get_item` to see them.
 - `{"texts": [...]}`: the value texts by position. The editor checks only the form of the line. For example, `"type": {"texts": ["navmarker", "my_system", "12345", "12346", "0", "0", "0"]}` for an objective. An empty list is a line without values: the editor gives each default value, or refuses a value that the key needs.
 

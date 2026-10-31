@@ -171,6 +171,17 @@ public sealed partial class AgentMissionToolTests
         var one = Ok(host, "mission_set_action", $$"""{ "line": "{{WaveLine(3)}}", "values": { "ship": "ol_ship_3" } }""");
         Assert.Equal("Agent: Set ship", (string?)one["undo_label"]);
         Assert.Equal("Act_SpawnShip = ol_ship_3", m.Lines("ol_wave")[3]);
+
+        // get_trigger gives a position as one text with commas. The tool takes that text back, so an agent can read a
+        // line, change one value and write the values back (final finding 16 of MCP1-3).
+        Ok(host, "mission_set_action", $$"""{ "line": "{{WaveLine(3)}}", "values": { "orders": "no_ol", "position": "100, 200, 300" } }""");
+        Assert.Equal("Act_SpawnShip = ol_ship_3, no_ol, 100, 200, 300", m.Lines("ol_wave")[3]);
+        var values = Ok(host, "get_trigger", $$"""{ "ref": "{{Wave}}", "include_lines": true }""")["lines"]!.AsArray()
+            .Single(l => (int?)l!["row"] == 3)!["values"]!.AsObject();
+        Assert.Equal("100, 200, 300", (string?)values["position"]);
+        values["position"] = "110, 200, 300";
+        Ok(host, "mission_set_action", $$"""{ "line": "{{WaveLine(3)}}", "values": {{values.ToJsonString()}} }""");
+        Assert.Equal("Act_SpawnShip = ol_ship_3, no_ol, 110, 200, 300", m.Lines("ol_wave")[3]);
     }
 
     /// <summary>mission_move_action moves an action before another line of its trigger. The result gives the row

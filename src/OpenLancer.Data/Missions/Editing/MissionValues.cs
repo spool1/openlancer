@@ -178,7 +178,12 @@ internal static class MissionValues
     {
         if (spec.Width > 1)
         {
-            var numbers = value.Type == MissionValueType.List ? value.Items : [];
+            // get_trigger and get_item give a position or a rotation as one text with commas, for example
+            // "100, 200, 300". The line reader takes that form too, so an agent can write back the values that it read
+            // (final finding 16 of MCP1-3).
+            var numbers = value.Type == MissionValueType.List ? value.Items
+                : value.Type == MissionValueType.Text ? value.Text.Split(',').Select(t => MissionValue.Of(t.Trim())).ToList()
+                : [];
             var what = spec.Kind == MissionValueKind.Rotation ? $"{spec.Width} numbers" : $"{Words(spec.Width)} numbers";
             if (numbers.Count != spec.Width)
                 throw Refuse(MissionErrors.ValueKindError(value.ToString(), spec.Kind == MissionValueKind.Position
