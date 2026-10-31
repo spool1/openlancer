@@ -185,6 +185,56 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal(["mission_edit", "mission_edit", "mission_edit"], host.Refusals.Select(r => r.Tool));
     }
 
+    /// <summary>Strict mode compares only the problems of the mission checks. The save gate has more rules. In a mod
+    /// that names a retail target, one rule is that the loadout of a ship build has an engine. A manifest of format
+    /// version 1 names each target, so the mod of the test names the retail targets. Strict mode applies the build.
+    /// check with the scope mission does not give the error. check with the scope all gives it, and save gives
+    /// save_blocked. So step 8 of the prompt two_trigger_mission also calls check with the scope all.</summary>
+    [Fact]
+    public void OnlyTheScopeAllGivesTheGateErrorOfAShipBuildWithoutAnEngine()
+    {
+        var (m, host) = Open(setup: ws =>
+        {
+            ws.WriteBase(@"EXE\freelancer.ini", $"""
+                [Freelancer]
+                data path = ..\data
+
+                {TestWorkspace.ResourcesSection}
+
+                [Data]
+                equipment = equipment\engine_equip.ini
+                loadouts = ships\loadouts.ini
+                """);
+            ws.WriteBase(@"DATA\EQUIPMENT\engine_equip.ini", "[Engine]\nnickname = ol_engine\n");
+            ws.WriteBase(@"DATA\SHIPS\loadouts.ini", """
+                [Loadout]
+                nickname = ol_loadout
+                equip = ol_engine
+
+                [Loadout]
+                nickname = ol_loadout_2
+                """);
+        });
+        using var _ = m;
+        var script = Json($"msn:{Script}");
+
+        var added = Ok(host, "mission_add_item", AddItem("ship_build", "ol_build_2",
+            """{ "ship_archetype": "ol_arch", "loadout": "ol_loadout_2", "level": "d5" }"""));
+        var mission = Ok(host, "check", $$"""{ "scope": "mission", "ref": {{script}} }""");
+        var all = Ok(host, "check");
+        var saved = Error(host, "save");
+
+        Assert.Equal("applied", (string?)added["status"]);
+        Assert.Equal((0, false), ((int)mission["errors"]!, (bool)mission["save_blocked"]!));
+        Assert.Equal((1, true), ((int)all["errors"]!, (bool)all["save_blocked"]!));
+        var error = all["problems"]!.AsArray().Single(p => (string?)p!["severity"] == "error")!;
+        Assert.Equal($"sec:{Ships}#NPCShipArch/ol_build_2", (string?)error["ref"]);
+        Assert.StartsWith("NPC ship 'ol_build_2': its loadout 'ol_loadout_2' has no engine.", (string?)error["message"]);
+        Assert.Equal(("save_blocked", "Gate"), (saved.Code, saved.Detail));
+        Assert.Contains("has no engine", saved.Message);
+        Assert.True(m.Session.IsDirty);
+    }
+
     /// <summary>A delete that leaves "Missing" lines asks for confirm: true (decision D712 of the MCP1 design). A
     /// preview tells it with needs_confirmation, and its warnings tell why, as the preview of the mission studio does
     /// (section 4.0.1 of the M6b design). The call with confirm: true applies.</summary>
