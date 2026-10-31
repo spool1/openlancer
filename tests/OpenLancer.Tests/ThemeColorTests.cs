@@ -133,6 +133,50 @@ public sealed class ThemeColorTests
         Assert.True(distance >= 25, $"{other} has a hue of {otherHue:0} degrees, only {distance:0} degrees from the run color.");
     }
 
+    /// <summary>The green of the Play button of a trigger node (note of 2026-10-27 in section 8.1 of the M6c design)
+    /// differs in hue by 25 degrees or more from the run states of the dry run and the live view, a selection, a warning,
+    /// an error, the mission items and the prefab overrides. So the button does not look like a run state.</summary>
+    [Theory]
+    [InlineData(nameof(EditorTheme.MissionRun))]
+    [InlineData(nameof(EditorTheme.Accent))]
+    [InlineData(nameof(EditorTheme.Warning))]
+    [InlineData(nameof(EditorTheme.Error))]
+    [InlineData(nameof(EditorTheme.MissionItem))]
+    [InlineData(nameof(EditorTheme.Override))]
+    public void ThePlayColorHasItsOwnHue(string other)
+    {
+        var (hue, saturation) = Hsv(EditorTheme.Play);
+        var (otherHue, _) = Hsv(ThemeColor(other));
+        var distance = MathF.Abs(hue - otherHue);
+        distance = MathF.Min(distance, 360 - distance);
+
+        Assert.True(saturation >= MinSaturation);
+        Assert.True(distance >= 25, $"{other} has a hue of {otherHue:0} degrees, only {distance:0} degrees from the Play color.");
+    }
+
+    /// <summary>The Play glyph is a mark that is not text, so it needs a contrast of 3:1 or more (WCAG 1.4.11): on the
+    /// node header, on the fill under the mouse (the green at alpha 0.25 over the header), and as the dark glyph on the
+    /// green fill of a press.</summary>
+    [Fact]
+    public void ThePlayButtonHasContrastInEachState()
+    {
+        var header = EditorTheme.GraphNodeHeader;
+        var hover = Vector4.Lerp(header, EditorTheme.Play, 0.25f) with { W = 1 };
+
+        Assert.True(Contrast(EditorTheme.Play, header) >= 3, $"Normal: {Contrast(EditorTheme.Play, header):0.00}:1.");
+        Assert.True(Contrast(EditorTheme.Play, hover) >= 3, $"Under the mouse: {Contrast(EditorTheme.Play, hover):0.00}:1.");
+        Assert.True(Contrast(header, EditorTheme.Play) >= 3, $"Pressed: {Contrast(header, EditorTheme.Play):0.00}:1.");
+    }
+
+    /// <summary>The warning chip of a graph line and of the play start is the grey chip with the warning color for its
+    /// text.</summary>
+    [Fact]
+    public void TheWarningChipIsTheGreyChipWithWarningText()
+    {
+        Assert.Equal(ChipLook.Grey with { Text = EditorTheme.Warning }, ChipLook.GreyWarning);
+        Assert.NotEqual(ChipLook.Grey.Text, ChipLook.GreyWarning.Text);
+    }
+
     /// <summary>The violet bar of an override is a mark that is not text, so it needs a contrast of 3:1 or more against
     /// each background of a label cell (WCAG 1.4.11).</summary>
     [Theory]

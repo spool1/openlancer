@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
@@ -88,6 +89,59 @@ public sealed class MissionPlayTests : IDisposable
         Assert.Equal(new PlayStartSetting("t_kill", "camera"), plays.PlayStartOf(ScriptPath));
         var start = Assert.IsType<MissionPlayStart>(Assert.Single(editor.Requests));
         Assert.Equal((MissionStartPoint.At("t_kill"), StartPlaceChoice.Camera), (start.Request.Start, start.Request.Place));
+    }
+
+    /// <summary>The Play buttons of the nodes of the tests, with passes that run at once.</summary>
+    private static PlayFromHereStates Buttons() => new(_ => null, _ => { }, (pass, _) => Task.FromResult(pass()));
+
+    /// <summary>A click on the Play button of a node (note of 2026-10-27 in section 8.1 of the M6c design) plays after the
+    /// canvas, as "Play from here" does: it sets the play start and plays the start that the state of the button shows,
+    /// the trigger at the place of the state. The click plays once.</summary>
+    [Fact]
+    public void AClickOnAPlayButtonPlaysTheStartOfItsState()
+    {
+        plays.SetPlayStart(ScriptPath, new PlayStartSetting("t_restore", "base:ol_base_a"));
+        var states = PlayFromHereStates.Make(editor.Index, editor.Slot, plays.PlayStartOf(ScriptPath),
+            System.Threading.CancellationToken.None);
+        var state = states["t_kill"];
+        var buttons = Buttons();
+        Assert.Null(buttons.PlayClick(plays, ScriptPath));
+
+        buttons.Click(editor.Index.Trigger("t_kill")!, 1);
+        var result = buttons.PlayClick(plays, ScriptPath);
+
+        Assert.NotNull(result);
+        Assert.Null(buttons.PlayClick(plays, ScriptPath));
+        Assert.Equal(new PlayStartSetting("t_kill", "base:ol_base_a"), plays.PlayStartOf(ScriptPath));
+        var start = Assert.IsType<MissionPlayStart>(Assert.Single(editor.Requests));
+        var plan = StartPlan.Make(editor.Index, editor.Slot, start.Request.Start, start.Request.Place, start.Request.PlaceBase);
+        Assert.Equal(MissionStartPoint.At("t_kill"), start.Request.Start);
+        Assert.True(start.Request.FromPlayStart);
+        Assert.Equal((state.CanStart, state.Place), (plan.CanStart, plan.Place));
+        Assert.Equal(StartPlaceKind.Base, state.Place.Kind);
+    }
+
+    /// <summary>A double-click on a Play button plays once. The release that ends the double-click, and each later click
+    /// in the row, does not start the game again. A click that the frame does not play is gone in the next
+    /// frame.</summary>
+    [Fact]
+    public void ADoubleClickOnAPlayButtonPlaysOnce()
+    {
+        var buttons = Buttons();
+        var trigger = editor.Index.Trigger("t_kill")!;
+
+        buttons.Click(trigger, 1);
+        buttons.PlayClick(plays, ScriptPath);
+        buttons.Click(trigger, 2);
+        Assert.Null(buttons.PlayClick(plays, ScriptPath));
+        buttons.Click(trigger, 3);
+        Assert.Null(buttons.PlayClick(plays, ScriptPath));
+
+        Assert.Single(editor.Requests);
+        buttons.Click(trigger, 1);
+        buttons.Sync(null, PlayStartSetting.Default, false);
+        Assert.Null(buttons.PlayClick(plays, ScriptPath));
+        Assert.Single(editor.Requests);
     }
 
     /// <summary>The agent play rule: with unsaved edits, the editor asks. Cancel gives refused with the reason, and no
@@ -277,6 +331,28 @@ public sealed class MissionPlayTests : IDisposable
         Assert.Equal("M99", start.Slot);
         Assert.True(start.Approximate);
         Assert.Equal(start.Plan.Setup.Select(t => t.Nickname), start.SetupTriggers);
+    }
+
+    /// <summary>Play makes the plan again with the place of the play after the start check (the note of 2026-10-28 in
+    /// section 5.3 of the M6c design). A start at the Scene camera then makes only the world of the camera system, and
+    /// the companions start next to the camera.</summary>
+    [Fact]
+    public void ThePlanOfThePlayUsesThePlaceOfThePlay()
+    {
+        editor.Index = MissionTestData.Index(StartWorldTests.Script(), StartWorldTests.World());
+        editor.Camera = new StartSavePlace("ol_sys_b", null, new Vector3(-5000, 0, 0), Quaternion.Identity);
+        plays.Request(new MissionPlayRequest(ScriptPath, MissionStartPoint.At("t_chosen")) { Place = StartPlaceChoice.Camera });
+        var start = (MissionPlayStart)editor.Requests[0];
+
+        var fromSave = start.Prepare();
+
+        Assert.NotNull(fromSave);
+        Assert.Contains(start.Plan!.LeftOut, l => l.Object == "ol_guard");
+        Assert.DoesNotContain(StartWorld.CameraWarning, start.Plan.Warnings);
+        var patch = Directory.GetFiles(fromSave.TestLayer!, "*.ini", SearchOption.AllDirectories).Single();
+        var text = File.ReadAllText(patch);
+        Assert.Contains("Act_RelocateShip = ol_wing, -5300, 0, 0, 1, 0, 0, 0", text);
+        Assert.DoesNotContain("ol_guard", text);
     }
 
     private const string PlayStartNote = "The play start of M99 named trigger 't_gone'. The script does not have this " +
@@ -493,9 +569,14 @@ public sealed class MissionPlayTests : IDisposable
             return Missing == null ? (Index, Slot) : null;
         }
 
+        /// <summary>The place of a start at the Scene camera, or null for the point of the plan.</summary>
+        public StartSavePlace? Camera { get; set; }
+
         public StartSavePlace? PlaceOf(StartPlace place, out string? problem)
         {
             problem = null;
+            if (place.Kind == StartPlaceKind.Camera && Camera != null)
+                return Camera;
             return place.Kind == StartPlaceKind.Base
                 ? StartSavePlace.AtBase("ol_sys_a", place.Base!)
                 : new StartSavePlace(place.System ?? "ol_sys_a", null, place.Position, place.Orientation);

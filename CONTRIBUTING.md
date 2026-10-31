@@ -4,7 +4,7 @@ OpenLancer is a mod editor for Freelancer (2003). This file tells you how to bui
 
 ## Before you start
 
-1. Read [ROADMAP.md](ROADMAP.md). Each pull request belongs to one milestone of the roadmap.
+1. Read [ROADMAP.md](ROADMAP.md). Each pull request belongs to one milestone of the roadmap. Each open milestone has an issue with the label `roadmap`, and the boxes of the issue are its tasks.
 2. For work that is not in a milestone, open an issue first. Wait for an answer from the owner before you start.
 3. For a new milestone or a large change, write a short design in the issue. The owner reviews the design before you build it.
 

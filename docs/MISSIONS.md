@@ -44,8 +44,8 @@ The Mission tab shows the open mission as a graph. The Scene part is at its righ
 
 ### The graph
 
-- Each node is one trigger. Its header has the glyph of its event, its name, and the chips "Start" and "Repeats". Its body shows the event and the actions as a summary. With "Show lines", it shows each line.
-- The pins at the left take a start, a stop, a load from a checkpoint and a watch. The pins at the right give them. The "+" pin in the header starts or stops another trigger.
+- Each node is one trigger. Its header has the glyph of its event, its name, and the chips "Start" and "Repeats". When the name or a chip does not fit, hover the name to read all of the header. Its body shows the event and the actions as a summary. With "Show lines", it shows each line.
+- The pins at the left take a start, a stop, a load from a checkpoint and a watch. The pins at the right give them. The "+" pin in the header starts or stops another trigger. The green Play button of a node plays the mission from its trigger (see "Set the play start and play").
 - A frame groups triggers: an act, the frame "Not started by the mission", or a behavior prefab. Click the arrow of a frame to collapse it into one node.
 - The marks at the right of a header show errors, warnings, the muted base-game messages, "Never starts" and "Watched state". Hover a mark to read the reasons.
 
@@ -170,20 +170,28 @@ Play from a trigger starts the mission in the OpenLancer game at a point of the 
 |---|---|---|
 | Mission start | The start triggers | The mission starts as a new mission. Exact. |
 | Checkpoint {trigger} | The restore trigger of an `Act_Save` line | The triggers of a saved game at that checkpoint. Exact for the triggers. A saved game also keeps the objective, the dock and lane rules, the reputations and other state from before the save. The start save does not keep them, and the Play start page warns about it. |
-| {trigger} (approximate) | Each other trigger | The triggers that wait at that point, and two setup triggers that rebuild the state of the path. Some state can differ, for example damage or the cargo of a ship. |
+| {trigger} (approximate) | Each other trigger | The triggers that wait at that point, and two setup triggers that rebuild the state of the path. The setup makes only the objects of the start system. The ships that travel with the player start next to the player. Some state can differ, for example damage or the cargo of a ship. |
 
 ### Set the play start and play
 
 1. Open a mission.
-2. Right-click a trigger in the graph.
-3. Click "Play from here". The trigger becomes the play start, and the game starts. To set the play start without a play, click "Set as play start". Click it again to make the mission start the play start again.
+2. Click the green Play button in the header of a trigger node. Play saves the edits of the active mod first, as F5 does. The trigger becomes the play start, and the game starts. You can also right-click the trigger and click "Play from here".
+3. To set the play start without a play, right-click the trigger and click "Set as play start". Click it again to make the mission start the play start again.
 4. Press F5 in the Mission tab to play from the play start again.
+
+The Play button of a node shows only when a play can start at its trigger now. The button uses the start place that you pick on the Play start page. Its tooltip names the start and the start place with the texts of the Play start page. For the start place "Suggested", the tooltip also gives the source of the place. A click on the button does not select or move the node. While a mission play runs, a click starts the game again at that trigger.
+
+When a trigger cannot start, its node has no Play button, and "Play from here" in its node menu is off. The tooltip of the item gives the reason. Examples are a path that another trigger stops, a start place that the game data does not have, and a script without a story slot. Prefab mode shows no Play buttons.
+
+When the start place cannot work for any trigger, no node shows a Play button. Examples are a base that the game data does not have, and the Scene camera without an open system. A warning chip then follows the toolbar chip "Play start", and its tooltip gives the reason.
+
+After an edit, the editor finds again which triggers can start. It does this in the background. The buttons do not run the mission checks of the setup triggers. Play runs them when it starts. When a check fails, the play does not start, and the Console gives the reason.
 
 The trigger of the play start has the chip "Play start". The toolbar chip "Play start: {start}" names the start. A click on it shows the Play start page in the Inspector, and the graph selects and frames the trigger of the play start.
 
 The play start is a setting of the editor for each profile and script. It is not data of the mod, so a change of it has no Undo entry, and the mod does not change. When you rename the trigger, the play start follows the rename, also its Undo and its Redo. The start of a running mission play follows the rename too. When the script does not have the trigger any more, F5 plays the mission start. The play start then becomes the mission start, and the Console tells it.
 
-The Play menu has the submenu "Play mission". It is available while a mission is open in the Mission tab. Its items are "From the play start", "From the mission start" and one item for each checkpoint. The item of the play start shows F5 while F5 runs it. The mission start and the checkpoints start at their suggested start places. While a mission play runs, the submenu also has "Restart the mission". Only "Play from here" and "Set as play start" change the play start.
+The Play menu has the submenu "Play mission". It is available while a mission is open in the Mission tab. Its items are "From the play start", "From the mission start" and one item for each checkpoint. The item of the play start shows F5 while F5 runs it. The mission start and the checkpoints start at their suggested start places. While a mission play runs, the submenu also has "Restart the mission". Only the Play button of a node, "Play from here" and "Set as play start" change the play start.
 
 In the Scene and Cutscene tabs, and in the Mission tab without an open mission, F5 stays Play from camera.
 
@@ -199,6 +207,8 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 | Source of the place | The line of the script that gives the suggested place, for example Act_SetInitialPlayerPos of key_save_x. When another line gives the system or the point, the text names that line too. Click "Select {trigger}" to select the trigger of the line in the graph. The row shows only for the suggested place. |
 | Ship | The ship package of the Play menu. |
 | Triggers that wait at the start | The triggers that are active when the play starts. Click a row to select the trigger. |
+| Objects that the setup leaves out ({n}) | A closed list of an approximate start. At this trigger, these objects are in another system, or a trigger of the start makes them again, so the setup does not make them. The list also has the fuse lines that the setup removes. Click a row to select the trigger of its spawn line. |
+| Ships that start next to the player ({n}) | A closed list of an approximate start. These ships travel with the player at this trigger, and each row tells why. The setup puts them next to the player. Click a row to select the trigger of its spawn line. |
 | Advanced > Setup lines | The setup triggers of an approximate start, as read-only raw INI with colors. They are in the test layer of the play, not in the mod. |
 | Play from the play start | Plays the mission from this start in OpenLancer, as F5 in the Mission tab does. The button is off while the start or its start place cannot start, and its tooltip gives the reason. |
 
@@ -209,6 +219,15 @@ Three warnings are about the start place. They follow the place that you pick:
 - A trigger that waits for the end of the launch does not run after a start in space or at the Scene camera, so the page names it. Pick a base to run it.
 - A trigger that waits for the player to enter space in another system runs in OpenLancer, but not in the linked game.
 - A trigger that waits for a jump into the system of the start does not run in OpenLancer until the next jump into that system. The path to the trigger already made that jump.
+
+Six warnings are about the world of the setup (see "How the setup builds the world"):
+
+- A trigger that waits for an object that the setup leaves out does not run in the play.
+- A trigger that waits for ships to arrive with the player in the start system does not run in the play. The setup makes these ships in the start system, so they do not arrive.
+- A trigger that waits for a label with left-out ships can run before it runs in the game.
+- A start at the Scene camera makes the world of the camera system when the play starts. Until then, the page shows each world line of the path.
+- For a base start without a known dock, the ships that travel with the player keep the points of their lines.
+- A trigger that waits at the start and spawns objects can name another system in its system key. The game does not read that key, so the trigger spawns its objects in the start system.
 
 ### How the editor suggests the start place
 
@@ -233,6 +252,57 @@ When no line gives a point, these rules give it:
 When no line of the path gives a place, the start is at the Scene camera in the system that the Scene shows.
 
 The section "Play a mission" of [PLAY.md](PLAY.md) tells what Play does with the start. It tells about the save, the start save, the test layer and the restart after a save.
+
+### How the setup builds the world
+
+An approximate start has two setup triggers. The first runs at the load. It sets the state of the path, for example the objective, the reputations and the locks. The second makes the world at the launch of the player. The game also sends the launch when a start in space spawns the player, before the entry to space.
+
+After the world lines, the second trigger starts the triggers that wait at the start. So their lines find the ships of the world. A trigger that waits for the launch or for the entry to space still runs at the spawn. For a base start, only a waiting trigger that runs at once with lines on ships starts at the launch. The other triggers start at the load, so a trigger of the base or of a room runs while the player is docked.
+
+The editor runs the path without a game world. So a trigger that waits for an event of the world stays active in the run, also when the game ran it long before the trigger of the start. The editor runs such a trigger when the path shows its event:
+
+- A launch of the path runs each trigger that waits for that launch. Examples are Cnd_PlayerLaunch, and Cnd_SpaceEnter without a system or with the system of the launch.
+- When the path shows the player in space, each trigger that waits for Cnd_InSpace = true runs. When the path shows the player docked, each trigger that waits for Cnd_InSpace = false runs. Before the first line that tells where the player is, a dock shows that the player was in space, and a launch shows that the player was docked.
+- A trigger of the path can complete an objective that no earlier line made active. Then the trigger that makes the objective active ran before. The editor runs it, with the triggers that start it, for example a timer.
+- A jump into a system, a launch in a system or a dock at a base of a system can show the player in a new system. Each trigger that waits for the exit from the old system (Cnd_SystemExit) then runs, and after it each trigger that waits for the entry (Cnd_SystemEnter). A waiting trigger that starts a trigger of the exit runs before it, for example a trigger near the jump gate. So a trigger of the exit can stop a distance check on a point of the old system before the check fails the mission. The system key of a trigger does not show a new system. The condition of the trigger of the start does not show one either, because the run only starts that trigger. A trigger that waits for the end of the jump (Cnd_JumpInComplete) still waits, because it can start a scene.
+
+Such a run must not stop or run a later trigger of the path. Else the editor does not do it, and the trigger waits at the start. The setup keeps the last objective line of the run. A log line (Act_NNIds) after it does not remove it.
+
+The setup trigger of the world rebuilds the world of the path. In the game, the objects of an earlier system stay in that system when the player jumps. So the setup makes only the objects of the start system. That is the system of the start place. For a base start, it is the system of the base. For a start at the Scene camera, it is the system of the camera when the play starts.
+
+The editor follows each object along the path:
+
+- A ship or a formation goes to the system of its record. A record without a system puts it in the system of the player at its spawn line.
+- A solar and a loot always go to the system of the player.
+- A line that moves a ship puts it in the system of the player.
+- When the player jumps, each ship with the jumper flag goes with the player, also from another system. The flag at the time of the jump counts.
+- Such a ship loses its orders when it arrives, as in the game. So the setup removes each order line that such ships got before the jump. Only a jump that a condition of the path shows counts, not a system key.
+- In the game, the arrival of such a ship then runs each trigger that waits for it (Cnd_NPCSystemEnter). Such a trigger can give the ship new orders. The play makes the ship in the start system, so a trigger of the start that waits for its arrival does not run. The setup gives the orders of that trigger to each ship that came with the player and got no orders after the arrival. These lines come after the other world lines.
+- An object whose system no line tells stays in the setup.
+
+The setup leaves out each object that is in another system at the trigger. It also removes each line that names such an object, for example orders, attitudes, marks and fuses. A label with a member in the start system keeps its lines. A line on an object that no line of the setup makes goes too, because it fails in the game. When the path spawns an object two times, only the last spawn line stays. The lines between the two spawn lines that name the object go too.
+
+A trigger that runs at the start can spawn an object of the setup again. Such triggers wait for nothing, for the launch, for the entry to space or for a timer. For a base start, they can also wait for the end of the launch or for the base. The scripts spawn an object again only after the first object left space. So the setup leaves out the old object, and the page names the trigger that makes it again.
+
+Such a trigger can also destroy an object of the setup and not spawn it again. That object does not travel with the player, because it leaves soon after the start. An old timer of the start does not make the objects of a trigger again when the path already ran that trigger. The editor runs the path without time, so it keeps timers that the game ran long before.
+
+A ship or a formation of the start system travels with the player when one of these is true. The path must not make it hostile to the player.
+
+- Its last orders follow, trail or dock with the player, or with another ship that travels with the player.
+- The newest FollowPlayer list of the player names it. A newer list of the player replaces the formation of the player.
+- It jumped with the player, and no later line moved it.
+- A nag keeps the player near it, or a waiting trigger watches its tether.
+
+Such a ship starts next to the player. The first rule that applies gives its point:
+
+1. A ship that is already within 2,500 units of the player keeps its point.
+2. A debug trigger or a checkpoint of the script can move the player to this step and place the ship. Then the ship gets the same offset from the player.
+3. A Follow order with an offset gives that offset.
+4. Else the ship starts in a free slot to the left or to the right of the player.
+
+No ship starts nearer than 50 units to the player or to another ship of this list. A point that is too near goes to the next rule.
+
+For a base start, these ships start 1,000 units in front of the dock of the base. The dock is an object of the system files, or a mission solar of the script that holds the base. When neither exists, they keep their points, and the page warns. Each other object of the start system keeps the point of its lines. An object that the setup leaves out does not come back when the player flies to its system later.
 
 ## The live view
 

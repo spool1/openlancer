@@ -106,6 +106,11 @@ public sealed class PlayStartPageTests
             ("rules help", MissionView.RulesHelp.WhatItIs), ("dry run during play", MissionView.DryRunPlayTip),
             ("play from here", GraphView.PlayFromHereTip), ("set as play start", GraphView.SetPlayStartTip),
             ("dry run from here", GraphView.DryRunFromHereTip), ("node chip", GraphView.PlayStartChip.Tooltip),
+            ("duplicate", PlayFromHereStates.DuplicateReason), ("play runs", PlayFromHereStates.PlayRunsLine),
+            ("exact start", PlayFromHereStates.ExactStart), ("exact triggers", PlayFromHereStates.ExactTriggers),
+            ("approximate start", PlayFromHereStates.ApproximateStart),
+            ("failed pass", PlayFromHereStates.FailedLine("The plan broke.")),
+            ("choice problem", MissionView.ChoiceProblemLead), ("no game data", MissionPlay.NoGameData),
             ("live", RunPanel.LiveHelp.WhatItIs), ("clear", RunPanel.ClearTip),
             ("rules differ", RunOverlay.RulesDifferTip), ("no effect", RunOverlay.NoEffectStallTip),
             ("approximate note", MissionPlayTexts.Approximate),
@@ -126,6 +131,17 @@ public sealed class PlayStartPageTests
             ("restart refused", MissionPlayTexts.RestartRefused(new NamedStart(), "The path is refused.", "save 2")),
             ("restart failed", MissionPlayTexts.RestartFailedInGame(new NamedStart(), "The start save does not load.")),
             ("ship", PlayShips.ShipText(null, null).Tooltip), ("ship missing", PlayShips.ShipText(null, "ol_package").Tooltip),
+            ("left out", PlayStartPageModel.LeftOutTip), ("companions", PlayStartPageModel.CompanionsTip),
+            ("row", PlayStartPageModel.RowTip), ("left out title", PlayStartPageModel.LeftOutLabel(3)),
+            ("companions title", PlayStartPageModel.CompanionsLabel(2)),
+            ("waiting", StartWorld.WaitingWarning("t_wave", "ol_ship", "Li02")),
+            ("label", StartWorld.LabelWarning("t_wave", "ol_label", 2)), ("camera", StartWorld.CameraWarning),
+            ("no dock", StartWorld.NoDockWarning("li01_01_base")),
+            ("spawn elsewhere", StartWorld.OtherSystemWarning("t_wave", "Li04", "Li01")),
+            ("made again", PlayStartPageModel.LeftOutText(new LeftOutObject("ol_ship", StartObjectKind.Ship, "Li01", "t_a")
+            {
+                MadeAgainBy = "t_wave",
+            })),
         };
 
         Assert.Empty(texts.SelectMany(t => SteLint.Problems(t.Text).Select(p => $"{t.Name}: {p}")));

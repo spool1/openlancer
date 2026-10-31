@@ -28,8 +28,9 @@ internal static class StartSetup
     private static readonly string[] Spawns =
         ["Act_SpawnShip", "Act_SpawnShipRel", "Act_SpawnFormation", "Act_SpawnSolar", "Act_SpawnLoot"];
 
-    /// <summary>The objective lines: only the last one counts.</summary>
-    private static readonly string[] Objectives = ["Act_SetNNObj", "Act_NNIds", "Act_NNPath"];
+    /// <summary>The objective lines: only the last one counts. <c>Act_NNIds</c> adds a text to the log and does not
+    /// change the objective, so it has its own last line.</summary>
+    private static readonly string[] Objectives = ["Act_SetNNObj", "Act_NNPath"];
 
     /// <summary>The lines that change the objective of the last objective line. They stay after it.</summary>
     private static readonly string[] ObjectiveChanges = ["Act_SetNNState", "Act_SetNNHidden", "Act_GiveNNObjs"];
@@ -37,7 +38,11 @@ internal static class StartSetup
     /// <summary>Gives a plan its setup triggers, its saved triggers and its save keys, and checks the setup
     /// triggers.</summary>
     /// <param name="story">The story path of the chosen trigger.</param>
-    public static StartPlan Apply(StartPlan plan, MissionIndex index, StartReplay replay, IReadOnlyList<MissionTrigger> story)
+    /// <param name="check">False gives the plan without the mission checks of the setup triggers.</param>
+    /// <param name="anchor">The start system and the start anchor, or null when the start system is not known. Then the
+    /// setup of the world keeps each world line of the path.</param>
+    public static StartPlan Apply(StartPlan plan, MissionIndex index, StartReplay replay, IReadOnlyList<MissionTrigger> story,
+        bool check = true, StartAnchor? anchor = null)
     {
         switch (plan.Kind)
         {
@@ -51,37 +56,91 @@ internal static class StartSetup
                     return plan with { SavedTriggers = [restore.Nickname] };
                 var name = FreeName(index, SetupName, []);
                 var only = new SetupTrigger(name, [Line("Cnd_True", "no_params"), Line("Act_ActTrig", restore.Nickname)]);
-                return Check(plan with { Setup = [only], SavedTriggers = [name] }, index);
+                var single = plan with { Setup = [only], SavedTriggers = [name] };
+                return check ? Check(single, index) : single;
         }
 
-        var forced = replay.Path.Where(t => t != replay.Chosen).ToList();
-        var lines = Filter(index, replay.Effects.Select(e => e.Line).ToList(), forced);
+        // The triggers that ran in the replay: the path, and the waiting triggers that the path shows ran. Their
+        // conditions name what the path destroyed, took and played.
+        var forced = replay.Path.Concat(replay.Changes.Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger))
+            .Where(t => t != replay.Chosen).Distinct().ToList();
+        var effects = replay.Effects.Select(e => e.Line).ToList();
+        var keep = Keep(index, effects, forced);
+        var lines = effects.Where((_, i) => keep[i]).ToList();
         var setupName = FreeName(index, SetupName, []);
         var worldName = FreeName(index, WorldName, [setupName]);
-        var world = lines.Where(l => l.Name!.Start == StartRole.World).Select(Copy).ToList();
+        // The world of the start system only, with the companions next to the player (D748, changed on 2026-10-28).
+        var built = anchor != null ? StartWorld.Build(index, replay, keep, anchor) : null;
+        var world = built?.Lines.ToList() ?? lines.Where(l => l.Name!.Start == StartRole.World).Select(Copy).ToList();
+        var worldWarnings = built?.Warnings ??
+                            (plan.Place.Kind == StartPlaceKind.Camera && world.Count > 0 ? [StartWorld.CameraWarning] : []);
         var setup = new List<(string Key, IReadOnlyList<string> Values)> { Line("Cnd_True", "no_params") };
         setup.AddRange(lines.Where(l => l.Name!.Start == StartRole.State).Select(Copy));
-        if (world.Count > 0)
-            setup.Add(Line("Act_ActTrig", worldName));
-        setup.AddRange(plan.ActiveSet.Select(t => Line("Act_ActTrig", t)));
         var triggers = new List<SetupTrigger> { new(setupName, setup) };
         if (world.Count > 0)
         {
-            // The world waits for the player in space, as 29 restore triggers of the retail scripts do. A base start
-            // rebuilds the world at the launch. no_params is case-sensitive (TR16).
-            var wait = plan.Place.Kind == StartPlaceKind.Base ? Line("Cnd_PlayerLaunch", "no_params") : Line("Cnd_SpaceEnter", "no_params");
-            triggers.Add(new SetupTrigger(worldName, [wait, .. world]));
+            var docked = plan.Place.Kind == StartPlaceKind.Base;
+            var late = replay.ActiveSet.Where(t => !docked || RunsDockedOnWorld(index, t)).Select(t => t.Nickname).ToHashSet();
+            setup.Add(Line("Act_ActTrig", worldName));
+            setup.AddRange(plan.ActiveSet.Where(t => !late.Contains(t)).Select(t => Line("Act_ActTrig", t)));
+            // The world waits for the launch of the player, as 14 restore triggers of the retail scripts do. Retail and
+            // OpenLancer send the launch each time the ship of the player enters space, also when a start in space
+            // spawns it. OpenLancer sends it before the entry to space. A base start rebuilds the world at the launch
+            // from the base. no_params is case-sensitive (TR16). The triggers of the active set start after the world
+            // lines, so their lines find the objects of the world. They still get the launch. The game gives an event
+            // to each trigger that starts while it handles the event (fixes of the reviews of 2026-10-28).
+            triggers.Add(new SetupTrigger(worldName,
+                [
+                    Line("Cnd_PlayerLaunch", "no_params"), .. world,
+                    .. plan.ActiveSet.Where(late.Contains).Select(t => Line("Act_ActTrig", t)),
+                ]));
+        }
+        else
+        {
+            setup.AddRange(plan.ActiveSet.Select(t => Line("Act_ActTrig", t)));
         }
         var saved = lines.Where(l => l.Name!.Start == StartRole.Save).ToList();
         var state = StateOf(index, saved, forced);
         if (UnknownAmbientBase(index, state) is { } reason)
             return plan with { Refusal = StartRefusal.SaveProblem, Reason = reason };
-        return Check(plan with
+        var made = plan with
         {
             Setup = triggers,
             SavedTriggers = [setupName],
             State = state,
-        }, index);
+            StartSystem = built != null ? anchor!.System : null,
+            LeftOut = built?.LeftOut ?? [],
+            Companions = built?.Companions ?? [],
+            Warnings = [.. plan.Warnings, .. worldWarnings],
+        };
+        return check ? Check(made, index) : made;
+    }
+
+    /// <summary>
+    /// True when a trigger of the active set of a base start must start after the world lines: it runs at once
+    /// (<c>Cnd_True</c>), and it or a <c>Cnd_True</c> trigger that it starts has a world line. Such a trigger runs at the
+    /// load, while the player is docked. The game does its world lines at the launch, before the world lines of the setup,
+    /// so they cannot find the objects of the world. Each other trigger of a base start starts at the load, so the base
+    /// and room triggers run while the player is docked.
+    /// </summary>
+    private static bool RunsDockedOnWorld(MissionIndex index, MissionTrigger trigger)
+    {
+        var seen = new HashSet<MissionTrigger>();
+        var queue = new Queue<MissionTrigger>([trigger]);
+        while (queue.Count > 0)
+        {
+            var next = queue.Dequeue();
+            if (!next.ConditionIs("Cnd_True") || !seen.Add(next))
+                continue;
+            if (next.Actions.Any(a => a.Name?.Start == StartRole.World))
+                return true;
+            foreach (var start in next.Actions.Where(a => Is(a, "Act_ActTrig")))
+            {
+                if (start.Value(0) is { } name && index.Trigger(name) is { IsDuplicate: false } child)
+                    queue.Enqueue(child);
+            }
+        }
+        return false;
     }
 
     /// <summary>The reason when an ambient script of the start save names a base that the game data does not have, or
@@ -105,13 +164,21 @@ internal static class StartSetup
     /// <item>A spawn whose objects a later <c>Act_Destroy</c> of the replay removes, or a <c>Cnd_Destroyed</c> or a
     /// <c>Cnd_LootAcquired</c> line of the path names. An <c>Act_Destroy</c> of only such objects goes too.</item>
     /// <item>Each music line but the last.</item>
-    /// <item>Each objective line but the last, and the changes of the objective before it.</item>
+    /// <item>Each objective line but the last, and the changes of the objective before it. The log lines
+    /// (<c>Act_NNIds</c>) keep their own last line.</item>
     /// </list>
     /// </summary>
     /// <param name="forced">The triggers of the path that ran: their conditions name what the path destroys and
     /// takes.</param>
     internal static IReadOnlyList<MissionLine> Filter(MissionIndex index, IReadOnlyList<MissionLine> lines,
         IReadOnlyList<MissionTrigger> forced)
+    {
+        var keep = Keep(index, lines, forced);
+        return lines.Where((_, i) => keep[i]).ToList();
+    }
+
+    /// <summary>For each line of the replay, true when <see cref="Filter"/> keeps it.</summary>
+    internal static bool[] Keep(MissionIndex index, IReadOnlyList<MissionLine> lines, IReadOnlyList<MissionTrigger> forced)
     {
         var gone = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var condition in forced.Select(t => t.Condition).OfType<MissionLine>())
@@ -148,7 +215,8 @@ internal static class StartSetup
         }
         KeepLast(lines, keep, l => Is(l, "Act_PlayMusic"), _ => false);
         KeepLast(lines, keep, l => Objectives.Any(o => Is(l, o)), l => ObjectiveChanges.Any(o => Is(l, o)));
-        return lines.Where((_, i) => keep[i]).ToList();
+        KeepLast(lines, keep, l => Is(l, "Act_NNIds"), _ => false);
+        return keep;
     }
 
     /// <summary>Keeps only the last line of a kind, and drops the lines of a second kind before it.</summary>
@@ -265,12 +333,13 @@ internal static class StartSetup
     /// <param name="taken">Names that other setup triggers of the plan take.</param>
     internal static string FreeName(MissionIndex index, string wanted, IReadOnlyCollection<string> taken)
     {
-        var names = index.Triggers.Select(t => t.Nickname).Concat(taken).ToList();
-        var ids = names.Select(FLHash.CreateID).ToHashSet();
+        var graph = StartGraph.Of(index);
+        var takenIds = taken.Select(FLHash.CreateID).ToHashSet();
         for (var n = 1;; n++)
         {
             var name = n == 1 ? wanted : $"{wanted}_{n.ToString(CultureInfo.InvariantCulture)}";
-            if (!names.Contains(name, StringComparer.OrdinalIgnoreCase) && !ids.Contains(FLHash.CreateID(name)))
+            if (!graph.IsTaken(name) && !taken.Contains(name, StringComparer.OrdinalIgnoreCase) &&
+                !takenIds.Contains(FLHash.CreateID(name)))
                 return name;
         }
     }

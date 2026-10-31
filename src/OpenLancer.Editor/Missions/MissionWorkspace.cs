@@ -69,6 +69,8 @@ internal sealed class MissionWorkspace
         DryRuns = new MissionDryRuns(Clock);
         Live = new MissionLive(Clock);
         Plays = new MissionPlay(window);
+        PlayHere = new PlayFromHereStates(window.StartPlaceProblem,
+            line => window.Log.Add(ConsoleSeverity.Error, PlayController.Source, line));
     }
 
     /// <summary>The clock of the dry run and the live view, in seconds.</summary>
@@ -78,6 +80,10 @@ internal sealed class MissionWorkspace
 
     /// <summary>The mission play request and the play starts of the scripts.</summary>
     public MissionPlay Plays { get; }
+
+    /// <summary>The Play buttons of the trigger nodes of the open mission (note of 2026-10-27 in section 8.1 of the M6c
+    /// design).</summary>
+    public PlayFromHereStates PlayHere { get; }
 
     /// <summary>The live trace of the mission of the OpenLancer game.</summary>
     public MissionLive Live { get; }
@@ -920,6 +926,7 @@ internal sealed class MissionWorkspace
         acts.Clear();
         DryRuns.Clear();
         Live.Clear();
+        PlayHere.Clear();
         latestRun = 0;
         rawTexts.Clear();
         marks.Clear();

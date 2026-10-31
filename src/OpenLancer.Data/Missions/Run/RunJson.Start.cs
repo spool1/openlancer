@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using LibreLancer;
 using OpenLancer.Data.Editing.Commands;
@@ -43,6 +44,38 @@ public sealed record StartPlaceView(StartPlaceKind Kind, string Text, string Sou
 
     /// <summary>The heading of a space start as Euler angles in degrees, or null.</summary>
     public IReadOnlyList<float>? Rotation { get; init; }
+}
+
+/// <summary>An object that the setup of the world leaves out, in JSON.</summary>
+/// <param name="Object">The <c>sec:</c> reference of the object, or of the target of a fuse. A target of a system file
+/// has its <c>obj:</c> reference.</param>
+/// <param name="Trigger">The <c>trg:</c> reference of the trigger of its spawn line or of the fuse line.</param>
+public sealed record LeftOutView(string Object, StartObjectKind Kind, string Trigger)
+{
+    /// <summary>The <c>system:</c> reference of the system where the object is at the chosen trigger, or null.</summary>
+    public string? System { get; init; }
+
+    /// <summary>The fuse of a fuse line, or null.</summary>
+    public string? Fuse { get; init; }
+
+    /// <summary>The <c>trg:</c> reference of the trigger of the start that makes the object again, or null.</summary>
+    public string? MadeAgainBy { get; init; }
+}
+
+/// <summary>A ship or a formation that starts next to the player, in JSON.</summary>
+/// <param name="Object">The <c>sec:</c> reference of the ship or the formation.</param>
+/// <param name="Signs">Why it travels with the player: <c>orders</c>, <c>player_formation</c>, <c>jump</c> and
+/// <c>escort</c>.</param>
+/// <param name="Point">Where it starts: <c>near</c>, <c>jump_here</c>, <c>follow</c>, <c>slot</c> or
+/// <c>kept</c>.</param>
+/// <param name="Moved">True when the setup moves it next to the player.</param>
+public sealed record CompanionView(string Object, IReadOnlyList<string> Signs, CompanionPoint Point, bool Moved)
+{
+    /// <summary>The <c>system:</c> reference of the system that it jumped from with the player, or null.</summary>
+    public string? JumpedFrom { get; init; }
+
+    /// <summary>The <c>trg:</c> reference of the jump-here trigger that gives its point, or null.</summary>
+    public string? PointTrigger { get; init; }
 }
 
 /// <summary>A setup trigger of a plan in JSON: its nickname and its lines as INI text.</summary>
@@ -92,6 +125,16 @@ public sealed record StartPlanView(string Script, long Version, string Start, st
     public IReadOnlyList<string> Scenes { get; init; } = [];
 
     public StartPlaceView? Place { get; init; }
+
+    /// <summary>The <c>system:</c> reference of the system whose world the setup makes, or null when the setup keeps
+    /// each world line of the path.</summary>
+    public string? StartSystem { get; init; }
+
+    /// <summary>The objects that the setup of the world leaves out, and the fuse lines that it removes.</summary>
+    public IReadOnlyList<LeftOutView> LeftOut { get; init; } = [];
+
+    /// <summary>The ships and formations that start next to the player.</summary>
+    public IReadOnlyList<CompanionView> Companions { get; init; } = [];
 
     /// <summary>The <c>trg:</c> references of the replay path, from the root to the trigger of the start.</summary>
     public IReadOnlyList<string> Path { get; init; } = [];
@@ -213,6 +256,20 @@ public static partial class RunJson
         var place = plan.Place;
         return view with
         {
+            StartSystem = plan.StartSystem == null ? null : SystemRef(plan.StartSystem),
+            LeftOut = plan.LeftOut.Select(l => new LeftOutView(
+                ObjectRef(script, l.Kind == StartObjectKind.Fuse ? l.TargetKind : l.Kind, l.Object), l.Kind, Ref(l.Trigger))
+            {
+                System = l.System == null ? null : SystemRef(l.System),
+                Fuse = l.Fuse,
+                MadeAgainBy = l.MadeAgainBy == null ? null : Ref(l.MadeAgainBy),
+            }).ToList(),
+            Companions = plan.Companions.Select(c => new CompanionView(ObjectRef(script, c.Kind, c.Object), SignWords(c.Signs),
+                c.Point, c.Moved)
+            {
+                JumpedFrom = c.JumpedFrom == null ? null : SystemRef(c.JumpedFrom),
+                PointTrigger = c.PointTrigger == null ? null : Ref(c.PointTrigger),
+            }).ToList(),
             Stage = plan.Stage,
             StageName = StoryStages.NameOf(plan.Stage),
             Accepted = plan.Accepted,
@@ -233,6 +290,30 @@ public static partial class RunJson
             },
         };
     }
+
+    private static string SystemRef(string system) => ItemRefs.Format(new ItemReference(ItemRefKind.System, system));
+
+    /// <summary>The reference of an object of a plan: the <c>sec:</c> reference of a mission object, or the
+    /// <c>obj:</c> reference of an object of a system file.</summary>
+    private static string ObjectRef(string script, StartObjectKind? kind, string name)
+    {
+        var type = kind switch
+        {
+            StartObjectKind.Ship => "MsnShip",
+            StartObjectKind.Formation => "MsnFormation",
+            StartObjectKind.Solar => "MsnSolar",
+            StartObjectKind.Loot => "MsnLoot",
+            _ => null,
+        };
+        return type == null
+            ? ItemRefs.Format(new ItemReference(ItemRefKind.Object, name))
+            : ItemRef.Of(script, type, name).ToString();
+    }
+
+    /// <summary>The words of the signs of a companion, in the order of the flags.</summary>
+    private static IReadOnlyList<string> SignWords(CompanionSigns signs) =>
+        Enum.GetValues<CompanionSigns>().Where(s => s != CompanionSigns.None && signs.HasFlag(s))
+            .Select(s => JsonNamingPolicy.SnakeCaseLower.ConvertName(s.ToString())).ToList();
 
     private static EditException BadField(string field, string message) =>
         new(new EditError(EditErrorKind.InvalidArgument, MissionErrors.BadJson, message) { Field = field });

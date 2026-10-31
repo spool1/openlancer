@@ -96,6 +96,12 @@ internal static class EditorTheme
     /// alone.</summary>
     public static readonly Vector4 Agent = Rgb(0xC3E65C);
 
+    /// <summary>The Play button of a trigger node in the mission graph (note of 2026-10-27 in section 8.1 of the M6c
+    /// design). The button shows a start whose checks passed, so it has the green of a passed check. Its hue differs by
+    /// 25 degrees or more from the run states, a selection, an error, a warning, the mission items and the prefab
+    /// overrides. The Play glyph and the tooltip also give its meaning.</summary>
+    public static readonly Vector4 Play = Success;
+
     /// <summary>The brackets and lines of an item under the mouse, and of the items that the cross-links of the Mission
     /// tab name. It is a light grey, so it does not look like the blue of the selection (UI rule 7).</summary>
     public static readonly Vector4 Highlight = Label;

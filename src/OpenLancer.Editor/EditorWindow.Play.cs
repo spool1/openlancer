@@ -211,6 +211,11 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
     internal string? StartPlaceProblem(StartPlace place) =>
         MissionPlay.PlaceProblem(Session?.GameData?.Items, Scene.System?.Nickname, place);
 
+    /// <summary>Why a mission play cannot start at the place choice of a play start for any trigger now, or null (see
+    /// <see cref="MissionPlay.ChoiceProblem"/>).</summary>
+    internal string? StartChoiceProblem(PlayStartSetting setting) =>
+        MissionPlay.ChoiceProblem(Session?.GameData?.Items, Scene.System?.Nickname, setting);
+
     /// <summary>The Console warning of a start point in space that Play can check only for the zones, because the Scene
     /// does not show its system.</summary>
     internal static string UncheckedPoint(string system) =>

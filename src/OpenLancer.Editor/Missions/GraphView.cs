@@ -48,9 +48,6 @@ internal sealed partial class GraphView : IDisposable
     // The minimum zoom of a full node (decision D554).
     private const float FullDetailScale = 0.6f;
 
-    // The look of a chip that names an item: the grey chip, with the accent outline under the mouse.
-    private static readonly ChipLook WarningChip = ChipLook.Grey with { Text = EditorTheme.Warning };
-
     private readonly EditorWindow window;
     private readonly MissionWorkspace missions;
     private readonly GraphViewState state;
@@ -112,6 +109,10 @@ internal sealed partial class GraphView : IDisposable
     // The node of the trigger of the play start of the open mission in this frame, or null (section 5.2 of the M6c
     // design).
     private GraphNode? playStartNode;
+
+    // True in a frame where the trigger nodes keep the space of their Play button (note of 2026-10-27 in section 8.1 of
+    // the M6c design).
+    private bool playButtons;
 
     /// <summary>A view move that waits for the next frame of the node editor.</summary>
     private enum Navigation
@@ -450,9 +451,10 @@ internal sealed partial class GraphView : IDisposable
         EditorTheme.Reapply(ImGuiHelper.Scale);
         Menus(analysis.Script.Path, graph);
         EditMenus(analysis.Script.Path);
+        missions.PlayHere.PlayClick(missions.Plays, analysis.Script.Path);
         if (pendingTooltip != null)
         {
-            ImGui.SetTooltip(pendingTooltip);
+            ItemTooltip.Wrapped(pendingTooltip);
         }
 
         Info();
@@ -736,8 +738,9 @@ internal sealed partial class GraphView : IDisposable
         ? origin.Y + MissionGraph.HeaderHeight / 2
         : origin.Y + MissionGraph.HeaderHeight + (slot - 1) * MissionGraph.LineHeight + MissionGraph.LineHeight / 2;
 
-    /// <summary>The header: the glyph, the title, the chips, the marks and the info icon (section 6.2 of the M6a
-    /// design).</summary>
+    /// <summary>The header: the glyph, the title, the chips, the marks, the Play button, the "+" pin and the info icon
+    /// (section 6.2 of the M6a design). A title that "..." cuts and the chips that do not fit show in the tooltip of the
+    /// title.</summary>
     private void Header(GraphNode node, Vector2 origin, bool full)
     {
         var drawList = ImGui.GetWindowDrawList();
@@ -773,6 +776,15 @@ internal sealed partial class GraphView : IDisposable
             right -= ChipGap;
         }
 
+        // Each trigger node keeps the space of the Play button, also without a button, so the title does not move when
+        // the states change after an edit.
+        if (playButtons && node.Kind == GraphNodeKind.Trigger)
+        {
+            right -= ChipHeight;
+            PlayButton(node, new Vector2(right, y - 1));
+            right -= ChipGap;
+        }
+
         right = Marks(node, drawList, right, y);
         if (RenameField(node, new Vector2(x, y - 3), right - x))
         {
@@ -781,33 +793,53 @@ internal sealed partial class GraphView : IDisposable
 
         // The violet dot of the overrides keeps its place before the marks, so a long title does not push it over them.
         var overrides = node.Frame?.Instance?.Linked?.OverrideCount ?? 0;
+        var titleMin = new Vector2(x, origin.Y);
         var titleWidth = TextFit.AddText(drawList, font, TextSize, new Vector2(x, y), EditorTheme.ToAbgr(EditorTheme.TextBright),
             node.Title, right - x - (overrides > 0 ? OverridesDotWidth : 0));
         x += titleWidth + 6;
         OverridesDot(overrides, drawList, ref x, origin);
-        if (!full)
+        var shown = 0;
+        var chipHovered = false;
+        if (full)
         {
-            return;
+            foreach (var chip in node.HeaderChips)
+            {
+                var chipWidth = Chip.WidthOf(font, SmallSize, chip);
+                if (x + chipWidth > right)
+                {
+                    break;
+                }
+
+                var min = new Vector2(x, origin.Y + (MissionGraph.HeaderHeight - ChipHeight) / 2);
+                var max = min + new Vector2(chipWidth, ChipHeight);
+                Chip.Paint(drawList, font, SmallSize, min, max, chip, ChipLook.Grey);
+                if (ImGui.IsMouseHoveringRect(min, max))
+                {
+                    pendingTooltip = MissionPageModel.TriggerChipTip(chip);
+                    chipHovered = true;
+                }
+
+                x += chipWidth + ChipGap;
+                shown++;
+            }
         }
 
-        foreach (var chip in node.HeaderChips)
+        // The marks and the buttons can take the room of the title and the chips. A hover on the rest of the header shows
+        // what they hide.
+        if (!chipHovered && ImGui.IsMouseHoveringRect(titleMin, new Vector2(right, origin.Y + MissionGraph.HeaderHeight)) &&
+            HeaderTip(node.Title, titleWidth < font.CalcTextSizeA(TextSize, float.MaxValue, 0, node.Title).X,
+                full ? node.HeaderChips.Skip(shown) : []) is { } tip)
         {
-            var chipWidth = Chip.WidthOf(font, SmallSize, chip);
-            if (x + chipWidth > right)
-            {
-                break;
-            }
-
-            var min = new Vector2(x, origin.Y + (MissionGraph.HeaderHeight - ChipHeight) / 2);
-            var max = min + new Vector2(chipWidth, ChipHeight);
-            Chip.Paint(drawList, font, SmallSize, min, max, chip, ChipLook.Grey);
-            if (ImGui.IsMouseHoveringRect(min, max))
-            {
-                pendingTooltip = MissionPageModel.TriggerChipTip(chip);
-            }
-
-            x += chipWidth + ChipGap;
+            pendingTooltip = tip;
         }
+    }
+
+    /// <summary>The tooltip of a header whose title "..." cuts or whose chips do not fit: the full title, then each
+    /// hidden chip with its tooltip. Null when the header shows all of it.</summary>
+    internal static string? HeaderTip(string title, bool titleCut, IEnumerable<string> hiddenChips)
+    {
+        var chips = hiddenChips.Select(c => $"{c}: {MissionPageModel.TriggerChipTip(c)}").ToList();
+        return titleCut || chips.Count > 0 ? string.Join("\n", [title, .. chips]) : null;
     }
 
     /// <summary>The help text of the info icon of a node: the event of a trigger, or the text of its frame.</summary>
@@ -944,7 +976,7 @@ internal sealed partial class GraphView : IDisposable
 
             var min = new Vector2(x, start.Y);
             var max = min + new Vector2(chipWidth, ChipHeight);
-            Chip.Paint(drawList, font, SmallSize, min, max, label, chip.Warning ? WarningChip : ChipLook.Grey);
+            Chip.Paint(drawList, font, SmallSize, min, max, label, chip.Warning ? ChipLook.GreyWarning : ChipLook.Grey);
             if (ImGui.IsMouseHoveringRect(min, max))
             {
                 pendingTooltip = chip.Tooltip;
@@ -1243,15 +1275,18 @@ internal sealed partial class GraphView : IDisposable
 
     /// <summary>The run overlay of the dry run of the open mission in this frame, and "Follow": a new step frames the
     /// trigger of its last change (section 4.5 of the M6c design). A fold after an edit adds no step, so it does not
-    /// frame. Prefab mode has no dry run.</summary>
+    /// frame. Prefab mode has no dry run. The states of the Play buttons of the nodes follow the open mission.</summary>
     private void RunState(MissionAnalysis analysis, MissionGraph graph)
     {
         var runs = missions.DryRuns;
         var open = missions.OpenPrefab == null && ReferenceEquals(analysis, missions.Open);
-        playStartNode = open && missions.Plays.PlayStartOf(analysis.Script.Path).Start.Trigger is { } start &&
-                        graph.Index.Trigger(start) is { } startTrigger
+        var playStart = missions.Plays.PlayStartOf(analysis.Script.Path);
+        playStartNode = open && playStart.Start.Trigger is { } start && graph.Index.Trigger(start) is { } startTrigger
             ? graph.NodeOf(startTrigger)
             : null;
+        // The Play buttons of the nodes: only the open mission outside prefab mode, and only a script with a story slot.
+        missions.PlayHere.Sync(open ? analysis : null, playStart, window.Session?.Edits.InTransaction == true);
+        playButtons = missions.PlayHere.KeepsSpace;
         // The live view of a mission play comes before the dry run (section 6.3 of the M6c design).
         var live = open && missions.ShownLive(analysis.Script.Path) != null;
         runOverlay = live ? missions.LiveOverlay(graph)
@@ -1552,19 +1587,25 @@ internal sealed partial class GraphView : IDisposable
     /// <summary>
     /// The items of the node menu of the play start and the dry run (section 8.1 of the M6c design): "Play from here",
     /// "Set as play start", "Dry run from here" and, while the dry run is on, "Run this trigger (dry run)". Only a
-    /// trigger that waits can run. Prefab mode has no play.
+    /// trigger that waits can run. Prefab mode has no play. "Play from here" is off when the trigger cannot start, and
+    /// its tooltip gives the reason. When it is on, it has the tooltip of the Play button of the node.
     /// </summary>
     private void DryRunMenu(MissionTrigger trigger)
     {
         if (missions.OpenPrefab == null && missions.OpenPath is { } script)
         {
             ImGui.Separator();
-            if (ImGui.MenuItem($"{EditorIcons.Play}  Play from here"))
+            var here = missions.PlayHere;
+            if (ImGui.MenuItem($"{EditorIcons.Play}  Play from here", "", false, here.CanPlay(trigger)))
             {
                 missions.Plays.PlayFromHere(script, trigger.Nickname);
             }
 
-            ImGui.SetItemTooltip(PlayFromHereTip);
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            {
+                ItemTooltip.Wrapped(here.Tooltip(trigger, missions.MissionPlayRuns));
+            }
+
             var isStart = string.Equals(missions.Plays.PlayStartOf(script).Trigger, trigger.Nickname,
                 StringComparison.OrdinalIgnoreCase);
             if (ImGui.MenuItem("Set as play start", "", isStart))
@@ -1889,6 +1930,55 @@ internal sealed partial class GraphView : IDisposable
         {
             pendingTooltip = help.FirstSentence;
         }
+    }
+
+    /// <summary>
+    /// The Play button of a trigger node (note of 2026-10-27 in section 8.1 of the M6c design): a green Play glyph when
+    /// "Play from here" can start now. It takes the fade of its node. A click plays from the trigger after the canvas,
+    /// and the release that ends a double-click does not play again. The button is an invisible button without overlap,
+    /// as the info glyph is, so the node editor does not select, drag or open the node.
+    /// </summary>
+    private void PlayButton(GraphNode node, Vector2 position)
+    {
+        var here = missions.PlayHere;
+        if (!here.Shows(node))
+        {
+            return;
+        }
+
+        ImGui.SetCursorScreenPos(position);
+        if (ImGui.InvisibleButton("##play", new Vector2(ChipHeight)))
+        {
+            here.Click(node.Trigger!, ImGui.GetIO().MouseClickedLastCount[(int)ImGuiMouseButton.Left]);
+        }
+
+        var hovered = ImGui.IsItemHovered();
+        var (fill, glyph) = PlayButtonLook(hovered, ImGui.IsItemActive(), Alpha(node));
+        var drawList = ImGui.GetWindowDrawList();
+        if (fill is { } color)
+        {
+            drawList.AddRectFilled(position, position + new Vector2(ChipHeight), EditorTheme.ToAbgr(color), Rounding);
+        }
+
+        Text(drawList, ImGuiHelper.Roboto, GlyphSize, position + new Vector2(3, 1), glyph, EditorIcons.Play.ToString());
+        if (hovered)
+        {
+            pendingTooltip = here.Tooltip(node.Trigger!, missions.MissionPlayRuns);
+        }
+    }
+
+    /// <summary>The fill and the glyph color of the Play button of a node (the look table of the note of 2026-10-27 in
+    /// section 8.1 of the M6c design), at the alpha of the node. The mouse on the button gives a light green fill. A
+    /// press gives a solid fill with a dark glyph, but only while the mouse is on the button, as an ImGui button and a
+    /// Unity button do. A release outside the button does not play.</summary>
+    /// <param name="held">True while the mouse button holds the button down (<c>ImGui.IsItemActive</c>).</param>
+    internal static (Vector4? Fill, Vector4 Glyph) PlayButtonLook(bool hovered, bool held, float alpha)
+    {
+        var pressed = held && hovered;
+        Vector4? fill = pressed ? EditorTheme.Play with { W = alpha }
+            : hovered ? EditorTheme.Play with { W = 0.25f * alpha }
+            : null;
+        return (fill, (pressed ? EditorTheme.GraphNodeHeader : EditorTheme.Play) with { W = alpha });
     }
 
     /// <summary>The popup of the info glyph that the user clicked, in screen space.</summary>

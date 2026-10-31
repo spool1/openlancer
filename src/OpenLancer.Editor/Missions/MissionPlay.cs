@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using LibreLancer.Data;
 using OpenLancer.Data.Editing;
@@ -72,6 +73,9 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
     public const string OtherPlayReason = "Another play runs, so the mission play did not start. Stop the other play " +
                                           "first.";
 
+    /// <summary>The reason of each start place while the game data of the profile did not load.</summary>
+    public const string NoGameData = "The game data of the profile did not load.";
+
     /// <summary>The reason of a start at the Scene camera while no system is open.</summary>
     public const string NoCameraSystem = "The start place is the Scene camera, and no system is open. Open a system, or " +
                                          "pick another start place on the Play start page.";
@@ -93,7 +97,7 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
     {
         if (items == null)
         {
-            return "The game data of the profile did not load.";
+            return NoGameData;
         }
 
         return place.Kind switch
@@ -111,6 +115,24 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
             _ => null,
         };
     }
+
+    /// <summary>
+    /// Why a mission play cannot start at the place choice of a play start for any trigger, or null (UI rule 2): the game
+    /// data did not load, the base of the choice "At base" is not in the game data, or the choice "At the Scene camera"
+    /// while no system is open. With the choice "Suggested", each trigger has its own place, so only the game data can
+    /// stop all of them. The chip of the play start shows the reason, because no node of the graph then shows a Play
+    /// button.
+    /// </summary>
+    /// <param name="items">The game data of the profile, or null when it did not load.</param>
+    /// <param name="openSystem">The nickname of the system that the Scene shows, or null.</param>
+    internal static string? ChoiceProblem(GameItemDb? items, string? openSystem, PlayStartSetting setting) =>
+        setting.PlaceChoice switch
+        {
+            (StartPlaceChoice.Base, { } dock) => PlaceProblem(items, openSystem,
+                new StartPlace(StartPlaceKind.Base, null, dock.Trim(), Vector3.Zero, Quaternion.Identity, "")),
+            (StartPlaceChoice.Camera, _) => PlaceProblem(items, openSystem, StartPlace.Camera("")),
+            _ => items == null ? NoGameData : null,
+        };
 
     /// <summary>The play start of a script of the open profile, or the mission start without a profile.</summary>
     public PlayStartSetting PlayStartOf(string script) => editor.ProfilePath is { } profile

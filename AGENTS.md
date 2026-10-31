@@ -23,6 +23,7 @@ These rules apply to each AI agent that works in this repository. [CONTRIBUTING.
 5. Follow Unity when Unity has an equivalent behavior.
 6. Put each engine change in a separate commit in `external/Librelancer`, with the subject `OL-NNNN: <the change>`. Add its row to `docs/UPSTREAM.md`.
 7. When a comment cites a decision (such as `D81`) or a design that you cannot read, ask. Do not guess the rule.
+8. When your task has a GitHub issue, read the issue before you start. Each box of the issue is a task. Before you finish, check each box against the code and the tests. Report each box as done or not done. For a done box, name the commit or the test that proves it. For an open box, give the reason.
 
 ## Editor UI rules
 

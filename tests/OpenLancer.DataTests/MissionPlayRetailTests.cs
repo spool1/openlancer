@@ -217,6 +217,27 @@ public sealed class MissionPlayRetailTests(ITestOutputHelper output) : IDisposab
             Editor.Missions.MissionPlay.PlaceProblem(null, home.System, Base(home.Base!)));
     }
 
+    /// <summary>The problem of a place choice that holds for each trigger (the warning chip of the play start, note of
+    /// 2026-10-27 in section 8.1 of the M6c design): a base that the game data does not have, and the Scene camera
+    /// without an open system. The choice "Suggested" gives each trigger its own place, so it has no such problem while
+    /// the game data loaded.</summary>
+    [Fact]
+    public void ThePlaceChoiceOfAPlayStartGivesTheProblemOfEachTrigger()
+    {
+        var items = RetailGame.Instance.Data.Items;
+        var home = HomeBase(items);
+        static Editor.PlayStartSetting Choice(string place) => new("t_any", place);
+
+        Assert.Null(Editor.Missions.MissionPlay.ChoiceProblem(items, null, Choice($"base:{home.Base}")));
+        Assert.Null(Editor.Missions.MissionPlay.ChoiceProblem(items, home.System, Choice("camera")));
+        Assert.Null(Editor.Missions.MissionPlay.ChoiceProblem(items, null, Choice("")));
+        Assert.Equal("The start place names the base 'ol_no_base', which is not in the game data. Pick a base or the " +
+                     "Scene camera on the Play start page.",
+            Editor.Missions.MissionPlay.ChoiceProblem(items, home.System, Choice("base:ol_no_base")));
+        Assert.Equal(Editor.Missions.MissionPlay.NoCameraSystem,
+            Editor.Missions.MissionPlay.ChoiceProblem(items, null, Choice("camera")));
+    }
+
     [Fact]
     public void AStartSaveOfAnUnknownMissionRefusesWithItsReason()
     {

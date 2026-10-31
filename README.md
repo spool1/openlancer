@@ -1,5 +1,7 @@
 # OpenLancer
 
+[![Join the OpenLancer Discord server](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/BUh3nucfmP)
+
 OpenLancer makes Freelancer (2003) openly moddable. It adds a mod overlay with a load order, and an editor for the game content. The editor has data editors, a 3D scene editor for star systems, a mission studio, and a cutscene editor. An MCP server lets AI agents read the game content, see the editor views and edit the systems and the data of a mod. Mission and cutscene edits for agents come next. OpenLancer runs on its own fork of the [Librelancer](https://codeberg.org/Librelancer/Librelancer) engine. The fork is a git submodule at `external/Librelancer` (see docs/UPSTREAM.md).
 
 ![The OpenLancer editor: the Scene view of New York (Li01) with the Hierarchy and the Assets panel](docs/images/editor-view.gif)
@@ -18,6 +20,10 @@ OpenLancer makes Freelancer (2003) openly moddable. It adds a mod overlay with a
 F5 plays the mod in the OpenLancer engine with the data of any linked game. The editor also identifies JFLP. Exports always hold only the changes of your mod, and they never write into a game folder. OpenLancer contains no code of the Freelancer-Decomp project.
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first. Fork the repository and open a pull request. The owner reviews each pull request before it goes into `master`. [ROADMAP.md](ROADMAP.md) shows the milestones.
+
+## Community
+
+Join the [OpenLancer Discord server](https://discord.gg/BUh3nucfmP) to ask for help, show your mods, test preview builds and talk about the code. Report bugs as [GitHub issues](https://github.com/spool1/openlancer/issues).
 
 ## Legal
 

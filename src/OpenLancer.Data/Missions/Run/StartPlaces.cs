@@ -48,6 +48,20 @@ internal static class StartPlaces
     /// the place of the start.</summary>
     public sealed record Suggestion(StartPlace Suggested, StartPlace Place, IReadOnlyList<string> Warnings);
 
+    /// <summary>The facts of the walk that the setup of the world reads (the note of 2026-10-28 after step 7 of section
+    /// 5.3 of the M6c design).</summary>
+    /// <param name="Systems">The system of the player at each change of the replay, or null when no line tells
+    /// it.</param>
+    /// <param name="Hostile">The objects that the path makes hostile to the player, by the nicknames of the
+    /// ships.</param>
+    /// <param name="JumpHere">The jump-here triggers of the walk, the newest first, with the point of the player that
+    /// each one gives.</param>
+    public sealed record WorldFacts(IReadOnlyList<string?> Systems, IReadOnlySet<string> Hostile,
+        IReadOnlyList<(MissionTrigger Trigger, Vector3 Point)> JumpHere);
+
+    /// <summary>The facts of the walk for the setup of the world of a replay.</summary>
+    public static WorldFacts World(MissionIndex index, StartReplay replay) => new Walk(index, replay).World();
+
     /// <summary>The suggested place of the start of a replay, and the warnings about the place that the user picked, or
     /// about the suggested place.</summary>
     /// <param name="picked">The base or the Scene camera that the user picked, or null for the suggested place.</param>
@@ -72,6 +86,36 @@ internal static class StartPlaces
     public static string ArrivedWarning(string trigger, string system) =>
         $"Trigger '{trigger}' waits for a jump into {system}. The path already made that jump, so the play starts in " +
         $"{system}. OpenLancer runs this trigger only at the next jump into {system}.";
+
+    /// <summary>The point <see cref="Offset"/> units in front of an object of a system file, and the heading of the
+    /// object. The game puts a ship there after a jump through a jump gate or hole. The setup puts the companions of a base
+    /// start there, in front of the dock object of the base.</summary>
+    internal static (Vector3 Point, Quaternion Turn) InFront(WorldObject item) =>
+        (item.Position + Vector3.Transform(new Vector3(0, 0, Offset), item.Rotation), item.Rotation);
+
+    /// <summary>True when the condition of a trigger of the path shows the player in space when the trigger runs: a
+    /// launch, an arrival, <c>Cnd_InSpace = true</c>, or a condition about the player that retail tests only in space.
+    /// False when it shows the player docked: a base condition, <c>Cnd_SpaceExit</c> or <c>Cnd_InSpace = false</c>. Null
+    /// for another condition.</summary>
+    internal static bool? InSpaceAt(MissionLine? condition)
+    {
+        if (condition == null)
+            return null;
+        var key = condition.Key;
+        if (IsAny(key, BaseConditions) || MissionIndex.Is(key, "Cnd_SpaceExit"))
+            return false;
+        if (MissionIndex.Is(key, "Cnd_InSpace"))
+            return !(MissionIndex.Is(condition.Value(0), "false") || condition.Value(0)?.Trim() == "0");
+        if (IsLaunch(condition) || IsAny(key, ArrivalConditions))
+            return true;
+        return IsAny(key, SpaceConditions) && NamesPlayer(condition) ? true : null;
+    }
+
+    /// <summary>True for a condition of a launch of the player: <c>Cnd_PlayerLaunch</c>, <c>Cnd_SpaceEnter</c>,
+    /// <c>Cnd_BaseExit</c>, and <c>Cnd_LaunchComplete</c> of the player.</summary>
+    internal static bool IsLaunch(MissionLine? condition) =>
+        condition != null && IsAny(condition.Key, LaunchConditions) &&
+        (!MissionIndex.Is(condition.Key, "Cnd_LaunchComplete") || NamesPlayer(condition));
 
     /// <summary>True for <c>Act_RelocateShip</c> of the player. Retail scripts move the player with it, for example after
     /// a scene in space. It is a place line, so the setup triggers do not copy it.</summary>
@@ -116,6 +160,64 @@ internal static class StartPlaces
         Enumerable.Range(0, line.Count).Any(i => MissionIndex.Is(line.Value(i), "Player"));
 
     private static bool IsAny(string key, string[] keys) => keys.Any(k => MissionIndex.Is(key, k));
+
+    /// <summary>The system that the condition of a trigger shows the player in when the trigger runs: the system of an
+    /// arrival or of Cnd_SpaceEnter, else <see cref="DockedSystemAt"/>. Null for another condition, and for a system or a
+    /// base that the world does not know.</summary>
+    internal static string? SystemAt(MissionIndex index, MissionLine? condition) =>
+        ConditionSystem(index, condition) ?? DockedSystemAt(index, condition);
+
+    /// <summary>The system of the base where the condition of a trigger shows the player docked: the base of a base
+    /// condition or of Cnd_BaseExit. Null for another condition, and for a base that the world does not know.</summary>
+    private static string? DockedSystemAt(MissionIndex index, MissionLine? condition) =>
+        BaseSystem(index, condition) ??
+        (MissionIndex.Is(condition?.Key, "Cnd_BaseExit") &&
+         Named(index, condition!, "base", MissionValueKind.Base) is { } dock
+            ? BaseSystemOf(index, dock)
+            : null);
+
+    /// <summary>The system of a condition that puts the player in a system: Cnd_SpaceEnter or an arrival.</summary>
+    private static string? ConditionSystem(MissionIndex index, MissionLine? condition) =>
+        MissionIndex.Is(condition?.Key, "Cnd_SpaceEnter") || IsArrival(condition)
+            ? Named(index, condition!, "system", MissionValueKind.System)
+            : null;
+
+    /// <summary>The system of the base of a base condition, or null.</summary>
+    private static string? BaseSystem(MissionIndex index, MissionLine? condition) =>
+        condition != null && IsAny(condition.Key, BaseConditions) &&
+        Named(index, condition, "base", MissionValueKind.Base) is { } dock
+            ? BaseSystemOf(index, dock)
+            : null;
+
+    /// <summary>The system of a base that the world knows, or null.</summary>
+    private static string? BaseSystemOf(MissionIndex index, string dock) =>
+        Known(index, index.World.SystemOfBase(dock), MissionValueKind.System);
+
+    /// <summary>The system key of a trigger, or null for ANY, for no key, or for a system that the world does not
+    /// know.</summary>
+    internal static string? Hint(MissionIndex index, MissionTrigger trigger) =>
+        Known(index, trigger.SystemHint, MissionValueKind.System);
+
+    /// <summary>The name of a value of a line, or null when the value is empty or a word, for example ANY or
+    /// no_params.</summary>
+    private static string? Named(MissionIndex index, MissionLine line, string value, MissionValueKind kind)
+    {
+        if (line.Name?.Value(value) is not { } spec || line.Value(spec.Index) is not { } text)
+            return null;
+        var reference = line.References.FirstOrDefault(r => r.ValueIndex == spec.Index);
+        return reference is { State: MissionReferenceState.Token or MissionReferenceState.Empty }
+            ? null
+            : Known(index, text, kind);
+    }
+
+    /// <summary>A name of a system or a base, or null for a word such as ANY or no_params. A world that knows the names
+    /// of the kind also drops a name that it does not have, for example the system hint ALL. Then the next rule gives
+    /// the place.</summary>
+    private static string? Known(MissionIndex index, string? name, MissionValueKind kind) =>
+        name?.Trim() is { Length: > 0 } text && !MissionIndex.Is(text, "ANY") && !MissionIndex.Is(text, "no_params") &&
+        (!index.World.Knows(kind) || index.World.Has(kind, text))
+            ? text
+            : null;
 
     /// <summary>The line in words: "{key} of {trigger}".</summary>
     private static string Of(MissionLine line, MissionTrigger trigger) => $"{line.Key.Trim()} of {trigger.Nickname}";
@@ -198,9 +300,8 @@ internal static class StartPlaces
         private readonly MissionTrigger? chosen;
         private readonly List<MissionTrigger> timeline;
         private readonly HashSet<MissionTrigger> onTimeline;
-        private readonly HashSet<MissionTrigger> checkpoints;
+        private readonly StartGraph graph;
         private readonly ILookup<MissionTrigger, MissionTrigger> starts;
-        private Dictionary<MissionTrigger, int>? depths;
         private Dictionary<string, bool>? attitudes;
 
         public Walk(MissionIndex index, StartReplay replay)
@@ -210,8 +311,8 @@ internal static class StartPlaces
             chosen = replay.Chosen;
             timeline = Timeline(index, replay);
             onTimeline = [.. timeline];
-            checkpoints = [.. DryRun.Checkpoints(index)];
-            starts = StartPlan.Next(index, MissionLinkKind.Start);
+            graph = StartGraph.Of(index);
+            starts = graph.Starts;
         }
 
         /// <summary>The number of earlier triggers of the timeline. The chosen trigger is the last trigger. The mission
@@ -226,13 +327,49 @@ internal static class StartPlaces
             return new Suggestion(suggested, place, Warnings(facts, place));
         }
 
+        /// <summary>
+        /// The facts for the setup of the world. The system of the player at a run is the system of the condition of
+        /// its trigger: an arrival, Cnd_SpaceEnter, or the base of a base condition. Else it is the system hint of the
+        /// trigger. Else the player stays in the system of the run before. The first run of a restore trigger at the
+        /// root takes the system of its place line (rule 5), and the story path to it gives the system before it.
+        /// </summary>
+        public WorldFacts World()
+        {
+            var changes = replay.Changes;
+            var systems = new string?[changes.Count];
+            var root = replay.Path.Count > 0 ? replay.Path[0] : null;
+            var restore = root is { StartsActive: false } ? root : null;
+            string? current = null;
+            foreach (var trigger in timeline.TakeWhile(t => t != root))
+                current = RunSystem(trigger) ?? current;
+            for (var i = 0; i < changes.Count; i++)
+            {
+                if (changes[i] is { Kind: MachineChangeKind.Ran, Trigger: var trigger })
+                {
+                    var own = trigger == restore ? PlaceSystem(trigger, null).System ?? RunSystem(trigger) : RunSystem(trigger);
+                    if (trigger == restore)
+                        restore = null;
+                    current = own ?? current;
+                }
+                systems[i] = current;
+            }
+            var jumps = Facts().Where(f => f is { Jump: true, Point: not null }).Select(f => (f.Trigger, f.Point!.Value))
+                .Distinct().ToList();
+            var hostile = Attitudes.Where(p => p.Value).Select(p => p.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return new WorldFacts(systems, hostile, jumps);
+        }
+
+        /// <summary>The system of the player when a trigger runs: the system that its condition shows, else its system
+        /// hint, or null.</summary>
+        private string? RunSystem(MissionTrigger trigger) => SystemAt(index, trigger.Condition) ?? Hint(index, trigger);
+
         /// <summary>The warnings about the place of the start, also for a place that the user picked. A base start
         /// launches, so the triggers that wait for the launch run. A start in space or at the Scene camera never ends a
         /// launch. The system of a picked Scene camera is not known, so it has no warning about the system.</summary>
         private IReadOnlyList<string> Warnings(List<Fact> facts, StartPlace place)
         {
             if (place.Kind == StartPlaceKind.Base)
-                return [.. OtherSystem(place.Base is { } dock ? BaseSystemOf(dock) : null)];
+                return [.. OtherSystem(place.Base is { } dock ? BaseSystemOf(index, dock) : null)];
             IEnumerable<string> own = chosen != null && WaitsForLaunchEnd(chosen.Condition)
                 ? [LaunchWatcherWarning(chosen.Nickname)]
                 : [];
@@ -272,7 +409,7 @@ internal static class StartPlaces
                     else if (MissionIndex.Is(action.Key, "Act_ForceLand"))
                         yield return new Fact(FactKind.Base, trigger, k, Of(action, trigger))
                         {
-                            Base = Named(action, "base", MissionValueKind.Base),
+                            Base = Named(index, action, "base", MissionValueKind.Base),
                         };
                 }
                 if (k + 1 < timeline.Count)
@@ -307,7 +444,7 @@ internal static class StartPlaces
             if (!WaitsToArrive(condition) && trigger.Actions.LastOrDefault(IsPlaceLine) is { } line &&
                 PlaceFact(trigger, line, at) is { } own)
                 yield return own;
-            if (checkpoints.Contains(trigger))
+            if (graph.IsCheckpoint(trigger))
             {
                 foreach (var step in starts[trigger].Distinct().Where(t => t.ConditionIs("Cnd_True")))
                 {
@@ -318,7 +455,7 @@ internal static class StartPlaces
             }
             if (condition != null &&
                 (IsAny(condition.Key, BaseConditions) || MissionIndex.Is(condition.Key, "Cnd_BaseExit")) &&
-                Named(condition, "base", MissionValueKind.Base) is { } dock)
+                Named(index, condition, "base", MissionValueKind.Base) is { } dock)
                 yield return new Fact(FactKind.Base, trigger, at, Of(condition, trigger)) { Base = dock };
         }
 
@@ -330,7 +467,11 @@ internal static class StartPlaces
             var key = condition.Key;
             var fact = new Fact(FactKind.Space, trigger, at, Of(condition, trigger));
             if (IsAny(key, BaseConditions))
-                return fact with { Kind = FactKind.Base, Base = Named(condition, "base", MissionValueKind.Base) };
+                return fact with
+                {
+                    Kind = FactKind.Base,
+                    Base = Named(index, condition, "base", MissionValueKind.Base),
+                };
             // The player leaves space at a dock. Cnd_SpaceExit and Cnd_InSpace = false name no base.
             if (MissionIndex.Is(key, "Cnd_InSpace"))
                 return MissionIndex.Is(condition.Value(0), "false") || condition.Value(0) == "0"
@@ -346,12 +487,14 @@ internal static class StartPlaces
                 return fact with
                 {
                     Kind = FactKind.Launch,
-                    System = ConditionSystem(condition),
-                    Base = MissionIndex.Is(key, "Cnd_BaseExit") ? Named(condition, "base", MissionValueKind.Base) : null,
+                    System = ConditionSystem(index, condition),
+                    Base = MissionIndex.Is(key, "Cnd_BaseExit")
+                        ? Named(index, condition, "base", MissionValueKind.Base)
+                        : null,
                 };
             }
             if (IsAny(key, ArrivalConditions))
-                return fact with { Kind = FactKind.Arrival, System = ConditionSystem(condition) };
+                return fact with { Kind = FactKind.Arrival, System = ConditionSystem(index, condition) };
             if (!IsAny(key, SpaceConditions) || !NamesPlayer(condition))
                 return null;
             if (NearPoint(condition) is { } point)
@@ -402,8 +545,8 @@ internal static class StartPlaces
         private IEnumerable<Fact> JumpsTo(MissionTrigger target, int at) =>
             index.StartsOf(target).Select(l => l.Source).Distinct()
                 .Where(j => j != target && !j.IsDuplicate && !onTimeline.Contains(j) &&
-                            (checkpoints.Contains(j) || index.NothingStarts(j)) && IsLatestStep(j, target))
-                .OrderBy(j => checkpoints.Contains(j) ? 0 : 1)
+                            (graph.IsCheckpoint(j) || index.NothingStarts(j)) && IsLatestStep(j, target))
+                .OrderBy(j => graph.IsCheckpoint(j) ? 0 : 1)
                 .Select(j => j.Actions.LastOrDefault(IsPlaceLine) is { } line ? PlaceFact(j, line, at, target) : null)
                 .OfType<Fact>();
 
@@ -413,31 +556,7 @@ internal static class StartPlaces
             starts[jump].All(t => Depth(t) <= Depth(target));
 
         /// <summary>The length of the story path of a trigger, or -1 when no start trigger reaches it.</summary>
-        private int Depth(MissionTrigger trigger) => (depths ??= Depths()).GetValueOrDefault(trigger, -1);
-
-        /// <summary>The length of the story path of each trigger that a start trigger reaches. The search uses the links
-        /// of <see cref="StartPlan.StoryPath"/>, so each length is the length of that path.</summary>
-        private Dictionary<MissionTrigger, int> Depths()
-        {
-            var next = StartPlan.Next(index, MissionLinkKind.Start, MissionLinkKind.Load);
-            var depth = new Dictionary<MissionTrigger, int>();
-            var queue = new Queue<MissionTrigger>();
-            foreach (var root in index.StartTriggers.Where(r => !r.IsDuplicate))
-            {
-                if (depth.TryAdd(root, 0))
-                    queue.Enqueue(root);
-            }
-            while (queue.Count > 0)
-            {
-                var trigger = queue.Dequeue();
-                foreach (var child in next[trigger])
-                {
-                    if (depth.TryAdd(child, depth[trigger] + 1))
-                        queue.Enqueue(child);
-                }
-            }
-            return depth;
-        }
+        private int Depth(MissionTrigger trigger) => graph.Depth(trigger);
 
         /// <summary>
         /// The system of a place line (rule 5), and the line of another trigger that gives it. The order is:
@@ -453,11 +572,11 @@ internal static class StartPlaces
         private (string? System, string? From) PlaceSystem(MissionTrigger trigger, MissionTrigger? target)
         {
             var next = starts[trigger].Distinct().OrderBy(t => t == target ? 0 : 1).ThenByDescending(Depth).ToList();
-            (string? System, string? From) own = (ConditionSystem(trigger.Condition), null);
+            (string? System, string? From) own = (ConditionSystem(index, trigger.Condition), null);
             if (own.System == null && next.FirstOrDefault(t => t.ConditionIs("Cnd_SpaceEnter") &&
-                    Named(t.Condition!, "system", MissionValueKind.System) != null) is { } stage)
-                own = (Named(stage.Condition!, "system", MissionValueKind.System), Of(stage.Condition!, stage));
-            (string? System, string? From) hint = (Hint(trigger), null);
+                    Named(index, t.Condition!, "system", MissionValueKind.System) != null) is { } stage)
+                own = (Named(index, stage.Condition!, "system", MissionValueKind.System), Of(stage.Condition!, stage));
+            (string? System, string? From) hint = (Hint(index, trigger), null);
             (string? System, string? From) first;
             // Retail never runs the condition of a trigger that nothing starts, so its system hint comes first.
             if (index.NothingStarts(trigger))
@@ -485,11 +604,11 @@ internal static class StartPlaces
                     continue;
                 if (trigger == step && IsArrival(condition))
                     continue;
-                if (ConditionSystem(condition) is { } system)
+                if (ConditionSystem(index, condition) is { } system)
                     return (system, Of(condition, trigger));
-                if (BaseSystem(condition) is { } dock)
+                if (BaseSystem(index, condition) is { } dock)
                     return (dock, $"the base of {Of(condition, trigger)}");
-                if (Hint(trigger) is { } hint)
+                if (Hint(index, trigger) is { } hint)
                     return (hint, $"the system hint of {trigger.Nickname}");
             }
             return (null, null);
@@ -547,12 +666,12 @@ internal static class StartPlaces
                 segment.SkipWhile(f => f != decide).Skip(1).FirstOrDefault(f => f is { Jump: false, System: not null }) is
                     { } older)
                 (system, systemFrom) = (older.System, older.Source);
-            if (system == null && launchBase != null && BaseSystemOf(launchBase.Base!) is { } baseSystem)
+            if (system == null && launchBase != null && BaseSystemOf(index, launchBase.Base!) is { } baseSystem)
                 (system, systemFrom) = (baseSystem, $"the base of {launchBase.Source}");
             if (system == null && OwnSystem() is { } waits)
                 (system, systemFrom) = (waits, Of(chosen!.Condition!, chosen));
             if (system == null && HintOf(decide, from) is { } hinted)
-                (system, systemFrom) = (Hint(hinted), $"the system hint of {hinted.Nickname}");
+                (system, systemFrom) = (Hint(index, hinted), $"the system hint of {hinted.Nickname}");
             var systemText = systemFrom != null ? $" The system comes from {systemFrom}." : "";
             if (system == null)
                 return launchBase != null
@@ -573,8 +692,8 @@ internal static class StartPlaces
             // mission can be far from it, for example at a target or at a parking point.
             if (point == null && arrival != null && !segment.Any(f => f.Kind == FactKind.Launch) &&
                 SystemBefore(arrival, system) is { } previous && index.World.JumpInto(system, previous) is { } gate)
-                (point, turn, pointText) = (gate.Position + Vector3.Transform(new Vector3(0, 0, Offset), gate.Rotation),
-                    gate.Rotation, $" The point is {Units} units from {gate.Nickname}, the jump gate or hole to {previous}.");
+                (point, turn, pointText) = (InFront(gate).Point, InFront(gate).Turn,
+                    $" The point is {Units} units from {gate.Nickname}, the jump gate or hole to {previous}.");
             if (point == null && Spawns(system, from).ToList() is { Count: > 0 } spawns)
             {
                 var spawn = spawns.FirstOrDefault(s => s is { Recent: true, Placed: true }) ??
@@ -605,7 +724,8 @@ internal static class StartPlaces
             for (var k = arrival.At - 1; k >= 0; k--)
             {
                 var trigger = timeline[k];
-                var named = ConditionSystem(trigger.Condition) ?? BaseSystem(trigger.Condition) ?? Hint(trigger);
+                var named = ConditionSystem(index, trigger.Condition) ?? BaseSystem(index, trigger.Condition) ??
+                            Hint(index, trigger);
                 if (named != null && !MissionIndex.Is(named, system))
                     return named;
             }
@@ -621,19 +741,19 @@ internal static class StartPlaces
         /// <summary>True when the point of a fact can be in the system. The fact, else the system hint of its trigger,
         /// names that system or no system.</summary>
         private bool InSystem(Fact fact, string system) =>
-            (fact.System ?? Hint(fact.Trigger)) is not { } own || MissionIndex.Is(own, system);
+            (fact.System ?? Hint(index, fact.Trigger)) is not { } own || MissionIndex.Is(own, system);
 
         /// <summary>The trigger of the nearest system hint (rule 4). The trigger of the fact comes first. Then each
         /// trigger from the chosen trigger back to the start of the segment comes. A chosen trigger that waits for an
         /// arrival has the hint of the next system, so it does not count.</summary>
         private MissionTrigger? HintOf(Fact decide, int from)
         {
-            if (Hint(decide.Trigger) != null)
+            if (Hint(index, decide.Trigger) != null)
                 return decide.Trigger;
             for (var k = timeline.Count - 1; k >= from; k--)
             {
                 var trigger = timeline[k];
-                if (Hint(trigger) != null && !(trigger == chosen && IsArrival(trigger.Condition)))
+                if (Hint(index, trigger) != null && !(trigger == chosen && IsArrival(trigger.Condition)))
                     return trigger;
             }
             return null;
@@ -671,10 +791,11 @@ internal static class StartPlaces
         /// <summary>The system of a spawn: the system of the condition or the system hint of its trigger, else the
         /// <c>system</c> line of the item.</summary>
         private string? SpawnSystem(MissionTrigger trigger, string name) =>
-            ConditionSystem(trigger.Condition) ?? Hint(trigger) ??
-            Known(ItemOf(name)?.Section.FirstOrDefault(e => MissionIndex.Is(e.Name, "system") && e.Count > 0) is { } line
-                ? MissionIndex.Text(line[0])
-                : null, MissionValueKind.System);
+            ConditionSystem(index, trigger.Condition) ?? Hint(index, trigger) ??
+            Known(index,
+                ItemOf(name)?.Section.FirstOrDefault(e => MissionIndex.Is(e.Name, "system") && e.Count > 0) is { } line
+                    ? MissionIndex.Text(line[0])
+                    : null, MissionValueKind.System);
 
         /// <summary>The <c>position</c> of an item, or null.</summary>
         private Vector3? ItemPoint(string name)
@@ -742,56 +863,19 @@ internal static class StartPlaces
         private bool WaitsForLaunchEnd(MissionLine? condition) =>
             condition != null &&
             (MissionIndex.Is(condition.Key, "Cnd_LaunchComplete") && NamesPlayer(condition) ||
-             MissionIndex.Is(condition.Key, "Cnd_BaseExit") && Named(condition, "base", MissionValueKind.Base) == null);
+             MissionIndex.Is(condition.Key, "Cnd_BaseExit") &&
+             Named(index, condition, "base", MissionValueKind.Base) == null);
 
         /// <summary>The system of Cnd_SpaceEnter of the chosen trigger, or null. The chosen trigger waits for a launch
         /// there.</summary>
         private string? OwnSystem() =>
             chosen?.Condition is { } condition && MissionIndex.Is(condition.Key, "Cnd_SpaceEnter")
-                ? Named(condition, "system", MissionValueKind.System)
+                ? Named(index, condition, "system", MissionValueKind.System)
                 : null;
-
-        /// <summary>The system of a condition that puts the player in a system: Cnd_SpaceEnter or an arrival.</summary>
-        private string? ConditionSystem(MissionLine? condition) =>
-            MissionIndex.Is(condition?.Key, "Cnd_SpaceEnter") || IsArrival(condition)
-                ? Named(condition!, "system", MissionValueKind.System)
-                : null;
-
-        /// <summary>The system of the base of a base condition, or null.</summary>
-        private string? BaseSystem(MissionLine? condition) =>
-            condition != null && IsAny(condition.Key, BaseConditions) &&
-            Named(condition, "base", MissionValueKind.Base) is { } dock
-                ? BaseSystemOf(dock)
-                : null;
-
-        /// <summary>The system of a base that the world knows, or null.</summary>
-        private string? BaseSystemOf(string dock) => Known(index.World.SystemOfBase(dock), MissionValueKind.System);
 
         /// <summary>The system that the chosen trigger waits to arrive in, or null.</summary>
         private string? ArrivalSystem() =>
-            IsArrival(chosen?.Condition) ? Named(chosen!.Condition!, "system", MissionValueKind.System) : null;
+            IsArrival(chosen?.Condition) ? Named(index, chosen!.Condition!, "system", MissionValueKind.System) : null;
 
-        private string? Hint(MissionTrigger trigger) => Known(trigger.SystemHint, MissionValueKind.System);
-
-        /// <summary>The name of a value of a line, or null when the value is empty or a word, for example ANY or
-        /// no_params.</summary>
-        private string? Named(MissionLine line, string value, MissionValueKind kind)
-        {
-            if (line.Name?.Value(value) is not { } spec || line.Value(spec.Index) is not { } text)
-                return null;
-            var reference = line.References.FirstOrDefault(r => r.ValueIndex == spec.Index);
-            return reference is { State: MissionReferenceState.Token or MissionReferenceState.Empty }
-                ? null
-                : Known(text, kind);
-        }
-
-        /// <summary>A name of a system or a base, or null for a word such as ANY or no_params. A world that knows the
-        /// names of the kind also drops a name that it does not have, for example the system hint ALL. Then the next
-        /// rule gives the place.</summary>
-        private string? Known(string? name, MissionValueKind kind) =>
-            name?.Trim() is { Length: > 0 } text && !MissionIndex.Is(text, "ANY") && !MissionIndex.Is(text, "no_params") &&
-            (!index.World.Knows(kind) || index.World.Has(kind, text))
-                ? text
-                : null;
     }
 }
