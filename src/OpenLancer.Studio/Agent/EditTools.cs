@@ -76,7 +76,7 @@ internal sealed class EditScope
     }
 
     /// <summary>The result of the commands of the step until now. A step with mission commands gives their inverse and
-    /// their row moves (decision H of the MCP1-3 plan: each mission step keeps its own inverse).</summary>
+    /// their row moves. So each mission step of <c>edit_batch</c> keeps its own inverse.</summary>
     internal EditResult StepResult()
     {
         var step = Batch.Parts.Skip(stepStart).ToList();

@@ -231,7 +231,13 @@ public sealed class AgentItemToolTests
         Assert.Contains(@"It also changes 1 section of a mission script that names the item, in DATA\MISSIONS\OL_REF\ol_ref.ini.",
             asks.Message);
         Assert.Contains(Texts(preview["changes"]), c => c.Contains("ol_lock", StringComparison.Ordinal));
+        Assert.Equal(1, (long?)preview["versions"]![@"DATA\MISSIONS\OL_REF\ol_ref.ini"]);
         Assert.False(session.CanUndo);
+
+        // The result gives the new version of each script that the rename changed (step 1 of MCP1-3).
+        var renamed = Ok(host, "rename_item", """{ "ref": "obj:Li01_01", "new_name": "Li01_station", "confirm": true }""");
+        Assert.Equal(2, (long?)renamed["versions"]![@"DATA\MISSIONS\OL_REF\ol_ref.ini"]);
+        Assert.Single(renamed["versions"]!.AsObject());
     }
 
     /// <summary>
