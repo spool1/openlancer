@@ -337,8 +337,115 @@ public sealed partial class AgentMissionToolTests
             Refusal(host, "delete_items", $$"""{ "refs": [ "inst:{{S}}#ol_w2" ], "confirm": true }"""));
     }
 
-    /// <summary>duplicate_items copies a trigger with a free name after its own name, as Ctrl+D does, and an item, in
-    /// one entry. An offset does not move a mission copy, and the result warns about each copy. A label refuses.</summary>
+    /// <summary>One delete_items call can name an item and an item that its delete removes. Each item goes one time, as
+    /// Delete in the graph does, so the order of the references does not change the files: a linked prefab instance and
+    /// its member, a matched instance and the trigger that it claims, and a mission ship and its unused NPC. Two forms
+    /// of one trigger delete it one time.</summary>
+    [Fact]
+    public void DeleteItemsDeletesAnItemThatAnotherDeleteRemovesOneTime()
+    {
+        var linked = $"inst:{S}#ol_w1";
+        var member = $"trg:{S}#ol_w1_end";
+        AssertOneDelete(() => WithGate(), [linked], [linked, member], [member, linked]);
+        var matched = $"inst:{S}#success/ol_win";
+        var claimed = $"trg:{S}#ol_win";
+        AssertOneDelete(() => Create(PrefabStudioTests.MatchedText), [matched], [matched, claimed], [claimed, matched]);
+        var ship = $"sec:{S}#MsnShip/ol_ship_3";
+        var npc = $"sec:{S}#NPC/ol_npc_shared";
+        AssertOneDelete(() => Create(), [ship], [ship, npc], [npc, ship]);
+        AssertOneDelete(() => Create(), [End], [End, $"sec:{S}#Trigger/ol_end"]);
+    }
+
+    /// <summary>A ship and an NPC that another ship still names: the ship goes, and the NPC refuses with RequiredBy for
+    /// its reference. Nothing changes.</summary>
+    [Fact]
+    public void DeleteItemsOfAShipAndAnNpcThatAnotherShipNamesRefuses()
+    {
+        var (m, host) = Open();
+        using var _ = m;
+        var before = m.State();
+
+        var refusal = Refusal(host, "delete_items", $$"""
+            { "refs": [ "sec:{{S}}#NPC/ol_npc_1", "{{Ship1}}" ], "confirm": true }
+            """);
+
+        Assert.Equal(("refused", MissionErrors.RequiredBy, "refs[0]"), refusal);
+        Assert.Equal(before, m.State());
+        Assert.False(m.Session.CanUndo);
+    }
+
+    /// <summary>Each delete_items call of <paramref name="calls"/> applies in one entry of the agent, and all give the
+    /// same state. One undo puts back the state before the call.</summary>
+    private static void AssertOneDelete(Func<MissionEdits> create, params string[][] calls)
+    {
+        string? expected = null;
+        foreach (var refs in calls)
+        {
+            using var m = create();
+            var host = new TestAgentHost(m.Session);
+            var before = m.State();
+            var list = string.Join(", ", refs.Select(r => $"\"{r}\""));
+
+            var result = Ok(host, "delete_items", $$"""{ "refs": [ {{list}} ], "confirm": true }""");
+
+            Assert.Equal("applied", (string?)result["status"]);
+            Assert.Equal(EditOrigin.Agent, m.Session.UndoOrigin);
+            Assert.NotNull(result["inverse"]);
+            expected ??= m.State();
+            Assert.Equal(expected, m.State());
+            m.Session.Undo();
+            Assert.Equal(before, m.State());
+        }
+    }
+
+    /// <summary>The test script with a second trigger <c>ol_wave</c> at its end, in a whole file of the active mod. The
+    /// game never runs the second trigger (TR4). A patch cannot find one of two sections with one nickname, so the test
+    /// needs the whole file.</summary>
+    private const string DuplicateText = Text + "\n\n[Trigger]\nnickname = ol_wave\nCnd_Timer = 99\nAct_ChangeState = FAIL\n";
+
+    private static MissionEdits CreateDuplicate() =>
+        Create(DuplicateText, modFiles: new() { [@"files\" + Script] = DuplicateText });
+
+    private static readonly string SecondWave = $"sec:{S}#Trigger/ol_wave~1";
+
+    /// <summary>delete_items deletes the second trigger with a nickname by its sec: reference with an ordinal, and the
+    /// first trigger stays. One call can delete both triggers. rename_item and duplicate_items find a trigger by its
+    /// nickname, so they refuse the second trigger, and the text names delete_items. Nothing changes then.</summary>
+    [Fact]
+    public void TheGenericToolsTakeTheSecondTriggerWithANickname()
+    {
+        using var m = CreateDuplicate();
+        var host = new TestAgentHost(m.Session);
+        var before = m.State();
+
+        var rename = Call(host, "rename_item", $$"""{ "ref": "{{SecondWave}}", "new_name": "ol_other" }""");
+        var copy = Call(host, "duplicate_items", $$"""{ "refs": [ "{{Wave}}", "{{SecondWave}}" ] }""");
+        Assert.Equal(("refused", EditTools.MissionItem, "ref"),
+            ((string?)rename.Content["code"], (string?)rename.Content["detail"], (string?)rename.Content["field"]));
+        Assert.Equal(("refused", EditTools.MissionItem, "refs[1]"),
+            ((string?)copy.Content["code"], (string?)copy.Content["detail"], (string?)copy.Content["field"]));
+        Assert.Contains("use delete_items", (string?)rename.Content["message"]);
+        Assert.Equal(before, m.State());
+
+        var result = Ok(host, "delete_items", $$"""{ "refs": [ "{{SecondWave}}" ] }""");
+
+        Assert.Equal(["cnd_timer = 3"], Waves(m));
+        AssertOneMissionEntry(m, result, "Delete ol_wave", before);
+
+        Ok(host, "delete_items", $$"""{ "refs": [ "{{Wave}}", "{{SecondWave}}" ], "confirm": true }""");
+        Assert.Empty(Waves(m));
+    }
+
+    /// <summary>The condition line of each trigger <c>ol_wave</c> of the script, in the order of the file.</summary>
+    private static string[] Waves(MissionEdits m) =>
+        m.Session.OpenDocument(Script)!.Working
+            .Where(s => s.Name == "Trigger" && s.Any(e => e.Name == "nickname" && Line(e) == "nickname = ol_wave"))
+            .Select(s => Line(s.First(e => e.Name.StartsWith("Cnd_", StringComparison.Ordinal))).ToLowerInvariant())
+            .ToArray();
+
+    /// <summary>duplicate_items copies a trigger with a free name after its own name, as Ctrl+D does, and items, in
+    /// one entry. An offset does not move a mission copy, and the result warns about each copy. Only the warning of a
+    /// copy with a position names set_fields, because set_fields does not change a trigger. A label refuses.</summary>
     [Fact]
     public void DuplicateItemsCopiesATriggerAndAnItem()
     {
@@ -347,22 +454,30 @@ public sealed partial class AgentMissionToolTests
         var before = m.State();
 
         var result = Ok(host, "duplicate_items", $$"""
-            { "refs": [ "{{Wave}}", "sec:{{S}}#ObjList/ol_orders" ], "offset": [0, 0, 100] }
+            { "refs": [ "{{Wave}}", "sec:{{S}}#ObjList/ol_orders", "{{Ship1}}" ], "offset": [0, 0, 100] }
             """);
 
         var adds = Texts(result["adds"]);
-        Assert.Equal(2, adds.Length);
+        Assert.Equal(3, adds.Length);
         Assert.Equal($"trg:{Script}#ol_wave_2", adds[0]);
         Assert.StartsWith($"sec:{Script}#ObjList/", adds[1]);
+        Assert.StartsWith($"sec:{Script}#MsnShip/", adds[2]);
         Assert.Equal(["system = ol_system", "nickname = ol_wave_2", "Cnd_Timer = 3", "Act_SpawnShip = ol_ship_1",
             "Act_DeactTrig = ol_end", "Act_ActTrig = ol_end"], m.Lines("ol_wave_2"));
-        Assert.Equal(adds, result["warnings"]!.AsArray().Select(w => (string?)w!["ref"]));
-        Assert.Contains("is an item of a mission", (string?)result["warnings"]![0]!["message"]);
-        AssertOneMissionEntry(m, result, "Duplicate 2 items", before);
+        var warnings = result["warnings"]!.AsArray();
+        Assert.Equal(adds, warnings.Select(w => (string?)w!["ref"]));
+        Assert.Equal($"The copy {adds[0]} has no position, so the offset did not move it.", (string?)warnings[0]!["message"]);
+        Assert.DoesNotContain("set_fields", (string?)warnings[1]!["message"]);
+        Assert.Equal($"The copy {adds[2]} is an item of a mission, so the offset did not move it. To move it, set its " +
+                     "position with set_fields.", (string?)warnings[2]!["message"]);
+        AssertOneMissionEntry(m, result, "Duplicate 3 items", before);
 
         var one = Ok(host, "duplicate_items", $$"""{ "refs": [ "{{Wave}}" ] }""");
         Assert.Equal("Agent: Duplicate trigger ol_wave", (string?)one["undo_label"]);
         Assert.Empty(one["warnings"]!.AsArray());
+        // Two forms of one trigger give one copy.
+        var twice = Ok(host, "duplicate_items", $$"""{ "refs": [ "{{Wave}}", "sec:{{S}}#Trigger/ol_wave" ] }""");
+        Assert.Equal([$"trg:{Script}#ol_wave_3"], Texts(twice["adds"]));
         Assert.Equal(("invalid_argument", EditTools.MissionItem, "refs[0]"),
             Refusal(host, "duplicate_items", $$"""{ "refs": [ "label:{{S}}#ol_wing" ] }"""));
     }
@@ -439,6 +554,10 @@ public sealed partial class AgentMissionToolTests
         AssertUiParity(m => GraphEditModel.DeleteInstance(Script, AnalysisOf(m).Prefabs!.Instances.Single(i => i.Id == "success/ol_win")),
             "delete_items", $$"""{ "refs": [ "inst:{{S}}#success/ol_win" ], "confirm": true }""",
             () => Create(PrefabStudioTests.MatchedText));
+        // The second trigger with a nickname goes by its section, not by its nickname.
+        AssertUiParity(m => MissionTreeEdits.Delete(AnalysisOf(m),
+                new MissionRef(Script, MissionItemKind.Trigger, AnalysisOf(m).Index.Triggers.Single(t => t.IsDuplicate).Section.Ref), null),
+            "delete_items", $$"""{ "refs": [ "{{SecondWave}}" ], "confirm": true }""", CreateDuplicate);
     }
 
     /// <summary>A mission item of the hidden group Missions gives not_available in each generic tool (decision D725).
@@ -468,23 +587,30 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal(before, m.State());
     }
 
-    /// <summary>The edit tools that change only sections of INI files refuse a mission item with invalid_argument and
-    /// the detail MissionItem. The text names the tools that change mission items. A section of another file under
-    /// DATA\MISSIONS, for example the shared ship build file, refuses with WorldFile in each edit tool. Nothing
-    /// changes.</summary>
+    /// <summary>The edit tools that change only sections of INI files refuse each kind of mission reference with
+    /// invalid_argument and the detail MissionItem: a section and a trigger of a script, a script, a label, a prefab
+    /// instance, a trigger and a section of the template of a prefab, and a prefab. The text names the tools that
+    /// change mission items. Nothing changes.</summary>
     [Fact]
     public void TheOtherEditToolsRefuseAMissionItem()
     {
         var (m, host) = Open();
         using var _ = m;
         var before = m.State();
-        var shared = $"sec:{SharedShips.Replace(@"\", @"\\")}#NPCShipArch/ol_shared_build";
+        static string Component(string reference) =>
+            $$"""{ "ref": "{{reference}}", "component": "loadout_user", "action": "remove" }""";
 
         (string Tool, string Arguments)[] calls =
         [
             ("scene_transform", $$"""{ "moves": [ { "ref": "{{Ship1}}", "position": [1, 2, 3] } ] }"""),
             ("scene_transform", $$"""{ "moves": [ { "ref": "{{Wave}}", "position": [1, 2, 3] } ] }"""),
-            ("scene_set_component", $$"""{ "ref": "{{Ship1}}", "component": "loadout_user", "action": "remove" }"""),
+            ("scene_set_component", Component(Ship1)),
+            ("scene_set_component", Component($"msn:{S}")),
+            ("scene_set_component", Component($"label:{S}#ol_wing")),
+            ("scene_set_component", Component($"inst:{S}#ol_w1")),
+            ("scene_set_component", Component("trg:prefab:mod:ol_gate#spawn")),
+            ("scene_set_component", Component("sec:prefab:mod:ol_gate#Trigger/spawn")),
+            ("scene_set_component", Component("prefab:mod:ol_gate")),
             ("scene_set_encounters", $$"""{ "zone": "{{Ship1}}", "encounters": [] }"""),
             ("prop_group_save", $$"""{ "refs": [ "{{End}}" ], "confirm": true }"""),
             ("create_from_template", $$"""{ "kind": "ship", "template": "sec:{{B}}#NPCShipArch/ol_build_1", "nickname": "ol_x" }"""),
@@ -498,11 +624,58 @@ public sealed partial class AgentMissionToolTests
             Assert.Contains("set_fields, set_text, rename_item, delete_items and duplicate_items", (string?)result.Content["message"]);
             Assert.StartsWith(tool, (string?)result.Content["message"]);
         }
-        Assert.Equal(("refused", MissionErrors.WorldFile, "ref"),
-            Refusal(host, "set_fields", $$"""{ "ref": "{{shared}}", "fields": { "level": "d7" } }"""));
-        Assert.Equal(("refused", MissionErrors.WorldFile, "ref"),
-            Refusal(host, "scene_set_component", $$"""{ "ref": "{{shared}}", "component": "loadout_user", "action": "remove" }"""));
         Assert.Equal(before, m.State());
         Assert.False(m.Session.CanUndo);
+    }
+
+    /// <summary>Each edit tool except mission_edit refuses a section of another file under DATA\MISSIONS. A pilot file
+    /// gives WorldFile, as in mission_edit. A shared ship build file gives SharedBuildChange, and the text names
+    /// mission_edit with confirm: true. mission_edit then changes a line of the build after the confirmation, as the text
+    /// tells.</summary>
+    [Fact]
+    public void TheEditToolsRefuseAWorldFileOfTheMissions()
+    {
+        const string pilots = @"DATA\MISSIONS\pilots_population.ini";
+        var (m, host) = Open(setup: ws => ws.WriteBase(pilots, "[Pilot]\nnickname = ol_pilot\n"));
+        using var _ = m;
+        var before = m.State();
+        var shared = $"sec:{SharedShips.Replace(@"\", @"\\")}#NPCShipArch/ol_shared_build";
+        var pilot = $"sec:{pilots.Replace(@"\", @"\\")}#Pilot/ol_pilot";
+        (string Tool, string Arguments)[] Calls(string reference) =>
+        [
+            ("set_fields", $$"""{ "ref": "{{reference}}", "fields": { "level": "d7" } }"""),
+            ("set_text", $$"""{ "ref": "{{reference}}", "field": "ids_name", "text": "x" }"""),
+            ("rename_item", $$"""{ "ref": "{{reference}}", "new_name": "ol_other" }"""),
+            ("delete_items", $$"""{ "refs": [ "{{reference}}" ], "confirm": true }"""),
+            ("duplicate_items", $$"""{ "refs": [ "{{reference}}" ] }"""),
+            ("scene_set_component", $$"""{ "ref": "{{reference}}", "component": "loadout_user", "action": "remove" }"""),
+        ];
+
+        foreach (var (tool, arguments) in Calls(shared))
+        {
+            var result = Call(host, tool, arguments);
+            Assert.True(result.IsError, result.Text);
+            Assert.Equal(("refused", MissionErrors.SharedBuildChange), ((string?)result.Content["code"], (string?)result.Content["detail"]));
+            var message = (string)result.Content["message"]!;
+            Assert.Contains($"so {tool} does not change it.", message);
+            Assert.Contains("use mission_edit with set_item_key or set_line and confirm: true.", message);
+        }
+        foreach (var (tool, arguments) in Calls(pilot))
+        {
+            var result = Call(host, tool, arguments);
+            Assert.True(result.IsError, result.Text);
+            Assert.Equal(("refused", MissionErrors.WorldFile), ((string?)result.Content["code"], (string?)result.Content["detail"]));
+        }
+        Assert.Equal(before, m.State());
+        Assert.False(m.Session.CanUndo);
+
+        var level = $$"""
+            { "kind": "set_item_key", "item": "{{shared}}", "key": "level", "lines": [ { "key": "level", "texts": [ "d7" ] } ] }
+            """;
+        var asks = Call(host, "mission_edit", Edit(level));
+        Assert.Equal("needs_confirmation", (string?)asks.Content["code"]);
+        Assert.Contains("is in a shared file", (string?)asks.Content["message"]);
+        Ok(host, "mission_edit", $$"""{ "commands": [ {{level}} ], "confirm": true }""");
+        Assert.Contains("level = d7", m.Lines(Item("NPCShipArch", "ol_shared_build", SharedShips)));
     }
 }

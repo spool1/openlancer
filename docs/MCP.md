@@ -414,9 +414,15 @@ With a `line:` reference, `field` of `set_text` is the name of the value, for ex
 
 `delete_items` deletes a trigger, a prefab instance with its members, and each other item. A mission ship goes with its NPC and its ship build when nothing else uses them. When lines name a deleted item, they stay and show "Missing", and the delete needs `confirm: true`. An `[NPC]` that a ship names and a ship build that an `[NPC]` names give `refused` with the detail `RequiredBy`. The `[Mission]` section gives `refused`. To delete a whole script, use `mission_edit` with `delete_script`.
 
-`duplicate_items` with `offset` moves no mission copy. The result warns about each mission copy. Set the position of a copy with `set_fields`.
+One `delete_items` call can name an item and an item that its delete removes. Examples are a prefab instance and one of its members, and a mission ship and its NPC. The tool deletes each item one time, as Delete in the graph does. It deletes the prefab instances first, then the triggers, the other items and the ships, and last the NPCs and the ship builds. So the order of the references does not change the result. An NPC that another ship still names gives `RequiredBy`.
 
-Each tool refuses the other mission references with `invalid_argument` and the detail `MissionItem`. Examples are a `label:` reference, a `line:` reference in `delete_items`, and a `msn:` or `act:` reference. The message names the tool for the change, for example `mission_edit` with `remove_action` to delete a line. Each edit tool refuses a section of another file under `DATA\MISSIONS`, for example a pilot file or the shared ship build file. It gives `refused` with the detail `WorldFile`, because encounters and bases use the data of these files too.
+Two triggers can have the same nickname. The game runs only the first, and the second has a `sec:` reference with an ordinal, for example `sec:...#Trigger/ol_wave~1`. `delete_items` deletes the second trigger with this reference. `rename_item` and `duplicate_items` find a trigger by its nickname, so they refuse the second trigger with `refused` and the detail `MissionItem`.
+
+`duplicate_items` with `offset` moves no mission copy. The result warns about each mission copy. To move a copy with a position, for example a ship or a formation, use `set_fields`.
+
+Each tool refuses the other mission references with `invalid_argument` and the detail `MissionItem`. Examples are a `label:` reference, a `line:` reference in `delete_items`, and a `msn:` or `act:` reference. The message names the tool for the change, for example `mission_edit` with `remove_action` to delete a line.
+
+The generic tools and the other edit tools that take a `sec:` reference refuse a section of another file under `DATA\MISSIONS`, because encounters and bases use the data of these files too. A pilot file and the other world files give `refused` with the detail `WorldFile`, as in `mission_edit`. A shared ship build file, for example `DATA\MISSIONS\npcships.ini`, gives `refused` with the detail `SharedBuildChange`. `mission_edit` changes the lines of a build of this file after a confirmation: `set_item_key` and `set_line` give `needs_confirmation`. Random encounters can use the build, so the agent asks you first. Then it calls `mission_edit` again with `confirm: true`. The mission commands do not rename, delete or copy a build of this file.
 
 ### Save
 

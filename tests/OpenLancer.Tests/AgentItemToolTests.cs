@@ -310,7 +310,7 @@ public sealed class AgentItemToolTests
         Assert.Equal("Agent: Duplicate 2 items", session.UndoLabel);
         Assert.Equal($"trg:{MissionScript}#ol_spare_2", adds[^1]);
         var warning = Assert.Single(result["warnings"]!.AsArray(), w => (string?)w!["ref"] == adds[^1])!;
-        Assert.Contains("is an item of a mission", (string?)warning["message"]);
+        Assert.Equal($"The copy {adds[^1]} has no position, so the offset did not move it.", (string?)warning["message"]);
         Assert.Contains(result["warnings"]!.AsArray(), w => (string?)w!["ref"] == adds[0] &&
                                                             ((string?)w["message"])!.Contains("has no position", StringComparison.Ordinal));
         Assert.True(HasTrigger(session, "ol_spare_2"));

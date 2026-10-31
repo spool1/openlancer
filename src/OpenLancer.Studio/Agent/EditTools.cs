@@ -466,7 +466,7 @@ internal static class EditTools
             throw MissionItemRefusal(call, text);
         var section = ItemRefs.ResolveSection(session, reference);
         if (SectionKeys.IsMissionFile(section.Path))
-            throw session.Missions.IsMissionFile(section.Path) ? MissionItemRefusal(call, text) : WorldFileRefusal(section, text);
+            throw session.Missions.IsMissionFile(section.Path) ? MissionItemRefusal(call, text) : WorldFileRefusal(call, section, text);
         RequireGroup(call, section, text);
         return section;
     });
@@ -589,12 +589,19 @@ internal static class EditTools
         new(new EditError(EditErrorKind.InvalidArgument, MissionItem,
             AgentTexts.Error("edit_mission_item", ("tool", call.Tool))) { Target = reference });
 
-    /// <summary>The refusal of a section of a file under <c>DATA\MISSIONS</c> that is not a mission script and not the
-    /// ship build file of a script, for example a pilot file. Encounters and bases use its data too (review finding RB2
-    /// of the M6b design), so the agent tools do not change it.</summary>
-    internal static EditException WorldFileRefusal(SectionRef section, string reference) =>
-        new(new EditError(EditErrorKind.Refused, MissionErrors.WorldFile,
-            AgentTexts.Error("edit_mission_world_file", ("path", section.Path))) { Target = reference });
+    /// <summary>
+    /// The refusal of a section of a file under <c>DATA\MISSIONS</c> that is not a mission script and not the ship build
+    /// file of a script. Encounters and bases use its data too (review finding RB2 of the M6b design), so the tool does
+    /// not change it. A pilot file and the other world files give the detail <c>WorldFile</c>, as in
+    /// <c>mission_edit</c>. A shared ship build file gives the detail <c>SharedBuildChange</c>: <c>mission_edit</c>
+    /// changes the lines of its builds after a confirmation, and the text tells it.
+    /// </summary>
+    internal static EditException WorldFileRefusal(ToolCall call, SectionRef section, string reference) =>
+        new(call.Session.Missions.IsSharedBuildFile(section.Path)
+            ? new EditError(EditErrorKind.Refused, MissionErrors.SharedBuildChange,
+                AgentTexts.Error("edit_mission_shared_build", ("path", section.Path), ("tool", call.Tool))) { Target = reference }
+            : new EditError(EditErrorKind.Refused, MissionErrors.WorldFile,
+                AgentTexts.Error("edit_mission_world_file", ("path", section.Path))) { Target = reference });
 
     /// <summary>The revision guard of <c>if_revision</c> (decision D723 of the MCP1 design). Inside a batch, the
     /// revision is the revision before the batch, because the batch changes it only at its commit.</summary>

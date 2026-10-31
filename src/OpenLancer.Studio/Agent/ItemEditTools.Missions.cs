@@ -76,20 +76,21 @@ internal static partial class ItemEditTools
             if (!SectionKeys.IsMissionFile(section.Path))
                 return new ItemTarget(section, null);
             if (!session.Missions.IsMissionFile(section.Path))
-                throw EditTools.WorldFileRefusal(section, text);
+                throw EditTools.WorldFileRefusal(call, section, text);
             return new ItemTarget(null, new MissionTarget(KindOf(section.Id), section.Path, text) { Section = section.Id });
         }
         if (call.Host.HiddenGroups.Contains(ToolGroup.Missions))
             throw new EditException(AgentTools.GroupHidden(ToolGroup.Missions) with { Target = text });
-        return new ItemTarget(null, MissionOf(session, reference, text) ?? throw KindRefusal(call, text));
+        return new ItemTarget(null, MissionOf(call, reference, text) ?? throw KindRefusal(call, text));
     });
 
     /// <summary>The mission item of a mission reference, or null for a kind that no generic tool takes: a
     /// <c>msn:</c>, <c>act:</c> or <c>prefab:</c> reference.</summary>
     /// <exception cref="EditException">The section of a trigger or a line does not resolve, or is not in a mission
     /// script or the ship build file of a script.</exception>
-    private static MissionTarget? MissionOf(EditSession session, ItemReference reference, string text)
+    private static MissionTarget? MissionOf(ToolCall call, ItemReference reference, string text)
     {
+        var session = call.Session;
         var kind = reference.Kind;
         if (kind is ItemRefKind.Label or ItemRefKind.Instance)
             return new MissionTarget(kind, reference.Path!, text) { Name = reference.Name };
@@ -107,7 +108,7 @@ internal static partial class ItemEditTools
         if (!session.Missions.IsMissionFile(section.Path))
         {
             throw SectionKeys.IsMissionFile(section.Path)
-                ? EditTools.WorldFileRefusal(section, text)
+                ? EditTools.WorldFileRefusal(call, section, text)
                 : new EditException(new EditError(EditErrorKind.InvalidArgument, ItemRefs.BadReference,
                     AgentTexts.Error("mission_line_file", ("ref", text))) { Target = text });
         }
@@ -259,19 +260,32 @@ internal static partial class ItemEditTools
         return -1;
     }
 
-    /// <summary>The lines of the section of a mission item now, in the batch of the call. The template of a prefab
-    /// comes from its analysis in prefab mode.</summary>
+    /// <summary>The lines of the section of a mission item now, in the batch of the call.</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.NotFound"/>: the file has no such section.</exception>
-    private static IReadOnlyList<Entry> EntriesOf(EditSession session, MissionTarget item)
+    private static IReadOnlyList<Entry> EntriesOf(EditSession session, MissionTarget item) =>
+        SectionOf(session, item)?.ToList() ?? throw new EditException(NotFound(item).Error with { Field = "ref" });
+
+    /// <summary>The section of a trigger or of another section of a mission file now, in the batch of the call, or
+    /// null. The template of a prefab comes from its analysis in prefab mode.</summary>
+    private static Section? SectionOf(EditSession session, MissionTarget item)
     {
         var id = item.Section!;
-        var section = MissionRefs.IsPrefab(item.Path)
+        return MissionRefs.IsPrefab(item.Path)
             ? session.Missions.AnalysisOf(item.Path)?.Document.Find(new SectionRef(item.Path, id))?.Section
             : session.OpenDocument(item.Path) is { } document && document.IndexOf(id) is >= 0 and var index
                 ? document.Working[index]
                 : null;
-        return section?.ToList() ?? throw new EditException(MissionErrors.ItemNotFoundError(item.Path,
-            MissionNames.KindWord(id.Type), id.Key ?? id.Type) with { Target = item.Text, Field = "ref" });
+    }
+
+    /// <summary>The error of a trigger or of another section of a mission file that does not exist, as the mission
+    /// commands give it.</summary>
+    private static EditException NotFound(MissionTarget item)
+    {
+        var id = item.Section!;
+        var name = id.Key ?? id.Type;
+        return new EditException((MissionIndex.Is(id.Type, "Trigger")
+            ? MissionErrors.TriggerNotFoundError(item.Path, name)
+            : MissionErrors.ItemNotFoundError(item.Path, MissionNames.KindWord(id.Type), name)) with { Target = item.Text });
     }
 
     // ---- rename_item ----
@@ -280,12 +294,13 @@ internal static partial class ItemEditTools
     /// <see cref="RenameItem"/>, as F2 in the graph and the Hierarchy does. Each line that names the item
     /// changes.</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a line, a label or a prefab
-    /// instance. Each error of the request: a name that is not valid or that the file has names
-    /// <c>new_name</c>.</exception>
+    /// instance. <see cref="EditErrorKind.Refused"/> for a second trigger with the nickname of an earlier trigger. Each
+    /// error of the request: a name that is not valid or that the file has names <c>new_name</c>.</exception>
     private static void RenameMissionItem(ToolCall call, EditScope scope, MissionTarget item, string name)
     {
         MissionCommand command = item.Kind switch
         {
+            ItemRefKind.Trigger when item.Section!.Ordinal > 0 => throw DuplicateTriggerRefusal(call, item, "ref"),
             ItemRefKind.Trigger => new RenameTrigger(item.Trigger, name.Trim()),
             ItemRefKind.Section => new RenameItem(item.Item, name.Trim()),
             _ => throw KindRefusal(call, item.Text, "ref"),
@@ -294,62 +309,114 @@ internal static partial class ItemEditTools
             error.Detail is MissionErrors.NameInvalid or MissionErrors.NameTaken or MissionErrors.NameIdTaken ? "new_name" : "ref");
     }
 
+    /// <summary>The refusal of a second trigger with the nickname of an earlier trigger, which the game never runs (TR4).
+    /// The rename and the copy of a trigger find it by its nickname, so they would change the first trigger. The text
+    /// tells the agent to delete the second trigger.</summary>
+    private static EditException DuplicateTriggerRefusal(ToolCall call, MissionTarget item, string field) =>
+        new(new EditError(EditErrorKind.Refused, EditTools.MissionItem,
+            AgentTexts.Error("mission_duplicate_trigger", ("ref", item.Text), ("name", item.Section!.Key!), ("tool", call.Tool)))
+        {
+            Target = item.Text, Field = field,
+        });
+
     // ---- delete_items ----
 
     /// <summary>
-    /// Deletes mission items in one request, with the commands of Delete in the graph and the Hierarchy: a trigger with
-    /// <see cref="RemoveTrigger"/>, a mission ship with its unused parts with <see cref="RemoveMissionShip"/> (decision
-    /// D669), and another item with <see cref="RemoveItem"/>. A prefab instance goes with the commands of
+    /// Deletes mission items in one Undo step, with the commands of Delete in the graph and the Hierarchy: a trigger
+    /// with <see cref="RemoveTrigger"/>, a mission ship with its unused parts with <see cref="RemoveMissionShip"/>
+    /// (decision D669), and another item with <see cref="RemoveItem"/>. A prefab instance goes with the commands of
     /// <see cref="PrefabLinks.DeleteCommands"/>. Each line that names a deleted item stays and shows "Missing", so the
     /// call needs <c>confirm: true</c>.
     /// </summary>
+    /// <remarks>An item that an earlier delete of the call removes is not deleted again, as the graph does not delete
+    /// the triggers of a prefab frame that it deletes: a member of a deleted prefab instance, and the NPC and the ship
+    /// build that a deleted mission ship removes. So the deletes go in the order of <see cref="DeleteStep"/>, and the
+    /// order of the references does not change the result. Each item resolves before the first delete, so an item that
+    /// does not exist gives <c>not_found</c>.</remarks>
     /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a line or a label.
-    /// <see cref="EditErrorKind.Refused"/> for the <c>[Mission]</c> section. Each error of the request names the
+    /// <see cref="EditErrorKind.Refused"/> for the <c>[Mission]</c> section. Each error of a request names the
     /// reference of its item.</exception>
     private static void DeleteMissionItems(ToolCall call, EditScope scope, IReadOnlyList<(int Index, MissionTarget Item)> items)
     {
-        var commands = new List<MissionCommand>();
-        var owners = new List<int>();
-        var label = $"Delete {items.Count} items";
+        var session = scope.Session;
+        // Each item resolves before the first request. So an item that does not exist gives not_found, and a later
+        // request skips only an item that an earlier request removed.
         foreach (var (index, item) in items)
+            EditTools.At($"refs[{index}]", () => DeleteCommandsOf(call, session, item));
+        var label = items.Count == 1 ? null : $"Delete {items.Count} items";
+        foreach (var request in items.GroupBy(t => DeleteStep(t.Item).Request).OrderBy(g => g.Key))
         {
-            var (made, itemLabel) = EditTools.At($"refs[{index}]", () => DeleteCommandsOf(call, scope.Session, item));
-            commands.AddRange(made);
-            owners.AddRange(made.Select(_ => index));
-            if (items.Count == 1)
-                label = itemLabel;
+            var commands = new List<MissionCommand>();
+            var owners = new List<int>();
+            // A section with a larger ordinal goes first, so a delete does not change the identity of a later
+            // section with the same nickname.
+            foreach (var (index, item) in request.OrderBy(t => DeleteStep(t.Item).Order)
+                         .ThenByDescending(t => t.Item.Section?.Ordinal ?? 0))
+            {
+                if (!Exists(session, item))
+                    continue;
+                var (made, itemLabel) = DeleteCommandsOf(call, session, item);
+                commands.AddRange(made);
+                owners.AddRange(made.Select(_ => index));
+                label ??= itemLabel;
+            }
+            if (commands.Count > 0)
+            {
+                scope.RunMission(new MissionBatch(label!, commands),
+                    error => error.Index is { } i && i < owners.Count ? $"refs[{owners[i]}]" : "refs");
+            }
         }
-        scope.RunMission(new MissionBatch(label, commands),
-            error => error.Index is { } i && i < owners.Count ? $"refs[{owners[i]}]" : "refs");
     }
+
+    /// <summary>
+    /// The place of the delete of a mission item in a call: the request, and the order in the request. A delete can
+    /// remove items of a later request, but no item of its own request. The first request deletes the prefab
+    /// instances, which remove their members. The second request deletes the triggers, the other items and then the
+    /// mission ships. A formation that names the NPC of a ship goes first, so the ship can remove its NPC. A ship
+    /// removes its NPC and its ship build when nothing else uses them. The last request deletes the NPCs and then the
+    /// ship builds, because an <c>[NPC]</c> that a ship names and a ship build that an <c>[NPC]</c> names refuse the
+    /// delete (<c>RequiredBy</c>).
+    /// </summary>
+    private static (int Request, int Order) DeleteStep(MissionTarget item) => item.Kind switch
+    {
+        ItemRefKind.Instance => (0, 0),
+        ItemRefKind.Trigger => (1, 0),
+        _ when MissionIndex.Is(item.Section!.Type, "MsnShip") => (1, 2),
+        _ when MissionIndex.Is(item.Section!.Type, "NPC") => (2, 0),
+        _ when MissionIndex.Is(item.Section!.Type, "NPCShipArch") => (2, 1),
+        _ => (1, 1),
+    };
+
+    /// <summary>True when the item of a mission reference exists now, in the batch of the call.</summary>
+    private static bool Exists(EditSession session, MissionTarget item) =>
+        item.Kind == ItemRefKind.Instance ? FindInstance(session, item) != null : SectionOf(session, item) != null;
 
     /// <summary>The commands that delete one mission item, and the label of a call that deletes only this
     /// item.</summary>
+    /// <exception cref="EditException">The item does not exist, or the tool does not delete it.</exception>
     private static (IReadOnlyList<MissionCommand> Commands, string Label) DeleteCommandsOf(ToolCall call, EditSession session,
         MissionTarget item)
     {
-        MissionCommand command;
-        switch (item.Kind)
+        if (item.Kind == ItemRefKind.Instance)
         {
-            case ItemRefKind.Instance:
-                var (script, instance) = InstanceOf(session, item);
-                return (PrefabLinks.DeleteCommands(script, instance, instance.Claimed), PrefabLinks.DeleteLabel(instance));
-            // A duplicate trigger, which the game never runs (TR4), goes by its section, as in the Hierarchy.
-            case ItemRefKind.Trigger when item.Section!.Ordinal == 0:
-                command = new RemoveTrigger(item.Trigger);
-                break;
-            case ItemRefKind.Section when MissionIndex.Is(item.Section!.Type, "Mission"):
-                throw new EditException(new EditError(EditErrorKind.Refused, EditTools.MissionItem,
-                    AgentTexts.Error("mission_delete_header")) { Target = item.Text });
-            case ItemRefKind.Section when MissionIndex.Is(item.Section!.Type, "MsnShip"):
-                command = new RemoveMissionShip(item.Item);
-                break;
-            case ItemRefKind.Trigger or ItemRefKind.Section:
-                command = new RemoveItem(item.Item);
-                break;
-            default:
-                throw KindRefusal(call, item.Text);
+            var (script, instance) = InstanceOf(session, item);
+            return (PrefabLinks.DeleteCommands(script, instance, instance.Claimed), PrefabLinks.DeleteLabel(instance));
         }
+        if (item.Kind is not (ItemRefKind.Trigger or ItemRefKind.Section))
+            throw KindRefusal(call, item.Text);
+        if (MissionIndex.Is(item.Section!.Type, "Mission"))
+        {
+            throw new EditException(new EditError(EditErrorKind.Refused, EditTools.MissionItem,
+                AgentTexts.Error("mission_delete_header")) { Target = item.Text });
+        }
+        _ = SectionOf(session, item) ?? throw NotFound(item);
+        MissionCommand command = item.Kind switch
+        {
+            // A duplicate trigger, which the game never runs (TR4), goes by its section, as in the Hierarchy.
+            ItemRefKind.Trigger when item.Section.Ordinal == 0 => new RemoveTrigger(item.Trigger),
+            ItemRefKind.Section when MissionIndex.Is(item.Section.Type, "MsnShip") => new RemoveMissionShip(item.Item),
+            _ => new RemoveItem(item.Item),
+        };
         return ([command], command.HistoryLabel);
     }
 
@@ -361,11 +428,16 @@ internal static partial class ItemEditTools
         var analysis = session.Missions.AnalysisOf(item.Path) ??
                        throw new EditException(MissionErrors.ScriptNotFoundError(item.Path) with { Target = item.Text });
         var instances = analysis.Prefabs?.Instances ?? [];
-        var instance = instances.FirstOrDefault(i => string.Equals(i.Id, item.Name, StringComparison.OrdinalIgnoreCase)) ??
+        var instance = FindInstance(session, item) ??
                        throw new EditException(MissionErrors.ItemNotFoundError(analysis.Script.Path, "prefab instance",
                            item.Name, ItemRefs.Hint(item.Name, instances.Select(i => i.Id))) with { Target = item.Text });
         return (analysis.Script.Path, instance);
     }
+
+    /// <summary>The prefab instance of an <c>inst:</c> reference in the analysis of its script now, or null.</summary>
+    private static MissionPrefabInstance? FindInstance(EditSession session, MissionTarget item) =>
+        session.Missions.AnalysisOf(item.Path)?.Prefabs?.Instances
+            .FirstOrDefault(i => string.Equals(i.Id, item.Name, StringComparison.OrdinalIgnoreCase));
 
     // ---- duplicate_items ----
 
@@ -373,10 +445,12 @@ internal static partial class ItemEditTools
     /// Copies mission items in one request, with the commands of Ctrl+D in the graph and the Hierarchy: a trigger with
     /// <see cref="DuplicateTrigger"/> and a free name after its own name, and another item with
     /// <see cref="DuplicateItem"/>. The copies are at the end of their files. An offset does not move a mission copy, so
-    /// the result warns about each copy, as for a copy of a system without a position.
+    /// the result warns about each copy, as for a copy of a system without a position. The warning of a copy with a
+    /// position tells the agent to set it with <c>set_fields</c>.
     /// </summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a line, a label or a prefab
-    /// instance. Each error of the request names the reference of its item.</exception>
+    /// instance. <see cref="EditErrorKind.Refused"/> for a second trigger with the nickname of an earlier trigger. Each
+    /// error of the request names the reference of its item.</exception>
     private static void DuplicateMissionItems(ToolCall call, EditScope scope, IReadOnlyList<(int Index, MissionTarget Item)> items,
         bool offset)
     {
@@ -384,6 +458,7 @@ internal static partial class ItemEditTools
         var taken = new Dictionary<string, HashSet<string>>(VfsPath.Comparer);
         var commands = items.Select(t => t.Item.Kind switch
         {
+            ItemRefKind.Trigger when t.Item.Section!.Ordinal > 0 => throw DuplicateTriggerRefusal(call, t.Item, $"refs[{t.Index}]"),
             ItemRefKind.Trigger => new DuplicateTrigger(t.Item.Trigger) { NewName = FreeCopyName(session, taken, t.Item) },
             ItemRefKind.Section => (MissionCommand)new DuplicateItem(t.Item.Item),
             _ => throw KindRefusal(call, t.Item.Text, $"refs[{t.Index}]"),
@@ -395,11 +470,19 @@ internal static partial class ItemEditTools
             return;
         scope.Report(new EditResult(EditStatus.Applied)
         {
-            Warnings = result.Adds.Select(copy =>
-                new Problem(DiagnosticSeverity.Warning, AgentTexts.Error("mission_copy_not_moved", ("ref", copy))) { Ref = copy })
-                .ToList(),
+            Warnings = result.Adds.Select(copy => new Problem(DiagnosticSeverity.Warning,
+                AgentTexts.Error(HasPosition(copy) ? "mission_copy_not_moved" : "mission_copy_no_position", ("ref", copy)))
+            {
+                Ref = copy,
+            }).ToList(),
         });
     }
+
+    /// <summary>True for the reference of a mission item whose section type has the key <c>position</c>, for example a
+    /// ship or a formation. A trigger has no position.</summary>
+    private static bool HasPosition(string reference) =>
+        ItemRefs.Parse(reference) is { Kind: ItemRefKind.Section, Section: { } id } &&
+        MissionLineInput.SectionSpec(id.Type)?.Key("position") != null;
 
     /// <summary>A free name for the copy of a trigger: its own name with <c>_2</c>, <c>_3</c> and so on, as Ctrl+D
     /// gives it (see <see cref="MissionNaming.Free"/>). The names of the triggers of the script and of the earlier copies
