@@ -214,13 +214,14 @@ public static class ItemRefs
     /// a section that a delete removed.
     /// </summary>
     /// <remarks>A <c>trg:</c> reference names the first trigger with its nickname. So the second trigger with a repeated
-    /// nickname keeps the <c>sec:</c> form with its ordinal.</remarks>
+    /// nickname keeps the <c>sec:</c> form with its ordinal. A trigger of the template of a prefab in prefab mode
+    /// (<c>prefab:mod:&lt;id&gt;</c>) also gets the <c>trg:</c> form.</remarks>
     public static string Canonical(EditSession session, SectionRef section)
     {
         var id = section.Id;
         if (id.Key is { } key && id.Parent == null && id.Ordinal == 0)
         {
-            if (Ini.SectionKeys.IsMissionFile(section.Path))
+            if (Ini.SectionKeys.IsMissionFile(section.Path) || MissionRefs.IsPrefab(section.Path))
             {
                 if (id.Type.Equals("Trigger", StringComparison.OrdinalIgnoreCase))
                     return Format(new ItemReference(ItemRefKind.Trigger, key) { Path = section.Path });

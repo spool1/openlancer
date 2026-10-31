@@ -150,6 +150,23 @@ public sealed class ItemRefsTests
         Assert.Equal($@"sec:{SceneWorkspace.Li01Path}#LightSource/twin~1", ItemRefs.Canonical(session, twin));
     }
 
+    /// <summary>A trigger of a mission script and of the template of a prefab in prefab mode gets the trg: form. Another
+    /// section of a template keeps the sec: form (section 5.6 of the MCP1 design).</summary>
+    [Fact]
+    public void ATriggerOfAScriptAndOfATemplateGetsTheTriggerForm()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        const string template = "prefab:mod:ol_gate";
+
+        Assert.Equal(@"trg:DATA\MISSIONS\OL_X\ol_x.ini#ol_go",
+            ItemRefs.Canonical(session, new SectionRef(@"DATA\MISSIONS\OL_X\ol_x.ini", new SectionIdentity("Trigger", "ol_go"))));
+        Assert.Equal("trg:prefab:mod:ol_gate#spawn",
+            ItemRefs.Canonical(session, new SectionRef(template, new SectionIdentity("Trigger", "spawn"))));
+        Assert.Equal("sec:prefab:mod:ol_gate#MsnShip/ship",
+            ItemRefs.Canonical(session, new SectionRef(template, new SectionIdentity("MsnShip", "ship"))));
+    }
+
     [Fact]
     public void AReferenceMatchesWithoutLetterCaseAndGivesTheStoredPath()
     {
