@@ -113,12 +113,8 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     /// finding 5 of MCP1-3).</summary>
     private bool IsMissionFile(string path) =>
         Session.IsGuardedMissionFile(path) ||
-        !InMissionsFolder(path) &&
+        !MissionFiles.IsDirectlyIn(path, Session.DataPath("MISSIONS")) &&
         Touched.Values.Any(d => d.HoldsScript && VfsPath.Comparer.Equals(Session.ShipBuildFileOf(d.Path), path));
-
-    /// <summary>True for a file directly in <c>DATA\MISSIONS</c>, for example the shared ship build file and the pilot
-    /// files.</summary>
-    private bool InMissionsFolder(string path) => InMissionsFolder(Session, path);
 
     /// <summary>True for a shared ship build file of the missions (see <see cref="SharedBuildFiles"/>).</summary>
     public bool IsSharedBuildFile(string path) =>
@@ -136,13 +132,8 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     /// <param name="path">A normal install path.</param>
     /// <param name="isMissionFile">True for a script, the ship build file of a script or an editor file.</param>
     internal static bool IsSharedBuildPath(EditSession session, string path, Func<string, bool> isMissionFile) =>
-        session.MissionShipPaths.Any(p => VfsPath.Comparer.Equals(p, path)) && InMissionsFolder(session, path) &&
-        !isMissionFile(path);
-
-    /// <inheritdoc cref="InMissionsFolder(string)"/>
-    private static bool InMissionsFolder(EditSession session, string path) =>
-        session.DataPath("MISSIONS") is { } missions &&
-        VfsPath.Comparer.Equals(VfsPath.Normalize(System.IO.Path.GetDirectoryName(path) ?? ""), missions);
+        session.MissionShipPaths.Any(p => VfsPath.Comparer.Equals(p, path)) &&
+        MissionFiles.IsDirectlyIn(path, session.DataPath("MISSIONS")) && !isMissionFile(path);
 
     /// <summary>The document of a path through the scope, with its state before the batch.</summary>
     private EditDocument Edit(string path)

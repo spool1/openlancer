@@ -114,6 +114,14 @@ public static class MissionFiles
         return !path[(missionsFolder.Length + 1)..].StartsWith(EncountersFolder + "\\", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>True for a file directly in the missions folder, for example the shared ship build file or a pilot file.
+    /// Such a file is world data: it is never the ship build file of a script (review finding RB2).</summary>
+    /// <param name="path">An install path.</param>
+    /// <param name="missionsFolder">The install path of <c>DATA\MISSIONS</c>, or null when the data has none.</param>
+    internal static bool IsDirectlyIn(string path, string? missionsFolder) =>
+        missionsFolder != null &&
+        VfsPath.Comparer.Equals(VfsPath.Normalize(System.IO.Path.GetDirectoryName(path) ?? "") ?? "", missionsFolder);
+
     /// <summary>True for the section types that only a mission script has.</summary>
     internal static bool IsScriptSection(string type) =>
         type.Equals("Mission", StringComparison.OrdinalIgnoreCase) || type.Equals("Trigger", StringComparison.OrdinalIgnoreCase);

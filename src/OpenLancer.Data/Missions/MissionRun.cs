@@ -431,8 +431,7 @@ public static class MissionRun
     /// directly in that folder, for example <c>npcships.ini</c>, is world data that encounters and bases use too, so its
     /// problems are not the problems of a script (review finding RB2).</summary>
     private static bool IsOwnShipFile(MissionInputs inputs, string path) =>
-        inputs.DataPath("MISSIONS") is not { } missions ||
-        !VfsPath.Comparer.Equals(VfsPath.Normalize(System.IO.Path.GetDirectoryName(path) ?? ""), missions);
+        !MissionFiles.IsDirectlyIn(path, inputs.DataPath("MISSIONS"));
 
     /// <summary>
     /// The problems of the ship build file of a script (final finding 14 of MCP1-3): each name of each ship build that

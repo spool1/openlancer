@@ -98,8 +98,7 @@ public sealed partial class EditSession
             return false;
         if (OpenDocument(path) is { HoldsScript: true })
             return true;
-        if (DataPath("MISSIONS") is { } missions && VfsPath.Normalize(System.IO.Path.GetDirectoryName(path) ?? "") is { } folder &&
-            VfsPath.Comparer.Equals(folder, missions))
+        if (MissionFiles.IsDirectlyIn(path, DataPath("MISSIONS")))
             return false;
         return ShipBuildFilesOfScripts().Contains(path);
     }
