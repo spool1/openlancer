@@ -459,6 +459,8 @@ public sealed class ToolQueueTests
         cancel.Cancel();
 
         Assert.True(cancelled.IsCanceled);
+        // A read above the rate fails at once. So the test also ends when the rate rule of a read breaks.
+        Assert.True(tooOften.IsFaulted);
         var limit = await Assert.ThrowsAsync<EditException>(() => tooOften);
         Assert.Equal((EditErrorKind.Limit, "CallRate"), (limit.Error.Kind, limit.Error.Detail));
         Assert.Equal(2, queue.Waiting);
