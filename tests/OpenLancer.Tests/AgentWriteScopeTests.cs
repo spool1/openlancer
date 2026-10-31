@@ -49,16 +49,38 @@ public sealed class AgentWriteScopeTests
         ("prop_group_delete", """{ "group": REF, "confirm": true }"""),
         ("create_from_template", """{ "kind": "equipment", "template": REF, "nickname": "gun9" }"""),
         ("mission_edit", """{ "commands": [ { "kind": "set_item_key", "item": REF, "key": "pos", "lines": [] } ] }"""),
+        ("mission_add_trigger", """{ "script": REF, "condition": { "key": "Cnd_True" } }"""),
+        ("mission_add_trigger", """{ "script": "msn:DATA\\MISSIONS\\x.ini", "condition": { "key": "Cnd_True" }, "started_by": [REF] }"""),
+        ("mission_set_condition", """{ "trigger": REF, "condition": { "key": "Cnd_True" } }"""),
+        ("mission_add_action", """{ "trigger": REF, "action": { "key": "Act_ChangeState", "texts": ["FAIL"] } }"""),
+        ("mission_add_action", """{ "trigger": "trg:DATA\\MISSIONS\\x.ini#t", "action": { "key": "Act_ChangeState", "texts": ["FAIL"] }, "before": REF }"""),
+        ("mission_set_action", """{ "line": REF, "values": { "state": "FAIL" } }"""),
+        ("mission_move_action", """{ "line": REF }"""),
+        ("mission_move_action", """{ "line": "line:DATA\\MISSIONS\\x.ini#Trigger/t/3", "before": REF }"""),
+        ("mission_link_triggers", """{ "from": REF, "to": "t" }"""),
+        ("mission_link_triggers", """{ "from": "trg:DATA\\MISSIONS\\x.ini#t", "to": REF }"""),
+        ("mission_insert_trigger", """{ "line": REF, "condition": { "key": "Cnd_True" } }"""),
     ];
 
-    /// <summary>The paths of a <c>mission_edit</c> call that are not install paths, or that leave the folder of the
-    /// missions (section 8.2, item 4 of the MCP1 design). <c>PATH</c> marks the path, as JSON text.</summary>
-    private static readonly string[] MissionCalls =
+    /// <summary>The paths of a call of a mission tool that are not install paths, or that leave the folder of the
+    /// missions (section 8.2, item 4 of the MCP1 design): the msn:, trg: and line: references, the path of a new script
+    /// and the keys of the versions. <c>PATH</c> marks the path, as JSON text.</summary>
+    private static readonly (string Tool, string Arguments)[] MissionCalls =
     [
-        """{ "commands": [ { "kind": "add_trigger", "script": "msn:PATH", "nickname": "ol_new" } ] }""",
-        """{ "commands": [ { "kind": "remove_trigger", "trigger": "trg:PATH#ol_end" } ], "confirm": true }""",
-        """{ "commands": [ { "kind": "create_script", "path": "PATH" } ] }""",
-        """{ "commands": [ { "kind": "set_condition_value", "trigger": "trg:DATA\\MISSIONS\\OL_TEST\\ol_test.ini#ol_wave", "name": "seconds", "value": 9 } ], "expect_versions": { "PATH": 1 } }""",
+        ("mission_edit", """{ "commands": [ { "kind": "add_trigger", "script": "msn:PATH", "nickname": "ol_new" } ] }"""),
+        ("mission_edit", """{ "commands": [ { "kind": "remove_trigger", "trigger": "trg:PATH#ol_end" } ], "confirm": true }"""),
+        ("mission_edit", """{ "commands": [ { "kind": "create_script", "path": "PATH" } ] }"""),
+        ("mission_edit", """{ "commands": [ { "kind": "set_condition_value", "trigger": "trg:DATA\\MISSIONS\\OL_TEST\\ol_test.ini#ol_wave", "name": "seconds", "value": 9 } ], "expect_versions": { "PATH": 1 } }"""),
+        ("mission_add_trigger", """{ "script": "msn:PATH", "condition": { "key": "Cnd_True" } }"""),
+        ("mission_add_trigger", """{ "script": "msn:DATA\\MISSIONS\\OL_TEST\\ol_test.ini", "condition": { "key": "Cnd_True" }, "started_by": ["trg:PATH#ol_start"] }"""),
+        ("mission_set_condition", """{ "trigger": "trg:PATH#ol_wave", "condition": { "key": "Cnd_True" } }"""),
+        ("mission_add_action", """{ "trigger": "trg:PATH#ol_wave", "action": { "key": "Act_ChangeState", "texts": ["FAIL"] } }"""),
+        ("mission_add_action", """{ "trigger": "trg:DATA\\MISSIONS\\OL_TEST\\ol_test.ini#ol_wave", "action": { "key": "Act_ChangeState", "texts": ["FAIL"] }, "before": "line:PATH#Trigger/ol_wave/3" }"""),
+        ("mission_set_action", """{ "line": "line:PATH#Trigger/ol_wave/3", "values": { "ship": "ol_ship_3" } }"""),
+        ("mission_move_action", """{ "line": "line:PATH#Trigger/ol_wave/3" }"""),
+        ("mission_link_triggers", """{ "from": "trg:PATH#ol_wave", "to": "ol_end" }"""),
+        ("mission_link_triggers", """{ "from": "trg:DATA\\MISSIONS\\OL_TEST\\ol_test.ini#ol_wave", "to": "trg:PATH#ol_end" }"""),
+        ("mission_insert_trigger", """{ "line": "line:PATH#Trigger/ol_start/3", "condition": { "key": "Cnd_True" } }"""),
     ];
 
     /// <summary>The bad paths for <see cref="MissionCalls"/>: a drive, a stream name, a <c>..</c> above the root and a
@@ -69,11 +91,11 @@ public sealed class AgentWriteScopeTests
         @"\\server\share\x.ini",
     ];
 
-    /// <summary>Each path of <c>mission_edit</c> that is not an install path gives <c>invalid_argument</c>: a path of
-    /// a reference, the path of a new script and a key of <c>expect_versions</c>. A new script outside
+    /// <summary>Each path of a mission tool that is not an install path gives <c>invalid_argument</c>: a path of a
+    /// reference, the path of a new script and a key of <c>expect_versions</c>. A new script outside
     /// <c>DATA\MISSIONS</c> gives <c>invalid_argument</c> with the detail <c>BadPath</c>. Nothing changes.</summary>
     [Fact]
-    public void MissionEditRefusesEachPathThatIsNotAnInstallPath()
+    public void TheMissionToolsRefuseEachPathThatIsNotAnInstallPath()
     {
         using var m = MissionEdits.Create();
         var host = new TestAgentHost(m.Session);
@@ -81,13 +103,15 @@ public sealed class AgentWriteScopeTests
 
         var wrong = (from call in MissionCalls
             from path in BadMissionPaths
-            let arguments = call.Replace("PATH", Json(path)[1..^1])
-            let error = Error(host, "mission_edit", arguments)
+            let arguments = call.Arguments.Replace("PATH", Json(path)[1..^1])
+            let error = Error(host, call.Tool, arguments)
             where error.Code != "invalid_argument"
-            select $"{arguments}: {error.Code} {error.Detail} {error.Message}").ToList();
+            select $"{call.Tool} {arguments}: {error.Code} {error.Detail} {error.Message}").ToList();
+        var tools = MissionCalls.Select(c => c.Tool).Distinct().Order();
         var outside = Error(host, "mission_edit", """{ "commands": [ { "kind": "create_script", "path": "DATA\\SHIPS\\ol_new.ini" } ] }""");
 
         Assert.True(wrong.Count == 0, string.Join(Environment.NewLine, wrong));
+        Assert.Equal(EditToolNames().Where(t => t.StartsWith("mission_", StringComparison.Ordinal)).Order(), tools);
         Assert.Equal(("invalid_argument", "BadPath"), (outside.Code, outside.Detail));
         Assert.Equal(before, m.State());
         Assert.False(m.Session.CanUndo);

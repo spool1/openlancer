@@ -22,9 +22,9 @@ namespace OpenLancer.Tests;
 /// The tool <c>mission_edit</c> (section 7.4 of the MCP1 design, step 1 of MCP1-3). A mission edit of an agent runs in
 /// the shared batch of the call. So it is one Undo step with the edit origin Agent, it has a preview, confirm,
 /// if_revision and the limits, and it runs in strict mode. The tests cover section 13.1, items 1, 5, 6, 8, 9, 10, 12 and
-/// 15, and section 13.2, items 6 and 7.
+/// 15, and section 13.2, items 6 and 7. The tests of the trigger tools are in <c>AgentMissionToolTests.Triggers.cs</c>.
 /// </summary>
-public sealed class AgentMissionToolTests
+public sealed partial class AgentMissionToolTests
 {
     /// <summary>The install path of the test script as JSON text.</summary>
     private static readonly string S = Script.Replace(@"\", @"\\");

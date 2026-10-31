@@ -23,7 +23,7 @@ internal static class MissionLineInput
     {
         ["line"] = new JsonObject
         {
-            ["description"] = AgentTexts.SharedFields["line"],
+            ["description"] = AgentTexts.SharedFields["$defs.line"],
             ["type"] = "object",
             ["properties"] = new JsonObject
             {
@@ -32,19 +32,19 @@ internal static class MissionLineInput
                     ["type"] = "string",
                     ["minLength"] = 1,
                     ["maxLength"] = TextParam.MaxLength,
-                    ["description"] = AgentTexts.SharedFields["line.key"],
+                    ["description"] = AgentTexts.SharedFields["$defs.line.key"],
                 },
                 ["values"] = new JsonObject
                 {
                     ["type"] = "object",
                     ["additionalProperties"] = ValueSchema(),
-                    ["description"] = AgentTexts.SharedFields["line.values"],
+                    ["description"] = AgentTexts.SharedFields["$defs.line.values"],
                 },
                 ["texts"] = new JsonObject
                 {
                     ["type"] = "array",
                     ["items"] = new JsonObject { ["type"] = "string" },
-                    ["description"] = AgentTexts.SharedFields["line.texts"],
+                    ["description"] = AgentTexts.SharedFields["$defs.line.texts"],
                 },
             },
             ["required"] = new JsonArray("key"),

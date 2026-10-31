@@ -243,8 +243,9 @@ public sealed class AgentToolTableTests
     /// with their kinds and hints. The tools of section 7.3 follow the tools of section 7.2, the mission tools of section
     /// 7.4 follow them, and the tools of section 7.6 come next. mission_edit can remove triggers and items, so it is
     /// destructive. A tool that adds data is not destructive, and a tool that can change or remove data is (review
-    /// finding R7 of MCP1-2). edit_batch can have a step that removes data, so it is destructive (final finding of
-    /// MCP1-2). play can save the mod, so it is destructive (section 7.0). play_stop removes no data.</summary>
+    /// finding R7 of MCP1-2). So a mission tool that sets, moves or links lines is destructive. edit_batch can have a
+    /// step that removes data, so it is destructive (final finding of MCP1-2). play can save the mod, so it is
+    /// destructive (section 7.0). play_stop removes no data.</summary>
     private static readonly Dictionary<string, (ToolKind Kind, ToolHints Hints)> Edits = new()
     {
         ["set_fields"] = (ToolKind.Edit, new ToolHints(false, true, true)),
@@ -268,6 +269,13 @@ public sealed class AgentToolTableTests
         ["create_loadout"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["create_from_template"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["mission_edit"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+        ["mission_add_trigger"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["mission_set_condition"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+        ["mission_add_action"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["mission_set_action"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+        ["mission_move_action"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+        ["mission_link_triggers"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+        ["mission_insert_trigger"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["save"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["undo"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["redo"] = (ToolKind.Session, new ToolHints(false, true, false)),
