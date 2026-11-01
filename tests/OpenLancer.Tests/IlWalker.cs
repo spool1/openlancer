@@ -171,8 +171,8 @@ internal static class IlWalker
             {
                 var (offset, _, instruction) = code[at];
                 if (instruction.Op != OpCodes.Call && instruction.Op != OpCodes.Callvirt ||
-                    method.Module.ResolveMember((int)instruction.Operand, typeArguments, methodArguments) is not MethodBase
-                        callee || callee.GetParameters().Length == 0)
+                    method.Module.ResolveMember((int)instruction.Operand, typeArguments, methodArguments) is not
+                        MethodBase callee || callee.GetParameters().Length == 0)
                     continue;
                 var value = targets.Contains(offset) ? null : ConstantOf(code[at - 1].Instruction);
                 yield return new LastArgument(owner, method, callee, value);
@@ -181,7 +181,8 @@ internal static class IlWalker
     }
 
     /// <summary>The offsets that a branch, a leave or a switch of a method goes to.</summary>
-    private static HashSet<int> BranchTargets(MethodBase method, List<(int Offset, int Next, Instruction Instruction)> code)
+    private static HashSet<int> BranchTargets(MethodBase method,
+        List<(int Offset, int Next, Instruction Instruction)> code)
     {
         var targets = new HashSet<int>();
         if (method.GetMethodBody()?.GetILAsByteArray() is not { } il)

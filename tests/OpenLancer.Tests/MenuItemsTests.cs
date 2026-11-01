@@ -32,8 +32,8 @@ public sealed class MenuItemsTests
     private static readonly HashSet<string> MenuMethods = ["MenuItem", "BeginMenu", "IconMenuItem", "IconMenuToggle"];
 
     /// <summary>True for a call of ImGui or Theme that draws a menu item or a submenu with an enabled flag as its last
-    /// parameter. An optional parameter is in the IL of each call, so <c>ImGui.BeginMenu("File")</c> passes the constant
-    /// true.</summary>
+    /// parameter. An optional parameter is in the IL of each call, so <c>ImGui.BeginMenu("File")</c> passes the
+    /// constant true.</summary>
     private static bool HasEnabledFlag(MethodBase callee) =>
         (callee.DeclaringType == typeof(ImGui) || callee.DeclaringType == typeof(Theme)) &&
         MenuMethods.Contains(callee.Name) && callee.GetParameters() is { Length: > 0 } parameters &&
@@ -71,8 +71,8 @@ public sealed class MenuItemsTests
         Type[] menus =
         [
             typeof(EditorWindow), typeof(PlayMenu), typeof(AgentMenu), typeof(HelpMenu), typeof(SceneEdits),
-            typeof(HierarchyPanel), typeof(AssetsPanel), typeof(InspectorPanel), typeof(DatabaseTable), typeof(GraphView),
-            typeof(CutsceneBrowser), typeof(TimelinePanel),
+            typeof(HierarchyPanel), typeof(AssetsPanel), typeof(InspectorPanel), typeof(DatabaseTable),
+            typeof(GraphView), typeof(CutsceneBrowser), typeof(TimelinePanel),
         ];
         Assert.All(menus, m => Assert.Contains(m, helper));
         Assert.Contains(calls, c => HasEnabledFlag(c.Callee) && c.Value == 1);
@@ -88,8 +88,8 @@ public sealed class MenuItemsTests
     [InlineData(EditorWindow.RevertTip)]
     public void TheSharedReasonsAreSimplifiedTechnicalEnglish(string text) => Assert.Empty(SteLint.Problems(text));
 
-    /// <summary>The rule finds each form of an enabled flag of <see cref="MenuSample"/> that can be false, and passes the
-    /// constant true.</summary>
+    /// <summary>The rule finds each form of an enabled flag of <see cref="MenuSample"/> that can be false, and passes
+    /// the constant true.</summary>
     [Fact]
     public void TheRuleFindsEachFlagThatCanBeOff()
     {

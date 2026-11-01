@@ -19,7 +19,8 @@ internal sealed record EmptyState(string Message, string Next)
     public const string TextPlace = "{text}";
 
     /// <summary>The state with the text of a search or a filter in its message.</summary>
-    public EmptyState With(string text) => this with { Message = Message.Replace(TextPlace, text, StringComparison.Ordinal) };
+    public EmptyState With(string text) =>
+        this with { Message = Message.Replace(TextPlace, text, StringComparison.Ordinal) };
 }
 
 /// <summary>
@@ -81,7 +82,8 @@ internal static class PanelStates
     /// <summary>Draws a dim message and a smaller hint below it, both centered in the free space.</summary>
     public static void Message(string message, string hint) => Lines(message, hint, false);
 
-    /// <summary>Draws an empty state: its message, and what to do next below it, both centered in the free space.</summary>
+    /// <summary>Draws an empty state: its message, and what to do next below it, both centered in the free
+    /// space.</summary>
     public static void Message(EmptyState state) => Lines(state.Message, state.Next, false);
 
     /// <summary>

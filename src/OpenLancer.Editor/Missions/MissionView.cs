@@ -22,7 +22,8 @@ namespace OpenLancer.Editor.Missions;
 internal sealed class MissionView : IDisposable
 {
     /// <summary>The empty state of the Mission tab and of its Hierarchy (#56).</summary>
-    internal static readonly EmptyState NoMission = new("No mission is open.", "Double-click a mission in the Missions tab.");
+    internal static readonly EmptyState NoMission =
+        new("No mission is open.", "Double-click a mission in the Missions tab.");
 
     // Sizes in unscaled points.
     private const float SplitterWidth = 6;

@@ -66,7 +66,8 @@ internal sealed class WelcomeScreen(EditorWindow window)
     /// <summary>The first action when a game is linked.</summary>
     internal const string FirstActionWithGame = "To start, click Open profile, or make a profile with New profile.";
 
-    /// <summary>The line that names the first action. Without a linked game, the first action is to link the game.</summary>
+    /// <summary>The line that names the first action. Without a linked game, the first action is to link the
+    /// game.</summary>
     internal static string FirstAction(bool hasLinkedGame) =>
         hasLinkedGame ? FirstActionWithGame : FirstActionWithoutGame;
 

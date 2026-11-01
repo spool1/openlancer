@@ -149,6 +149,7 @@ internal sealed class ModHeader(EditorWindow window, ModsWindow mods)
         {
             window.SetActiveMod(row.Id);
         }
+
         ImGui.Separator();
         if (ImGui.MenuItem("Duplicate..."))
         {
@@ -160,6 +161,7 @@ internal sealed class ModHeader(EditorWindow window, ModsWindow mods)
         {
             mods.Rename(row);
         }
+
         ImGui.Separator();
         if (session != null && mods.ProfileNeedsAllowance)
         {

@@ -45,9 +45,9 @@ public sealed class EmptyStateTests
         var owners = States().Select(s => s.Owner).ToHashSet();
         Type[] panels =
         [
-            typeof(PanelStates), typeof(HierarchyPanel), typeof(InspectorPanel), typeof(DatabasePanel), typeof(AssetsPanel),
-            typeof(ConsolePanel), typeof(MissionsBrowser), typeof(MissionView), typeof(CutsceneBrowser),
-            typeof(CutsceneView), typeof(TimelinePanel), typeof(ModsWindow),
+            typeof(PanelStates), typeof(HierarchyPanel), typeof(InspectorPanel), typeof(DatabasePanel),
+            typeof(AssetsPanel), typeof(ConsolePanel), typeof(MissionsBrowser), typeof(MissionView),
+            typeof(CutsceneBrowser), typeof(CutsceneView), typeof(TimelinePanel), typeof(ModsWindow),
         ];
         Assert.All(panels, p => Assert.Contains(p, owners));
     }

@@ -31,7 +31,8 @@ internal sealed class AssetsPanel : IDisposable
     public const string PanelId = "assets";
 
     // The empty states of the Assets panel (#56). The next action of a search without a match is a link.
-    internal static readonly EmptyState NoAssetMatch = new($"No asset matches '{EmptyState.TextPlace}'.", "Clear search");
+    internal static readonly EmptyState NoAssetMatch =
+        new($"No asset matches '{EmptyState.TextPlace}'.", "Clear search");
     internal static readonly EmptyState NoPropGroups = new("This category has no assets.",
         "Right-click an object in the Hierarchy and click Save as prop group.");
     internal static readonly EmptyState NoAssets =
@@ -650,7 +651,8 @@ internal sealed class AssetsPanel : IDisposable
         ImGui.Separator();
         if (Theme.IconMenuItem(EditorIcons.Copy, "Copy nickname", true))
             ImGui.SetClipboardText(row.Nickname);
-        if (MenuItems.Item(EditorIcons.Copy, "Copy model path", row.ModelPath == null ? "The asset has no model." : null))
+        if (MenuItems.Item(EditorIcons.Copy, "Copy model path",
+                row.ModelPath == null ? "The asset has no model." : null))
             ImGui.SetClipboardText(row.ModelPath!);
         if (row.Asset.Kind != AssetKind.PropGroup || Group(session, row.Asset) is not { } group)
             return;

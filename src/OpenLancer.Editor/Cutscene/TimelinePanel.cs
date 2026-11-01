@@ -36,7 +36,8 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
     public const string PanelId = "timeline";
 
     // The empty states of the Timeline and of the Hierarchy of a cutscene (#56).
-    internal static readonly EmptyState NoCutscene = new("No cutscene is open.", "Open a cutscene in the Cutscenes tab.");
+    internal static readonly EmptyState NoCutscene =
+        new("No cutscene is open.", "Open a cutscene in the Cutscenes tab.");
     internal static readonly EmptyState NoEntityWithEvents = new("No entity of this cutscene has events.",
         "Turn off Only with events in the toolbar to show all entities.");
     internal static readonly EmptyState NoEntities =
@@ -882,9 +883,10 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
             foreach (var other in others)
             {
                 var label = other.Targets.Count > 0 ? $"{other.Type} {other.Targets[0]}" : other.Type;
-                if (MenuItems.Item($"{label}##{other.Ref.Id.Value}", ThnEdits.ReorderRefusal(session!.Edits, ev.Ref, other.Ref),
-                        $"Runs the event before {label}. The engine runs the events of one time in the order of the file " +
-                        "(ThnScript.cs:150-152)."))
+                var refusal = ThnEdits.ReorderRefusal(session!.Edits, ev.Ref, other.Ref);
+                if (MenuItems.Item($"{label}##{other.Ref.Id.Value}", refusal,
+                        $"Runs the event before {label}. The engine runs the events of one time in the order of the " +
+                        "file (ThnScript.cs:150-152)."))
                 {
                     window.Commands.Execute(ThnEdits.Reorder(ev.Ref, other.Ref));
                 }

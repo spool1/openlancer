@@ -110,6 +110,7 @@ internal sealed class PlayMenu(EditorWindow window)
         {
             PlayFromCamera();
         }
+
         BaseMenu();
         MissionMenu();
         ImGui.Separator();

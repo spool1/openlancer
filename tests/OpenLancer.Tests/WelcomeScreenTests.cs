@@ -7,7 +7,8 @@ namespace OpenLancer.Tests;
 /// <summary>The texts of the Welcome page (#56): the editor makes mods, and the page names the first action.</summary>
 public sealed class WelcomeScreenTests
 {
-    /// <summary>The name of a control in a sentence: its label without the dots of a control that opens a window.</summary>
+    /// <summary>The name of a control in a sentence: its label without the dots of a control that opens a
+    /// window.</summary>
     private static string Name(string label) => label.TrimEnd('.');
 
     [Fact]

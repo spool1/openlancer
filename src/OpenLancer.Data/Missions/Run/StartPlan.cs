@@ -265,9 +265,9 @@ public sealed record StartPlan
     /// checkpoint (#8). A saved game of the retail game keeps more than the triggers. The start save keeps only them.
     /// The Play start page and the tooltip of the Play button of a node show it as a warning.</summary>
     public static string CheckpointStateWarning(string trigger) =>
-        $"This version restores only the triggers of checkpoint '{trigger}'. A saved game also keeps the objective, the " +
-        "dock and lane rules, the reputations and other state from before the save. This version does not restore that " +
-        "state.";
+        $"This version restores only the triggers of checkpoint '{trigger}'. A saved game also keeps the objective, " +
+        "the dock and lane rules, the reputations and other state from before the save. This version does not " +
+        "restore that state.";
 
     /// <summary>The kind of a start: a script without a story slot gives a test script, the mission start and a start
     /// trigger give the mission start, a restore trigger gives a checkpoint, and each other trigger gives an

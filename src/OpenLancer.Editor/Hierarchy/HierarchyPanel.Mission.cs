@@ -103,9 +103,14 @@ internal sealed partial class HierarchyPanel
     }
 
     // The reasons of the edit items of a row of a mission that is not such an item.
-    private const string NoMissionRename = "Rename changes only a trigger, an act or an item of the script with a nickname.";
-    private const string NoMissionDuplicate = "Duplicate copies only a trigger, an item of the script or a prefab instance.";
-    private const string NoMissionDelete = "Delete removes only a trigger, an item of the script, an act or a prefab instance.";
+    private const string NoMissionRename =
+        "Rename changes only a trigger, an act or an item of the script with a nickname.";
+
+    private const string NoMissionDuplicate =
+        "Duplicate copies only a trigger, an item of the script or a prefab instance.";
+
+    private const string NoMissionDelete =
+        "Delete removes only a trigger, an item of the script, an act or a prefab instance.";
 
     private void StartMissionRename(MissionRef item)
     {

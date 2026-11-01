@@ -79,8 +79,8 @@ internal static class MenuItems
         return open;
     }
 
-    /// <summary>Draws a line that is always off, for example "No recent profiles", which tells why a menu has no items, or
-    /// a line of facts.</summary>
+    /// <summary>Draws a line that is always off, for example "No recent profiles", which tells why a menu has no
+    /// items, or a line of facts.</summary>
     /// <param name="tooltip">More words about the line, or null for no tooltip.</param>
     public static void Note(string text, string? tooltip = null)
     {

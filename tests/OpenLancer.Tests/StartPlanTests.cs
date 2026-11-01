@@ -716,7 +716,8 @@ public sealed class StartPlanTests
         Assert.DoesNotContain(Plan(Script, "t_chosen").Warnings, IsCheckpointLimit);
         Assert.DoesNotContain(Plan(Script, null).Warnings, IsCheckpointLimit);
         Assert.Empty(SteLint.Problems(limit));
-        Assert.StartsWith("This version restores only the triggers of checkpoint 't_restore'.", limit, StringComparison.Ordinal);
+        Assert.StartsWith("This version restores only the triggers of checkpoint 't_restore'.", limit,
+            StringComparison.Ordinal);
         foreach (var state in new[] { "the objective", "the dock and lane rules", "the reputations" })
             Assert.Contains(state, limit, StringComparison.Ordinal);
     }

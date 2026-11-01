@@ -652,6 +652,7 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
         {
             Revert(entry.Path);
         }
+
         if (Theme.IconMenuItem(EditorIcons.Copy, "Copy path", true))
         {
             ImGui.SetClipboardText(entry.Path);

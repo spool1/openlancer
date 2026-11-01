@@ -1012,7 +1012,8 @@ internal sealed partial class EditorWindow : Game
 
             if (menuProfiles.Count == 0)
             {
-                MenuItems.Note($"No profiles in {Path.Combine(Settings.WorkspaceOrDefault, ModWorkspace.ProfilesFolder)}");
+                MenuItems.Note(
+                    $"No profiles in {Path.Combine(Settings.WorkspaceOrDefault, ModWorkspace.ProfilesFolder)}");
             }
 
             ImGui.EndMenu();

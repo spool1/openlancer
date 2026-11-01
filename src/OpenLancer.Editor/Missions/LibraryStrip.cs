@@ -223,6 +223,7 @@ internal sealed class LibraryStrip(EditorWindow window)
         {
             window.Missions.OpenPrefabMode(prefab);
         }
+
         if ((prefab.Builtin || item.Lock != null) && item.Template != null && editable &&
             window.Session?.Edits.Missions is { } editor)
         {

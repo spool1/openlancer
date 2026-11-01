@@ -110,10 +110,11 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
     internal const string CopyTip = "Copies the selected ship or equipment with the sections that belong to it.";
 
     /// <summary>The tooltip of Revert while it can run.</summary>
-    internal const string RevertTip = "Puts back the section as the base data and the mods before the active mod have it.";
+    internal const string RevertTip =
+        "Puts back the section as the base data and the mods before the active mod have it.";
 
-    /// <summary>Why New from template cannot copy the section, or null when it can: it copies a ship or equipment, with a
-    /// session that takes edits.</summary>
+    /// <summary>Why New from template cannot copy the section, or null when it can: it copies a ship or equipment,
+    /// with a session that takes edits.</summary>
     public string? CopyReason(SectionRef? section) =>
         Session is not { } session ? MenuItems.NoProfile
         : session.NoEditReason is { } reason ? reason
@@ -131,7 +132,8 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         : section == null ? "Select an item in the Hierarchy, the Scene or the Database."
         : session.NoEditReason is { } reason ? reason
         : FieldBinding.RevertLock(session.Edits, section) is { } locked ? locked
-        : !session.Edits.KnowsSchema(section.Path) ? "The editor shows this file read-only, so it cannot revert its items."
+        : !session.Edits.KnowsSchema(section.Path)
+            ? "The editor shows this file read-only, so it cannot revert its items."
         : session.Edits.Get(section) switch
         {
             null => "The edit view does not have this item.",

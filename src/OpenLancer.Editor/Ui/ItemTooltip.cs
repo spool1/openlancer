@@ -20,7 +20,8 @@ internal static class ItemTooltip
     }
 
     /// <summary>Shows the text as the tooltip of the last item while the mouse is on it, after the usual delay of a
-    /// tooltip, also when the item is disabled. The tooltip wraps at a readable width (see <see cref="Wrapped"/>).</summary>
+    /// tooltip, also when the item is disabled. The tooltip wraps at a readable width (see
+    /// <see cref="Wrapped"/>).</summary>
     public static void ShowWrapped(string text)
     {
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled | ImGuiHoveredFlags.ForTooltip))
