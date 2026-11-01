@@ -265,7 +265,7 @@ The Console tells why the game stopped:
 | 5 | The game did not start, for example because the game window did not open. |
 | other | A crash. |
 
-For an exit code other than 0 or 3, the Console gives the cause and the path of the game log, `%LOCALAPPDATA%\OpenLancer\logs\OpenLancer.Play.log.txt`. A crash writes the whole exception to that log.
+For an exit code other than 0 or 3, the Console gives the cause and the path of the game log, `%LOCALAPPDATA%\OpenLancer\logs\OpenLancer.Play.log.txt`. A crash writes the whole exception to that log. **Help > Open log folder** opens the folder of the log.
 
 When the validation finds errors and the game closes during its load, the Console names the validation errors as the cause.
 

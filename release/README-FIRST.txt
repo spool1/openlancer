@@ -139,7 +139,10 @@ WHERE OPENLANCER KEEPS FILES
   profile.
 - Editor settings and the list of linked games:
   %LOCALAPPDATA%\OpenLancer\editor.json
-- Log files: %LOCALAPPDATA%\OpenLancer\logs
+- Log files: %LOCALAPPDATA%\OpenLancer\logs. Help > Open log folder opens
+  this folder. At each start, the log of the last run moves to the file
+  that ends in .log.previous.txt. The older lines of a long log are in
+  the files that end in .log.old.txt and .log.previous.old.txt.
 - Saves of the game main menu: Documents\SavedGames\OpenLancer
 To remove OpenLancer, delete its folder, the folder
 %LOCALAPPDATA%\OpenLancer and the folder Documents\SavedGames\OpenLancer.
@@ -149,15 +152,21 @@ not want to keep your mods.
 
 REPORT A PROBLEM
 ----------------
-Open an issue at https://github.com/spool1/openlancer/issues
-Tell us:
-- the OpenLancer version (right-click OpenLancer.Editor.exe, click
-  Properties, then Details, and copy the "Product version"),
-- the game and the version that the editor shows,
-- what you did, what you expected, and what happened.
-Attach the log files from the logs folder. The log files show the paths
-of your folders. A path can contain your Windows user name. Remove the
-text that you do not want to share.
+1. In the editor, click Help > Report a problem. The editor copies a
+   short text with the version, the commit, the linked game and the
+   Windows version. Then it opens the bug report form in your browser.
+2. Paste the text into the first field of the form.
+3. Tell us what you did, what you expected, and what happened.
+4. Click Help > Open log folder.
+5. Attach OpenLancer.Editor.log.txt, and OpenLancer.Play.log.txt for a
+   problem in Play. After a crash and a restart, attach the file that
+   ends in .log.previous.txt. It has the log of the run that crashed.
+Help > About OpenLancer... shows the version, the commit and the engine
+commit. Click Copy to copy them.
+The form is at
+https://github.com/spool1/openlancer/issues/new?template=bug_report.yml
+The log files show the paths of your folders. A path can contain your
+Windows user name. Remove the text that you do not want to share.
 To tell us about your game folder, open a command prompt in the
 OpenLancer folder. Run: oltool game "<your game folder>"
 Attach the output. It names the game, its version, its folder and the

@@ -72,6 +72,12 @@ The editor makes a profile for your game and an empty mod, `my-mod`, and opens t
 
 The data tests read `..\GameData\base`. Set `OPENLANCER_BASE` to use a different folder. Without game data, the data tests are skipped. `oltool game <folder>` prints the check of a game folder (see [docs/GAME_LINK.md](docs/GAME_LINK.md)).
 
+## Help menu
+
+**Help > Documentation** opens the help pages of your version in the browser. **Help > Getting started** opens `README-FIRST.txt` of the release zip. **Help > Keys...** lists the keys of the editor, the Scene and the cutscene preview. **Help > About OpenLancer...** shows the version, the commit and the engine commit of your build. Click **Copy** to copy them. The window title also shows the version.
+
+To report a bug, click **Help > Report a problem**. The editor copies a short text with the version, the commit, the linked game and the Windows version, and opens the bug report form. Paste the text into the first field of the form. **Help > Open log folder** opens the log files of the editor and the game. Each start moves the log of the last run to the file that ends in `.log.previous.txt`. So after a crash and a restart, attach that file.
+
 ## Make a mod
 
 ![The system editor: the Hierarchy of New Tokyo (Ku01), the Scene with the gizmo on Planet Kitadake, the Inspector with named fields, and the Assets panel with rendered thumbnails](docs/images/system-editor.png)
