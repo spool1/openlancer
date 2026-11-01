@@ -876,7 +876,7 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 - The child sections of the section go with it, and so do the objects whose `parent` names the object, again and again.
 - A zone takes its `[Nebula]` and `[Asteroids]` sections, and the `[LootableZone]` sections that name it. The engine drops a nebula or a field without its zone.
 - A line that names the item gets a safe fix in the same entry when one exists. The `ring` line of a planet goes. The lines of each hole of a deleted zone go from the `[Exclusion Zones]` sections of the nebula and field files. The engine skips a hole whose zone is not there. But retail gives the lines of that hole to the hole before it, so the lines must go.
-- Another line keeps its value and shows "Missing" (see "Data lists and pickers"). In this version, only a fix of a line that the editor cannot change gives such a line.
+- Another line keeps its value and shows "Missing" (see "Data lists and pickers"). Two cases give such a line. One is a fix of a line that the editor cannot change. The other is a line of a mission script that names a deleted object. The save stops at such a mission line until you fix it.
 - A line whose rule refuses the delete names the line and stops the delete, as Unity RequireComponent does. This version refuses the delete of a jump gate, a jump hole and a trade lane ring.
 - A delete of a nebula or an asteroid field removes only its section, as Unity "Remove Component" does. Its zone stays, with its encounters, its music and its damage.
 
@@ -899,13 +899,15 @@ The rename changes each line that the data lists find:
 - The hole lines of the nebula and field files.
 - The `locked_gate` and `npc_locked_gate` lines of `[locked_gates]` in `InitialWorld.ini`. Each of these lines holds the FLHash of a gate nickname as a number. Retail locks these gates at the start of a new game.
 
+The rename of an object also changes each line of the mission scripts that names the object, in the same entry of the edit history. A line that the editor cannot change keeps the old nickname, and a warning tells it.
+
 A section of a lower layer gets its new key with `ol.rename` (see "Renames"). A section of the lower layer with child sections keeps its key.
 
 The editor refuses a nickname that another object or zone of any system has, without letter case, or that has the same FLHash. Retail keeps the zones of all systems in one map by the hash of the zone nickname. It also keeps the visit flags of objects and zones by the hash of the nickname. A light nickname must be unique in its file only. The editor also refuses a change of letter case only. It refuses a nickname that another section of the lower layer of the file has, also when the active mod deleted that section.
 
 A rename with a warning opens a dialog first:
 
-- The files that name the old nickname as text: the mission files, the cutscenes and the other INI files. A mission or a cutscene that names the old nickname does not find the item. This version does not index the mission files.
+- The files that name the old nickname as text: the cutscenes, the mission files that are not scripts, and the other INI files. A cutscene or such a file that names the old nickname does not find the item.
 - `KnowledgeMap.ini`: a text of the game then does not reveal the item on the navigation map.
 - A mod that loads later and changes the section. Its patch cannot find the section after the rename.
 - A zone nickname that gets or loses the word `Tradelane` or `vignette` (letter case counts). Retail makes a zone with `Tradelane` a trade lane zone when its shape fits, and a zone with `vignette` lawful.
@@ -941,7 +943,7 @@ These component checks give warnings, until a retail comparison proves an effect
 
 The pages of an object, a zone, a nebula and a field have a "Used by" section. It lists each line that names the item, from the data lists of the edit view with the unsaved edits. A button selects the item of the line, or its section.
 
-The page of an object has a "Behaviors" section. It shows the pilot, the behavior, the difficulty and the reputation of the object. It also shows the encounters of the zones that hold its position, and the files that name it as text. It is read-only, except the rows of its keys. This version does not show the cutscene scripts and the mission triggers that name the object.
+The page of an object has a "Behaviors" section. It shows the pilot, the behavior, the difficulty and the reputation of the object. It also shows the encounters of the zones that hold its position, and the mission lines that name the object. A click on a mission line opens the mission at that line. The other files that name the object as text follow, for example the cutscenes. The section is read-only, except the rows of its keys.
 
 The Hierarchy marks a row whose section the active mod changes with a blue bar at its left, as Unity marks a prefab override. A row whose section the active mod adds also gets a `+`.
 
@@ -1411,4 +1413,4 @@ Librelancer loads some data that the retail game does not accept or does not rea
 
 The crash checks follow the crash list of The Starport knowledge base. The retail data itself has two such cases, which the game uses only in scripted scenes. A cutscene missile has no `lootprops.ini` entries, and some capital ships of the story missions have no engine. These cases give no finding, because the checks report only what the mods add.
 
-This version does not check models and textures. Examples of such checks are collision parts with too many triangles, texture sizes and cutscene animations that a model does not have.
+The content checks do not read models and textures. So they do not check collision parts with too many triangles, texture sizes, or cutscene animations that a model does not have.
