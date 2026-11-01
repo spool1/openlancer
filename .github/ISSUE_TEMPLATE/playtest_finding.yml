@@ -1,0 +1,106 @@
+name: Play test finding
+description: Report one finding of a play test round.
+labels: ["playtest"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use one form for each finding. The round issue lists the steps and the build of the round.
+  - type: dropdown
+    id: round
+    attributes:
+      label: Round
+      description: The play test round.
+      options:
+        - "1"
+        - "2"
+        - "3"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and commit
+      description: The version and the commit from **Help > About OpenLancer**.
+      placeholder: OpenLancer 1.0.0-beta.1, commit 0123abc
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: The area of the editor.
+      options:
+        - Install
+        - First run and Game link
+        - Welcome
+        - Scene
+        - Hierarchy
+        - Inspector
+        - Database
+        - Assets
+        - Save gate
+        - Undo and the close prompt
+        - F5 and Ctrl+F5
+        - Mods window and export
+        - Help menu
+        - Missions
+        - Play from a trigger
+        - Cutscenes
+        - Agent server
+        - oltool
+        - Help pages
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: step
+    attributes:
+      label: Step
+      description: The step of the round issue or of the journey test.
+      placeholder: Journey test, step 4
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Paste or drag a screenshot here.
+    validations:
+      required: false
+  - type: textarea
+    id: console
+    attributes:
+      label: Console text
+      description: When something fails, copy the lines of the Console here.
+      render: text
+    validations:
+      required: false
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: >-
+        Blocker: a crash, a loss of data, or a task that cannot finish.
+        Major: a wrong, unclear or broken-looking result in a main view, or a break of an editor UI rule.
+        Minor: polish in a side view.
+        Idea: a new feature or a wish.
+      options:
+        - Blocker
+        - Major
+        - Minor
+        - Idea
+    validations:
+      required: true

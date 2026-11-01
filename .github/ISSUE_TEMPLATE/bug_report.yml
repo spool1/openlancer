@@ -1,0 +1,70 @@
+name: Bug report
+description: Report a problem with the editor, Play, oltool or the agent server.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use one report for each problem. For help with the install or the game link, ask in the setup-help forum of the OpenLancer Discord server.
+
+        In the editor, click **Help > Report a problem**. The editor copies a short text with the version, the commit, the linked game and the Windows version. Paste that text into the first field.
+  - type: textarea
+    id: version
+    attributes:
+      label: Version and commit
+      description: The version and the commit from **Help > About OpenLancer**. Click **Copy** in the About window, or paste the text of **Help > Report a problem**.
+      placeholder: OpenLancer 1.0.0-beta.1, commit 0123abc
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: Game and version
+      description: The game that you linked in the editor, and its version. The text of **Help > Report a problem** names it.
+      placeholder: HD Edition 0.7.1
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: The steps that show the problem. Write one step on each line.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What you expected to see.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: What happened. Add the Console text or a screenshot.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log files
+      description: >-
+        Click **Help > Open log folder**. Attach OpenLancer.Editor.log.txt, and OpenLancer.Play.log.txt for a problem in Play.
+        After a crash and a restart, attach the file that ends in .log.previous.txt.
+        The log files show the paths of your folders. A path can contain your Windows user name.
+        Remove the text that you do not want to share.
+    validations:
+      required: false
+  - type: checkboxes
+    id: no-game-files
+    attributes:
+      label: Game files
+      description: The repository cannot hold game files. Do not attach a file from the game folder, also not a changed copy.
+      options:
+        - label: I did not attach game files.
+          required: true

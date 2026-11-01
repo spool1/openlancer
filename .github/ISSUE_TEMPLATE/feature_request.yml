@@ -1,0 +1,37 @@
+name: Feature request
+description: Ask for a new feature or a change of a feature.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use one request for each feature. [ROADMAP.md](https://github.com/spool1/openlancer/blob/master/ROADMAP.md) shows the planned work.
+  - type: textarea
+    id: goal
+    attributes:
+      label: What you want to do
+      description: The task that you want to do in the editor, and why. Write the task, not the solution.
+      placeholder: I want to give a station a new market without a text editor.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How the editor can help with the task.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What you do today
+      description: How you do the task now, for example with another tool or by hand.
+    validations:
+      required: false
+  - type: textarea
+    id: more
+    attributes:
+      label: More information
+      description: Screenshots, sketches or links. Do not attach game files.
+    validations:
+      required: false

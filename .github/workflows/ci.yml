@@ -48,6 +48,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The test of the issue forms reads YAML. The CMake install below runs only when the cache has no natives.
+      - name: Install PyYAML
+        run: python -m pip install --disable-pip-version-check "PyYAML==6.0.3"
+
       # The scan runs before the build, so that a legal problem stops the run in seconds.
       - name: Content scan
         run: |

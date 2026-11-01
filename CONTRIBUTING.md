@@ -53,6 +53,8 @@ python tools/content_scan.py
 
 `dotnet test OpenLancer.slnx` runs the unit tests (`tests/OpenLancer.Tests`) and the data tests (`tests/OpenLancer.DataTests`).
 
+The test of the issue forms, `tools/test_issue_forms.py`, needs PyYAML (`python -m pip install PyYAML==6.0.3`). Without PyYAML, the tests that read the forms skip.
+
 The process tests of the unit tests start a small stub program, `tests/OpenLancer.TestStub`, in place of a game. The build of the unit tests puts the stub next to the tests.
 
 The retail tests in the data tests need your own game data. CI has no game data, so the retail tests skip in CI. To run them:
