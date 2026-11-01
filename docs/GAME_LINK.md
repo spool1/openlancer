@@ -16,6 +16,8 @@ When you select a folder inside the game, for example `EXE` or `DATA`, the edito
 
 **Skip** shows the normal Welcome page for this start. **Open a profile file...** opens a profile that you have already.
 
+The normal Welcome page says that the editor makes mods. It names the first action. Without a linked game, link your game with **Game link...**, or click **Open profile...**. With a linked game, click **Open profile...**, or make a profile with **New profile...**. The page also lists the linked games, the recent profiles and the other profiles of the workspace.
+
 ## What the editor finds
 
 | Game | How the editor knows it | Export target of mods |

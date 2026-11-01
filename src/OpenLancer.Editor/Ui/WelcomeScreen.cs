@@ -44,6 +44,32 @@ internal sealed class WelcomeScreen(EditorWindow window)
     // The interval of the background check for missing files and new workspace profiles, in seconds.
     private const double CheckInterval = 2;
 
+    /// <summary>The first line below the title: what the editor does.</summary>
+    internal const string Purpose =
+        "The editor makes mods: changes to the star systems, ships, equipment, missions and cutscenes of the game.";
+
+    /// <summary>The second line below the title: what a profile is.</summary>
+    internal const string ProfileNote = "A profile names the base game data and the mods that go on top of it.";
+
+    /// <summary>The label of the link that opens the Game link window.</summary>
+    internal const string GameLinkLabel = "Game link...";
+
+    /// <summary>The label of the link that makes a new profile for a linked game.</summary>
+    internal const string NewProfileLabel = "New profile...";
+
+    /// <summary>The label of the primary button that opens a profile file.</summary>
+    internal const string OpenProfileLabel = "Open profile...";
+
+    /// <summary>The first action when no game is linked.</summary>
+    internal const string FirstActionWithoutGame = "To start, link your game with Game link, or click Open profile.";
+
+    /// <summary>The first action when a game is linked.</summary>
+    internal const string FirstActionWithGame = "To start, click Open profile, or make a profile with New profile.";
+
+    /// <summary>The line that names the first action. Without a linked game, the first action is to link the game.</summary>
+    internal static string FirstAction(bool hasLinkedGame) =>
+        hasLinkedGame ? FirstActionWithGame : FirstActionWithoutGame;
+
     private readonly Dictionary<string, ProfileInfo> infos = [];
     private readonly HashSet<string> loading = [];
     private HashSet<string> missing = [];
@@ -118,8 +144,9 @@ internal sealed class WelcomeScreen(EditorWindow window)
         ImGui.Text("OpenLancer Editor");
         ImGui.PopFont();
         ImGui.PushStyleColor(ImGuiCol.Text, EditorTheme.Label);
-        ImGui.Text("Look at the game data of a mod profile: its star systems, ships and equipment.");
-        ImGui.Text("A profile names the base game data and the mods that go on top of it.");
+        ImGui.TextWrapped(Purpose);
+        ImGui.TextWrapped(ProfileNote);
+        ImGui.TextWrapped(FirstAction(window.Links.Games.Count > 0));
         ImGui.PopStyleColor();
         LinkedGames();
         ImGui.Dummy(new Vector2(0, MathF.Truncate(SectionGap * scale)));
@@ -205,7 +232,7 @@ internal sealed class WelcomeScreen(EditorWindow window)
             ImGui.TextDisabled("There is no linked game.");
         }
 
-        if (ImGui.TextLink("Game link..."))
+        if (ImGui.TextLink(GameLinkLabel))
         {
             window.ShowGameLink();
         }
@@ -214,7 +241,7 @@ internal sealed class WelcomeScreen(EditorWindow window)
         ImGui.SameLine(0, MathF.Truncate(ColumnGap * ImGuiHelper.Scale));
         var games = window.LinkedGameReports().Where(g => g.CanBeBase).ToList();
         ImGui.BeginDisabled(games.Count == 0);
-        if (ImGui.TextLink("New profile..."))
+        if (ImGui.TextLink(NewProfileLabel))
         {
             window.ShowNewProfile(games);
         }
@@ -233,7 +260,7 @@ internal sealed class WelcomeScreen(EditorWindow window)
     {
         EditorTheme.PushPrimaryButtonColors();
         ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 0);
-        if (ImGui.Button($"{EditorIcons.Open}  Open profile...",
+        if (ImGui.Button($"{EditorIcons.Open}  {OpenProfileLabel}",
                 new Vector2(width, MathF.Truncate(CardLayout.ButtonHeight * ImGuiHelper.Scale))))
         {
             window.OpenProfileDialog();
