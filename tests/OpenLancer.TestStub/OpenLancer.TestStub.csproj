@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The stub program of the process tests in OpenLancer.Tests. OpenLancer.Tests references it, so the build puts it
+       next to the tests. It is a small compiled program with no packages, because it must start fast also on a busy
+       computer. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

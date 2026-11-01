@@ -22,6 +22,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\OpenLancer.Data\OpenLancer.Data.csproj" />
     <ProjectReference Include="..\..\src\OpenLancer.Editor\OpenLancer.Editor.csproj" />
+    <!-- The process tests start the stub program from the test folder. -->
+    <ProjectReference Include="..\OpenLancer.TestStub\OpenLancer.TestStub.csproj" />
   </ItemGroup>
 
 </Project>

@@ -10,28 +10,18 @@ using Xunit;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The process of a play copy (section 8.6 of the M11 design, decision D313) with a stub program. The stub is a
-/// PowerShell script without a window. It writes its working folder, its arguments and its process id, then waits or
-/// exits. No test starts a game program or FLServer.
+/// The process of a play copy (section 8.6 of the M11 design, decision D313) with a stub program. The stub is the stub
+/// program of the tests in game mode (see <see cref="StubProgram"/>), without a window. It writes its working folder,
+/// its arguments and its process id, then waits or exits. No test starts a game program or FLServer.
 /// </summary>
 public sealed class GameProcessTests : IDisposable
 {
-    private const string Script = """
-        param([string]$Record, [int]$Exit = 0, [switch]$Wait,
-              [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest)
-        $text = "cwd " + (Get-Location).Path + "`nargs " + ($Rest -join ' ') + "`npid " + $PID
-        [IO.File]::WriteAllText($Record, $text)
-        if ($Wait) { Start-Sleep -Seconds 60 }
-        exit $Exit
-        """;
-
     private readonly string folder = Path.Combine(Path.GetTempPath(), "openlancer-tests", Guid.NewGuid().ToString("N"));
     private readonly QueuedUIThread ui = new();
 
     public GameProcessTests()
     {
         Directory.CreateDirectory(Path.Combine(folder, "EXE"));
-        File.WriteAllText(Path.Combine(folder, "stub.ps1"), Script);
     }
 
     /// <summary>Deletes the folder of the test. Windows can hold the working folder of an ended stub for a short
@@ -59,16 +49,15 @@ public sealed class GameProcessTests : IDisposable
     /// <summary>The start of the stub in the EXE folder of the test, without a window.</summary>
     private ProcessStartInfo Stub(bool wait, int exit = 0)
     {
-        var info = new ProcessStartInfo("powershell.exe")
+        var info = new ProcessStartInfo(StubProgram.FilePath)
         {
             WorkingDirectory = Path.Combine(folder, "EXE"),
             CreateNoWindow = true,
+            ArgumentList = { "game", "--record", RecordPath, "--exit", exit.ToString() },
         };
-        foreach (var argument in new[] { "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-                     Path.Combine(folder, "stub.ps1"), "-Record", RecordPath, "-Exit", exit.ToString() })
-            info.ArgumentList.Add(argument);
         if (wait)
-            info.ArgumentList.Add("-Wait");
+            info.ArgumentList.Add("--wait");
+        info.ArgumentList.Add("--");
         info.ArgumentList.Add(TestServer.SettingsSwitch);
         return info;
     }

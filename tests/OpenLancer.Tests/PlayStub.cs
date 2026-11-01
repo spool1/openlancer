@@ -36,75 +36,20 @@ internal sealed record StubPlan(
 }
 
 /// <summary>
-/// A stub of the play program (section 16.1 of the M4 design): a PowerShell script, because it must read lines of its
-/// input. It writes its process id and each input line to a record file, and <c>&lt;eof&gt;</c> at the end of its
-/// input. It answers <c>start</c>, each <c>reload n</c> and each <c>restart n</c> with the lines of its plan. It ends at
-/// <c>stop</c> or at the end of its input.
+/// A stub of the play program (section 16.1 of the M4 design): the stub program in play mode (see
+/// <see cref="StubProgram"/>). It writes its process id and each input line to a record file, and <c>&lt;eof&gt;</c> at
+/// the end of its input. It answers <c>start</c>, each <c>reload n</c> and each <c>restart n</c> with the lines of its
+/// plan. It ends at <c>stop</c> or at the end of its input.
 /// </summary>
 internal sealed class PlayStub
 {
-    private const string Script = """
-        param([string]$Record, [string]$Lines = '', [string]$StartLines = '', [int]$Exit = -1, [switch]$IgnoreStop,
-              [int]$Sleep = 0, [string]$ReloadLines = '', [string]$RestartLines = '')
-        # The test reads the record while the stub writes it, so both share the file.
-        function Write-Record([string]$Text) {
-            $stream = [IO.File]::Open($Record, 'Append', 'Write', 'ReadWrite')
-            $bytes = [Text.Encoding]::ASCII.GetBytes($Text + "`n")
-            $stream.Write($bytes, 0, $bytes.Length)
-            $stream.Dispose()
-        }
-        Write-Record "pid $PID"
-        function Write-Lines([string]$Path) {
-            if ($Path -eq '') { return }
-            foreach ($line in [IO.File]::ReadAllLines($Path)) {
-                if ($line.StartsWith('!err ')) { [Console]::Error.WriteLine($line.Substring(5)) }
-                else { [Console]::Out.WriteLine($line) }
-            }
-            [Console]::Out.Flush()
-            [Console]::Error.Flush()
-        }
-        if ($Sleep -gt 0) { Start-Sleep -Seconds $Sleep; exit 0 }
-        Write-Lines $Lines
-        if ($Exit -ge 0) { exit $Exit }
-        $reloads = @()
-        if ($ReloadLines -ne '') { $reloads = [IO.File]::ReadAllLines($ReloadLines) }
-        $reloadCount = 0
-        $restarts = @()
-        if ($RestartLines -ne '') { $restarts = [IO.File]::ReadAllLines($RestartLines) }
-        $restartCount = 0
-        while ($true) {
-            $line = [Console]::In.ReadLine()
-            if ($null -eq $line) { Write-Record '<eof>'; exit 0 }
-            Write-Record $line
-            if ($line -eq 'start') { Write-Lines $StartLines }
-            if ($line.StartsWith('reload ') -and $reloads.Count -gt 0) {
-                foreach ($out in $reloads[[Math]::Min($reloadCount, $reloads.Count - 1)].Split([char]0x1F)) {
-                    [Console]::Out.WriteLine($out)
-                }
-                [Console]::Out.Flush()
-                $reloadCount++
-            }
-            if ($line.StartsWith('restart ') -and $restarts.Count -gt 0) {
-                foreach ($out in $restarts[[Math]::Min($restartCount, $restarts.Count - 1)].Split([char]0x1F)) {
-                    [Console]::Out.WriteLine($out)
-                }
-                [Console]::Out.Flush()
-                $restartCount++
-            }
-            if ($line -eq 'stop' -and -not $IgnoreStop) { exit 0 }
-        }
-        """;
-
     private readonly string folder;
-    private readonly string script;
     private readonly List<string> records = [];
 
     public PlayStub(string folder)
     {
         this.folder = folder;
         Directory.CreateDirectory(folder);
-        script = Path.Combine(folder, "stub.ps1");
-        File.WriteAllText(script, Script);
     }
 
     /// <summary>The number of starts of the stub.</summary>
@@ -116,52 +61,45 @@ internal sealed class PlayStub
         var n = records.Count;
         var record = Path.Combine(folder, $"record{n}.txt");
         records.Add(record);
-        var info = new ProcessStartInfo(OperatingSystem.IsWindows() ? "powershell.exe" : "pwsh")
-        {
-            ArgumentList =
-            {
-                "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script,
-                "-Record", record,
-            },
-        };
+        var info = new ProcessStartInfo(StubProgram.FilePath) { ArgumentList = { "play", "--record", record } };
         if (plan.Lines.Length > 0)
         {
-            info.ArgumentList.Add("-Lines");
+            info.ArgumentList.Add("--lines");
             info.ArgumentList.Add(LinesFile($"lines{n}.txt", plan.Lines));
         }
 
         if (plan.StartLines is { Length: > 0 } startLines)
         {
-            info.ArgumentList.Add("-StartLines");
+            info.ArgumentList.Add("--start-lines");
             info.ArgumentList.Add(LinesFile($"start{n}.txt", startLines));
         }
 
         if (plan.Exit is { } exit)
         {
-            info.ArgumentList.Add("-Exit");
+            info.ArgumentList.Add("--exit");
             info.ArgumentList.Add(exit.ToString());
         }
 
         if (plan.IgnoreStop)
         {
-            info.ArgumentList.Add("-IgnoreStop");
+            info.ArgumentList.Add("--ignore-stop");
         }
 
         if (plan.Sleep > 0)
         {
-            info.ArgumentList.Add("-Sleep");
+            info.ArgumentList.Add("--sleep");
             info.ArgumentList.Add(plan.Sleep.ToString());
         }
 
         if (plan.ReloadLines is { Length: > 0 } reloadLines)
         {
-            info.ArgumentList.Add("-ReloadLines");
+            info.ArgumentList.Add("--reload-lines");
             info.ArgumentList.Add(LinesFile($"reload{n}.txt", reloadLines));
         }
 
         if (plan.RestartLines is { Length: > 0 } restartLines)
         {
-            info.ArgumentList.Add("-RestartLines");
+            info.ArgumentList.Add("--restart-lines");
             info.ArgumentList.Add(LinesFile($"restart{n}.txt", restartLines));
         }
 
