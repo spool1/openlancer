@@ -21,8 +21,8 @@ public sealed class CutsceneCommandsTests
     /// <summary>The script of <see cref="ThnSessions.Script"/> with a curve of three points on the first START_PSYS of
     /// Fx.</summary>
     private static readonly string CurveScript = Script.Replace("{ 5, START_PSYS, { \"Fx\" }, { duration = 2 } }",
-        "{ 5, START_PSYS, { \"Fx\" }, { duration = 2, param_curve = { CLSID = \"FreeFormPCurve\", points = { { 0, 0, 0, 0 }, " +
-        "{ 0.5, 0.25, 0, 0 }, { 1, 1, 0, 0 } } } } }");
+        "{ 5, START_PSYS, { \"Fx\" }, { duration = 2, param_curve = { CLSID = \"FreeFormPCurve\", points = { " +
+        "{ 0, 0, 0, 0 }, { 0.5, 0.25, 0, 0 }, { 1, 1, 0, 0 } } } } }");
 
     private static readonly ThnPath Fovh = new("cameraprops.fovh");
 
@@ -76,7 +76,8 @@ public sealed class CutsceneCommandsTests
     [Fact]
     public void MoveEventsGivesTheWOfTheMove()
     {
-        var plan = AssertSameW(s => CutsceneCommands.MoveEvents(s, [Event(s, 1), Event(s, 3), Event(s, 1)], 1.23456f, 0.5f),
+        var plan = AssertSameW(
+            s => CutsceneCommands.MoveEvents(s, [Event(s, 1), Event(s, 3), Event(s, 1)], 1.23456f, 0.5f),
             s => ThnEdits.MoveEvents([Event(s, 1), Event(s, 3), Event(s, 1)], 1.23456f, 0.5f));
         Assert.Equal("Move 3 events", plan.Label);
         Assert.Equal(2, plan.Changed.Count);
@@ -144,10 +145,12 @@ public sealed class CutsceneCommandsTests
 
         AssertRefused(viewer, CutsceneCommands.SetValue(viewer, Entity(viewer, "Cam_A"), Fovh, N(1)), noMod,
             EditPlan.PlanRefused);
-        AssertRefused(viewer, CutsceneCommands.MoveEvents(viewer, [Event(viewer, 1)], 1, 0), noMod, EditPlan.PlanRefused);
+        AssertRefused(viewer, CutsceneCommands.MoveEvents(viewer, [Event(viewer, 1)], 1, 0), noMod,
+            EditPlan.PlanRefused);
         AssertRefused(viewer, CutsceneCommands.SetDuration(viewer, ScriptPath, 4), noMod, EditPlan.PlanRefused);
-        AssertRefused(viewer, CutsceneCommands.SetCurvePoint(viewer, Event(viewer, 1), 0, new ThnCurvePoint(0, 1, 0, 0)),
-            noMod, EditPlan.PlanRefused);
+        var point = new ThnCurvePoint(0, 1, 0, 0);
+        AssertRefused(viewer, CutsceneCommands.SetCurvePoint(viewer, Event(viewer, 1), 0, point), noMod,
+            EditPlan.PlanRefused);
         AssertRefused(session, CutsceneCommands.SetValue(session, Entity(session, "Monitor"), Fovh, N(1)),
             ThnDocument.HiddenEntityMessage, EditPlan.PlanRefused);
         Assert.False(session.CanUndo);
@@ -169,13 +172,17 @@ public sealed class CutsceneCommandsTests
 
         AssertRefused(session, CutsceneCommands.MoveEvents(session, [Event(session, 3), psys], -5.001f, 0),
             ThnEdits.StartsBeforeZero, value);
-        AssertRefused(session, CutsceneCommands.MoveEvents(session, [psys], 0, -2.001f), ThnEdits.NegativeLength, value);
-        AssertRefused(session, CutsceneCommands.MoveEvents(session, [psys], float.NaN, 0), ThnNumber.NotFiniteMessage, value);
-        AssertRefused(session, CutsceneCommands.SetDuration(session, ScriptPath, -0.5f), ThnEdits.NegativeDuration, value);
+        AssertRefused(session, CutsceneCommands.MoveEvents(session, [psys], 0, -2.001f), ThnEdits.NegativeLength,
+            value);
+        AssertRefused(session, CutsceneCommands.MoveEvents(session, [psys], float.NaN, 0), ThnNumber.NotFiniteMessage,
+            value);
+        AssertRefused(session, CutsceneCommands.SetDuration(session, ScriptPath, -0.5f), ThnEdits.NegativeDuration,
+            value);
         AssertRefused(session, CutsceneCommands.SetDuration(session, ScriptPath, float.PositiveInfinity),
             ThnNumber.NotFiniteMessage, value);
-        AssertRefused(session, CutsceneCommands.SetCurvePoint(session, psys, 1, new ThnCurvePoint(0.5f, float.NaN, 0, 0)),
-            ThnNumber.NotFiniteMessage, value);
+        var notFinite = new ThnCurvePoint(0.5f, float.NaN, 0, 0);
+        AssertRefused(session, CutsceneCommands.SetCurvePoint(session, psys, 1, notFinite), ThnNumber.NotFiniteMessage,
+            value);
         // The time 5 moves to -0.0004, which rounds to 0 on the 1 ms grid.
         Assert.True(CutsceneCommands.MoveEvents(session, [psys], -5.0004f, 0).CanRun);
 
@@ -197,6 +204,23 @@ public sealed class CutsceneCommandsTests
             "The curve of the event has no point 1.", EditPlan.PlanRefused);
         Assert.Equal(3, CutsceneCommands.CurvePoints(session, Event(session, 1))!.Count);
         Assert.Null(CutsceneCommands.CurvePoints(session, Event(session, 0)));
+    }
+
+    /// <summary>The time field of an event refuses a value that is not a number with the detail FieldValue, and a time
+    /// below 0 with the text of the move.</summary>
+    [Fact]
+    public void TheTimeFieldRefusesAValueThatIsNotANumber()
+    {
+        using var ws = Workspace();
+        var session = ws.Session("act");
+        var psys = Event(session, 1);
+        var time = ThnFieldCommand.Time(psys, 5);
+
+        AssertRefused(session, time.Make(session, T("5")), "The value must be a number.", MissionErrors.FieldValue);
+        AssertRefused(session, ThnFieldCommand.Length(psys, 2).Make(session, T("1")), "The value must be a number.",
+            MissionErrors.FieldValue);
+        AssertRefused(session, time.Make(session, N(-1)), ThnEdits.StartsBeforeZero, MissionErrors.FieldValue);
+        Assert.True(time.Make(session, N(6)).CanRun);
     }
 
     /// <summary>

@@ -108,8 +108,8 @@ public static class CutsceneCommands
         if (CurveOf(session, ev) is not { } curve || ThnCurve.Points(curve) is not { } points || index < 0 ||
             index >= points.Count)
             return CutscenePlan.Refused(label, ev.Path, NoCurvePoint(index));
-        return CutscenePlan.Of(label, ev.Path, () => ThnEdits.Set(ev, ThnCurve.Path, ThnCurve.WithPoint(curve, index, point)),
-            changed: [ev]);
+        return CutscenePlan.Of(label, ev.Path,
+            () => ThnEdits.Set(ev, ThnCurve.Path, ThnCurve.WithPoint(curve, index, point)), changed: [ev]);
     }
 
     /// <summary>The points of the curve of an event in W, or null when the event has no curve with a list of
@@ -143,10 +143,18 @@ public static class CutsceneCommands
             if (timeDelta != 0 && table.List.FirstOrDefault() is ThnNumber time &&
                 ThnEdits.OnGrid((double)time.Value + timeDelta) < 0)
                 return ThnEdits.StartsBeforeZero;
-            if (lengthDelta != 0 && LengthPath.ValueIn(ThnElementKind.Event, table) is var length and (null or ThnNumber) &&
-                ThnEdits.OnGrid((double)((length as ThnNumber)?.Value ?? 0) + lengthDelta) < 0)
+            if (lengthDelta != 0 && LengthOf(table) is { } length && ThnEdits.OnGrid((double)length + lengthDelta) < 0)
                 return ThnEdits.NegativeLength;
         }
         return null;
     }
+
+    /// <summary>The length of an event: 0 without <c>props.duration</c>, or null when the value is not a
+    /// number.</summary>
+    private static float? LengthOf(ThnTable ev) => LengthPath.ValueIn(ThnElementKind.Event, ev) switch
+    {
+        null => 0,
+        ThnNumber number => number.Value,
+        _ => null,
+    };
 }

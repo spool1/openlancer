@@ -20,7 +20,8 @@ namespace OpenLancer.Tests;
 /// <summary>
 /// The Inspector edits of a cutscene without ImGui (section 7.5 of the M8 design): the text of a value and the value
 /// that a text gives, the field edit as one entry that keeps the last valid value, the bits of a flags key of an event,
-/// a drag of a curve point, and the path keys.
+/// a drag of a curve point, and the path keys. The field edit and the drag are gestures of the command layer (decision
+/// D766), so the runner opens them and refuses them when the editor takes no edits.
 /// </summary>
 public sealed class ThnFieldEditTests
 {
@@ -112,6 +113,31 @@ public sealed class ThnFieldEditTests
         Assert.Equal(N(10), Value(session, cam, "cameraprops.fovh"));
     }
 
+    /// <summary>
+    /// The runner opens a field edit as a gesture of the command layer. The edit becomes one entry with the origin User
+    /// and the label of the field. When the editor takes no edits, the edit does not open, and the message is the
+    /// reason. No gesture stays open then, so the next edit opens.
+    /// </summary>
+    [Fact]
+    public void AFieldEditIsOneEntryOfTheUserAndDoesNotOpenWhileTheEditorTakesNoEdits()
+    {
+        using var ws = Workspace();
+        var session = ws.Session("act");
+        var cam = Entity(session, "Cam_A");
+
+        const string reason = "The game runs from this profile.";
+        var refused = Assert.Throws<InvalidOperationException>(() => Gesture(session, cam, "10", reason));
+        Assert.Equal(reason, refused.Message);
+        var edit = Gesture(session, cam, "10");
+        edit.Change("30");
+        Assert.Null(edit.End(keep: true, interactive: true));
+
+        Assert.Equal(N(30), Value(session, cam, "cameraprops.fovh"));
+        Assert.Equal(("Set cameraprops.fovh", EditOrigin.User), (session.UndoLabel, session.UndoOrigin));
+        session.Undo();
+        Assert.False(session.CanUndo);
+    }
+
     /// <summary>A value that a save cannot write, here a text that is not ASCII, is an error of the field.</summary>
     [Fact]
     public void AValueThatASaveCannotWriteIsAnErrorOfTheField()
@@ -121,7 +147,8 @@ public sealed class ThnFieldEditTests
         var trent = Entity(session, "Char_trent");
         var path = new ThnPath("userprops.category");
 
-        var edit = new ThnFieldGesture(session, new FieldKey(trent, path.Text, FieldKey.AllLines), "Char",
+        var key = new FieldKey(trent, path.Text, FieldKey.AllLines);
+        var edit = ThnFieldGesture.Open(FakeCommandHost.Runner(session), key, "Char",
             text => ThnFieldParse.Of(new ThnText(text)), ThnFieldCommand.Set(trent, path));
         edit.Change("Chär");
 
@@ -258,6 +285,7 @@ public sealed class ThnFieldEditTests
         var length = NumberField(session, psys, "props.duration", ThnFieldCommand.Length(psys, 2));
         length.Change("-0.5");
         Assert.Equal("The length of an event cannot be negative.", length.Error);
+        Assert.Equal((N(7.25f), N(2)), (Value(session, psys, "time"), Value(session, psys, "props.duration")));
         length.Change("3.33333");
         Assert.Null(length.End(keep: true, interactive: true));
         Assert.Equal((N(7.25f), N(3.333f)), (Value(session, psys, "time"), Value(session, psys, "props.duration")));
@@ -276,18 +304,17 @@ public sealed class ThnFieldEditTests
     [Fact]
     public void ADragOfACurvePointIsOneEntryAndKeepsTheOrderOfThePoints()
     {
-        var script = Script.Replace("{ 5, START_PSYS, { \"Fx\" }, { duration = 2 } }",
-            "{ 5, START_PSYS, { \"Fx\" }, { duration = 2, param_curve = { CLSID = \"FreeFormPCurve\", points = { { 0, 0, 0, 0 }, { 0.5, 0.25, 0, 0 }, { 1, 1, 0, 0 } } } } }");
-        using var ws = Workspace(script: script);
+        using var ws = Workspace(script: CurveScript());
         var session = ws.Session("act");
+        var commands = FakeCommandHost.Runner(session);
         var psys = Event(session, 1);
         var before = (ThnTable)Value(session, psys, "props.param_curve")!;
 
-        using (var drag = CurvePointDrag.Begin(session, psys, 1))
+        using (var drag = CurvePointDrag.Begin(commands, psys, 1))
         {
             for (var i = 0; i < 50; i++)
-                drag.Move(0.5f + i * 0.02f, 0.25f + i * 0.01f);
-            drag.Move(1.5f, 0.75f);
+                Assert.Null(drag.Move(0.5f + i * 0.02f, 0.25f + i * 0.01f));
+            Assert.Null(drag.Move(1.5f, 0.75f));
             drag.End();
         }
 
@@ -299,17 +326,56 @@ public sealed class ThnFieldEditTests
         Assert.Same(oldPoints.List[2], newPoints.List[2]);
         Assert.Same(before["CLSID"], curve["CLSID"]);
         Assert.Equal("Move point 2 of the curve", session.UndoLabel);
+        Assert.Equal(EditOrigin.User, session.UndoOrigin);
         session.Undo();
         Assert.Same(before, Value(session, psys, "props.param_curve"));
         Assert.False(session.CanUndo);
 
-        var back = CurvePointDrag.Begin(session, psys, 0);
+        var back = CurvePointDrag.Begin(commands, psys, 0);
         back.Move(0, 0.5f);
         back.Move(0, 0);
         back.End();
         Assert.False(session.CanUndo);
-        Assert.Throws<InvalidOperationException>(() => CurvePointDrag.Begin(session, psys, 3));
-        Assert.Throws<InvalidOperationException>(() => CurvePointDrag.Begin(session, Event(session, 0), 0));
+        var escape = CurvePointDrag.Begin(commands, psys, 2);
+        escape.Move(1, 3);
+        var moved = ThnCurve.Points((ThnTable)Value(session, psys, "props.param_curve")!)!;
+        Assert.Equal(new ThnCurvePoint(1, 3, 0, 0), moved[2]);
+        escape.Cancel();
+        Assert.Same(before, Value(session, psys, "props.param_curve"));
+        Assert.False(session.CanUndo);
+        Assert.Equal("The curve of the event has no point 4.",
+            Assert.Throws<InvalidOperationException>(() => CurvePointDrag.Begin(commands, psys, 3)).Message);
+        Assert.Throws<InvalidOperationException>(() => CurvePointDrag.Begin(commands, Event(session, 0), 0));
+    }
+
+    /// <summary>
+    /// A step of a curve drag that does not apply gives the reason, and W holds the curve of the start of the drag. The
+    /// curve editor then stops the drag with an error in the Console. Here a patch cannot change the event, because the
+    /// lower event has no key. When the editor takes no edits, the drag does not open, and the message is the reason.
+    /// </summary>
+    [Fact]
+    public void ARefusedStepOfACurveDragLeavesTheCurveOfTheStart()
+    {
+        using var ws = Workspace(script: CurveScript("{ 7 }"));
+        var session = ws.Session("act");
+        var psys = Event(session, 1);
+        var before = Value(session, psys, "props.param_curve");
+
+        var drag = CurvePointDrag.Begin(FakeCommandHost.Runner(session), psys, 1);
+        Assert.StartsWith("A patch cannot change this event of the lower cutscene", drag.Move(0.6f, 0.5f));
+        Assert.Same(before, Value(session, psys, "props.param_curve"));
+        Assert.Equal(new ThnCurvePoint(0.5f, 0.25f, 0, 0), drag.Applied);
+        drag.Cancel();
+        Assert.False(session.CanUndo);
+
+        var refused = Assert.Throws<InvalidOperationException>(() =>
+            CurvePointDrag.Begin(FakeCommandHost.Runner(session, "The game runs from this profile."), psys, 1));
+        Assert.Equal("The game runs from this profile.", refused.Message);
+        // No gesture stays open, so the next drag opens.
+        CurvePointDrag.Begin(FakeCommandHost.Runner(session), psys, 1).Cancel();
+        var viewer = ws.SecondSession(null);
+        Assert.Equal("There is no active mod. Select a mod to edit.", Assert.Throws<InvalidOperationException>(() =>
+            CurvePointDrag.Begin(FakeCommandHost.Runner(viewer), Event(viewer, 1), 1)).Message);
     }
 
     /// <summary>A field of a point of the curve table gives the curve with that point.</summary>
@@ -362,7 +428,8 @@ public sealed class ThnFieldEditTests
         var angles = ThnFieldEdit.Format(ThnKeyKind.Orient, Value(session, cam, orient.Text));
         Assert.Equal("0, 0, 0", angles);
         var kind = FieldDrag.KindOf(ThnKeyKind.Orient, orient.Text)!.Value;
-        var drag = new ThnFieldGesture(session, new FieldKey(cam, orient.Text, FieldKey.AllLines), angles,
+        var key = new FieldKey(cam, orient.Text, FieldKey.AllLines);
+        var drag = ThnFieldGesture.Open(FakeCommandHost.Runner(session), key, angles,
             text => ThnFieldEdit.Parse(ThnKeyKind.Orient, text, Evaluator), ThnFieldCommand.Set(cam, orient));
         drag.Change(FieldDrag.DragText(kind, drag.StartText, 3, 1, 40));
         Assert.Null(drag.End(keep: true, interactive: true));
@@ -372,13 +439,21 @@ public sealed class ThnFieldEditTests
         Assert.Equal("Set spatialprops.orient", session.UndoLabel);
     }
 
-    private static ThnFieldGesture Gesture(EditSession session, ThnRef target, string start) =>
-        new(session, new FieldKey(target, Fovh.Text, FieldKey.AllLines), start,
+    private static ThnFieldGesture Gesture(EditSession session, ThnRef target, string start,
+        string? noEditReason = null) =>
+        ThnFieldGesture.Open(FakeCommandHost.Runner(session, noEditReason),
+            new FieldKey(target, Fovh.Text, FieldKey.AllLines), start,
             text => ThnFieldEdit.Parse(ThnKeyKind.Number, text, Evaluator), ThnFieldCommand.Set(target, Fovh));
 
     /// <summary>A field of a number that the Inspector draws, with an edit.</summary>
     private static ThnFieldGesture NumberField(EditSession session, ThnRef target, string path, ThnFieldCommand command) =>
-        new(session, new FieldKey(target, path, FieldKey.AllLines),
+        ThnFieldGesture.Open(FakeCommandHost.Runner(session), new FieldKey(target, path, FieldKey.AllLines),
             ThnFieldEdit.Format(ThnKeyKind.Number, Value(session, target, path)),
             text => ThnFieldEdit.Parse(ThnKeyKind.Number, text, Evaluator), command);
+
+    /// <summary>The script with a curve of three points on the first START_PSYS of Fx.</summary>
+    private static string CurveScript(string targets = "{ \"Fx\" }") => Script.Replace(
+        "{ 5, START_PSYS, { \"Fx\" }, { duration = 2 } }",
+        $"{{ 5, START_PSYS, {targets}, {{ duration = 2, param_curve = {{ CLSID = \"FreeFormPCurve\", points = {{ " +
+        "{ 0, 0, 0, 0 }, { 0.5, 0.25, 0, 0 }, { 1, 1, 0, 0 } } } } }");
 }

@@ -48,34 +48,23 @@ internal abstract class FieldGesture : IDisposable
 }
 
 /// <summary>
-/// The edit of the lines of a bound key as one gesture of the command layer. The edit keeps the key and the section as
-/// they were at its start. Each change runs a field command in a step of the gesture, so it shows at once in the edit
-/// view. While the edit is open, the Inspector lays out the rows of the section from its start (see
-/// <see cref="Inspector.PropertyGrid.LayoutView"/>).
+/// The edit of a field as one gesture of the command layer (see <see cref="CommandTransaction"/>). Each change runs a
+/// command of the layer in a step of the gesture, so it shows at once in the edit view. The end of the edit commits or
+/// cancels the gesture.
 /// </summary>
-/// <remarks>The edit gets its gesture from <see cref="CommandRunner.Gesture{T}"/>, and the edit owns it: the end of the
-/// edit commits or cancels the gesture.</remarks>
-internal abstract class LineEditGesture : FieldGesture
+/// <remarks>The edit gets its gesture from <see cref="CommandRunner.Gesture{T}"/>, and the edit owns it.</remarks>
+internal abstract class CommandFieldGesture : FieldGesture
 {
     private readonly CommandTransaction gesture;
 
-    private protected LineEditGesture(CommandTransaction gesture, FieldBinding binding, string startText)
-        : base(binding.FieldKey, startText)
+    private protected CommandFieldGesture(CommandTransaction gesture, FieldKey key, string startText)
+        : base(key, startText)
     {
         this.gesture = gesture;
-        Binding = binding;
-        StartSection = gesture.Session.Get(binding.Section);
     }
 
-    /// <summary>The key as it was at the start of the edit.</summary>
-    public FieldBinding Binding { get; }
-
-    /// <summary>The section of the key as it was at the start of the edit, or null when the edit view did not have
-    /// it.</summary>
-    public SectionView? StartSection { get; }
-
-    /// <summary>The label of the history entry of an edit of a key, for example <c>Set mass</c>.</summary>
-    public static string Label(FieldBinding binding) => $"Set {binding.Name}";
+    /// <summary>The session of the gesture.</summary>
+    private protected EditSession Session => gesture.Session;
 
     /// <summary>
     /// Ends the edit. When the last change is valid, the edit becomes one entry of the history. Otherwise the edit view
@@ -96,14 +85,14 @@ internal abstract class LineEditGesture : FieldGesture
 
     /// <summary>Shows a step in the edit view, in place of the step of the last change. A plan of the step that refuses
     /// sets <see cref="FieldGesture.Error"/>, and the edit view goes back to its state before the edit.</summary>
-    /// <param name="step">Makes the plan of a field command from the session.</param>
+    /// <param name="step">Makes the plan of a command of the layer from the session.</param>
     /// <returns>True when the step applied.</returns>
     private protected bool Apply(Func<EditSession, EditPlan> step)
     {
         var result = gesture.Apply(step);
         if (result.Status == EditStatus.Refused)
         {
-            Error = result.Errors.FirstOrDefault()?.Message ?? $"'{Binding.Name}' did not change.";
+            Error = result.Errors.FirstOrDefault()?.Message ?? $"'{Key.Name}' did not change.";
             return false;
         }
         Error = null;
@@ -116,6 +105,31 @@ internal abstract class LineEditGesture : FieldGesture
         gesture.Reset();
         Error = null;
     }
+}
+
+/// <summary>
+/// The edit of the lines of a bound key as one gesture of the command layer. The edit keeps the key and the section as
+/// they were at its start. Each change runs a field command in a step of the gesture. While the edit is open, the
+/// Inspector lays out the rows of the section from its start (see <see cref="Inspector.PropertyGrid.LayoutView"/>).
+/// </summary>
+internal abstract class LineEditGesture : CommandFieldGesture
+{
+    private protected LineEditGesture(CommandTransaction gesture, FieldBinding binding, string startText)
+        : base(gesture, binding.FieldKey, startText)
+    {
+        Binding = binding;
+        StartSection = Session.Get(binding.Section);
+    }
+
+    /// <summary>The key as it was at the start of the edit.</summary>
+    public FieldBinding Binding { get; }
+
+    /// <summary>The section of the key as it was at the start of the edit, or null when the edit view did not have
+    /// it.</summary>
+    public SectionView? StartSection { get; }
+
+    /// <summary>The label of the history entry of an edit of a key, for example <c>Set mass</c>.</summary>
+    public static string Label(FieldBinding binding) => $"Set {binding.Name}";
 }
 
 /// <summary>

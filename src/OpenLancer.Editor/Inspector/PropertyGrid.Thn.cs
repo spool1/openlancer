@@ -166,12 +166,15 @@ internal sealed partial class PropertyGrid
         ThnFieldCommand? command = null) =>
         Route(field.Key, changed, () => ThnBegin(field, parse, command), text);
 
-    /// <summary>Starts the field edit of a cutscene value, from the text of the value in this frame.</summary>
+    /// <summary>Starts the field edit of a cutscene value in a gesture of the command layer, from the text of the value
+    /// in this frame.</summary>
     /// <param name="command">The edit of a value, or null for <see cref="ThnFieldCommand.Set"/> of the path of the
     /// field.</param>
+    /// <exception cref="InvalidOperationException">The editor takes no edits, or a transaction or a batch is open. The
+    /// field edits give the reason as a warning.</exception>
     private ThnFieldGesture ThnBegin(ThnFieldState field, Func<string, ThnFieldParse> parse,
         ThnFieldCommand? command = null) =>
-        new(window.Session!.Edits, field.Key, ThnFieldEdit.Format(field.Kind, field.Value), parse,
+        ThnFieldGesture.Open(window.Commands, field.Key, ThnFieldEdit.Format(field.Kind, field.Value), parse,
             command ?? ThnFieldCommand.Set(field.Target, field.Path));
 
     /// <summary>The error of the open edit of a field below the field.</summary>

@@ -7,6 +7,7 @@ using LibreLancer.Thn.Events;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Cutscene;
+using OpenLancer.Editor.Editing;
 using OpenLancer.Runtime.Thn;
 using OpenLancer.Studio.Commands;
 using Xunit;
@@ -18,7 +19,8 @@ namespace OpenLancer.Tests;
 /// <summary>
 /// The edits of the Timeline without ImGui (section 7.3 of the M8 design): each drag is one entry of the history, its
 /// changes are on the 1 ms grid, Ctrl snaps to the playhead and to the edges of other events, and the copy, the paste,
-/// the duplicate, Add event and the delete of an entity with its events are one entry each.
+/// the duplicate, Add event and the delete of an entity with its events are one entry each. A drag is a gesture of the
+/// command layer (decision D766), so the runner opens it and refuses it when the editor takes no edits.
 /// </summary>
 public sealed class TimelineDragTests
 {
@@ -29,6 +31,10 @@ public sealed class TimelineDragTests
         TimelineModel.Build(ScriptPath, W(session), Evaluator.Symbols, ScriptPlay.Normal);
 
     private static TimelineEvent Ev(EditSession session, int index) => Model(session).Event(W(session).Events[index].Id)!;
+
+    /// <summary>The runner of the gestures of a session.</summary>
+    private static CommandRunner Commands(EditSession session, string? noEditReason = null) =>
+        FakeCommandHost.Runner(session, noEditReason);
 
     private static float Time(EditSession session, ThnRef ev) => ((ThnNumber)Value(session, ev, "time")!).Value;
 
@@ -54,11 +60,11 @@ public sealed class TimelineDragTests
         var changes = 0;
         session.Changed += _ => changes++;
 
-        using (var drag = TimelineDrag.Begin(session, [motion], TimelineDragKind.Move, 6.2, []))
+        using (var drag = TimelineDrag.Begin(Commands(session), [motion], TimelineDragKind.Move, 6.2, []))
         {
             for (var step = 1; step <= 100; step++)
             {
-                drag.Drag(6.2 + step * 0.0123456, snap: false, tolerance: 0);
+                Assert.Null(drag.Drag(6.2 + step * 0.0123456, snap: false, tolerance: 0));
                 Assert.Equal(ThnEdits.OnGrid(6 + Math.Round(step * 0.0123456, 3)), Time(session, motion.Ref));
             }
 
@@ -66,7 +72,7 @@ public sealed class TimelineDragTests
         }
 
         Assert.Equal(new ThnNumber(7.235f), Value(session, motion.Ref, "time"));
-        Assert.Equal("Move event", session.UndoLabel);
+        Assert.Equal(("Move event", EditOrigin.User), (session.UndoLabel, session.UndoOrigin));
         Assert.Equal(101, changes);
         session.Undo();
         Assert.Equal(6, Time(session, motion.Ref));
@@ -82,11 +88,11 @@ public sealed class TimelineDragTests
         var session = ws.Session("act");
         var motion = Ev(session, Motion);
 
-        var back = TimelineDrag.Begin(session, [motion], TimelineDragKind.Move, 6, []);
+        var back = TimelineDrag.Begin(Commands(session), [motion], TimelineDragKind.Move, 6, []);
         back.Drag(7.5, false, 0);
         back.Drag(6.0004, false, 0);
         back.End();
-        var cancelled = TimelineDrag.Begin(session, [motion], TimelineDragKind.Move, 6, []);
+        var cancelled = TimelineDrag.Begin(Commands(session), [motion], TimelineDragKind.Move, 6, []);
         cancelled.Drag(9, false, 0);
         Assert.Equal(9, Time(session, motion.Ref));
         cancelled.Cancel();
@@ -94,6 +100,55 @@ public sealed class TimelineDragTests
         Assert.False(session.CanUndo);
         Assert.Equal(6, Time(session, motion.Ref));
         Assert.Throws<InvalidOperationException>(() => cancelled.Drag(8, false, 0));
+        Assert.Throws<InvalidOperationException>(() => cancelled.End());
+    }
+
+    /// <summary>
+    /// A step of a drag that does not apply gives the reason, and W holds the state before the drag. The Timeline then
+    /// stops the drag with an error in the Console. Here a patch cannot change the event, because the lower event has
+    /// no key: its second target is not a text.
+    /// </summary>
+    [Fact]
+    public void ARefusedStepLeavesTheStateBeforeTheDrag()
+    {
+        using var ws = Workspace(script: Script.Replace("{ \"Cam_A\", \"char_trent\" }", "{ \"Cam_A\", 7 }"));
+        var session = ws.Session("act");
+        var keyless = Ev(session, Attach);
+        var motion = Ev(session, Motion);
+        var before = W(session);
+
+        var drag = TimelineDrag.Begin(Commands(session), [motion, keyless], TimelineDragKind.Move, 6, []);
+        Assert.StartsWith("A patch cannot change this event of the lower cutscene", drag.Drag(7, false, 0));
+        Assert.Same(before, W(session));
+        Assert.Equal((0.0, 0.0), (drag.TimeDelta, drag.LengthDelta));
+        drag.Cancel();
+
+        Assert.Same(before, W(session));
+        Assert.False(session.CanUndo);
+    }
+
+    /// <summary>
+    /// The runner refuses to open a drag when the editor takes no edits, and the message is the reason. A cutscene that
+    /// takes no edits refuses the drag too. No gesture stays open, so the next drag opens.
+    /// </summary>
+    [Fact]
+    public void ADragDoesNotOpenWhileTheEditorOrTheCutsceneTakesNoEdits()
+    {
+        using var ws = Workspace();
+        var session = ws.Session("act");
+        var motion = Ev(session, Motion);
+        const string reason = "The game runs from this profile.";
+
+        Assert.Equal(reason, Assert.Throws<InvalidOperationException>(() =>
+            TimelineDrag.Begin(Commands(session, reason), [motion], TimelineDragKind.Move, 6, [])).Message);
+        Assert.Equal(reason, Assert.Throws<InvalidOperationException>(() =>
+            TimelineDrag.BeginDuration(Commands(session, reason), ScriptPath, 10, 10, [])).Message);
+        TimelineDrag.Begin(Commands(session), [motion], TimelineDragKind.Move, 6, []).Cancel();
+
+        var viewer = ws.SecondSession(null);
+        Assert.Equal("There is no active mod. Select a mod to edit.", Assert.Throws<InvalidOperationException>(() =>
+            TimelineDrag.BeginDuration(Commands(viewer), ScriptPath, 10, 10, [])).Message);
+        Assert.False(session.CanUndo);
     }
 
     /// <summary>A drag of the start of a bar moves its time and keeps its end. It stops at 0 and at the end of the bar.
@@ -105,7 +160,7 @@ public sealed class TimelineDragTests
         var session = ws.Session("act");
         var psys = Ev(session, Psys);
 
-        var start = TimelineDrag.Begin(session, [psys], TimelineDragKind.Start, 5, []);
+        var start = TimelineDrag.Begin(Commands(session), [psys], TimelineDragKind.Start, 5, []);
         start.Drag(5.5, false, 0);
         Assert.Equal((5.5f, 1.5f), (Time(session, psys.Ref), Length(session, psys.Ref)!.Value));
         start.Drag(9, false, 0);
@@ -117,7 +172,7 @@ public sealed class TimelineDragTests
         Assert.Equal((3.25f, 3.75f), (Time(session, psys.Ref), Length(session, psys.Ref)!.Value));
         Assert.Equal("Change the start of event", session.UndoLabel);
 
-        var end = TimelineDrag.Begin(session, [Ev(session, Psys)], TimelineDragKind.End, 7, []);
+        var end = TimelineDrag.Begin(Commands(session), [Ev(session, Psys)], TimelineDragKind.End, 7, []);
         end.Drag(8.125, false, 0);
         Assert.Equal((3.25f, 4.875f), (Time(session, psys.Ref), Length(session, psys.Ref)!.Value));
         end.Drag(0, false, 0);
@@ -128,7 +183,8 @@ public sealed class TimelineDragTests
         session.Undo();
         Assert.Equal((5f, 2f), (Time(session, psys.Ref), Length(session, psys.Ref)!.Value));
         Assert.False(session.CanUndo);
-        Assert.Throws<ArgumentException>(() => TimelineDrag.Begin(session, [Ev(session, Cut)], TimelineDragKind.End, 0, []));
+        Assert.Throws<ArgumentException>(() =>
+            TimelineDrag.Begin(Commands(session), [Ev(session, Cut)], TimelineDragKind.End, 0, []));
     }
 
     /// <summary>A move of a set moves each event by the same change, in one entry. It stops when the earliest event is
@@ -140,7 +196,7 @@ public sealed class TimelineDragTests
         var session = ws.Session("act");
         var (psys, motion) = (Ev(session, Psys), Ev(session, Motion));
 
-        using var drag = TimelineDrag.Begin(session, [motion, psys], TimelineDragKind.Move, 6, []);
+        using var drag = TimelineDrag.Begin(Commands(session), [motion, psys], TimelineDragKind.Move, 6, []);
         drag.Drag(-2, false, 0);
         Assert.Equal(-5, drag.TimeDelta);
         drag.End();
@@ -166,7 +222,7 @@ public sealed class TimelineDragTests
         var snaps = TimelineDrag.SnapPoints(model, [motion.Ref], 9.45);
         Assert.Equal([0, 5, 6, 7, 7.5, 8, 9.45], snaps);
 
-        using var drag = TimelineDrag.Begin(session, [motion], TimelineDragKind.Move, 6.5, snaps);
+        using var drag = TimelineDrag.Begin(Commands(session), [motion], TimelineDragKind.Move, 6.5, snaps);
         drag.Drag(8.04, snap: true, tolerance: 0.05);
         Assert.Equal((7.5f, 7.5), (Time(session, motion.Ref), drag.SnappedTo!.Value));
         drag.Drag(8.04, snap: false, tolerance: 0.05);
@@ -187,7 +243,7 @@ public sealed class TimelineDragTests
         using var ws = Workspace();
         var session = ws.Session("act");
 
-        using (var drag = TimelineDrag.BeginDuration(session, ScriptPath, 10, 10, []))
+        using (var drag = TimelineDrag.BeginDuration(Commands(session), ScriptPath, 10, 10, []))
         {
             drag.Drag(12.34567, false, 0);
             Assert.Equal(12.346f, W(session).Duration);
@@ -198,7 +254,7 @@ public sealed class TimelineDragTests
         }
 
         Assert.Equal(11.5f, W(session).Duration);
-        Assert.Equal("Set duration", session.UndoLabel);
+        Assert.Equal(("Set duration", EditOrigin.User), (session.UndoLabel, session.UndoOrigin));
         session.Undo();
         Assert.Equal(10f, W(session).Duration);
         Assert.False(session.CanUndo);

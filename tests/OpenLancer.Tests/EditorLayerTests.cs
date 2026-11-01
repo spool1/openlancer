@@ -7,10 +7,10 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor;
+using OpenLancer.Editor.Cutscene;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Inspector;
 using OpenLancer.Runtime.Scene;
-using OpenLancer.Studio.Commands;
 using Xunit;
 
 namespace OpenLancer.Tests;
@@ -21,21 +21,25 @@ namespace OpenLancer.Tests;
 /// no editor type makes a session command, gets a delegate that makes one, or runs one.
 /// </summary>
 /// <remarks>
-/// <para>The cutscene callers keep their session commands and <see cref="CommandRunner.Execute(EditCommand)"/> until
-/// milestone MCP1-4 moves them to the cutscene commands. A fixed allow-list names them, and a test fails when an entry
-/// of the list has no edit call any more.</para>
+/// <para>The cutscene callers of discrete edits keep their session commands and
+/// <see cref="CommandRunner.Execute(EditCommand)"/> until milestone MCP1-4 moves them to the cutscene commands. A fixed
+/// allow-list names each of these types, and a test fails when an entry of the list has no edit call any more. The
+/// gestures of the cutscene editor (the drags of the Timeline and of the curve editor, and the field gestures) are not
+/// on the list: they run the cutscene commands in a gesture of the layer.</para>
 /// <para>A second rule reads the IL of the runtime assembly. No runtime method runs a session command, so the editor
 /// cannot reach a raw edit through a runtime helper.</para>
 /// </remarks>
 public sealed class EditorLayerTests
 {
-    /// <summary>The cutscene callers that keep their edit calls until milestone MCP1-4. ThnCurveEditor is not on the
-    /// list, because it starts its drag through CurvePointDrag of OpenLancer.Editor.Cutscene.</summary>
+    /// <summary>The cutscene callers that keep the edit calls of their discrete edits until milestone MCP1-4, one entry
+    /// for each type.</summary>
     private static readonly IReadOnlyList<Allowed> AllowList =
     [
-        new("the types of OpenLancer.Editor.Cutscene", t => t.Namespace == "OpenLancer.Editor.Cutscene", _ => true),
+        new(nameof(CutsceneWorkspace), t => t == typeof(CutsceneWorkspace), _ => true),
+        new(nameof(TimelinePanel), t => t == typeof(TimelinePanel), _ => true),
+        new(nameof(CutsceneBrowser), t => t == typeof(CutsceneBrowser), _ => true),
+        new(nameof(CutsceneView), t => t == typeof(CutsceneView), _ => true),
         new(nameof(ThnPage), t => t == typeof(ThnPage), _ => true),
-        new(nameof(ThnFieldGesture), t => t == typeof(ThnFieldGesture), _ => true),
         new($"{nameof(PropertyGrid)}, for calls of {nameof(ThnEdits)} and of {nameof(CommandRunner.Execute)}",
             t => t == typeof(PropertyGrid), m => m.DeclaringType == typeof(ThnEdits) || IsExecute(m)),
     ];
@@ -88,7 +92,7 @@ public sealed class EditorLayerTests
         Assert.Contains(calls, c => c.Callee.Name == "get_" + nameof(EditPlan.Command));
         Assert.DoesNotContain(calls, c => c.Callee.Name == "get_" + nameof(EditPlan.CanRun));
         var delegateCalls = calls.Where(c => c.Caller.Name == nameof(RawEditSample.Delegate)).ToList();
-        Assert.Contains(delegateCalls, c => c.Callee.Name == "get_" + nameof(ThnFieldCommand.Make));
+        Assert.Contains(delegateCalls, c => c.Callee.Name == "get_" + nameof(RawEditField.Make));
         Assert.Contains(delegateCalls, c => c.Callee.Name == nameof(Func<ThnValue, EditCommand>.Invoke));
         Assert.Contains(delegateCalls, c => IsExecute(c.Callee));
     }
@@ -173,6 +177,11 @@ internal static class RawEditSample
 
     public static bool Plan(EditPlan plan) => plan.CanRun && plan.Command != null;
 
-    public static bool Delegate(CommandRunner runner, ThnFieldCommand command, ThnValue value) =>
-        runner.Execute(command.Make(value));
+    public static bool Delegate(CommandRunner runner, RawEditField field, ThnValue value) =>
+        runner.Execute(field.Make(value));
 }
+
+/// <summary>A type that gives a delegate that makes a session command, for the form of
+/// <see cref="RawEditSample.Delegate"/>. The edit of a cutscene field had this form before it planned its value through
+/// the command layer.</summary>
+internal sealed record RawEditField(Func<ThnValue, EditCommand> Make);

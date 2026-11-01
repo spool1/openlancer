@@ -7,6 +7,7 @@ using System.Text;
 using LibreLancer;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Data.Thn;
 using OpenLancer.Runtime.Scene;
 
@@ -20,36 +21,41 @@ internal sealed record ThnFieldParse(ThnValue? Value, string? Error)
     public static ThnFieldParse Fail(string error) => new(null, error);
 }
 
-/// <summary>The edit of a field of a cutscene value: the label of its entry in the edit history, and the command that
-/// gives the element the value of the field.</summary>
-internal sealed record ThnFieldCommand(string Label, Func<ThnValue, EditCommand> Make)
+/// <summary>The edit of a field of a cutscene value: the label of its entry in the edit history, and the command of the
+/// layer that plans the value of the field (see <see cref="CutsceneCommands"/>). A field gesture runs the plan in each
+/// step, so no editor type makes a session command (decision D766).</summary>
+internal sealed record ThnFieldCommand(string Label, Func<EditSession, ThnValue, EditPlan> Make)
 {
     /// <summary>The edit that sets the value at a path of an element. Its label is <c>Set</c> and the path.</summary>
     public static ThnFieldCommand Set(ThnRef target, ThnPath path) =>
-        new($"Set {path}", value => ThnEdits.Set(target, path, value));
+        new($"Set {path}", (session, value) => CutsceneCommands.SetValue(session, target, path, value));
 
     /// <summary>The edit of the time of an event: a move, as a drag on the Timeline makes it. The time rounds to 1 ms,
-    /// and a time below 0 is an error (see <see cref="ThnEdits.MoveEvents"/>).</summary>
+    /// and a time below 0 refuses (see <see cref="CutsceneCommands.MoveEvents"/>).</summary>
     /// <param name="start">The time of the event at the start of the edit.</param>
     public static ThnFieldCommand Time(ThnRef ev, float start) =>
-        new("Move event", value => Move(ev, Change(value, start), 0));
+        new("Move event", (session, value) => Move(session, ev, value, start, time: true));
 
     /// <summary>The edit of the length (<c>props.duration</c>) of an event, as a drag of the end of a bar makes it. The
-    /// length rounds to 1 ms, and a length below 0 is an error.</summary>
+    /// length rounds to 1 ms, and a length below 0 refuses.</summary>
     /// <param name="start">The length of the event at the start of the edit. An event without a length has the length
     /// 0.</param>
     public static ThnFieldCommand Length(ThnRef ev, float start) =>
-        new("Change the length of event", value => Move(ev, 0, Change(value, start)));
+        new("Change the length of event", (session, value) => Move(session, ev, value, start, time: false));
 
-    /// <summary>The move of one event. No change gives a command that changes nothing.</summary>
-    private static EditCommand Move(ThnRef ev, float time, float length) =>
-        time == 0 && length == 0 ? EditCommand.Group("", []) : ThnEdits.MoveEvents([ev], time, length);
+    /// <summary>The move of one event by the change from the start value to a number. No change gives a plan that
+    /// changes nothing. A value that is not a number refuses.</summary>
+    private static EditPlan Move(EditSession session, ThnRef ev, ThnValue value, float start, bool time)
+    {
+        if (value is not ThnNumber number)
+        {
+            return CutscenePlan.Refused(ThnEdits.MoveLabel(1, time ? 1 : 0, time ? 0 : 1), ev.Path,
+                "The value must be a number.", MissionErrors.FieldValue);
+        }
 
-    /// <summary>The change from the start value to a number.</summary>
-    /// <exception cref="ArgumentException">The value is not a number.</exception>
-    private static float Change(ThnValue value, float start) => value is ThnNumber number
-        ? (float)((double)number.Value - start)
-        : throw new ArgumentException("The value must be a number.", nameof(value));
+        var change = (float)((double)number.Value - start);
+        return CutsceneCommands.MoveEvents(session, [ev], time ? change : 0, time ? 0 : change);
+    }
 }
 
 /// <summary>

@@ -56,7 +56,8 @@ public sealed class ErrorTextTests
         var session = ws.Session("act");
         var trent = Entity(session, "Char_trent");
         var path = new ThnPath("userprops.category");
-        var edit = new ThnFieldGesture(session, new FieldKey(trent, path.Text, FieldKey.AllLines), "Char",
+        var key = new FieldKey(trent, path.Text, FieldKey.AllLines);
+        var edit = ThnFieldGesture.Open(FakeCommandHost.Runner(session), key, "Char",
             text => ThnFieldParse.Of(new ThnText(text)), ThnFieldCommand.Set(trent, path));
 
         edit.Change("é");

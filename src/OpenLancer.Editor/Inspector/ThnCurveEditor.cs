@@ -156,14 +156,15 @@ internal sealed class ThnCurveEditor(EditorWindow window, PropertyGrid grid)
 
     private void Begin(ThnRef ev, int index)
     {
-        if (window.Session is not { } session)
+        if (window.Session == null)
         {
             return;
         }
 
         try
         {
-            drag = CurvePointDrag.Begin(session.Edits, ev, index);
+            // The runner refuses the gesture when the editor takes no edits, and the message is the reason.
+            drag = CurvePointDrag.Begin(window.Commands, ev, index);
             dragged = (ev, index);
         }
         catch (InvalidOperationException e)
@@ -172,16 +173,15 @@ internal sealed class ThnCurveEditor(EditorWindow window, PropertyGrid grid)
         }
     }
 
+    /// <summary>One frame of an open drag. A change that does not apply stops the drag, and the Console tells
+    /// why.</summary>
     private void Move(float time, float value)
     {
-        try
+        if (drag!.Move(time, value) is { } refusal)
         {
-            drag!.Move(time, value);
-        }
-        catch (InvalidOperationException e)
-        {
-            window.Log.Add(ConsoleSeverity.Error, EditController.Source, $"The drag of the curve point stopped: {ErrorText.Of(e)}");
-            drag!.Cancel();
+            window.Log.Add(ConsoleSeverity.Error, EditController.Source,
+                $"The drag of the curve point stopped: {refusal}");
+            drag.Cancel();
             drag = null;
             dragged = null;
         }

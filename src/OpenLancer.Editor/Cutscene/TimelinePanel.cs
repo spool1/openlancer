@@ -683,7 +683,7 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
     /// change of its start or its length.</summary>
     private void BeginDrag(TimelineModel model, Press press, TimelineView view)
     {
-        if (window.Session is not { } session)
+        if (window.Session == null)
         {
             return;
         }
@@ -699,13 +699,9 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
 
         try
         {
-            if (session.NoEditReason is { } reason)
-            {
-                throw new InvalidOperationException(reason);
-            }
-
+            // The runner refuses the gesture when the editor takes no edits, and the message is the reason.
             var snaps = TimelineDrag.SnapPoints(model, events.Select(e => e.Ref), workspace.Transport?.Time ?? 0);
-            drag = TimelineDrag.Begin(session.Edits, events, press.Kind, press.Time, snaps);
+            drag = TimelineDrag.Begin(window.Commands, events, press.Kind, press.Time, snaps);
         }
         catch (Exception e) when (e is InvalidOperationException or ArgumentException)
         {
@@ -716,20 +712,16 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
     /// <summary>Opens a drag of the end handle of the ruler.</summary>
     private void BeginDurationDrag(TimelineModel model, TimelineView view, float left)
     {
-        if (window.Session is not { } session || workspace.Path is not { } path)
+        if (window.Session == null || workspace.Path is not { } path)
         {
             return;
         }
 
         try
         {
-            if (session.NoEditReason is { } reason)
-            {
-                throw new InvalidOperationException(reason);
-            }
-
+            // The runner refuses the gesture when the editor takes no edits, and the message is the reason.
             var snaps = TimelineDrag.SnapPoints(model, [], workspace.Transport?.Time ?? 0);
-            drag = TimelineDrag.BeginDuration(session.Edits, path, model.Duration,
+            drag = TimelineDrag.BeginDuration(window.Commands, path, model.Duration,
                 view.TimeAt(ImGui.GetMousePos().X, left), snaps);
         }
         catch (InvalidOperationException e)
@@ -738,17 +730,15 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
         }
     }
 
-    /// <summary>One frame of an open drag. A change that does not apply stops the drag.</summary>
+    /// <summary>One frame of an open drag. A change that does not apply stops the drag, and the Console tells
+    /// why.</summary>
     private void Step(double time, TimelineView view)
     {
-        try
+        var tolerance = SnapDistance * ImGuiHelper.Scale / view.PixelsPerSecond;
+        if (drag!.Drag(time, ImGui.GetIO().KeyCtrl, tolerance) is { } refusal)
         {
-            drag!.Drag(time, ImGui.GetIO().KeyCtrl, SnapDistance * ImGuiHelper.Scale / view.PixelsPerSecond);
-        }
-        catch (InvalidOperationException e)
-        {
-            window.Log.Add(ConsoleSeverity.Error, EditController.Source, $"The drag stopped: {ErrorText.Of(e)}");
-            drag!.Cancel();
+            window.Log.Add(ConsoleSeverity.Error, EditController.Source, $"The drag stopped: {refusal}");
+            drag.Cancel();
             drag = null;
         }
     }

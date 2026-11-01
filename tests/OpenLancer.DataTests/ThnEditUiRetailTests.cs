@@ -41,6 +41,7 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         var hashBefore = SHA256.HashData(File.ReadAllBytes(baseFile));
         using var ws = new RetailWorkspace(baseFolder, "m8proof");
         var session = ws.Open();
+        var commands = FakeCommandHost.Runner(session);
         var symbols = ThornEvaluator.Instance.Symbols;
         var lower = session.LowerCutscene(S002xe)!;
         var expected = new Expected();
@@ -73,9 +74,9 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         Drag(TimelineDragKind.End, mix, Model().Event(mix.Id)!.End, Model().Event(mix.Id)!.End - 1);
         Done("Change the length of event");
         expected.Change(mix);
-        using (var duration = TimelineDrag.BeginDuration(session, S002xe, W().Duration, W().Duration, []))
+        using (var duration = TimelineDrag.BeginDuration(commands, S002xe, W().Duration, W().Duration, []))
         {
-            duration.Drag(95, false, 0);
+            Assert.Null(duration.Drag(95, false, 0));
             duration.End();
         }
 
@@ -177,9 +178,9 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
 
         // The curve editor and the path keys.
         var zoom = Event(11.281f, "START_CAMERA_PROP_ANIM", "Cam_01_VideoCam_A", "Cam_01_VideoCam_D_Zoom");
-        using (var point = CurvePointDrag.Begin(session, zoom, 1))
+        using (var point = CurvePointDrag.Begin(commands, zoom, 1))
         {
-            point.Move(0.45f, 0.6f);
+            Assert.Null(point.Move(0.45f, 0.6f));
             point.End();
         }
 
@@ -189,8 +190,8 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         var keys = ThnMotionPath.Parse(((ThnText)Value(pathEntity, "pathprops.path_data")!).Value, ThornEvaluator.Instance);
         var pathKey = new FieldKey(pathEntity, ThnMotionPath.Path.Text, 2);
         var keyStart = ThnFieldEdit.Format(ThnKeyKind.Vector, ThnPose.Vector(keys.Keys[1].Point));
-        var keyEdit = new ThnFieldGesture(session, pathKey, keyStart, text => ThnPathKeysEditor.PointParse(keys, 1, text),
-            ThnFieldCommand.Set(pathEntity, ThnMotionPath.Path));
+        var keyEdit = ThnFieldGesture.Open(commands, pathKey, keyStart,
+            text => ThnPathKeysEditor.PointParse(keys, 1, text), ThnFieldCommand.Set(pathEntity, ThnMotionPath.Path));
         keyEdit.Change(PropertyGrid.ComponentText(keyStart, 3, 2, "0.25"));
         Assert.Null(keyEdit.End(keep: true, interactive: true));
         Done("Set pathprops.path_data");
@@ -295,10 +296,10 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         void Drag(TimelineDragKind kind, ThnRef ev, double grab, double to)
         {
             var model = Model();
-            using var drag = TimelineDrag.Begin(session, [model.Event(ev.Id)!], kind, grab,
+            using var drag = TimelineDrag.Begin(commands, [model.Event(ev.Id)!], kind, grab,
                 TimelineDrag.SnapPoints(model, [ev], 0));
             for (var step = 1; step <= 10; step++)
-                drag.Drag(grab + (to - grab) * step / 10, snap: false, tolerance: 0);
+                Assert.Null(drag.Drag(grab + (to - grab) * step / 10, snap: false, tolerance: 0));
             drag.End();
         }
 
@@ -306,7 +307,7 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         void Field(ThnRef target, string path, ThnKeyKind kind, Func<string, string> text, ThnFieldCommand? command = null)
         {
             var start = ThnFieldEdit.Format(kind, Value(target, path));
-            var edit = new ThnFieldGesture(session, new FieldKey(target, path, FieldKey.AllLines), start,
+            var edit = ThnFieldGesture.Open(commands, new FieldKey(target, path, FieldKey.AllLines), start,
                 value => ThnFieldEdit.Parse(kind, value, ThornEvaluator.Instance),
                 command ?? ThnFieldCommand.Set(target, new ThnPath(path)));
             edit.Change(text(start));
