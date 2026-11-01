@@ -758,6 +758,8 @@
     "redo_user_undid": "The user undid this edit: {label}. The agent cannot redo it.",
     "limit_steps": "One batch can have at most {max} steps. Split the batch.",
     "limit_commands": "One call of mission_edit can have at most {max} commands. Split the edit.",
+    "limit_mission_budget": "One call can run at most {max} mission commands. The count includes each command in a command_group at each level. It also includes each command of each mission step of edit_batch. The call changed nothing. Split the edit into more calls.",
+    "limit_mission_inverse": "The inverse of the call has more than {max} mission commands, and one result can give at most {max}. The call changed nothing. Split the edit into more calls.",
     "mission_strict": "The mission tools always refuse an edit that adds an error. Remove reject_new_errors, or set it to true.",
     "mission_other_script": "The trigger {ref} is in another script. Name a trigger of {script}.",
     "mission_other_line": "{ref} is not a line of {item}. Name a line of the same item.",

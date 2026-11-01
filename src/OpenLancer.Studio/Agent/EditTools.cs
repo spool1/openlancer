@@ -50,6 +50,10 @@ internal sealed class EditScope
     /// <summary>The index in <see cref="missionRuns"/> of the first mission request of the step.</summary>
     private int stepMissionStart;
 
+    /// <summary>The mission commands that the requests of the call gave until now, and the mission commands of their
+    /// inverses (see <see cref="CountOf"/>).</summary>
+    private int missionCommands, inverseCommands;
+
     internal EditScope(EditSession session, EditBatch batch, AgentLimits limits)
     {
         Session = session;
@@ -105,15 +109,25 @@ internal sealed class EditScope
     public MissionEditResult RunMission(MissionBatch batch, string field) =>
         RunMission(batch, error => error.Index is { } i
             ? error.Field is { } name ? $"{field}[{i}].{name}" : $"{field}[{i}]"
-            : error.Field ?? field, ownField: true);
+            : error.Field ?? field, ownField: true, commandsField: field);
 
     /// <inheritdoc cref="RunMission(MissionBatch, string)"/>
     /// <param name="fieldOf">The argument of an error that names no argument, for example the argument of the
     /// command at the index of the error. A tool that makes its commands from its arguments uses it.</param>
     /// <param name="ownField">True when <paramref name="fieldOf"/> also names the argument of an error that names a
     /// field of a command.</param>
-    public MissionEditResult RunMission(MissionBatch batch, Func<EditError, string> fieldOf, bool ownField = false)
+    /// <param name="commandsField">The argument that holds the commands, for the error of the budget, or null when the
+    /// tool makes its commands from its arguments.</param>
+    /// <exception cref="EditException">Also <see cref="EditErrorKind.Limit"/> when the call goes above the budget of
+    /// mission commands, or the inverses of the call go above it (user decision of 2026-11-01). The caller cancels the
+    /// batch, so nothing changes.</exception>
+    public MissionEditResult RunMission(MissionBatch batch, Func<EditError, string> fieldOf, bool ownField = false,
+        string? commandsField = null)
     {
+        // The budget counts before the request runs, so a call above it runs no command of the request.
+        missionCommands += batch.Commands.Sum(CountOf);
+        if (missionCommands > AgentLimits.MissionCommands)
+            throw Budget(MissionEditTools.MissionBudget, "limit_mission_budget", commandsField);
         var result = Session.Missions.Apply(batch with
         {
             Origin = EditOrigin.Agent,
@@ -129,10 +143,25 @@ internal sealed class EditScope
                 error = error with { Message = AgentTexts.Error("edit_mission_world_file", ("path", ScriptRef.Parse(file).Path)) };
             throw new EditException(error with { Field = ownField ? fieldOf(error) : error.Field ?? fieldOf(error) });
         }
+        // The result gives the inverse, so the inverse must fit the budget too, as a result must fit its size limit.
+        inverseCommands += result.Inverse is { } inverse ? CountOf(inverse) : 0;
+        if (inverseCommands > AgentLimits.MissionCommands)
+            throw Budget(MissionEditTools.InverseBudget, "limit_mission_inverse", commandsField);
         missionRuns.Add((result.Inverse, result.Rows));
         stepConfirmations.AddRange(result.Asked.Select(a => a.Message).Distinct());
         return result;
     }
+
+    /// <summary>The mission commands of a command: the command itself, and each command of a command group at each
+    /// level.</summary>
+    private static int CountOf(MissionCommand command) =>
+        1 + (command is CommandGroup group ? group.Commands.Sum(CountOf) : 0);
+
+    private static EditException Budget(string detail, string text, string? field) =>
+        new(new EditError(EditErrorKind.Limit, detail, AgentTexts.Error(text, ("max", AgentLimits.MissionCommands)))
+        {
+            Field = field,
+        });
 
     /// <summary>A result with the inverse and the row moves of mission requests, or the result as it is without
     /// mission requests. The row moves are the net moves of all the requests: each line once, with its row before the

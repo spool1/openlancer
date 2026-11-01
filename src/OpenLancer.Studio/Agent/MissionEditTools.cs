@@ -25,6 +25,13 @@ internal static partial class MissionEditTools
     /// <summary>The detail code of a <c>mission_edit</c> call with more commands than the limit.</summary>
     public const string MissionCommands = "MissionCommands";
 
+    /// <summary>The detail code of a call above the budget of mission commands (see
+    /// <see cref="AgentLimits.MissionCommands"/>).</summary>
+    public const string MissionBudget = "MissionBudget";
+
+    /// <summary>The detail code of a call whose inverses have more mission commands than the budget.</summary>
+    public const string InverseBudget = "InverseBudget";
+
     /// <summary>The JSON Schema of a mission batch (section 4.13 of the M6b design), made once at the first use. It has
     /// about 340 definitions, so the tool table does not make it when it loads.</summary>
     private static readonly Lazy<JsonObject> BatchSchema = new(MissionJson.Schema);
@@ -65,7 +72,7 @@ internal static partial class MissionEditTools
                 AgentTexts.Error("mission_strict")) { Field = "options.reject_new_errors" });
         }
         var commands = args.Node("commands")!.AsArray();
-        // A command group counts as one command, so the limit does not count the commands in a group (see docs/MCP.md).
+        // The limit counts the commands of the batch. The budget of the scope also counts the commands in each group.
         if (commands.Count > call.Limits.BatchSteps)
         {
             throw new EditException(new EditError(EditErrorKind.Limit, MissionCommands,

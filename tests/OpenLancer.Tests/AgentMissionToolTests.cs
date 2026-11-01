@@ -339,7 +339,7 @@ public sealed partial class AgentMissionToolTests
     }
 
     /// <summary>The limits of section 8.4 of the MCP1 design: more commands than the limit give limit. A command group
-    /// counts as one command, so the section limit bounds it. A result with an inverse above the size limit gives
+    /// counts as one command of the limit, so the section limit and the budget of the mission commands bound it. A result with an inverse above the size limit gives
     /// limit before the commit. Nothing changes.</summary>
     [Fact]
     public void TheCommandTheSectionAndTheResultLimitsRefuse()
@@ -362,6 +362,56 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal(("limit", "EditSections"), ((string?)sections.Content["code"], (string?)sections.Content["detail"]));
         Assert.Equal(before, m.State());
         Assert.Equal(0, m.Session.Revision);
+    }
+
+    /// <summary>
+    /// One call runs at most 1000 mission commands (user decision of 2026-11-01). The budget counts each command in a
+    /// command group at each level, and each command of each mission step of edit_batch. A call above it gives limit
+    /// with the field of the commands, and nothing changes. The inverses that a call gives must fit the budget too.
+    /// </summary>
+    [Fact]
+    public void OneCallRunsAtMostTheBudgetOfMissionCommands()
+    {
+        var (m, host) = Open();
+        using var _ = m;
+        var before = m.State();
+        static string Group(IEnumerable<string> commands) =>
+            $$"""{ "kind": "command_group", "commands": [ {{string.Join(", ", commands)}} ] }""";
+        static (string?, string?, string?) Of(ToolResult result) =>
+            ((string?)result.Content["code"], (string?)result.Content["detail"], (string?)result.Content["field"]);
+
+        // The outer group, 10 groups in it and 99 commands in each: 1001 commands.
+        var nested = Call(host, "mission_edit", Edit(Group(Enumerable.Range(0, 10).Select(_ => Group(Enumerable.Repeat(Wait9, 99))))));
+        Assert.Equal(("limit", MissionEditTools.MissionBudget, "commands"), Of(nested));
+        Assert.Equal("One call can run at most 1000 mission commands. The count includes each command in a command_group " +
+                     "at each level. It also includes each command of each mission step of edit_batch. The call changed " +
+                     "nothing. Split the edit into more calls.", (string?)nested.Content["message"]);
+        Assert.Equal(before, m.State());
+        Assert.Equal(0, m.Session.Revision);
+
+        // 100 mission steps of 100 commands: the step that goes above the budget names its commands.
+        var step = $$"""{ "tool": "mission_edit", "arguments": {{Edit(Enumerable.Repeat(Wait9, 100).ToArray())}} }""";
+        var steps = Call(host, "edit_batch", $$"""{ "steps": [ {{string.Join(", ", Enumerable.Repeat(step, 100))}} ] }""");
+        Assert.Equal(("limit", MissionEditTools.MissionBudget, "steps[10].arguments.commands"), Of(steps));
+        Assert.Equal(10, (int?)steps.Content["index"]);
+        Assert.Equal(before, m.State());
+        Assert.Equal(0, m.Session.Revision);
+
+        // One command whose inverse removes 1001 new lines and gives back the old line: 1003 commands.
+        var labels = string.Join(", ", Enumerable.Range(0, 1001).Select(i => $$"""{ "key": "label", "texts": [ "ol_label_{{i}}" ] }"""));
+        var setLabels = Edit($$"""{ "kind": "set_item_key", "item": "sec:{{S}}#MsnShip/ol_ship_1", "key": "label", "lines": [ {{labels}} ] }""");
+        foreach (var arguments in new[] { setLabels, setLabels.Insert(1, "\"preview\": true, ") })
+        {
+            var inverse = Call(host, "mission_edit", arguments);
+            Assert.Equal(("limit", MissionEditTools.InverseBudget, "commands"), Of(inverse));
+            Assert.StartsWith("The inverse of the call has more than 1000 mission commands", (string?)inverse.Content["message"]);
+        }
+        Assert.Equal(before, m.State());
+        Assert.Equal(0, m.Session.Revision);
+
+        // A call in the budget runs: the outer group, 10 groups and 98 commands in each are 991 commands.
+        Ok(host, "mission_edit", Edit(Group(Enumerable.Range(0, 10).Select(_ => Group(Enumerable.Repeat(Wait9, 98))))));
+        Assert.Equal("Cnd_Timer = 9", m.Lines("ol_wave")[2]);
     }
 
     /// <summary>The size check of a result counts the inverse, so an edit whose inverse is too large changes

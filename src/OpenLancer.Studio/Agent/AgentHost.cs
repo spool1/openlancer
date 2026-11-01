@@ -56,6 +56,12 @@ public sealed record AgentLimits
     /// <summary>The most steps of one <c>edit_batch</c> call. A batch runs in one frame of the editor.</summary>
     public int BatchSteps { get; init; } = 100;
 
+    /// <summary>The most mission commands that one call runs, and the most mission commands of the inverses that it
+    /// gives (user decision of 2026-11-01). Each command in a command group counts, at each level, and each command of
+    /// each mission step of <c>edit_batch</c>. It is not a setting, because it bounds the time of a call on the thread of
+    /// the session.</summary>
+    public const int MissionCommands = 1000;
+
     /// <summary>The most legs of one route of <c>scene_place_patrol_route</c>. A retail route has at most 12
     /// legs.</summary>
     public int RouteLegs { get; init; } = 50;
