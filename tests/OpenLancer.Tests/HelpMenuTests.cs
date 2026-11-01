@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -144,7 +145,7 @@ public sealed class HelpMenuTests : IDisposable
     {
         var game = Report(GameKind.HdEdition, "0.7.1", Path.Combine(ws.Root, "HD Edition folder"));
 
-        var header = ReportHeader.Text(BuildInfo.Parse($"1.0.0-dev+{Hash}", EngineHash), game,
+        var header = ReportHeader.Text(BuildInfo.Parse($"1.0.0-dev+{Hash}", EngineHash), game, false,
             RuntimeInformation.OSDescription);
 
         Assert.Equal($"OpenLancer 1.0.0-dev\nCommit: {Hash}\nGame: HD Edition 0.7.1\n" +
@@ -157,7 +158,8 @@ public sealed class HelpMenuTests : IDisposable
     {
         var game = Report(GameKind.SourceBuild, "1.1", Path.Combine(ws.Root, "my-own-build"));
 
-        var header = ReportHeader.Text(BuildInfo.Parse("1.0.0-beta.1", null), game, RuntimeInformation.OSDescription);
+        var header = ReportHeader.Text(BuildInfo.Parse("1.0.0-beta.1", null), game, false,
+            RuntimeInformation.OSDescription);
 
         Assert.Contains("\nGame: Source build\n", header);
         Assert.Contains($"\nCommit: {AboutDialog.NoCommit}\n", header);
@@ -171,10 +173,89 @@ public sealed class HelpMenuTests : IDisposable
 
         foreach (var game in new[] { null, notAGame })
         {
-            var header = ReportHeader.Text(BuildInfo.Current, game, RuntimeInformation.OSDescription);
+            var header = ReportHeader.Text(BuildInfo.Current, game, false, RuntimeInformation.OSDescription);
             Assert.Contains($"\nGame: {ReportHeader.NoGame}\n", header);
             AssertPrivate(header, "empty folder");
         }
+    }
+
+    /// <summary>The editor knows the kind and the version of the linked game only after its check. Before the end of
+    /// the check, the header does not say that the profile has no linked game.</summary>
+    [Fact]
+    public void TheHeaderSaysWhenTheCheckOfTheLinkedGameDidNotFinish()
+    {
+        var build = BuildInfo.Current;
+        var system = RuntimeInformation.OSDescription;
+        var game = Report(GameKind.HdEdition, "0.7.1", Path.Combine(ws.Root, "HD Edition folder"));
+        var notAGame = Report(GameKind.NotAGame, null, Path.Combine(ws.Root, "empty folder"));
+
+        Assert.Contains($"\nGame: {ReportHeader.CheckPending}\n", ReportHeader.Text(build, null, true, system));
+        Assert.Contains("\nGame: HD Edition 0.7.1\n", ReportHeader.Text(build, game, true, system));
+        Assert.Contains($"\nGame: {ReportHeader.NoGame}\n", ReportHeader.Text(build, notAGame, true, system));
+    }
+
+    /// <summary>The items of the menu, in their order. A separator comes before Discord and before About
+    /// OpenLancer.</summary>
+    [Fact]
+    public void TheMenuHasTheItemsOfTheIssue()
+    {
+        var items = HelpMenu.Items(BuildInfo.Current, ws.Root);
+
+        Assert.Equal(
+            ["Documentation", "Getting started", "Keys...", "Discord", "Report a problem", "Open log folder",
+                "About OpenLancer..."],
+            items.Select(i => i.Label));
+        Assert.Equal(["Discord", "About OpenLancer..."], items.Where(i => i.StartsGroup).Select(i => i.Label));
+        Assert.All(items, i => Assert.EndsWith(".", i.Tooltip));
+    }
+
+    /// <summary>A click on each item opens its target. Report a problem copies the header with the game of the open
+    /// profile, tells the user in the Console, and then opens the form.</summary>
+    [Fact]
+    public void EachItemOpensItsTarget()
+    {
+        var readme = Path.Combine(ws.Root, HelpLinks.ReadmeFirst);
+        File.WriteAllText(readme, "Start here.");
+        var build = BuildInfo.Parse($"1.0.0-dev+{Hash}", EngineHash);
+        var game = Report(GameKind.HdEdition, "0.7.1", Path.Combine(ws.Root, "HD Edition folder"));
+        var header = ReportHeader.Text(build, game, false, RuntimeInformation.OSDescription);
+
+        var calls = HelpMenu.Items(build, ws.Root).ToDictionary(i => i.Label, i =>
+        {
+            Assert.Null(i.Unavailable);
+            var host = new RecordingHost { Game = game };
+            HelpMenu.Run(i, host, build);
+            return host.Calls;
+        });
+
+        Assert.Equal([$"web {HelpLinks.Repository}/tree/{Hash}/docs"], calls["Documentation"]);
+        Assert.Equal([$"text {Path.GetFullPath(readme)}"], calls["Getting started"]);
+        Assert.Equal(["keys"], calls["Keys..."]);
+        Assert.Equal([$"web {HelpLinks.Discord}"], calls["Discord"]);
+        Assert.Equal([$"copy {header}", $"info {HelpMenu.ReportCopied}", $"web {HelpLinks.ReportForm}"],
+            calls["Report a problem"]);
+        Assert.Equal([$"folder {RunLogs.Folder}"], calls["Open log folder"]);
+        Assert.Equal(["about"], calls["About OpenLancer..."]);
+    }
+
+    [Fact]
+    public void ReportAProblemCopiesTheStateOfAGameCheckThatDidNotFinish()
+    {
+        var build = BuildInfo.Current;
+        var host = new RecordingHost { GameCheckPending = true };
+
+        HelpMenu.Run(HelpMenu.Items(build, ws.Root).Single(i => i.Action == HelpAction.Report), host, build);
+
+        Assert.Equal($"copy {ReportHeader.Text(build, null, true, RuntimeInformation.OSDescription)}", host.Calls[0]);
+        Assert.Contains($"\nGame: {ReportHeader.CheckPending}\n", host.Calls[0]);
+    }
+
+    [Fact]
+    public void GettingStartedIsOffInTheMenuOfABuildWithoutReadmeFirst()
+    {
+        var item = HelpMenu.Items(BuildInfo.Current, ws.Root).Single(i => i.Label == "Getting started");
+
+        Assert.Equal(HelpLinks.NoReadmeFirst, item.Unavailable);
     }
 
     [Fact]
@@ -261,6 +342,30 @@ public sealed class HelpMenuTests : IDisposable
         Assert.DoesNotContain(folderName, header);
         if (Environment.UserName.Length > 2)
             Assert.DoesNotContain(Environment.UserName, header, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The fake editor of <see cref="HelpMenu.Run"/>: it writes each call as a line.</summary>
+    private sealed class RecordingHost : IHelpMenuHost
+    {
+        public List<string> Calls { get; } = [];
+
+        public GameReport? Game { get; init; }
+
+        public bool GameCheckPending { get; init; }
+
+        public void OpenWebLink(string url) => Calls.Add($"web {url}");
+
+        public void OpenTextFile(string path) => Calls.Add($"text {path}");
+
+        public void OpenFolder(string path) => Calls.Add($"folder {path}");
+
+        public void CopyText(string text) => Calls.Add($"copy {text}");
+
+        public void Info(string text) => Calls.Add($"info {text}");
+
+        public void ShowKeys() => Calls.Add("keys");
+
+        public void ShowAbout() => Calls.Add("about");
     }
 
     private static GameReport Report(GameKind kind, string? version, string folder) =>
