@@ -509,5 +509,14 @@ class InternalIdTests(unittest.TestCase):
         self.assertEqual([], found)
 
 
+class ReleaseScriptTests(unittest.TestCase):
+    def test_the_release_script_names_no_folder_of_a_machine(self):
+        """The default work root of tools/release.ps1 is a rule, not a folder of one machine (#57)."""
+        with open(os.path.join(REPO, "tools", "release.ps1"), encoding="utf-8") as f:
+            found = [(n, m.group(0)) for n, line in enumerate(f, 1)
+                     for m in re.finditer(r"(?<![\w$])[A-Za-z]:[\\/][^\s'\"]*", line)]
+        self.assertEqual([], found)
+
+
 if __name__ == "__main__":
     unittest.main()

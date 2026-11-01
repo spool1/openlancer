@@ -26,8 +26,9 @@ release refuses a development version, for example 1.0.0-dev.
 The commit to build. The default is the commit of origin/master.
 
 .PARAMETER WorkRoot
-The folder for the clone and the outputs. It must not be in the repo and its path must not hold the user name or the
-word "decompiled", because the native binaries keep the source paths of the build.
+The folder for the clone and the outputs. The default is the folder olrel at the root of the drive that holds the
+repo. So the default is not on the system drive when the repo is not on it. The work root must not be in the repo. Its
+path must not hold the user name or the word "decompiled". The native binaries keep the source paths of the build.
 
 .PARAMETER DryRun
 A test run. It allows another version than the version of the commit, a development version, texts with marks, a
@@ -54,7 +55,7 @@ Versions and releases:
 param(
     [Parameter(Mandatory = $true)][string]$Version,
     [string]$Commit,
-    [string]$WorkRoot = 'C:\olrel',
+    [string]$WorkRoot,
     [switch]$DryRun,
     [switch]$SkipTests
 )
@@ -63,6 +64,9 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3
 
 $DevRepo = Split-Path -Parent $PSScriptRoot
+# The default work root. The help of -WorkRoot and the preflight messages name this rule.
+$WorkRootRule = 'the folder olrel at the root of the drive that holds the repo'
+if (-not $WorkRoot) { $WorkRoot = Join-Path ([System.IO.Path]::GetPathRoot($DevRepo)) 'olrel' }
 $script:LogFile = $null
 
 function Write-Log([string]$Text) {
@@ -122,14 +126,14 @@ if (-not [Environment]::Is64BitProcess) { throw 'Start the script in 64-bit Powe
 
 $script:Root = [System.IO.Path]::GetFullPath($WorkRoot).TrimEnd('\')
 $devFull = [System.IO.Path]::GetFullPath($DevRepo).TrimEnd('\')
-if ($script:Root.StartsWith($devFull, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "The work root $script:Root is in the repo. Use a folder outside the repo, for example C:\olrel."
+if ($script:Root -eq $devFull -or $script:Root.StartsWith($devFull + '\', [StringComparison]::OrdinalIgnoreCase)) {
+    throw "The work root $script:Root is in the repo. Use a folder outside the repo, for example the default: $WorkRootRule."
 }
 if ($env:USERNAME -and $script:Root.IndexOf($env:USERNAME, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
-    throw "The work root $script:Root holds the user name. The natives keep their source paths. Use C:\olrel."
+    throw "The work root $script:Root holds the user name. The natives keep their source paths. Use the default: $WorkRootRule."
 }
 if ($script:Root.IndexOf('decompiled', [StringComparison]::OrdinalIgnoreCase) -ge 0) {
-    throw "The work root $script:Root holds the word 'decompiled'. Use C:\olrel."
+    throw "The work root $script:Root holds the word 'decompiled'. Use the default: $WorkRootRule."
 }
 
 $src = Join-Path $script:Root 'src'
