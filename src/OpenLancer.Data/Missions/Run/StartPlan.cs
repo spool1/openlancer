@@ -261,11 +261,13 @@ public sealed record StartPlan
     public static string NoTriggerReason(string trigger) =>
         $"The script has no trigger '{trigger}'. Pick a trigger of the script.";
 
-    /// <summary>The warning of a start from a checkpoint, also of an approximate start whose path starts at a
-    /// checkpoint. A saved game of the retail game keeps more than the triggers. The start save keeps only them.</summary>
+    /// <summary>The limit text of a start from a checkpoint, also of an approximate start whose path starts at a
+    /// checkpoint (#8). A saved game of the retail game keeps more than the triggers. The start save keeps only them.
+    /// The Play start page and the tooltip of the Play button of a node show it as a warning.</summary>
     public static string CheckpointStateWarning(string trigger) =>
-        $"A saved game at checkpoint '{trigger}' also keeps the objective, the dock and lane rules, the reputations and " +
-        "other state from before the save. The start save of this play keeps only the triggers, so that state can differ.";
+        $"This version restores only the triggers of checkpoint '{trigger}'. A saved game also keeps the objective, the " +
+        "dock and lane rules, the reputations and other state from before the save. This version does not restore that " +
+        "state.";
 
     /// <summary>The kind of a start: a script without a story slot gives a test script, the mission start and a start
     /// trigger give the mission start, a restore trigger gives a checkpoint, and each other trigger gives an

@@ -169,7 +169,7 @@ Play from a trigger starts the mission in the OpenLancer game at a point of the 
 | Start | Which triggers | What the game gets |
 |---|---|---|
 | Mission start | The start triggers | The mission starts as a new mission. Exact. |
-| Checkpoint {trigger} | The restore trigger of an `Act_Save` line | The triggers of a saved game at that checkpoint. Exact for the triggers. A saved game also keeps the objective, the dock and lane rules, the reputations and other state from before the save. The start save does not keep them, and the Play start page warns about it. |
+| Checkpoint {trigger} | The restore trigger of an `Act_Save` line | The triggers of a saved game at that checkpoint. Exact for the triggers. A saved game also keeps the objective, the dock and lane rules, the reputations and other state from before the save. This version does not restore that state, and the Play start page shows this limit. |
 | {trigger} (approximate) | Each other trigger | The triggers that wait at that point, and two setup triggers that rebuild the state of the path. The setup makes only the objects of the start system. The ships that travel with the player start next to the player. Some state can differ, for example damage or the cargo of a ship. |
 
 ### Set the play start and play
@@ -212,7 +212,9 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 | Advanced > Setup lines | The setup triggers of an approximate start, as read-only raw INI with colors. They are in the test layer of the play, not in the mod. |
 | Play from the play start | Plays the mission from this start in OpenLancer, as F5 in the Mission tab does. The button is off while the start or its start place cannot start, and its tooltip gives the reason. |
 
-A warning shows when no start trigger and no checkpoint leads to the trigger. The play then starts only this trigger. A warning also shows for a checkpoint start and for a start whose path starts at a checkpoint. The start save keeps only the triggers of a saved game. When the start cannot start, the page shows the reason, for example for a script without a story slot.
+A warning shows when no start trigger and no checkpoint leads to the trigger. The play then starts only this trigger. When the start cannot start, the page shows the reason, for example for a script without a story slot.
+
+A checkpoint start, and a start whose path starts at a checkpoint, show the limit of this version as a warning: "This version restores only the triggers of checkpoint '{trigger}'. A saved game also keeps the objective, the dock and lane rules, the reputations and other state from before the save. This version does not restore that state." So after such a start, the objective, the dock and lane rules and the reputations can differ from a saved game of the retail game.
 
 Three warnings are about the start place. They follow the place that you pick:
 

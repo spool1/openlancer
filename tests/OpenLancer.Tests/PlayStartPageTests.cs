@@ -65,6 +65,24 @@ public sealed class PlayStartPageTests
         Assert.Equal("At the Scene camera", Model(new PlayStartSetting("t_restore", "camera")).PlaceText);
     }
 
+    /// <summary>The Play start page of a checkpoint start shows the limit of this version (#56, #8): the start does not
+    /// restore the objective, the locks and the reputations of a saved game. The page of a mission start and of an
+    /// approximate start without a checkpoint on its path does not show it.</summary>
+    [Fact]
+    public void TheLimitTextShowsOnlyForAStartFromACheckpoint()
+    {
+        var checkpoint = Model(new PlayStartSetting("t_restore", "suggested"));
+        var mission = Model(new PlayStartSetting("", "suggested"));
+        var approximate = Model(new PlayStartSetting("t_chosen", "suggested"));
+
+        Assert.Equal(StartKind.Checkpoint, checkpoint.Plan.Kind);
+        Assert.Contains(StartPlan.CheckpointStateWarning("t_restore"), checkpoint.Plan.Warnings);
+        Assert.Equal(StartKind.MissionStart, mission.Plan.Kind);
+        Assert.DoesNotContain(mission.Plan.Warnings, StartPlanTests.IsCheckpointLimit);
+        Assert.Equal(StartKind.Approximate, approximate.Plan.Kind);
+        Assert.DoesNotContain(approximate.Plan.Warnings, StartPlanTests.IsCheckpointLimit);
+    }
+
     /// <summary>The suggested place and the row "Source of the place" (fix of 2026-10-27). The dropdown item of the
     /// suggestion shows the true suggestion also while the user picked a base or the Scene camera. The row shows only for
     /// the suggested place.</summary>

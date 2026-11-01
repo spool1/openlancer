@@ -700,21 +700,30 @@ public sealed class StartPlanTests
     /// <summary>
     /// A saved game keeps more state than the triggers, for example the objective, the dock rules and the reputations.
     /// The start save keeps only the triggers, so a checkpoint start and an approximate start whose path starts at a
-    /// checkpoint warn about it (review fix of M6c-2). A start from a start trigger has no such warning.
+    /// checkpoint show the limit text of this version (review fix of M6c-2, #56). A start from a start trigger has no
+    /// such warning.
     /// </summary>
     [Fact]
     public void ACheckpointStartWarnsThatTheStateOfASavedGameIsNotInTheStart()
     {
         var checkpoint = Plan(Script, "t_restore");
         var fromCheckpoint = Plan(Script, "t_fail");
+        var limit = StartPlan.CheckpointStateWarning("t_restore");
 
-        Assert.Contains(StartPlan.CheckpointStateWarning("t_restore"), checkpoint.Warnings);
+        Assert.Contains(limit, checkpoint.Warnings);
         Assert.Equal(["t_restore", "t_fail"], fromCheckpoint.Path);
-        Assert.Contains(StartPlan.CheckpointStateWarning("t_restore"), fromCheckpoint.Warnings);
-        Assert.DoesNotContain(Plan(Script, "t_chosen").Warnings, w => w.StartsWith("A saved game", StringComparison.Ordinal));
-        Assert.DoesNotContain(Plan(Script, null).Warnings, w => w.StartsWith("A saved game", StringComparison.Ordinal));
-        Assert.Empty(SteLint.Problems(StartPlan.CheckpointStateWarning("t_restore")));
+        Assert.Contains(limit, fromCheckpoint.Warnings);
+        Assert.DoesNotContain(Plan(Script, "t_chosen").Warnings, IsCheckpointLimit);
+        Assert.DoesNotContain(Plan(Script, null).Warnings, IsCheckpointLimit);
+        Assert.Empty(SteLint.Problems(limit));
+        Assert.StartsWith("This version restores only the triggers of checkpoint 't_restore'.", limit, StringComparison.Ordinal);
+        foreach (var state in new[] { "the objective", "the dock and lane rules", "the reputations" })
+            Assert.Contains(state, limit, StringComparison.Ordinal);
     }
+
+    /// <summary>True for the limit text of a checkpoint start, of any checkpoint.</summary>
+    internal static bool IsCheckpointLimit(string warning) =>
+        warning.StartsWith("This version restores only the triggers of checkpoint", StringComparison.Ordinal);
 
     /// <summary>The kind of a start, for the chip of the toolbar and for the plan: one rule.</summary>
     [Fact]

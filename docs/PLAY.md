@@ -204,6 +204,8 @@ The player starts at the start place of the Play start page. The suggestion is w
 
 For an approximate start, the setup triggers make only the world of the start system. The ships that travel with the player start next to the player. The setup starts the triggers that wait at the start after it makes the world. So their lines find the ships of the world. "How the setup builds the world" in [MISSIONS.md](MISSIONS.md) tells the rules.
 
+A checkpoint start restores only the triggers of the checkpoint. This version does not restore the objective, the dock and lane rules and the reputations of a saved game. The Play start page shows this limit for a checkpoint start, and also for a start whose path starts at a checkpoint.
+
 The Console then names the play, for example "OpenLancer plays M02 from Checkpoint t_restore." For an approximate start, a second line says that setup triggers rebuild the state of the path. When the start cannot start, the Console says why. An example is "Play from here is not available: This mission script has no story slot."
 
 A start in space at a point of the plan gets the start check of Play from camera when the Scene shows its system. The start moves out of a planet or a station, and the Console warns about a death zone. When the Scene shows another system, Play checks the start point only for the damage zones of the game data. So the start also moves out of a death zone. The Console then warns that a planet or a station can hold the start point.
