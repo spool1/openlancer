@@ -28,8 +28,10 @@ The commit to build. The default is the commit of origin/master.
 
 .PARAMETER WorkRoot
 The folder for the clone and the outputs. The default is the folder olrel at the root of the drive that holds the
-repo. So the default is not on the system drive when the repo is not on it. The work root must not be in the repo. Its
-path must not hold the user name or the word "decompiled". The native binaries keep the source paths of the build.
+repo. So the default is not on the system drive when the repo is not on it. The native binaries keep the source paths
+of the build. Step 8 refuses a release file that holds the path of the repo, the path of its parent folder, the user
+name or the word "decompiled". So the preflight refuses a work root whose path holds one of these texts, for example a
+folder in the repo or next to the repo. A drive root is not a forbidden path.
 
 .PARAMETER DryRun
 A test run. It allows another version than the version of the commit, a development version, texts with marks, a
@@ -72,8 +74,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3
 
 $DevRepo = Split-Path -Parent $PSScriptRoot
-# The default work root. The help of -WorkRoot and the preflight messages name this rule.
-$WorkRootRule = 'the folder olrel at the root of the drive that holds the repo'
+# The default work root. The help of -WorkRoot names this rule.
 if (-not $WorkRoot) { $WorkRoot = Join-Path ([System.IO.Path]::GetPathRoot($DevRepo)) 'olrel' }
 $script:LogFile = $null
 
@@ -140,15 +141,11 @@ if (-not [Environment]::Is64BitProcess) { throw 'Start the script in 64-bit Powe
 
 $script:Root = [System.IO.Path]::GetFullPath($WorkRoot).TrimEnd('\')
 $devFull = [System.IO.Path]::GetFullPath($DevRepo).TrimEnd('\')
-if ($script:Root -eq $devFull -or $script:Root.StartsWith($devFull + '\', [StringComparison]::OrdinalIgnoreCase)) {
-    throw "The work root $script:Root is in the repo. Use a folder outside the repo, for example the default: $WorkRootRule."
-}
-if ($env:USERNAME -and $script:Root.IndexOf($env:USERNAME, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
-    throw "The work root $script:Root holds the user name. The natives keep their source paths. Use the default: $WorkRootRule."
-}
-if ($script:Root.IndexOf('decompiled', [StringComparison]::OrdinalIgnoreCase) -ge 0) {
-    throw "The work root $script:Root holds the word 'decompiled'. Use the default: $WorkRootRule."
-}
+$python = Find-Tool 'python'
+# The release_check.py next to this script, because the clone does not exist yet. The work-root command refuses a work
+# root that check c would refuse at the end of the run. It prints the paths that check c forbids.
+$devCheck = Join-Path $PSScriptRoot 'release_check.py'
+$sourcePaths = @((Get-NativeOutput $python @('-B', $devCheck, 'work-root', $script:Root, '--repo', $devFull)) -split '\r?\n')
 
 $src = Join-Path $script:Root 'src'
 $publish = Join-Path $script:Root 'publish'
@@ -161,7 +158,6 @@ Set-Content -LiteralPath $script:LogFile -Value "OpenLancer release $Version" -E
 
 $git = Find-Tool 'git'
 $dotnet = Find-Tool 'dotnet'
-$python = Find-Tool 'python'
 $cmakeFolder = Join-Path $env:ProgramFiles 'CMake\bin'
 if (Test-Path -LiteralPath (Join-Path $cmakeFolder 'cmake.exe')) { $env:PATH = "$cmakeFolder;$env:PATH" }
 $cmake = Find-Tool 'cmake'
@@ -200,7 +196,7 @@ if ($buildVersion -ne $Version -and -not $DryRun) {
     Stop-Release "The commit $sha has the version $buildVersion, not $Version. Change src/Directory.Build.props first."
 }
 # The name rule of tools/release_check.py. It also refuses a release of a development version, before the clone.
-$nameArgs = @('-B', (Join-Path $PSScriptRoot 'release_check.py'), 'name', '--version', $buildVersion, '--sha7', $sha7)
+$nameArgs = @('-B', $devCheck, 'name', '--version', $buildVersion, '--sha7', $sha7)
 if ($DryRun) { $nameArgs += '--dry-run' }
 $zipName = Get-NativeOutput $python $nameArgs
 Write-Log "Commit $sha, engine commit $forkSha, version $buildVersion, dry run: $DryRun"
@@ -280,7 +276,7 @@ Invoke-Native $python $docsArgs
 if (-not (Test-Path -LiteralPath $notesOut)) {
     Write-Log "The commit has no release/notes/v$buildVersion.md. The dry run writes no release notes."
 }
-$forbid = @('--forbid', $devFull, '--forbid', (Split-Path -Parent $devFull))
+$forbid = @($sourcePaths | ForEach-Object { '--forbid', $_ })
 Invoke-Native $python (@('-B', $check, 'stage', $stage, '--repo', $src, '--version', $buildVersion) + $forbid)
 
 # ---------------------------------------------------------------------------------------------------------------------

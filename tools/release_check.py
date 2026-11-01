@@ -3,6 +3,9 @@
 Usage:
   python tools/release_check.py name --version <v> --sha7 <commit> [--dry-run]
       Prints the file name of the zip. It refuses a release of a development version (a suffix that starts with "dev").
+  python tools/release_check.py work-root <work root> --repo <dev repo>
+      Prints the paths that check c forbids, one on each line. It refuses a work root that holds a text that check c
+      forbids, because the natives keep the source paths of the build.
   python tools/release_check.py merge <stage> <program>=<publish folder>...
       Merges the publish folders of the programs into the stage folder.
   python tools/release_check.py docs <stage> --repo <clone> --version <v> --commit <sha> --fork-commit <sha>
@@ -27,6 +30,7 @@ import fnmatch
 import glob
 import hashlib
 import json
+import ntpath
 import os
 import posixpath
 import re
@@ -548,8 +552,43 @@ def check_retail(entries, hashes):
             if hashes and content_scan.digests(data) & hashes]
 
 
+def is_drive_root(path):
+    """True for a path that names no folder, for example "X:\\" or "/"."""
+    return re.fullmatch(r"(?:[A-Za-z]:)?[\\/]*", path) is not None
+
+
+def source_paths(repo):
+    """The paths of the dev repo that no release file may hold: the repo and its parent folder. A drive root names no
+    folder, so it is not in the list. Else check c would refuse each native that a build on that drive makes."""
+    repo = repo.rstrip("\\/")
+    parent = ntpath.dirname(repo)
+    return [repo] if is_drive_root(parent) else [repo, parent]
+
+
+def work_root_problems(work_root, repo):
+    """The problems of the work root of tools/release.ps1, before the clone. The natives keep the source paths of the
+    build, and these paths are below the work root. So check c refuses a work root that holds a forbidden text, but
+    only at the end of the run. This check finds the same texts in the path of the work root. It is stricter than
+    check c in two ways. It ignores case, because a build can use the case of the folders on the disk. It also finds
+    the word "decompiled" in a longer word, because a path holds no code names."""
+    root = work_root.rstrip("\\/")
+    key = ntpath.normcase(root) + "\\"
+    if key.startswith(ntpath.normcase(repo.rstrip("\\/")) + "\\"):
+        return [f"the work root {root} is in the repo. Use a folder outside the repo, for example the default work "
+                "root."]
+    data = (key + "|" + key.replace("\\", "/")).encode("utf-8")
+    problems = []
+    for label, text in forbidden_values(source_paths(repo)):
+        patterns = [(l, t, "nocase" if mode == "word" else mode) for l, t, mode in search_patterns([(label, text)])]
+        if find_strings(data, patterns):
+            problems.append(f"the work root {root} holds the {label} '{text}'. The natives keep the source paths of "
+                            "the build, and check c refuses a release file with this text. Use another work root, for "
+                            "example the default work root.")
+    return problems
+
+
 def forbidden_values(extra):
-    """The texts that no release file may hold: the extra texts (the dev repo and its parent folder), the user profile,
+    """The texts that no release file may hold: the extra texts (the source_paths of the dev repo), the user profile,
     the user name, the git e-mail and the word "decompiled". Each value is (label, text)."""
     values = [("path", e) for e in extra if e]
     for label, var in (("user profile", "USERPROFILE"), ("user name", "USERNAME"), ("home", "HOME")):
@@ -840,6 +879,9 @@ def main(argv):
     p.add_argument("--version", required=True)
     p.add_argument("--sha7", required=True)
     p.add_argument("--dry-run", action="store_true")
+    p = sub.add_parser("work-root")
+    p.add_argument("work_root")
+    p.add_argument("--repo", required=True)
     p = sub.add_parser("merge")
     p.add_argument("stage")
     p.add_argument("publishes", nargs="+", metavar="program=folder")
@@ -869,6 +911,12 @@ def main(argv):
         if not problems:
             # The only output is the name, so tools/release.ps1 can read it.
             print(zip_name(args.version, args.dry_run, args.sha7))
+            return 0
+    elif args.command == "work-root":
+        problems = work_root_problems(args.work_root, args.repo)
+        if not problems:
+            # The only output is the paths, so tools/release.ps1 can give them to the checks with --forbid.
+            print("\n".join(source_paths(args.repo)))
             return 0
     elif args.command == "merge":
         pairs = [item.partition("=")[::2] for item in args.publishes]

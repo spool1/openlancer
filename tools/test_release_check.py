@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from unittest import mock
 import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -138,6 +139,74 @@ class VersionTests(unittest.TestCase):
         self.assertEqual(1, code)
         self.assertIn("the version 1.0.0-dev is a development version. Only a dry run can build it.", text)
         self.assertNotIn(".zip", text)
+
+
+class WorkRootTests(unittest.TestCase):
+    """The preflight refuses a work root that check c would refuse at the end of the run (#57). The natives keep the
+    source paths of the build, and these paths are below the work root."""
+
+    REPO = "D:\\src\\openlancer"
+
+    def setUp(self):
+        user = {"USERNAME": "Someone", "USERPROFILE": "X:\\Users\\Someone", "HOME": "X:\\Users\\Someone"}
+        environment = mock.patch.dict(os.environ, user)
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def work_root_command(self, *args):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = rc.main(["work-root", *args])
+        return code, out.getvalue()
+
+    def test_the_forbidden_paths_are_the_repo_and_its_parent_folder(self):
+        self.assertEqual([self.REPO, "D:\\src"], rc.source_paths(self.REPO))
+        self.assertEqual([self.REPO, "D:\\src"], rc.source_paths(self.REPO + "\\"))
+
+    def test_a_drive_root_is_not_a_forbidden_path(self):
+        """A drive root names no folder. As a forbidden path, it refuses each native that a build on the drive makes."""
+        self.assertEqual(["X:\\openlancer"], rc.source_paths("X:\\openlancer"))
+        self.assertEqual(["/openlancer"], rc.source_paths("/openlancer"))
+        self.assertEqual([], rc.work_root_problems("X:\\olrel", "X:\\openlancer"))
+        native = b"x X:\\olrel\\src\\external\\Librelancer\\extern\\imgui\\imgui.h"
+        patterns = rc.search_patterns(rc.forbidden_values(rc.source_paths("X:\\openlancer")))
+        self.assertEqual([], rc.find_strings(native, patterns))
+
+    def test_the_default_and_a_folder_on_another_drive_pass(self):
+        for root in ("D:\\olrel", "E:\\rel", "D:\\other\\olrel"):
+            self.assertEqual([], rc.work_root_problems(root, self.REPO), root)
+
+    def test_a_work_root_in_the_repo_fails(self):
+        for root in (self.REPO, "d:\\SRC\\OpenLancer\\out", self.REPO + "\\"):
+            problems = rc.work_root_problems(root, self.REPO)
+            self.assertEqual(1, len(problems), root)
+            self.assertIn("is in the repo", problems[0])
+
+    def test_a_work_root_next_to_the_repo_fails(self):
+        """The old preflight let a folder next to the repo pass, and check c refused its natives at the end of the run.
+        The preflight ignores case, because the build can use the case of the folders on the disk."""
+        patterns = rc.search_patterns(rc.forbidden_values(rc.source_paths(self.REPO)))
+        for root in ("D:\\src\\openlancer-rel", "D:\\src\\olrel", "d:\\Src\\rel"):
+            problems = rc.work_root_problems(root, self.REPO)
+            self.assertTrue(any("holds the path 'D:\\src'" in p for p in problems), (root, problems))
+            native = f"x {root.upper()}\\SRC\\EXTERN\\IMGUI\\IMGUI.H".encode("utf-8")
+            self.assertTrue(rc.find_strings(native, patterns), root)
+
+    def test_the_user_name_and_the_word_fail(self):
+        for root, label in (("E:\\someone\\rel", "user name"), ("E:\\My Decompiled\\rel", "word"),
+                            ("E:\\decompiledx\\rel", "word")):
+            problems = rc.work_root_problems(root, self.REPO)
+            self.assertTrue(any(f"holds the {label}" in p for p in problems), (root, problems))
+        self.assertEqual([], rc.work_root_problems("E:\\compiled\\rel", self.REPO))
+
+    def test_the_command_prints_only_the_forbidden_paths(self):
+        self.assertEqual((0, "D:\\src\\openlancer\nD:\\src\n"), self.work_root_command("D:\\olrel", "--repo", self.REPO))
+        self.assertEqual((0, "X:\\openlancer\n"), self.work_root_command("X:\\olrel", "--repo", "X:\\openlancer"))
+
+    def test_the_command_refuses_a_work_root_next_to_the_repo(self):
+        code, text = self.work_root_command("D:\\src\\openlancer-rel", "--repo", self.REPO)
+        self.assertEqual(1, code)
+        self.assertIn("the work root D:\\src\\openlancer-rel holds the path 'D:\\src'.", text)
 
 
 class NameAndHashTests(unittest.TestCase):
