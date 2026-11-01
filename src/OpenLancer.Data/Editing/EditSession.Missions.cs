@@ -110,8 +110,11 @@ public sealed partial class EditSession
     /// 20 of the accepted differences of MCP1-3).</summary>
     /// <param name="path">An install path in normal form.</param>
     internal bool HoldsOnlyShipBuilds(string path) =>
-        OpenDocument(path) is not { State.Exists: true } document ||
-        !document.HoldsScript && document.Working.All(s => s.Name.Equals("NPCShipArch", StringComparison.OrdinalIgnoreCase));
+        OpenDocument(path) is not { State.Exists: true } document || !document.HoldsScript && OnlyShipBuilds(document.Working);
+
+    /// <summary>True when each section is an <c>[NPCShipArch]</c> section.</summary>
+    internal static bool OnlyShipBuilds(IEnumerable<Section> sections) =>
+        sections.All(s => s.Name.Equals("NPCShipArch", StringComparison.OrdinalIgnoreCase));
 
     private (int Revision, HashSet<string> Files)? shipBuildFiles;
 

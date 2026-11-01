@@ -258,6 +258,65 @@ public sealed class MissionGuardTests
         m.Apply(new SetItemKey(mission, "reward", [LineSpec.Raw("reward", "500")]));
     }
 
+    /// <summary>
+    /// A ship build file has only [NPCShipArch] sections (item 20 of the user decisions of 2026-11-01 of MCP1-3). So a
+    /// command that puts another section into the ship build file of a script refuses with NotShipBuildFile, also in a
+    /// command group and in a new ship build file, and nothing changes. A new script cannot take the place of a ship
+    /// build file that a script names either. The file stays in the guard of the mission files, so the inverse of an
+    /// edit of the file reverts the edit through the mission commands.
+    /// </summary>
+    [Fact]
+    public void ACommandCannotPutAnotherSectionIntoTheShipBuildFileOfAScript()
+    {
+        const string newShips = @"DATA\MISSIONS\OL_TEST\ol_new_ships.ini";
+        using var m = Create();
+        var ships = new ScriptRef(Ships);
+        var room = new AddSection(ships, "Room", [LineSpec.Raw("nickname", "ol_room")]);
+        var trigger = new AddSection(ships, "Trigger", [LineSpec.Of("Cnd_True")]);
+        var restored = new RestoreSection(ships, 0, new RawSection("Room", [new RawEntry("nickname", ["ol_room"])]));
+        var build = new AddItem(TestScript, "ship_build") { Nickname = "ol_build_2" };
+        var before = m.State();
+
+        var error = m.Refuse(room, MissionErrors.NotShipBuildFile);
+        Assert.Equal(EditErrorKind.InvalidValue, error.Kind);
+        Assert.Equal($"{Ships} is the ship build file of {Script}. A ship build file has only [NPCShipArch] sections, so " +
+                     "it cannot get a [Room] section. Put the section in another file.", error.Message);
+        m.Refuse(trigger, MissionErrors.NotShipBuildFile);
+        m.Refuse(restored, MissionErrors.NotShipBuildFile);
+        m.Refuse(new CommandGroup([build, room]), MissionErrors.NotShipBuildFile);
+        m.Refuse(new CommandGroup([new CommandGroup([build, restored])]), MissionErrors.NotShipBuildFile);
+        var batch = m.Missions.Apply(new MissionBatch("Room", [build, room]));
+        Assert.Equal((EditStatus.Refused, MissionErrors.NotShipBuildFile, 1),
+            (batch.Status, batch.Errors[0].Detail, batch.Errors[0].Index));
+        // A new ship build file gets the same check after the command that makes it.
+        var mission = ItemRef.Of(Script, "Mission", null);
+        var newFile = m.Missions.Apply(new MissionBatch("New file",
+        [
+            new SetItemKey(mission, "npc_ship_file", [LineSpec.Raw("npc_ship_file", @"missions\ol_test\ol_new_ships.ini")]),
+            build,
+            new AddSection(new ScriptRef(newShips), "Room", [LineSpec.Raw("nickname", "ol_room")]),
+        ]));
+        Assert.Equal((EditStatus.Refused, MissionErrors.NotShipBuildFile, 2),
+            (newFile.Status, newFile.Errors[0].Detail, newFile.Errors[0].Index));
+        var script = m.Missions.Apply(new MissionBatch("New script",
+        [
+            new SetItemKey(mission, "npc_ship_file", [LineSpec.Raw("npc_ship_file", @"missions\ol_test\ol_new_ships.ini")]),
+            new CreateScript(newShips),
+        ]));
+        Assert.Equal((EditStatus.Refused, MissionErrors.NotShipBuildFile, 1),
+            (script.Status, script.Errors[0].Detail, script.Errors[0].Index));
+        Assert.Equal(before, m.State());
+        Assert.Empty(m.Session.EditedPaths);
+        Assert.False(m.Session.CanUndo);
+        Assert.True(m.Session.IsGuardedMissionFile(Ships));
+
+        // A build is a correct section, and the inverse of its add takes it out again through the mission commands.
+        var added = m.Apply(new AddSection(ships, "NPCShipArch", [LineSpec.Raw("nickname", "ol_build_2")]));
+        Assert.True(m.Session.IsGuardedMissionFile(Ships));
+        m.Apply(added.Inverse!);
+        Assert.Equal(before, m.State());
+    }
+
     [Fact]
     public void ALineOfABuildOfTheSharedShipBuildFileNeedsAConfirmation()
     {

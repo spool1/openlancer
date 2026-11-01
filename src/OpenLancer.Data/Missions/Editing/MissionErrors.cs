@@ -384,6 +384,14 @@ public static class MissionErrors
             @"data of the game can use its sections. Name a file in a folder under DATA\MISSIONS outside the encounters " +
             "folder, with only [NPCShipArch] sections. Or name a new file.");
 
+    /// <summary>A command puts a section other than <c>[NPCShipArch]</c> into the ship build file of a script (item 20
+    /// of the user decisions of 2026-11-01 of MCP1-3). The code is the code of a bad <c>npc_ship_file</c> value, because
+    /// the line of the script would then name a file that is not a ship build file.</summary>
+    internal static EditError ShipBuildSectionError(string script, string file, string type) =>
+        new(EditErrorKind.InvalidValue, NotShipBuildFile,
+            $"{file} is the ship build file of {script}. A ship build file has only [NPCShipArch] sections, so it cannot " +
+            $"get a [{type}] section. Put the section in another file.");
+
     internal static EditError PathInUseError(string path) =>
         new(EditErrorKind.NameTaken, PathInUse,
             $"The editor cannot make a script at {path}, because the edit view already has a file at this path. Pick " +

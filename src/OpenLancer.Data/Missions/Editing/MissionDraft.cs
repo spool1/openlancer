@@ -124,6 +124,10 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     /// a file is a new ship build file. A line that names the same file as before the batch is not checked again. The
     /// plan command calls it after each command, and a command group after each of its commands.
     /// </summary>
+    /// <remarks>It also refuses a command that puts a section other than <c>[NPCShipArch]</c> into the ship build file
+    /// of a script (item 20 of the user decisions of 2026-11-01). Such a file would leave the guard of the mission
+    /// files, and the inverse could not change it back. A file that had another section before the batch, for example
+    /// a script, is not checked again.</remarks>
     /// <exception cref="EditException"><c>NotShipBuildFile</c>.</exception>
     public void CheckShipBuildFiles()
     {
@@ -134,7 +138,24 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
                 continue;
             throw Refuse(MissionErrors.NotShipBuildFileError(path, Session.OpenDocument(file)?.Path ?? file));
         }
+        foreach (var (path, document) in Touched)
+        {
+            if (Session.HoldsOnlyShipBuilds(path) ||
+                Before.TryGetValue(path, out var before) && before.Exists && !EditSession.OnlyShipBuilds(before.Working) ||
+                ScriptNaming(path) is not { } script)
+                continue;
+            var type = document.Working.First(s => !s.Name.Equals("NPCShipArch", StringComparison.OrdinalIgnoreCase)).Name;
+            throw Refuse(MissionErrors.ShipBuildSectionError(script, document.Path, type));
+        }
     }
+
+    /// <summary>A script of W whose <c>npc_ship_file</c> line names a file, or null. It reads the scripts of the scan
+    /// and the scripts that the batch changed.</summary>
+    private string? ScriptNaming(string path) =>
+        Editor.ScriptPaths().Concat(Touched.Values.Where(d => d.HoldsScript).Select(d => d.Path))
+            .Distinct(VfsPath.Comparer)
+            .FirstOrDefault(p => !VfsPath.Comparer.Equals(p, path) && Session.OpenDocument(p) is { State.Exists: true } &&
+                                 VfsPath.Comparer.Equals(Session.ShipBuildFileOf(p), path));
 
     /// <summary>True for a file that the <c>npc_ship_file</c> line of a script can name (see
     /// <see cref="CheckShipBuildFiles"/>).</summary>
