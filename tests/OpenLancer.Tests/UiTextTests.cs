@@ -5,36 +5,50 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Prefabs;
-using OpenLancer.Editor;
-using OpenLancer.Studio.Commands;
 using Xunit;
 
 namespace OpenLancer.Tests;
 
 /// <summary>
 /// No UI text names an internal milestone (#56). A modder cannot know the IDs of the roadmap, so a text gives a plain
-/// reason instead. The test reads the texts of the editor, of the data layer and of the command layer: each string
-/// literal of their IL, each const string, each string argument of a custom attribute, and each string value of their
-/// embedded JSON files.
+/// reason instead. The test reads the texts of each product assembly: the editor, the game, oltool and the layers
+/// below them. It reads each string literal of their IL, each const string and each string argument of a custom
+/// attribute. It also reads the string values of their embedded JSON files and the texts of their embedded INI files.
 /// </summary>
-/// <remarks>The command layer is in the scan because it holds the refusal texts of the Inspector fields. The texts of
-/// all three assemblies are in the scan, not only the texts that a view shows. A text that no view shows can still
-/// get to the Console or to an agent.</remarks>
+/// <remarks>The scan reads all texts of each assembly, not only the texts that a view shows. A text that no view shows
+/// can still get to the Console, to the command line or to an agent.</remarks>
 public sealed class UiTextTests
 {
+    /// <summary>The assembly of each project under <c>src</c>.</summary>
     private static readonly Assembly[] Scanned =
-        [typeof(EditorWindow).Assembly, typeof(MissionChecks).Assembly, typeof(FieldBinding).Assembly];
+    [
+        .. new[]
+        {
+            "OpenLancer.Editor", "OpenLancer.Studio", "OpenLancer.Data", "OpenLancer.Runtime", "OpenLancer.Play",
+            "OpenLancer.Mcp", "oltool",
+        }.Select(Assembly.Load),
+    ];
 
-    /// <summary>The JSON keys whose values are not UI texts: the record of a fact, the story slot of a script and the
-    /// path of a file.</summary>
-    private static readonly HashSet<string> SkippedKeys = ["evidence", "slot", "path"];
+    /// <summary>The JSON key whose values are not UI texts in each file: the record of a fact.</summary>
+    private static readonly HashSet<string> SkippedKeys = ["evidence"];
+
+    /// <summary>The keys of a row of the story slot table whose values are data, not UI texts. These are the name of the
+    /// slot, for example M11, and the path of its script.</summary>
+    private static readonly HashSet<string> StorySlotKeys = ["slot", "path"];
+
+    /// <summary>The keys of an embedded INI file whose values the editor shows. A built-in prefab has its name, its
+    /// help, its labels and the text of what it writes in these keys.</summary>
+    private static readonly HashSet<string> IniTextKeys =
+        new(StringComparer.OrdinalIgnoreCase) { "name", "help", "label", "writes" };
 
     private const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance |
                                      BindingFlags.Static | BindingFlags.DeclaredOnly;
 
-    /// <summary>The texts of the scan. The scan reads the IL of three assemblies, so the facts share one read.</summary>
+    /// <summary>The texts of the scan. The scan reads the IL of each product assembly, so the facts share one
+    /// read.</summary>
     private static readonly Lazy<List<Text>> ScannedTexts = new(() => Texts().ToList());
 
     [Fact]
@@ -108,6 +122,20 @@ public sealed class UiTextTests
             $"The scan reads no text of the kind {kind}."));
     }
 
+    /// <summary>The scan reads the assembly of each project under <c>src</c>, so a new project cannot go out of the
+    /// scan.</summary>
+    [Fact]
+    public void TheScanReadsEachProductAssembly()
+    {
+        var projects = Directory.GetDirectories(RepoFiles.Of("src"))
+            .SelectMany(folder => Directory.GetFiles(folder, "*.csproj"))
+            .Select(project => XDocument.Load(project).Descendants("AssemblyName").FirstOrDefault()?.Value ??
+                               Path.GetFileNameWithoutExtension(project));
+
+        Assert.Equal(projects.Order(StringComparer.Ordinal),
+            Scanned.Select(a => a.GetName().Name!).Order(StringComparer.Ordinal));
+    }
+
     /// <summary>The scan reads each embedded JSON file of the scanned assemblies. These files hold labels and help
     /// texts of the editor, and the texts of the agent tools.</summary>
     [Theory]
@@ -119,20 +147,54 @@ public sealed class UiTextTests
         Assert.Contains(ScannedTexts.Value,
             t => t.Kind == TextKind.Json && t.Where.StartsWith(resource + ".", StringComparison.Ordinal));
 
-    /// <summary>The JSON scan reads each string value. It leaves out the comment keys and the keys whose values are not
-    /// UI texts.</summary>
+    /// <summary>The JSON scan reads each string value. It leaves out the comment keys and the evidence. It leaves out
+    /// the slot and the path only in a row of the story slot table.</summary>
     [Fact]
     public void TheJsonScanLeavesOutTheCommentsAndTheSkippedKeys()
     {
         using var document = JsonDocument.Parse("""
             {
               "// about": "milestone M27",
-              "slots": [ { "slot": "M11", "path": "DATA\\M27\\a.ini", "label": "First" } ],
-              "rows": [ { "evidence": "GA1 row 3", "texts": [ "Second", 3 ] } ]
+              "storySlots": [ { "slot": "M11", "path": "MISSIONS\\M27.ini", "label": "First", "notes": [ "Second" ] } ],
+              "rows": [ { "evidence": "GA1 row 3", "slot": "Third", "path": "Fourth", "texts": [ "Fifth", 3 ] } ]
             }
             """);
 
-        Assert.Equal(["First", "Second"], JsonTexts("sample", document.RootElement).Select(t => t.Value));
+        Assert.Equal(["First", "Second", "Third", "Fourth", "Fifth"],
+            JsonTexts("sample", document.RootElement).Select(t => t.Value));
+    }
+
+    /// <summary>A "path" key outside the story slot table can be a help text. An example is the help of the path
+    /// argument of the agent tool create_script. The scan reads it.</summary>
+    [Fact]
+    public void TheScanReadsTheHelpOfAPathArgument() =>
+        Assert.Contains(ScannedTexts.Value, t => t.Kind == TextKind.Json &&
+            t.Where == "OpenLancer.Studio.Agent.agent-tools.json.mission_commands.create_script.fields.path");
+
+    /// <summary>The INI scan reads the values of the text keys. It leaves out the comments, the section headers and the
+    /// other keys, for example an id.</summary>
+    [Fact]
+    public void TheIniScanReadsOnlyTheTextKeys()
+    {
+        string[] lines =
+        [
+            "; milestone M27", "[Prefab]", "id = M27", "name = First", "help = Second, with = in it", "[Field]",
+            "label = Third", "kind = M11", "writes = Fourth",
+        ];
+
+        Assert.Equal(["First", "Second, with = in it", "Third", "Fourth"], IniTexts("sample", lines).Select(t => t.Value));
+    }
+
+    /// <summary>The scan reads each built-in prefab file. The prefab library and the Inspector show its texts.</summary>
+    [Fact]
+    public void TheScanReadsEachPrefabFile()
+    {
+        var prefabs = typeof(MissionChecks).Assembly.GetManifestResourceNames()
+            .Where(n => n.EndsWith(".ini", StringComparison.Ordinal)).ToList();
+
+        Assert.NotEmpty(prefabs);
+        Assert.All(prefabs, name => Assert.Contains(ScannedTexts.Value,
+            t => t.Kind == TextKind.Ini && t.Where.StartsWith(name + ":", StringComparison.Ordinal)));
     }
 
     /// <summary>The walker finds each form of a string literal of <see cref="LiteralSample"/>, and gives each one to the
@@ -172,6 +234,13 @@ public sealed class UiTextTests
                 using var stream = assembly.GetManifestResourceStream(name)!;
                 using var document = JsonDocument.Parse(stream);
                 foreach (var text in JsonTexts(name, document.RootElement))
+                    yield return text;
+            }
+
+            foreach (var name in assembly.GetManifestResourceNames().Where(n => n.EndsWith(".ini", StringComparison.Ordinal)))
+            {
+                using var reader = new StreamReader(assembly.GetManifestResourceStream(name)!);
+                foreach (var text in IniTexts(name, reader.ReadToEnd().Split('\n')))
                     yield return text;
             }
         }
@@ -218,16 +287,29 @@ public sealed class UiTextTests
         _ => [],
     };
 
-    /// <summary>Each string value of a JSON element, without the comment keys ("// ...") and the skipped keys.</summary>
-    private static IEnumerable<Text> JsonTexts(string where, JsonElement element) => element.ValueKind switch
-    {
-        JsonValueKind.String => [new Text(TextKind.Json, where, element.GetString()!)],
-        JsonValueKind.Array => element.EnumerateArray().SelectMany((item, i) => JsonTexts($"{where}[{i}]", item)),
-        JsonValueKind.Object => element.EnumerateObject()
-            .Where(p => !p.Name.StartsWith("// ", StringComparison.Ordinal) && !SkippedKeys.Contains(p.Name))
-            .SelectMany(p => JsonTexts($"{where}.{p.Name}", p.Value)),
-        _ => [],
-    };
+    /// <summary>Each string value of a JSON element, without the comment keys ("// ...") and the skipped keys. A row of
+    /// the table <c>storySlots</c> also leaves out <see cref="StorySlotKeys"/>.</summary>
+    /// <param name="rowSkips">The keys that the objects of this element leave out, or null.</param>
+    private static IEnumerable<Text> JsonTexts(string where, JsonElement element, HashSet<string>? rowSkips = null) =>
+        element.ValueKind switch
+        {
+            JsonValueKind.String => [new Text(TextKind.Json, where, element.GetString()!)],
+            JsonValueKind.Array => element.EnumerateArray()
+                .SelectMany((item, i) => JsonTexts($"{where}[{i}]", item, rowSkips)),
+            JsonValueKind.Object => element.EnumerateObject()
+                .Where(p => !p.Name.StartsWith("// ", StringComparison.Ordinal) && !SkippedKeys.Contains(p.Name) &&
+                            rowSkips?.Contains(p.Name) != true)
+                .SelectMany(p => JsonTexts($"{where}.{p.Name}", p.Value, p.Name == "storySlots" ? StorySlotKeys : null)),
+            _ => [],
+        };
+
+    /// <summary>The value of each line of an INI text whose key is in <see cref="IniTextKeys"/>.</summary>
+    private static IEnumerable<Text> IniTexts(string where, IEnumerable<string> lines) =>
+        from line in lines.Select((text, i) => (Text: text.Trim(), Number: i + 1))
+        where !line.Text.StartsWith(';') && !line.Text.StartsWith('[')
+        let parts = line.Text.Split('=', 2)
+        where parts.Length == 2 && IniTextKeys.Contains(parts[0].Trim())
+        select new Text(TextKind.Ini, $"{where}:{line.Number} {parts[0].Trim()}", parts[1].Trim());
 
     private enum TextKind
     {
@@ -235,6 +317,7 @@ public sealed class UiTextTests
         Const,
         Attribute,
         Json,
+        Ini,
     }
 
     /// <summary>A text of the scan: its kind, where it is and its value.</summary>
@@ -248,7 +331,7 @@ public sealed class UiTextTests
 /// </summary>
 /// <remarks>Each ID is a whole word with the case of the roadmap, so "m11.ini" has no ID. An ID between two path
 /// separators is a folder of a path, for example in <c>DATA\MISSIONS\M11\m11.ini</c>. A text that is exactly a rule ID
-/// of the mission checks or of the prefab checks passes, because a rule ID is data, not prose.</remarks>
+/// of the mission checks or of the prefab checks passes. A rule ID is data, not prose.</remarks>
 internal sealed partial class MilestoneText
 {
     private readonly Regex ids;
@@ -302,9 +385,9 @@ internal sealed partial class MilestoneText
 }
 
 /// <summary>
-/// A type with a string literal in each form that the walker of <see cref="UiTextTests"/> reads: a direct text, an
-/// interpolated text, a text in a lambda, a field initializer, a const and an attribute argument. The test of the walker
-/// reads it.
+/// A type with a string literal in each form that the walker of <see cref="UiTextTests"/> reads. The forms are a direct
+/// text, an interpolated text, a text in a lambda, a field initializer, a const and an attribute argument. The test of
+/// the walker reads this type.
 /// </summary>
 [System.ComponentModel.Description("a text of an attribute")]
 internal static class LiteralSample

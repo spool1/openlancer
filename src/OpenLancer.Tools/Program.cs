@@ -110,7 +110,7 @@ internal static class Program
                                             same tables, with exact numbers and key order, and that the text is a fixed
                                             point. Exit 1 on a difference. Each problem names the first different value.
 
-        Agent server (milestone MCP1):
+        Agent server:
         """ + "\n" + McpCommands.Usage + "\n\n" + """
         Exit codes: 0 = OK, 1 = the data has problems, 2 = the command could not run (wrong arguments, files, folders).
         """;

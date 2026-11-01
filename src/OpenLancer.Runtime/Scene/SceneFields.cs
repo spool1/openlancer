@@ -116,7 +116,7 @@ public static class SceneFields
     public static IReadOnlyList<SceneField> Rows { get; } =
     [
         // [Object]: GetSystemObject (GameItemDb.cs:2583-2668).
-        Locked(SceneSection.Object, "nickname", "GameItemDb.cs:2587. Rename (F2) in the Hierarchy changes it (milestone M3)."),
+        Locked(SceneSection.Object, "nickname", "GameItemDb.cs:2587. Rename (F2) in the Hierarchy changes it."),
         Row(SceneSection.Object, "pos", SceneEffect.Transform, "GameItemDb.cs:2591"),
         Row(SceneSection.Object, "rotate", SceneEffect.Transform, "GameItemDb.cs:2633-2636"),
         Row(SceneSection.Object, "archetype", DataReinit | SceneEffect.Label | SceneEffect.Lanes,
@@ -155,7 +155,7 @@ public static class SceneFields
         Row(SceneSection.Object, "size", SceneEffect.None, "SystemPart.size exists, but GetSystemObject does not read it."),
 
         // [Zone]: InitSystems (GameItemDb.cs:1601-1676).
-        Locked(SceneSection.Zone, "nickname", "GameItemDb.cs:1603. Rename (F2) in the Hierarchy changes it (milestone M3)."),
+        Locked(SceneSection.Zone, "nickname", "GameItemDb.cs:1603. Rename (F2) in the Hierarchy changes it."),
         Row(SceneSection.Zone, "pos", SceneEffect.Transform, "GameItemDb.cs:1610"),
         Row(SceneSection.Zone, "rotate", SceneEffect.Transform, "GameItemDb.cs:1647-1661"),
         Row(SceneSection.Zone, "size", SceneEffect.Transform | SceneEffect.Volume,
@@ -164,12 +164,9 @@ public static class SceneFields
             "size of a box, so SceneApplier adds Roles only when the size changes that rule for the zone."),
         Row(SceneSection.Zone, "shape", SceneEffect.Transform | SceneEffect.Roles | SceneEffect.Volume,
             "GameItemDb.cs:1663. The ring swap depends on the shape, and Zone.cs:660-666 gives the roles."),
-        LockedRow(SceneSection.Zone, "encounter", DataRoles,
-            "GameItemDb.cs:1637. A linked group (SectionKeys.cs:74): a later milestone edits the group."),
-        LockedRow(SceneSection.Zone, "faction", DataRoles,
-            "GameItemDb.cs:1637. A linked group (SectionKeys.cs:74): a later milestone edits the group."),
-        LockedRow(SceneSection.Zone, "faction_weight", DataRoles,
-            "GameItemDb.cs:1637. A linked group (SectionKeys.cs:74): a later milestone edits the group."),
+        LockedRow(SceneSection.Zone, "encounter", DataRoles, EncounterEvidence),
+        LockedRow(SceneSection.Zone, "faction", DataRoles, EncounterEvidence),
+        LockedRow(SceneSection.Zone, "faction_weight", DataRoles, EncounterEvidence),
         Row(SceneSection.Zone, "path_label", DataRoles, "GameItemDb.cs:1634, Zone.cs:660-666"),
         Row(SceneSection.Zone, "lane_id", SceneEffect.Data,
             "GameItemDb.cs:1620. The retail game does not read it (decision D513), so the zone roles do not use it."),
@@ -210,7 +207,7 @@ public static class SceneFields
 
         // [LightSource]: InitSystems (GameItemDb.cs:1466-1516).
         Locked(SceneSection.LightSource, "nickname",
-            "GameItemDb.cs:1516. Rename (F2) in the Hierarchy changes it (milestone M3)."),
+            "GameItemDb.cs:1516. Rename (F2) in the Hierarchy changes it."),
         Row(SceneSection.LightSource, "pos", SceneEffect.Transform, "GameItemDb.cs:1483-1490"),
         Row(SceneSection.LightSource, "color", SceneEffect.Light, "GameItemDb.cs:1472-1481"),
         Row(SceneSection.LightSource, "range", SceneEffect.Light, "GameItemDb.cs:1492-1500"),
@@ -262,9 +259,10 @@ public static class SceneFields
         Row(SceneSection.Asteroids, "file", SceneEffect.None, FileEvidence),
 
         // The [system] section of universe.ini (GameItemDb.cs:1393-1416).
-        Locked(SceneSection.UniverseSystem, "nickname", "GameItemDb.cs:1404. A rename is a later milestone."),
+        Locked(SceneSection.UniverseSystem, "nickname", "GameItemDb.cs:1404. The editor does not rename a system."),
         Locked(SceneSection.UniverseSystem, "file",
-            "GameItemDb.cs:1398. A change of the file moves all contents of the system, which is a later milestone."),
+            "GameItemDb.cs:1398. A change of the file moves all contents of the system, so the Inspector cannot " +
+            "change it."),
         Row(SceneSection.UniverseSystem, "strid_name", DataLabel,
             "GameItemDb.cs:1402. The window title, the status bar, the system list and the Hierarchy show the name."),
         Row(SceneSection.UniverseSystem, "navmapscale", SceneEffect.Data, "GameItemDb.cs:1416. The Sector row reads it."),
@@ -279,6 +277,9 @@ public static class SceneFields
     private const string FileEvidence =
         "Schema/Universe/Nebula.cs:38-45 and AsteroidField.cs:39-46 read the file when the universe loads. The Scene " +
         "shows another file when the system opens again after the save.";
+
+    private const string EncounterEvidence =
+        "GameItemDb.cs:1637. A linked group (SectionKeys.cs:74), so the Inspector cannot edit one of its keys.";
 
     private const string PreloadEvidence =
         "GameItemDb.cs:1423-1455. A section without a key entry, so a patch cannot find it (PatchWriter.cs:146-152).";
