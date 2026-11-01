@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using OpenLancer.Data.Missions.Editing;
 
 namespace OpenLancer.Studio.Agent;
 
@@ -20,11 +21,15 @@ internal sealed record ResourceTexts(string Name, string Title, string Descripti
 internal sealed record PromptTexts(string Title, string Description, IReadOnlyList<(string Name, string Help)> Arguments,
     IReadOnlyList<string> Text);
 
+/// <summary>The help of one mission command of the input schema of <c>mission_edit</c>.</summary>
+/// <param name="Fields">The help of the fields of this command only, by JSON name.</param>
+internal sealed record MissionCommandTexts(string Description, IReadOnlyDictionary<string, string> Fields);
+
 /// <summary>
 /// The texts of the agent tools in <c>agent-tools.json</c> (decision D726 of the MCP1 design): the server
 /// instructions, the title and the description of each tool, the help of each argument, the texts of the host errors,
-/// the texts of the resources and the texts of the prompts. A unit test checks each text with the STE rules of
-/// AGENTS.md. The texts use invented
+/// the texts of the resources, the texts of the prompts and the help of the mission commands. A unit test checks each
+/// text with the STE rules of AGENTS.md. The texts use invented
 /// names only, so no retail text gets into the repository.
 /// </summary>
 internal static class AgentTexts
@@ -37,7 +42,9 @@ internal static class AgentTexts
         IReadOnlyDictionary<string, string> Fields,
         IReadOnlyDictionary<string, ToolTexts> Tools, IReadOnlyDictionary<string, string> Errors,
         IReadOnlyDictionary<string, ResourceTexts> Resources, IReadOnlyDictionary<string, PromptTexts> Prompts,
-        IReadOnlyDictionary<string, string> Results);
+        IReadOnlyDictionary<string, string> Results, IReadOnlyDictionary<string, string> MissionFields,
+        IReadOnlyDictionary<string, MissionCommandTexts> MissionCommands,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> MissionParts);
 
     /// <summary>The server instructions: the order of work in short STE steps (section 9.2 of the MCP1 design). The
     /// group <c>all</c> is for each host, <c>edit</c> for a host with edit tools, and <c>read_only</c> for a host
@@ -73,6 +80,40 @@ internal static class AgentTexts
     /// <summary>The help of the properties of the results, by JSON name, or by the type name and the JSON name, for
     /// example <c>RawLineMark.line</c>.</summary>
     public static IReadOnlyDictionary<string, string> Results => Loaded.Value.Results;
+
+    /// <summary>The help of the fields that many mission commands share, by JSON name (section 9.1 of the MCP1
+    /// design).</summary>
+    public static IReadOnlyDictionary<string, string> MissionFields => Loaded.Value.MissionFields;
+
+    /// <summary>The help of each mission command of the input schema of <c>mission_edit</c>, by kind, for example
+    /// <c>add_trigger</c>.</summary>
+    public static IReadOnlyDictionary<string, MissionCommandTexts> MissionCommands => Loaded.Value.MissionCommands;
+
+    /// <summary>The help of the fields of the objects in the mission commands, by type name and then by JSON name, for
+    /// example <c>RowRef</c> and <c>expect_key</c>. The type <c>MissionCommand</c> gives the help of the field
+    /// <c>kind</c> of each command.</summary>
+    public static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> MissionParts => Loaded.Value.MissionParts;
+
+    /// <summary>
+    /// The help of a type of the mission commands, or of one of its JSON fields, for the input schema of
+    /// <c>mission_edit</c> (see <c>MissionJson.Schema</c>). A command type gives the description of its command without a
+    /// field, and the help of the command, else the shared help, for a field. Another type gives the help of
+    /// <see cref="MissionParts"/>. Null when the file has no help.
+    /// </summary>
+    public static string? MissionHelp(Type type, string? field)
+    {
+        if (type != typeof(MissionCommand) &&
+            typeof(MissionCommand).IsAssignableFrom(type))
+        {
+            if (!MissionCommands.TryGetValue(MissionJson.KindOf(type), out var command))
+                return null;
+            return field == null ? command.Description
+                : command.Fields.TryGetValue(field, out var own) ? own
+                : field == "kind" ? MissionHelp(typeof(MissionCommand), field)
+                : MissionFields.GetValueOrDefault(field);
+        }
+        return field != null && MissionParts.TryGetValue(TypeName(type), out var part) ? part.GetValueOrDefault(field) : null;
+    }
 
     /// <summary>The texts of a tool.</summary>
     /// <exception cref="KeyNotFoundException">The file has no texts for the tool.</exception>
@@ -137,7 +178,13 @@ internal static class AgentTexts
                 p.Value.GetProperty("description").GetString()!,
                 p.Value.GetProperty("arguments").EnumerateObject().Select(a => (a.Name, a.Value.GetString()!)).ToList(),
                 p.Value.GetProperty("text").EnumerateArray().Select(e => e.GetString()!).ToList())),
-            Strings(root.GetProperty("results")));
+            Strings(root.GetProperty("results")),
+            Strings(root.GetProperty("mission_fields")),
+            root.GetProperty("mission_commands").EnumerateObject().ToDictionary(p => p.Name, p => new MissionCommandTexts(
+                p.Value.GetProperty("description").GetString()!,
+                p.Value.TryGetProperty("fields", out var fields) ? Strings(fields) : new Dictionary<string, string>())),
+            root.GetProperty("mission_parts").EnumerateObject().ToDictionary(p => p.Name,
+                p => (IReadOnlyDictionary<string, string>)Strings(p.Value)));
     }
 
     private static Dictionary<string, string> Strings(JsonElement element) =>

@@ -7,6 +7,7 @@ using System.Text.Json.Schema;
 using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Studio.Agent;
 using Xunit;
 
@@ -149,6 +150,12 @@ public sealed class AgentToolTableTests
                 .Concat(Problems($"prompt {p.Key} description", p.Value.Description))
                 .Concat(p.Value.Arguments.SelectMany(a => Problems($"prompt {p.Key}.{a.Name}", a.Help)))
                 .Concat(p.Value.Text.SelectMany(line => Problems($"prompt {p.Key}", line, SteLint.InstructionWords)))))
+            // The help of the mission commands is strict STE (section 9.1 of the MCP1 design).
+            .Concat(AgentTexts.MissionFields.SelectMany(f => Problems($"mission field {f.Key}", f.Value, SteLint.InstructionWords)))
+            .Concat(AgentTexts.MissionCommands.SelectMany(c => Problems($"command {c.Key}", c.Value.Description, SteLint.InstructionWords)
+                .Concat(c.Value.Fields.SelectMany(f => Problems($"command {c.Key}.{f.Key}", f.Value, SteLint.InstructionWords)))))
+            .Concat(AgentTexts.MissionParts.SelectMany(p => p.Value.SelectMany(f =>
+                Problems($"mission part {p.Key}.{f.Key}", f.Value, SteLint.InstructionWords))))
             .ToList();
 
         Assert.Empty(problems);
@@ -229,6 +236,47 @@ public sealed class AgentToolTableTests
             Assert.Equal([AgentTexts.Result(null, "result"), AgentTexts.Result(null, "error")],
                 tool.OutputSchema["anyOf"]!.AsArray().Select(o => (string?)o!["description"]));
         }
+    }
+
+    /// <summary>
+    /// Each mission command of the input schema of <c>mission_edit</c> has a help, and so does each of its fields, also
+    /// each field of an object in a command (section 9.1 of the MCP1 design, user decision of 2026-11-01). The help is
+    /// in <c>agent-tools.json</c>. Each text of the file names a command or a field of the schema.
+    /// </summary>
+    [Fact]
+    public void EachMissionCommandAndEachOfItsFieldsHasAHelp()
+    {
+        var definitions = AgentTools.Find("mission_edit")!.InputSchema["$defs"]!.AsObject();
+        var parts = new HashSet<(string Type, string Field)>();
+        MissionJson.Schema((type, field) =>
+        {
+            var text = AgentTexts.MissionHelp(type, field);
+            if (text != null && field != null && !typeof(MissionCommand).IsAssignableFrom(type))
+                parts.Add((AgentTexts.TypeName(type), field));
+            return text;
+        });
+
+        Assert.Equal(MissionJson.Kinds.Keys.Order(), AgentTexts.MissionCommands.Keys.Order());
+        var missing = new List<string>();
+        var shared = new HashSet<string>();
+        foreach (var kind in MissionJson.Kinds.Keys)
+        {
+            var definition = definitions[kind]!.AsObject();
+            if (definition["description"] == null)
+                missing.Add(kind);
+            missing.AddRange(UndescribedFields(definition, kind));
+            var own = AgentTexts.MissionCommands[kind].Fields;
+            var fields = definition["properties"]!.AsObject().Select(p => p.Key).ToList();
+            Assert.Empty(own.Keys.Except(fields));
+            shared.UnionWith(fields.Except(own.Keys));
+        }
+        Assert.True(missing.Count == 0, "No help: " + string.Join(", ", missing));
+        Assert.Empty(AgentTexts.MissionFields.Keys.Except(shared));
+        Assert.Equal(["kind"], AgentTexts.MissionParts["MissionCommand"].Keys);
+        Assert.Empty(AgentTexts.MissionParts.Where(p => p.Key != "MissionCommand")
+            .SelectMany(p => p.Value.Keys.Select(f => (p.Key, f))).Except(parts));
+        Assert.Equal("The kind of the command.", (string?)definitions["add_trigger"]!["properties"]!["kind"]!["description"]);
+        Assert.Equal(AgentTexts.MissionFields["row"], (string?)definitions["remove_line"]!["properties"]!["row"]!["description"]);
     }
 
     /// <summary>The structured content of a tool error fits the output schema of each tool (section 5.7 of the MCP1
@@ -337,6 +385,21 @@ public sealed class AgentToolTableTests
 
     private static string[] Problems(string where, string text, int words = SteLint.DescriptionWords) =>
         SteLint.Problems(text, words).Select(p => $"{where}: {p}: {text}").ToArray();
+
+    /// <summary>The paths of the properties of a schema without a help, at each level. A property that refers to another
+    /// schema (<c>$ref</c>) needs its own help too.</summary>
+    private static IEnumerable<string> UndescribedFields(JsonNode? schema, string path)
+    {
+        if (schema is JsonArray array)
+            return array.SelectMany((item, i) => UndescribedFields(item, $"{path}[{i}]"));
+        if (schema is not JsonObject obj)
+            return [];
+        var own = obj["properties"] is JsonObject properties
+            ? properties.Where(p => p.Value is not JsonObject { } property || property["description"] == null)
+                .Select(p => $"{path}.{p.Key}")
+            : [];
+        return own.Concat(obj.SelectMany(p => UndescribedFields(p.Value, $"{path}/{p.Key}")));
+    }
 
     /// <summary>The paths of the properties of a schema without a help. A property that only refers to another schema
     /// (<c>$ref</c>) gets the help of that schema.</summary>

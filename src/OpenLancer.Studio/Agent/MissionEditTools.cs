@@ -32,9 +32,10 @@ internal static partial class MissionEditTools
     /// <summary>The detail code of a call whose inverses have more mission commands than the budget.</summary>
     public const string InverseBudget = "InverseBudget";
 
-    /// <summary>The JSON Schema of a mission batch (section 4.13 of the M6b design), made once at the first use. It has
-    /// about 340 definitions, so the tool table does not make it when it loads.</summary>
-    private static readonly Lazy<JsonObject> BatchSchema = new(MissionJson.Schema);
+    /// <summary>The JSON Schema of a mission batch (section 4.13 of the M6b design), made once at the first use, with
+    /// the help of each command and each of its fields from <c>agent-tools.json</c> (section 9.1 of the MCP1 design).
+    /// It has about 340 definitions, so the tool table does not make it when it loads.</summary>
+    private static readonly Lazy<JsonObject> BatchSchema = new(() => MissionJson.Schema(AgentTexts.MissionHelp));
 
     /// <summary>
     /// The arguments of <c>mission_edit</c>: the fields of a mission batch, flat, with the schemas of

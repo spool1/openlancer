@@ -121,12 +121,16 @@ public static class MissionJson
     /// kind, and a definition for each line key with its named values from <c>mission-schema.json</c>. MCP1 gives it as
     /// the input schema of its tool <c>mission_edit</c>. The schema comes from the command types, so it follows them.
     /// </summary>
-    public static JsonObject Schema()
+    /// <param name="help">Gives the help of a type of the command layer without a field, or of one of its JSON fields,
+    /// or null. A command type without a field gives the description of its definition. Each field of a command, also
+    /// of an object in a command, gets its help as its description. Null gives no help. MCP1 gives the texts of its
+    /// data file (section 9.1 of the MCP1 design).</param>
+    public static JsonObject Schema(Func<Type, string?, string?>? help = null)
     {
         var schema = MissionSchema.Retail;
         var definitions = new JsonObject();
         foreach (var (kind, type) in Kinds.OrderBy(k => k.Key, StringComparer.Ordinal))
-            definitions[kind] = CommandSchema(kind, type);
+            definitions[kind] = CommandSchema(kind, type, help);
         definitions["command"] = OneOf(Kinds.Keys.Order(StringComparer.Ordinal));
 
         var lines = new List<string>();
@@ -151,7 +155,7 @@ public static class MissionJson
             ["anyOf"] = new JsonArray([.. lines.Select(Ref)]),
         };
 
-        var batch = Export(typeof(MissionBatch));
+        var batch = Export(typeof(MissionBatch), null);
         batch["$schema"] = "https://json-schema.org/draft/2020-12/schema";
         batch["title"] = "Mission batch";
         batch["description"] = "Mission commands that give one history entry and one validation.";
@@ -164,30 +168,50 @@ public static class MissionJson
 
     /// <summary>The schema of a command: its <c>kind</c>, its fields, and the fields of its constructor as the
     /// required fields.</summary>
-    private static JsonObject CommandSchema(string kind, Type type)
+    private static JsonObject CommandSchema(string kind, Type type, Func<Type, string?, string?>? help)
     {
-        var exported = Export(type);
-        var properties = new JsonObject { ["kind"] = new JsonObject { ["const"] = kind } };
+        var exported = Export(type, help);
+        var properties = new JsonObject
+        {
+            ["kind"] = Described(new JsonObject { ["const"] = kind }, help?.Invoke(type, "kind")),
+        };
         foreach (var (name, value) in exported["properties"]?.AsObject().ToList() ?? [])
             properties[name] = value?.DeepClone();
         // The exporter gives no items for a list of commands, because a command has its own converter.
         foreach (var property in SchemaOptions.Value.GetTypeInfo(type).Properties
                      .Where(p => typeof(IEnumerable<MissionCommand>).IsAssignableFrom(p.PropertyType)))
-            properties[property.Name] = new JsonObject { ["type"] = "array", ["items"] = Ref("command") };
+        {
+            properties[property.Name] = Described(new JsonObject { ["type"] = "array", ["items"] = Ref("command") },
+                help?.Invoke(type, property.Name));
+        }
         var required = new JsonArray("kind");
         foreach (var parameter in type.GetConstructors().OrderByDescending(c => c.GetParameters().Length).First()
                      .GetParameters().Where(p => !p.HasDefaultValue))
             required.Add(JsonNamingPolicy.SnakeCaseLower.ConvertName(parameter.Name!));
-        var schema = new JsonObject
+        var schema = Described(new JsonObject
         {
             ["type"] = "object",
             ["properties"] = properties,
             ["required"] = required,
             ["additionalProperties"] = false,
-        };
+        }, help?.Invoke(type, null));
         Relocate(schema, "#/$defs/" + kind);
         return schema;
     }
+
+    /// <summary>A schema with a description, or the schema as it is without one. The schema <c>true</c> takes any
+    /// value, so it becomes an object with only the description.</summary>
+    private static JsonNode Described(JsonNode node, string? description)
+    {
+        if (description == null)
+            return node;
+        var schema = node as JsonObject ?? new JsonObject();
+        schema["description"] = description;
+        return schema;
+    }
+
+    private static JsonObject Described(JsonObject node, string? description) =>
+        (JsonObject)Described((JsonNode)node, description);
 
     /// <summary>
     /// Moves each <c>$ref</c> that the exporter wrote to the place of a definition. The exporter names a type that its
@@ -274,22 +298,29 @@ public static class MissionJson
     private static readonly Lazy<JsonSerializerOptions> SchemaOptions = new(() =>
         new JsonSerializerOptions(Options) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() });
 
-    /// <summary>The schema of a type of the command layer, with the reference strings in place of the records.</summary>
-    private static JsonObject Export(Type type)
+    /// <summary>The schema of a type of the command layer, with the reference strings in place of the records. Each
+    /// property gets its help as its description (see <see cref="Schema"/>).</summary>
+    private static JsonObject Export(Type type, Func<Type, string?, string?>? help)
     {
         var node = JsonSchemaExporter.GetJsonSchemaAsNode(SchemaOptions.Value, type, new JsonSchemaExporterOptions
         {
             TreatNullObliviousAsNonNullable = true,
-            TransformSchemaNode = (context, node) => ReferenceSchema(context.TypeInfo.Type) ??
-                                                     (context.PropertyInfo?.CustomConverter is NullableLongAsText
-                                                         ? new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9]+$" }
-                                                         : node),
+            TransformSchemaNode = (context, node) =>
+            {
+                var schema = ReferenceSchema(context.TypeInfo.Type, help) ??
+                             (context.PropertyInfo?.CustomConverter is NullableLongAsText
+                                 ? new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9]+$" }
+                                 : node);
+                return context.PropertyInfo is { } property
+                    ? Described(schema, help?.Invoke(property.DeclaringType, property.Name))
+                    : schema;
+            },
         });
         return node.AsObject();
     }
 
     /// <summary>The schema of a type that JSON writes in its own form, or null.</summary>
-    private static JsonNode? ReferenceSchema(Type type)
+    private static JsonNode? ReferenceSchema(Type type, Func<Type, string?, string?>? help)
     {
         static JsonObject Text(string prefix, string example) => new()
         {
@@ -317,9 +348,12 @@ public static class MissionJson
                 ["type"] = "object",
                 ["properties"] = new JsonObject
                 {
-                    ["ref"] = Text("line", @"line:DATA\MISSIONS\M02\m02.ini#Trigger/ol_trigger/2"),
-                    ["expect_key"] = new JsonObject { ["type"] = "string" },
-                    ["expect_values"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" } },
+                    ["ref"] = Described(Text("line", @"line:DATA\MISSIONS\M02\m02.ini#Trigger/ol_trigger/2"),
+                        help?.Invoke(type, "ref")),
+                    ["expect_key"] = Described(new JsonObject { ["type"] = "string" }, help?.Invoke(type, "expect_key")),
+                    ["expect_values"] = Described(
+                        new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" } },
+                        help?.Invoke(type, "expect_values")),
                 },
                 ["required"] = new JsonArray("ref"),
                 ["additionalProperties"] = false,

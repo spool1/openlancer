@@ -428,7 +428,7 @@
       "description": "Runs mission commands as one Undo step, all or nothing. Each command sees the result of the commands before it. The tool refuses an edit that adds an error to a script. The result gives the inverse: give it to this tool to revert the edit after later edits. Read get_mission and describe_mission_name first. Set preview to true to see the result first.",
       "fields": {
         "label": "The label of the Undo step. Without it, the edit takes the label of its one command, or 'Mission edit'.",
-        "commands": "The mission commands in order. Each command is an object with a kind, for example add_trigger. A line is {key, values} with the value names of describe_mission_name. studio_status gives the most commands of one call.",
+        "commands": "The mission commands in order. Each command is an object with a kind, for example add_trigger. A line is {key, values} with the value names of describe_mission_name. studio_status gives the most commands of one call. One call runs at most 1000 mission commands, also each command in a command_group.",
         "options": "reject_new_errors is always true: an edit that adds an error changes nothing. Set reject_new_warnings to true to also refuse an edit that adds a warning. Then a new warning gives new_errors with the detail NewWarnings.",
         "expect_versions": "The versions of the scripts that you read, by install path. When a script has another version now, the edit gives stale_revision."
       }
@@ -647,6 +647,600 @@
       "fields": {
         "panel": "The panel to capture. Its tab must show in the editor."
       }
+    }
+  },
+  "mission_fields": {
+    "script": "The msn: reference of the mission script.",
+    "trigger": "The trg: reference of the trigger.",
+    "item": "The sec: reference of the item.",
+    "section": "The sec: reference of the section, or the trg: reference of a trigger.",
+    "ship": "The sec: reference of the mission ship.",
+    "order_list": "The sec: reference of the order list.",
+    "row": "The line: an object with its line: reference in ref. The guards expect_key and expect_values are optional.",
+    "line": "The new line: an object with its key and its values by name. Or give its value texts by position in texts.",
+    "instance": "The inst: reference of the linked prefab instance.",
+    "prefab": "The prefab: reference of the prefab, for example prefab:mod:my_prefab.",
+    "act": "The act: reference of the act.",
+    "place": "The place of the node in the mission graph, in canvas points. Without it, the graph places the node.",
+    "references": "keep: each line that names the removed item stays and shows 'Missing'. remove: each such line goes too. The default is keep.",
+    "change_references": "True also changes each line that names the old nickname. Without it, these lines show 'Missing'.",
+    "value": "The new value: a number, a text, a boolean, or a list for a position.",
+    "position": "The position: three numbers x, y and z.",
+    "rotation": "The orientation: four numbers, as an orientation line holds them.",
+    "near": "A place near an object, in place of the position. The command writes a rel_pos line.",
+    "field": "The id of the field of the prefab."
+  },
+  "mission_commands": {
+    "accept_base": {
+      "description": "Accepts the base data now for a section of the active mod, after the base data changed. The lines of the section do not change.",
+      "fields": {
+        "hash": "The hash of the base section to write: 16 hex digits. Without it, the command writes the hash of the base data now."
+      }
+    },
+    "add_act": {
+      "description": "Adds an act to the graph file of the script. The game does not read the acts. A trigger is in one act, so each member leaves its other act.",
+      "fields": {
+        "nickname": "The nickname of the new act. Without it, the editor makes the nickname act_<n>.",
+        "name": "The name of the act that the editor shows. Without it, the name is 'Act <n>'.",
+        "text": "The walkthrough text of the act.",
+        "members": "The nicknames of the triggers of the act, in order.",
+        "index": "The place of the act in the list of the acts, from 0. Without it, the act goes to the end."
+      }
+    },
+    "add_action": {
+      "description": "Adds an action line to a trigger, before a row or at the end. An action cannot go before the nickname line or the condition.",
+      "fields": {
+        "line": "The action, for example {\"key\": \"Act_ActTrig\", \"values\": {\"trigger\": \"my_next\"}}.",
+        "before": "The row of the trigger that the action goes before, from 0. Without it, the action goes to the end."
+      }
+    },
+    "add_item": {
+      "description": "Adds an item to a mission script. The item kinds are formation, solar, loot, order_list, objective, conversation, npc, random_encounter and ship_build. A ship build goes into the ship build file of the script.",
+      "fields": {
+        "item_kind": "The kind of the item, for example formation or ship_build. A section type, for example MsnFormation, is also correct.",
+        "nickname": "The nickname of the new item. Without it, the editor makes a free name.",
+        "lines": "The lines of the new item, each with its key and its values by name."
+      }
+    },
+    "add_label": {
+      "description": "Adds a label line to a ship, a formation, a solar or a loot. The line goes before the first formation or ship line.",
+      "fields": {
+        "label": "The label, for example my_wing. A condition or an action can name all items with the label."
+      }
+    },
+    "add_mission_ship": {
+      "description": "Adds a mission ship as one step. The command adds an [MsnShip] at the end of the script, a new [NPC] and a new ship build. An existing [NPC] or ship build can take the place of a new one.",
+      "fields": {
+        "nickname": "The nickname of the new ship. Without it, the editor makes a free name.",
+        "npc": "The nickname of an existing [NPC] of the script. Without it, the command adds a new [NPC] with the pilot.",
+        "pilot": "The pilot of a new [NPC]: its faction, its voice, its look and its name.",
+        "build": "The nickname of an existing ship build. Without it, the command adds the ship build of new_build.",
+        "new_build": "A new ship build: its ship archetype, its loadout and its other lines. It goes into the ship build file of the script.",
+        "position": "The start position: three numbers x, y and z.",
+        "rotation": "The start orientation: four numbers, as an orientation line holds them.",
+        "system": "The nickname of the system of the ship, for example my_system.",
+        "labels": "The labels of the ship, for example my_wing.",
+        "orders": "The nickname of the order list that the ship starts with."
+      }
+    },
+    "add_order": {
+      "description": "Adds an order line to an order list, before a row or at the end. The key of the line is one of the 23 order keys, for example GotoVec.",
+      "fields": {
+        "line": "The order, with its key and its values by name. describe_mission_name gives the value names.",
+        "before": "The row of the order list that the order goes before, from 0. Without it, the order goes to the end."
+      }
+    },
+    "add_prefab_field": {
+      "description": "Adds a field to the template of a prefab of the active mod, in prefab mode. Each linked instance of the prefab compiles again.",
+      "fields": {
+        "prefab": "The prefab: reference of a prefab of the active mod, for example prefab:mod:my_prefab.",
+        "id": "The id of the new field. A line of the template names the field by this id.",
+        "label": "The name of the field that the editor shows.",
+        "field_kind": "The kind of the field: a value kind of the mission schema, list, triggers, condition or lines.",
+        "columns": "The columns of a list field, each as 'id, kind, label'.",
+        "keys": "The keys that a condition field or a lines field takes. Without them, the field takes each key.",
+        "tokens": "The id of the word set of a field of the kind token.",
+        "unit": "The unit of a number that the editor shows, for example s.",
+        "per_instance": "True when each instance sets the value itself. Such a value never shows as an override.",
+        "optional": "True when a value field can have no value. Each line with its slot then goes.",
+        "help": "The help text of the field that the editor shows.",
+        "default": "The default rows of the field in their text form.",
+        "index": "The place of the field among the fields, from 0. Without it, the field goes to the end."
+      }
+    },
+    "add_section": {
+      "description": "Adds a section to a mission script or to its ship build file. A section with a nickname line gets a free name when its lines have none.",
+      "fields": {
+        "script": "The msn: reference of the script, or of its ship build file.",
+        "type": "The section type, for example MsnSolar or NPCShipArch.",
+        "lines": "The lines of the section, each with its key and its values by name.",
+        "before": "The sec: reference of the section that the new section goes before. Without it, the section goes to the end."
+      }
+    },
+    "add_trigger": {
+      "description": "Adds a trigger at the end of a script. Without a nickname, the editor makes a free name.",
+      "fields": {
+        "nickname": "The nickname of the new trigger. Without it, the editor makes a free name.",
+        "condition": "The condition, for example {\"key\": \"Cnd_Timer\", \"values\": {\"seconds\": 3}}. Without it, the trigger has no condition.",
+        "actions": "The action lines of the trigger, in order.",
+        "starts_with_mission": "True writes InitState = ACTIVE, so the trigger starts with the mission.",
+        "repeats": "True writes repeatable = true, so the trigger runs again when its condition is true again.",
+        "system": "The system of the trigger, for example my_system. The editor shows it. The game does not read it.",
+        "act": "The act: reference of the act that the trigger joins."
+      }
+    },
+    "add_waypoint": {
+      "description": "Adds a waypoint to an order list: a GotoVec line with the point. The other values of the line take their defaults.",
+      "fields": {
+        "position": "The point: three numbers x, y and z.",
+        "before": "The row of the order list that the line goes before, from 0. Without it, the line goes to the end."
+      }
+    },
+    "apply_fix": {
+      "description": "Runs a fix of a problem of the mission checks, as the fix button of the editor does. A fix that does not apply now refuses with FixNotFound.",
+      "fields": {
+        "subject": "The subject of the problem, for example M03|my_trigger|Cnd_True.",
+        "fix": "The id of the fix, for example keepLast."
+      }
+    },
+    "apply_override_to_prefab": {
+      "description": "Makes overrides of a linked instance the defaults of its prefab. Each linked instance of the prefab in the active mod compiles again. A built-in prefab and a prefab of a lower mod refuse.",
+      "fields": {
+        "field": "The field of the override. Without field and member, each override of the instance goes to the prefab.",
+        "member": "The role of a removed member. The prefab then removes the member too."
+      }
+    },
+    "bind_value": {
+      "description": "In prefab mode, makes a value of a line of the template the slot of a field. Without a value name, the whole line is the line of a condition field or a lines field.",
+      "fields": {
+        "value": "The name of the value in the line. Without it, the whole line is the slot."
+      }
+    },
+    "command_group": {
+      "description": "Runs commands in order as one step. The inverses use it. The budget of mission commands of a call counts each command in a group.",
+      "fields": {
+        "commands": "The commands of the group, in order.",
+        "expect_bodies": "The guards of an inverse: the reference of each section and the hash of its lines. Another hash refuses with SectionChanged."
+      }
+    },
+    "compile_prefab_instance": {
+      "description": "Compiles a linked instance again from its prefab and its fields. A hand edit of its lines goes, and the instance gets the changes of its prefab."
+    },
+    "create_prefab_asset": {
+      "description": "Makes a prefab of the active mod. The start is a template text, another prefab for a variant, or an instance. A source instance becomes a linked instance of the new prefab.",
+      "fields": {
+        "id": "The id of the new prefab. The file of the prefab is prefabs\\missions\\<id>.ini.",
+        "name": "The name in the library. Without it, the prefab takes the name of its source.",
+        "text": "The whole text of the template. The inverse of a delete gives it.",
+        "variant_of": "The prefab: reference of the prefab that the new prefab copies.",
+        "source": "The inst: reference of the instance that becomes a linked instance of the new prefab.",
+        "fields": "For a linked source: the fields whose overrides become the defaults. Without it, each override becomes a default."
+      }
+    },
+    "create_script": {
+      "description": "Makes a new mission script: a whole file of the active mod under DATA\\MISSIONS with one [Mission] section. With a ship build file, the [Mission] section names it.",
+      "fields": {
+        "path": "The install path of the new script in a folder under DATA\\MISSIONS outside the encounters folder, for example DATA\\MISSIONS\\MY\\my_mission.ini.",
+        "ship_build_file": "The install path of the ship build file, for example DATA\\MISSIONS\\MY\\npcships.ini. A file that does not exist becomes a new file.",
+        "sections": "The sections of the script. Without them, the script has one [Mission] section. The inverse of a delete gives them.",
+        "ship_build_sections": "The sections of a new ship build file. The inverse of a delete gives them."
+      }
+    },
+    "delete_script": {
+      "description": "Deletes a whole mission file of the active mod: a script, or the ship build file of a script. A file of the game data or of a lower mod cannot go. The ship build file of a script goes too when no other script names it.",
+      "fields": {
+        "script": "The msn: reference of the script, or of the ship build file."
+      }
+    },
+    "duplicate_item": {
+      "description": "Copies an item with a new nickname to the end of its file. The lines that name the original do not change.",
+      "fields": {
+        "new_name": "The nickname of the copy. Without it, the editor makes a free name."
+      }
+    },
+    "duplicate_trigger": {
+      "description": "Copies a trigger to the end of the script with a new nickname. A line of the copy that names the original names the copy.",
+      "fields": {
+        "new_name": "The nickname of the copy. Without it, the editor makes a free name.",
+        "place": "The place of the node of the copy in the mission graph, in canvas points. Without it, the graph places the node."
+      }
+    },
+    "insert_line": {
+      "description": "Inserts any line into a section of a mission file, before a row or at the end. A second nickname line is not allowed.",
+      "fields": {
+        "before": "The row that the line goes before, from 0. Without it, the line goes to the end."
+      }
+    },
+    "insert_trigger_on_link": {
+      "description": "Puts a new trigger on a Start link. The new trigger has the condition and starts the old target. The line of the link then starts the new trigger.",
+      "fields": {
+        "row": "The Act_ActTrig line of the link: an object with its line: reference in ref.",
+        "condition": "The condition of the new trigger, with its key and its values by name.",
+        "nickname": "The nickname of the new trigger. Without it, the editor makes a free name."
+      }
+    },
+    "link_triggers": {
+      "description": "Links two triggers. start writes Act_ActTrig, stop writes Act_DeactTrig, and restart writes Act_DeactTrig and then Act_ActTrig.",
+      "fields": {
+        "source": "The trg: reference of the trigger that gets the action lines.",
+        "target": "The nickname of the target trigger in the same script. A name that does not resolve adds the error M05.",
+        "link_kind": "The kind of the link: start, stop or restart.",
+        "before": "The row of the source that the lines go before, from 0. Without it, the lines go to the end."
+      }
+    },
+    "move_line": {
+      "description": "Moves any line of a section before another row, or to the end. The first nickname line cannot move.",
+      "fields": {
+        "before": "The row before the move that the line goes before, from 0. Without it, the line goes to the end."
+      }
+    },
+    "move_nodes": {
+      "description": "Sets the places of trigger nodes in the graph file of a script. The game does not read the graph file.",
+      "fields": {
+        "places": "The new place of each node."
+      }
+    },
+    "move_section": {
+      "description": "Moves a ship or a formation section before another section of its file, or to the end. The place of another section type has no effect in the game.",
+      "fields": {
+        "section": "The sec: reference of the ship or of the formation.",
+        "before": "The sec: reference of the section that the section goes before. Without it, the section goes to the end."
+      }
+    },
+    "place_mission_ship": {
+      "description": "Places a mission ship: its position, orientation and system lines, or its rel_pos line near an object.",
+      "fields": {
+        "system": "The nickname of the system of the ship, for example my_system."
+      }
+    },
+    "place_prefab_instance": {
+      "description": "Places a linked instance of a prefab in a script. The compiled sections go to the end of the script, and the record goes into the graph file.",
+      "fields": {
+        "prefab": "The prefab: reference of the prefab, for example prefab:builtin:spawnWave or prefab:mod:my_prefab.",
+        "id": "The id of the instance. Without it, the editor makes an id.",
+        "values": "The value of each field. A field without a value takes the default of the prefab.",
+        "ports": "The outside trigger that each port starts.",
+        "removed": "The roles of the members that the new instance does not have.",
+        "place": "The place of the first member trigger in the mission graph. Without it, the graph places the nodes.",
+        "act": "The act: reference of the act that the member triggers join."
+      }
+    },
+    "remove_act": {
+      "description": "Removes an act from the graph file. Its triggers stay. When no act stays, the graph shows the acts that it proposes."
+    },
+    "remove_action": {
+      "description": "Removes an action line of a trigger.",
+      "fields": {
+        "row": "The action line: an object with its line: reference in ref."
+      }
+    },
+    "remove_item": {
+      "description": "Removes an item of a mission file. The lines that name it stay and show 'Missing'. An [NPC] that a ship names refuses, and so does a ship build that an [NPC] names."
+    },
+    "remove_label": {
+      "description": "Removes each label line with a label from an item.",
+      "fields": {
+        "label": "The label to remove."
+      }
+    },
+    "remove_line": {
+      "description": "Removes any line of a section of a mission file, except the first nickname line."
+    },
+    "remove_mission_ship": {
+      "description": "Removes a mission ship. Its [NPC] goes when no other ship or formation names it. Its ship build goes when no other [NPC] names it. The lines that name the ship show 'Missing'."
+    },
+    "remove_prefab_asset": {
+      "description": "Removes a prefab of the active mod. Each linked instance keeps its lines and gets the problem P02. One undo gives the prefab back."
+    },
+    "remove_prefab_field": {
+      "description": "Removes a field from the template of a prefab in prefab mode. A field that a line of the template uses refuses. Use unbind_value on such a line first."
+    },
+    "remove_prefab_instance": {
+      "description": "Removes a linked instance: its member sections and its record. Each line outside the instance that names a member stays and shows 'Missing', or goes."
+    },
+    "remove_section": {
+      "description": "Removes a section of a mission file. The lines that name it stay and show 'Missing'."
+    },
+    "remove_trigger": {
+      "description": "Removes a trigger. Each line that names it stays and shows 'Missing', or goes with references: remove."
+    },
+    "rename_item": {
+      "description": "Gives an item a new nickname. With change_references, each line that names it changes too. A ship build of the shared ship build file refuses.",
+      "fields": {
+        "new_name": "The new nickname of the item."
+      }
+    },
+    "rename_prefab_asset": {
+      "description": "Gives a prefab of the active mod a new id, file name and name. Each instance record of the active mod that names it changes too.",
+      "fields": {
+        "new_id": "The new id. With the same id, only the name in the library changes.",
+        "new_name": "The new name in the library. Without it, the name stays."
+      }
+    },
+    "rename_trigger": {
+      "description": "Gives a trigger a new nickname. With change_references, each line of the script that names the trigger changes too.",
+      "fields": {
+        "new_name": "The new nickname of the trigger."
+      }
+    },
+    "reorder_action": {
+      "description": "Moves an action line of a trigger before another row, or to the end.",
+      "fields": {
+        "row": "The action line: an object with its line: reference in ref.",
+        "before": "The row of the trigger before the move that the action goes before, from 0. Without it, the action goes to the end."
+      }
+    },
+    "replace_section_body": {
+      "description": "Sets all lines of a section, also the lines before the nickname line. The first nickname cannot change. Use a rename for it.",
+      "fields": {
+        "entries": "All lines of the section in order, each with its key and its value texts."
+      }
+    },
+    "restore_instance_record": {
+      "description": "Puts a record of a linked instance into the graph file of a script. It takes the place of the record with the same id. The inverses use it.",
+      "fields": {
+        "record": "The record of the instance, as an inverse gives it.",
+        "index": "The place of a new record in the list of the records, from 0. Without it, the record goes to the end."
+      }
+    },
+    "restore_prefab_asset": {
+      "description": "Sets the whole text of a prefab of the active mod, or deletes its file. It does not compile an instance. The inverses use it.",
+      "fields": {
+        "text": "The text of the file. Without it, the file goes."
+      }
+    },
+    "restore_section": {
+      "description": "Puts a section with exact lines at a place of a file. The inverses and the raw INI editor use it.",
+      "fields": {
+        "script": "The msn: reference of the script, or of its ship build file.",
+        "index": "The place of the section in the file, from 0. A larger number puts the section at the end.",
+        "section": "The section with its type and its lines."
+      }
+    },
+    "retarget_link": {
+      "description": "Gives a line that names a trigger another trigger. The line is an Act_ActTrig, Act_DeactTrig, Act_Save or Cnd_WatchTrigger line.",
+      "fields": {
+        "row": "The line that names a trigger: an object with its line: reference in ref.",
+        "target": "The nickname of the new trigger in the same script."
+      }
+    },
+    "revert_override": {
+      "description": "Removes overrides of a linked instance and compiles it. The field takes the value of the prefab again, and a removed member comes back.",
+      "fields": {
+        "field": "The field of the override. Without field and member, each override goes.",
+        "member": "The role of a removed member that comes back."
+      }
+    },
+    "revert_section": {
+      "description": "Puts back the lines of the base data of a section, or of one key of it. A section that the active mod adds refuses.",
+      "fields": {
+        "name": "The key whose lines go back. Without it, the whole section goes back."
+      }
+    },
+    "set_act": {
+      "description": "Sets the name or the walkthrough text of an act. A field that the command does not give keeps its value.",
+      "fields": {
+        "name": "The new name of the act.",
+        "text": "The new walkthrough text of the act."
+      }
+    },
+    "set_act_members": {
+      "description": "Sets the triggers of an act in order. A trigger is in one act, so each trigger of the list leaves its other act.",
+      "fields": {
+        "triggers": "The nicknames of the triggers of the act, in order."
+      }
+    },
+    "set_action_line": {
+      "description": "Sets a whole action line, also with a new key.",
+      "fields": {
+        "row": "The action line: an object with its line: reference in ref.",
+        "line": "The new action, with its key and its values by name."
+      }
+    },
+    "set_action_value": {
+      "description": "Sets one named value of an action line, or a run of values such as a position.",
+      "fields": {
+        "row": "The action line: an object with its line: reference in ref.",
+        "name": "The name of the value, as describe_mission_name gives it."
+      }
+    },
+    "set_condition": {
+      "description": "Sets the condition of a trigger in the place of the condition that the game uses. A trigger without a condition gets the line after its state lines.",
+      "fields": {
+        "line": "The new condition, with its key and its values by name."
+      }
+    },
+    "set_condition_value": {
+      "description": "Sets one named value of the condition that the game uses for a trigger.",
+      "fields": {
+        "name": "The name of the value, as describe_mission_name gives it."
+      }
+    },
+    "set_formation_members": {
+      "description": "Sets the ship lines of a formation in order. A ship section that comes later in the file moves before the formation, so the game finds the ship.",
+      "fields": {
+        "formation": "The sec: reference of the formation.",
+        "ships": "The nicknames of the ships of the formation, in order."
+      }
+    },
+    "set_item_key": {
+      "description": "Sets all lines of one key of an item, in their place. A ship key of a ship or a formation goes before the first formation or ship line.",
+      "fields": {
+        "key": "The key, for example label.",
+        "lines": "All lines of the key, each with its key and its values by name."
+      }
+    },
+    "set_line": {
+      "description": "Sets one whole line of a section, also with a new key. The first nickname line cannot change. Use a rename for it.",
+      "fields": {
+        "line": "The new line, with its key and its values by name, or its value texts by position in texts."
+      }
+    },
+    "set_line_text": {
+      "description": "Gives a text id of a line its own text. The text goes into strings.json of the active mod, and the line gets its $str: placeholder.",
+      "fields": {
+        "name": "The name of the text id value, as describe_mission_name gives it.",
+        "text": "The text."
+      }
+    },
+    "set_line_value": {
+      "description": "Sets one value of a line, by its name or by its index from 0.",
+      "fields": {
+        "name": "The name of the value. Without it, index gives the value.",
+        "index": "The index of the value in the line, from 0, when the command gives no name."
+      }
+    },
+    "set_orders": {
+      "description": "Sets all order lines of an order list in order. The other lines keep their places.",
+      "fields": {
+        "lines": "All order lines in order, each with its key and its values by name."
+      }
+    },
+    "set_prefab_field": {
+      "description": "Sets a field of a prefab instance. A linked instance gets an override and compiles. A matched instance writes the lines that the field reads.",
+      "fields": {
+        "rows": "The rows of the value in their text form, for example 'Cnd_Timer = 5' or my_formation."
+      }
+    },
+    "set_prefab_field_default": {
+      "description": "Sets the default rows of a field of the template of a prefab, in prefab mode. Each linked instance without an override of the field gets the new value.",
+      "fields": {
+        "rows": "The default rows in their text form."
+      }
+    },
+    "set_prefab_port": {
+      "description": "Sets the outside triggers that a port of a linked instance starts, and compiles the instance.",
+      "fields": {
+        "port": "The id of the port.",
+        "triggers": "The nicknames of the outside triggers that the port starts."
+      }
+    },
+    "set_ship_loadout": {
+      "description": "Sets the loadout of a mission ship. shared changes the ship build for each ship that uses it. this_ship gives the ship its own copy of the build.",
+      "fields": {
+        "loadout": "The nickname of the loadout, for example my_loadout.",
+        "scope": "shared: change the ship build. this_ship: copy the ship build for this ship only."
+      }
+    },
+    "set_text": {
+      "description": "Sets a text of the active mod in strings.json, or removes it. The inverse of set_line_text uses it.",
+      "fields": {
+        "key": "The key of the text. Use letters, digits, '_', '-' or '.'.",
+        "text": "The text. Without it, the text goes."
+      }
+    },
+    "set_trigger_repeats": {
+      "description": "Makes a trigger repeat, or not. True writes repeatable = true at the place of a state line. False removes each repeatable line.",
+      "fields": {
+        "repeats": "True makes the trigger repeat."
+      }
+    },
+    "set_trigger_start": {
+      "description": "Makes a trigger start with the mission, or not. True writes InitState = ACTIVE at the place of a state line. False removes the InitState line.",
+      "fields": {
+        "starts": "True makes the trigger start with the mission."
+      }
+    },
+    "set_trigger_system": {
+      "description": "Sets the system line of a trigger. The editor shows it. The game does not read it.",
+      "fields": {
+        "system": "The nickname of the system. Without it, the line goes."
+      }
+    },
+    "unbind_value": {
+      "description": "In prefab mode, makes the slot of a field in a line of the template a fixed value. Without texts, the value takes the default of the field.",
+      "fields": {
+        "value": "The name of the value in the line. Without it, the command takes the first slot of the line, or the line of a field.",
+        "texts": "The fixed value texts. Without them, the value takes the default of the field."
+      }
+    },
+    "unlink_triggers": {
+      "description": "Removes the lines of a link between two triggers: Act_ActTrig for start, Act_DeactTrig for stop, and both for restart.",
+      "fields": {
+        "source": "The trg: reference of the trigger with the action lines.",
+        "target": "The nickname of the target trigger.",
+        "link_kind": "The kind of the link: start, stop or restart."
+      }
+    },
+    "unpack_prefab_instance": {
+      "description": "Removes the record of a linked instance. The member sections stay as plain sections, as Unpack Prefab does in Unity."
+    }
+  },
+  "mission_parts": {
+    "MissionCommand": {
+      "kind": "The kind of the command."
+    },
+    "RowRef": {
+      "ref": "The line: reference of the line.",
+      "expect_key": "The key that the line must have. Another key refuses with RowChanged.",
+      "expect_values": "The value texts that the line must have. Other values refuse with RowChanged."
+    },
+    "GraphPoint": {
+      "x": "The x of the point on the canvas of the mission graph.",
+      "y": "The y of the point on the canvas of the mission graph."
+    },
+    "NearSpec": {
+      "anchor": "The nickname of the object, for example my_station.",
+      "heading": "The heading from the object, in degrees.",
+      "range": "The range from the object, in meters. It is optional."
+    },
+    "PilotSpec": {
+      "faction": "The faction of the pilot, for example my_faction.",
+      "voice": "The voice of the pilot.",
+      "head": "The head of the pilot in the comm window.",
+      "body": "The body of the pilot in the comm window.",
+      "accessories": "The accessories of the pilot in the comm window.",
+      "name_text": "The text id of the name of the pilot: a number, or $str:<key>."
+    },
+    "ShipBuildSpec": {
+      "archetype": "The ship archetype of the build, for example my_ship.",
+      "loadout": "The loadout of the build, for example my_loadout.",
+      "pilot": "The pilot of the build, for example my_pilot.",
+      "state_graph": "The state graph: FIGHTER, TRANSPORT, GUNBOAT, CRUISER, NOTHING or PLAYER.",
+      "level": "The level of the build, for example d5.",
+      "npc_classes": "The NPC classes of the build."
+    },
+    "RawSection": {
+      "type": "The section type, for example MsnShip.",
+      "entries": "The lines of the section in order, each with its key and its value texts."
+    },
+    "RawEntry": {
+      "key": "The key of the line.",
+      "values": "The value texts of the line by position."
+    },
+    "NodePlace": {
+      "trigger": "The nickname of the trigger.",
+      "x": "The x of the node on the canvas of the mission graph.",
+      "y": "The y of the node on the canvas of the mission graph.",
+      "remove": "True removes the place, so the graph places the node again.",
+      "index": "The place of a new record in the list of the node records, from 0. The inverses use it."
+    },
+    "PrefabFieldInput": {
+      "field": "The id of the field.",
+      "rows": "The rows of the value in their text form."
+    },
+    "InstancePort": {
+      "port": "The id of the port.",
+      "trigger": "The nickname of the outside trigger that the port starts."
+    },
+    "InstanceRecord": {
+      "id": "The id of the instance in the script.",
+      "prefab": "The prefab: builtin:<id> or mod:<id>.",
+      "prefab_hash": "The hash of the prefab at the last compile.",
+      "members": "The members of the instance.",
+      "values": "The values of the fields that each instance sets itself.",
+      "overrides": "The fields whose value differs from the default of the prefab.",
+      "removed": "The roles of the members that the instance does not have.",
+      "ports": "The outside trigger that each port starts.",
+      "lines_hash": "The hash of the compiled lines. Other lines of the members are a hand edit."
+    },
+    "InstanceMember": {
+      "role": "The role of the section in the template of the prefab.",
+      "nickname": "The nickname of the section in the script."
+    },
+    "InstanceValue": {
+      "field": "The id of the field.",
+      "rows": "The rows of the value in their text form."
     }
   },
   "errors": {
