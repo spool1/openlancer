@@ -351,7 +351,7 @@ internal sealed class DatabaseTable
             ImGui.SetClipboardText(row.Nickname);
         }
 
-        if (Theme.IconMenuItem(EditorIcons.Copy, "Copy name", row.Name.Length > 0))
+        if (MenuItems.Item(EditorIcons.Copy, "Copy name", row.Name.Length == 0 ? MenuItems.NoName : null))
         {
             ImGui.SetClipboardText(row.Name);
         }

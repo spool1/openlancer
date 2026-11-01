@@ -151,7 +151,7 @@ internal sealed class HistoryTab(EditorWindow window, ModsWindow mods)
         }
 
         ImGui.SetItemTooltip("Record that this version is on Nexus. A version on Nexus never gets other game files.");
-        if (ImGui.MenuItem("Remove the mark", "", false, published))
+        if (MenuItems.Item("Remove the mark", published ? null : "This version has no mark."))
         {
             mods.Mark(row, entry.Version, null);
         }

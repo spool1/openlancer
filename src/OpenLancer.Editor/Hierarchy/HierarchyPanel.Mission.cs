@@ -57,15 +57,9 @@ internal sealed partial class HierarchyPanel
         {
             foreach (var (kind, label) in MissionTreeEdits.CreateKindsOf(analysis))
             {
-                var refusal = MissionTreeEdits.CreateRefusal(analysis, kind);
-                if (ImGui.MenuItem(label, "", false, refusal == null))
+                if (MenuItems.Item(label, MissionTreeEdits.CreateRefusal(analysis, kind)))
                 {
                     RunMission(MissionTreeEdits.Create(analysis, kind));
-                }
-
-                if (refusal != null)
-                {
-                    ImGui.SetItemTooltip(refusal);
                 }
             }
         }
@@ -92,21 +86,26 @@ internal sealed partial class HierarchyPanel
         }
 
         ImGui.Separator();
-        if (Theme.IconMenuItem(EditorIcons.Pen, "Rename", renames))
+        if (MenuItems.Item(EditorIcons.Pen, "Rename", renames ? null : NoMissionRename))
         {
             StartMissionRename(item);
         }
 
-        if (Theme.IconMenuItem(EditorIcons.Clone, "Duplicate", duplicate != null))
+        if (MenuItems.Item(EditorIcons.Clone, "Duplicate", duplicate == null ? NoMissionDuplicate : null))
         {
             RunMission(duplicate);
         }
 
-        if (Theme.IconMenuItem(EditorIcons.TrashAlt, "Delete", delete != null))
+        if (MenuItems.Item(EditorIcons.TrashAlt, "Delete", delete == null ? NoMissionDelete : null))
         {
             RunMission(delete);
         }
     }
+
+    // The reasons of the edit items of a row of a mission that is not such an item.
+    private const string NoMissionRename = "Rename changes only a trigger, an act or an item of the script with a nickname.";
+    private const string NoMissionDuplicate = "Duplicate copies only a trigger, an item of the script or a prefab instance.";
+    private const string NoMissionDelete = "Delete removes only a trigger, an item of the script, an act or a prefab instance.";
 
     private void StartMissionRename(MissionRef item)
     {

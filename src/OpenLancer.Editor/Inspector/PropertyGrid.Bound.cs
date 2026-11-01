@@ -642,14 +642,16 @@ internal sealed partial class PropertyGrid
         }
 
         EditorTheme.PushMenuColors();
-        var canEdit = window.Session?.NoEditReason == null;
-        if (Theme.IconMenuItem(EditorIcons.Undo, "Revert to the lower layer", field.CanRevert && canEdit))
+        var locked = window.Session is not { } current ? MenuItems.NoProfile : current.NoEditReason;
+        if (MenuItems.Item(EditorIcons.Undo, "Revert to the lower layer",
+                locked ?? (field.CanRevert ? null : MenuItems.NoRevert),
+                "Puts back the value of the base data and the mods that load before the active mod."))
         {
             window.Commands.Run(session => FieldCommands.RevertKey(session, field.Section, field.Name));
         }
 
-        ImGui.SetItemTooltip("Puts back the value of the base data and the mods that load before the active mod.");
-        if (Theme.IconMenuItem(EditorIcons.Copy, "Copy INI line", field.Lines.Count > 0))
+        if (MenuItems.Item(EditorIcons.Copy, "Copy INI line",
+                field.Lines.Count == 0 ? "The section has no line of this key." : null))
         {
             ImGui.SetClipboardText(FieldEdit.IniText(field.Name, field.Lines));
         }

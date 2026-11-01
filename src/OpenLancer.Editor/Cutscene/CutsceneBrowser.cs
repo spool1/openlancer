@@ -648,25 +648,21 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
             workspace.OpenAndShow(entry.Path);
         }
 
-        var revert = RevertProblem(entry.Path);
-        if (Theme.IconMenuItem(EditorIcons.Undo, "Revert", revert == null))
+        if (MenuItems.Item(EditorIcons.Undo, "Revert", RevertProblem(entry.Path), RevertTip))
         {
             Revert(entry.Path);
         }
-
-        ImGui.SetItemTooltip(revert ?? RevertTip);
         if (Theme.IconMenuItem(EditorIcons.Copy, "Copy path", true))
         {
             ImGui.SetClipboardText(entry.Path);
         }
 
         var value = ThnReferences.IniValueOf(entry.Path);
-        if (Theme.IconMenuItem(EditorIcons.Link, "Copy INI value", value != null))
+        if (MenuItems.Item(EditorIcons.Link, "Copy INI value",
+                value == null ? "Only a cutscene below the DATA folder has an INI value." : null, IniValueTip(value)))
         {
             ImGui.SetClipboardText(value!);
         }
-
-        ImGui.SetItemTooltip(IniValueTip(value));
 
         if (uses.Count == 0)
         {

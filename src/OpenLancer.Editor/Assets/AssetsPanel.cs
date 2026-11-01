@@ -457,19 +457,18 @@ internal sealed class AssetsPanel : IDisposable
     /// <summary>The menu of a tile of a mission prefab asset (section 8.3 of the M6b design).</summary>
     private void PrefabMenu(EditorSession session, AssetRow row)
     {
-        if (Theme.IconMenuItem(EditorIcons.Cubes, "Open prefab", !row.HasProblem))
+        if (MenuItems.Item(EditorIcons.Cubes, "Open prefab", row.HasProblem ? row.NotPlaceable : null,
+                MissionPageModel.OpenPrefabTip))
             window.Missions.OpenPrefabMode(PrefabOf(row));
-        ImGui.SetItemTooltip(MissionPageModel.OpenPrefabTip);
         var reason = PrefabLock(session, row);
-        if (ImGui.MenuItem($"{EditorIcons.Pen}   Rename", "F2", false, reason == null))
+        if (MenuItems.Item(EditorIcons.Pen, "Rename", reason, "Change the name of the prefab in the library.", "F2"))
             RenamePrefab(row);
-        ImGui.SetItemTooltip(reason ?? "Change the name of the prefab in the library.");
-        if (ImGui.MenuItem($"{EditorIcons.Pen}   Rename file...", "", false, reason == null))
+        if (MenuItems.Item(EditorIcons.Pen, "Rename file...", reason,
+                $"Change the file name of the prefab. {Data.Missions.Prefabs.PrefabAsset.FileNameRule}"))
             RenamePrefab(row, file: true);
-        ImGui.SetItemTooltip(reason ?? $"Change the file name of the prefab. {Data.Missions.Prefabs.PrefabAsset.FileNameRule}");
-        if (ImGui.MenuItem($"{EditorIcons.TrashAlt}   Delete", "Delete", false, reason == null))
+        if (MenuItems.Item(EditorIcons.TrashAlt, "Delete", reason,
+                "Delete the prefab file. Its instances keep their lines and show the warning P02.", "Delete"))
             DeletePrefab(row);
-        ImGui.SetItemTooltip(reason ?? "Delete the prefab file. Its instances keep their lines and show the warning P02.");
         ImGui.Separator();
         if (Theme.IconMenuItem(EditorIcons.Copy, "Copy file name", true))
             ImGui.SetClipboardText(row.Asset.Id);
@@ -639,35 +638,29 @@ internal sealed class AssetsPanel : IDisposable
         var reason = placeable
             ? row.NotPlaceable ?? window.SceneEdits.Unavailable(Data.Editing.Scene.SceneAction.Create, null)
             : row.NotPlaceable ?? "The Scene does not place this asset.";
-        if (Theme.IconMenuItem(EditorIcons.Crosshairs, "Place at the camera pivot", reason == null))
+        if (MenuItems.Item(EditorIcons.Crosshairs, "Place at the camera pivot", reason))
             window.SceneEdits.Spawn(row, window.Scene.Pivot, null);
-        if (reason != null)
-            ImGui.SetItemTooltip(reason);
         if (row.Asset.Kind is AssetKind.Ship or AssetKind.Asteroid or AssetKind.Model)
         {
-            if (Theme.IconMenuItem(EditorIcons.Plus, "New static prop archetype", reason == null))
+            if (MenuItems.Item(EditorIcons.Plus, "New static prop archetype", reason,
+                    "Makes a new [Solar] with this model, and an object of it at the camera pivot."))
                 window.SceneEdits.NewProp(row, window.Scene.Pivot);
-            ImGui.SetItemTooltip(reason ?? "Makes a new [Solar] with this model, and an object of it at the camera pivot.");
         }
 
         ImGui.Separator();
         if (Theme.IconMenuItem(EditorIcons.Copy, "Copy nickname", true))
             ImGui.SetClipboardText(row.Nickname);
-        if (Theme.IconMenuItem(EditorIcons.Copy, "Copy model path", row.ModelPath != null))
+        if (MenuItems.Item(EditorIcons.Copy, "Copy model path", row.ModelPath == null ? "The asset has no model." : null))
             ImGui.SetClipboardText(row.ModelPath!);
         if (row.Asset.Kind != AssetKind.PropGroup || Group(session, row.Asset) is not { } group)
             return;
         ImGui.Separator();
         var groupReason = !group.Editable ? $"The group is of mod '{group.ModId}'. Only a group of the active mod can change."
             : session.NoEditReason;
-        if (ImGui.MenuItem($"{EditorIcons.Pen}   Rename", "F2", false, groupReason == null))
+        if (MenuItems.Item(EditorIcons.Pen, "Rename", groupReason, shortcut: "F2"))
             window.SceneEdits.RenameGroup(group);
-        if (groupReason != null)
-            ImGui.SetItemTooltip(groupReason);
-        if (ImGui.MenuItem($"{EditorIcons.TrashAlt}   Delete", "Delete", false, groupReason == null))
+        if (MenuItems.Item(EditorIcons.TrashAlt, "Delete", groupReason, shortcut: "Delete"))
             window.SceneEdits.DeleteGroup(group);
-        if (groupReason != null)
-            ImGui.SetItemTooltip(groupReason);
         if (Theme.IconMenuItem(EditorIcons.FolderOpen, "Show in folder", true))
             FolderActions.Open(window, Path.GetDirectoryName(group.File)!);
     }

@@ -116,22 +116,21 @@ internal sealed class ModHeader(EditorWindow window, ModsWindow mods)
         var games = mods.PlayGames(manifest);
         if (games.Count == 0)
         {
-            ImGui.MenuItem("No linked game can play this mod", false);
-            ItemTooltip.Show("Play needs a linked game folder of a target game of the mod, with its game program. " +
-                             "Link the game folder in File > Game link.");
+            MenuItems.Note("No linked game can play this mod",
+                "Play needs a linked game folder of a target game of the mod, with its game program. Link the game " +
+                "folder in File > Game link.");
             return;
         }
 
         var block = mods.PlayBlock();
         foreach (var game in games)
         {
-            if (ImGui.MenuItem($"Play this mod alone in {game.Name}", "", false, block == null))
+            if (MenuItems.Item($"Play this mod alone in {game.Name}", block,
+                    $"Install the build of this mod for {game.Name} into the play copy of {game.Root}, and start the " +
+                    "game. The play copy then holds this mod alone."))
             {
                 mods.PlayAlone(row, game);
             }
-
-            ItemTooltip.Show(block ?? $"Install the build of this mod for {game.Name} into the play copy of " +
-                             $"{game.Root}, and start the game. The play copy then holds this mod alone.");
         }
     }
 
@@ -141,14 +140,15 @@ internal sealed class ModHeader(EditorWindow window, ModsWindow mods)
         var session = window.Session;
         var inProfile = row.Group == ModGroup.Profile;
         var active = session?.Edits.ActiveMod is { } current && GameFolders.Same(current.Folder, row.Folder);
-        if (ImGui.MenuItem("Make active mod", "", active, inProfile && !active && window.CanChangeProfile))
+        if (MenuItems.Item("Make active mod",
+                !inProfile ? "Add the mod to the profile first. The active mod is a mod of the open profile."
+                : active ? "This mod is the active mod."
+                : !window.CanChangeProfile ? EditorWindow.ProfileLoading
+                : null,
+                "The editor saves your edits into the active mod.", selected: active))
         {
             window.SetActiveMod(row.Id);
         }
-
-        ItemTooltip.Show(!inProfile ? "Add the mod to the profile first. The active mod is a mod of the open profile."
-            : !window.CanChangeProfile ? EditorWindow.ProfileLoading
-            : "The editor saves your edits into the active mod.");
         ImGui.Separator();
         if (ImGui.MenuItem("Duplicate..."))
         {
@@ -156,13 +156,10 @@ internal sealed class ModHeader(EditorWindow window, ModsWindow mods)
         }
 
         ImGui.SetItemTooltip("Make a copy of the mod with a new id and a new display name. The copy is not in a profile.");
-        var renameBlock = mods.RenameBlock(row);
-        if (ImGui.MenuItem("Rename...", "", false, renameBlock == null))
+        if (MenuItems.Item("Rename...", mods.RenameBlock(row), "Give the mod a new id and a new folder name."))
         {
             mods.Rename(row);
         }
-
-        ItemTooltip.Show(renameBlock ?? "Give the mod a new id and a new folder name.");
         ImGui.Separator();
         if (session != null && mods.ProfileNeedsAllowance)
         {
@@ -178,21 +175,20 @@ internal sealed class ModHeader(EditorWindow window, ModsWindow mods)
         var changeBlock = mods.ProfileBlock();
         if (inProfile)
         {
-            if (ImGui.MenuItem("Remove from profile", "", false, changeBlock == null))
+            if (MenuItems.Item("Remove from profile", changeBlock,
+                    "Remove the mod from the profile. The folder of the mod stays."))
             {
                 mods.RemoveFromProfile(row);
             }
-
-            ItemTooltip.Show(changeBlock ?? "Remove the mod from the profile. The folder of the mod stays.");
         }
         else
         {
-            if (ImGui.MenuItem("Add to profile", "", false, changeBlock == null && row.Manifest != null))
+            if (MenuItems.Item("Add to profile",
+                    changeBlock ?? (row.Manifest == null ? row.LoadError ?? "The mod file did not load." : null),
+                    "Add the mod to the end of the load order of the profile."))
             {
                 mods.AddToProfile(row);
             }
-
-            ItemTooltip.Show(changeBlock ?? "Add the mod to the end of the load order of the profile.");
         }
 
         ImGui.Separator();

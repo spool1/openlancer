@@ -683,8 +683,9 @@ internal sealed class SceneView : IDisposable
         foreach (var (nickname, triggers) in systems)
         {
             var system = window.Session?.GameData?.Items.Systems.Get(nickname);
-            if (ImGui.MenuItem(Missions.MissionView.SystemItem(window.Session, nickname, triggers), "",
-                    System?.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase) == true, system != null))
+            if (MenuItems.Item(Missions.MissionView.SystemItem(window.Session, nickname, triggers),
+                    system == null ? $"The game data has no system '{nickname}'." : null,
+                    selected: System?.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase) == true))
             {
                 window.OpenSystem(system!);
             }

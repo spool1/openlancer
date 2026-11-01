@@ -1648,14 +1648,10 @@ internal sealed partial class GraphView : IDisposable
         {
             ImGui.Separator();
             var here = missions.PlayHere;
-            if (ImGui.MenuItem($"{EditorIcons.Play}  Play from here", "", false, here.CanPlay(trigger)))
+            var tooltip = here.Tooltip(trigger, missions.MissionPlayRuns);
+            if (MenuItems.Item($"{EditorIcons.Play}  Play from here", here.CanPlay(trigger) ? null : tooltip, tooltip))
             {
                 missions.Plays.PlayFromHere(script, trigger.Nickname);
-            }
-
-            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            {
-                ItemTooltip.Wrapped(here.Tooltip(trigger, missions.MissionPlayRuns));
             }
 
             var isStart = string.Equals(missions.Plays.PlayStartOf(script).Trigger, trigger.Nickname,
@@ -1667,15 +1663,11 @@ internal sealed partial class GraphView : IDisposable
             }
 
             ImGui.SetItemTooltip(SetPlayStartTip);
-            if (ImGui.MenuItem("Dry run from here", "", false, !missions.MissionPlayRuns))
+            if (MenuItems.Item("Dry run from here", missions.MissionPlayRuns ? MissionView.DryRunPlayTip : null,
+                    DryRunFromHereTip))
             {
                 missions.DryRuns.On = true;
                 missions.AddDryRunInput(DryRunInput.StartAt(trigger.Nickname));
-            }
-
-            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            {
-                ImGui.SetTooltip(missions.MissionPlayRuns ? MissionView.DryRunPlayTip : DryRunFromHereTip);
             }
         }
 
@@ -1685,15 +1677,12 @@ internal sealed partial class GraphView : IDisposable
         }
 
         var machine = run.State.Machine;
-        var waits = !machine.IsOver && machine.StateOf(trigger).Status == TriggerStatus.Active;
-        if (ImGui.MenuItem("Run this trigger (dry run)", "", false, waits))
+        var reason = machine.IsOver ? RunPanel.OverTip
+            : machine.StateOf(trigger).Status != TriggerStatus.Active ? RunThisTip
+            : null;
+        if (MenuItems.Item("Run this trigger (dry run)", reason, RunThisTip))
         {
             missions.AddDryRunInput(DryRunInput.RunTrigger(trigger.Nickname));
-        }
-
-        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-        {
-            ImGui.SetTooltip(machine.IsOver ? RunPanel.OverTip : RunThisTip);
         }
     }
 

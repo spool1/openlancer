@@ -219,12 +219,10 @@ internal sealed class LibraryStrip(EditorWindow window)
         }
 
         EditorTheme.PushMenuColors();
-        if (ImGui.MenuItem("Open prefab", "", false, item.Template != null))
+        if (MenuItems.Item("Open prefab", item.Template == null ? item.Problem : null, MissionPageModel.OpenPrefabTip))
         {
             window.Missions.OpenPrefabMode(prefab);
         }
-
-        ImGui.SetItemTooltip(MissionPageModel.OpenPrefabTip);
         if ((prefab.Builtin || item.Lock != null) && item.Template != null && editable &&
             window.Session?.Edits.Missions is { } editor)
         {

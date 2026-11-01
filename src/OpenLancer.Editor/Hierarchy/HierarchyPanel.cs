@@ -726,7 +726,7 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
         }
 
         var name = window.Session?.ItemName(item) ?? "";
-        if (Theme.IconMenuItem(EditorIcons.Copy, "Copy name", name.Length > 0))
+        if (MenuItems.Item(EditorIcons.Copy, "Copy name", name.Length == 0 ? MenuItems.NoName : null))
         {
             ImGui.SetClipboardText(name);
         }
@@ -747,13 +747,16 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
         {
             ImGui.Separator();
             var target = dock.Target == null ? null : window.Session?.GameData?.Items.Systems.Get(dock.Target);
-            if (Theme.IconMenuItem(EditorIcons.Map, "Open destination system", target != null))
+            var noTarget = dock.Target == null ? "The jump names no destination system."
+                : target == null ? $"The game data has no system '{dock.Target}'."
+                : null;
+            if (MenuItems.Item(EditorIcons.Map, "Open destination system", noTarget))
             {
                 window.OpenSystem(target!);
             }
 
-            if (Theme.IconMenuItem(EditorIcons.MousePointer, "Open and select exit",
-                    target != null && dock.Exit != null))
+            if (MenuItems.Item(EditorIcons.MousePointer, "Open and select exit",
+                    noTarget ?? (dock.Exit == null ? "The jump names no exit object." : null)))
             {
                 window.OpenSystem(target!);
                 if (window.Scene.Index?.ObjectsByNickname.GetValueOrDefault(dock.Exit!) is { } exit)
@@ -768,12 +771,16 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
             ImGui.Separator();
             var next = dock.Target == null ? null : index.ObjectsByNickname.GetValueOrDefault(dock.Target);
             var previous = dock.TargetLeft == null ? null : index.ObjectsByNickname.GetValueOrDefault(dock.TargetLeft);
-            if (Theme.IconMenuItem(EditorIcons.ArrowRight, "Select next ring", next != null))
+            if (MenuItems.Item(EditorIcons.ArrowRight, "Select next ring", next != null ? null
+                    : dock.Target == null ? "This ring is the last ring of its trade lane."
+                    : $"The open system has no ring '{dock.Target}'."))
             {
                 window.Selection = next;
             }
 
-            if (Theme.IconMenuItem(EditorIcons.ArrowLeft, "Select previous ring", previous != null))
+            if (MenuItems.Item(EditorIcons.ArrowLeft, "Select previous ring", previous != null ? null
+                    : dock.TargetLeft == null ? "This ring is the first ring of its trade lane."
+                    : $"The open system has no ring '{dock.TargetLeft}'."))
             {
                 window.Selection = previous;
             }
@@ -790,7 +797,7 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
         }
 
         var name = missionModel?.NodeOf(item)?.Name;
-        if (Theme.IconMenuItem(EditorIcons.Copy, "Copy nickname", name != null))
+        if (MenuItems.Item(EditorIcons.Copy, "Copy nickname", name == null ? MenuItems.NoNickname : null))
         {
             ImGui.SetClipboardText(name!);
         }
@@ -833,7 +840,8 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
         }
 
         var text = item is CutsceneRoot root ? root.Path : cutsceneModel?.NodeOf(item)?.Name;
-        if (Theme.IconMenuItem(EditorIcons.Copy, item is CutsceneRoot ? "Copy path" : "Copy name", text != null))
+        if (MenuItems.Item(EditorIcons.Copy, item is CutsceneRoot ? "Copy path" : "Copy name",
+                text == null ? MenuItems.NoName : null))
         {
             ImGui.SetClipboardText(text!);
         }

@@ -76,6 +76,8 @@ The data tests read `..\GameData\base`. Set `OPENLANCER_BASE` to use a different
 
 **Help > Documentation** opens the help pages of your version in the browser. **Help > Getting started** opens `README-FIRST.txt` of the release zip. **Help > Keys...** lists the keys of the editor, the Scene, the Hierarchy and the cutscene preview, and the mouse controls of the Scene. **Help > About OpenLancer...** shows the version, the commit and the engine commit of your build. Click **Copy** to copy them. The window title also shows the version.
 
+A menu item that is off tells why: point to it, and its tooltip gives the reason. An empty panel tells what to do next, for example "Select a system in the Scene toolbar."
+
 To report a bug, click **Help > Report a problem**. The editor copies a short text with the version, the commit, the linked game and the Windows version, and opens the bug report form. Paste the text into the first field of the form.
 
 **Help > Open log folder** opens the log files of the editor and the game. When the editor or the game starts, it moves the log of its last run to the file that ends in `.log.previous.txt`. Attach `OpenLancer.Editor.log.txt` to the report. For a problem in Play, also attach `OpenLancer.Play.log.txt`. If the editor crashed and you started it again, attach `OpenLancer.Editor.log.previous.txt`. If the game of Play crashed and you started Play again, attach `OpenLancer.Play.log.previous.txt`.

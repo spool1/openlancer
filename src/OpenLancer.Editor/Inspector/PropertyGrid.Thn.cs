@@ -260,19 +260,21 @@ internal sealed partial class PropertyGrid
         }
 
         EditorTheme.PushMenuColors();
-        var editable = field.ReadOnly == null && window.Session?.NoEditReason == null;
-        if (Theme.IconMenuItem(EditorIcons.Undo, "Revert to the lower cutscene", editable && field.CanRevert))
+        var locked = field.ReadOnly ?? (window.Session is not { } current ? MenuItems.NoProfile : current.NoEditReason);
+        const string noValue = "The cutscene has no value here.";
+        if (MenuItems.Item(EditorIcons.Undo, "Revert to the lower cutscene",
+                locked ?? (field.CanRevert ? null : MenuItems.NoRevert),
+                "Puts back the value of the cutscene as the base data and the mods before the active mod have it."))
         {
             window.Commands.Execute(() => ThnEdits.Revert(field.Target.Path, field.Target, field.Path));
         }
 
-        ImGui.SetItemTooltip("Puts back the value of the cutscene as the base data and the mods before the active mod have it.");
-        if (Theme.IconMenuItem(EditorIcons.TrashAlt, "Remove", editable && field.Value != null))
+        if (MenuItems.Item(EditorIcons.TrashAlt, "Remove", locked ?? (field.Value == null ? noValue : null)))
         {
             window.Commands.Execute(() => ThnEdits.Remove(field.Target, field.Path));
         }
 
-        if (Theme.IconMenuItem(EditorIcons.Copy, "Copy value", field.Value != null))
+        if (MenuItems.Item(EditorIcons.Copy, "Copy value", field.Value == null ? noValue : null))
         {
             ImGui.SetClipboardText(ThnWriter.Value(field.Value!));
         }

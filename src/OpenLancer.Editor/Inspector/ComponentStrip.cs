@@ -85,14 +85,9 @@ internal sealed class ComponentStrip(EditorWindow window, PropertyGrid grid)
                 EditorTheme.PushMenuColors();
                 var problem = ObjectComponents.RemoveProblem(component.Kind) ?? session.NoEditReason ??
                               session.Edits.Get(section)?.ReadOnlyReason;
-                if (ImGui.MenuItem($"{EditorIcons.TrashAlt}   Remove component", "", false, problem == null))
+                if (MenuItems.Item(EditorIcons.TrashAlt, "Remove component", problem))
                 {
                     window.SceneEdits.RemoveComponent(section, component.Kind);
-                }
-
-                if (problem != null)
-                {
-                    ImGui.SetItemTooltip(problem);
                 }
 
                 EditorTheme.PopMenuColors();
@@ -114,15 +109,9 @@ internal sealed class ComponentStrip(EditorWindow window, PropertyGrid grid)
                 EditorTheme.PushMenuColors();
                 foreach (var (kind, unavailable) in add)
                 {
-                    var reason = unavailable ?? session.NoEditReason;
-                    if (ImGui.MenuItem(ObjectComponents.Name(kind) + "...", "", false, reason == null))
+                    if (MenuItems.Item(ObjectComponents.Name(kind) + "...", unavailable ?? session.NoEditReason))
                     {
                         window.SceneEdits.AddComponent(section, kind);
-                    }
-
-                    if (reason != null)
-                    {
-                        ImGui.SetItemTooltip(reason);
                     }
                 }
 

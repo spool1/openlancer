@@ -312,8 +312,7 @@ internal sealed partial class GraphView
         }
 
         EditorTheme.PushMenuColors();
-        var insertRefusal = GraphEditModel.InsertRefusal(link);
-        if (ImGui.BeginMenu("Insert trigger", insertRefusal == null))
+        if (MenuItems.BeginMenu("Insert trigger", GraphEditModel.InsertRefusal(link)))
         {
             var place = InsertPlace(link);
             if (ImGui.BeginMenu("After a delay"))
@@ -350,20 +349,9 @@ internal sealed partial class GraphView
             ImGui.EndMenu();
         }
 
-        if (insertRefusal != null)
-        {
-            ImGui.SetItemTooltip(insertRefusal);
-        }
-
-        var unlinkRefusal = GraphEditModel.UnlinkRefusal(link);
-        if (ImGui.MenuItem("Remove link", "Delete", false, unlinkRefusal == null))
+        if (MenuItems.Item("Remove link", GraphEditModel.UnlinkRefusal(link), shortcut: "Delete"))
         {
             Run(edit.Unlink(link));
-        }
-
-        if (unlinkRefusal != null)
-        {
-            ImGui.SetItemTooltip(unlinkRefusal);
         }
 
         EditorTheme.PopMenuColors();
@@ -448,12 +436,11 @@ internal sealed partial class GraphView
         if (edit.HasActs)
         {
             var newAct = edit.NewAct(selectedBlocks);
-            if (ImGui.MenuItem("New act from selection", "", false, newAct != null))
+            if (MenuItems.Item("New act from selection", newAct == null ? "Select one or more triggers first." : null,
+                    "Put the selected triggers into a new act."))
             {
                 Run(newAct);
             }
-
-            ImGui.SetItemTooltip("Put the selected triggers into a new act.");
         }
 
         EditorTheme.PopMenuColors();

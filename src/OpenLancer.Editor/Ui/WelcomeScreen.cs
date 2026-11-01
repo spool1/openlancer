@@ -387,7 +387,7 @@ internal sealed class WelcomeScreen(EditorWindow window)
         if (ImGui.BeginPopupContextItem("##recent-menu"))
         {
             EditorTheme.PushMenuColors();
-            if (Theme.IconMenuItem(EditorIcons.Open, "Open", !isMissing))
+            if (MenuItems.Item(EditorIcons.Open, "Open", isMissing ? "The file is not found." : null))
             {
                 action = RowAction.Open;
             }

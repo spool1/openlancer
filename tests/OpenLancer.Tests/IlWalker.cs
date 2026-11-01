@@ -37,6 +37,11 @@ internal static class IlWalker
     /// the method that it calls and the constant. An enum value, for example a key, is such a constant.</summary>
     public sealed record ConstantArgument(Type Owner, MethodBase Caller, MethodBase Callee, long Value);
 
+    /// <summary>A call and its last argument: the type that holds it, the method that makes it, the method that it
+    /// calls, and the constant integer of the last argument, or null when that argument is not one constant. A bool
+    /// constant is 0 or 1.</summary>
+    public sealed record LastArgument(Type Owner, MethodBase Caller, MethodBase Callee, long? Value);
+
     private static readonly OpCode[] OneByte = new OpCode[0x100];
     private static readonly OpCode[] TwoByte = new OpCode[0x100];
 
@@ -145,6 +150,64 @@ internal static class IlWalker
         }
     }
 
+    /// <summary>
+    /// The calls of each method and constructor of a type, without its nested types, that pass one or more arguments,
+    /// each with the constant of its last argument. The last argument is a constant only when the instruction before
+    /// the call loads a constant integer and no branch goes to the call. So a value that two paths give, for example
+    /// <c>a || b</c>, is not a constant.
+    /// </summary>
+    public static IEnumerable<LastArgument> LastArguments(Type type)
+    {
+        var owner = OwnerOf(type);
+        foreach (var method in MethodsOf(type))
+        {
+            var typeArguments = method.DeclaringType is { IsGenericType: true } generic
+                ? generic.GetGenericArguments()
+                : null;
+            var methodArguments = method.IsGenericMethod ? method.GetGenericArguments() : null;
+            var code = Decode(method).ToList();
+            var targets = BranchTargets(method, code);
+            for (var at = 1; at < code.Count; at++)
+            {
+                var (offset, _, instruction) = code[at];
+                if (instruction.Op != OpCodes.Call && instruction.Op != OpCodes.Callvirt ||
+                    method.Module.ResolveMember((int)instruction.Operand, typeArguments, methodArguments) is not MethodBase
+                        callee || callee.GetParameters().Length == 0)
+                    continue;
+                var value = targets.Contains(offset) ? null : ConstantOf(code[at - 1].Instruction);
+                yield return new LastArgument(owner, method, callee, value);
+            }
+        }
+    }
+
+    /// <summary>The offsets that a branch, a leave or a switch of a method goes to.</summary>
+    private static HashSet<int> BranchTargets(MethodBase method, List<(int Offset, int Next, Instruction Instruction)> code)
+    {
+        var targets = new HashSet<int>();
+        if (method.GetMethodBody()?.GetILAsByteArray() is not { } il)
+            return targets;
+        foreach (var (offset, next, instruction) in code)
+        {
+            switch (instruction.Op.OperandType)
+            {
+                case OperandType.ShortInlineBrTarget:
+                    targets.Add(next + (sbyte)instruction.Operand);
+                    break;
+                case OperandType.InlineBrTarget:
+                    targets.Add(next + (int)instruction.Operand);
+                    break;
+                case OperandType.InlineSwitch:
+                    // The count follows the opcode, then one offset for each case, from the end of the instruction.
+                    var count = BitConverter.ToInt32(il, offset + 1);
+                    for (var i = 0; i < count; i++)
+                        targets.Add(next + BitConverter.ToInt32(il, offset + 5 + 4 * i));
+                    break;
+            }
+        }
+
+        return targets;
+    }
+
     /// <summary>True for an instruction that loads one value and takes none from the stack.</summary>
     private static bool LoadsOneValue(OpCode op) =>
         op.Name is { } name && (name.StartsWith("ldc.", StringComparison.Ordinal) ||
@@ -174,13 +237,18 @@ internal static class IlWalker
         type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All));
 
     /// <summary>The instructions of the IL of a method, in their order. A method without IL has none.</summary>
-    public static IEnumerable<Instruction> Instructions(MethodBase method)
+    public static IEnumerable<Instruction> Instructions(MethodBase method) => Decode(method).Select(d => d.Instruction);
+
+    /// <summary>The instructions of the IL of a method, each with its offset and the offset of the next
+    /// instruction.</summary>
+    private static IEnumerable<(int Offset, int Next, Instruction Instruction)> Decode(MethodBase method)
     {
         if (method.GetMethodBody()?.GetILAsByteArray() is not { } il)
             yield break;
         var at = 0;
         while (at < il.Length)
         {
+            var offset = at;
             var op = il[at] == 0xfe ? TwoByte[il[++at]] : OneByte[il[at]];
             at++;
             if (op.Size == 0)
@@ -189,14 +257,14 @@ internal static class IlWalker
             {
                 OperandType.InlineNone or OperandType.InlineSwitch or OperandType.InlineR
                     or OperandType.ShortInlineR => 0,
-                OperandType.ShortInlineI => (sbyte)il[at],
-                OperandType.ShortInlineBrTarget or OperandType.ShortInlineVar => il[at],
+                OperandType.ShortInlineI or OperandType.ShortInlineBrTarget => (sbyte)il[at],
+                OperandType.ShortInlineVar => il[at],
                 OperandType.InlineVar => BitConverter.ToUInt16(il, at),
                 OperandType.InlineI8 => BitConverter.ToInt64(il, at),
                 _ => BitConverter.ToInt32(il, at),
             };
-            yield return new Instruction(op, operand);
             at += OperandSize(op, il, at);
+            yield return (offset, at, new Instruction(op, operand));
         }
     }
 

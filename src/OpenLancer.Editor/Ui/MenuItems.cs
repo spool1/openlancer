@@ -21,6 +21,9 @@ internal static class MenuItems
     /// <summary>The reason of Copy name for an item without a name.</summary>
     public const string NoName = "The item has no name.";
 
+    /// <summary>The reason of the Revert of a field that has nothing to put back.</summary>
+    public const string NoRevert = "The active mod does not change this value, or no lower layer has it.";
+
     /// <summary>The reason of an item that needs the game data of the open profile, or null when the game data is
     /// there.</summary>
     public static string? NoGameData(EditorSession? session) =>

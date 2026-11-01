@@ -856,46 +856,41 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
     private void EventMenu(TimelineModel model, TimelineEvent ev)
     {
         var session = window.Session;
-        var editable = session is { NoEditReason: null } && session.Edits.CutsceneReadOnlyReason(ev.Ref) == null;
+        var locked = session == null ? MenuItems.NoProfile
+            : session.NoEditReason ?? session.Edits.CutsceneReadOnlyReason(ev.Ref);
         if (Theme.IconMenuItem(EditorIcons.Copy, "Copy", true))
         {
             workspace.Copy();
         }
 
-        if (Theme.IconMenuItem(EditorIcons.Clone, "Duplicate", editable))
+        if (MenuItems.Item(EditorIcons.Clone, "Duplicate", locked,
+                "Adds a copy of the selected events right after them (Ctrl+D)."))
         {
             workspace.Duplicate();
         }
 
-        ImGui.SetItemTooltip("Adds a copy of the selected events right after them (Ctrl+D).");
-        if (Theme.IconMenuItem(EditorIcons.TrashAlt, "Delete", editable))
+        if (MenuItems.Item(EditorIcons.TrashAlt, "Delete", locked))
         {
             workspace.DeleteSelection();
         }
 
         ImGui.Separator();
         var others = model.Events.Where(e => e.Time == ev.Time && e.Ref.Id != ev.Ref.Id).ToList();
-        if (ImGui.BeginMenu($"{EditorIcons.Stream}   Move before", editable && others.Count > 0))
+        if (MenuItems.BeginMenu($"{EditorIcons.Stream}   Move before",
+                locked ?? (others.Count == 0 ? "No other event has the same time." : null)))
         {
             foreach (var other in others)
             {
-                var refusal = ThnEdits.ReorderRefusal(session!.Edits, ev.Ref, other.Ref);
                 var label = other.Targets.Count > 0 ? $"{other.Type} {other.Targets[0]}" : other.Type;
-                if (ImGui.MenuItem($"{label}##{other.Ref.Id.Value}", "", false, refusal == null))
+                if (MenuItems.Item($"{label}##{other.Ref.Id.Value}", ThnEdits.ReorderRefusal(session!.Edits, ev.Ref, other.Ref),
+                        $"Runs the event before {label}. The engine runs the events of one time in the order of the file " +
+                        "(ThnScript.cs:150-152)."))
                 {
                     window.Commands.Execute(ThnEdits.Reorder(ev.Ref, other.Ref));
                 }
-
-                ImGui.SetItemTooltip(refusal ?? $"Runs the event before {label}. The engine runs the events of one time " +
-                                     "in the order of the file (ThnScript.cs:150-152).");
             }
 
             ImGui.EndMenu();
-        }
-
-        if (others.Count == 0)
-        {
-            ImGui.SetItemTooltip("No other event has the same time.");
         }
     }
 
@@ -907,39 +902,41 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
         var name = line.Lane?.Name ?? line.Row?.Name;
         var session = window.Session;
         var path = workspace.Path!;
-        var editable = session is { NoEditReason: null } && session.Edits.CutsceneReadOnlyReason(path) == null;
+        var locked = session == null ? MenuItems.NoProfile
+            : session.NoEditReason ?? session.Edits.CutsceneReadOnlyReason(path);
         var working = workspace.Working;
         var choices = entity != null && name != null && working != null
             ? TimelineEdits.AddChoices(working, name, CutsceneWorkspace.Symbols)
             : [];
-        if (ImGui.BeginMenu($"{EditorIcons.Plus}   Add event", editable && choices.Count > 0))
+        if (MenuItems.BeginMenu($"{EditorIcons.Plus}   Add event",
+                locked ?? (choices.Count == 0 ? "No event type fits this row." : null)))
         {
             foreach (var choice in choices)
             {
-                if (ImGui.MenuItem(choice.Role.Type, "", false, choice.Refusal == null))
+                if (MenuItems.Item(choice.Role.Type, choice.Refusal,
+                        $"Adds a {choice.Role.Type} at {Seconds(target.Time)} s" +
+                        (choice.Second != null ? $" with the second target {choice.Second}." : ".")))
                 {
                     if (window.Commands.Execute(() => TimelineEdits.Add(path, choice, name!, target.Time)))
                     {
                         workspace.SelectEvents(TimelineEdits.Added(workspace.Working!, 1));
                     }
                 }
-
-                ImGui.SetItemTooltip(choice.Refusal ??
-                                     $"Adds a {choice.Role.Type} at {Seconds(target.Time)} s" +
-                                     (choice.Second != null ? $" with the second target {choice.Second}." : "."));
             }
 
             ImGui.EndMenu();
         }
 
-        if (Theme.IconMenuItem(EditorIcons.Clone, "Paste here", editable && workspace.Clip != null))
+        if (MenuItems.Item(EditorIcons.Clone, "Paste here",
+                locked ?? (workspace.Clip == null ? "Copy one or more events first." : null),
+                "Pastes the copied events at this time. The events of the row of the copy move to this row."))
         {
             workspace.Paste(target.Time, name);
         }
 
-        ImGui.SetItemTooltip("Pastes the copied events at this time. The events of the row of the copy move to this row.");
         ImGui.Separator();
-        if (Theme.IconMenuItem(EditorIcons.TrashAlt, "Delete entity...", editable && entity != null))
+        if (MenuItems.Item(EditorIcons.TrashAlt, "Delete entity...",
+                locked ?? (entity == null ? "This row has no entity." : null)))
         {
             workspace.DeleteEntity(entity!);
         }

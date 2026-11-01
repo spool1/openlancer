@@ -194,13 +194,12 @@ internal sealed class PublishPage(EditorWindow window, ModsWindow mods)
                  })
         {
             var next = ModVersion.Next(draft.Values.Version, part, row.History.Versions);
-            if (ImGui.MenuItem(next == null ? part.ToString() : $"{part}: {next}", "", false, next != null))
+            if (MenuItems.Item(next == null ? part.ToString() : $"{part}: {next}",
+                    next == null ? PublishMessages.VersionRule : null, tooltip))
             {
                 draft.IncreaseVersion(part, row.History.Versions);
                 focus = PublishField.Changelog;
             }
-
-            ItemTooltip.Show(next == null ? PublishMessages.VersionRule : tooltip);
         }
 
         ImGui.EndPopup();
