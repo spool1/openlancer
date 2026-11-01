@@ -7,6 +7,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using ImGuiNET;
 using LibreLancer.ImUI;
+using OpenLancer.Data.Games;
 using OpenLancer.Data.Mods;
 using OpenLancer.Editor.Games;
 
@@ -63,13 +64,39 @@ internal sealed class WelcomeScreen(EditorWindow window)
     /// <summary>The first action when no game is linked.</summary>
     internal const string FirstActionWithoutGame = "To start, link your game with Game link, or click Open profile.";
 
-    /// <summary>The first action when a game is linked.</summary>
+    /// <summary>The first action when a linked game can be the base of a profile.</summary>
     internal const string FirstActionWithGame = "To start, click Open profile, or make a profile with New profile.";
 
-    /// <summary>The line that names the first action. Without a linked game, the first action is to link the
-    /// game.</summary>
-    internal static string FirstAction(bool hasLinkedGame) =>
-        hasLinkedGame ? FirstActionWithGame : FirstActionWithoutGame;
+    /// <summary>The first action when a game is linked, but no linked game can be the base of a profile.</summary>
+    internal const string FirstActionWithoutBase = "To start, check your game in Game link, or click Open profile.";
+
+    /// <summary>The tooltip of New profile while it is on.</summary>
+    internal const string NewProfileTip = "Makes a profile with an empty mod for a linked game, and opens it.";
+
+    /// <summary>Why New profile is off when no game is linked.</summary>
+    internal const string NoGameReason = "No game is linked. Link a game folder with Game link.";
+
+    /// <summary>Why New profile is off when a game is linked, but no linked game can be the base of a profile. For
+    /// example, the folder of the game is not there, or the game is a source build.</summary>
+    internal const string NoBaseReason = "No linked game can be the base of a profile. Check the game in Game link.";
+
+    /// <summary>The line that names the first action. Without a linked game, the first action is to link the game.
+    /// When no linked game can be the base of a profile, the first action is to check the game.</summary>
+    /// <param name="linkedGames">The number of linked games.</param>
+    /// <param name="baseGames">The number of linked games that can be the base of a profile.</param>
+    internal static string FirstAction(int linkedGames, int baseGames) =>
+        baseGames > 0 ? FirstActionWithGame
+        : linkedGames > 0 ? FirstActionWithoutBase
+        : FirstActionWithoutGame;
+
+    /// <summary>Why New profile is off, or null when it is on. New profile needs a linked game that can be the base
+    /// of a profile.</summary>
+    /// <param name="linkedGames">The number of linked games.</param>
+    /// <param name="baseGames">The number of linked games that can be the base of a profile.</param>
+    internal static string? NewProfileReason(int linkedGames, int baseGames) =>
+        baseGames > 0 ? null
+        : linkedGames > 0 ? NoBaseReason
+        : NoGameReason;
 
     private readonly Dictionary<string, ProfileInfo> infos = [];
     private readonly HashSet<string> loading = [];
@@ -141,15 +168,18 @@ internal sealed class WelcomeScreen(EditorWindow window)
         }
 
         var scale = ImGuiHelper.Scale;
+        // New profile and the line of the first action use the same count of games that can be a base.
+        var linked = window.Links.Games.Count;
+        var bases = window.LinkedGameReports().Where(g => g.CanBeBase).ToList();
         ImGui.PushFont(null, EditorTheme.HeroSize);
         ImGui.Text("OpenLancer Editor");
         ImGui.PopFont();
         ImGui.PushStyleColor(ImGuiCol.Text, EditorTheme.Label);
         ImGui.TextWrapped(Purpose);
         ImGui.TextWrapped(ProfileNote);
-        ImGui.TextWrapped(FirstAction(window.Links.Games.Count > 0));
+        ImGui.TextWrapped(FirstAction(linked, bases.Count));
         ImGui.PopStyleColor();
-        LinkedGames();
+        LinkedGames(bases, NewProfileReason(linked, bases.Count));
         ImGui.Dummy(new Vector2(0, MathF.Truncate(SectionGap * scale)));
 
         var columnWidth = MathF.Truncate(ButtonColumnWidth * scale);
@@ -212,7 +242,9 @@ internal sealed class WelcomeScreen(EditorWindow window)
     /// One line for each linked game, at most three: its glyph, its name and its folder. Then the links to the Game link
     /// window and to New profile.
     /// </summary>
-    private void LinkedGames()
+    /// <param name="bases">The linked games that can be the base of a profile.</param>
+    /// <param name="newProfileReason">Why New profile is off, or null when it is on.</param>
+    private void LinkedGames(IReadOnlyList<GameReport> bases, string? newProfileReason)
     {
         var links = window.Links;
         ImGui.Dummy(new Vector2(0, MathF.Truncate(BannerPadding * ImGuiHelper.Scale)));
@@ -240,19 +272,16 @@ internal sealed class WelcomeScreen(EditorWindow window)
 
         ImGui.SetItemTooltip("Shows the linked game folders, their versions and their profiles.");
         ImGui.SameLine(0, MathF.Truncate(ColumnGap * ImGuiHelper.Scale));
-        var games = window.LinkedGameReports().Where(g => g.CanBeBase).ToList();
-        ImGui.BeginDisabled(games.Count == 0);
+        ImGui.BeginDisabled(newProfileReason != null);
         if (ImGui.TextLink(NewProfileLabel))
         {
-            window.ShowNewProfile(games);
+            window.ShowNewProfile(bases);
         }
 
         ImGui.EndDisabled();
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
         {
-            ImGui.SetTooltip(games.Count == 0
-                ? "Link a game folder first."
-                : "Makes a profile with an empty mod for a linked game, and opens it.");
+            ImGui.SetTooltip(newProfileReason ?? NewProfileTip);
         }
     }
 
