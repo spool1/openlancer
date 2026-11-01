@@ -54,7 +54,7 @@ public sealed class UiTextTests
     }
 
     [Theory]
-    [InlineData("Jump gates come with milestone M27.", "milestone")]
+    [InlineData("comes with milestone M27", "milestone")]
     [InlineData("The Milestone list", "Milestone")]
     [InlineData("see rule M21 first", "M21")]
     [InlineData("M6c-3", "M6c-3")]
@@ -62,6 +62,7 @@ public sealed class UiTextTests
     [InlineData("the encounters of a zone (M3b)", "M3b")]
     [InlineData("M27/M28", "M27")]
     [InlineData("a row of GA1", "GA1")]
+    [InlineData("the H1 work", "H1")]
     [InlineData("after M11", "M11")]
     [InlineData("M34", "M34")]
     public void TheMatcherFindsAMilestone(string text, string hit) =>
