@@ -251,6 +251,27 @@ internal sealed partial class MissionDraft
         return true;
     }
 
+    /// <summary>
+    /// Removes each line of a state key after the nickname line of a trigger, then puts one new line of the key with a
+    /// text at the place of a new state line. A null text only removes the lines. The row map gets the removed rows and
+    /// then the row of the new line, so each line between them moves by one row (final findings 3 of MCP1-3).
+    /// </summary>
+    public void SetStateLine(EditDocument document, int index, string key, string? text)
+    {
+        var entries = document.Working[index].ToList();
+        var nickname = TriggerRules.NicknameLine(entries);
+        var origins = Enumerable.Range(0, entries.Count).Where(i => i <= nickname || !MissionIndex.Is(entries[i].Name, key))
+            .ToList();
+        var kept = origins.Select(i => entries[i]).ToList();
+        if (text != null)
+        {
+            var place = TriggerRules.StatePlace(kept);
+            kept.Insert(place, NewEntry(document, index, key, [text], kept.Take(place)));
+            origins.Insert(place, -1);
+        }
+        SetLines(document, index, kept, origins: origins);
+    }
+
     /// <summary>Sets the value texts of one line, with the inverse that gives the old line back.</summary>
     public void SetTexts(EditDocument document, int index, int row, IReadOnlyList<string> texts)
     {

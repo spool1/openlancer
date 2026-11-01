@@ -307,13 +307,7 @@ public sealed record SetTriggerStart(TriggerRef Trigger, bool Starts) : MissionC
     {
         var (document, index) = d.Trigger(Trigger);
         d.Editable(document, index);
-        var entries = document.Working[index].ToList();
-        var nickname = TriggerRules.NicknameLine(entries);
-        var kept = entries.Where((e, i) => i <= nickname || !MissionIndex.Is(e.Name, "InitState")).ToList();
-        if (Starts)
-            kept.Insert(TriggerRules.StatePlace(kept), d.NewEntry(document, index, "InitState", ["ACTIVE"],
-                kept.Take(TriggerRules.StatePlace(kept))));
-        d.SetLines(document, index, kept);
+        d.SetStateLine(document, index, "InitState", Starts ? "ACTIVE" : null);
     }
 }
 
@@ -327,13 +321,7 @@ public sealed record SetTriggerRepeats(TriggerRef Trigger, bool Repeats) : Missi
     {
         var (document, index) = d.Trigger(Trigger);
         d.Editable(document, index);
-        var entries = document.Working[index].ToList();
-        var nickname = TriggerRules.NicknameLine(entries);
-        var kept = entries.Where((e, i) => i <= nickname || !MissionIndex.Is(e.Name, "repeatable")).ToList();
-        if (Repeats)
-            kept.Insert(TriggerRules.StatePlace(kept), d.NewEntry(document, index, "repeatable", ["true"],
-                kept.Take(TriggerRules.StatePlace(kept))));
-        d.SetLines(document, index, kept);
+        d.SetStateLine(document, index, "repeatable", Repeats ? "true" : null);
     }
 }
 

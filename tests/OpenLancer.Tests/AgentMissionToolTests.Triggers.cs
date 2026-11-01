@@ -242,6 +242,45 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal(before, m.State());
     }
 
+    /// <summary>set_trigger_start and set_trigger_repeats remove the state line of their key and put a new one at the
+    /// place of a state line. Their row moves give the removed row and then the new row, so each line between them moves
+    /// by one row. A compare of the lines would give the moved state line, or miss the line that it moves over (final
+    /// findings 3 of MCP1-3). The new state line has no row before the call, so it has no move.</summary>
+    [Fact]
+    public void TheStateCommandsGiveTheMovesOfALaterStateLine()
+    {
+        var (m, host) = Open();
+        using var _ = m;
+        (string?, int?, int?)[] Moves(JsonObject result) =>
+            [.. result["row_moves"]!.AsArray().Select(r => ((string?)r!["trigger"], (int?)r["from"], (int?)r["to"]))];
+        (string?, int?, int?) Move(int from, int to) => ($"trg:{Script}#ol_wave", from, to);
+        JsonObject Insert(string key, string text, int? before) => Ok(host, "mission_edit", Edit(
+            $$"""{ "kind": "insert_line", "section": "{{Wave}}", "line": { "key": "{{key}}", "texts": [ "{{text}}" ] }{{(before is { } row ? $", \"before\": {row}" : "")}} }"""));
+
+        // The state line is right after the condition: only the condition moves, by one row.
+        Insert("InitState", "ACTIVE", 3);
+        Assert.Equal(["system = ol_system", "nickname = ol_wave", "Cnd_Timer = 3", "InitState = ACTIVE"], m.Lines("ol_wave")[..4]);
+        var start = Ok(host, "mission_edit", Edit($$"""{ "kind": "set_trigger_start", "trigger": "{{Wave}}", "starts": true }"""));
+        Assert.Equal(["system = ol_system", "nickname = ol_wave", "InitState = ACTIVE", "Cnd_Timer = 3"], m.Lines("ol_wave")[..4]);
+        Assert.Equal([Move(2, 3)], Moves(start));
+        m.Session.Undo();
+        m.Session.Undo();
+
+        // A repeatable line after the actions (TR10): each line from the condition to the last action moves by one row.
+        Insert("repeatable", "true", null);
+        Assert.Equal("repeatable = true", m.Lines("ol_wave")[^1]);
+        var count = m.Lines("ol_wave").Length;
+        var repeats = Ok(host, "mission_edit", Edit($$"""{ "kind": "set_trigger_repeats", "trigger": "{{Wave}}", "repeats": true }"""));
+        Assert.Equal(["nickname = ol_wave", "repeatable = true", "Cnd_Timer = 3"], m.Lines("ol_wave")[1..4]);
+        Assert.Equal([.. Enumerable.Range(2, count - 3).Select(r => Move(r, r + 1))], Moves(repeats));
+        m.Session.Undo();
+
+        // "No" removes the line, so no line before it moves.
+        var stop = Ok(host, "mission_edit", Edit($$"""{ "kind": "set_trigger_repeats", "trigger": "{{Wave}}", "repeats": false }"""));
+        Assert.Equal(count - 1, m.Lines("ol_wave").Length);
+        Assert.Empty(Moves(stop));
+    }
+
     /// <summary>mission_link_triggers adds the lines of a link, and removes them with remove. A restart writes the stop
     /// first. The target can be a trg: reference of the same script.</summary>
     [Fact]
