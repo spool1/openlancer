@@ -27,7 +27,7 @@ internal static class Program
         }
 
         // The engine starts a new log, so keep the log of the last session first.
-        RunLogs.KeepLastRun(typeof(Program).Assembly.GetName().Name!);
+        RunLogs.KeepLastRun(typeof(Program).Assembly);
         EditorWindow? window = null;
         AppHandler.Run(Product.Name, () =>
         {

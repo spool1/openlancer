@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using LibreLancer;
 using OpenLancer.Data;
 using OpenLancer.Editor;
@@ -155,5 +156,31 @@ public sealed class RunLogsTests : IDisposable
 
         Assert.True(keep >= 0, $"{program} does not keep the last log.");
         Assert.True(run > keep, $"{program} keeps the last log after the engine starts the new log.");
+    }
+
+    /// <summary>Main gives the call its own assembly, <c>typeof(Program).Assembly</c>, and no text. The engine names
+    /// the log with the name of the assembly that calls <c>AppHandler.Run</c>, and Main makes that call. So the kept log
+    /// is the log that the engine writes.</summary>
+    [Theory]
+    [InlineData("OpenLancer.Editor")]
+    [InlineData("OpenLancer.Play")]
+    public void EachProgramKeepsTheLogOfItsOwnAssembly(string program)
+    {
+        var type = Assembly.Load(program).GetType(program + ".Program", true)!;
+        var main = type.GetMethod("Main", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var il = IlWalker.Instructions(main).ToList();
+        MethodBase? Callee(int index) => il[index].Op.OperandType == OperandType.InlineMethod
+            ? main.Module.ResolveMethod((int)il[index].Operand)
+            : null;
+
+        var at = Enumerable.Range(0, il.Count)
+            .Single(i => Callee(i) is { Name: nameof(RunLogs.KeepLastRun) } m && m.DeclaringType == typeof(RunLogs));
+
+        Assert.Equal([typeof(Assembly)], Callee(at)!.GetParameters().Select(p => p.ParameterType));
+        Assert.True(at >= 3, $"{program} gives the call no assembly of a type.");
+        Assert.Equal(OpCodes.Ldtoken, il[at - 3].Op);
+        Assert.Equal(type, main.Module.ResolveType((int)il[at - 3].Operand));
+        Assert.Equal(nameof(Type.GetTypeFromHandle), Callee(at - 2)?.Name);
+        Assert.Equal("get_" + nameof(Type.Assembly), Callee(at - 1)?.Name);
     }
 }

@@ -400,9 +400,9 @@ internal sealed class PlayController : IDisposable
     /// <summary>
     /// Starts the game of a request, or gives the reason why the play does not start. A crash report that waits for a
     /// validation comes now: before the lines of the new game, or after the reason. The new game moves the game log to
-    /// the previous log when it starts (<see cref="RunLogs.KeepLastRun(string)"/>). So the report names the previous
-    /// log when the game starts, and the game log when the play does not start. When the start throws, the report comes
-    /// with the game log before the exception leaves the method.
+    /// the previous log when it starts (<see cref="RunLogs.KeepLastRun(System.Reflection.Assembly)"/>). So the report
+    /// names the previous log when the game starts, and the game log when the play does not start. When the start
+    /// throws, the report comes with the game log before the exception leaves the method.
     /// </summary>
     private PlayRequestResult Begin(PlayRequest request)
     {

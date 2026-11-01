@@ -23,7 +23,7 @@ internal static class ProgramPaths
     public static string PlayLog => RunLogs.PathOf(PlayName);
 
     /// <summary>The previous log of the game process of Play. Each start of the game moves the log of the last run to
-    /// this file (<see cref="RunLogs.KeepLastRun(string)"/>).</summary>
+    /// this file (<see cref="RunLogs.KeepLastRun(System.Reflection.Assembly)"/>).</summary>
     public static string PreviousPlayLog => RunLogs.PreviousPathOf(PlayName);
 
     private static string NextToEditor(string name) =>

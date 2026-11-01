@@ -40,7 +40,7 @@ internal static class Program
 
         // The engine starts a new log, so keep the log of the last run first. A crash report of the editor that waits
         // until this start names the previous log.
-        RunLogs.KeepLastRun(typeof(Program).Assembly.GetName().Name!);
+        RunLogs.KeepLastRun(typeof(Program).Assembly);
         PlayHost? host = null;
         // Null until the play gives a code. The engine can return before it runs the play (PlayExitCodes.NotStarted).
         int? exitCode = null;

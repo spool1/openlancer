@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using LibreLancer;
 using OpenLancer.Data;
 
@@ -10,7 +11,7 @@ namespace OpenLancer.Runtime;
 /// in <see cref="Folder"/>, and makes the file again at each start. When the log reaches its size limit, the engine
 /// copies it to the old file <c>&lt;program&gt;.log.old.txt</c> (<see cref="FLLog.OldSpewPath"/>). So a start would
 /// replace the log of the last run, and a restart after a crash would lose the log that a bug report needs.
-/// <see cref="KeepLastRun(string)"/> keeps that log before the engine starts the new one.
+/// <see cref="KeepLastRun(Assembly)"/> keeps that log before the engine starts the new one.
 /// </summary>
 public static class RunLogs
 {
@@ -32,8 +33,9 @@ public static class RunLogs
 
     /// <summary>Keeps the log of the last run of a program in its previous log. Call it before
     /// <c>AppHandler.Run</c>, which starts the new log.</summary>
-    /// <param name="program">The name of the program assembly.</param>
-    public static void KeepLastRun(string program) => KeepLastRun(program, Folder);
+    /// <param name="program">The program assembly, for example <c>typeof(Program).Assembly</c>. The engine names the log
+    /// with the name of this assembly, so the call takes the name with the same rule.</param>
+    public static void KeepLastRun(Assembly program) => KeepLastRun(program.GetName().Name!, Folder);
 
     /// <summary>
     /// Keeps the log of the last run of a program in a folder. The log moves to the previous log, and its old file moves
