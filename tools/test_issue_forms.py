@@ -176,10 +176,14 @@ class IssueFormTests(unittest.TestCase):
         self.assertEqual(["version", "game", "steps", "expected", "actual", "logs", "no-game-files"], list(fields))
         for field_id in ("version", "game", "steps", "expected", "actual"):
             self.assertTrue(fields[field_id]["validations"]["required"], field_id)
-        self.assertIn("Help > About OpenLancer", fields["version"]["attributes"]["description"])
+        version = fields["version"]["attributes"]["description"]
+        self.assertIn("Help > About OpenLancer", version)
         logs = fields["logs"]["attributes"]["description"]
         for text in ("paths of your folders", "Windows user name", ".log.previous.txt"):
             self.assertIn(text, logs)
+        # The public preview has no Help menu, so each field also tells a user of such a build what to do.
+        self.assertIn("A build without a Help menu: write the version from the name of its zip file.", version)
+        self.assertIn("A build without a Help menu: README-FIRST.txt names the log folder.", logs)
 
     def test_the_bug_report_needs_the_box_that_no_game_files_are_attached(self):
         box = self.fields("bug_report.yml")["no-game-files"]
@@ -195,6 +199,14 @@ class IssueFormTests(unittest.TestCase):
                          options)
         for field_id in ("round", "version", "area", "step", "happened", "expected", "severity"):
             self.assertTrue(fields[field_id]["validations"]["required"], field_id)
+
+    def test_the_severity_gives_one_line_to_each_option_and_minor_holds_the_rest(self):
+        """The triage of the 1.0 scope defines blocker, major and idea. Minor holds all other problems."""
+        severity = self.fields("playtest_finding.yml")["severity"]["attributes"]
+        lines = severity["description"].splitlines()
+        self.assertEqual([f"- **{o}**" for o in severity["options"]], [line.split(":")[0] for line in lines])
+        [minor] = [line for line in lines if line.startswith("- **Minor**")]
+        self.assertIn("a problem that is not a blocker or a major problem", minor)
 
     def test_the_chooser_sends_help_questions_to_the_setup_help_forum(self):
         config = self.load(CONFIG)

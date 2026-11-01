@@ -92,11 +92,11 @@ body:
     id: severity
     attributes:
       label: Severity
-      description: >-
-        Blocker: a crash, a loss of data, or a task that cannot finish.
-        Major: a wrong, unclear or broken-looking result in a main view, or a break of an editor UI rule.
-        Minor: polish in a side view.
-        Idea: a new feature or a wish.
+      description: |
+        - **Blocker**: a crash, a loss of data, or a task that cannot finish.
+        - **Major**: a wrong, unclear or broken-looking result in a main view, or a break of an editor UI rule.
+        - **Minor**: a problem that is not a blocker or a major problem, for example polish or a problem in a side view.
+        - **Idea**: a new feature or a wish.
       options:
         - Blocker
         - Major
