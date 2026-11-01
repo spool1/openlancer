@@ -4,22 +4,23 @@ Builds the binary release zip of OpenLancer from one commit in a clean clone.
 
 .DESCRIPTION
 The steps follow section 7.1 of the R1 release plan:
- 1. Preflight: the tools, the work root, the commits on origin and the version of the commit.
+ 1. Preflight: the tools, the work root, the commits on origin, the version of the commit and the name of the zip.
  2. A clean clone of the commit and its submodules, and the content scan of the clone.
  3. The engine natives and the shader tools of the clone (natives with the static C runtime, OL-0035).
  4. The OpenLancer tests and the engine fork tests in Release.
- 5. A self-contained win-x64 publish of each program.
+ 5. A self-contained win-x64 publish of each program, with the engine commit for Help > About.
  6. One stage folder from the three publish folders (tools/release_check.py merge).
  7. README-FIRST.txt, LICENSE.txt, NOTICE.txt and the licenses folder (tools/release_check.py docs).
  8. The checks a to i of the stage folder (tools/release_check.py stage).
  9. A start of oltool, and a load of each native DLL.
 10. The deterministic zip and the checks of its entries (tools/release_check.py zip).
 11. The outputs in <work root>\out: the zip, its .sha256 file, the OpenAL Soft source archive, the release notes with
-    the commits filled in, and the log.
+    the commits filled in (when the commit has a notes file), and the log.
 The script writes only below the work root. It never tags, pushes or uploads.
 
 .PARAMETER Version
-The release version, for example 0.1.0-preview. It must be the version in src/Directory.Build.props of the commit.
+The release version, for example 1.0.0-beta.1. It must be the version in src/Directory.Build.props of the commit. A
+release refuses a development version, for example 1.0.0-dev.
 
 .PARAMETER Commit
 The commit to build. The default is the commit of origin/master.
@@ -29,14 +30,25 @@ The folder for the clone and the outputs. It must not be in the repo and its pat
 word "decompiled", because the native binaries keep the source paths of the build.
 
 .PARAMETER DryRun
-A test run: another version is allowed, the texts can keep their marks, a component can have a status, and the zip
-gets the name OpenLancer-<version>-dryrun-<commit>-win-x64.zip.
+A test run. It allows another version than the version of the commit, a development version, texts with marks, a
+component with a status and no release notes. The zip gets the name OpenLancer-<version>-dryrun-<commit>-win-x64.zip,
+with the version of the commit.
 
 .PARAMETER SkipTests
 Only with -DryRun: skip step 4.
 
 .EXAMPLE
-powershell -ExecutionPolicy Bypass -File tools\release.ps1 -Version 0.1.0-preview -DryRun
+powershell -ExecutionPolicy Bypass -File tools\release.ps1 -Version 1.0.0-dev -DryRun
+
+.NOTES
+Versions and releases:
+- Master holds the next version with the suffix dev, for example 1.0.0-dev. A release commit sets the version of the
+  release in src/Directory.Build.props, for example 1.0.0-beta.1, 1.0.0-rc.1 or 1.0.0.
+- After each release, master goes to the next version with -dev.
+- A beta or a release candidate is a GitHub pre-release. Only the final version is Latest.
+- Each version needs its notes file release/notes/v<version>.md. One approval of the owner covers the notes files of
+  the beta, the release candidates and the final version of one release.
+- Each notes file needs its entry in MARKDOWN_FILES of tools/content_scan.py.
 #>
 [CmdletBinding()]
 param(
@@ -78,11 +90,12 @@ function Invoke-Native {
     if ($code -ne $Expected) { Stop-Release "$File exited with code $code." }
 }
 
-# Runs a program and returns its output as one trimmed string.
+# Runs a program and returns its output as one trimmed string. When the program fails, the stop also names its output.
 function Get-NativeOutput([string]$File, [string[]]$Arguments) {
     $lines = & $File @Arguments
-    if ($LASTEXITCODE -ne 0) { Stop-Release "$File $($Arguments -join ' ') exited with code $LASTEXITCODE." }
-    return (($lines | Out-String).Trim())
+    $text = ($lines | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) { Stop-Release "$File $($Arguments -join ' ') exited with code $LASTEXITCODE. $text" }
+    return $text
 }
 
 function Find-Tool([string]$Name) {
@@ -168,7 +181,10 @@ $buildVersion = if ($null -ne $suffixNode -and $suffixNode.InnerText.Trim()) { "
 if ($buildVersion -ne $Version -and -not $DryRun) {
     Stop-Release "The commit $sha has the version $buildVersion, not $Version. Change src/Directory.Build.props first."
 }
-$zipName = if ($DryRun) { "OpenLancer-$buildVersion-dryrun-$sha7-win-x64.zip" } else { "OpenLancer-v$Version-win-x64.zip" }
+# The name rule of tools/release_check.py. It also refuses a release of a development version, before the clone.
+$nameArgs = @('-B', (Join-Path $PSScriptRoot 'release_check.py'), 'name', '--version', $buildVersion, '--sha7', $sha7)
+if ($DryRun) { $nameArgs += '--dry-run' }
+$zipName = Get-NativeOutput $python $nameArgs
 Write-Log "Commit $sha, engine commit $forkSha, version $buildVersion, dry run: $DryRun"
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -219,7 +235,7 @@ foreach ($program in $programs.Keys) {
     $folder = Join-Path $publish $project
     Invoke-Native $dotnet @('publish', "src\$project\$project.csproj", '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true',
         '-o', $folder, "-p:PathMap=$src=/_/", '-p:EnableSourceLink=false', '-p:DebugType=embedded',
-        "-p:SourceRevisionId=$sha7", '--nologo') $src
+        "-p:SourceRevisionId=$sha7", "-p:OpenLancerEngineCommit=$forkSha", '--nologo') $src
     $merges += "$program=$folder"
 }
 
@@ -230,10 +246,14 @@ $stage = Join-Path $stageRoot "OpenLancer-v$buildVersion"
 $check = Join-Path $src 'tools\release_check.py'
 Invoke-Native $python (@('-B', $check, 'merge', $stage) + $merges)
 $notesOut = Join-Path $out "release-notes-v$buildVersion.md"
+if (Test-Path -LiteralPath $notesOut) { Remove-Item -LiteralPath $notesOut -Force }
 $docsArgs = @('-B', $check, 'docs', $stage, '--repo', $src, '--version', $buildVersion, '--commit', $sha,
     '--fork-commit', $forkSha, '--notes-out', $notesOut)
 if ($DryRun) { $docsArgs += '--dry-run' }
 Invoke-Native $python $docsArgs
+if (-not (Test-Path -LiteralPath $notesOut)) {
+    Write-Log "The commit has no release/notes/v$buildVersion.md. The dry run writes no release notes."
+}
 $forbid = @('--forbid', $devFull, '--forbid', (Split-Path -Parent $devFull))
 Invoke-Native $python (@('-B', $check, 'stage', $stage, '--repo', $src, '--version', $buildVersion) + $forbid)
 
