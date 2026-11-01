@@ -663,7 +663,7 @@
     "act": "The act: reference of the act.",
     "place": "The place of the node in the mission graph, in canvas points. Without it, the graph places the node.",
     "references": "keep: each line that names the removed item stays and shows 'Missing'. remove: each such line goes too. The default is keep.",
-    "change_references": "True also changes each line that names the old nickname. Without it, these lines show 'Missing'.",
+    "change_references": "True changes each line that names the old nickname. This is the default. False keeps these lines, and they show 'Missing'.",
     "value": "The new value: a number, a text, a boolean, or a list for a position.",
     "position": "The position: three numbers x, y and z.",
     "rotation": "The orientation: four numbers, as an orientation line holds them.",
@@ -945,7 +945,7 @@
       "description": "Removes a trigger. Each line that names it stays and shows 'Missing', or goes with references: remove."
     },
     "rename_item": {
-      "description": "Gives an item a new nickname. With change_references, each line that names it changes too. A ship build of the shared ship build file refuses.",
+      "description": "Gives an item a new nickname. Each line that names it changes too, unless change_references is false. A ship build of the shared ship build file refuses.",
       "fields": {
         "new_name": "The new nickname of the item."
       }
@@ -958,7 +958,7 @@
       }
     },
     "rename_trigger": {
-      "description": "Gives a trigger a new nickname. With change_references, each line of the script that names the trigger changes too.",
+      "description": "Gives a trigger a new nickname. Each line of the script that names the trigger changes too, unless change_references is false.",
       "fields": {
         "new_name": "The new nickname of the trigger."
       }

@@ -20653,7 +20653,8 @@
               },
               "change_references": {
                 "type": "boolean",
-                "description": "True also changes each line that names the old nickname. Without it, these lines show \u0027Missing\u0027."
+                "default": true,
+                "description": "True changes each line that names the old nickname. This is the default. False keeps these lines, and they show \u0027Missing\u0027."
               }
             },
             "required": [
@@ -20662,7 +20663,7 @@
               "new_name"
             ],
             "additionalProperties": false,
-            "description": "Gives an item a new nickname. With change_references, each line that names it changes too. A ship build of the shared ship build file refuses."
+            "description": "Gives an item a new nickname. Each line that names it changes too, unless change_references is false. A ship build of the shared ship build file refuses."
           },
           "rename_prefab_asset": {
             "type": "object",
@@ -20720,7 +20721,8 @@
               },
               "change_references": {
                 "type": "boolean",
-                "description": "True also changes each line that names the old nickname. Without it, these lines show \u0027Missing\u0027."
+                "default": true,
+                "description": "True changes each line that names the old nickname. This is the default. False keeps these lines, and they show \u0027Missing\u0027."
               }
             },
             "required": [
@@ -20729,7 +20731,7 @@
               "new_name"
             ],
             "additionalProperties": false,
-            "description": "Gives a trigger a new nickname. With change_references, each line of the script that names the trigger changes too."
+            "description": "Gives a trigger a new nickname. Each line of the script that names the trigger changes too, unless change_references is false."
           },
           "reorder_action": {
             "type": "object",

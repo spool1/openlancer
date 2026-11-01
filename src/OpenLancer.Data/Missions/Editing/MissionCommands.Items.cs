@@ -432,13 +432,16 @@ public sealed record DuplicateItem(ItemRef Item) : MissionCommand
 }
 
 /// <summary>
-/// Gives an item a new name (section 4.10 of the M6b design): the key line, and with <see cref="ChangeReferences"/>
-/// each line that names it by the reference kinds of the schema. A name of a script changes only in its script. A ship
+/// Gives an item a new name (section 4.10 of the M6b design): the key line, and with <see cref="ChangeReferences"/>, true
+/// by default, each line that names it by the reference kinds of the schema. A name of a script changes only in its script. A ship
 /// build changes in each script whose <c>[NPC]</c> names it. A ship build of a shared file refuses
 /// (<c>SharedBuildRename</c>).
 /// </summary>
 public sealed record RenameItem(ItemRef Item, string NewName) : MissionCommand
 {
+    /// <summary>True changes each line that names the item. It is true by default. False keeps the lines, and they show
+    /// "Missing".</summary>
+    [System.ComponentModel.DefaultValue(true)]
     public bool ChangeReferences { get; init; } = true;
 
     protected override string Describe() => $"Rename {Item.Section.Key} to {NewName}";

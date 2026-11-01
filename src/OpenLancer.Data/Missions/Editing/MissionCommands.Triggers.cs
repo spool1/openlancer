@@ -146,10 +146,12 @@ public sealed record RemoveTrigger(TriggerRef Trigger) : MissionCommand
     }
 }
 
-/// <summary>Gives a trigger a new nickname. With <see cref="ChangeReferences"/>, each line of the script that names the
-/// trigger changes too (section 4.10 of the M6b design).</summary>
+/// <summary>Gives a trigger a new nickname. With <see cref="ChangeReferences"/>, true by default, each line of the script
+/// that names the trigger changes too (section 4.10 of the M6b design).</summary>
 public sealed record RenameTrigger(TriggerRef Trigger, string NewName) : MissionCommand
 {
+    /// <inheritdoc cref="RenameItem.ChangeReferences"/>
+    [System.ComponentModel.DefaultValue(true)]
     public bool ChangeReferences { get; init; } = true;
 
     protected override string Describe() => $"Rename {Trigger.Name} to {NewName}";

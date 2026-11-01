@@ -312,11 +312,24 @@ public static class MissionJson
                                  ? new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9]+$" }
                                  : node);
                 return context.PropertyInfo is { } property
-                    ? Described(schema, help?.Invoke(property.DeclaringType, property.Name))
+                    ? Described(WithDefault(schema, property), help?.Invoke(property.DeclaringType, property.Name))
                     : schema;
             },
         });
         return node.AsObject();
+    }
+
+    /// <summary>The schema of a property with the default that its <see cref="System.ComponentModel.DefaultValueAttribute"/>
+    /// gives, for example <c>change_references</c>, or the schema as it is without one. The exporter gives only the
+    /// default of a parameter of a constructor.</summary>
+    private static JsonNode WithDefault(JsonNode schema, JsonPropertyInfo property)
+    {
+        if (property.AttributeProvider?.GetCustomAttributes(typeof(System.ComponentModel.DefaultValueAttribute), false) is not
+            [System.ComponentModel.DefaultValueAttribute attribute, ..])
+            return schema;
+        var withDefault = schema as JsonObject ?? new JsonObject();
+        withDefault["default"] = JsonSerializer.SerializeToNode(attribute.Value, Options);
+        return withDefault;
     }
 
     /// <summary>The schema of a type that JSON writes in its own form, or null.</summary>

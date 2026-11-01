@@ -414,6 +414,38 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal("Cnd_Timer = 9", m.Lines("ol_wave")[2]);
     }
 
+    /// <summary>A rename without change_references changes each line that names the item, because the default is true.
+    /// The input schema and the help give that default. False keeps the lines, so they name the old nickname and need
+    /// confirm: true.</summary>
+    [Fact]
+    public void ARenameChangesTheLinesThatNameTheItemByDefault()
+    {
+        var (m, host) = Open();
+        using var _ = m;
+
+        Ok(host, "mission_edit", Edit($$"""{ "kind": "rename_trigger", "trigger": "trg:{{S}}#ol_end", "new_name": "ol_finish" }"""));
+        Ok(host, "mission_edit", Edit($$"""{ "kind": "rename_item", "item": "sec:{{S}}#MsnShip/ol_ship_1", "new_name": "ol_lead" }"""));
+        var kept = Edit($$"""{ "kind": "rename_trigger", "trigger": "trg:{{S}}#ol_wave", "new_name": "ol_attack", "change_references": false }""");
+        var asked = Error(host, "mission_edit", kept);
+        Assert.Equal(("needs_confirmation", EditTools.ConfirmChanges), (asked.Code, asked.Detail));
+        Ok(host, "mission_edit", kept.Insert(1, "\"confirm\": true, "));
+
+        Assert.Equal(["Act_ActTrig = ol_wave", "Act_ActTrig = ol_finish"], m.Lines("ol_start")[3..]);
+        Assert.Equal("Act_SpawnShip = ol_lead", m.Lines("ol_attack")[3]);
+        var definitions = AgentTools.Find("mission_edit")!.InputSchema["$defs"]!;
+        foreach (var (kind, byDefault) in new[]
+                 {
+                     ("rename_trigger", new RenameTrigger(T("ol_x"), "ol_y").ChangeReferences),
+                     ("rename_item", new RenameItem(Item("MsnShip", "ol_x"), "ol_y").ChangeReferences),
+                 })
+        {
+            var field = definitions[kind]!["properties"]!["change_references"]!;
+            Assert.True(byDefault);
+            Assert.Equal(byDefault, (bool?)field["default"]);
+            Assert.Contains("This is the default.", (string?)field["description"]);
+        }
+    }
+
     /// <summary>The size check of a result counts the inverse, so an edit whose inverse is too large changes
     /// nothing.</summary>
     [Fact]
