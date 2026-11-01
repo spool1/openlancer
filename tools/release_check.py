@@ -361,6 +361,15 @@ def fill(name, text, values):
     return text, [f"{name}: unknown placeholder {p}" for p in left]
 
 
+def readme_first(repo, version):
+    """The text of README-FIRST.txt of a version and the problems of its placeholders. The title rule under the first
+    line is as long as the title."""
+    text = read_text(os.path.join(repo, "release", "README-FIRST.txt"))
+    title = f"OpenLancer {version_title(version)}"
+    return fill("release/README-FIRST.txt", text.replace("@TITLE_RULE@", "=" * len(title)),
+                {"@VERSION@": version, "@VERSION_TITLE@": version_title(version)})
+
+
 def component_text(component, repo, versions):
     """The text of licenses/<id>.txt of one component. Raises ValueError for a missing source."""
     head = [component["name"], "=" * len(component["name"]), f"Version: {component['version']}",
@@ -396,10 +405,7 @@ def docs(stage, repo, version, commit, fork_commit, notes_out=None, dry_run=Fals
     """
     data = load_release_data(repo)
     problems = []
-    values = {"@VERSION@": version, "@VERSION_TITLE@": version_title(version)}
-    readme = read_text(os.path.join(repo, "release", "README-FIRST.txt"))
-    title = f"OpenLancer {version_title(version)}"
-    readme, found = fill("release/README-FIRST.txt", readme.replace("@TITLE_RULE@", "=" * len(title)), values)
+    readme, found = readme_first(repo, version)
     problems += found
     notes_name = f"release/notes/v{version}.md"
     notes_path = os.path.join(repo, *notes_name.split("/"))

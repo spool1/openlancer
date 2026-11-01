@@ -20,8 +20,8 @@ SYSTEM REQUIREMENTS
 -------------------
 - Windows 10 or Windows 11, 64-bit.
 - A graphics card and a driver with OpenGL 3.2 or later.
-- An installed copy of Freelancer. We tested this preview with the data of
-  the English version 1.0.
+- An installed copy of Freelancer. We tested this version with the English
+  Freelancer 1.1 and with Freelancer: HD Edition 0.7.1.
 - About 130 MB of disk space.
 You do not need to install .NET.
 
@@ -39,7 +39,7 @@ START THE EDITOR
 6. Select the folder of your game. This folder contains the EXE and DATA
    folders. You can also drag the folder to the editor window.
 7. Make sure that the editor shows "Game found" and the name of your game,
-   for example "Freelancer 1.0".
+   for example "Freelancer 1.1".
 8. Click "Create profile and open". The editor makes a profile and an
    empty mod, my-mod, in Documents\OpenLancer. Then the Scene shows a star
    system in 3D.
@@ -67,7 +67,7 @@ WHAT WORKS IN THIS PREVIEW
   the result of its check. It also makes one more profile for a game.
 - Look at the star systems in a 3D Scene, with a Hierarchy and an
   Inspector.
-- Look at ships, equipment, bases, factions and more in the Database.
+- Look at the star systems, ships, goods and equipment in the Database.
 - Change values in the Inspector. Lists show the valid values. Color
   pickers and drags on the X, Y and Z labels help.
 - Move and rotate objects, and change the size of zones, with snap and
@@ -89,6 +89,13 @@ WHAT WORKS IN THIS PREVIEW
   crashes the game, it stops the save and tells you why. It does not find
   all such values.
 - Test your mod with F5 (Play). A save reloads the running game.
+- Change the missions of the game in the Mission tab. The mission editor
+  shows a mission as a graph of triggers. It adds and changes triggers,
+  checks the script and runs a dry run. Play from a trigger starts the
+  game at a point of the mission.
+- Export your mod for Freelancer 1.1 and for HD Edition 0.7.1, as a
+  drop-in zip and as an FLMM package, with Mod > Export mod... The
+  export checks the mod before it writes the packages.
 - Look at the cutscenes of the game, and preview them. Change the values of
   a cutscene in your mod.
 - oltool checks your game folder, and checks, merges and shows mods from
@@ -107,15 +114,12 @@ new folder has another version of the game, the editor asks you first.
 
 WHAT DOES NOT WORK YET
 ----------------------
-- Export. No tool installs a mod into the original game or into
-  HD Edition yet. You can test a mod only with Play of the editor.
 - Play is a test run of the editor, not a release of a game. It uses the
   OpenLancer runtime, a fork of the Librelancer engine. It is not the
   original game program. It does not play the whole story. Some missions
   stop, ships have fewer AI behaviors, and some effects and cutscenes look
   different.
-- Version 1.1 and HD Edition: the editor detects them, but we did not test
-  the editor or Play on them. Play does not run the HD Edition plugins.
+- Play does not run the HD Edition plugins.
 - OpenLancer does not support total conversions such as Discovery. The
   editor can open their data, with a warning.
 - You cannot create or delete jump gates, jump holes and trade lane
@@ -124,7 +128,7 @@ WHAT DOES NOT WORK YET
 - The nebula and field picks, Create, Duplicate, Rename, Delete and the
   Assets panel are the newest parts of this preview. We tested them
   mostly with automatic tests.
-- There is no mission editor and no dialogue editor yet.
+- There is no dialogue editor yet.
 - The mod format can change before version 1.0.
 
 

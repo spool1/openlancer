@@ -577,6 +577,56 @@ class InternalIdTests(unittest.TestCase):
             found = [(n, m.group(0)) for n, line in enumerate(f, 1) for m in self.pattern.finditer(line)]
         self.assertEqual([], found)
 
+    def test_readme_first_names_no_internal_id(self):
+        """README-FIRST.txt goes into the release zip."""
+        with open(os.path.join(REPO, "release", "README-FIRST.txt"), encoding="utf-8") as f:
+            found = [(n, m.group(0)) for n, line in enumerate(f, 1) for m in self.pattern.finditer(line)]
+        self.assertEqual([], found)
+
+
+class ReadmeFirstTests(unittest.TestCase):
+    """The real release/README-FIRST.txt (#56). It fills with the values of each kind of version, and it makes no claim
+    that is false for this version."""
+
+    VERSIONS = ("1.0.0-dev", "1.0.0-beta.1", "1.0.0-rc.1", "1.0.0")
+
+    def filled(self, version):
+        text, problems = rc.readme_first(REPO, version)
+        self.assertEqual([], problems, version)
+        return text
+
+    def section(self, text, heading):
+        """The lines of a section: from its heading and its rule line to the next empty line pair."""
+        match = re.search(rf"^{re.escape(heading)}\n-+\n(.*?)\n\n\n", text, re.M | re.S)
+        self.assertIsNotNone(match, heading)
+        return match.group(1)
+
+    def test_each_kind_of_version_fills_each_placeholder(self):
+        for version in self.VERSIONS:
+            text = self.filled(version)
+            title, rule = text.split("\n")[:2]
+            self.assertEqual(f"OpenLancer {rc.version_title(version)}", title)
+            self.assertEqual("=" * len(title), rule)
+            self.assertIn(f"Open the folder OpenLancer-v{version}.", text)
+            self.assertIsNone(rc.PLACEHOLDER.search(text), version)
+
+    def test_the_text_makes_no_old_claim(self):
+        text = self.filled("1.0.0-beta.1")
+        for claim in ("Export. No tool installs", "bases, factions", "There is no mission editor",
+                      "we did not test", "the English version 1.0"):
+            self.assertNotIn(claim, text)
+
+    def test_the_tested_games_are_freelancer_1_1_and_hd_edition_0_7_1(self):
+        requirements = " ".join(self.section(self.filled("1.0.0"), "SYSTEM REQUIREMENTS").split())
+        self.assertIn("We tested this version with the English Freelancer 1.1 and with Freelancer: HD Edition 0.7.1.",
+                      requirements)
+
+    def test_what_works_names_the_export_the_mission_editor_and_the_database(self):
+        works = " ".join(self.section(self.filled("1.0.0"), "WHAT WORKS IN THIS PREVIEW").split())
+        self.assertIn("as a drop-in zip and as an FLMM package, with Mod > Export mod...", works)
+        self.assertIn("The mission editor shows a mission as a graph of triggers.", works)
+        self.assertIn("Look at the star systems, ships, goods and equipment in the Database.", works)
+
 
 class ReleaseScriptTests(unittest.TestCase):
     """The rules of the steps of tools/release.ps1 (#57). The tools tests cannot run the script, so they read its text."""
