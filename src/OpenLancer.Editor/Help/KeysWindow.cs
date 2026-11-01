@@ -6,7 +6,6 @@ using LibreLancer.ImUI;
 using OpenLancer.Editor.Cutscene;
 using OpenLancer.Editor.Scene;
 using OpenLancer.Editor.Ui;
-using OpenLancer.Runtime.Scene;
 
 namespace OpenLancer.Editor.Help;
 
@@ -19,7 +18,7 @@ internal sealed record KeyRow(string Group, string Keys, string Action);
 /// <summary>
 /// Help &gt; Keys: a floating window with one table of the keys of the editor, as the Shortcuts window of Unity lists
 /// them. The rows of the keys come from the lists that the key handlers read (<see cref="EditorKeys"/>,
-/// <see cref="GizmoInput.ToolKeys"/> and <see cref="PreviewKeys.Table"/>), so the table cannot drift from the keys. The
+/// <see cref="GizmoInput.KeyRows"/> and <see cref="PreviewKeys.Table"/>), so the table cannot drift from the keys. The
 /// rows of the mouse come from the help popover of the Scene (<see cref="SceneView.MouseControls"/>).
 /// </summary>
 internal sealed class KeysWindow
@@ -120,16 +119,10 @@ internal sealed class KeysWindow
         var rows = new List<KeyRow>();
         rows.AddRange(EditorKeys.Global.Select(k => new KeyRow(Global, k.Chord.Text, k.Action)));
         rows.AddRange(EditorKeys.Scene.Select(k => new KeyRow(Scene, k.Chord.Text, k.Action)));
-        rows.AddRange(GizmoInput.ToolKeys.Select(t =>
-            new KeyRow(Scene, KeyChord.KeyName(t.Key), $"Select the {ToolName(t.Tool)} tool of the gizmo.")));
-        rows.Add(new KeyRow(Scene, KeyChord.KeyName(GizmoInput.SpaceKey),
-            "Change the gizmo between Local and World. The scale tool always uses Local."));
+        rows.AddRange(GizmoInput.KeyRows.Select(k => new KeyRow(Scene, k.Keys, k.Action)));
         rows.AddRange(SceneView.MouseControls.Select(c => new KeyRow(SceneMouse, c.Input, c.Action + ".")));
         rows.AddRange(EditorKeys.Hierarchy.Select(k => new KeyRow(Hierarchy, k.Chord.Text, k.Action)));
         rows.AddRange(PreviewKeys.Table.Select(k => new KeyRow(Preview, k.Chord.Text, k.Action)));
         return rows;
     }
-
-    /// <summary>The name of a gizmo tool for the user: move, rotate or scale.</summary>
-    private static string ToolName(GizmoTool tool) => tool.ToString().ToLowerInvariant();
 }

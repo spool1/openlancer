@@ -1,5 +1,7 @@
 using System;
+using System.Linq;
 using ImGuiNET;
+using OpenLancer.Editor.Ui;
 using OpenLancer.Runtime.Scene;
 
 namespace OpenLancer.Editor.Scene;
@@ -85,6 +87,21 @@ internal static class GizmoInput
     /// <summary>The key of each tool: W moves, E rotates and R scales.</summary>
     public static readonly (GizmoTool Tool, ImGuiKey Key)[] ToolKeys =
         [(GizmoTool.Move, ImGuiKey.W), (GizmoTool.Rotate, ImGuiKey.E), (GizmoTool.Scale, ImGuiKey.R)];
+
+    /// <summary>The input that changes the snap of a drag (see <see cref="GizmoSnap.WithCtrl"/>).</summary>
+    public const string SnapInput = "Ctrl, while dragging a handle";
+
+    /// <summary>The rows of the gizmo keys for the help popover of the Scene and Help &gt; Keys: the tool keys, the
+    /// space key and the snap input.</summary>
+    public static readonly (string Keys, string Action)[] KeyRows =
+    [
+        .. ToolKeys.Select(t => (KeyChord.KeyName(t.Key), $"Select the {ToolName(t.Tool)} tool of the gizmo.")),
+        (KeyChord.KeyName(SpaceKey), "Change the gizmo between Local and World. The scale tool always uses Local."),
+        (SnapInput, "Snap when the snap is off, or do not snap when it is on."),
+    ];
+
+    /// <summary>The name of a gizmo tool for the user: move, rotate or scale.</summary>
+    public static string ToolName(GizmoTool tool) => tool.ToString().ToLowerInvariant();
 
     /// <summary>
     /// What gets the mouse in this frame. An open or ended drag keeps it. A button that was active in the last frame

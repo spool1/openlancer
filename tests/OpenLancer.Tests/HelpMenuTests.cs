@@ -283,6 +283,8 @@ public sealed class HelpMenuTests : IDisposable
             Assert.Single(rows, r => r.Group == KeysWindow.Scene && r.Keys == KeyChord.KeyName(key) &&
                                      r.Action.Contains(tool.ToString(), StringComparison.OrdinalIgnoreCase));
         Assert.Single(rows, r => r.Group == KeysWindow.Scene && r.Keys == KeyChord.KeyName(GizmoInput.SpaceKey));
+        Assert.Single(rows, r => r.Group == KeysWindow.Scene && r.Keys == GizmoInput.SnapInput &&
+                                 r.Action.StartsWith("Snap", StringComparison.Ordinal));
         foreach (var (input, action) in SceneView.MouseControls)
             Assert.Contains(new KeyRow(KeysWindow.SceneMouse, input, action + "."), rows);
         foreach (var key in EditorKeys.Hierarchy)
@@ -293,7 +295,7 @@ public sealed class HelpMenuTests : IDisposable
             Assert.Contains(new KeyRow(KeysWindow.Preview, chord.Text, action), rows);
         }
 
-        Assert.Equal(EditorKeys.Global.Length + EditorKeys.Scene.Length + GizmoInput.ToolKeys.Length + 1 +
+        Assert.Equal(EditorKeys.Global.Length + EditorKeys.Scene.Length + GizmoInput.KeyRows.Length +
                      SceneView.MouseControls.Length + EditorKeys.Hierarchy.Length + PreviewKeys.Table.Length,
             rows.Count);
         Assert.Equal(
@@ -307,8 +309,8 @@ public sealed class HelpMenuTests : IDisposable
         string[] expected =
         [
             "Ctrl+S", "Ctrl+Z", "Ctrl+Y", "Ctrl+Shift+Z", "F5", "Ctrl+F5", "Shift+F5", "F2", "Ctrl+D", "Delete", "F", "W",
-            "E", "R", "X", "Esc", "Up arrow", "Down arrow", "Enter", "Ctrl+C", "Space", "Home", "End", "Left arrow",
-            "Right arrow", "Shift+Left arrow", "Shift+Right arrow",
+            "E", "R", "X", "Ctrl, while dragging a handle", "Esc", "Up arrow", "Down arrow", "Enter", "Ctrl+C", "Space",
+            "Home", "End", "Left arrow", "Right arrow", "Shift+Left arrow", "Shift+Right arrow",
         ];
 
         Assert.Equal(expected.Order(),
@@ -326,7 +328,31 @@ public sealed class HelpMenuTests : IDisposable
         Assert.Contains(mouse, r => r.Keys == "W A S D, Q and E" && r.Action.Contains("right mouse button"));
         Assert.Contains(mouse, r => r.Keys == "Alt + left mouse drag");
         Assert.Contains(mouse, r => r.Keys == "Middle mouse drag");
-        Assert.All(SceneView.MouseControls, c => Assert.Contains(c, SceneView.Controls));
+        Assert.All(SceneView.MouseControls, c => Assert.Contains((c.Input, c.Action + "."), SceneView.Controls));
+    }
+
+    /// <summary>The help popovers of the Scene and of the cutscene preview give each key the name that the Keys window
+    /// gives it (#55). The Scene popover also gives each key the action of the Keys window. So one key has one
+    /// name.</summary>
+    [Fact]
+    public void TheHelpPopoversNameTheKeysAsTheKeysWindowDoes()
+    {
+        var mouse = SceneView.MouseControls.Select(c => (c.Input, Action: c.Action + ".")).ToList();
+        var sceneKeys = SceneView.Controls.Except(mouse).Select(c => new KeyRow(KeysWindow.Scene, c.Input, c.Action))
+            .ToList();
+
+        Assert.All(sceneKeys, r => Assert.Contains(r, KeysWindow.Rows));
+        Assert.Contains(sceneKeys, r => r.Keys == EditorKeys.Frame.Chord.Text);
+        Assert.Contains(sceneKeys, r => r.Keys == GizmoInput.SnapInput);
+        Assert.Contains(sceneKeys, r => r.Keys == EditorKeys.CancelDrag.Chord.Text);
+        foreach (var (_, chord, action) in PreviewKeys.Table)
+            Assert.Contains((chord.Text, action), CutsceneView.Controls);
+
+        var names = KeysWindow.Rows.Select(r => r.Keys).ToHashSet();
+        Assert.All(CutsceneView.Controls, c => Assert.True(
+            names.Contains(c.Input) || c.Input.Split(" and ").All(names.Contains), c.Input));
+        Assert.All(SceneView.Controls.Concat(CutsceneView.Controls),
+            c => Assert.DoesNotContain("focus", c.Action, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Each paragraph of a text file, with its white space merged to single spaces.</summary>

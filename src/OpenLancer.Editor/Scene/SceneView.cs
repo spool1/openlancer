@@ -91,16 +91,15 @@ internal sealed class SceneView : IDisposable
         ("Click an axis end", "Look along the axis"),
     ];
 
-    /// <summary>The mouse and keyboard controls of the view and the gizmo, for the help popover and the status
-    /// bar.</summary>
+    /// <summary>The mouse and keyboard controls of the view and the gizmo, for the help popover and the status bar.
+    /// The keys come from the lists of the key handlers, with the texts of Help &gt; Keys: the Frame key, the gizmo
+    /// keys and the key that cancels a drag.</summary>
     public static readonly (string Input, string Action)[] Controls =
     [
-        .. MouseControls,
-        ("F", "Focus on the selection"),
-        ("W, E and R", "Move, rotate or scale tool of the gizmo, when the selected item takes it"),
-        ("X", "Local or World axes of a move or a turn. A scale always uses Local"),
-        ("Ctrl, while dragging a handle", "Snap when the snap is off, or do not snap when it is on"),
-        ("Esc or right click, while dragging a handle", "Cancel the drag"),
+        .. MouseControls.Select(c => (c.Input, c.Action + ".")),
+        (EditorKeys.Frame.Chord.Text, EditorKeys.Frame.Action),
+        .. GizmoInput.KeyRows,
+        (EditorKeys.CancelDrag.Chord.Text, EditorKeys.CancelDrag.Action),
     ];
 
     public StarSystem? System => stage?.System;
@@ -653,7 +652,7 @@ internal sealed class SceneView : IDisposable
             ImGuiCond.Appearing, new Vector2(1, 0));
         if (ImGui.BeginPopup("##controls"))
         {
-            ControlsTable();
+            ControlsTable.Draw("Scene controls", Controls);
             ImGui.EndPopup();
         }
     }
@@ -696,28 +695,6 @@ internal sealed class SceneView : IDisposable
 
         EditorTheme.PopMenuColors();
         ImGui.EndPopup();
-    }
-
-    /// <summary>Draws the controls of the view and the gizmo as a table of inputs and actions.</summary>
-    private static void ControlsTable()
-    {
-        ImGui.Text("Scene controls");
-        ImGui.Separator();
-        if (!ImGui.BeginTable("##controls", 2, ImGuiTableFlags.SizingFixedFit))
-        {
-            return;
-        }
-
-        foreach (var (input, action) in Controls)
-        {
-            ImGui.TableNextRow();
-            ImGui.TableNextColumn();
-            ImGui.Text(input);
-            ImGui.TableNextColumn();
-            ImGui.TextDisabled(action);
-        }
-
-        ImGui.EndTable();
     }
 
     /// <summary>

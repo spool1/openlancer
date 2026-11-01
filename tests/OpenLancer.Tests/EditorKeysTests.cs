@@ -75,13 +75,15 @@ public sealed class EditorKeysTests
     }
 
     /// <summary>Each key of the lists has a handler outside the lists and the Keys window. So the Keys window cannot
-    /// show a key that the editor does not read.</summary>
+    /// show a key that the editor does not read. A static field initializer only lists keys, for example for a help
+    /// popover, so it is not a handler.</summary>
     [Fact]
     public void AHandlerReadsEachKeyOfTheList()
     {
         var readers = typeof(EditorWindow).Assembly.GetTypes()
             .SelectMany(IlWalker.FieldLoads)
-            .Where(l => l.Owner != typeof(EditorKeys) && l.Owner.Namespace != "OpenLancer.Editor.Help")
+            .Where(l => l.Owner != typeof(EditorKeys) && l.Owner.Namespace != "OpenLancer.Editor.Help" &&
+                        l.Method is not ConstructorInfo { IsStatic: true })
             .Select(l => l.Field)
             .ToHashSet();
 
@@ -142,6 +144,16 @@ public sealed class EditorKeysTests
         Assert.Contains("Ctrl+S", texts);
         Assert.Contains("F2", texts);
         Assert.True(literals.Count == 0, "Shortcut texts outside the lists: " + string.Join(", ", literals));
+    }
+
+    /// <summary>Ctrl+F5 installs the mods into a play copy. The Keys window says so, because a new modder must not
+    /// think that the key writes into the game folder.</summary>
+    [Fact]
+    public void TheKeyOfPlayInTheGameSaysThatTheGameFolderDoesNotChange()
+    {
+        Assert.Contains("play copy", EditorKeys.PlayInGame.Action, StringComparison.Ordinal);
+        Assert.EndsWith("Your game folder does not change.", EditorKeys.PlayInGame.Action, StringComparison.Ordinal);
+        Assert.Empty(SteLint.Problems(EditorKeys.PlayInGame.Action));
     }
 
     [Fact]

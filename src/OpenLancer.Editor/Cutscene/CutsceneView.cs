@@ -108,25 +108,25 @@ internal sealed class CutsceneView
     private Vector2 dragStart;
     private object? hovered;
 
-    /// <summary>The controls of the keys and of the mouse, for the help popover.</summary>
+    /// <summary>The controls of the keys and of the mouse, for the help popover. The keys come from the lists of the
+    /// key handlers, with the texts of Help &gt; Keys: the preview keys, the Play keys, and the Frame key and the gizmo
+    /// keys of the Free mode.</summary>
     public static readonly (string Input, string Action)[] Controls =
     [
-        ("Space", "Play or pause the preview"),
-        ("Home and End", "Go to the start or the end"),
-        ("Left and Right", "One frame back or forward (1/60 s)"),
-        ("Shift + Left and Shift + Right", "One second back or forward"),
-        ("F5 and Shift + F5", "Play and Stop of the game, as in each panel"),
-        ("Right mouse drag", "Free: look around"),
-        ("W A S D, Q and E", "Free: fly, while the right mouse button is down"),
-        ("Wheel, while flying", "Free: set the fly speed"),
-        ("Alt + left mouse drag", "Free: orbit"),
-        ("Middle mouse drag", "Free: pan"),
-        ("Wheel", "Free: zoom"),
-        ("Click", "Free: select an entity"),
-        ("F", "Free: focus on the selected entity"),
-        ("W and E", "Free: move or rotate tool of the gizmo, while the right mouse button is up"),
-        ("X", "Free: Local or World axes of the gizmo"),
-        ("Ctrl + gizmo drag", "Free: snap, or no snap when the snap is on"),
+        .. PreviewKeys.Table.Select(k => (k.Chord.Text, k.Action)),
+        ($"{EditorKeys.Play.Chord.Text} and {EditorKeys.Stop.Chord.Text}", "Play and Stop of the game, as in each panel."),
+        ("Right mouse drag", "Free: look around."),
+        ("W A S D, Q and E", "Free: fly, while the right mouse button is down."),
+        ("Wheel, while flying", "Free: set the fly speed."),
+        ("Alt + left mouse drag", "Free: orbit."),
+        ("Middle mouse drag", "Free: pan."),
+        ("Wheel", "Free: zoom."),
+        ("Click", "Free: select an entity."),
+        (EditorKeys.Frame.Chord.Text, "Free: frame the selected entity."),
+        (string.Join(" and ", GizmoInput.ToolKeys.Where(t => t.Tool != GizmoTool.Scale).Select(t => KeyChord.KeyName(t.Key))),
+            "Free: select the move or the rotate tool of the gizmo, while the right mouse button is up."),
+        (KeyChord.KeyName(GizmoInput.SpaceKey), "Free: change the gizmo between Local and World."),
+        (GizmoInput.SnapInput, "Free: snap when the snap is off, or do not snap when it is on."),
     ];
 
     public CutsceneView(EditorWindow window, CutsceneWorkspace workspace)
@@ -981,22 +981,7 @@ internal sealed class CutsceneView
 
     private static void KeysTable()
     {
-        ImGui.Text("Preview keys, while the Timeline or the Cutscene panel has the focus, and Free controls");
-        ImGui.Separator();
-        if (!ImGui.BeginTable("##keys", 2, ImGuiTableFlags.SizingFixedFit))
-        {
-            return;
-        }
-
-        foreach (var (input, action) in Controls)
-        {
-            ImGui.TableNextRow();
-            ImGui.TableNextColumn();
-            ImGui.Text(input);
-            ImGui.TableNextColumn();
-            ImGui.TextDisabled(action);
-        }
-
-        ImGui.EndTable();
+        ControlsTable.Draw("Preview keys, while the Timeline or the Cutscene panel has the focus, and Free controls",
+            Controls);
     }
 }
