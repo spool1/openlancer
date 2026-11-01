@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Missions;
@@ -76,7 +77,12 @@ public sealed class PlayStartPageTests
         var approximate = Model(new PlayStartSetting("t_chosen", "suggested"));
 
         Assert.Equal(StartKind.Checkpoint, checkpoint.Plan.Kind);
-        Assert.Contains(StartPlan.CheckpointStateWarning("t_restore"), checkpoint.Plan.Warnings);
+        var limit = Assert.Single(checkpoint.Plan.Warnings, StartPlanTests.IsCheckpointLimit);
+        Assert.StartsWith("This version restores only the triggers of checkpoint 't_restore'.", limit,
+            StringComparison.Ordinal);
+        foreach (var state in new[] { "the objective", "the dock and lane rules", "the reputations" })
+            Assert.Contains(state, limit, StringComparison.Ordinal);
+        Assert.EndsWith("This version does not restore that state.", limit, StringComparison.Ordinal);
         Assert.Equal(StartKind.MissionStart, mission.Plan.Kind);
         Assert.DoesNotContain(mission.Plan.Warnings, StartPlanTests.IsCheckpointLimit);
         Assert.Equal(StartKind.Approximate, approximate.Plan.Kind);
