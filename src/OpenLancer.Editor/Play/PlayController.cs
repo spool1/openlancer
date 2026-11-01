@@ -407,9 +407,14 @@ internal sealed class PlayController : IDisposable
     {
         var waiting = crash;
         crash = null;
-        var result = StartGame(request, ref waiting);
-        ReportCrash(waiting, ProgramPaths.PlayLog);
-        return result;
+        try
+        {
+            return StartGame(request, ref waiting);
+        }
+        finally
+        {
+            ReportCrash(waiting, ProgramPaths.PlayLog);
+        }
     }
 
     /// <param name="waiting">The crash report that waits. The method reports it and sets it to null when the game
