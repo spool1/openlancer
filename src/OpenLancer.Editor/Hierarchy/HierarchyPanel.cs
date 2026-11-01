@@ -604,7 +604,7 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
             return;
         }
 
-        if (ImGui.IsKeyPressed(ImGuiKey.F, false) || ImGui.IsKeyPressed(ImGuiKey.Enter, false))
+        if (ImGui.IsKeyPressed(EditorKeys.Frame.Chord.Key, false) || ImGui.IsKeyPressed(ImGuiKey.Enter, false))
         {
             Frame(selection);
         }

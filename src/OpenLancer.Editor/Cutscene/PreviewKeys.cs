@@ -1,5 +1,6 @@
 using System;
 using ImGuiNET;
+using OpenLancer.Editor.Ui;
 
 namespace OpenLancer.Editor.Cutscene;
 
@@ -24,7 +25,24 @@ internal enum PreviewKey
 /// </summary>
 internal static class PreviewKeys
 {
-    /// <summary>The command of the keys of this frame, or <see cref="PreviewKey.None"/>.</summary>
+    /// <summary>The key of each command and what it does, in the order of the commands. <see cref="Read"/> reads the keys
+    /// from this table, and Help &gt; Keys shows it.</summary>
+    public static readonly (PreviewKey Command, KeyChord Chord, string Action)[] Table =
+    [
+        (PreviewKey.PlayPause, new KeyChord(ImGuiKey.Space), "Play or pause the preview."),
+        (PreviewKey.Start, new KeyChord(ImGuiKey.Home), "Go to the start of the cutscene."),
+        (PreviewKey.End, new KeyChord(ImGuiKey.End), "Go to the end of the cutscene."),
+        (PreviewKey.FrameBack, new KeyChord(ImGuiKey.LeftArrow), "Go back one frame."),
+        (PreviewKey.FrameForward, new KeyChord(ImGuiKey.RightArrow), "Go forward one frame."),
+        (PreviewKey.SecondBack, new KeyChord(ImGuiKey.LeftArrow, Shift: true), "Go back one second."),
+        (PreviewKey.SecondForward, new KeyChord(ImGuiKey.RightArrow, Shift: true), "Go forward one second."),
+    ];
+
+    /// <summary>
+    /// The command of the keys of this frame, or <see cref="PreviewKey.None"/>. The first row of <see cref="Table"/>
+    /// whose key is pressed gives the command. A key that has a row with Shift needs the Shift state of its row. Each
+    /// other key works with and without Shift.
+    /// </summary>
     /// <param name="focused">The Timeline or the Cutscene panel has the focus.</param>
     /// <param name="textInput">A text field takes the keys.</param>
     /// <param name="pressed">True for a key that went down in this frame, or repeats.</param>
@@ -36,28 +54,16 @@ internal static class PreviewKeys
             return PreviewKey.None;
         }
 
-        if (pressed(ImGuiKey.Space))
+        foreach (var (command, chord, _) in Table)
         {
-            return PreviewKey.PlayPause;
+            if (pressed(chord.Key) && (chord.Shift == shift || !HasShiftRow(chord.Key)))
+            {
+                return command;
+            }
         }
 
-        if (pressed(ImGuiKey.Home))
-        {
-            return PreviewKey.Start;
-        }
-
-        if (pressed(ImGuiKey.End))
-        {
-            return PreviewKey.End;
-        }
-
-        if (pressed(ImGuiKey.LeftArrow))
-        {
-            return shift ? PreviewKey.SecondBack : PreviewKey.FrameBack;
-        }
-
-        return pressed(ImGuiKey.RightArrow)
-            ? shift ? PreviewKey.SecondForward : PreviewKey.FrameForward
-            : PreviewKey.None;
+        return PreviewKey.None;
     }
+
+    private static bool HasShiftRow(ImGuiKey key) => Array.Exists(Table, row => row.Chord.Key == key && row.Chord.Shift);
 }

@@ -9,7 +9,8 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// Reads the IL of the methods of a type. It gives the calls (<c>call</c>, <c>callvirt</c>, <c>newobj</c>,
-/// <c>ldftn</c> and <c>ldvirtftn</c>) and the string literals (<c>ldstr</c>). The reader resolves each member with the
+/// <c>ldftn</c> and <c>ldvirtftn</c>), the string literals (<c>ldstr</c>) and the field loads (<c>ldfld</c>,
+/// <c>ldsfld</c> and their address forms). The reader resolves each member with the
 /// generic arguments of the type and of the method. A compiler-generated nested type, for example the class of a lambda
 /// or a state machine, counts as the type that holds it. A local function is a method of its type.
 /// </summary>
@@ -22,6 +23,10 @@ internal static class IlWalker
     /// <summary>A string literal: the type that holds it, the method that loads it and the text. Each part of an
     /// interpolated string is a literal of its own.</summary>
     public sealed record Literal(Type Owner, MethodBase Method, string Text);
+
+    /// <summary>A load of a field or of its address: the type that holds it, the method that loads it and the
+    /// field.</summary>
+    public sealed record FieldLoad(Type Owner, MethodBase Method, FieldInfo Field);
 
     private static readonly OpCode[] OneByte = new OpCode[0x100];
     private static readonly OpCode[] TwoByte = new OpCode[0x100];
@@ -79,6 +84,27 @@ internal static class IlWalker
         }
     }
 
+    /// <summary>The field loads of each method and constructor of a type, without its nested types.</summary>
+    public static IEnumerable<FieldLoad> FieldLoads(Type type)
+    {
+        var owner = OwnerOf(type);
+        foreach (var method in MethodsOf(type))
+        {
+            var typeArguments = method.DeclaringType is { IsGenericType: true } generic
+                ? generic.GetGenericArguments()
+                : null;
+            var methodArguments = method.IsGenericMethod ? method.GetGenericArguments() : null;
+            foreach (var (op, token) in Tokens(method))
+            {
+                if (op != OpCodes.Ldfld && op != OpCodes.Ldsfld && op != OpCodes.Ldflda && op != OpCodes.Ldsflda)
+                    continue;
+                var field = method.Module.ResolveField(token, typeArguments, methodArguments) ??
+                            throw new InvalidOperationException($"{method.Name}: token {token:x8} does not resolve.");
+                yield return new FieldLoad(owner, method, field);
+            }
+        }
+    }
+
     /// <summary>The type that a type counts as: the first declaring type that the compiler did not make.</summary>
     public static Type OwnerOf(Type type)
     {
@@ -91,7 +117,7 @@ internal static class IlWalker
     private static IEnumerable<MethodBase> MethodsOf(Type type) =>
         type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All));
 
-    /// <summary>Each opcode of the IL of a method whose operand is the token of a method or of a string, with the
+    /// <summary>Each opcode of the IL of a method whose operand is the token of a method, a field or a string, with the
     /// token.</summary>
     private static IEnumerable<(OpCode Op, int Token)> Tokens(MethodBase method)
     {
@@ -104,7 +130,7 @@ internal static class IlWalker
             at++;
             if (op.Size == 0)
                 throw new InvalidOperationException($"{method.DeclaringType}.{method.Name}: unknown opcode at {at - 1}.");
-            if (op.OperandType is OperandType.InlineMethod or OperandType.InlineString)
+            if (op.OperandType is OperandType.InlineMethod or OperandType.InlineField or OperandType.InlineString)
                 yield return (op, BitConverter.ToInt32(il, at));
             at += OperandSize(op, il, at);
         }

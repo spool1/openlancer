@@ -538,13 +538,14 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
     /// and the keys of Play, F5 (a mission play in the Mission tab), Ctrl+F5 (Play in the game) and Shift+F5, wait while
     /// a text field has the keyboard. So
     /// Ctrl+Z and Ctrl+Y stay the undo and redo of the text field. They also wait while a field edit or a dialog is open.
+    /// The chords come from <see cref="EditorKeys"/>, which Help &gt; Keys shows.
     /// </summary>
     private void Shortcuts()
     {
         const ImGuiInputFlags global = ImGuiInputFlags.RouteGlobal;
         // A global route of a key with Ctrl also fires while a text field is active. The text field has no route for
         // Ctrl+S, and ImGui types no character while Ctrl is down.
-        if (ImGui.Shortcut((int)(ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.S), global))
+        if (ImGui.Shortcut(EditorKeys.Save.Chord.Shortcut, global))
         {
             SaveCommand.Run(this);
             return;
@@ -555,25 +556,25 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
             return;
         }
 
-        if (ImGui.Shortcut((int)(ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.Z), global))
+        if (ImGui.Shortcut(EditorKeys.Undo.Chord.Shortcut, global))
         {
             Edits.Undo();
         }
-        else if (ImGui.Shortcut((int)(ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.Y), global) ||
-                 ImGui.Shortcut((int)(ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.ImGuiMod_Shift | ImGuiKey.Z), global))
+        else if (ImGui.Shortcut(EditorKeys.Redo.Chord.Shortcut, global) ||
+                 ImGui.Shortcut(EditorKeys.RedoShift.Chord.Shortcut, global))
         {
             Edits.Redo();
         }
-        else if (ImGui.Shortcut((int)(ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.F5), global))
+        else if (ImGui.Shortcut(EditorKeys.PlayInGame.Chord.Shortcut, global))
         {
             GamePlay.PlayLast();
         }
-        else if (ImGui.Shortcut((int)ImGuiKey.F5, global))
+        else if (ImGui.Shortcut(EditorKeys.Play.Chord.Shortcut, global))
         {
             // In the Mission tab, F5 plays the open mission from its play start (decision D744 of the M6c design).
             playMenu.PlayF5();
         }
-        else if (ImGui.Shortcut((int)(ImGuiKey.ImGuiMod_Shift | ImGuiKey.F5), global))
+        else if (ImGui.Shortcut(EditorKeys.Stop.Chord.Shortcut, global))
         {
             playMenu.Stop();
         }

@@ -138,7 +138,8 @@ internal sealed class TransformGizmo
     {
         if (available)
         {
-            var cancel = ImGui.IsKeyPressed(ImGuiKey.Escape, false) || ImGui.IsMouseClicked(ImGuiMouseButton.Right);
+            var cancel = ImGui.IsKeyPressed(EditorKeys.CancelDrag.Chord.Key, false) ||
+                         ImGui.IsMouseClicked(ImGuiMouseButton.Right);
             if (flow.Start(ImGuizmo.IsUsing(), ImGui.IsMouseDown(ImGuiMouseButton.Left), cancel, selected))
             {
                 Reset();

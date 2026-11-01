@@ -423,7 +423,7 @@ internal sealed class SceneView : IDisposable
                 DoubleClicked?.Invoke(doubleClicked);
             }
         }
-        if (viewKeys && !ImGui.GetIO().WantTextInput && ImGui.IsKeyPressed(ImGuiKey.F))
+        if (viewKeys && !ImGui.GetIO().WantTextInput && ImGui.IsKeyPressed(EditorKeys.Frame.Chord.Key))
         {
             Focus(window.Selection);
         }

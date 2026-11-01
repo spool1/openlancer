@@ -99,11 +99,11 @@ internal sealed class SceneEdits(EditorWindow window)
     {
         if (ImGui.GetIO().WantTextInput || window.IsEditing || IsOpen || Renaming != null || SectionOf(selection) is not { } section)
             return;
-        if (ImGui.IsKeyPressed(ImGuiKey.F2, false))
+        if (ImGui.IsKeyPressed(EditorKeys.Rename.Chord.Key, false))
             BeginRename(section);
-        else if (ImGui.Shortcut((int)(ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.D)))
+        else if (ImGui.Shortcut(EditorKeys.Duplicate.Chord.Shortcut))
             Duplicate(section);
-        else if (ImGui.IsKeyPressed(ImGuiKey.Delete, false))
+        else if (ImGui.IsKeyPressed(EditorKeys.Delete.Chord.Key, false))
             Delete(section);
     }
 
