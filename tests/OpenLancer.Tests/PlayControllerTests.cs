@@ -1009,6 +1009,59 @@ public sealed class PlayControllerTests : IDisposable
     }
 
     /// <summary>
+    /// A new play while a crash report waits for the validation: the Console reports the crash when the new game starts.
+    /// The new game moves the game log to the previous log at its start, so the line names the previous log. It comes
+    /// before the lines of the new game.
+    /// </summary>
+    [Fact]
+    public void ACrashThatWaitsUntilTheNextPlayNamesThePreviousLog()
+    {
+        plan = new StubPlan([Error("The engine load stops.", crash: true)], Exit: 1);
+        editor.SaveResult = new SaveOutcome(true, 2, false);
+        RequestPlay();
+        ui.Run(2);
+        play.Update(false, false);
+        Assert.Equal(PlayStatus.Validating, play.Status);
+        Assert.DoesNotContain(Console, m => m.StartsWith("The game stopped"));
+        var lines = Console.Count;
+
+        // The validation of save 2 still runs, and the new play makes no new save.
+        plan = Game;
+        editor.SaveResult = new SaveOutcome(true, 0, false);
+        RequestPlay();
+
+        Assert.Equal(2, starts.Count);
+        Assert.Equal("The game stopped with exit code 1: The engine load stops. The log is " +
+                     $"{OpenLancer.Editor.ProgramPaths.PreviousPlayLog}.", Console[lines]);
+        Assert.Single(Console, m => m.StartsWith("The game stopped"));
+        editor.Finish(2);
+        RunUntil(PlayStatus.Running);
+        StopAndRunToIdle();
+    }
+
+    /// <summary>A new play that does not start while a crash report waits: no new game moves the game log, so the line
+    /// names the game log. It comes after the reason.</summary>
+    [Fact]
+    public void ACrashThatWaitsForARefusedPlayNamesTheGameLog()
+    {
+        plan = new StubPlan([Error("The engine load stops.", crash: true)], Exit: 1);
+        editor.SaveResult = new SaveOutcome(true, 2, false);
+        RequestPlay();
+        ui.Run(2);
+        play.Update(false, false);
+        Assert.Equal(PlayStatus.Validating, play.Status);
+
+        // The Scene does not show Li01, so the start check stops Play from camera.
+        RequestPlay(new PlayStart.InSpace("li01", Vector3.Zero, Quaternion.Identity));
+
+        Assert.Single(starts);
+        Assert.StartsWith("Play from camera stopped: the Scene does not show", Console[^2]);
+        Assert.Equal("The game stopped with exit code 1: The engine load stops. The log is " +
+                     $"{OpenLancer.Editor.ProgramPaths.PlayLog}.", Console[^1]);
+        Assert.Equal(PlayStatus.Idle, play.Status);
+    }
+
+    /// <summary>
     /// The error watchdog ends a game that crashed while the validation of its save runs. The crash rule (D55) then
     /// applies as for an exit: the report waits for the validation, and its errors are the cause.
     /// </summary>

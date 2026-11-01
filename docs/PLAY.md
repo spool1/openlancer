@@ -269,6 +269,10 @@ For an exit code other than 0 or 3, the Console gives the cause and the path of 
 
 When the validation finds errors and the game closes during its load, the Console names the validation errors as the cause.
 
+Each start of the game moves the log of the last run to the previous log, `OpenLancer.Play.log.previous.txt` in the same folder. So a new Play does not delete the log of a crash. When a log reaches its size limit of 32 MiB, its older lines go to `OpenLancer.Play.log.old.txt`. That file moves with the log, to `OpenLancer.Play.log.previous.old.txt`. The editor keeps the log of its last session in the same way, in `OpenLancer.Editor.log.previous.txt`.
+
+The Console report of a crash during the validation of its save waits for the result of the validation. When you stop Play first, the Console reports the crash at once. When you start Play again first, the Console reports the crash when the new game starts. Then the line names the previous log, because the new game moved the log of the crash there. When the new Play does not start, the line names the game log.
+
 The warnings and errors of the game log also go to the Console with the source "Play". The Console adds a line only when it does not show the same line yet. The Console hides the lines that the base game without mods also gives, as it does for the lines of the editor. Turn on the base-game toggle of the Console to show them. When the game server is slow, the Console shows one info entry for the Play run. The Play log has each slow update.
 
 A line of the game about a setup trigger of the test layer of a mission play has the origin OpenLancer. Its text ends with "(play start)", because the mod does not have the setup triggers.

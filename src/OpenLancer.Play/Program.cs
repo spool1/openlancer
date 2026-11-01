@@ -4,6 +4,7 @@ using LibreLancer;
 using OpenLancer.Data;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Overlay;
+using OpenLancer.Runtime;
 using OpenLancer.Runtime.Play;
 
 namespace OpenLancer.Play;
@@ -37,6 +38,9 @@ internal static class Program
         // no catch. So the editor gets the cause before the end.
         AppDomain.CurrentDomain.UnhandledException += (_, e) => ReportCrash(e.ExceptionObject);
 
+        // The engine starts a new log, so keep the log of the last run first. A crash report of the editor that waits
+        // until this start names the previous log.
+        RunLogs.KeepLastRun(typeof(Program).Assembly.GetName().Name!);
         PlayHost? host = null;
         // Null until the play gives a code. The engine can return before it runs the play (PlayExitCodes.NotStarted).
         int? exitCode = null;

@@ -1,6 +1,7 @@
 using System;
 using LibreLancer;
 using OpenLancer.Data;
+using OpenLancer.Runtime;
 
 namespace OpenLancer.Editor;
 
@@ -25,6 +26,8 @@ internal static class Program
             return 2;
         }
 
+        // The engine starts a new log, so keep the log of the last session first.
+        RunLogs.KeepLastRun(typeof(Program).Assembly.GetName().Name!);
         EditorWindow? window = null;
         AppHandler.Run(Product.Name, () =>
         {

@@ -12,6 +12,7 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Games;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
+using OpenLancer.Runtime;
 using OpenLancer.Runtime.Play;
 
 namespace OpenLancer.Editor.Play;
@@ -396,9 +397,25 @@ internal sealed class PlayController : IDisposable
         game = null;
     }
 
+    /// <summary>
+    /// Starts the game of a request, or gives the reason why the play does not start. A crash report that waits for a
+    /// validation comes now: before the lines of the new game, or after the reason. The new game moves the game log to
+    /// the previous log when it starts (<see cref="RunLogs.KeepLastRun(string)"/>). So the report names the previous
+    /// log when the game starts, and the game log when the play does not start.
+    /// </summary>
     private PlayRequestResult Begin(PlayRequest request)
     {
-        ReportCrashNow();
+        var waiting = crash;
+        crash = null;
+        var result = StartGame(request, ref waiting);
+        ReportCrash(waiting, ProgramPaths.PlayLog);
+        return result;
+    }
+
+    /// <param name="waiting">The crash report that waits. The method reports it and sets it to null when the game
+    /// starts.</param>
+    private PlayRequestResult StartGame(PlayRequest request, ref Crash? waiting)
+    {
         if (editor.Session is not { } session)
         {
             Log(ConsoleSeverity.Warning, NoProfile);
@@ -471,6 +488,8 @@ internal sealed class PlayController : IDisposable
             return Refused("ProcessStart", message);
         }
 
+        ReportCrash(waiting, ProgramPaths.PreviousPlayLog);
+        waiting = null;
         run = new GameRun(process, args, request.Time, clock()) { Lines = editor.Log.BeginGameRun(), Mission = request.Mission };
         game = run;
         editor.PlayStarted();
@@ -1074,7 +1093,7 @@ internal sealed class PlayController : IDisposable
         // An error event without a crash gives its own cause, for example an unknown ship package.
         if (run.Error is { Crash: false })
         {
-            ReportExit(run, exitCode, errorOutput);
+            ReportExit(run, exitCode, errorOutput, ProgramPaths.PlayLog);
             return;
         }
 
@@ -1091,7 +1110,7 @@ internal sealed class PlayController : IDisposable
             return;
         }
 
-        ReportExit(run, exitCode, errorOutput);
+        ReportExit(run, exitCode, errorOutput, ProgramPaths.PlayLog);
     }
 
     /// <summary>Reports the crash that waits, when the validation of its save does not run any more.</summary>
@@ -1114,23 +1133,33 @@ internal sealed class PlayController : IDisposable
         }
         else
         {
-            ReportExit(waiting.Run, waiting.Code, waiting.ErrorOutput);
+            ReportCrash(waiting, ProgramPaths.PlayLog);
         }
     }
 
-    /// <summary>Reports the crash that waits for a validation now, for example when a new play starts.</summary>
+    /// <summary>Reports the crash that waits for a validation now, for example when the user stops Play. A new play
+    /// reports it in <see cref="Begin"/>.</summary>
     private void ReportCrashNow()
     {
-        if (crash is { } waiting)
+        var waiting = crash;
+        crash = null;
+        ReportCrash(waiting, ProgramPaths.PlayLog);
+    }
+
+    /// <summary>Reports a crash that waited for a validation, when there is one.</summary>
+    /// <param name="log">The file that holds the log of the crashed game now.</param>
+    private void ReportCrash(Crash? waiting, string log)
+    {
+        if (waiting != null)
         {
-            crash = null;
-            ReportExit(waiting.Run, waiting.Code, waiting.ErrorOutput);
+            ReportExit(waiting.Run, waiting.Code, waiting.ErrorOutput, log);
         }
     }
 
     /// <summary>The Console line of an exit with a code other than 0 (section 11.4).</summary>
     /// <param name="code">The exit code, or null when the editor ended the game.</param>
-    private void ReportExit(GameRun run, int? code, string errorOutput)
+    /// <param name="log">The file that holds the log of the game.</param>
+    private void ReportExit(GameRun run, int? code, string errorOutput, string log)
     {
         if (code == PlayExitCodes.Data && run.Error is { } data)
         {
@@ -1141,7 +1170,7 @@ internal sealed class PlayController : IDisposable
         var cause = run.Error?.Message ?? (errorOutput.Length > 0 ? errorOutput : run.LastErrorLine) ??
             "The game gave no cause.";
         var stopped = code is { } exit ? $"The game stopped with exit code {exit}" : "The game stopped";
-        Log(ConsoleSeverity.Error, $"{stopped}: {cause.TrimEnd('.')}. The log is {ProgramPaths.PlayLog}.");
+        Log(ConsoleSeverity.Error, $"{stopped}: {cause.TrimEnd('.')}. The log is {log}.");
     }
 
     /// <summary>The watchdogs of section 9.10.</summary>

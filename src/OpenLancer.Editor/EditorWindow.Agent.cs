@@ -14,6 +14,7 @@ using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Missions;
 using OpenLancer.Editor.Scene;
 using OpenLancer.Editor.Ui;
+using OpenLancer.Runtime;
 using OpenLancer.Studio.Agent;
 
 namespace OpenLancer.Editor;
@@ -46,7 +47,7 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
         AgentFollow = new AgentFollow(Settings.Agent, this);
         agentController = new AgentController(this, this, Activity,
             AgentDiscovery.PathOf(AgentDiscovery.DefaultFolder, System.Environment.ProcessId),
-            AppHandler.LogFolder(Product.Name));
+            RunLogs.Folder);
         agentMenu = new AgentMenu(this, agentController);
     }
 
