@@ -61,7 +61,8 @@ public sealed class NetSelectTests
     }
 
     /// <summary>A delete of the selected item gives no select. This is also true for an item that the request added and
-    /// deleted, for an item that the request renamed first, and for a child that goes with its parent.</summary>
+    /// then deleted. It is also true for an item that the request renamed first, and for a child that goes with its
+    /// parent.</summary>
     [Fact]
     public void ADeleteOfTheSelectedItemGivesNoSelect()
     {
@@ -84,6 +85,18 @@ public sealed class NetSelectTests
         Assert.Equal("obj:p", SelectOf(Part("obj:x"), Part("obj:p", deletes: ["obj:x"])));
         // A later rename of the new select gives its new reference.
         Assert.Equal("obj:r", SelectOf(Part("obj:x"), Part("obj:q"), Part(renames: [("obj:q", "obj:r")])));
+    }
+
+    /// <summary>In a part, the renames and the deletes name the items before the part, and the select names an item
+    /// after it. So the renames and the deletes of a part do not change its own select. An example is a part that
+    /// renames x to y, then adds a new x and selects it.</summary>
+    [Fact]
+    public void TheRenamesAndTheDeletesOfAPartDoNotChangeItsOwnSelect()
+    {
+        Assert.Equal("obj:x", SelectOf(Part("obj:x"), Part("obj:x", renames: [("obj:x", "obj:y")])));
+        Assert.Equal("obj:x", SelectOf(Part("obj:x", renames: [("obj:x", "obj:y")])));
+        Assert.Equal("obj:x", SelectOf(Part("obj:x", deletes: ["obj:x"])));
+        Assert.Equal("obj:x", SelectOf(Part("obj:w"), Part("obj:x", deletes: ["obj:x"])));
     }
 
     /// <summary>The walk changes only the select. The other lists of the result and the other fields stay as the rules
