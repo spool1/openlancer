@@ -49,7 +49,7 @@ public sealed class EmptyStateTests
             typeof(ConsolePanel), typeof(MissionsBrowser), typeof(MissionView), typeof(CutsceneBrowser),
             typeof(CutsceneView), typeof(TimelinePanel), typeof(ModsWindow),
         ];
-        Assert.Empty(panels.Where(p => !owners.Contains(p)));
+        Assert.All(panels, p => Assert.Contains(p, owners));
     }
 
     [Theory]

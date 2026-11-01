@@ -74,7 +74,7 @@ public sealed class MenuItemsTests
             typeof(HierarchyPanel), typeof(AssetsPanel), typeof(InspectorPanel), typeof(DatabaseTable), typeof(GraphView),
             typeof(CutsceneBrowser), typeof(TimelinePanel),
         ];
-        Assert.Empty(menus.Where(m => !helper.Contains(m)));
+        Assert.All(menus, m => Assert.Contains(m, helper));
         Assert.Contains(calls, c => HasEnabledFlag(c.Callee) && c.Value == 1);
     }
 
