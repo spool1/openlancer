@@ -295,6 +295,52 @@ public sealed partial class AgentMissionToolTests
         Assert.Contains("Cnd_Timer = 7", m.Lines("ol_wave"));
     }
 
+    /// <summary>A call that points the npc_ship_file line of the script at the ship build file of another script cannot
+    /// change the old ship build file after that, because no script names it (final finding of MCP1-3). The inverse
+    /// that the server gives for a call that points the line away reverts the call through mission_edit.</summary>
+    [Fact]
+    public void TheInverseRevertsACallThatPointsTheShipBuildFileLineAway()
+    {
+        var (m, host) = Open(setup: ws =>
+        {
+            ws.WriteBase(@"DATA\MISSIONS\OL_OTHER\ol_other.ini", "[Mission]\nnpc_ship_file = missions\\ol_other\\npcships.ini\n");
+            ws.WriteBase(@"DATA\MISSIONS\OL_OTHER\npcships.ini", "[NPCShipArch]\nnickname = ol_other_build\n");
+        });
+        using var _ = m;
+        var ships = Ships.Replace(@"\", @"\\");
+        const string otherShips = @"DATA\\MISSIONS\\OL_OTHER\\npcships.ini";
+        var otherBuild = $$"""
+            { "kind": "add_section", "script": "msn:{{otherShips}}", "type": "NPCShipArch",
+              "lines": [ { "key": "nickname", "texts": [ "ol_other_build_2" ] } ] }
+            """;
+        var away = $$"""
+            { "kind": "set_item_key", "item": "sec:{{S}}#Mission", "key": "npc_ship_file",
+              "lines": [ { "key": "npc_ship_file", "texts": [ "missions\\ol_other\\npcships.ini" ] } ] }
+            """;
+        string Old(string type) => $$"""
+            { "kind": "add_section", "script": "msn:{{ships}}", "type": "{{type}}",
+              "lines": [ { "key": "nickname", "texts": [ "ol_old" ] } ] }
+            """;
+        var before = m.State();
+
+        foreach (var type in new[] { "NPCShipArch", "Room" })
+        {
+            var refused = Call(host, "mission_edit", Edit(otherBuild, away, Old(type)));
+            Assert.Equal(("refused", MissionErrors.WorldFile, "commands[2]"), ((string?)refused.Content["code"],
+                (string?)refused.Content["detail"], (string?)refused.Content["field"]));
+        }
+        Assert.Equal(before, m.State());
+        Assert.Equal(0, m.Session.Revision);
+
+        var applied = Ok(host, "mission_edit", Edit(otherBuild, Old("NPCShipArch"), away));
+        Assert.Equal([@"npc_ship_file = missions\ol_other\npcships.ini"], m.Lines(Item("Mission", null)));
+        Ok(host, "mission_edit", Edit(applied["inverse"]!.ToJsonString()));
+        Assert.Equal([@"npc_ship_file = missions\ol_test\npcships.ini"], m.Lines(Item("Mission", null)));
+        Assert.Equal(["[NPCShipArch]", "nickname = ol_other_build"], m.Session.OpenDocument(@"DATA\MISSIONS\OL_OTHER\npcships.ini")!
+            .Working.SelectMany(s => s.Select(Line).Prepend($"[{s.Name}]")));
+        Assert.False(m.Has(Item("NPCShipArch", "ol_old", Ships)));
+    }
+
     /// <summary>The guards of the revision and of the script versions refuse an edit after a change. The error of a
     /// script version names the argument expect_versions.</summary>
     [Fact]

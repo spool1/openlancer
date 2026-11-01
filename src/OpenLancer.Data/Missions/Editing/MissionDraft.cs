@@ -92,7 +92,9 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     /// <summary>
     /// The document of a mission file, to change it: a script, or the ship build file of a script (section 4.1 of the
     /// M6b design). The shared files under <c>DATA\MISSIONS</c>, for example the pilot files and the encounters, are
-    /// world data. The commands only read them.
+    /// world data. The commands only read them. The guard of the session reads W after each change of the batch. So a
+    /// ship build file that an earlier command of the batch names is a mission file, and a file that it stops naming
+    /// is world data (final findings of MCP1-3).
     /// </summary>
     /// <exception cref="EditException">The edit view has no such file, the file is world data, or it is
     /// read-only.</exception>
@@ -102,20 +104,10 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
             return Template(path);
         if (Session.OpenDocument(path) is not { State.Exists: true } document || !SectionKeys.IsMissionFile(document.Path))
             throw new EditException(MissionErrors.ScriptNotFoundError(path) with { Index = Index });
-        if (!IsMissionFile(document.Path))
+        if (!Session.IsGuardedMissionFile(document.Path))
             throw new EditException(MissionErrors.WorldFileError(document.Path) with { Index = Index });
         return Edit(document.Path);
     }
-
-    /// <summary>True for a mission file: a script or the ship build file of a script, also of a script that an earlier
-    /// command of the batch changed. A file directly in <c>DATA\MISSIONS</c> or in its encounters folder, and a file
-    /// with a section that is not a ship build, are never the ship build file of a script, as for the guard of the
-    /// session. So a command cannot point a script at a world file to change that file, also not inside a command
-    /// group (final findings 5 of MCP1-3).</summary>
-    private bool IsMissionFile(string path) =>
-        Session.IsGuardedMissionFile(path) ||
-        MissionFiles.CanBeOwnShipFile(path, Session.DataPath("MISSIONS")) && Session.HoldsOnlyShipBuilds(path) &&
-        Touched.Values.Any(d => d.HoldsScript && VfsPath.Comparer.Equals(Session.ShipBuildFileOf(d.Path), path));
 
     /// <summary>
     /// Refuses the command that runs now when it points the <c>npc_ship_file</c> line of a script at a file that is not
@@ -174,7 +166,7 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     /// <c>DATA\MISSIONS</c> that no script names. Encounters and bases use their builds too (review finding
     /// RB2).</summary>
     public IEnumerable<EditDocument> SharedBuildFiles() =>
-        Session.MissionShipPaths.Where(p => IsSharedBuildPath(Session, p, IsMissionFile))
+        Session.MissionShipPaths.Where(p => IsSharedBuildPath(Session, p, Session.IsGuardedMissionFile))
             .Select(Session.OpenDocument).OfType<EditDocument>().Where(d => d.State.Exists);
 
     /// <summary>True for the path of a shared ship build file: a file of the role <c>mission_ships</c> directly in

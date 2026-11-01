@@ -119,7 +119,9 @@ public sealed partial class EditSession
     private (int Revision, HashSet<string> Files)? shipBuildFiles;
 
     /// <summary>The ship build files that the <c>[Mission] npc_ship_file</c> lines of the scripts of W name (see
-    /// <see cref="MissionEditor.ScriptPaths"/>).</summary>
+    /// <see cref="MissionEditor.ScriptPaths"/>). The session makes the set again after a growth of
+    /// <see cref="CacheRevision"/> and after each change of a file under <c>DATA\MISSIONS</c> (see
+    /// <see cref="ForgetShipBuildFiles"/>).</summary>
     internal IReadOnlySet<string> ShipBuildFilesOfScripts()
     {
         if (shipBuildFiles is var (revision, known) && revision == CacheRevision)
@@ -133,6 +135,20 @@ public sealed partial class EditSession
         }
         shipBuildFiles = (CacheRevision, files);
         return files;
+    }
+
+    /// <summary>
+    /// Forgets the ship build files of the scripts when a command changes a file under <c>DATA\MISSIONS</c>, or a file
+    /// that the scope does not name. A mission plan command makes all the changes of a batch before
+    /// <see cref="CacheRevision"/> grows, and each command of the batch reads the guard of the mission files. So the
+    /// guard reads W after each change: a file that an earlier command of the batch stops naming is world data for the
+    /// later commands, also when a command before that read the guard (final finding of MCP1-3).
+    /// </summary>
+    /// <param name="path">The install path of the changed file, or null when the scope does not name the file.</param>
+    private void ForgetShipBuildFiles(string? path)
+    {
+        if (path == null || SectionKeys.IsMissionFile(path))
+            shipBuildFiles = null;
     }
 
     /// <summary>The install path of the ship build file that the <c>[Mission] npc_ship_file</c> line of W of a script

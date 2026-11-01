@@ -514,7 +514,7 @@ internal sealed partial class MissionDraft
         var own = Session.ShipBuildFileOf(script.Path);
         if (own != null && VfsPath.Comparer.Equals(own, file.Path))
             return true;
-        if (IsMissionFile(file.Path))
+        if (Session.IsGuardedMissionFile(file.Path))
             return false;
         return own == null || Session.OpenDocument(own) is not { State.Exists: true } ownFile ||
                IndexOfKey(ownFile, "NPCShipArch", name) < 0;

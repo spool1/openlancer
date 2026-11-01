@@ -317,6 +317,63 @@ public sealed class MissionGuardTests
         Assert.Equal(before, m.State());
     }
 
+    /// <summary>
+    /// The guard of the mission files reads W after each command of a batch, also when an earlier command of the batch
+    /// read it (final finding of MCP1-3). A batch or a group that points the script at the ship build file of another
+    /// script cannot change the old ship build file after that, because no script names it. The first command reads
+    /// the guard before the line changes. A batch that changes the old file before it points the line away applies,
+    /// and its inverse reverts it through the mission commands.
+    /// </summary>
+    [Fact]
+    public void AFileThatABatchStopsNamingIsWorldDataForTheLaterCommandsOfTheBatch()
+    {
+        const string other = @"DATA\MISSIONS\OL_OTHER\ol_other.ini";
+        const string otherShips = @"DATA\MISSIONS\OL_OTHER\npcships.ini";
+        using var m = Create(setup: ws =>
+        {
+            ws.WriteBase(other, "[Mission]\nnpc_ship_file = missions\\ol_other\\npcships.ini\n");
+            ws.WriteBase(otherShips, "[NPCShipArch]\nnickname = ol_other_build\n");
+        });
+        var mission = ItemRef.Of(Script, "Mission", null);
+        var away = new SetItemKey(mission, "npc_ship_file", [LineSpec.Raw("npc_ship_file", @"missions\ol_other\npcships.ini")]);
+        var otherBuild = new AddSection(new ScriptRef(otherShips), "NPCShipArch", [LineSpec.Raw("nickname", "ol_other_build_2")]);
+        AddSection Old(string type) => new(new ScriptRef(Ships), type, [LineSpec.Raw("nickname", "ol_old")]);
+        string Files() => string.Join("\n", new[] { Script, Ships, other, otherShips }.Select(path =>
+            path + "\n" + string.Join("\n", m.Session.OpenDocument(path)!.Working
+                .SelectMany(s => s.Select(MissionEdits.Line).Prepend($"[{s.Name}]")))));
+        var before = m.State();
+        var files = Files();
+
+        foreach (var type in new[] { "NPCShipArch", "Room" })
+        {
+            var batch = m.Missions.Apply(new MissionBatch("Old file", [otherBuild, away, Old(type)]));
+            Assert.Equal((EditStatus.Refused, MissionErrors.WorldFile, 2),
+                (batch.Status, batch.Errors[0].Detail, batch.Errors[0].Index));
+            var group = m.Missions.Apply(new MissionBatch("Old file", [new CommandGroup([otherBuild, away, Old(type)])]));
+            Assert.Equal((EditStatus.Refused, MissionErrors.WorldFile, 0),
+                (group.Status, group.Errors[0].Detail, group.Errors[0].Index));
+            var nested = m.Missions.Apply(new MissionBatch("Old file",
+                [otherBuild, new CommandGroup([away, new CommandGroup([Old(type)])])]));
+            Assert.Equal((EditStatus.Refused, MissionErrors.WorldFile, 1),
+                (nested.Status, nested.Errors[0].Detail, nested.Errors[0].Index));
+            var cold = m.Missions.Apply(new MissionBatch("Old file", [away, Old(type)]));
+            Assert.Equal((EditStatus.Refused, MissionErrors.WorldFile, 1),
+                (cold.Status, cold.Errors[0].Detail, cold.Errors[0].Index));
+        }
+        Assert.Equal(before, m.State());
+        Assert.Equal(files, Files());
+        Assert.Empty(m.Session.EditedPaths);
+        Assert.False(m.Session.CanUndo);
+        Assert.True(m.Session.IsGuardedMissionFile(Ships));
+
+        var applied = m.Missions.Apply(new MissionBatch("Away", [otherBuild, Old("NPCShipArch"), away]));
+        Assert.Equal(EditStatus.Applied, applied.Status);
+        Assert.False(m.Session.IsGuardedMissionFile(Ships));
+        m.Apply(applied.Inverse!);
+        Assert.Equal(files, Files());
+        Assert.True(m.Session.IsGuardedMissionFile(Ships));
+    }
+
     [Fact]
     public void ALineOfABuildOfTheSharedShipBuildFileNeedsAConfirmation()
     {

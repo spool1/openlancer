@@ -914,12 +914,19 @@ public sealed partial class EditSession : IDisposable
             return document;
         }
 
-        public void Changed(SectionRef section, bool structural) =>
+        public void Changed(SectionRef section, bool structural)
+        {
             change.Note(Normal(section), structural);
+            session.ForgetShipBuildFiles(section.Path);
+        }
 
         /// <summary>Records a change of sections that the scope does not list one by one, for example a new whole
         /// file.</summary>
-        public void NoteStructural() => change.NoteStructural();
+        public void NoteStructural()
+        {
+            change.NoteStructural();
+            session.ForgetShipBuildFiles(null);
+        }
 
         /// <summary>Records that a section got a new key, for <see cref="EditChange.Renames"/>.</summary>
         public void Renamed(SectionRef from, SectionRef to) => change.NoteRename(Normal(from), Normal(to));
