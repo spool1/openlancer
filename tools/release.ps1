@@ -7,7 +7,8 @@ The steps follow section 7.1 of the R1 release plan:
  1. Preflight: the tools, the work root, the commits on origin, the version of the commit and the name of the zip.
  2. A clean clone of the commit and its submodules, and the content scan of the clone.
  3. The engine natives and the shader tools of the clone (natives with the static C runtime, OL-0035).
- 4. The OpenLancer tests and the engine fork tests in Release.
+ 4. The OpenLancer tests and the engine fork tests in Release, then the timing gates in a separate run (see the
+    notes).
  5. A self-contained win-x64 publish of each program, with the engine commit for Help > About.
  6. One stage folder from the three publish folders (tools/release_check.py merge).
  7. README-FIRST.txt, LICENSE.txt, NOTICE.txt and the licenses folder (tools/release_check.py docs).
@@ -50,6 +51,13 @@ Versions and releases:
 - Each version needs its notes file release/notes/v<version>.md. One approval of the owner covers the notes files of
   the beta, the release candidates and the final version of one release.
 - Each notes file needs its entry in MARKDOWN_FILES of tools/content_scan.py.
+
+Tests:
+- Step 4 leaves out PlayCopyRetailTests, HdePlayCopyRetailTests, RandomEditTests and SampleModTests. They write a play
+  copy or test output into the output folder next to the game data folder. The script writes only below the work root.
+- A timing gate (a test with the trait Category=Performance) measures time. Load on the computer can make a gate fail.
+  So step 4 runs the timing gates alone, after the other tests. When a gate fails, the step runs the timing gates one
+  more time. A second failure stops the release.
 #>
 [CmdletBinding()]
 param(
@@ -80,18 +88,24 @@ function Stop-Release([string]$Text) {
     throw $Text
 }
 
-# Runs a program and stops the release when it gives an exit code other than the expected code.
+# Runs a program and stops the release when it gives an exit code other than the expected code. With -Tries 2, the
+# first other exit code runs the program one more time.
 function Invoke-Native {
-    param([string]$File, [string[]]$Arguments, [string]$Folder = (Get-Location).Path, [int]$Expected = 0)
-    Write-Log ("> {0} {1}" -f $File, ($Arguments -join ' '))
-    Push-Location -LiteralPath $Folder
-    try {
-        & $File @Arguments
-        $code = $LASTEXITCODE
-    } finally {
-        Pop-Location
+    param([string]$File, [string[]]$Arguments, [string]$Folder = (Get-Location).Path, [int]$Expected = 0,
+        [int]$Tries = 1)
+    for ($try = 1; ; $try++) {
+        Write-Log ("> {0} {1}" -f $File, ($Arguments -join ' '))
+        Push-Location -LiteralPath $Folder
+        try {
+            & $File @Arguments
+            $code = $LASTEXITCODE
+        } finally {
+            Pop-Location
+        }
+        if ($code -eq $Expected) { return }
+        if ($try -ge $Tries) { Stop-Release "$File exited with code $code." }
+        Write-Log "$File exited with code $code. Try $($try + 1) of $Tries."
     }
-    if ($code -ne $Expected) { Stop-Release "$File exited with code $code." }
 }
 
 # Runs a program and returns its output as one trimmed string. When the program fails, the stop also names its output.
@@ -225,8 +239,16 @@ if ($SkipTests) {
     } else {
         Write-Log 'No base data folder. The retail tests skip.'
     }
-    Invoke-Native $dotnet @('test', 'OpenLancer.slnx', '-c', 'Release', '--nologo') $src
+    # The filter of PlayCopyRetailTests also matches HdePlayCopyRetailTests.
+    $notNextToData = 'FullyQualifiedName!~PlayCopyRetailTests&FullyQualifiedName!~RandomEditTests&FullyQualifiedName!~SampleModTests'
+    Write-Log ('The tests leave out PlayCopyRetailTests, HdePlayCopyRetailTests, RandomEditTests and SampleModTests. ' +
+        'They write a play copy or test output into the output folder next to the game data folder.')
+    Write-Log 'The first test run leaves out the timing gates (Category=Performance). A separate run tests them.'
+    Invoke-Native $dotnet @('test', 'OpenLancer.slnx', '-c', 'Release', '--nologo', '--filter', "$notNextToData&Category!=Performance") $src
     Invoke-Native $dotnet @('test', 'external\Librelancer\src\LibreLancer.Tests\LibreLancer.Tests.csproj', '-c', 'Release', '--nologo') $src
+    Write-Log 'The timing gates run alone. When a gate fails, the step runs the timing gates one more time.'
+    Invoke-Native $dotnet @('test', 'tests\OpenLancer.DataTests', '-c', 'Release', '--no-build', '--nologo', '--filter',
+        "Category=Performance&$notNextToData") $src -Tries 2
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
