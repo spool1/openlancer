@@ -106,25 +106,47 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         _ => Scene.SectionOf(item),
     };
 
-    /// <summary>True when New from template can copy the section: a ship or equipment, with a session that takes
-    /// edits.</summary>
-    public bool CanCopy(SectionRef? section) =>
-        section?.Id.Key is { } key && Session is { CanEdit: true } session &&
-        (section.Id.Type.Equals("Ship", StringComparison.OrdinalIgnoreCase) &&
-         section.Equals(session.Edits.Find(ItemFileKind.Ships, key)) ||
-         section.Equals(session.Edits.Find(ItemFileKind.Equipment, key)));
+    /// <summary>The tooltip of New from template while it can run.</summary>
+    internal const string CopyTip = "Copies the selected ship or equipment with the sections that belong to it.";
 
-    /// <summary>True when Revert can put back the section as the lower layer has it. A section of a file whose schema
-    /// the editor does not know is read-only (decision D123), so it has no Revert.</summary>
-    public bool CanRevert(SectionRef? section) =>
-        section != null && Session is { CanEdit: true } session &&
-        session.Edits.Get(section) is { IsChanged: true, IsNew: false, ReadOnlyReason: null } &&
-        session.Edits.KnowsSchema(section.Path) && FieldBinding.RevertLock(session.Edits, section) == null;
+    /// <summary>The tooltip of Revert while it can run.</summary>
+    internal const string RevertTip = "Puts back the section as the base data and the mods before the active mod have it.";
 
-    /// <summary>The tooltip of Revert: what it does, or why it cannot run for the section.</summary>
-    public string RevertTooltip(SectionRef? section) =>
-        (section == null || Session is not { } session ? null : FieldBinding.RevertLock(session.Edits, section)) ??
-        "Puts back the section as the base data and the mods before the active mod have it.";
+    /// <summary>Why New from template cannot copy the section, or null when it can: it copies a ship or equipment, with a
+    /// session that takes edits.</summary>
+    public string? CopyReason(SectionRef? section) =>
+        Session is not { } session ? MenuItems.NoProfile
+        : session.NoEditReason is { } reason ? reason
+        : section?.Id.Key is { } key &&
+          (section.Id.Type.Equals("Ship", StringComparison.OrdinalIgnoreCase) &&
+           section.Equals(session.Edits.Find(ItemFileKind.Ships, key)) ||
+           section.Equals(session.Edits.Find(ItemFileKind.Equipment, key)))
+            ? null
+            : "Select a ship or equipment.";
+
+    /// <summary>Why Revert cannot put back the section as the lower layer has it, or null when it can. A section of a
+    /// file whose schema the editor does not know is read-only (decision D123), so it has no Revert.</summary>
+    public string? RevertReason(SectionRef? section) =>
+        Session is not { } session ? MenuItems.NoProfile
+        : section == null ? "Select an item in the Hierarchy, the Scene or the Database."
+        : session.NoEditReason is { } reason ? reason
+        : FieldBinding.RevertLock(session.Edits, section) is { } locked ? locked
+        : !session.Edits.KnowsSchema(section.Path) ? "The editor shows this file read-only, so it cannot revert its items."
+        : session.Edits.Get(section) switch
+        {
+            null => "The edit view does not have this item.",
+            { ReadOnlyReason: { } readOnly } => readOnly,
+            { IsNew: true } => "The active mod adds this item, so no lower layer has it. Use Undo or Delete.",
+            { IsChanged: false } => "The active mod does not change this item.",
+            _ => null,
+        };
+
+    /// <summary>Why Undo or Redo cannot run now, or null when it can.</summary>
+    private string? UndoReason(bool redo) =>
+        Session is not { } session ? MenuItems.NoProfile
+        : IsEditing ? MenuItems.EditOpen
+        : redo ? (session.Edits.CanRedo ? null : "There is nothing to redo.")
+        : session.Edits.CanUndo ? null : "There is nothing to undo.";
 
     /// <summary>Asks for the nickname of a copy of a ship or of equipment, and adds the copy. The copy is then
     /// selected.</summary>
@@ -213,39 +235,36 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
     {
         var session = Session;
         var edits = session?.Edits;
-        var idle = !IsEditing;
-        if (ImGui.MenuItem($"{EditorIcons.Undo}   {(edits?.UndoLabel is { } undo ? $"Undo {undo}" : "Undo")}",
-                EditorKeys.Undo.Chord.Text,
-                false, edits is { CanUndo: true } && idle))
+        if (MenuItems.Item(EditorIcons.Undo, edits?.UndoLabel is { } undo ? $"Undo {undo}" : "Undo", UndoReason(false),
+                shortcut: EditorKeys.Undo.Chord.Text))
         {
             Edits.Undo();
         }
 
-        if (ImGui.MenuItem($"{EditorIcons.Redo}   {(edits?.RedoLabel is { } redo ? $"Redo {redo}" : "Redo")}",
-                EditorKeys.Redo.Chord.Text,
-                false, edits is { CanRedo: true } && idle))
+        if (MenuItems.Item(EditorIcons.Redo, edits?.RedoLabel is { } redo ? $"Redo {redo}" : "Redo", UndoReason(true),
+                shortcut: EditorKeys.Redo.Chord.Text))
         {
             Edits.Redo();
         }
 
         ImGui.Separator();
         var section = SectionOf(Selection);
-        if (Theme.IconMenuItem(EditorIcons.Clone, "New from template...", CanCopy(section)))
+        if (MenuItems.Item(EditorIcons.Clone, "New from template...", CopyReason(section), CopyTip))
         {
             NewFromTemplate(section!);
         }
 
-        ImGui.SetItemTooltip("Copies the selected ship or equipment with the sections that belong to it.");
-        if (Theme.IconMenuItem(EditorIcons.Undo, "Revert selected item", CanRevert(section)))
+        if (MenuItems.Item(EditorIcons.Undo, "Revert selected item", RevertReason(section), RevertTip))
         {
             Revert(section!);
         }
 
-        ImGui.SetItemTooltip(RevertTooltip(section));
         // The actions on the items of the open system (milestone M3). Their keys belong to the Hierarchy and the Scene,
         // as in Unity.
         ImGui.Separator();
-        if (ImGui.BeginMenu($"{EditorIcons.Plus}   Create", session != null && CenterMode != CenterMode.Cutscene))
+        if (MenuItems.BeginMenu($"{EditorIcons.Plus}   Create", session == null ? MenuItems.NoProfile
+                : CenterMode == CenterMode.Cutscene ? "Create makes the items of a system. Open the Scene tab first."
+                : null))
         {
             EditorTheme.PushMenuColors();
             SceneEdits.CreateMenu(null);
@@ -261,13 +280,12 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
     private void SaveMenuItem()
     {
         var session = Session;
-        if (ImGui.MenuItem($"{EditorIcons.Save}   Save", EditorKeys.Save.Chord.Text, false, session != null))
+        if (MenuItems.Item(EditorIcons.Save, "Save", session == null ? MenuItems.NoProfile : null,
+                session?.NoEditReason ?? $"Writes the edits as patches of the mod '{session?.Edits.ActiveMod?.Id}'.",
+                EditorKeys.Save.Chord.Text))
         {
             SaveCommand.Run(this);
         }
-
-        ImGui.SetItemTooltip(session == null ? "No profile is open."
-            : session.NoEditReason ?? $"Writes the edits as patches of the mod '{session.Edits.ActiveMod!.Id}'.");
     }
 
     private void ModMenu()
@@ -281,7 +299,7 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         ImGui.Separator();
         if (Session is not { } session)
         {
-            ImGui.MenuItem("No profile is open", false);
+            MenuItems.Note("No profile is open");
             return;
         }
 
@@ -294,7 +312,8 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         }
 
         ImGui.TextDisabled("Active mod");
-        if (ImGui.MenuItem("None (read-only)", "", active == null, CanChangeProfile))
+        var loading = CanChangeProfile ? null : ProfileLoading;
+        if (MenuItems.Item("None (read-only)", loading, selected: active == null))
         {
             SetActiveMod(null);
         }
@@ -303,16 +322,14 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         {
             var mod = edits.Profile.Mods[i];
             var name = i < menuModNames.Count ? menuModNames[i] : mod.Manifest.Name;
-            if (ImGui.MenuItem($"{EditorIcons.LayerGroup}   {name}", mod.Id, mod.Id == active, CanChangeProfile))
+            if (MenuItems.Item(EditorIcons.LayerGroup, name, loading, mod.Folder, mod.Id, mod.Id == active))
             {
                 SetActiveMod(mod.Id);
             }
-
-            ImGui.SetItemTooltip(mod.Folder);
         }
 
         ImGui.Separator();
-        if (Theme.IconMenuItem(EditorIcons.Plus, "New mod...", CanChangeProfile))
+        if (MenuItems.Item(EditorIcons.Plus, "New mod...", loading))
         {
             NewMod(session, null);
         }
@@ -323,21 +340,22 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         }
 
         ImGui.Separator();
-        if (Theme.IconMenuItem(EditorIcons.BoxOpen, "Export mod...", edits.ActiveMod != null && !IsEditing))
+        if (MenuItems.Item(EditorIcons.BoxOpen, "Export mod...",
+                edits.ActiveMod == null ? "Pick an active mod. The export makes the packages of the active mod."
+                : IsEditing ? MenuItems.EditOpen
+                : null,
+                "Make the packages of the active mod for HD Edition, Freelancer 1.1 and OpenLancer."))
         {
             // The Mods window asks first when its publish draft of the mod has changes (section 12.6 of the M11c
             // design).
             Mods.Export(edits.ActiveMod!.Folder);
         }
 
-        ImGui.SetItemTooltip(edits.ActiveMod == null
-            ? "Pick an active mod. The export makes the packages of the active mod."
-            : "Make the packages of the active mod for HD Edition, Freelancer 1.1 and OpenLancer.");
-
         if (session.RepoRoot != null)
         {
             var allowed = session.RepoEditsAllowed;
-            if (ImGui.MenuItem("Allow edits of this repo mod", "", ref allowed, !allowed))
+            if (MenuItems.Toggle("Allow edits of this repo mod", ref allowed,
+                    allowed ? "The edits of this repo mod are allowed until the editor closes." : null))
             {
                 session.RepoEditsAllowed = allowed;
             }

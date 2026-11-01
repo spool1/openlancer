@@ -19,6 +19,16 @@ internal static class ItemTooltip
         }
     }
 
+    /// <summary>Shows the text as the tooltip of the last item while the mouse is on it, after the usual delay of a
+    /// tooltip, also when the item is disabled. The tooltip wraps at a readable width (see <see cref="Wrapped"/>).</summary>
+    public static void ShowWrapped(string text)
+    {
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled | ImGuiHoveredFlags.ForTooltip))
+        {
+            Wrapped(text);
+        }
+    }
+
     /// <summary>Draws a tooltip now, in screen space, that wraps at a readable width. A line that starts with the warning
     /// glyph draws in the warning color, as the warnings of the Play start page do.</summary>
     public static void Wrapped(string text)

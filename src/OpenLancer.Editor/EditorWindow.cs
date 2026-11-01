@@ -1003,18 +1003,16 @@ internal sealed partial class EditorWindow : Game
 
             foreach (var path in menuProfiles)
             {
-                if (Theme.IconMenuItem(EditorIcons.LayerGroup, Path.GetFileNameWithoutExtension(path), !loading))
+                if (MenuItems.Item(EditorIcons.LayerGroup, Path.GetFileNameWithoutExtension(path),
+                        loading ? ProfileLoading : null, path))
                 {
                     OpenProfile(path);
                 }
-
-                ImGui.SetItemTooltip(loading ? ProfileLoading : path);
             }
 
             if (menuProfiles.Count == 0)
             {
-                ImGui.MenuItem($"No profiles in {Path.Combine(Settings.WorkspaceOrDefault, ModWorkspace.ProfilesFolder)}",
-                    false);
+                MenuItems.Note($"No profiles in {Path.Combine(Settings.WorkspaceOrDefault, ModWorkspace.ProfilesFolder)}");
             }
 
             ImGui.EndMenu();
@@ -1030,34 +1028,27 @@ internal sealed partial class EditorWindow : Game
 
             foreach (var recent in Settings.RecentProfiles)
             {
-                var exists = !missingRecentProfiles.Contains(recent.Path);
-                if (Theme.IconMenuItem(EditorIcons.LayerGroup, Path.GetFileNameWithoutExtension(recent.Path),
-                        exists && !loading))
+                var reason = loading ? ProfileLoading
+                    : missingRecentProfiles.Contains(recent.Path) ? $"The file is not found.\n{recent.Path}"
+                    : null;
+                if (MenuItems.Item(EditorIcons.LayerGroup, Path.GetFileNameWithoutExtension(recent.Path), reason,
+                        recent.Path))
                 {
                     OpenProfile(recent.Path);
                 }
-
-                ImGui.SetItemTooltip(loading ? ProfileLoading
-                    : exists ? recent.Path
-                    : $"The file is not found.\n{recent.Path}");
             }
 
             if (Settings.RecentProfiles.Count == 0)
             {
-                ImGui.MenuItem("No recent profiles", false);
+                MenuItems.Note("No recent profiles");
             }
 
             ImGui.EndMenu();
         }
 
-        if (Theme.IconMenuItem(EditorIcons.FileImport, "Open profile file...", !loading))
+        if (MenuItems.Item(EditorIcons.FileImport, "Open profile file...", loading ? ProfileLoading : null))
         {
             OpenProfileDialog();
-        }
-
-        if (loading)
-        {
-            ImGui.SetItemTooltip(ProfileLoading);
         }
 
         if (Theme.IconMenuItem(EditorIcons.Link, "Game link...", true))
@@ -1066,14 +1057,10 @@ internal sealed partial class EditorWindow : Game
         }
 
         ImGui.SetItemTooltip("Shows the linked game folders, their versions and their profiles.");
-        if (Theme.IconMenuItem(EditorIcons.X, "Close profile", Session != null && !loading))
+        if (MenuItems.Item(EditorIcons.X, "Close profile",
+                Session == null ? MenuItems.NoProfile : loading ? ProfileLoading : null))
         {
             CloseProfile();
-        }
-
-        if (loading)
-        {
-            ImGui.SetItemTooltip(ProfileLoading);
         }
 
         ImGui.Separator();

@@ -119,12 +119,12 @@ internal sealed class SceneEdits(EditorWindow window)
             return;
         foreach (var (template, label) in ScenePlans.ObjectTemplates(session.Edits))
         {
-            if (Theme.IconMenuItem(Kind(template).Icon, label + "...", unavailable == null))
+            if (MenuItems.Item(Kind(template).Icon, label + "...", unavailable))
                 Create(template, row);
         }
 
         ImGui.Separator();
-        if (ImGui.BeginMenu($"{ObjectKinds.Of(ZoneRole.Other).Icon}  Zone", unavailable == null))
+        if (MenuItems.BeginMenu($"{ObjectKinds.Of(ZoneRole.Other).Icon}  Zone", unavailable))
         {
             foreach (var (label, shape) in Shapes)
             {
@@ -135,10 +135,8 @@ internal sealed class SceneEdits(EditorWindow window)
             ImGui.EndMenu();
         }
 
-        if (Theme.IconMenuItem(ObjectKinds.Light.Icon, "Light", unavailable == null))
+        if (MenuItems.Item(ObjectKinds.Light.Icon, "Light", unavailable))
             Create(SceneTemplate.Light, row);
-        if (unavailable != null)
-            ImGui.SetItemTooltip(unavailable);
         ImGui.Separator();
         ImGui.TextDisabled(ScenePlans.NoNewConnections);
     }
@@ -159,13 +157,13 @@ internal sealed class SceneEdits(EditorWindow window)
     /// reason when it cannot run.</summary>
     public void SaveGroupMenuItem(object? item)
     {
-        var unavailable = window.Session is not { } session ? "No profile is open."
+        var unavailable = window.Session is not { } session ? MenuItems.NoProfile
             : session.NoEditReason ?? (SectionOf(item) == null
                 ? "Select an object, a zone or a light of the open system."
                 : null);
-        if (Theme.IconMenuItem(EditorIcons.Cubes, "Save as prop group...", unavailable == null))
+        if (MenuItems.Item(EditorIcons.Cubes, "Save as prop group...", unavailable,
+                "Saves the item and its children as a prop group of the mod."))
             SaveGroup(SectionOf(item)!);
-        ImGui.SetItemTooltip(unavailable ?? "Saves the item and its children as a prop group of the mod.");
     }
 
     /// <summary>
@@ -361,14 +359,8 @@ internal sealed class SceneEdits(EditorWindow window)
     public void SetComponent(SectionRef section, AssetRow row) =>
         window.Commands.Run(edits => SceneCommands.DropAsset(edits, section, row.Asset));
 
-    private bool MenuItem(char icon, string label, string shortcut, SceneAction action, object? item)
-    {
-        var unavailable = Unavailable(action, item);
-        var clicked = ImGui.MenuItem($"{icon}   {label}", shortcut, false, unavailable == null);
-        if (unavailable != null)
-            ImGui.SetItemTooltip(unavailable);
-        return clicked;
-    }
+    private bool MenuItem(char icon, string label, string shortcut, SceneAction action, object? item) =>
+        MenuItems.Item(icon, label, Unavailable(action, item), shortcut: shortcut);
 
     /// <summary>
     /// Creates an item (decisions D233 to D235): an object after the pick of its archetype, and of its base for a station,

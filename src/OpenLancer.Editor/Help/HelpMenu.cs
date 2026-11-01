@@ -176,12 +176,10 @@ internal sealed class HelpMenu(EditorWindow window) : IHelpMenuHost
                 ImGui.Separator();
             }
 
-            if (Theme.IconMenuItem(item.Icon, item.Label, item.Unavailable == null))
+            if (MenuItems.Item(item.Icon, item.Label, item.Unavailable, item.Tooltip))
             {
                 Run(item, this, build);
             }
-
-            ImGui.SetItemTooltip(item.Unavailable ?? item.Tooltip);
         }
     }
 

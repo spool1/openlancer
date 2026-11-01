@@ -106,12 +106,10 @@ internal sealed class PlayMenu(EditorWindow window)
         var block = CameraBlock();
         // F5 runs one of the two items: the mission play in the Mission tab with an open mission, else this one.
         var playKey = OpenMission == null ? EditorKeys.Play.Chord.Text : "";
-        if (ImGui.MenuItem($"{EditorIcons.Play}   Play from camera", playKey, false, block == null))
+        if (MenuItems.Item(EditorIcons.Play, "Play from camera", block, PlayTooltip(null), playKey))
         {
             PlayFromCamera();
         }
-
-        ImGui.SetItemTooltip(PlayTooltip(block));
         BaseMenu();
         MissionMenu();
         ImGui.Separator();
@@ -119,21 +117,18 @@ internal sealed class PlayMenu(EditorWindow window)
         ImGui.Separator();
         GameItems();
         ImGui.Separator();
-        if (Theme.IconMenuItem(EditorIcons.SyncAlt, "Reload game", play.CanReload))
+        if (MenuItems.Item(EditorIcons.SyncAlt, "Reload game", play.ReloadBlock,
+                "The running game loads the mod files again and continues at the same place. Use it after a change " +
+                "outside the editor. A save reloads the game itself when its validation passes."))
         {
             play.Reload();
         }
 
-        ImGui.SetItemTooltip(play.ReloadBlock ??
-                             "The running game loads the mod files again and continues at the same place. Use it " +
-                             "after a change outside the editor. A save reloads the game itself when its validation " +
-                             "passes.");
-        if (ImGui.MenuItem($"{EditorIcons.Stop}   {StopLabel(ForceStop)}", EditorKeys.Stop.Chord.Text, false, CanStop))
+        if (MenuItems.Item(EditorIcons.Stop, StopLabel(ForceStop), CanStop ? null : NoGameRuns, StopTooltip(),
+                EditorKeys.Stop.Chord.Text))
         {
             Stop();
         }
-
-        ImGui.SetItemTooltip(StopTooltip());
     }
 
     /// <summary>Draws the Play, menu and Stop buttons in the middle of the main menu bar. Call it in the menu bar after
@@ -197,9 +192,10 @@ internal sealed class PlayMenu(EditorWindow window)
         var plays = window.Missions.Plays;
         var script = window.Missions.OpenPath;
         var analysis = script == null ? null : window.Missions.Analysis(script);
-        if (!ImGui.BeginMenu($"{EditorIcons.Play}   Play mission", analysis != null && window.Session?.GameData != null))
+        if (!MenuItems.BeginMenu($"{EditorIcons.Play}   Play mission",
+                analysis == null ? "Open a mission in the Mission tab." : MenuItems.NoGameData(window.Session),
+                "Play a mission in OpenLancer."))
         {
-            ImGui.SetItemTooltip(analysis == null ? "Open a mission in the Mission tab." : "Play a mission in OpenLancer.");
             return;
         }
 
@@ -226,24 +222,12 @@ internal sealed class PlayMenu(EditorWindow window)
             ImGui.SetItemTooltip(CheckpointTip);
         }
 
+        // While Restart cannot run, the item shows only while a mission play runs.
         var restart = window.Play.RestartBlock;
-        if (restart != null)
-        {
-            // The item shows only while a mission play runs.
-            if (window.Play.Mission != null)
-            {
-                ImGui.MenuItem("Restart the mission", "", false, false);
-                ItemTooltip.Show(restart);
-            }
-        }
-        else if (ImGui.MenuItem("Restart the mission"))
+        if ((restart == null || window.Play.Mission != null) &&
+            MenuItems.Item("Restart the mission", restart, RestartTip))
         {
             window.Play.RestartMission();
-        }
-
-        if (restart == null)
-        {
-            ImGui.SetItemTooltip(RestartTip);
         }
 
         ImGui.EndMenu();
@@ -258,6 +242,9 @@ internal sealed class PlayMenu(EditorWindow window)
 
     internal const string RestartTip = "Start the mission play again from its start, with the saved files. Unsaved " +
                                        "edits do not go to the game.";
+
+    /// <summary>The reason of Stop while no game runs.</summary>
+    internal const string NoGameRuns = "No game runs.";
 
     /// <summary>Why Play from camera cannot run now, or null when it can: the checks that the agent tool play shares
     /// (<see cref="PlayChecks.CameraBlock"/>).</summary>
@@ -293,29 +280,30 @@ internal sealed class PlayMenu(EditorWindow window)
         var games = window.GamePlay;
         var targets = games.Targets;
         var last = games.LastTarget;
-        var block = window.Session == null ? "No profile is open."
+        var block = window.Session == null ? MenuItems.NoProfile
             : games.Busy ? "A game or the test server of a play copy runs, or Play in the game prepares one."
             : null;
         if (targets.Count == 0)
         {
-            ImGui.MenuItem($"{EditorIcons.Rocket}   Play in the game", EditorKeys.PlayInGame.Chord.Text, false, false);
-            ItemTooltip.Show(GamePlay.NoTarget);
+            MenuItems.Item(EditorIcons.Rocket, "Play in the game", GamePlay.NoTarget,
+                shortcut: EditorKeys.PlayInGame.Chord.Text);
         }
 
         foreach (var target in targets)
         {
-            if (ImGui.MenuItem($"{EditorIcons.Rocket}   Play in {target.Name}##{target.Root}",
-                    target == last ? EditorKeys.PlayInGame.Chord.Text : "", false, block == null))
+            if (MenuItems.Item(EditorIcons.Rocket, $"Play in {target.Name}##{target.Root}", block,
+                    $"Save the active mod, install the mods of the profile into the play copy of {target.Root}, and " +
+                    "start its game. Your game folder does not change.",
+                    target == last ? EditorKeys.PlayInGame.Chord.Text : ""))
             {
                 games.Play(target);
             }
-
-            ItemTooltip.Show(block ?? $"Save the active mod, install the mods of the profile into the play copy of " +
-                                      $"{target.Root}, and start its game. Your game folder does not change.");
         }
 
         var servers = targets.Where(t => t.HasServer).ToList();
-        if (ImGui.BeginMenu($"{EditorIcons.SatelliteDish}   Host test server", servers.Count > 0 && block == null))
+        if (MenuItems.BeginMenu($"{EditorIcons.SatelliteDish}   Host test server",
+                servers.Count == 0 ? "Link a game folder with its FLServer.exe in File > Game link." : block,
+                "Start FLServer of a play copy with the mods of the profile. Then join it from the game."))
         {
             foreach (var target in servers)
             {
@@ -329,29 +317,21 @@ internal sealed class PlayMenu(EditorWindow window)
 
             ImGui.EndMenu();
         }
-        else
-        {
-            ItemTooltip.Show(servers.Count == 0
-                ? "Link a game folder with its FLServer.exe in File > Game link."
-                : block ?? "Start FLServer of a play copy with the mods of the profile. Then join it from the game.");
-        }
 
-        if (ImGui.MenuItem($"{EditorIcons.SatelliteDish}   Join test server", "", false, games.JoinBlock == null))
+        if (MenuItems.Item(EditorIcons.SatelliteDish, "Join test server", games.JoinBlock,
+                "Start the game of the play copy of the test server. Join the server in its multiplayer menu."))
         {
             games.JoinServer();
         }
 
-        ItemTooltip.Show(games.JoinBlock ??
-                         "Start the game of the play copy of the test server. Join the server in its multiplayer menu.");
-        if (ImGui.MenuItem($"{EditorIcons.Stop}   {(games.ServerForceStop ? "Force stop test server" : "Stop test server")}",
-                "", false, games.ServerRuns))
+        if (MenuItems.Item(EditorIcons.Stop, games.ServerForceStop ? "Force stop test server" : "Stop test server",
+                games.ServerRuns ? null : "No test server runs.",
+                games.ServerForceStop
+                    ? "FLServer saves its characters, which can take up to 60 seconds. Force stop ends it at once."
+                    : "Close FLServer. It saves its characters first."))
         {
             games.StopServer();
         }
-
-        ItemTooltip.Show(games.ServerForceStop
-            ? "FLServer saves its characters, which can take up to 60 seconds. Force stop ends it at once."
-            : "Close FLServer. It saves its characters first.");
     }
 
     /// <summary>The Play at base list: the bases of the open system first, then the other bases by system (section
@@ -359,13 +339,8 @@ internal sealed class PlayMenu(EditorWindow window)
     private void BaseMenu()
     {
         var data = window.Session?.GameData;
-        if (!ImGui.BeginMenu($"{EditorIcons.Building}   Play at base", data != null))
+        if (!MenuItems.BeginMenu($"{EditorIcons.Building}   Play at base", MenuItems.NoGameData(window.Session)))
         {
-            if (data == null)
-            {
-                ImGui.SetItemTooltip("The game data of the profile did not load.");
-            }
-
             return;
         }
 
@@ -393,7 +368,7 @@ internal sealed class PlayMenu(EditorWindow window)
 
         if (bases.Count == 0)
         {
-            ImGui.MenuItem("The game data has no bases", false);
+            MenuItems.Note("The game data has no bases");
         }
 
         ImGui.EndMenu();
@@ -417,9 +392,9 @@ internal sealed class PlayMenu(EditorWindow window)
         var session = window.Session;
         var package = session == null ? null : window.Settings.PlayPackageOf(session.Profile.FilePath);
         var (text, tooltip) = PlayShips.ShipText(session, package);
-        ImGui.MenuItem($"{EditorIcons.SpaceShuttle}   Ship: {text}", false);
-        ImGui.SetItemTooltip(tooltip);
-        if (Theme.IconMenuItem(EditorIcons.Undo, "Use the default ship", package != null))
+        MenuItems.Note($"{EditorIcons.SpaceShuttle}   Ship: {text}", tooltip);
+        if (MenuItems.Item(EditorIcons.Undo, "Use the default ship",
+                package == null ? "Play uses the default ship already." : null))
         {
             window.UseForPlay(null);
         }

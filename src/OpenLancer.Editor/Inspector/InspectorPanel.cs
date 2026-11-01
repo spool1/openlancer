@@ -562,17 +562,15 @@ internal sealed class InspectorPanel : IDisposable
     private void ItemMenu(object item)
     {
         var section = window.SectionOf(item);
-        if (Theme.IconMenuItem(EditorIcons.Clone, "New from template...", window.CanCopy(section)))
+        if (MenuItems.Item(EditorIcons.Clone, "New from template...", window.CopyReason(section), EditorWindow.CopyTip))
         {
             window.NewFromTemplate(section!);
         }
 
-        if (Theme.IconMenuItem(EditorIcons.Undo, "Revert", window.CanRevert(section)))
+        if (MenuItems.Item(EditorIcons.Undo, "Revert", window.RevertReason(section), EditorWindow.RevertTip))
         {
             window.Revert(section!);
         }
-
-        ImGui.SetItemTooltip(window.RevertTooltip(section));
         // Duplicate, Rename and Delete of an item of the open system (milestone M3). Rename starts the field of its
         // Hierarchy row.
         if (IsSceneItem(item))
@@ -582,19 +580,20 @@ internal sealed class InspectorPanel : IDisposable
 
         ImGui.Separator();
         var nickname = Nickname(item);
-        if (Theme.IconMenuItem(EditorIcons.Copy, "Copy nickname", nickname != null))
+        if (MenuItems.Item(EditorIcons.Copy, "Copy nickname", nickname == null ? MenuItems.NoNickname : null))
         {
             ImGui.SetClipboardText(nickname!);
         }
 
         var name = window.Session?.ItemName(item) ?? "";
-        if (Theme.IconMenuItem(EditorIcons.Copy, "Copy name", name.Length > 0))
+        if (MenuItems.Item(EditorIcons.Copy, "Copy name", name.Length == 0 ? MenuItems.NoName : null))
         {
             ImGui.SetClipboardText(name);
         }
 
         ImGui.Separator();
-        if (Theme.IconMenuItem(EditorIcons.CompressArrowsAlt, "Frame in Scene", window.Scene.Contains(item)))
+        if (MenuItems.Item(EditorIcons.CompressArrowsAlt, "Frame in Scene",
+                window.Scene.Contains(item) ? null : "The Scene does not show this item. Open its system first."))
         {
             window.Scene.Focus(item);
         }

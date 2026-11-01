@@ -39,12 +39,11 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
     {
         var settings = window.Settings.Agent;
         var running = controller.State is AgentServerState.On or AgentServerState.Starting;
-        if (Theme.IconMenuItem(EditorIcons.Play, "Start agent server", !running))
+        if (MenuItems.Item(EditorIcons.Play, "Start agent server", running ? "The agent server runs." : null, StartTip))
             Start();
-        ImGui.SetItemTooltip(StartTip);
-        if (Theme.IconMenuItem(EditorIcons.Stop, "Stop agent server", running))
+        if (MenuItems.Item(EditorIcons.Stop, "Stop agent server", running ? null : "The agent server does not run.",
+                "Stops the agent server at once."))
             controller.Stop();
-        ImGui.SetItemTooltip("Stops the agent server at once.");
         ImGui.Separator();
         var paused = controller.Paused;
         if (Theme.IconMenuItem(paused ? EditorIcons.Play : EditorIcons.Pause, PauseLabel(paused), true))
