@@ -310,7 +310,7 @@ Each script has a version. It starts at 1 and grows at each edit, undo and redo 
 
 One call has at most 100 commands. A `command_group` counts as one command of the 100, and each step of `edit_batch` has its own limit too. One call also runs at most 1000 mission commands in all. This budget counts each command, and each command in a `command_group` at each level. It also counts each command of each mission step of `edit_batch`, and the commands that the trigger tools and the generic tools make. The budget is not a setting, so the editor does not stop for a long time on one call.
 
-A call above the budget gives `limit` with the detail `MissionBudget` and the field `commands`, and nothing changes. In `edit_batch`, the field names the step where the count goes above the budget, for example `steps[10].arguments.commands`. The inverses that the result gives must fit the budget too. A large delete can have a large inverse. When the inverses have more than 1000 commands, the call gives `limit` with the detail `InverseBudget`, and nothing changes.
+A call above the budget gives `limit` with the detail `MissionBudget` and the field `commands`, and nothing changes. In `edit_batch`, the field names the step where the count goes above the budget, for example `steps[10].arguments.commands`. The inverses that the result gives must fit the budget too. A large delete can have a large inverse. The count includes the `command_group` that joins the inverses of a call or a step with more than one mission request, for example `mission_add_item` for a ship with more keys. When the inverses have more than 1000 commands, the call gives `limit` with the detail `InverseBudget`, and nothing changes.
 
 #### The trigger tools
 

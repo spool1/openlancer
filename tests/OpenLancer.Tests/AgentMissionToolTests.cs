@@ -414,6 +414,48 @@ public sealed partial class AgentMissionToolTests
         Assert.Equal("Cnd_Timer = 9", m.Lines("ol_wave")[2]);
     }
 
+    /// <summary>
+    /// The inverse budget counts each command of the inverse that the call gives, also the command group that joins the
+    /// inverses of two requests. mission_add_item adds a ship with one request and its labels in the texts form with a
+    /// second request. When the two inverses have 1000 commands, the inverse of the call has 1001. So the call gives
+    /// limit and changes nothing. One label less gives an inverse of exactly 1000 commands, and the call applies.
+    /// </summary>
+    [Fact]
+    public void TheInverseBudgetCountsTheGroupThatJoinsTheInversesOfAStep()
+    {
+        var (m, host) = OpenItems();
+        using var _ = m;
+        host.TestLimits = new AgentLimits { ResultKilobytes = 4096 };
+        var before = m.State();
+        static string Ship(int labels, bool preview = false) => AddItem("ship", "ol_new", $$"""
+            { "npc": "ol_npc_1", "label": [ {{string.Join(", ", Enumerable.Range(0, labels)
+                .Select(i => $$"""{ "texts": [ "ol_label_{{i}}" ] }"""))}} ] }
+            """).Insert(1, preview ? "\"preview\": true, " : "");
+        static int CountOf(JsonNode command) => 1 + (command["commands"]?.AsArray().Sum(c => CountOf(c!)) ?? 0);
+
+        // The inverse of the call is the group of the two inverses. Each label adds one command to it.
+        var two = Ok(host, "mission_add_item", Ship(2, preview: true))["inverse"]!;
+        var three = Ok(host, "mission_add_item", Ship(3, preview: true))["inverse"]!;
+        Assert.Equal(("command_group", 2), ((string?)two["kind"], two["commands"]!.AsArray().Count));
+        Assert.Equal(1, CountOf(three) - CountOf(two));
+        var largest = 2 + AgentLimits.MissionCommands - CountOf(two);
+
+        foreach (var preview in new[] { false, true })
+        {
+            var above = Call(host, "mission_add_item", Ship(largest + 1, preview));
+            Assert.Equal(("limit", MissionEditTools.InverseBudget),
+                ((string?)above.Content["code"], (string?)above.Content["detail"]));
+        }
+        Assert.Equal(before, m.State());
+        Assert.Equal(0, m.Session.Revision);
+        var applied = Ok(host, "mission_add_item", Ship(largest));
+        Assert.Equal(AgentLimits.MissionCommands, CountOf(applied["inverse"]!));
+        Assert.Equal($"label = ol_label_{largest - 1}", m.Lines(Item("MsnShip", "ol_new"))[^1]);
+        var inverse = applied["inverse"]!.ToJsonString();
+        Ok(host, "mission_edit", $$"""{ "commands": [ {{inverse}} ], "confirm": true }""");
+        Assert.Equal(before, m.State());
+    }
+
     /// <summary>A rename without change_references changes each line that names the item, because the default is true.
     /// The input schema and the help give that default. False keeps the lines, so they name the old nickname and need
     /// confirm: true.</summary>

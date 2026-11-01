@@ -50,8 +50,8 @@ internal sealed class EditScope
     /// <summary>The index in <see cref="missionRuns"/> of the first mission request of the step.</summary>
     private int stepMissionStart;
 
-    /// <summary>The mission commands that the requests of the call gave until now, and the mission commands of their
-    /// inverses (see <see cref="CountOf"/>).</summary>
+    /// <summary>The mission commands that the requests of the call gave until now, and the mission commands of the
+    /// inverses that the call gives, with the group that joins the inverses of a step (see <see cref="CountOf"/>).</summary>
     private int missionCommands, inverseCommands;
 
     internal EditScope(EditSession session, EditBatch batch, AgentLimits limits)
@@ -143,8 +143,14 @@ internal sealed class EditScope
                 error = error with { Message = AgentTexts.Error("edit_mission_world_file", ("path", ScriptRef.Parse(file).Path)) };
             throw new EditException(error with { Field = ownField ? fieldOf(error) : error.Field ?? fieldOf(error) });
         }
-        // The result gives the inverse, so the inverse must fit the budget too, as a result must fit its size limit.
-        inverseCommands += result.Inverse is { } inverse ? CountOf(inverse) : 0;
+        // The result gives the inverse, so the inverse must fit the budget too, as a result must fit its size limit. A
+        // step with more than one inverse gives them in one more command group (see WithMission), and that group
+        // counts too.
+        if (result.Inverse is { } inverse)
+        {
+            var joined = missionRuns.Skip(stepMissionStart).Count(r => r.Inverse != null) == 1;
+            inverseCommands += CountOf(inverse) + (joined ? 1 : 0);
+        }
         if (inverseCommands > AgentLimits.MissionCommands)
             throw Budget(MissionEditTools.InverseBudget, "limit_mission_inverse", commandsField);
         missionRuns.Add((result.Inverse, result.Rows));
