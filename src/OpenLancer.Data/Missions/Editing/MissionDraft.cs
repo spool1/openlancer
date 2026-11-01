@@ -58,7 +58,7 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
 
     /// <summary>The report of each command until now, in order. The net report of the request reads them with
     /// <see cref="EditResult.Net"/>. So an item that a command adds and a later command removes is not in the net
-    /// report, and the select follows a later rename or delete.</summary>
+    /// report. The select follows a later rename or delete.</summary>
     public IReadOnlyList<EditResult> Parts => parts;
 
     private readonly List<EditResult> parts = [];

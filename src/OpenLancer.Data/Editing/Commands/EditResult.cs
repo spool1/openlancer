@@ -185,9 +185,9 @@ public record EditResult(EditStatus Status)
     };
 
     /// <summary>
-    /// The net result of the parts of a request, so that each reference of the result resolves after the request
-    /// (section 5.6 of the MCP1 design). A part can add an item, and a later part can change, rename or delete it.
-    /// These are the rules:
+    /// The net result of the parts of a request (section 5.6 of the MCP1 design). Each reference of the result resolves
+    /// after the request. A part can add an item, and a later part can change, rename or delete it. These are the
+    /// rules:
     /// <list type="bullet">
     /// <item>An item that the request adds is an add with its last reference. The changes and the renames leave it out.
     /// An example is a new object with the nickname of its request.</item>

@@ -215,8 +215,9 @@ public sealed partial class MissionEditor
         };
     }
 
-    /// <summary>The part of the result of the plan: the "Missing" lines, the notes, the warnings, and the net adds,
-    /// changes, deletes, renames and selection of its commands (see <see cref="MissionDraft.Parts"/>).</summary>
+    /// <summary>The part of the result of the plan: the "Missing" lines, the notes and the warnings. It also gives the
+    /// net adds, changes, deletes, renames and selection of the commands (see
+    /// <see cref="MissionDraft.Parts"/>).</summary>
     private static EditResult Part(MissionDraft draft) => EditResult.Net(new EditResult(EditStatus.Applied)
     {
         Missing = draft.Missing,
