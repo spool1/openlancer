@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Missions.Run;
@@ -14,6 +15,7 @@ public sealed class DryRunTextsTests
     {
         yield return ("toggle", MissionView.DryRunTip);
         yield return ("node menu", GraphView.RunThisTip);
+        yield return ("not waiting", GraphView.NotWaitingReason);
         yield return ("empty", RunPanel.EmptyText);
         yield return ("help", RunPanel.Help.WhatItIs);
         yield return ("help writes", RunPanel.Help.WhatItWrites);
@@ -33,6 +35,18 @@ public sealed class DryRunTextsTests
                      ("chain", TriggerMachine.ChainMessage("ol_trigger")),
                  })
             yield return (name, text);
+    }
+
+    /// <summary>"Run this trigger (dry run)" of the node menu gives the state of the run or of the trigger as the
+    /// reason why it is off, not its tooltip (#56).</summary>
+    [Fact]
+    public void RunThisTriggerTellsWhyItIsOff()
+    {
+        Assert.Equal(RunPanel.OverTip, GraphView.RunThisReason(true, TriggerStatus.Active));
+        Assert.Equal(GraphView.NotWaitingReason, GraphView.RunThisReason(false, TriggerStatus.Inactive));
+        Assert.Equal(GraphView.NotWaitingReason, GraphView.RunThisReason(false, TriggerStatus.Complete));
+        Assert.Null(GraphView.RunThisReason(false, TriggerStatus.Active));
+        Assert.StartsWith("This trigger does not wait now.", GraphView.NotWaitingReason, StringComparison.Ordinal);
     }
 
     [Fact]

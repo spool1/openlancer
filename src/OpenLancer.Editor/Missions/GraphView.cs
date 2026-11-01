@@ -1626,6 +1626,16 @@ internal sealed partial class GraphView : IDisposable
     internal const string RunThisTip = "Run this trigger: In the dry run, run this trigger now, as if its condition is met. " +
                                        "Only a trigger that waits can run.";
 
+    /// <summary>Why "Run this trigger (dry run)" is off for a trigger that does not wait.</summary>
+    internal const string NotWaitingReason = "This trigger does not wait now. Only a trigger that waits can run.";
+
+    /// <summary>Why "Run this trigger (dry run)" is off, or null when it is on. It is off when the run is over or when
+    /// the trigger does not wait.</summary>
+    internal static string? RunThisReason(bool over, TriggerStatus status) =>
+        over ? RunPanel.OverTip
+        : status != TriggerStatus.Active ? NotWaitingReason
+        : null;
+
     // The tooltips of the node menu items of Play from a trigger (section 8.1 of the M6c design).
     internal const string PlayFromHereTip = "Play from here: Set this trigger as the play start, then play in OpenLancer.";
     internal const string SetPlayStartTip = "Set as play start: Set this trigger as the play start, and do not play now.";
@@ -1677,9 +1687,7 @@ internal sealed partial class GraphView : IDisposable
         }
 
         var machine = run.State.Machine;
-        var reason = machine.IsOver ? RunPanel.OverTip
-            : machine.StateOf(trigger).Status != TriggerStatus.Active ? RunThisTip
-            : null;
+        var reason = RunThisReason(machine.IsOver, machine.StateOf(trigger).Status);
         if (MenuItems.Item("Run this trigger (dry run)", reason, RunThisTip))
         {
             missions.AddDryRunInput(DryRunInput.RunTrigger(trigger.Nickname));

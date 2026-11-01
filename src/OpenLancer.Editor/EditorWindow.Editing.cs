@@ -113,6 +113,9 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
     internal const string RevertTip =
         "Puts back the section as the base data and the mods before the active mod have it.";
 
+    /// <summary>Why "Allow edits of this repo mod" is off after the user allowed the edits.</summary>
+    internal const string RepoEditsAllowedReason = "You allowed the edits of this repo mod until the editor closes.";
+
     /// <summary>Why New from template cannot copy the section, or null when it can: it copies a ship or equipment,
     /// with a session that takes edits.</summary>
     public string? CopyReason(SectionRef? section) =>
@@ -357,7 +360,7 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         {
             var allowed = session.RepoEditsAllowed;
             if (MenuItems.Toggle("Allow edits of this repo mod", ref allowed,
-                    allowed ? "The edits of this repo mod are allowed until the editor closes." : null))
+                    allowed ? RepoEditsAllowedReason : null))
             {
                 session.RepoEditsAllowed = allowed;
             }

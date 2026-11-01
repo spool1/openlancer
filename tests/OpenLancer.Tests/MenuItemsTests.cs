@@ -134,6 +134,7 @@ public sealed class MenuItemsTests
     [InlineData(MenuItems.NoRevert)]
     [InlineData(EditorWindow.CopyTip)]
     [InlineData(EditorWindow.RevertTip)]
+    [InlineData(EditorWindow.RepoEditsAllowedReason)]
     public void TheSharedReasonsAreSimplifiedTechnicalEnglish(string text) => Assert.Empty(SteLint.Problems(text));
 
     /// <summary>The rule finds each form of an enabled flag of <see cref="MenuSample"/> that can be false, and passes
