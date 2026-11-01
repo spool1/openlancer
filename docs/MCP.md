@@ -276,8 +276,10 @@ These steps build an NPC patrol and a wreck with cargo in a system.
 7. Call `scene_place_wreck` with a position, the two archetypes, the cargo rows, a nickname and a name.
 8. In the editor, call `render_scene` with the wreck in `frame`.
 9. Call `check`.
-10. Correct each error with `set_fields`.
-11. Save the mod in the editor.
+10. If the loadout of the wreck has an error, call `undo` before the next edit. Only `undo` changes the loadout of a placed wreck, and it reverts the last edit of the agent.
+11. If you called `undo`, call `scene_place_wreck` again with the correct rows.
+12. Correct each other error with `set_fields`, for example an error of the patrol.
+13. Save the mod in the editor.
 
 ### The mission tools
 
@@ -638,7 +640,7 @@ The server gives one prompt. An agent program shows a prompt as a command. In Cl
 |---|---|---|
 | `two_trigger_mission` | `script`: the `msn:` reference of a mission script. `list_missions` gives the scripts. | The steps to add a pirate ambush with two triggers. The agent adds the ship build, the NPC and the ship with `mission_add_item`. It adds the two triggers and the loot in one `edit_batch`. Then it runs `mission_dry_run` and `check`. The names in the steps are examples. |
 
-The prompt needs the edit tools. So a host that only reads, for example `oltool mcp serve --read-only`, lists no prompt. The prompts `build_outpost` and `patrol_and_wreck` and the resource `openlancer://guide/workflows` wait for a decision of the project. The prompt `short_cutscene` comes with the cutscene tools.
+The prompt needs the edit tools. So a host that only reads, for example `oltool mcp serve --read-only`, lists no prompt. The prompts `build_outpost` and `patrol_and_wreck` and the resource `openlancer://guide/workflows` are not in this version. They come after version 1.0 ([#70](https://github.com/spool1/openlancer/issues/70)). The prompt `short_cutscene` comes with the cutscene tools.
 
 ## Permission rules for the agent program
 
