@@ -206,6 +206,9 @@ class IssueFormTests(unittest.TestCase):
         self.assertEqual("textarea", fields["version"]["type"])
         self.assertIn("Help > Report a problem", fields["version"]["attributes"]["description"])
         self.assertNotIn("About", fields["version"]["attributes"]["description"])
+        # Report a problem also opens the bug report form, so the field tells the tester to stay on this form.
+        self.assertIn("Report a problem also opens the bug report form. Close that form, and paste the text here.",
+                      fields["version"]["attributes"]["description"])
 
     def test_the_severity_gives_one_line_to_each_option_and_minor_holds_the_rest(self):
         """The triage of the 1.0 scope defines blocker, major and idea. Minor holds all other problems."""

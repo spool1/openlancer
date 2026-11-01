@@ -21,7 +21,7 @@ body:
     id: version
     attributes:
       label: Version and commit
-      description: Click **Help > Report a problem**, then paste its text here. It has the version, the commit, the game and the Windows version.
+      description: Click **Help > Report a problem**, then paste its text here. It has the version, the commit, the game and the Windows version. Report a problem also opens the bug report form. Close that form, and paste the text here.
       placeholder: OpenLancer 1.0.0-beta.1, commit 0123abc
     validations:
       required: true
