@@ -114,7 +114,8 @@ internal sealed class CutsceneView
     public static readonly (string Input, string Action)[] Controls =
     [
         .. PreviewKeys.Table.Select(k => (k.Chord.Text, k.Action)),
-        ($"{EditorKeys.Play.Chord.Text} and {EditorKeys.Stop.Chord.Text}", "Play and Stop of the game, as in each panel."),
+        ($"{EditorKeys.Play.Chord.Text} and {EditorKeys.Stop.Chord.Text}",
+            "Play and Stop of the game, as in each panel."),
         ("Right mouse drag", "Free: look around."),
         ("W A S D, Q and E", "Free: fly, while the right mouse button is down."),
         ("Wheel, while flying", "Free: set the fly speed."),
@@ -123,7 +124,8 @@ internal sealed class CutsceneView
         ("Wheel", "Free: zoom."),
         ("Click", "Free: select an entity."),
         (EditorKeys.Frame.Chord.Text, "Free: frame the selected entity."),
-        (string.Join(" and ", GizmoInput.ToolKeys.Where(t => t.Tool != GizmoTool.Scale).Select(t => KeyChord.KeyName(t.Key))),
+        (string.Join(" and ",
+                GizmoInput.ToolKeys.Where(t => t.Tool != GizmoTool.Scale).Select(t => KeyChord.KeyName(t.Key))),
             "Free: select the move or the rotate tool of the gizmo, while the right mouse button is up."),
         (KeyChord.KeyName(GizmoInput.SpaceKey), "Free: change the gizmo between Local and World."),
         (GizmoInput.SnapInput, "Free: snap when the snap is off, or do not snap when it is on."),

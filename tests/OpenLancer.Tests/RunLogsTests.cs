@@ -159,8 +159,8 @@ public sealed class RunLogsTests : IDisposable
     }
 
     /// <summary>Main gives the call its own assembly, <c>typeof(Program).Assembly</c>, and no text. The engine names
-    /// the log with the name of the assembly that calls <c>AppHandler.Run</c>, and Main makes that call. So the kept log
-    /// is the log that the engine writes.</summary>
+    /// the log with the name of the assembly that calls <c>AppHandler.Run</c>, and Main makes that call. So the kept
+    /// log is the log that the engine writes.</summary>
     [Theory]
     [InlineData("OpenLancer.Editor")]
     [InlineData("OpenLancer.Play")]

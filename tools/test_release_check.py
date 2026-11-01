@@ -655,8 +655,10 @@ class ReadmeFirstTests(unittest.TestCase):
 
     def test_only_a_preview_calls_itself_a_preview(self):
         """The first text that a new modder reads names the stage of its version (#56)."""
-        stages = {"1.0.0-dev": "This is a development build. Expect bugs.", "1.0.0-beta.1": "This is a beta. Expect bugs.",
-                  "1.0.0-rc.1": "This is a release candidate. Expect bugs.", "1.0.0": "Report each bug that you find.",
+        stages = {"1.0.0-dev": "This is a development build. Expect bugs.",
+                  "1.0.0-beta.1": "This is a beta. Expect bugs.",
+                  "1.0.0-rc.1": "This is a release candidate. Expect bugs.",
+                  "1.0.0": "Report each bug that you find.",
                   "0.1.0-preview": "This is a preview. Expect bugs."}
         for version, stage in stages.items():
             text = " ".join(self.filled(version).split())
