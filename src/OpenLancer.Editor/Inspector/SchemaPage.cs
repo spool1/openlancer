@@ -17,8 +17,8 @@ namespace OpenLancer.Editor.Inspector;
 internal sealed class SchemaPage(EditorWindow window, PropertyGrid grid)
 {
     /// <summary>The empty state of a selected section that the edit view does not have, for example after an undo of
-    /// its create (#56).</summary>
-    internal static readonly EmptyState NoSection = new("The edit view does not have this section.",
+    /// its create (#56). The text uses plain words, because a modder does not know the edit view.</summary>
+    internal static readonly EmptyState NoSection = new("The data of the open profile does not have this section now.",
         "Select another item, or click Undo or Redo to restore the section.");
 
     private readonly MarketSection market = new(window, grid);

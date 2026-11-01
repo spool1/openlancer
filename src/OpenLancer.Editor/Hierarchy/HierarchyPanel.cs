@@ -33,11 +33,12 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
     /// <summary>The id of the panel. The layout reports its focus by this id.</summary>
     public const string PanelId = "hierarchy";
 
-    // The empty states of the Hierarchy (#56).
-    private const string ClearSearch = "Press Esc in the search field to clear the search.";
-    internal static readonly EmptyState NoObjectMatch = new("No object matches the search.", ClearSearch);
-    internal static readonly EmptyState NoMissionItemMatch = new("No item matches the search.", ClearSearch);
-    internal static readonly EmptyState NoEntityMatch = new("No entity matches the search.", ClearSearch);
+    // The empty states of the Hierarchy (#56). The next action of a search without a match is a link that clears the
+    // search, as in the Assets panel.
+    private const string ClearSearchLink = "Clear search";
+    internal static readonly EmptyState NoObjectMatch = new("No object matches the search.", ClearSearchLink);
+    internal static readonly EmptyState NoMissionItemMatch = new("No item matches the search.", ClearSearchLink);
+    internal static readonly EmptyState NoEntityMatch = new("No entity matches the search.", ClearSearchLink);
 
     private const string SearchTip =
         "Search by name or nickname. A t: word shows one type, for example t:station.\n" +
@@ -108,6 +109,23 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
     /// <summary>Sets the text of the search field of the system tree, for example "t:zone" to show only the
     /// zones.</summary>
     public void SetSearch(string text) => search = text;
+
+    /// <summary>Clears the search field of the tree that shows, as the clear button in the field does.</summary>
+    private void ClearSearch()
+    {
+        if (window.CenterMode == CenterMode.Cutscene)
+        {
+            cutsceneSearch = "";
+        }
+        else if (window.CenterMode == CenterMode.Mission)
+        {
+            missionSearch = "";
+        }
+        else
+        {
+            search = "";
+        }
+    }
 
     /// <summary>Forgets the trees of the last system and cutscene. Call it when the profile closes.</summary>
     public void Reset()
@@ -198,18 +216,20 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
         }
 
         Rows(tree, focused);
+        // The state of a search without a match draws before the drop area, so its link shows in the panel.
+        if (tree.IsSearching && tree.Root.Matches == 0 &&
+            PanelStates.MessageWithLink(window.CenterMode == CenterMode.Cutscene ? NoEntityMatch
+                : window.CenterMode == CenterMode.Mission ? NoMissionItemMatch
+                : NoObjectMatch))
+        {
+            ClearSearch();
+        }
+
         // The empty space below the rows takes a tile: the asset spawns at the camera pivot.
         if (IsScene && ImGui.GetContentRegionAvail().Y > 1)
         {
             ImGui.Dummy(new Vector2(Math.Max(1, ImGui.GetContentRegionAvail().X), ImGui.GetContentRegionAvail().Y));
             window.AssetDrag.Hierarchy(null);
-        }
-
-        if (tree.IsSearching && tree.Root.Matches == 0)
-        {
-            PanelStates.Message(window.CenterMode == CenterMode.Cutscene ? NoEntityMatch
-                : window.CenterMode == CenterMode.Mission ? NoMissionItemMatch
-                : NoObjectMatch);
         }
 
         // A right click on empty space opens the Create menu (decision D255 of the M3 design).

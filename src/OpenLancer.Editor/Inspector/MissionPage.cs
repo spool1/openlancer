@@ -34,7 +34,7 @@ internal sealed partial class MissionPage(EditorWindow window, PropertyGrid grid
     internal static readonly EmptyState NoPrefab = new($"No mod has the prefab '{EmptyState.TextPlace}'.",
         "Select a prefab in the library or in the Assets panel.");
     internal static readonly EmptyState NoScript =
-        new("This mission script is not in the edit view.", "Select a mission in the Missions tab.");
+        new("The open profile does not have this mission script.", "Select a mission in the Missions tab.");
 
     // Sizes in unscaled points.
     private const float HeaderPaddingX = 10;

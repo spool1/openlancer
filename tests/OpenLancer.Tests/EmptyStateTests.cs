@@ -110,6 +110,36 @@ public sealed class EmptyStateTests
         Assert.Empty(SteLint.Problems(state.Next));
     }
 
+    /// <summary>A search without a match in the Hierarchy, the Assets panel, the Database or the Cutscenes panel has
+    /// one form of its next action: a link that clears the search or the filter.</summary>
+    [Fact]
+    public void ASearchWithoutAMatchInAMainPanelGivesAClearLink()
+    {
+        Type[] panels = [typeof(HierarchyPanel), typeof(AssetsPanel), typeof(DatabasePanel), typeof(CutsceneBrowser)];
+        var searches = States().Where(s => panels.Contains(s.Owner) && s.State.Message.Contains("match")).ToList();
+        var links = typeof(EditorWindow).Assembly.GetTypes()
+            .SelectMany(IlWalker.Calls)
+            .Where(c => c.Callee.DeclaringType == typeof(PanelStates) &&
+                        c.Callee.Name == nameof(PanelStates.MessageWithLink))
+            .Select(c => c.Owner)
+            .ToHashSet();
+
+        Assert.Equal(3, searches.Count(s => s.Owner == typeof(HierarchyPanel)));
+        Assert.All(searches, s => Assert.Matches("^Clear (search|filter)$", s.State.Next));
+        Assert.All(panels, p => Assert.Contains(p, links));
+    }
+
+    /// <summary>An empty state uses plain words. "Edit view" is a word of the mod format help, so a new modder does
+    /// not know it.</summary>
+    [Theory]
+    [MemberData(nameof(Names))]
+    public void NoStateNamesTheEditView(string name)
+    {
+        var state = Of(name);
+        Assert.DoesNotContain("edit view", state.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("edit view", state.Next, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void AStateGetsTheTextOfTheSearchInItsMessage()
     {
