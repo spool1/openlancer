@@ -171,6 +171,8 @@ public sealed class PlayProcessTests : IDisposable
     /// A game runs for a long time, and each read of its output blocks its thread. So threads of their own read the
     /// output and wait for the exit, not threads of the thread pool. On a busy computer the pool can have no free thread
     /// for many seconds, and an exit that waits for one comes late. CI failed the 30 s waits of these tests in this way.
+    /// The test shows that no event, log line or exit comes to the UI queue from a thread of the pool. The reader of the
+    /// error output queues no action, so <see cref="ProcessThreadTests"/> covers it.
     /// </summary>
     [Fact]
     public void TheOutputAndTheExitDoNotWaitForAThreadOfThePool()
