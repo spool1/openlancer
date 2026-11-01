@@ -177,7 +177,9 @@ class IssueFormTests(unittest.TestCase):
         for field_id in ("version", "game", "steps", "expected", "actual"):
             self.assertTrue(fields[field_id]["validations"]["required"], field_id)
         version = fields["version"]["attributes"]["description"]
-        self.assertIn("Help > About OpenLancer", version)
+        # The text of Report a problem holds only facts. Copy of the About window also copies the license and the note.
+        self.assertIn("Paste the text of **Help > Report a problem**.", version)
+        self.assertNotIn("Copy", version)
         logs = fields["logs"]["attributes"]["description"]
         for text in ("paths of your folders", "Windows user name", "OpenLancer.Editor.log.previous.txt",
                      "OpenLancer.Play.log.previous.txt"):
@@ -200,6 +202,10 @@ class IssueFormTests(unittest.TestCase):
                          options)
         for field_id in ("round", "version", "area", "step", "happened", "expected", "severity"):
             self.assertTrue(fields[field_id]["validations"]["required"], field_id)
+        # The text of Report a problem has four lines, so the field keeps them.
+        self.assertEqual("textarea", fields["version"]["type"])
+        self.assertIn("Help > Report a problem", fields["version"]["attributes"]["description"])
+        self.assertNotIn("About", fields["version"]["attributes"]["description"])
 
     def test_the_severity_gives_one_line_to_each_option_and_minor_holds_the_rest(self):
         """The triage of the 1.0 scope defines blocker, major and idea. Minor holds all other problems."""

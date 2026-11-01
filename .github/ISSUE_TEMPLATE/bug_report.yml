@@ -13,7 +13,7 @@ body:
     attributes:
       label: Version and commit
       description: >-
-        The version and the commit from **Help > About OpenLancer**. Click **Copy** in the About window, or paste the text of **Help > Report a problem**.
+        Paste the text of **Help > Report a problem**. It has the version, the commit, the game and the Windows version. **Help > About OpenLancer** also shows the version and the commit.
         A build without a Help menu: write the version from the name of its zip file.
       placeholder: OpenLancer 1.0.0-beta.1, commit 0123abc
     validations:

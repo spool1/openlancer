@@ -17,11 +17,11 @@ body:
         - "3"
     validations:
       required: true
-  - type: input
+  - type: textarea
     id: version
     attributes:
       label: Version and commit
-      description: The version and the commit from **Help > About OpenLancer**.
+      description: Click **Help > Report a problem**, then paste its text here. It has the version, the commit, the game and the Windows version.
       placeholder: OpenLancer 1.0.0-beta.1, commit 0123abc
     validations:
       required: true
