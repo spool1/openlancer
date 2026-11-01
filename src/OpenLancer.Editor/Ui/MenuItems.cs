@@ -50,8 +50,9 @@ internal static class MenuItems
     public static bool Item(string label, string? reason, string? tooltip = null, string shortcut = "",
         bool selected = false)
     {
-        var clicked = ImGui.MenuItem(label, shortcut, selected, reason == null);
-        Tooltip(reason ?? tooltip);
+        var (enabled, text) = State(reason, tooltip);
+        var clicked = ImGui.MenuItem(label, shortcut, selected, enabled);
+        Tooltip(text);
         return clicked;
     }
 
@@ -61,8 +62,9 @@ internal static class MenuItems
     /// <param name="tooltip">The tooltip of the item while it is on, or null for no tooltip.</param>
     public static bool Toggle(string label, ref bool value, string? reason, string? tooltip = null)
     {
-        var clicked = ImGui.MenuItem(label, "", ref value, reason == null);
-        Tooltip(reason ?? tooltip);
+        var (enabled, text) = State(reason, tooltip);
+        var clicked = ImGui.MenuItem(label, "", ref value, enabled);
+        Tooltip(text);
         return clicked;
     }
 
@@ -71,14 +73,22 @@ internal static class MenuItems
     /// <param name="tooltip">The tooltip of the submenu while it is on and closed, or null for no tooltip.</param>
     public static bool BeginMenu(string label, string? reason, string? tooltip = null)
     {
-        var open = ImGui.BeginMenu(label, reason == null);
+        var (enabled, text) = State(reason, tooltip);
+        var open = ImGui.BeginMenu(label, enabled);
         if (!open)
         {
-            Tooltip(reason ?? tooltip);
+            Tooltip(text);
         }
 
         return open;
     }
+
+    /// <summary>The rule of each item that can be off: a reason turns the item off and becomes its tooltip. Without a
+    /// reason, the item is on and shows its own tooltip.</summary>
+    /// <param name="reason">Why the item is off, or null for an item that is on.</param>
+    /// <param name="tooltip">The tooltip of the item while it is on, or null for no tooltip.</param>
+    internal static (bool Enabled, string? Tooltip) State(string? reason, string? tooltip) =>
+        (reason == null, reason ?? tooltip);
 
     /// <summary>Draws a line that is always off, for example "No recent profiles", which tells why a menu has no
     /// items, or a line of facts.</summary>

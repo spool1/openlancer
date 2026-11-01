@@ -126,6 +126,37 @@ public sealed class MenuItemsTests
         Assert.Contains(calls, c => HasEnabledFlag(c.Callee) && c.Value == 1);
     }
 
+    /// <summary>A reason turns an item off and becomes its tooltip. Without a reason, the item is on and shows its own
+    /// tooltip.</summary>
+    [Theory]
+    [InlineData(null, null, true, null)]
+    [InlineData(null, "Saves the edits.", true, "Saves the edits.")]
+    [InlineData(MenuItems.NoProfile, null, false, MenuItems.NoProfile)]
+    [InlineData(MenuItems.NoProfile, "Saves the edits.", false, MenuItems.NoProfile)]
+    public void AReasonTurnsTheItemOffAndBecomesItsTooltip(string? reason, string? tooltip, bool enabled, string? shown)
+    {
+        Assert.Equal((enabled, shown), MenuItems.State(reason, tooltip));
+    }
+
+    /// <summary>Each method of the helper that draws an item that can be off gives ImGui the state of
+    /// <see cref="MenuItems.State"/>, not a constant. So an item with a reason cannot stay on. Only Note draws an item
+    /// with a constant flag, and that item is always off.</summary>
+    [Fact]
+    public void TheHelperGivesImGuiTheStateOfTheReason()
+    {
+        var flags = IlWalker.LastArguments(typeof(MenuItems)).Where(a => HasEnabledFlag(a.Callee)).ToList();
+        var drawing = flags.Where(a => HelperMethods.Contains(a.Caller.Name)).ToList();
+        var callers = IlWalker.Calls(typeof(MenuItems))
+            .Where(c => c.Callee.DeclaringType == typeof(MenuItems) && c.Callee.Name == nameof(MenuItems.State))
+            .Select(c => c.Caller.Name)
+            .ToHashSet();
+
+        Assert.Equal(["BeginMenu", "Item", "Toggle"], drawing.Select(a => a.Caller.Name).Order());
+        Assert.All(drawing, a => Assert.Null(a.Value));
+        Assert.All(drawing, a => Assert.Contains(a.Caller.Name, callers));
+        Assert.All(flags.Except(drawing), a => Assert.Equal(("Note", 0L), (a.Caller.Name, a.Value!.Value)));
+    }
+
     [Theory]
     [InlineData(MenuItems.NoProfile)]
     [InlineData(MenuItems.EditOpen)]
