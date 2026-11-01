@@ -14,11 +14,13 @@ namespace OpenLancer.TestStub;
 /// <para><c>play --record &lt;file&gt;</c> is a stub of the play program (PlayStub in OpenLancer.Tests). It writes its
 /// process id and each input line to the record, and <c>&lt;eof&gt;</c> at the end of its input. It writes the lines of
 /// <c>--lines</c> at its start, and the lines of <c>--start-lines</c> when it reads <c>start</c>. A line that starts
-/// with <c>!err </c> goes to the error output without the prefix. It answers each <c>reload n</c> and each
-/// <c>restart n</c> with the lines of <c>--reload-lines</c> and <c>--restart-lines</c>: the first line at the first
-/// command, the second line at the second command, and the last line at each later command. The character U+001F
-/// separates the output lines of one answer. It ends at <c>stop</c> or at the end of its input. <c>--ignore-stop</c>
-/// makes it end only at the end of its input. <c>--exit &lt;code&gt;</c> makes it exit after its start lines, and
+/// with <c>!err </c> goes to the error output without the prefix.</para>
+/// <para>The play stub answers each <c>reload n</c> with the lines of <c>--reload-lines</c>, and each
+/// <c>restart n</c> with the lines of <c>--restart-lines</c>. The first command gets the first line, and the second
+/// command gets the second line. Each later command gets the last line. The character U+001F separates the output lines
+/// of one answer.</para>
+/// <para>The play stub ends at <c>stop</c> or at the end of its input. <c>--ignore-stop</c> makes it end only at the
+/// end of its input. <c>--exit &lt;code&gt;</c> makes it exit with the code after the lines of <c>--lines</c>.
 /// <c>--sleep &lt;seconds&gt;</c> makes it wait and exit with no output.</para>
 /// <para><c>game --record &lt;file&gt; [--exit &lt;code&gt;] [--wait] -- &lt;arguments&gt;</c> is a stub of a program
 /// of a play copy (GameProcessTests). It writes its working folder, the arguments after <c>--</c> and its process id to
@@ -129,8 +131,9 @@ internal static class Program
         Console.Error.Flush();
     }
 
-    /// <summary>The answers to a command that comes more than one time: the first line at the first command, the
-    /// second line at the second command, and the last line at each later command. No lines give no answer.</summary>
+    /// <summary>The answers to a command that comes more than one time. The first command gets the first line, and
+    /// the second command gets the second line. Each later command gets the last line. Without lines, it gives no
+    /// answer.</summary>
     private sealed class Answers(string[] lines)
     {
         private int count;

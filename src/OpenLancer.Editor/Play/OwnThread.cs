@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 namespace OpenLancer.Editor.Play;
 
 /// <summary>
-/// Runs work that blocks while a program of a play runs, on a thread of its own and not on a thread of the thread pool.
-/// The read of the output of a game and the wait for its exit are such work. On a pool thread, this work takes a thread
+/// Runs work that blocks while a program of a play runs. The work gets a thread of its own, not a thread of the thread
+/// pool. The read of the output of a game and the wait for its exit are such work. On a pool thread, this work takes a thread
 /// from the other work of the editor for the full play. When the computer is busy, the pool can have no free thread for
 /// many seconds, and work that waits for one comes late. So the exit of a game would come late too.
 /// </summary>
