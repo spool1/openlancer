@@ -214,7 +214,7 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 
 A warning shows when no start trigger and no checkpoint leads to the trigger. The play then starts only this trigger. When the start cannot start, the page shows the reason, for example for a script without a story slot.
 
-A checkpoint start, and a start whose path starts at a checkpoint, show the limit of this version as a warning: "This version restores only the triggers of checkpoint '{trigger}'. A saved game also keeps the objective, the dock and lane rules, the reputations and other state from before the save. This version does not restore that state." So after such a start, the objective, the dock and lane rules and the reputations can differ from a saved game of the retail game.
+A checkpoint start, and a start whose path starts at a checkpoint, show the limit of this version as a warning. The warning starts with "This version restores only the triggers of checkpoint '{trigger}'." A saved game also keeps the objective, the dock and lane rules, the reputations and other state from before the save. This version does not restore that state. So after such a start, that state can differ from a saved game of the retail game.
 
 Three warnings are about the start place. They follow the place that you pick:
 
