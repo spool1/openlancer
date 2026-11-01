@@ -19,9 +19,10 @@ namespace OpenLancer.Editor.Play;
 /// <para>On Windows, the process is in a job object that ends the process when the job closes (decision D53, see
 /// <see cref="ProcessJob"/>). So the game ends at <see cref="Dispose"/>, and also when the editor process ends in any
 /// way. When Windows does not give the job, <see cref="Dispose"/> kills the process.</para>
-/// <para>A task reads the output. It drops the lines that are not events, warnings or errors: the game log of the
-/// engine keeps them. After the end of the output and of the process, it gives the exit to the UI thread. So each
-/// event and each log line comes before the exit.</para>
+/// <para>A thread of its own reads the output (see <see cref="OwnThread"/>). It drops the lines that are not events,
+/// warnings or errors: the game log of the engine keeps them. After the end of the output and of the process, it gives
+/// the exit to the UI thread. So each event and each log line comes before the exit. A second thread of its own reads
+/// the error output.</para>
 /// </remarks>
 internal sealed class PlayProcess : IDisposable
 {
@@ -44,7 +45,7 @@ internal sealed class PlayProcess : IDisposable
         this.process = process;
         this.input = input;
         job = ProcessJob.For(process);
-        reader = Task.Run(() => Read(ui, onEvent, onLogLine, onExit));
+        reader = OwnThread.Run(() => Read(ui, onEvent, onLogLine, onExit));
     }
 
     /// <summary>The program and the arguments that start the play program next to the editor.</summary>
@@ -179,13 +180,13 @@ internal sealed class PlayProcess : IDisposable
         CloseInput();
     }
 
-    private async Task Read(IUIThread ui, Action<PlayEvent> onEvent, Action<string> onLogLine,
-        Action<int, string> onExit)
+    private void Read(IUIThread ui, Action<PlayEvent> onEvent, Action<string> onLogLine, Action<int, string> onExit)
     {
-        var errors = FirstLines(process.StandardError);
+        var errorOutput = process.StandardError;
+        var errors = OwnThread.Run(() => FirstLines(errorOutput));
         using (var output = process.StandardOutput)
         {
-            while (await output.ReadLineAsync() is { } line)
+            while (output.ReadLine() is { } line)
             {
                 if (PlayProtocol.ReadEvent(line) is { } e)
                 {
@@ -198,8 +199,8 @@ internal sealed class PlayProcess : IDisposable
             }
         }
 
-        var errorText = await errors;
-        await process.WaitForExitAsync();
+        var errorText = errors.GetAwaiter().GetResult();
+        process.WaitForExit();
         int code;
         lock (processLock)
         {
@@ -212,12 +213,12 @@ internal sealed class PlayProcess : IDisposable
     }
 
     /// <summary>The first non-empty lines of the error output, in one line. It reads the output to its end.</summary>
-    private static async Task<string> FirstLines(StreamReader errors)
+    private static string FirstLines(StreamReader errors)
     {
         var lines = new List<string>();
         using (errors)
         {
-            while (await errors.ReadLineAsync() is { } line)
+            while (errors.ReadLine() is { } line)
             {
                 if (lines.Count < ErrorLines && line.Trim() is { Length: > 0 } text)
                 {

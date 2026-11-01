@@ -23,79 +23,89 @@ internal delegate IGameProcess GameStarter(ProcessStartInfo info, Action<int> ex
 /// <summary>
 /// The game or FLServer of a play copy (section 8.6 of the M11 design, decision D313). The process is in a job that ends
 /// it with the editor, as the game of Play in OpenLancer is (<see cref="ProcessJob"/>). It has no redirected input or
-/// output, because the retail programs have no protocol with the editor.
+/// output, because the retail programs have no protocol with the editor. A thread of its own waits for the exit (see
+/// <see cref="OwnThread"/>).
 /// </summary>
 internal sealed class GameProcess : IGameProcess
 {
     private readonly Process process;
     private readonly ProcessJob? job;
 
-    private GameProcess(Process process)
+    // CloseMainWindow, Kill and the end of the wait use the process object on two threads.
+    private readonly object processLock = new();
+    private bool ended;
+
+    private GameProcess(Process process, IUIThread ui, Action<int> exited)
     {
         this.process = process;
         job = ProcessJob.For(process);
+        OwnThread.Run(() => WaitForExit(ui, exited));
     }
 
     /// <summary>A starter that gives the exit code on the UI thread.</summary>
     public static GameStarter Starter(IUIThread ui) => (info, exited) => Start(info, ui, exited);
 
     /// <summary>Starts the program with the working folder and the arguments of the start info.</summary>
-    /// <param name="exited">Gets the exit code on the UI thread, or -1 when Windows does not give it.</param>
+    /// <param name="exited">Gets the exit code on the UI thread, or -1 when Windows does not give it. It also comes
+    /// after <see cref="Dispose"/>, when the job ended the program.</param>
     /// <exception cref="Win32Exception">The program did not start.</exception>
     public static GameProcess Start(ProcessStartInfo info, IUIThread ui, Action<int> exited)
     {
         info.UseShellExecute = false;
-        var process = new Process { StartInfo = info, EnableRaisingEvents = true };
-        process.Exited += (_, _) =>
-        {
-            int code;
-            try
-            {
-                code = process.ExitCode;
-            }
-            catch (InvalidOperationException)
-            {
-                code = -1;
-            }
-
-            ui.QueueUIThread(() => exited(code));
-        };
+        var process = new Process { StartInfo = info };
         if (!process.Start())
         {
             process.Dispose();
             throw new InvalidOperationException($"{info.FileName} did not start.");
         }
 
-        return new GameProcess(process);
+        return new GameProcess(process, ui, exited);
     }
 
     public bool CloseMainWindow()
     {
-        try
+        lock (processLock)
         {
-            process.Refresh();
-            return process.CloseMainWindow();
-        }
-        catch (InvalidOperationException)
-        {
-            // The program ended. Its exit follows.
-            return false;
+            if (ended)
+            {
+                return false;
+            }
+
+            try
+            {
+                process.Refresh();
+                return process.CloseMainWindow();
+            }
+            catch (InvalidOperationException)
+            {
+                // The program ended. Its exit follows.
+                return false;
+            }
         }
     }
 
     public void Kill()
     {
-        try
+        lock (processLock)
         {
-            process.Kill(entireProcessTree: true);
-        }
-        catch (Exception e) when (e is InvalidOperationException or Win32Exception)
-        {
-            // The program ends now. Its exit follows.
+            if (ended)
+            {
+                return;
+            }
+
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (Exception e) when (e is InvalidOperationException or Win32Exception)
+            {
+                // The program ends now. Its exit follows.
+            }
         }
     }
 
-    /// <summary>Closes the job, which ends the program. Without a job, it kills the program.</summary>
+    /// <summary>Closes the job, which ends the program. Without a job, it kills the program. The wait for the exit
+    /// then releases the process.</summary>
     public void Dispose()
     {
         if (job != null)
@@ -106,7 +116,27 @@ internal sealed class GameProcess : IGameProcess
         {
             Kill();
         }
+    }
 
-        process.Dispose();
+    private void WaitForExit(IUIThread ui, Action<int> exited)
+    {
+        process.WaitForExit();
+        int code;
+        lock (processLock)
+        {
+            try
+            {
+                code = process.ExitCode;
+            }
+            catch (InvalidOperationException)
+            {
+                code = -1;
+            }
+
+            ended = true;
+            process.Dispose();
+        }
+
+        ui.QueueUIThread(() => exited(code));
     }
 }

@@ -10,8 +10,21 @@ namespace OpenLancer.Tests;
 internal sealed class QueuedUIThread : IUIThread
 {
     private readonly BlockingCollection<Action> queue = [];
+    private int queuedFromThreadPool;
 
-    public void QueueUIThread(Action work) => queue.Add(work);
+    /// <summary>The count of actions that a thread of the thread pool queued. The process tests use it to show that the
+    /// output and the exit of a program do not wait for a free thread of the pool.</summary>
+    public int QueuedFromThreadPool => Volatile.Read(ref queuedFromThreadPool);
+
+    public void QueueUIThread(Action work)
+    {
+        if (Thread.CurrentThread.IsThreadPoolThread)
+        {
+            Interlocked.Increment(ref queuedFromThreadPool);
+        }
+
+        queue.Add(work);
+    }
 
     /// <summary>Runs the next actions, and waits for each one.</summary>
     public void Run(int count)

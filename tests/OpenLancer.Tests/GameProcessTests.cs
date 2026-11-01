@@ -120,6 +120,21 @@ public sealed class GameProcessTests : IDisposable
         Assert.Equal("/c", Record("args"));
     }
 
+    /// <summary>A game runs for a long time. So a thread of its own waits for the exit, not a thread of the thread pool.
+    /// On a busy computer the pool can have no free thread for many seconds, and an exit that waits for one comes
+    /// late.</summary>
+    [Fact]
+    public void TheExitDoesNotWaitForAThreadOfThePool()
+    {
+        int? code = null;
+
+        using var process = GameProcess.Start(Stub(wait: false, exit: 5), ui, c => code = c);
+        ui.RunUntil(() => code != null, "the exit of the stub");
+
+        Assert.Equal(5, code);
+        Assert.Equal(0, ui.QueuedFromThreadPool);
+    }
+
     [Fact]
     public void KillEndsTheProgramAndAWindowlessProgramHasNoWindowToClose()
     {

@@ -167,6 +167,26 @@ public sealed class PlayProcessTests : IDisposable
         Assert.Equal((7, "Process terminated. Assertion failed. at A.B() second"), exit);
     }
 
+    /// <summary>
+    /// A game runs for a long time, and each read of its output blocks its thread. So threads of their own read the
+    /// output and wait for the exit, not threads of the thread pool. On a busy computer the pool can have no free thread
+    /// for many seconds, and an exit that waits for one comes late. CI failed the 30 s waits of these tests in this way.
+    /// </summary>
+    [Fact]
+    public void TheOutputAndTheExitDoNotWaitForAThreadOfThePool()
+    {
+        string[] lines = [PlayProtocol.Write(new PlayEvent.Waiting(2300)), "[Warning: 12:00:00] Ini: a warning", "!err an error"];
+        var events = 0;
+        var logLines = 0;
+        (int Code, string Errors)? exit = null;
+        using var process = PlayProcess.Start(stub.Command(new StubPlan(lines, Exit: 4)), ui, _ => events++,
+            _ => logLines++, (code, errors) => exit = (code, errors));
+        ui.RunUntil(() => exit != null, "the exit of the stub");
+
+        Assert.Equal((1, 1, (4, "an error")), (events, logLines, exit));
+        Assert.Equal(0, ui.QueuedFromThreadPool);
+    }
+
     [Fact]
     public void TheCommandStartsThePlayProgramNextToTheEditorWithTheArgumentsOfThePlay()
     {
