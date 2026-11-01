@@ -23,6 +23,20 @@ public sealed class EditBatchToolTests
 
     private static string Batch(params string[] steps) => $$"""{ "steps": [{{string.Join(", ", steps)}}] }""";
 
+    /// <summary>A step that deletes items, with a confirmation.</summary>
+    private static string Delete(string item) =>
+        $$"""{ "tool": "delete_items", "arguments": { "refs": [{{Json(item)}}], "confirm": true } }""";
+
+    /// <summary>A step that renames an item.</summary>
+    private static string Rename(string item, string name) =>
+        $$"""{ "tool": "rename_item", "arguments": { "ref": {{Json(item)}}, "new_name": {{Json(name)}} } }""";
+
+    /// <summary>A step that creates a zone in Li01 with a nickname.</summary>
+    private static string Zone(string name, int z) => $$"""
+        { "tool": "scene_create_zone",
+          "arguments": { "system": "Li01", "position": [0, 0, {{z}}], "nickname": {{Json(name)}} } }
+        """;
+
     [Fact]
     public void HundredStepsAreOneEntryAndTheNextStepGivesLimit()
     {
@@ -153,11 +167,6 @@ public sealed class EditBatchToolTests
     {
         var (ws, session, host) = Scene();
         using var _ = ws;
-        string Delete(string item) => $$"""{ "tool": "delete_items", "arguments": { "refs": [{{Json(item)}}], "confirm": true } }""";
-        string Rename(string item, string name) =>
-            $$"""{ "tool": "rename_item", "arguments": { "ref": {{Json(item)}}, "new_name": {{Json(name)}} } }""";
-        string Zone(string name, int z) =>
-            $$"""{ "tool": "scene_create_zone", "arguments": { "system": "Li01", "position": [0, 0, {{z}}], "nickname": {{Json(name)}} } }""";
         static string[] Deletes(JsonObject result) => result["deletes"]!.AsArray().Select(d => (string)d!["ref"]!).ToArray();
         static (string?, string?)[] Renames(JsonObject result) =>
             result["renames"]!.AsArray().Select(r => ((string?)r!["from"], (string?)r["to"])).ToArray();
@@ -185,6 +194,70 @@ public sealed class EditBatchToolTests
         Assert.DoesNotContain("zone:probe_c", Texts(back["changes"]));
         // The result of each step still gives the items of that step.
         Assert.Equal(["zone:probe_a"], Deletes(added["steps"]![2]!.AsObject()));
+    }
+
+    /// <summary>
+    /// The select of a batch is the last reference of the item that the last step with a select selects (review
+    /// finding of MCP1-2). A zone and a data item that a batch creates and then renames give the new nickname. The
+    /// rename of a data item gives no select of its own, so only the net result corrects it.
+    /// </summary>
+    [Fact]
+    public void ABatchThatCreatesAndRenamesAnItemSelectsItsNewNickname()
+    {
+        var (ws, _, host) = Scene();
+        using var _ = ws;
+        using var items = ItemWorkspace.Create();
+        var data = items.Session("act");
+        var dataHost = new TestAgentHost(data);
+
+        var zone = Ok(host, "edit_batch", Batch(Zone("probe_z", 0), Rename("zone:probe_z", "probe_y")));
+        var gun = Ok(dataHost, "edit_batch", Batch("""
+            { "tool": "create_from_template",
+              "arguments": { "kind": "equipment", "template": "gun1", "nickname": "gun2" } }
+            """, Rename(ItemRefs.Canonical(data, ItemWorkspace.Gun("gun2")), "gun3")));
+
+        Assert.Equal("zone:probe_y", (string?)zone["select"]);
+        Assert.Equal(ItemRefs.Canonical(data, ItemWorkspace.Gun("gun3")), (string?)gun["select"]);
+        Assert.Null((string?)gun["steps"]![1]!["select"]);
+        // The result of each step still gives the select of that step.
+        Assert.Equal("zone:probe_z", (string?)zone["steps"]![0]!["select"]);
+        Assert.Equal(ItemRefs.Canonical(data, ItemWorkspace.Gun("gun2")), (string?)gun["steps"]![0]!["select"]);
+    }
+
+    /// <summary>A batch that creates an item and deletes it gives no select, because the item does not exist after the
+    /// batch. This is also true when an earlier step selected another item: the editor selects nothing after a delete of
+    /// the selected item, as Unity does.</summary>
+    [Fact]
+    public void ABatchThatCreatesAndDeletesAnItemSelectsNothing()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+
+        var deleted = Ok(host, "edit_batch", Batch(Zone("probe_a", 0), Delete("zone:probe_a")));
+        var replaced = Ok(host, "edit_batch", Batch(Zone("probe_b", 0), Zone("probe_c", 100), Delete("zone:probe_c")));
+
+        Assert.Null((string?)deleted["select"]);
+        Assert.Equal("zone:probe_a", (string?)deleted["steps"]![0]!["select"]);
+        Assert.Null((string?)replaced["select"]);
+        Assert.Equal(["zone:probe_b"], Texts(replaced["adds"]));
+        Assert.Null(session.Get(SceneWorkspace.Zone("probe_c")));
+    }
+
+    /// <summary>A batch that renames an existing item keeps the select on its last reference. A step that changes or
+    /// deletes another item does not change the select.</summary>
+    [Fact]
+    public void ARenameOfASelectedItemKeepsTheSelectOnItsNewReference()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+
+        var result = Ok(host, "edit_batch", Batch(Rename("obj:Li01_dock", "probe_d2"), Move("obj:Li01_01", 3),
+            Delete("zone:Zone_hole"), Rename("obj:probe_d2", "probe_d3"), Move("obj:probe_d3", 4)));
+
+        Assert.Equal("obj:probe_d3", (string?)result["select"]);
+        Assert.Equal(("obj:Li01_dock", "obj:probe_d3"),
+            ((string?)result["renames"]![0]!["from"], (string?)result["renames"]![0]!["to"]));
+        Assert.NotNull(session.Get(SceneWorkspace.Object("probe_d3")));
     }
 
     /// <summary>A step of a tool of a group that the user hides gives not_available (decision D725), also when the step

@@ -88,9 +88,9 @@ internal sealed class EditScope
             missionRuns.Skip(stepMissionStart).ToList());
     }
 
-    /// <summary>The net result of all commands of the call. Its adds, renames and changes come from the parts of the
-    /// batch in their order (see <see cref="EditTools.Shaped"/>). A call with mission commands gives their inverse and
-    /// their row moves when the call applied or is a preview.</summary>
+    /// <summary>The net result of all commands of the call. Its adds, renames, changes, deletes and select come from the
+    /// parts of the batch in their order (see <see cref="EditTools.Shaped"/>). A call with mission commands gives their
+    /// inverse and their row moves when the call applied or is a preview.</summary>
     internal EditResult CallResult(EditResult batchResult) =>
         WithMission(EditTools.Shaped(batchResult, Batch.Parts),
             batchResult.Status is EditStatus.Applied or EditStatus.Previewed ? missionRuns : null);
@@ -430,12 +430,20 @@ internal static class EditTools
     /// reference is no rename.</item>
     /// <item>A change gives the last reference of the item. An item that the call deletes is not a change.</item>
     /// <item>A delete of an item that the call renamed gives the reference before the call, and no rename.</item>
+    /// <item>The select is the item that the last part with a select selects, with its last reference. A rename of
+    /// that item in a later part gives its new reference. A delete of that item gives no select, also when the call
+    /// added it.</item>
     /// </list>
     /// </summary>
-    /// <remarks>The walk reads the parts in order. A rename changes an add only when the add came before it. So an
+    /// <remarks>
+    /// <para>The walk reads the parts in order. A rename changes an add only when the add came before it. So an
     /// existing item that a step renames stays a rename. This is also true when a later step adds an item with its old
-    /// nickname (review finding of MCP1-2, step 4). In a part, the renames and the deletes name the items before the
-    /// part, and the adds and the changes name the items after it. So the renames and the deletes apply first.</remarks>
+    /// nickname (review finding of MCP1-2, step 4).</para>
+    /// <para>In a part, the renames and the deletes name the items before the part. The adds, the changes and the
+    /// select name the items after it. So the renames and the deletes apply first. Then the select of the part replaces
+    /// the select of the parts before it. The merge of the parts only takes the last select, so it keeps a reference
+    /// that a later rename or delete made stale (review finding of MCP1-2).</para>
+    /// </remarks>
     /// <param name="result">The merged result of the parts, with the lists of the other kinds.</param>
     /// <param name="parts">The parts of the commands, in order.</param>
     internal static EditResult Shaped(EditResult result, IReadOnlyList<EditResult> parts)
@@ -444,10 +452,13 @@ internal static class EditTools
         var renames = new List<ResultRename>();
         var changes = new List<string>();
         var deletes = new List<ResultDelete>();
+        string? select = null;
         foreach (var part in parts)
         {
             foreach (var rename in part.Renames)
             {
+                if (select == rename.From)
+                    select = rename.To;
                 Replace(changes, rename.From, rename.To);
                 if (Replace(adds, rename.From, rename.To))
                     continue;
@@ -461,6 +472,8 @@ internal static class EditTools
             }
             foreach (var delete in part.Deletes)
             {
+                if (select == delete.Ref)
+                    select = null;
                 changes.Remove(delete.Ref);
                 if (adds.Remove(delete.Ref))
                     continue;
@@ -475,8 +488,9 @@ internal static class EditTools
             }
             adds.AddRange(part.Adds.Where(add => !adds.Contains(add)));
             changes.AddRange(part.Changes.Where(change => !adds.Contains(change) && !changes.Contains(change)));
+            select = part.Select ?? select;
         }
-        return result with { Adds = adds, Renames = renames, Changes = changes, Deletes = deletes };
+        return result with { Adds = adds, Renames = renames, Changes = changes, Deletes = deletes, Select = select };
     }
 
     /// <summary>Replaces a reference in a list with its new reference. Gives false when the list does not have
