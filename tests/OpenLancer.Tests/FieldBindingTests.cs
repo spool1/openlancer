@@ -380,11 +380,11 @@ public sealed class FieldBindingTests
     {
         using var ws = SystemWorkspace.Create(SceneLi01);
         var session = ws.Session("act");
-        const string group = "This key belongs to a group of lines that belong together. A later milestone edits the group.";
+        const string group = "This key belongs to a group of lines that belong together. This version cannot edit the group.";
 
         foreach (var key in new[] { "encounter", "faction", "faction_weight" })
             Assert.Equal(group, Bind(session, SceneSections[SceneSection.Zone], key).ReadOnlyReason);
-        Assert.Equal("Changing the file of a system moves all its contents. A later milestone does this.",
+        Assert.Equal("Changing the file of a system moves all its contents. This version cannot change the file of a system.",
             Bind(session, SystemWorkspace.System("Li01"), "file").ReadOnlyReason);
         Assert.Equal("'nickname' is the key that finds the section. The editor cannot change it.",
             Bind(session, SceneSections[SceneSection.Object], "nickname").ReadOnlyReason);
@@ -441,7 +441,7 @@ public sealed class FieldBindingTests
         var st01 = SystemWorkspace.System("st01");
 
         Assert.True(session.Get(li01)!.IsChanged);
-        Assert.Equal("Changing the file of a system moves all its contents. A later milestone does this.",
+        Assert.Equal("Changing the file of a system moves all its contents. This version cannot change the file of a system.",
             FieldBinding.RevertLock(session, li01));
         Assert.False(Bind(session, li01, "file").CanRevert);
 

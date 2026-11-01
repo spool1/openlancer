@@ -346,9 +346,10 @@ public sealed class PropGroupDraftTests
 
         Assert.Contains("cannot put into a prop group jump gates",
             PropGroups.Draft(session, [SceneWorkspace.Object("Li01_to_Li02")]).Refusals[0].Message);
-        Assert.Contains("milestone M26", PropGroups.Draft(session, [SceneWorkspace.Li01("Nebula", "Zone_cloud")]).Refusals[0].Message);
-        Assert.Contains("milestone M26", PropGroups.Draft(session, [SceneWorkspace.Li01("Asteroids", "Zone_cloud")]).Refusals[0].Message);
-        Assert.Contains("milestone M26", PropGroups.Draft(session, [SceneWorkspace.Zone("Zone_cloud")]).Refusals[0].Message);
+        const string noVolume = "this version cannot put nebulae, asteroid fields or their zones into a prop group";
+        Assert.Contains(noVolume, PropGroups.Draft(session, [SceneWorkspace.Li01("Nebula", "Zone_cloud")]).Refusals[0].Message);
+        Assert.Contains(noVolume, PropGroups.Draft(session, [SceneWorkspace.Li01("Asteroids", "Zone_cloud")]).Refusals[0].Message);
+        Assert.Contains(noVolume, PropGroups.Draft(session, [SceneWorkspace.Zone("Zone_cloud")]).Refusals[0].Message);
         Assert.Equal("A prop group takes the items of one system file.", Assert.Single(PropGroups.Draft(session,
             [SceneWorkspace.Object("Li01_dock"), SceneWorkspace.Li02("Object", "Li02_01")]).Refusals).Message);
         Assert.Throws<InvalidOperationException>(() => PropGroups.Write(session,

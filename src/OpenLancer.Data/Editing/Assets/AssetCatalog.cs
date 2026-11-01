@@ -106,7 +106,8 @@ public sealed class AssetCatalog
     /// <summary>The id part and the label of the child of the connection types of the solars.</summary>
     private const string ConnectionsPart = "connections";
 
-    internal const string ConnectionsReason = "Jump gates, jump holes and trade lane rings come with milestone M27.";
+    /// <summary>The end of the reason of a model that no solar archetype uses.</summary>
+    private const string NoPropFromModel = "This version cannot make a prop from such a model.";
 
     private readonly EditSession session;
     private readonly Dictionary<string, Built> built = new(StringComparer.OrdinalIgnoreCase);
@@ -302,11 +303,12 @@ public sealed class AssetCatalog
             case AssetKind.Equipment:
                 detail = entry.Section?.Id.Type ?? "";
                 category = entry.Section is { } typed ? $"{definition.Id}/{typed.Id.Type.ToLowerInvariant()}" : category;
-                notPlaceable = "Equipment goes on an object through its loadout. Milestone M28 edits loadouts.";
+                notPlaceable = "Equipment goes on an object through its loadout. This version cannot edit loadouts.";
                 break;
             case AssetKind.Effect:
                 detail = Value(working, "effect_type") ?? "";
-                notPlaceable = "An effect goes on an object through equipment in its loadout. Milestone M28 edits loadouts.";
+                notPlaceable = "An effect goes on an object through equipment in its loadout. This version cannot edit " +
+                               "loadouts.";
                 break;
             case AssetKind.Loadout:
                 detail = Value(working, "archetype") ?? "";
@@ -328,9 +330,9 @@ public sealed class AssetCatalog
                 hasProp = users.Any(u => u.Kind == AssetKind.SolarArchetype);
                 notPlaceable = users.Count == 0
                     ? "No solar archetype, ship or asteroid uses this model, so the editor does not know its materials. " +
-                      "Milestone M28 adds props from such models."
+                      NoPropFromModel
                     : users.All(u => u.Kind == AssetKind.Equipment)
-                        ? "Retail has no solar with an equipment model. Milestone M28 adds props from such models."
+                        ? "Retail has no solar with an equipment model. " + NoPropFromModel
                         : null;
                 break;
         }
@@ -357,7 +359,7 @@ public sealed class AssetCatalog
             return $"{definition.Id}/{template.Id}";
         if (type != null && rules.ConnectionTypes.Contains(type))
         {
-            notPlaceable = ConnectionsReason;
+            notPlaceable = ScenePlans.NoNewConnections;
             return $"{definition.Id}/{ConnectionsPart}";
         }
         notPlaceable = type == null

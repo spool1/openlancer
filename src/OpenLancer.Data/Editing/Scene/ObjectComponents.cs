@@ -160,9 +160,9 @@ public static class ObjectComponents
     {
         ObjectComponent.Solar => "Each object needs an archetype.",
         ObjectComponent.JumpConnection or ObjectComponent.TradeLaneRing =>
-            "The editor changes jump gates, jump holes and trade lane rings in milestone M27.",
+            "This version cannot change the links of jump gates, jump holes or trade lane rings.",
         ObjectComponent.FieldReferences => "Delete the nebula or the asteroid field to remove its section.",
-        ObjectComponent.EncounterZone => "The editor edits the encounters of a zone in milestone M3b.",
+        ObjectComponent.EncounterZone => "This version cannot edit the encounters of a zone.",
         _ => null,
     };
 

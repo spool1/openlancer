@@ -150,8 +150,8 @@ public static class PropGroups
                     section, view, connection)) with { Target = section });
             else if (kind is SceneKind.Nebula or SceneKind.Asteroids ||
                      kind == SceneKind.Zone && ScenePlans.HoldsVolume(session, section))
-                refusals.Add(Diagnostic.Error(section.Path, $"{SceneSections.Label(kind, section)}: nebulae, asteroid " +
-                                                            "fields and their zones come with milestone M26.")
+                refusals.Add(Diagnostic.Error(section.Path, $"{SceneSections.Label(kind, section)}: this version cannot put " +
+                                                            "nebulae, asteroid fields or their zones into a prop group.")
                     with { Target = section });
         }
         if (set.Select(s => s.Path).Distinct(VfsPath.Comparer).Count() > 1)

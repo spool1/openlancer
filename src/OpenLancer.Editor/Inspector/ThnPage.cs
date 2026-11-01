@@ -114,9 +114,9 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
             var state = CutsceneCatalog.StateText(source);
             if (source.Kind == ThnFileKind.NewHere)
             {
-                // A new cutscene is a text file, which the retail engine reads only after the M11 check.
-                state += ", OpenLancer only until the M11 check";
-                grid.SetNextNote(CutsceneBrowser.OpenLancerOnly);
+                // A new cutscene is a text file. Nobody checked yet that the retail games play one (#62).
+                state += ", not checked in the retail games";
+                grid.SetNextNote(CutsceneBrowser.NotCheckedInRetail);
             }
 
             grid.Text("State", edits.HasUnsavedCutsceneEdits(path) ? $"{state}, with unsaved edits" : state);

@@ -17,7 +17,7 @@ internal sealed class FieldBinding
     private const string SystemFileKey = "file";
 
     private const string SystemFileReason =
-        "Changing the file of a system moves all its contents. A later milestone does this.";
+        "Changing the file of a system moves all its contents. This version cannot change the file of a system.";
 
     /// <summary>Why a section of a file without a known schema is read-only (decision D123).</summary>
     public const string NoSchemaReason = "The editor cannot edit this file yet. It reads it for the lists.";
@@ -107,7 +107,7 @@ internal sealed class FieldBinding
             return $"'{name}' is the key that finds the section. The editor cannot change it.";
         // For example, a change of the encounter lines of a zone gives its faction lines to another encounter.
         if (view.IsLinked(name))
-            return "This key belongs to a group of lines that belong together. A later milestone edits the group.";
+            return "This key belongs to a group of lines that belong together. This version cannot edit the group.";
         return name.Equals(SystemFileKey, StringComparison.OrdinalIgnoreCase) && IsUniverseSystem(session, section)
             ? SystemFileReason
             : null;

@@ -38,6 +38,10 @@ public sealed record TemplateArchetype(string Nickname, string Type, ListEntry E
 /// </remarks>
 public static partial class ScenePlans
 {
+    /// <summary>Why the editor cannot make a connection object (decision D253). The Create menu, the Assets panel and
+    /// the templates show it.</summary>
+    public const string NoNewConnections = "This version cannot make jump gates, jump holes or trade lane rings.";
+
     /// <summary>The value of <c>pos</c> of a new item: whole numbers (decision D234).</summary>
     internal static string PositionText(Vector3 position) => string.Join(", ",
         new[] { position.X, position.Y, position.Z }.Select(v => ((int)MathF.Round(v)).ToString(CultureInfo.InvariantCulture)));
@@ -209,8 +213,7 @@ public static partial class ScenePlans
     {
         var type = TypeOf(session, archetype);
         if (type != null && session.Lists.RuleData.ConnectionTypes.Contains(type))
-            return $"The archetype {archetype} is a jump gate, a jump hole or a trade lane ring. The editor adds connections " +
-                   "in milestone M27.";
+            return $"The archetype {archetype} is a jump gate, a jump hole or a trade lane ring. {NoNewConnections}";
         if (type != null && !session.Lists.RuleData.SceneTemplates.Any(t => t.Types.Contains(type)))
             return NoTemplateReason(type);
         return $"The archetype {archetype} is not an archetype of the template {template}.";
@@ -283,8 +286,7 @@ public static partial class ScenePlans
                 refusals.Add(Diagnostic.Error(section.Path, SceneSections.ConnectionMessage("copy", section, view, connection))
                     with { Target = section });
             else if (kind is SceneKind.Nebula or SceneKind.Asteroids || kind == SceneKind.Zone && HoldsVolume(session, section))
-                refusals.Add(Diagnostic.Error(section.Path, $"{SceneSections.Label(kind, section)}: the editor copies " +
-                                                            "nebulae and asteroid fields in milestone M26.") with { Target = section });
+                refusals.Add(Diagnostic.Error(section.Path, NoVolumeCopy(kind, section)) with { Target = section });
             else if (session.OpenDocument(section.Path)?.ReadOnlyReason is { } reason)
                 refusals.Add(Diagnostic.Error(section.Path, $"{section.Id}: {reason}") with { Target = section });
         }
@@ -647,7 +649,7 @@ public static partial class ScenePlans
                 if (SceneSections.ConnectionKind(session, view) is { } copied)
                     return SceneSections.ConnectionMessage("copy", section, view, copied);
                 if (kind is SceneKind.Nebula or SceneKind.Asteroids || kind == SceneKind.Zone && HoldsVolume(session, section))
-                    return $"{SceneSections.Label(kind, section)}: the editor copies nebulae and asteroid fields in milestone M26.";
+                    return NoVolumeCopy(kind, section);
                 return session.OpenDocument(section.Path)?.ReadOnlyReason;
             default:
                 if (SceneSections.ConnectionKind(session, view) is { } deleted)
@@ -902,6 +904,10 @@ public static partial class ScenePlans
                 Collect(session, child, set);
         }
     }
+
+    /// <summary>Why Duplicate and Copy refuse a nebula, an asteroid field or a zone that holds one.</summary>
+    private static string NoVolumeCopy(SceneKind kind, SectionRef section) =>
+        $"{SceneSections.Label(kind, section)}: this version cannot copy nebulae, asteroid fields or the zones that hold them.";
 
     /// <summary>True when a <c>[Nebula]</c> or an <c>[Asteroids]</c> section of the file names the zone.</summary>
     internal static bool HoldsVolume(EditSession session, SectionRef zone) =>

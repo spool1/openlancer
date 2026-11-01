@@ -77,14 +77,13 @@ internal static class SceneSections
 
     /// <summary>
     /// Why the editor refuses an action on a connection object, with its partner (decision D253). For example: "Li01_to_Li02
-    /// is a jump gate. The editor cannot delete jump gates, jump holes and trade lane rings before milestone M27. The
-    /// partner gate Li02: Li02_to_Li01 and the route files must change with it."
+    /// is a jump gate. This version cannot delete jump gates, jump holes or trade lane rings. The partner gate Li02:
+    /// Li02_to_Li01 and the route files must change with it."
     /// </summary>
     /// <param name="verb">The action, for example "delete" or "copy".</param>
     public static string ConnectionMessage(string verb, SectionRef section, SectionView view, string kind)
     {
-        var text = $"{section.Id.Key} is a {kind}. The editor cannot {verb} jump gates, jump holes and trade lane rings " +
-                   "before milestone M27.";
+        var text = $"{section.Id.Key} is a {kind}. This version cannot {verb} jump gates, jump holes or trade lane rings.";
         if (view.Lines("goto").LastOrDefault() is { Values.Count: >= 2 } line)
         {
             var partner = kind == "jump hole" ? "hole" : "gate";

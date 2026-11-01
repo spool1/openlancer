@@ -180,7 +180,7 @@ public sealed class AgentSceneToolTests
             ((string?)other.Content["code"], (string?)other.Content["detail"], (string?)other.Content["field"]));
         Assert.Equal("The archetype buoy is not an archetype of the template Planet.", (string?)other.Content["message"]);
         Assert.Equal(("invalid_value", SceneEditTools.ArchetypeTemplate), (gate.Code, gate.Detail));
-        Assert.Contains("milestone M27", gate.Message);
+        Assert.EndsWith(ScenePlans.NoNewConnections, gate.Message);
         Assert.Equal(("not_found", ItemRefs.NotFound), (unknown.Code, unknown.Detail));
         Assert.StartsWith("The list solar_archetype has no archetype planet_9.", unknown.Message);
         Assert.Contains("planet1", unknown.Message);

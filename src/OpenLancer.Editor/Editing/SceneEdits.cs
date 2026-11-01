@@ -140,7 +140,7 @@ internal sealed class SceneEdits(EditorWindow window)
         if (unavailable != null)
             ImGui.SetItemTooltip(unavailable);
         ImGui.Separator();
-        ImGui.TextDisabled("Jump gates, jump holes and trade lane rings come with milestone M27.");
+        ImGui.TextDisabled(ScenePlans.NoNewConnections);
     }
 
     /// <summary>The items of the actions of a selected item for a menu: Duplicate, Rename and Delete, each disabled with

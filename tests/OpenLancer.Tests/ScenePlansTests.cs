@@ -140,8 +140,8 @@ public sealed class ScenePlansDeleteTests
         var ring = ScenePlans.Delete(session, [Object("ring2")]);
 
         Assert.Null(gate.Command);
-        Assert.Equal("Li01_to_Li02 is a jump gate. The editor cannot delete jump gates, jump holes and trade lane rings " +
-                     "before milestone M27. The partner gate Li02: Li02_to_Li01 and the route files must change with it.",
+        Assert.Equal("Li01_to_Li02 is a jump gate. This version cannot delete jump gates, jump holes or trade lane rings. " +
+                     "The partner gate Li02: Li02_to_Li01 and the route files must change with it.",
             Assert.Single(gate.Refusals).Message);
         Assert.Contains("Its neighbor rings ring1 must change with it.", Assert.Single(ring.Refusals).Message);
     }
@@ -485,8 +485,9 @@ public sealed class ScenePlansCreateTests
         using var ws = Create();
         var session = ws.Session("act");
 
-        Assert.Contains("milestone M27", Assert.Single(ScenePlans.Create(session, "Li01", SceneTemplate.Solar, "jumpgate",
-            Vector3.Zero, null).Refusals).Message);
+        Assert.Equal("The archetype jumpgate is a jump gate, a jump hole or a trade lane ring. " + ScenePlans.NoNewConnections,
+            Assert.Single(ScenePlans.Create(session, "Li01", SceneTemplate.Solar, "jumpgate", Vector3.Zero, null).Refusals)
+                .Message);
         // Decision D277 of the M23 design: a station archetype without a docking sphere is an archetype of the station
         // template now, so this case takes a planet.
         Assert.Contains("not an archetype of the template", Assert.Single(ScenePlans.Create(session, "Li01",
@@ -673,8 +674,9 @@ public sealed class ScenePlansDuplicateTests
         var session = ws.Session("act");
 
         Assert.Contains("cannot copy jump gates", ScenePlans.Duplicate(session, [Object("Li01_to_Li02")]).Refusals[0].Message);
-        Assert.Contains("milestone M26", ScenePlans.Duplicate(session, [Li01("Nebula", "Zone_cloud")]).Refusals[0].Message);
-        Assert.Contains("milestone M26", ScenePlans.Duplicate(session, [Zone("Zone_cloud")]).Refusals[0].Message);
+        const string noCopy = "this version cannot copy nebulae, asteroid fields or the zones that hold them";
+        Assert.Contains(noCopy, ScenePlans.Duplicate(session, [Li01("Nebula", "Zone_cloud")]).Refusals[0].Message);
+        Assert.Contains(noCopy, ScenePlans.Duplicate(session, [Zone("Zone_cloud")]).Refusals[0].Message);
         Assert.Equal(Zone("Zone_hole_1"), ScenePlans.Duplicate(session, [Zone("Zone_hole")]).Adds[0]);
         Assert.Equal(Li01("LightSource", "light1_1"), ScenePlans.Duplicate(session, [Li01("LightSource", "light1")]).Adds[0]);
     }

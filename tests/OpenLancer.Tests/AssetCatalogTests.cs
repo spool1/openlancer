@@ -180,7 +180,7 @@ public sealed class AssetCatalogTests
         using var ws = AssetWorkspace.Create();
         var session = ws.Session("act");
 
-        Assert.Equal("Jump gates, jump holes and trade lane rings come with milestone M27.",
+        Assert.Equal("This version cannot make jump gates, jump holes or trade lane rings.",
             AssetWorkspace.Row(session, "solars/connections", "jumpgate").NotPlaceable);
         var odd = AssetWorkspace.Row(session, "solars", "odd");
         Assert.Equal("solars/solar", odd.CategoryId);

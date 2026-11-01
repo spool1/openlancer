@@ -56,7 +56,7 @@ public sealed class SceneCommandsTests
             Assert.True(SceneCommands.SpawnAsksForBase(session, "station1"));
             Assert.False(SceneCommands.SpawnAsksForBase(session, "station_nodock"));
             Assert.False(SceneCommands.SpawnAsksForBase(session, "planet1"));
-            Assert.Contains("milestone M27", Assert.Single(SceneCommands.SpawnAsset(session, "Li01",
+            Assert.EndsWith(ScenePlans.NoNewConnections, Assert.Single(SceneCommands.SpawnAsset(session, "Li01",
                 new AssetRef(AssetKind.SolarArchetype, "jumpgate"), Vector3.Zero).Refusals).Message);
             Assert.Equal("no_ship has no model.", Assert.Single(SceneCommands.SpawnAsset(session, "Li01",
                 new AssetRef(AssetKind.Ship, "no_ship"), Vector3.Zero).Refusals).Message);

@@ -27,9 +27,9 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
     /// <summary>The id of the panel.</summary>
     public const string PanelId = "cutscenes";
 
-    /// <summary>The note of a new cutscene about the retail engine (risk 7 of the M8b design).</summary>
-    public const string OpenLancerOnly =
-        "OpenLancer only until the M11 check that the retail engine reads text cutscenes.";
+    /// <summary>The note of a new cutscene about the retail games (risk 7 of the M8b design). A new cutscene is a text
+    /// file, and nobody checked yet that the retail games play one (#62).</summary>
+    public const string NotCheckedInRetail = "Nobody checked a new cutscene in the retail games yet.";
 
     /// <summary>The text for a cutscene that no INI line names. The table, the cutscene list of the Cutscene toolbar
     /// and the Inspector show it.</summary>
@@ -242,7 +242,7 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
         ImGui.SetItemTooltip("The install path of the new cutscene. A save writes it as a whole Lua text file into the " +
                              "files folder of the active mod.");
         ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + 360 * scale);
-        ImGui.TextDisabled(OpenLancerOnly);
+        ImGui.TextDisabled(NotCheckedInRetail);
         ImGui.PopTextWrapPos();
         var refusal = session == null ? "No profile is open."
             : path == null ? ThnEdits.NoActiveMod
@@ -261,7 +261,7 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
             ImGui.CloseCurrentPopup();
             selected = path;
             window.Log.Add(ConsoleSeverity.Info, EditorWindow.EditorSource,
-                $"New cutscene {path}. {OpenLancerOnly} The next save writes it.");
+                $"New cutscene {path}. {NotCheckedInRetail} The next save writes it.");
             workspace.OpenAndShow(path!);
         }
 
