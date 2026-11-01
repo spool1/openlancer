@@ -625,6 +625,8 @@ class ReadmeFirstTests(unittest.TestCase):
         works = " ".join(self.section(self.filled("1.0.0"), "WHAT WORKS IN THIS PREVIEW").split())
         self.assertIn("as a drop-in zip and as an FLMM package, with Mod > Export mod...", works)
         self.assertIn("The mission editor shows a mission as a graph of triggers.", works)
+        self.assertIn("Play from a trigger starts Play, the test run of the editor, at a trigger of the mission. "
+                      "It does not start the original game.", works)
         self.assertIn("Look at the star systems, ships, goods and equipment in the Database.", works)
 
 

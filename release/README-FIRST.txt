@@ -91,8 +91,9 @@ WHAT WORKS IN THIS PREVIEW
 - Test your mod with F5 (Play). A save reloads the running game.
 - Change the missions of the game in the Mission tab. The mission editor
   shows a mission as a graph of triggers. It adds and changes triggers,
-  checks the script and runs a dry run. Play from a trigger starts the
-  game at a point of the mission.
+  checks the script and runs a dry run. Play from a trigger starts Play,
+  the test run of the editor, at a trigger of the mission. It does not
+  start the original game.
 - Export your mod for Freelancer 1.1 and for HD Edition 0.7.1, as a
   drop-in zip and as an FLMM package, with Mod > Export mod... The
   export checks the mod before it writes the packages.
