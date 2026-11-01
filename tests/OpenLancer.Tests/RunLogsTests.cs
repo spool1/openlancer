@@ -148,7 +148,7 @@ public sealed class RunLogsTests : IDisposable
     public void EachProgramKeepsTheLastLogBeforeTheEngineStartsANewLog(string program)
     {
         var main = Assembly.Load(program).GetType(program + ".Program", true)!;
-        var calls = IlCalls.Of(main).Where(c => c.Caller.Name == "Main").Select(c => c.Callee).ToList();
+        var calls = IlWalker.Calls(main).Where(c => c.Caller.Name == "Main").Select(c => c.Callee).ToList();
 
         var keep = calls.FindIndex(c => c.DeclaringType == typeof(RunLogs) && c.Name == nameof(RunLogs.KeepLastRun));
         var run = calls.FindIndex(c => c.DeclaringType == typeof(AppHandler) && c.Name == nameof(AppHandler.Run));

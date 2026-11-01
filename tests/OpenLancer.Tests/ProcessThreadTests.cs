@@ -39,7 +39,7 @@ public sealed class ProcessThreadTests
     [Fact]
     public void EachProcessTypeStartsItsWorkThroughOwnThread()
     {
-        var owners = typeof(PlayProcess).Assembly.GetTypes().SelectMany(IlCalls.Of)
+        var owners = typeof(PlayProcess).Assembly.GetTypes().SelectMany(IlWalker.Calls)
             .Where(c => c.Callee.DeclaringType == typeof(OwnThread))
             .Select(c => c.Owner)
             .ToHashSet();
@@ -86,10 +86,10 @@ public sealed class ProcessThreadTests
         type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ValueTask<>);
 
     /// <summary>Each call of the types that the filter selects that the rule names, with the reason.</summary>
-    private static IEnumerable<(IlCalls.Call Call, string Reason)> PoolCalls(Assembly assembly, Func<Type, bool> owner) =>
+    private static IEnumerable<(IlWalker.Call Call, string Reason)> PoolCalls(Assembly assembly, Func<Type, bool> owner) =>
         from type in assembly.GetTypes()
-        where owner(IlCalls.OwnerOf(type))
-        from call in IlCalls.Of(type)
+        where owner(IlWalker.OwnerOf(type))
+        from call in IlWalker.Calls(type)
         let reason = PoolRule(call.Callee)
         where reason != null
         select (call, reason);

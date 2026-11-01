@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
@@ -133,9 +132,9 @@ public sealed class EditorLayerTests
     /// <remarks>A call of a member of the same type, for example of its own lambda, does not count. The walker reads
     /// the body of that member as a part of the type.</remarks>
     private static IEnumerable<EditCall> EditCalls(Assembly assembly, Func<MemberInfo, string?> rule) =>
-        assembly.GetTypes().SelectMany(IlCalls.Of).Select(c => (Call: c, Reason: rule(c.Callee)))
+        assembly.GetTypes().SelectMany(IlWalker.Calls).Select(c => (Call: c, Reason: rule(c.Callee)))
             .Where(c => c.Reason != null &&
-                        !(c.Call.Callee.DeclaringType is { } declaring && IlCalls.OwnerOf(declaring) == c.Call.Owner))
+                        !(c.Call.Callee.DeclaringType is { } declaring && IlWalker.OwnerOf(declaring) == c.Call.Owner))
             .Select(c => new EditCall(c.Call.Owner, c.Call.Caller, c.Call.Callee, c.Call.Op, c.Reason!));
 
     /// <summary>A call that a rule names.</summary>
@@ -176,94 +175,4 @@ internal static class RawEditSample
 
     public static bool Delegate(CommandRunner runner, ThnFieldCommand command, ThnValue value) =>
         runner.Execute(command.Make(value));
-}
-
-/// <summary>
-/// The calls in the IL of the methods of a type: <c>call</c>, <c>callvirt</c>, <c>newobj</c>, <c>ldftn</c> and
-/// <c>ldvirtftn</c>. The reader resolves each member with the generic arguments of the type and of the method. A
-/// compiler-generated nested type, for example the class of a lambda or a state machine, counts as the type that holds
-/// it. A local function is a method of its type.
-/// </summary>
-internal static class IlCalls
-{
-    /// <summary>A call: the type that holds it, the method that makes it, the member that it calls and its
-    /// opcode.</summary>
-    public sealed record Call(Type Owner, MethodBase Caller, MemberInfo Callee, OpCode Op);
-
-    private static readonly OpCode[] OneByte = new OpCode[0x100];
-    private static readonly OpCode[] TwoByte = new OpCode[0x100];
-
-    private const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance |
-                                     BindingFlags.Static | BindingFlags.DeclaredOnly;
-
-    static IlCalls()
-    {
-        foreach (var field in typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static))
-        {
-            var code = (OpCode)field.GetValue(null)!;
-            var value = (ushort)code.Value;
-            if (value < 0x100)
-                OneByte[value] = code;
-            else if ((value & 0xff00) == 0xfe00)
-                TwoByte[value & 0xff] = code;
-        }
-    }
-
-    /// <summary>The calls of each method and constructor of a type, without its nested types.</summary>
-    public static IEnumerable<Call> Of(Type type)
-    {
-        var owner = OwnerOf(type);
-        var methods = type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All));
-        foreach (var method in methods)
-        {
-            foreach (var call in CallsOf(method))
-                yield return call with { Owner = owner };
-        }
-    }
-
-    /// <summary>The type that a type counts as: the first declaring type that the compiler did not make.</summary>
-    public static Type OwnerOf(Type type)
-    {
-        while (type.DeclaringType is { } outer && (type.IsDefined(typeof(CompilerGeneratedAttribute)) ||
-                                                   type.Name.StartsWith('<')))
-            type = outer;
-        return type;
-    }
-
-    private static IEnumerable<Call> CallsOf(MethodBase method)
-    {
-        if (method.GetMethodBody()?.GetILAsByteArray() is not { } il)
-            yield break;
-        var typeArguments = method.DeclaringType is { IsGenericType: true } generic ? generic.GetGenericArguments() : null;
-        var methodArguments = method.IsGenericMethod ? method.GetGenericArguments() : null;
-        var at = 0;
-        while (at < il.Length)
-        {
-            var op = il[at] == 0xfe ? TwoByte[il[++at]] : OneByte[il[at]];
-            at++;
-            if (op.Size == 0)
-                throw new InvalidOperationException($"{method.DeclaringType}.{method.Name}: unknown opcode at {at - 1}.");
-            if (op == OpCodes.Call || op == OpCodes.Callvirt || op == OpCodes.Newobj || op == OpCodes.Ldftn ||
-                op == OpCodes.Ldvirtftn)
-            {
-                var token = BitConverter.ToInt32(il, at);
-                var callee = method.Module.ResolveMember(token, typeArguments, methodArguments) ??
-                             throw new InvalidOperationException($"{method.Name}: token {token:x8} does not resolve.");
-                yield return new Call(method.DeclaringType!, method, callee, op);
-            }
-
-            at += OperandSize(op, il, at);
-        }
-    }
-
-    /// <summary>The size of the operand of an opcode at a place of the IL.</summary>
-    private static int OperandSize(OpCode op, byte[] il, int at) => op.OperandType switch
-    {
-        OperandType.InlineNone => 0,
-        OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
-        OperandType.InlineVar => 2,
-        OperandType.InlineI8 or OperandType.InlineR => 8,
-        OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, at),
-        _ => 4,
-    };
 }

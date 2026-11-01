@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Publishing;
@@ -68,7 +67,7 @@ public sealed class BuildInfoTests
     [Fact]
     public void TheBuildHasTheVersionOfTheBuildProps()
     {
-        var props = XDocument.Load(Path.Combine(RepoRoot(), "src", "Directory.Build.props"));
+        var props = XDocument.Load(RepoFiles.Of("src", "Directory.Build.props"));
         var prefix = props.Root!.Element("PropertyGroup")!.Element("VersionPrefix")!.Value;
         var suffix = props.Root.Element("PropertyGroup")!.Element("VersionSuffix")!.Value;
 
@@ -83,7 +82,7 @@ public sealed class BuildInfoTests
     public void TheBuildHasTheEngineCommitOfTheSubmodule()
     {
         // The build reads only a checkout of its own, which has a .git entry.
-        var engine = Path.Combine(RepoRoot(), "external", "Librelancer");
+        var engine = RepoFiles.Of("external", "Librelancer");
         var own = Path.Exists(Path.Combine(engine, ".git"));
         var head = own ? GitHead(engine) : null;
         Assert.SkipWhen(head == null, $"git found no checkout of the engine in {engine}.");
@@ -117,9 +116,4 @@ public sealed class BuildInfoTests
             return null;
         }
     }
-
-    /// <summary>The root of the repository. The build output can be outside the repository, so the test finds it from
-    /// this source file.</summary>
-    private static string RepoRoot([CallerFilePath] string path = "") =>
-        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!, "..", ".."));
 }
