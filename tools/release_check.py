@@ -1,12 +1,14 @@
 """Merge, document, check and zip a binary release of OpenLancer (research r1-release-plan, sections 3.2, 5 and 7).
 
 Usage:
+  python tools/release_check.py name --version <v> --sha7 <commit> [--dry-run]
+      Prints the file name of the zip. It refuses a release of a development version (a suffix that starts with "dev").
   python tools/release_check.py merge <stage> <program>=<publish folder>...
       Merges the publish folders of the programs into the stage folder.
   python tools/release_check.py docs <stage> --repo <clone> --version <v> --commit <sha> --fork-commit <sha>
                                      [--notes-out <file>] [--dry-run]
       Writes README-FIRST.txt, LICENSE.txt, NOTICE.txt and licenses/<component>.txt into the stage folder, and the
-      release notes with the commits filled in.
+      release notes with the commits filled in. A dry run without a notes file writes no notes.
   python tools/release_check.py stage <stage> --repo <clone> --version <v> [--forbid <text>]...
       Runs the checks a to i on the stage folder. It stops at the first check that finds a problem and lists each
       problem of that check.
@@ -148,6 +150,28 @@ def version_title(version):
     """"0.1.0-preview" gives "v0.1.0 (preview)", the form of the README and the release title."""
     number, _, suffix = version.partition("-")
     return f"v{number} ({suffix})" if suffix else f"v{number}"
+
+
+def is_development(version):
+    """True for a development version: its suffix starts with "dev", for example "1.0.0-dev". Master holds such a
+    version between two releases. BuildInfo.IsDevelopment of OpenLancer.Data uses the same rule."""
+    return version.partition("-")[2].startswith("dev")
+
+
+def zip_name(version, dry_run, sha7):
+    """The file name of the release zip. A release gives "OpenLancer-v1.0.0-beta.1-win-x64.zip". A dry run also
+    names its commit, for example "OpenLancer-1.0.0-dev-dryrun-abc1234-win-x64.zip"."""
+    if dry_run:
+        return f"OpenLancer-{version}-dryrun-{sha7}-win-x64.zip"
+    return f"OpenLancer-v{version}-win-x64.zip"
+
+
+def name_problems(version, dry_run):
+    """The problems of the version of a release before the clone: a release of a development version."""
+    if dry_run or not is_development(version):
+        return []
+    return [f"the version {version} is a development version. Only a dry run can build it. Set the version of the "
+            "release in src/Directory.Build.props first."]
 
 
 def deps_files(stage):
@@ -361,7 +385,11 @@ def notice_text(repo, data):
 
 
 def docs(stage, repo, version, commit, fork_commit, notes_out=None, dry_run=False):
-    """Writes the documents of the release into the stage folder. Returns the problems."""
+    """Writes the documents of the release into the stage folder. Returns the problems.
+
+    With notes_out, a release needs its notes file release/notes/v<version>.md. A dry run without a notes file prints a
+    note and writes no notes file.
+    """
     data = load_release_data(repo)
     problems = []
     values = {"@VERSION@": version, "@VERSION_TITLE@": version_title(version)}
@@ -373,12 +401,14 @@ def docs(stage, repo, version, commit, fork_commit, notes_out=None, dry_run=Fals
     notes_path = os.path.join(repo, *notes_name.split("/"))
     notes = None
     if notes_out:
-        if not os.path.isfile(notes_path):
-            problems.append(f"no release notes: {notes_name}")
-        else:
+        if os.path.isfile(notes_path):
             notes, found = fill(notes_name, read_text(notes_path),
                                 {"@COMMIT@": commit, "@FORK_COMMIT@": fork_commit})
             problems += found
+        elif dry_run:
+            print(f"note: no release notes {notes_name}. The dry run writes no notes file.")
+        else:
+            problems.append(f"no release notes: {notes_name}")
     if not dry_run:
         problems += marks_problems("release/README-FIRST.txt", readme)
         if notes is not None:
@@ -402,7 +432,7 @@ def docs(stage, repo, version, commit, fork_commit, notes_out=None, dry_run=Fals
     write_text(os.path.join(stage, "NOTICE.txt"), notice_text(repo, data), crlf=True)
     for cid, text in texts.items():
         write_text(os.path.join(stage, "licenses", cid + ".txt"), text, crlf=True)
-    if notes_out:
+    if notes is not None:
         write_text(notes_out, notes, crlf=False)
     return []
 
@@ -806,6 +836,10 @@ def check_zip(zip_path, repo, forbid=()):
 def main(argv):
     parser = argparse.ArgumentParser(description="Merge, document, check and zip a binary release.")
     sub = parser.add_subparsers(dest="command", required=True)
+    p = sub.add_parser("name")
+    p.add_argument("--version", required=True)
+    p.add_argument("--sha7", required=True)
+    p.add_argument("--dry-run", action="store_true")
     p = sub.add_parser("merge")
     p.add_argument("stage")
     p.add_argument("publishes", nargs="+", metavar="program=folder")
@@ -830,7 +864,13 @@ def main(argv):
     p.add_argument("--forbid", action="append", default=[])
     args = parser.parse_args(argv)
 
-    if args.command == "merge":
+    if args.command == "name":
+        problems = name_problems(args.version, args.dry_run)
+        if not problems:
+            # The only output is the name, so tools/release.ps1 can read it.
+            print(zip_name(args.version, args.dry_run, args.sha7))
+            return 0
+    elif args.command == "merge":
         pairs = [item.partition("=")[::2] for item in args.publishes]
         problems = merge(args.stage, pairs)
     elif args.command == "docs":

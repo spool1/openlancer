@@ -1,5 +1,7 @@
 """Tests of tools/release_check.py. Run them with: python -B -m unittest discover -s tools"""
+import contextlib
 import hashlib
+import io
 import json
 import os
 import re
@@ -85,6 +87,57 @@ class HeaderAndTextTests(unittest.TestCase):
         text, problems = rc.fill("x", "@VERSION@ @OTHER@", {"@VERSION@": "1.0"})
         self.assertEqual("1.0 @OTHER@", text)
         self.assertEqual(["x: unknown placeholder @OTHER@"], problems)
+
+
+class VersionTests(unittest.TestCase):
+    """The names, the titles and the version checks of a beta, a release candidate, the final version and the
+    development version of master (#57)."""
+
+    def name_command(self, *args):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = rc.main(["name", *args])
+        return code, out.getvalue()
+
+    def test_a_beta_and_a_release_candidate(self):
+        for version, suffix, other in (("1.0.0-beta.1", "beta.1", "1.0.0-rc.1"), ("1.0.0-rc.1", "rc.1", "1.0.0")):
+            with self.subTest(version):
+                self.assertEqual(f"OpenLancer-v{version}-win-x64.zip", rc.zip_name(version, False, "abc1234"))
+                self.assertEqual(f"v1.0.0 ({suffix})", rc.version_title(version))
+                self.assertFalse(rc.is_development(version))
+                self.assertEqual([], rc.name_problems(version, dry_run=False))
+                with tempfile.TemporaryDirectory() as stage:
+                    write(os.path.join(stage, "OpenLancer.Editor.exe"),
+                          fake_version_resource("1.0.0.0", version + "+abc1234"))
+                    self.assertEqual([], rc.check_version(stage, version))
+                    self.assertEqual([f"h: OpenLancer.Editor.exe has the product version {version}+abc1234, "
+                                      f"not {other}+<commit>"], rc.check_version(stage, other))
+
+    def test_the_final_version(self):
+        self.assertEqual("OpenLancer-v1.0.0-win-x64.zip", rc.zip_name("1.0.0", False, "abc1234"))
+        self.assertEqual("v1.0.0", rc.version_title("1.0.0"))
+        self.assertFalse(rc.is_development("1.0.0"))
+
+    def test_a_development_version_builds_only_in_a_dry_run(self):
+        self.assertEqual("OpenLancer-1.0.0-dev-dryrun-abc1234-win-x64.zip", rc.zip_name("1.0.0-dev", True, "abc1234"))
+        for version in ("1.0.0-dev", "1.1.0-dev.2"):
+            self.assertTrue(rc.is_development(version), version)
+            self.assertEqual([], rc.name_problems(version, dry_run=True))
+            self.assertEqual(1, len(rc.name_problems(version, dry_run=False)))
+        for version in ("1.0.0", "1.0.0-beta.1", "1.0.0-rc.1", "0.1.0-preview", "1.0.0-beta.1-dev"):
+            self.assertFalse(rc.is_development(version), version)
+
+    def test_the_name_command_prints_only_the_name(self):
+        self.assertEqual((0, "OpenLancer-1.0.0-dev-dryrun-abc1234-win-x64.zip\n"),
+                         self.name_command("--version", "1.0.0-dev", "--sha7", "abc1234", "--dry-run"))
+        self.assertEqual((0, "OpenLancer-v1.0.0-beta.1-win-x64.zip\n"),
+                         self.name_command("--version", "1.0.0-beta.1", "--sha7", "abc1234"))
+
+    def test_the_name_command_refuses_a_release_of_a_development_version(self):
+        code, text = self.name_command("--version", "1.0.0-dev", "--sha7", "abc1234")
+        self.assertEqual(1, code)
+        self.assertIn("the version 1.0.0-dev is a development version. Only a dry run can build it.", text)
+        self.assertNotIn(".zip", text)
 
 
 class NameAndHashTests(unittest.TestCase):
@@ -279,6 +332,26 @@ class DocsTests(RepoFixture):
         self.assertIn("[if built]", problems[0])
         self.assertIn("component pkg has the status 'pending'", problems[1])
         self.assertIn("openal_source has no sha256", problems[2])
+        self.assertFalse(os.path.exists(os.path.join(self.stage, "README-FIRST.txt")))
+
+    def remove_notes(self):
+        os.remove(os.path.join(self.repo, "release", "notes", "v1.0.0-test.md"))
+
+    def test_a_dry_run_without_notes_writes_the_documents_and_no_notes_file(self):
+        self.remove_notes()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual([], self.docs())
+        self.assertIn("note: no release notes release/notes/v1.0.0-test.md. The dry run writes no notes file.",
+                      out.getvalue())
+        self.assertTrue(os.path.isfile(os.path.join(self.stage, "README-FIRST.txt")))
+        self.assertFalse(os.path.exists(os.path.join(self.folder.name, "notes.md")))
+
+    def test_a_release_without_notes_fails(self):
+        self.remove_notes()
+        problems = self.docs(dry_run=False)
+        self.assertIn("no release notes: release/notes/v1.0.0-test.md", problems)
+        self.assertFalse(os.path.exists(os.path.join(self.folder.name, "notes.md")))
         self.assertFalse(os.path.exists(os.path.join(self.stage, "README-FIRST.txt")))
 
     def test_a_missing_text_source_is_a_problem(self):
