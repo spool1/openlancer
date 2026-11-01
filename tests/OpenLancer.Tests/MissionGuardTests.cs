@@ -186,6 +186,50 @@ public sealed class MissionGuardTests
         named.Refuse(section, MissionErrors.WorldFile);
     }
 
+    /// <summary>
+    /// A command group gets the check of the ship build files after each of its commands (final finding 5 of MCP1-3, the
+    /// group form). A group that points the script at a file of a mission folder that is not a ship build file, adds a
+    /// build or a section to it and points the script back refuses with NotShipBuildFile and changes nothing. A script
+    /// that already names such a file does not make it a mission file: the guard does not cover it, and a command that
+    /// changes it gets WorldFile.
+    /// </summary>
+    [Fact]
+    public void ACommandGroupCannotPointAScriptAtAWorldFileOfAMissionFolder()
+    {
+        const string scene = @"DATA\MISSIONS\OL_TEST\ol_scene.ini";
+        const string sceneText = "[Room]\nnickname = ol_room\n";
+        using var m = Create(setup: ws => ws.WriteBase(scene, sceneText));
+        var mission = ItemRef.Of(Script, "Mission", null);
+        SetItemKey ShipFile(string file) => new(mission, "npc_ship_file", [LineSpec.Raw("npc_ship_file", file)]);
+        var build = new AddItem(TestScript, "ship_build") { Nickname = "ol_scene_build" };
+        var section = new AddSection(new ScriptRef(scene), "NPCShipArch", [LineSpec.Raw("nickname", "ol_scene_build")]);
+        var before = m.State();
+
+        foreach (MissionCommand change in new MissionCommand[] { build, section })
+        {
+            var group = new CommandGroup([ShipFile(@"missions\ol_test\ol_scene.ini"), change, ShipFile(@"missions\ol_test\npcships.ini")]);
+            var trick = m.Missions.Apply(new MissionBatch("Trick", [group]));
+            Assert.Equal((EditStatus.Refused, MissionErrors.NotShipBuildFile, 0),
+                (trick.Status, trick.Errors[0].Detail, trick.Errors[0].Index));
+            // A group inside a group gets the same check.
+            var nested = m.Missions.Apply(new MissionBatch("Trick", [new CommandGroup([new CommandGroup(group.Commands)])]));
+            Assert.Equal((EditStatus.Refused, MissionErrors.NotShipBuildFile), (nested.Status, nested.Errors[0].Detail));
+        }
+        Assert.Equal(before, m.State());
+        Assert.Equal(["[Room]", "nickname = ol_room"], m.Session.OpenDocument(scene)!.Working
+            .SelectMany(s => s.Select(MissionEdits.Line).Prepend($"[{s.Name}]")));
+        Assert.Empty(m.Session.EditedPaths);
+        Assert.False(m.Session.CanUndo);
+
+        using var named = Create(Text.Replace(@"missions\ol_test\npcships.ini", @"missions\ol_test\ol_scene.ini"),
+            setup: ws => ws.WriteBase(scene, sceneText));
+        Assert.False(named.Session.IsGuardedMissionFile(scene));
+        named.Refuse(build, MissionErrors.WorldFile);
+        named.Refuse(section, MissionErrors.WorldFile);
+        named.Session.Execute(EditCommand.SetLinesFromText(new SectionRef(scene, new SectionIdentity("Room", "ol_room")),
+            "ol_note", ["1"]));
+    }
+
     /// <summary>The npc_ship_file line can name a ship build file of another script, the shared ship build file or a new
     /// file. It cannot name a script or another file with a section that is not a ship build (final finding 5 of
     /// MCP1-3).</summary>

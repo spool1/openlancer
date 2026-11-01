@@ -360,8 +360,13 @@ public sealed record CommandGroup(IReadOnlyList<MissionCommand> Commands) : Miss
         var inverses = new List<MissionCommand>();
         try
         {
+            // The check of the ship build files runs after each command of the group, as after each command of a batch.
+            // So a group cannot point a script at a world file, change that file and point the script back.
             foreach (var command in Commands)
+            {
                 inverses.AddRange(d.RunInner(command));
+                d.CheckShipBuildFiles();
+            }
         }
         finally
         {

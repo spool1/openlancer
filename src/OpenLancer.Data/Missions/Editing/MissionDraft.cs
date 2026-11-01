@@ -108,19 +108,21 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     }
 
     /// <summary>True for a mission file: a script or the ship build file of a script, also of a script that an earlier
-    /// command of the batch changed. A file directly in <c>DATA\MISSIONS</c> or in its encounters folder is never the
-    /// ship build file of a script, as for the guard of the session. So a command cannot point a script at a world file
-    /// to change that file (final finding 5 of MCP1-3).</summary>
+    /// command of the batch changed. A file directly in <c>DATA\MISSIONS</c> or in its encounters folder, and a file
+    /// with a section that is not a ship build, are never the ship build file of a script, as for the guard of the
+    /// session. So a command cannot point a script at a world file to change that file, also not inside a command
+    /// group (final findings 5 of MCP1-3).</summary>
     private bool IsMissionFile(string path) =>
         Session.IsGuardedMissionFile(path) ||
-        MissionFiles.CanBeOwnShipFile(path, Session.DataPath("MISSIONS")) &&
+        MissionFiles.CanBeOwnShipFile(path, Session.DataPath("MISSIONS")) && Session.HoldsOnlyShipBuilds(path) &&
         Touched.Values.Any(d => d.HoldsScript && VfsPath.Comparer.Equals(Session.ShipBuildFileOf(d.Path), path));
 
     /// <summary>
     /// Refuses the command that runs now when it points the <c>npc_ship_file</c> line of a script at a file that is not
     /// a ship build file (final finding 5 of MCP1-3). A ship build file is in a folder below <c>DATA\MISSIONS</c>,
     /// outside the encounters folder. It is not a script, and it has only <c>[NPCShipArch]</c> sections. A path without
-    /// a file is a new ship build file. A line that names the same file as before the batch is not checked again.
+    /// a file is a new ship build file. A line that names the same file as before the batch is not checked again. The
+    /// plan command calls it after each command, and a command group after each of its commands.
     /// </summary>
     /// <exception cref="EditException"><c>NotShipBuildFile</c>.</exception>
     public void CheckShipBuildFiles()
@@ -140,8 +142,7 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     {
         if (Session.DataPath("MISSIONS") is { } missions && !MissionFiles.IsScanned(path, missions))
             return false;
-        return Session.OpenDocument(path) is not { State.Exists: true } document ||
-               !document.HoldsScript && document.Working.All(s => MissionIndex.Is(s.Name, "NPCShipArch"));
+        return Session.HoldsOnlyShipBuilds(path);
     }
 
     /// <summary>True for a shared ship build file of the missions (see <see cref="SharedBuildFiles"/>).</summary>

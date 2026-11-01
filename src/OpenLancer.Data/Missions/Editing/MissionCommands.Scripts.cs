@@ -87,8 +87,10 @@ public sealed record DeleteScript(ScriptRef Script) : MissionCommand
         var sections = script.Working.Select(MissionDraft.RawSection).ToList();
         var shipPath = script.HoldsScript ? d.Session.ShipBuildFileOf(script.Path) : null;
         IReadOnlyList<RawSection>? shipSections = null;
+        // A file with a section that is not a ship build is world data, so it stays.
         if (shipPath != null && d.Session.OpenDocument(shipPath) is { IsWholeFile: true, State.Exists: true } ships &&
-            !d.OtherScriptNames(script.Path, shipPath) && !d.Session.LowerLayerHas(ships.Path))
+            d.Session.HoldsOnlyShipBuilds(ships.Path) && !d.OtherScriptNames(script.Path, shipPath) &&
+            !d.Session.LowerLayerHas(ships.Path))
         {
             var file = d.File(ships.Path);
             shipSections = file.Working.Select(MissionDraft.RawSection).ToList();

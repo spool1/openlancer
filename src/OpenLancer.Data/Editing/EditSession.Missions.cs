@@ -90,7 +90,8 @@ public sealed partial class EditSession
     /// True when the guard of the mission files covers a file (section 4.1 of the M6b design, decision D660): a mission
     /// script, and each ship build file that a <c>[Mission] npc_ship_file</c> line of a script names. The shared files
     /// directly in <c>DATA\MISSIONS</c>, for example <c>npcships.ini</c> and the pilot files, and the encounter files
-    /// are world data (review finding RB2, final finding 5 of MCP1-3).
+    /// are world data (review finding RB2, final finding 5 of MCP1-3). A file with a section that is not a ship build
+    /// is world data too, also when a script names it, for example after a change outside the editor.
     /// </summary>
     /// <param name="path">An install path in normal form.</param>
     internal bool IsGuardedMissionFile(string path)
@@ -99,10 +100,18 @@ public sealed partial class EditSession
             return false;
         if (OpenDocument(path) is { HoldsScript: true })
             return true;
-        if (!MissionFiles.CanBeOwnShipFile(path, DataPath("MISSIONS")))
+        if (!MissionFiles.CanBeOwnShipFile(path, DataPath("MISSIONS")) || !HoldsOnlyShipBuilds(path))
             return false;
         return ShipBuildFilesOfScripts().Contains(path);
     }
+
+    /// <summary>True when W of a file has only <c>[NPCShipArch]</c> sections and the file is not a script, or when the
+    /// file does not exist. Only such a file can be the ship build file of a script (user decision of 2026-11-01, item
+    /// 20 of the accepted differences of MCP1-3).</summary>
+    /// <param name="path">An install path in normal form.</param>
+    internal bool HoldsOnlyShipBuilds(string path) =>
+        OpenDocument(path) is not { State.Exists: true } document ||
+        !document.HoldsScript && document.Working.All(s => s.Name.Equals("NPCShipArch", StringComparison.OrdinalIgnoreCase));
 
     private (int Revision, HashSet<string> Files)? shipBuildFiles;
 
