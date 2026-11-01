@@ -29,6 +29,15 @@ public static class ThnEdits
     /// a 1 ms grid.</summary>
     private const double StepsPerSecond = 1000;
 
+    /// <summary>The refusal of a move that puts an event before the time 0.</summary>
+    public const string StartsBeforeZero = "An event cannot start before 0.";
+
+    /// <summary>The refusal of a change that gives an event a negative length.</summary>
+    public const string NegativeLength = "The length of an event cannot be negative.";
+
+    /// <summary>The refusal of a negative duration of a script.</summary>
+    public const string NegativeDuration = "The duration cannot be negative.";
+
     /// <summary>Sets a value. Each missing record on the path is made.</summary>
     /// <remarks>Use <see cref="RenameEntity"/> for <c>entity_name</c>, and <see cref="SetFlags"/> for the flags of the
     /// Inspector.</remarks>
@@ -65,7 +74,7 @@ public static class ThnEdits
     {
         CheckNumber(seconds, nameof(seconds));
         if (seconds < 0)
-            throw new ArgumentException("The duration cannot be negative.", nameof(seconds));
+            throw new ArgumentException(NegativeDuration, nameof(seconds));
         return new DurationCommand(path, seconds);
     }
 
@@ -137,10 +146,13 @@ public static class ThnEdits
             CheckKind(ev, ThnElementKind.Event);
         if (events.Select(e => VfsPath.Normalize(e.Path)).Distinct(VfsPath.Comparer).Count() > 1)
             throw new ArgumentException("The events must be in one cutscene.", nameof(events));
-        var label = timeDelta == 0 && lengthDelta != 0 ? "Change the length of" : "Move";
-        return new MoveCommand($"{label} {(events.Count == 1 ? "event" : $"{events.Count} events")}", events, timeDelta,
-            lengthDelta);
+        return new MoveCommand(MoveLabel(events.Count, timeDelta, lengthDelta), events, timeDelta, lengthDelta);
     }
+
+    /// <summary>The label of the entry of a move of events (see <see cref="MoveEvents"/>), for example "Move 2 events"
+    /// or "Change the length of event".</summary>
+    public static string MoveLabel(int count, float timeDelta, float lengthDelta) =>
+        $"{(timeDelta == 0 && lengthDelta != 0 ? "Change the length of" : "Move")} {(count == 1 ? "event" : $"{count} events")}";
 
     /// <summary>
     /// Why <see cref="Reorder"/> cannot move <paramref name="ev"/> before <paramref name="before"/> now, or null when it
@@ -628,7 +640,7 @@ public static class ThnEdits
                     var time = table.List.FirstOrDefault() as ThnNumber ??
                                throw new InvalidOperationException("The time of the event is not a number.");
                     table = ThnElementPaths.Set(ThnElementKind.Event, table, TimePath,
-                        new ThnNumber(Step((double)time.Value + timeDelta, "An event cannot start before 0.")));
+                        new ThnNumber(Step((double)time.Value + timeDelta, StartsBeforeZero)));
                 }
                 if (lengthDelta != 0)
                 {
@@ -638,7 +650,7 @@ public static class ThnEdits
                         ThnNumber number => number.Value,
                         _ => throw new InvalidOperationException("The length of the event (props.duration) is not a number."),
                     };
-                    var newLength = Step((double)length + lengthDelta, "The length of an event cannot be negative.");
+                    var newLength = Step((double)length + lengthDelta, NegativeLength);
                     // An event without props.duration has the length 0 (ThnEvent.cs:14, :55). So when the lower event
                     // has no length, the length 0 removes the key, and the props that a move made, and the patch gets
                     // no value for them.
