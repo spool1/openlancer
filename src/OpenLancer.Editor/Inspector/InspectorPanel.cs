@@ -33,6 +33,10 @@ internal sealed class InspectorPanel : IDisposable
     /// <summary>The id of the panel. The layout reports its focus by this id.</summary>
     public const string PanelId = "inspector";
 
+    /// <summary>The empty state of the Inspector (#56).</summary>
+    internal static readonly EmptyState NothingSelected =
+        new("Nothing selected.", "Select an object in the Hierarchy, the Scene or the Database.");
+
     // Sizes in unscaled points.
     private const float HeaderHeight = 52;
     private const float HeaderPaddingX = 10;
@@ -128,7 +132,7 @@ internal sealed class InspectorPanel : IDisposable
         thnPage.Frame();
         if (item == null)
         {
-            PanelStates.Message("Nothing selected.", "Select an object in the Hierarchy, the Scene or the Database.");
+            PanelStates.Message(NothingSelected);
             return;
         }
 

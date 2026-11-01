@@ -35,6 +35,13 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
     /// <summary>The id of the panel. The layout reports its focus by this id.</summary>
     public const string PanelId = "timeline";
 
+    // The empty states of the Timeline and of the Hierarchy of a cutscene (#56).
+    internal static readonly EmptyState NoCutscene = new("No cutscene is open.", "Open a cutscene in the Cutscenes tab.");
+    internal static readonly EmptyState NoEntityWithEvents = new("No entity of this cutscene has events.",
+        "Turn off Only with events in the toolbar to show all entities.");
+    internal static readonly EmptyState NoEntities =
+        new("This cutscene has no entities and no events.", "Open another cutscene in the Cutscenes tab.");
+
     // Sizes in unscaled points.
     private const float LabelWidth = 230;
     private const float LabelPadding = 6;
@@ -160,7 +167,7 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
 
         if (workspace.Path == null)
         {
-            PanelStates.Message("No cutscene is open.", "Open a cutscene in the Cutscenes tab.");
+            PanelStates.Message(NoCutscene);
             return;
         }
 
@@ -342,12 +349,11 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
         {
             if (view.OnlyWithEvents)
             {
-                PanelStates.Message("No entity of this cutscene has events.",
-                    "The filter of the toolbar hides the entities without events. Turn it off to show all entities.");
+                PanelStates.Message(NoEntityWithEvents);
             }
             else
             {
-                PanelStates.Message("This cutscene has no entities and no events.", "There is nothing to show.");
+                PanelStates.Message(NoEntities);
             }
 
             ImGui.EndChild();

@@ -22,6 +22,10 @@ namespace OpenLancer.Editor.Missions;
 /// </summary>
 internal sealed class MissionsBrowser(EditorWindow window, MissionWorkspace missions)
 {
+    /// <summary>The empty state of the Missions tab (#56).</summary>
+    internal static readonly EmptyState NoScripts = new("The game data of this profile has no mission scripts.",
+        "Open a profile of a game with mission scripts in DATA\\MISSIONS.");
+
     private const ImGuiTableFlags Flags = ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY |
                                           ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerV |
                                           ImGuiTableFlags.SizingFixedFit;
@@ -167,8 +171,7 @@ internal sealed class MissionsBrowser(EditorWindow window, MissionWorkspace miss
 
         if (result.Scripts.Count == 0)
         {
-            PanelStates.Message("No mission scripts found.",
-                "The game data of this profile has no mission script in DATA\\MISSIONS.");
+            PanelStates.Message(NoScripts);
             return;
         }
 

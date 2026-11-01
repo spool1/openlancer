@@ -23,6 +23,12 @@ internal sealed class ConsolePanel(EditorWindow window)
     /// <summary>The id of the panel. The layout reports its focus by this id.</summary>
     public const string PanelId = "console";
 
+    // The empty states of the Console (#56).
+    internal static readonly EmptyState NoMessages =
+        new("No messages.", "Open a profile, save or play. The warnings and errors then show here.");
+    internal static readonly EmptyState NoMessageMatch =
+        new("No message matches the filters.", "Turn on the severity toggles or clear the search.");
+
     // Sizes in unscaled points.
     private const float IconWidth = 20;
     private const float TimeWidth = 64;
@@ -276,9 +282,7 @@ internal sealed class ConsolePanel(EditorWindow window)
             ImGui.BeginChild("##empty", listSize);
             if (notes == 0)
             {
-                PanelStates.Message(Log.Entries.Count == 0 ? "No messages." : "No message matches the filters.",
-                    Log.Entries.Count == 0 ? "Warnings and errors of the editor, the mods and the engine show here."
-                        : "Turn on the severity toggles or clear the search.");
+                PanelStates.Message(Log.Entries.Count == 0 ? NoMessages : NoMessageMatch);
             }
 
             ImGui.EndChild();

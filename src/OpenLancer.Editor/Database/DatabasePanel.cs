@@ -29,6 +29,9 @@ internal sealed class DatabasePanel(EditorWindow window)
 {
     private const string GoodsId = "goods";
 
+    /// <summary>The empty state of a table whose rows the filter hides (#56). The next action is a link.</summary>
+    internal static readonly EmptyState NoRowMatch = new($"No rows match '{EmptyState.TextPlace}'.", "Clear filter");
+
     // Sizes in unscaled points.
     private const float CategoryMin = 120;
     private const float CategoryMaxFraction = 0.4f;
@@ -153,7 +156,7 @@ internal sealed class DatabasePanel(EditorWindow window)
         ImGui.SetCursorScreenPos(origin + new Vector2(listWidth + gap, 0));
         if (table.Shown == 0 && filter.Length > 0)
         {
-            if (PanelStates.MessageWithLink($"No rows match '{filter}'.", "Clear filter"))
+            if (PanelStates.MessageWithLink(NoRowMatch.With(filter)))
             {
                 filter = "";
             }

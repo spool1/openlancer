@@ -30,6 +30,13 @@ internal sealed class AssetsPanel : IDisposable
 {
     public const string PanelId = "assets";
 
+    // The empty states of the Assets panel (#56). The next action of a search without a match is a link.
+    internal static readonly EmptyState NoAssetMatch = new($"No asset matches '{EmptyState.TextPlace}'.", "Clear search");
+    internal static readonly EmptyState NoPropGroups = new("This category has no assets.",
+        "Right-click an object in the Hierarchy and click Save as prop group.");
+    internal static readonly EmptyState NoAssets =
+        new("This category has no assets.", "Pick another category. A mod adds these assets in its data files.");
+
     // Sizes in unscaled points.
     private const float TreeMin = 120;
     private const float TreeMaxFraction = 0.4f;
@@ -202,7 +209,7 @@ internal sealed class AssetsPanel : IDisposable
     {
         if (window.Session is not { } session)
         {
-            PanelStates.Message("No profile is open.", "Open a profile from the File menu.");
+            PanelStates.Message(PanelStates.NoProfile);
             return;
         }
 
@@ -317,13 +324,11 @@ internal sealed class AssetsPanel : IDisposable
         {
             if (search.Length > 0)
             {
-                if (PanelStates.MessageWithLink($"No asset matches '{search}'.", "Clear search"))
+                if (PanelStates.MessageWithLink(NoAssetMatch.With(search)))
                     search = "";
             }
             else
-                PanelStates.Message("This category has no assets.",
-                    current.Id == "groups" ? "Right-click an object in the Hierarchy and click Save as prop group."
-                        : "A mod adds them in its data files.");
+                PanelStates.Message(current.Id == "groups" ? NoPropGroups : NoAssets);
             return;
         }
 

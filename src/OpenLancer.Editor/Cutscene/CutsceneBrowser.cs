@@ -27,6 +27,14 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
     /// <summary>The id of the panel.</summary>
     public const string PanelId = "cutscenes";
 
+    // The empty states of the cutscene list (#56). The next action of a filter without a match is a link.
+    internal static readonly EmptyState NoCutsceneMatch =
+        new($"No cutscene matches '{EmptyState.TextPlace}'.", "Clear filter");
+    internal static readonly EmptyState NoCutsceneInGroup =
+        new("No cutscene is in this group.", "Pick another group in the list of the toolbar.");
+    internal static readonly EmptyState NoCutscenes =
+        new("The game data has no cutscenes.", "Click New cutscene to make a cutscene in the active mod.");
+
     /// <summary>The note of a new cutscene about the retail games (risk 7 of the M8b design). A new cutscene is a text
     /// file, and nobody checked yet that the retail games play one (#62).</summary>
     public const string NotCheckedInRetail = "Nobody checked a new cutscene in the retail games yet.";
@@ -214,7 +222,29 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
             Sort();
         }
 
+        if (shown.Count == 0 && catalog.Done)
+        {
+            Empty();
+            return;
+        }
+
         Table();
+    }
+
+    /// <summary>The empty state of the list: a filter without a match, an empty group, or no cutscenes.</summary>
+    private void Empty()
+    {
+        if (filter.Length > 0)
+        {
+            if (PanelStates.MessageWithLink(NoCutsceneMatch.With(filter)))
+            {
+                filter = "";
+            }
+        }
+        else
+        {
+            PanelStates.Message(choice != null ? NoCutsceneInGroup : NoCutscenes);
+        }
     }
 
     /// <summary>The popup of New cutscene: the name, the install path, the note about the retail engine, and Create

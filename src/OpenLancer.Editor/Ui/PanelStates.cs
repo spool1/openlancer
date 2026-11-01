@@ -6,6 +6,23 @@ using LibreLancer.ImUI;
 namespace OpenLancer.Editor.Ui;
 
 /// <summary>
+/// An empty state of a panel: what the panel does not have, and what to do next (#56). Each main panel keeps its empty
+/// states as named fields, so a test checks that each one tells the next action.
+/// </summary>
+/// <param name="Message">What the panel does not have, for example "No system is open." A message can hold the text of
+/// a search or a filter as <c>{text}</c>.</param>
+/// <param name="Next">What to do next, for example "Select a system in the Scene toolbar." For a state with a link, it
+/// is the text of the link, for example "Clear search".</param>
+internal sealed record EmptyState(string Message, string Next)
+{
+    /// <summary>The place of the text of a search or a filter in <see cref="Message"/>.</summary>
+    public const string TextPlace = "{text}";
+
+    /// <summary>The state with the text of a search or a filter in its message.</summary>
+    public EmptyState With(string text) => this with { Message = Message.Replace(TextPlace, text, StringComparison.Ordinal) };
+}
+
+/// <summary>
 /// The states of a panel body that has nothing to show yet: a loading spinner or a message, centered in the free space.
 /// </summary>
 internal static class PanelStates
@@ -15,6 +32,12 @@ internal static class PanelStates
     private const float SpinnerThickness = 3;
     private const float LineGap = 8;
 
+    /// <summary>The state of a panel while no profile is open.</summary>
+    public static readonly EmptyState NoProfile = new("No profile is open.", "Open a profile from the File menu.");
+
+    /// <summary>The state of a panel when the game data of the profile did not load.</summary>
+    public static readonly EmptyState LoadFailed = new("The game data did not load.", "Read the error in the Console.");
+
     /// <summary>
     /// Draws the state of a panel that needs the game data, when the data is not there: no profile, the load, or a
     /// failed load.
@@ -23,7 +46,7 @@ internal static class PanelStates
     {
         if (session == null)
         {
-            Message("No profile is open.", "Open a profile from the File menu.");
+            Message(NoProfile);
         }
         else if (session.IsLoading)
         {
@@ -31,7 +54,7 @@ internal static class PanelStates
         }
         else
         {
-            Message("The game data did not load.", "The Console shows the error.");
+            Message(LoadFailed);
         }
     }
 
@@ -58,11 +81,14 @@ internal static class PanelStates
     /// <summary>Draws a dim message and a smaller hint below it, both centered in the free space.</summary>
     public static void Message(string message, string hint) => Lines(message, hint, false);
 
+    /// <summary>Draws an empty state: its message, and what to do next below it, both centered in the free space.</summary>
+    public static void Message(EmptyState state) => Lines(state.Message, state.Next, false);
+
     /// <summary>
-    /// Draws a dim message and a link below it, both centered in the free space. Returns true when the user clicks
-    /// the link.
+    /// Draws the message of an empty state and its next action as a link below it, both centered in the free space.
+    /// Returns true when the user clicks the link.
     /// </summary>
-    public static bool MessageWithLink(string message, string link) => Lines(message, link, true);
+    public static bool MessageWithLink(EmptyState state) => Lines(state.Message, state.Next, true);
 
     /// <summary>Draws a message and a second line in the caption size: a dim hint, or a link.</summary>
     private static bool Lines(string message, string second, bool isLink)

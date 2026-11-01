@@ -33,6 +33,13 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
     /// <summary>The id of the panel. The layout reports its focus by this id.</summary>
     public const string PanelId = "hierarchy";
 
+    // The empty states of the Hierarchy (#56).
+    private const string ClearSearch = "Press Esc in the search field to clear the search.";
+    internal static readonly EmptyState NoSystem = new("No system is open.", "Select a system in the Scene toolbar.");
+    internal static readonly EmptyState NoObjectMatch = new("No object matches the search.", ClearSearch);
+    internal static readonly EmptyState NoMissionItemMatch = new("No item matches the search.", ClearSearch);
+    internal static readonly EmptyState NoEntityMatch = new("No entity matches the search.", ClearSearch);
+
     private const string SearchTip =
         "Search by name or nickname. A t: word shows one type, for example t:station.\n" +
         "Types: sun, planet, station, ring, gate, hole, lane, satellite, platform, zone, field, nebula, light.";
@@ -127,7 +134,7 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
         {
             if (window.Cutscenes.Timeline is not { } timeline)
             {
-                PanelStates.Message("No cutscene is open.", "Open a cutscene in the Cutscenes tab.");
+                PanelStates.Message(TimelinePanel.NoCutscene);
                 return;
             }
 
@@ -146,7 +153,7 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
             }
             else if (window.Missions.Open is not { } analysis)
             {
-                PanelStates.Message("No mission is open.", "Double-click a mission in the Missions tab.");
+                PanelStates.Message(MissionView.NoMission);
                 return;
             }
             else
@@ -163,7 +170,7 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
         {
             if (window.Scene.Index is not { } index)
             {
-                PanelStates.Message("No system is open.", "Select a system in the Scene toolbar.");
+                PanelStates.Message(NoSystem);
                 return;
             }
 
@@ -201,11 +208,9 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
 
         if (tree.IsSearching && tree.Root.Matches == 0)
         {
-            PanelStates.Message(
-                window.CenterMode == CenterMode.Cutscene ? "No entity matches the search."
-                : window.CenterMode == CenterMode.Mission ? "No item matches the search."
-                : "No object matches the search.",
-                "Esc in the search field clears it.");
+            PanelStates.Message(window.CenterMode == CenterMode.Cutscene ? NoEntityMatch
+                : window.CenterMode == CenterMode.Mission ? NoMissionItemMatch
+                : NoObjectMatch);
         }
 
         // A right click on empty space opens the Create menu (decision D255 of the M3 design).

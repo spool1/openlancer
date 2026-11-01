@@ -41,6 +41,10 @@ internal sealed class CutsceneView
     /// <summary>The id of the panel. The layout reports its focus by this id.</summary>
     public const string PanelId = "cutscene";
 
+    /// <summary>The empty state of the Cutscene tab (#56).</summary>
+    internal static readonly EmptyState NoCutscene =
+        new("No cutscene is open.", "Open a cutscene in the Cutscenes tab or in the list of the toolbar.");
+
     /// <summary>The scrub bar shows the first 600 s of a long ambient script. The time field takes any time.</summary>
     private const double ScrubSeconds = 600;
 
@@ -247,7 +251,7 @@ internal sealed class CutsceneView
 
         if (workspace.Path == null)
         {
-            PanelStates.Message("No cutscene is open.", "Open a cutscene in the Cutscenes tab or in the list of the toolbar.");
+            PanelStates.Message(NoCutscene);
             return;
         }
 

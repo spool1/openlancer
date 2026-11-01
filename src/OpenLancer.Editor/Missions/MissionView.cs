@@ -21,6 +21,9 @@ namespace OpenLancer.Editor.Missions;
 /// </summary>
 internal sealed class MissionView : IDisposable
 {
+    /// <summary>The empty state of the Mission tab and of its Hierarchy (#56).</summary>
+    internal static readonly EmptyState NoMission = new("No mission is open.", "Double-click a mission in the Missions tab.");
+
     // Sizes in unscaled points.
     private const float SplitterWidth = 6;
     private const float MinSceneTabWidth = 640;
@@ -604,7 +607,7 @@ internal sealed class MissionView : IDisposable
 
         if (missions.OpenPath is not { } path || missions.Analysis(path) is not { } analysis)
         {
-            PanelStates.Message("No mission is open.", "Double-click a mission in the Missions tab.");
+            PanelStates.Message(NoMission);
             return;
         }
 

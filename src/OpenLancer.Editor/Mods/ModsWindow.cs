@@ -35,6 +35,12 @@ internal sealed partial class ModsWindow : IDisposable
     /// <summary>The Console source of the Mods window.</summary>
     public const string Source = "Mods";
 
+    // The empty states of the Mods window (#56).
+    internal static readonly EmptyState NoMods = new("The workspace has no mods.", "Click New mod to make a mod.");
+    internal static readonly EmptyState NoModMatch =
+        new("No mod matches the search and the filter.", "Clear the search, or pick another filter.");
+    internal static readonly EmptyState NoModSelected = new("No mod is selected.", "Select a mod in the list.");
+
     private const string WindowId = "###mods";
     private static readonly Vector2 DefaultSize = new(1100, 720);
 
@@ -536,7 +542,7 @@ internal sealed partial class ModsWindow : IDisposable
     {
         if (rows.Count == 0)
         {
-            ImGui.TextWrapped(scan != null ? "Reading the mods..." : "The workspace has no mods. Click New mod to make a mod.");
+            ImGui.TextWrapped(scan != null ? "Reading the mods..." : $"{NoMods.Message} {NoMods.Next}");
             return;
         }
 
@@ -565,7 +571,7 @@ internal sealed partial class ModsWindow : IDisposable
         ListRow.PopStyle();
         if (visible.Count == 0)
         {
-            ImGui.TextDisabled("No mod matches the search.");
+            ImGui.TextWrapped($"{NoModMatch.Message} {NoModMatch.Next}");
         }
     }
 
@@ -693,7 +699,7 @@ internal sealed partial class ModsWindow : IDisposable
     {
         if (Selected is not { } selected)
         {
-            ImGui.TextDisabled(rows.Count == 0 ? "" : "Select a mod in the list.");
+            ImGui.TextDisabled(rows.Count == 0 ? "" : NoModSelected.Next);
             return;
         }
 
