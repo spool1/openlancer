@@ -105,7 +105,8 @@ public sealed class UiTextTests
     {
         var ids = MilestoneText.RoadmapIds(File.ReadAllLines(RepoFiles.Of("ROADMAP.md")));
 
-        Assert.Superset(new HashSet<string> { "M1", "M3b", "M8c", "M11c", "M27", "MCP1-2", "GA1", "H1", "R1" },
+        Assert.Superset(
+            new HashSet<string> { "M1", "M3b", "M8c", "M11c", "M27", "MCP1-2", "GA1", "H1", "R1", "R2", "R3" },
             ids.ToHashSet());
         Assert.DoesNotContain("ID", ids);
         Assert.DoesNotContain("Base", ids);

@@ -2,7 +2,7 @@
 
 OpenLancer is a mod editor for Freelancer (2003). The goal: people can easily make mods for Freelancer HD Edition 0.7.1 and vanilla 1.1, and publish them, for example on Nexus.
 
-Each milestone goes through four steps: design, adversarial review, build and verify. Each pull request names its milestone (see [CONTRIBUTING.md](CONTRIBUTING.md)). The IDs are names, not an order. The table shows the order.
+Each milestone goes through four steps: design, adversarial review, build and verify. Each pull request names its milestone (see [CONTRIBUTING.md](CONTRIBUTING.md)). The IDs are names, not an order. The table shows the order. Version 1.0 (R3) holds the rows above it, except the parts that a row puts after 1.0. The rows below R3 come after 1.0.
 
 ## Mod tiers
 
@@ -38,11 +38,12 @@ Each milestone goes through four steps: design, adversarial review, build and ve
 | R1 | First release, v0.1.0 (preview) | none | done | One zip with the editor, Play and oltool. It holds no game files. Published on 2026-10-22. |
 | MCP1-2 | Agent scene and data edits | editor | done | Agents edit the Scene and the data through the edit session, checks, save gate and undo of the editor. They also save, export and start Play. The editor shows each agent edit. See docs/MCP.md. |
 | MCP1-3 | Agent mission edits | editor | done | Agents edit missions with the commands of the mission studio. They also run the dry run and the mission play. See docs/MCP.md. |
-| M8c | Cutscene editor, part 3 | 1 | in progress | Pick the animation of a character event from a list of the game clips, with a preview of each clip on the character. Warnings for cutscene problems, and Convert to patch. |
-| M6c | Play from a trigger | editor | in progress | A dry run runs the triggers of a mission in the editor without the game (M6c-1, done). "Play from here" starts the game at a trigger, and a live view in the graph shows which triggers ran and which wait (M6c-2, done). Next: a start save that HD Edition and vanilla 1.1 load (M6c-3). |
+| M8c | Cutscene editor, part 3 | 1 | in progress | Pick the animation of a character event from a list of the game clips, with a preview of each clip on the character. An unknown animation, template or costume name blocks Save. The warnings for cutscene problems and Convert to patch come after 1.0. |
+| M6c | Play from a trigger | editor | in progress | A dry run runs the triggers of a mission in the editor without the game (M6c-1, done). "Play from here" starts the game at a trigger, and a live view in the graph shows which triggers ran and which wait (M6c-2, done). A start save that HD Edition and vanilla 1.1 load (M6c-3) comes after 1.0. |
 | MCP1-4 | Agent cutscene edits | editor | next | Agents edit the entities, events and timing of cutscenes, with guards. |
-| R2 | Second release, v0.2.0 (preview) | none | next | A new zip with Play from a trigger and the newer agent tools. |
-| M3b | Scene editing, part 2 | 1 | next | Multi-selection, move with children, the encounter group editor, new factions and a Problems panel. |
+| R2 | 1.0 beta, v1.0.0-beta.1 (pre-release) | none | next | The zip of the second play test round. It adds the agent edits of the Scene, the data, the missions and the cutscenes. It also has the fixes of Play from a trigger and of the first round. GitHub shows it as a pre-release. |
+| R3 | OpenLancer 1.0, v1.0.0 | none | next | The first full release. A new modder makes a tier-1 mod for HD Edition 0.7.1 and vanilla 1.1 with no help from the developer. |
+| M3b | Scene editing, part 2 | 1 | after 1.0 | Multi-selection, move with children, the encounter group editor, new factions and a Problems panel. |
 | M34 | Prop scale | 2 | later | A scale key for objects. The model, the hit test, the collision and the dock paths scale with it. |
 | M24 | Game tab | editor | later | The game window docks in a tab of the editor. The game stays a separate process. |
 | M28 | Prefab viewer | 1 | later | One page for each asset: archetype, model parts, hardpoints and loadout. |
