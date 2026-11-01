@@ -275,7 +275,9 @@ Each start of the game moves the log of the last run to the previous log, `OpenL
 
 The editor keeps the log of its last session in the same way, in `OpenLancer.Editor.log.previous.txt`. As for the game, the second start of the editor after a crash replaces the log of the crash.
 
-The Console report of a crash during the validation of its save waits for the result of the validation. When you stop Play first, the Console reports the crash at once. When you start Play again first, the Console reports the crash when the new game starts. Then the line names the previous log, because the new game moved the log of the crash there. When the new Play does not start, the line names the game log.
+When the game crashes while the editor validates a save, the Console waits for the result of the validation before it reports the crash. Then the report can name the validation errors as the cause. When you stop Play first, the Console reports the crash at once. When you start Play again first, the Console reports the crash when the new game starts. Then the line names the previous log, because the new game moved the log of the crash there. When the new Play does not start, the line names the game log.
+
+A program that keeps the game log open, for example a log viewer, stops the move to the previous log. Then the log of the crash stays in `OpenLancer.Play.log.txt`, and the new game writes its log to a file with a number, for example `OpenLancer.Play.log.0.txt`. The Console line still names the previous log, but that file has the log of an older run. Close the log viewer before you start Play again.
 
 The warnings and errors of the game log also go to the Console with the source "Play". The Console adds a line only when it does not show the same line yet. The Console hides the lines that the base game without mods also gives, as it does for the lines of the editor. Turn on the base-game toggle of the Console to show them. When the game server is slow, the Console shows one info entry for the Play run. The Play log has each slow update.
 
