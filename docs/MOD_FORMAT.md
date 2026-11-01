@@ -544,7 +544,7 @@ A drag of a group tile into the Scene places the group, and so does "Place at th
 
 The placement checks each planned line with the data lists before the line goes into W. A line with an error never reaches the mod. The dialog lists each such line with what the game does with it, and offers "Place without these lines" and Cancel. A required line cannot go, so an unknown archetype refuses the whole placement: "<member>: the archetype <value> is not in this profile. The game drops this object. Add the mod that has <value> to the profile."
 
-The game package of an export leaves `props/` out, because the game does not read it. Milestone M11 decides if a source package for other modders holds the group files.
+The game package of an export leaves `props/` out, because the game does not read it. The package of the target OpenLancer also leaves it out (see "Package of the target OpenLancer").
 
 ## Cutscenes
 
@@ -553,7 +553,7 @@ A cutscene script (`.thn`) is a Lua 3.2 script. The retail scripts are bytecode.
 - `patches/<install path>.thn` is a THN patch. It holds only the changed values. Use it to change a retail cutscene or a cutscene of another mod.
 - `files/<install path>` is a whole script as Lua text. Use it for a new cutscene, under `DATA/MODS/<mod id>/CUTSCENES/`. Do not copy a retail script into a mod.
 
-New cutscene in the editor writes `files/DATA/MODS/<mod id>/CUTSCENES/<name>.thn`. An INI line names a cutscene with its path below `DATA`, for example `start_script = MODS\my-mod\CUTSCENES\bar_shot.thn`. The engine finds the file through the data folder of the merged files. A new cutscene plays in OpenLancer. It plays in the retail game only after the M11 check that the retail engine reads text cutscenes, so the editor marks it "OpenLancer only".
+New cutscene in the editor writes `files/DATA/MODS/<mod id>/CUTSCENES/<name>.thn`. An INI line names a cutscene with its path below `DATA`, for example `start_script = MODS\my-mod\CUTSCENES\bar_shot.thn`. The engine finds the file through the data folder of the merged files. A new cutscene plays in OpenLancer. A new cutscene is a text file, and nobody checked a new cutscene in the retail games yet. So the editor marks it "not checked in the retail games".
 
 The merge reads the script as the mods before the patch leave it, and applies each THN patch in load order. Then it writes the result as canonical Lua text. `oltool thn` prints that text, and `oltool deploy` writes it into the deploy folder. The cutscene editor shows each cutscene, and it saves the edits of a lower cutscene as a THN patch (see [CUTSCENES.md](CUTSCENES.md)).
 
@@ -684,7 +684,7 @@ The files of a mod in the OpenLancer repo, for example `samples/mods/ol-sample`,
 
 ### The Mods window
 
-**Mod > Mods...** opens the Mods window (milestone M11c). It lists the mods of the open profile in load order, then the other mods of the `mods` folder of the workspace. The workspace is the folder above the folder of the open profile. Without an open profile, it is the workspace folder of the editor. **Show** and the search field filter the list. The search finds the display name, the id and the tags.
+**Mod > Mods...** opens the Mods window. It lists the mods of the open profile in load order, then the other mods of the `mods` folder of the workspace. The workspace is the folder above the folder of the open profile. Without an open profile, it is the workspace folder of the editor. **Show** and the search field filter the list. The search finds the display name, the id and the tags.
 
 A row shows the display name, the id and the version. A blue dot marks unsaved or unapplied changes. A yellow triangle marks a change after the last export. The last glyph shows the state of the checks. A mod whose `mod.json` does not load shows its error, and Open folder is its only action. The window reads the mods again when it gets the focus, after each of its actions, after a save, after an export and on **Refresh**.
 
@@ -835,7 +835,7 @@ The Scene adds, copies, renames and deletes the objects, zones and lights of the
 | The Edit menu | Create, Duplicate, Rename and Delete |
 | The keys, while the Hierarchy or the Scene has the focus | `F2` Rename, `Ctrl+D` Duplicate, `Delete` Delete |
 
-The keys work only when no text field is active and no field edit or drag is open. A disabled menu item tells why in its tooltip. Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has a `goto`, a `prev_ring` or a `next_ring` line, or an archetype of such a type. The editor cannot add, copy or delete them before milestone M27, because the partner gate, the neighbor rings and the route files must change with them. A rename of a connection object works.
+The keys work only when no text field is active and no field edit or drag is open. A disabled menu item tells why in its tooltip. Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has a `goto`, a `prev_ring` or a `next_ring` line, or an archetype of such a type. This version cannot add, copy or delete them, because the partner gate, the neighbor rings and the route files must change with them. A rename of a connection object works.
 
 #### Create
 
@@ -867,7 +867,7 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 
 - A copy leaves out the `base` line, because a base has one object in space. The Console tells it.
 - A text placeholder of the active mod gets a copy of its text with a new key, as New from template does. A numeric text id stays.
-- The editor copies nebulae and asteroid fields, and the zones that hold them, in milestone M26.
+- This version cannot copy nebulae, asteroid fields or the zones that hold them.
 
 #### Delete
 
@@ -876,8 +876,8 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 - The child sections of the section go with it, and so do the objects whose `parent` names the object, again and again.
 - A zone takes its `[Nebula]` and `[Asteroids]` sections, and the `[LootableZone]` sections that name it. The engine drops a nebula or a field without its zone.
 - A line that names the item gets a safe fix in the same entry when one exists. The `ring` line of a planet goes. The lines of each hole of a deleted zone go from the `[Exclusion Zones]` sections of the nebula and field files. The engine skips a hole whose zone is not there. But retail gives the lines of that hole to the hole before it, so the lines must go.
-- Another line keeps its value and shows "Missing" (see "Data lists and pickers"). In milestone M3, only a fix of a line that the editor cannot change gives such a line.
-- A line whose rule refuses the delete names the line and stops the delete, as Unity RequireComponent does. A jump gate, a jump hole and a trade lane ring refuse their delete until milestone M27.
+- Another line keeps its value and shows "Missing" (see "Data lists and pickers"). In this version, only a fix of a line that the editor cannot change gives such a line.
+- A line whose rule refuses the delete names the line and stops the delete, as Unity RequireComponent does. This version refuses the delete of a jump gate, a jump hole and a trade lane ring.
 - A delete of a nebula or an asteroid field removes only its section, as Unity "Remove Component" does. Its zone stays, with its encounters, its music and its damage.
 
 A delete that removes only the item and its child sections runs at once. Another delete opens a dialog. It lists the items that go too, the lines that change and the lines that show "Missing". It also lists the files that name the item as text, and these warnings:
@@ -905,7 +905,7 @@ The editor refuses a nickname that another object or zone of any system has, wit
 
 A rename with a warning opens a dialog first:
 
-- The files that name the old nickname as text: the mission files, the cutscenes and the other INI files. A mission or a cutscene that names the old nickname does not find the item. Milestone M29 adds the index of the mission files.
+- The files that name the old nickname as text: the mission files, the cutscenes and the other INI files. A mission or a cutscene that names the old nickname does not find the item. This version does not index the mission files.
 - `KnowledgeMap.ini`: a text of the game then does not reveal the item on the navigation map.
 - A mod that loads later and changes the section. Its patch cannot find the section after the rename.
 - A zone nickname that gets or loses the word `Tradelane` or `vignette` (letter case counts). Retail makes a zone with `Tradelane` a trade lane zone when its shape fits, and a zone with `vignette` lawful.
@@ -924,9 +924,9 @@ The Inspector page of an object starts with its components, as Unity shows the c
 | Dockable station | `dock_with` | the base picker, only for an archetype with a docking sphere | removes `dock_with` |
 | Base object | `base` | the base picker | removes `base` |
 | Faction member | `reputation` | the faction picker | removes `reputation` |
-| Jump connection | `goto` | milestone M27 | refused until milestone M27 |
-| Trade lane ring | `prev_ring`, `next_ring`, `tradelane_space_name` | milestone M27 | refused until milestone M27 |
-| Planet ring | `ring` | milestone M26 | removes `ring` |
+| Jump connection | `goto` | not in this version | refused in this version |
+| Trade lane ring | `prev_ring`, `next_ring`, `tradelane_space_name` | not in this version | refused in this version |
+| Planet ring | `ring` | not in this version | removes `ring` |
 
 A click on a chip opens the section of the page with its keys. A chip with a glyph has a problem, and its tooltip tells it. "Add component" offers the components that the object does not have. A right click on a chip offers "Remove component". Each add and each remove is one entry of the edit history.
 
@@ -941,7 +941,7 @@ These component checks give warnings, until a retail comparison proves an effect
 
 The pages of an object, a zone, a nebula and a field have a "Used by" section. It lists each line that names the item, from the data lists of the edit view with the unsaved edits. A button selects the item of the line, or its section.
 
-The page of an object has a "Behaviors" section. It shows the pilot, the behavior, the difficulty and the reputation of the object. It also shows the encounters of the zones that hold its position, and the files that name it as text. It is read-only, except the rows of its keys. Milestone M29 adds the cutscene scripts and the mission triggers.
+The page of an object has a "Behaviors" section. It shows the pilot, the behavior, the difficulty and the reputation of the object. It also shows the encounters of the zones that hold its position, and the files that name it as text. It is read-only, except the rows of its keys. This version does not show the cutscene scripts and the mission triggers that name the object.
 
 The Hierarchy marks a row whose section the active mod changes with a blue bar at its left, as Unity marks a prefab override. A row whose section the active mod adds also gets a `+`.
 
@@ -961,7 +961,7 @@ The Assets panel is the first tab of the bottom group, as the Unity Project wind
 | Factions | the `[Group]` sections of `initialworld.ini` | On an object only |
 | Models | the `.cmp`, `.3db` and `.sph` files below `DATA`, by top folder | Placed as a static prop when a solar archetype, a ship or an asteroid uses the model |
 
-The rule data gives the categories. A solar archetype whose type is in no template shows in "Other solar" with a lock: it does not spawn. Jump gates, jump holes, airlock gates and trade lane rings show with a lock until milestone M27.
+The rule data gives the categories. A solar archetype whose type is in no template shows in "Other solar" with a lock: it does not spawn. Jump gates, jump holes, airlock gates and trade lane rings show with a lock, because this version cannot make them.
 
 The toolbar has the search field (`Ctrl+F`), the path of the category, and the size slider. The smallest size shows a list. The search finds the name, the nickname, the type and the model file, without letter case. "All assets" searches each category. A tile shows a "+" when the active mod adds the item, and a blue bar when it changes it. A ship, an asteroid or a model shows a "prop" badge when a solar archetype uses its model. The hover tooltip shows a larger image, the layer, the model file, and the number of lines that name the entry.
 
@@ -1026,9 +1026,9 @@ The `file` key of a `[Nebula]` and of an `[Asteroids]` section uses the list of 
 
 The `zone` key uses the list of the zones of the system file. A zone that the system does not have is an error: the game drops the nebula or the field. A section without a `file` line is an error of a section that the active mod changes: the game drops the item.
 
-The Inspector page of a nebula or a field shows the zone and the file with its picker. It also shows the area of the zone, the holes and the sections of the file. The sections of a nebula or asteroid file are read-only until a later milestone. The Scene shows another file when you open the system again after the save.
+The Inspector page of a nebula or a field shows the zone and the file with its picker. It also shows the area of the zone, the holes and the sections of the file. The sections of a nebula or asteroid file are read-only in this version. The Scene shows another file when you open the system again after the save.
 
-The editor reads some files only for the lists, for example `solararch.ini` and `loadouts.ini`. Their sections are read-only in the Inspector until a later milestone gives them their pages.
+The editor reads some files only for the lists, for example `solararch.ini` and `loadouts.ini`. Their sections are read-only in the Inspector, because this version has no pages for them.
 
 The Assets panel uses two more lists. The `asteroid` list holds the `[Asteroid]` sections of the files of `[Data] asteroids`. The `model` list holds the `.cmp`, `.3db` and `.sph` files below `DATA`. A list field also takes a tile of the Assets panel (see "The Assets panel").
 
@@ -1243,7 +1243,7 @@ When the deploy folder path has characters outside ASCII, lancer.exe reads the p
 
 ## Export
 
-The export makes the packages that players install (milestone M11). It merges one mod on the files of a target game, checks the result and writes the packages. The internal patch format stays the working format of the editor. Open the export in the editor with **Mod > Export mod...** or with **Export...** of the Mods window, or run `oltool export`.
+The export makes the packages that players install. It merges one mod on the files of a target game, checks the result and writes the packages. The internal patch format stays the working format of the editor. Open the export in the editor with **Mod > Export mod...** or with **Export...** of the Mods window, or run `oltool export`.
 
 The Export dialog reads the mod from its folder when it opens, so it uses the applied display name, version and targets. It shows the display name with **Change...**, which opens the Mods window at that field, and the publish checklist. It writes into the version folder of the output folder, and it tells that folder. After the export, it records the packages in the publish history, and it tells the next step: the upload to Nexus and the mark "published". When the Mods window has unapplied publish settings of the mod, the export asks to apply them first.
 
@@ -1411,4 +1411,4 @@ Librelancer loads some data that the retail game does not accept or does not rea
 
 The crash checks follow the crash list of The Starport knowledge base. The retail data itself has two such cases, which the game uses only in scripted scenes. A cutscene missile has no `lootprops.ini` entries, and some capital ships of the story missions have no engine. These cases give no finding, because the checks report only what the mods add.
 
-The checks of models and textures need the model readers of a later milestone. Examples are collision parts with too many triangles, texture sizes and cutscene animations that a model does not have.
+This version does not check models and textures. Examples of such checks are collision parts with too many triangles, texture sizes and cutscene animations that a model does not have.

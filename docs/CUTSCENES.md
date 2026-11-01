@@ -7,7 +7,7 @@ Without an active mod, the editor shows each cutscene and takes no edits. So you
 This version has these limits:
 
 - The preview plays the sounds of the open script in 2D only. It does not play the position of a sound, START_AUDIO_PROP_ANIM, or the sounds of the other scripts of a room.
-- A new cutscene plays only in OpenLancer until the M11 check that the retail engine reads text cutscenes.
+- A new cutscene is a text file. Nobody checked a new cutscene in the retail games yet, so the editor marks it "not checked in the retail games".
 - The editor cannot change a whole cutscene file of a mod into a patch.
 - The validation reports only the errors that stop a cutscene. It does not report warnings, for example an event after the end of the script.
 - The save gate checks a cutscene without the game data. So it does not find a template or a costume that does not exist.
@@ -178,7 +178,7 @@ The Inspector shows the selected entity or event, the selected events, or the cu
 - A new **name** renames the entity, the targets of the events that name it and the `userprops.speaker` values that name it, in this file. When other data uses the name, a dialog lists the uses first and offers **Rename in this file** or **Cancel**: the `[Camera]`, `[CharacterPlacement]`, `[PlayerShipPlacement]` and `[ForSaleShipPlacement]` names of the rooms whose set or scene script is this file, the `[MRoom] fixture` spots of those rooms, and the REFERENCE entities with the name in the other scripts of those rooms. A rename never changes other files.
 - Two or more selected events show "N events selected", a time shift and **Delete the events**.
 - A SOUND entity has the row **Preview**. Play plays the sound of its template once from its start, in 2D, with the voice rule of the preview. Stop stops it.
-- The cutscene page has the section **Problems** when the script has errors that the lower cutscene does not have. The game crashes when it plays such a script, so these errors stop Save and Play. A click on an error selects its element. The state of a new cutscene says "OpenLancer only until the M11 check".
+- The cutscene page has the section **Problems** when the script has errors that the lower cutscene does not have. The game crashes when it plays such a script, so these errors stop Save and Play. A click on an error selects its element. The state of a new cutscene says "not checked in the retail games".
 
 ### The animation of a character
 
