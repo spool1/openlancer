@@ -47,7 +47,7 @@ internal static class EditorKeys
         "Redo the last edit that you undid.");
 
     public static readonly EditorKey PlayInGame = new(new KeyChord(ImGuiKey.F5, Ctrl: true),
-        "Play the mods in the linked game of the last play.");
+        "Play the mods in the linked game of the last play, or in the first linked game.");
 
     public static readonly EditorKey Play = new(new KeyChord(ImGuiKey.F5),
         "Play from the Scene camera in OpenLancer. In the Mission tab, play the open mission from its play start.");

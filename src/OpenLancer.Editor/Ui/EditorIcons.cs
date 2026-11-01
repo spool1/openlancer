@@ -154,4 +154,9 @@ internal static class EditorIcons
     public const char CodeBranch = '\uf126';
     public const char Comments = '\uf086';
     public const char ProjectDiagram = '\uf542';
+
+    // The Help menu.
+    public const char Book = '\uf02d';
+    public const char Keyboard = '\uf11c';
+    public const char Bug = '\uf188';
 }

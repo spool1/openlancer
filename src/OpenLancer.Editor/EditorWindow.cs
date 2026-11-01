@@ -27,6 +27,7 @@ using OpenLancer.Editor.Database;
 using OpenLancer.Editor.Dialogs;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Games;
+using OpenLancer.Editor.Help;
 using OpenLancer.Editor.Hierarchy;
 using OpenLancer.Editor.Inspector;
 using OpenLancer.Editor.Logs;
@@ -78,6 +79,7 @@ internal sealed partial class EditorWindow : Game
     private MissionBench? missionBench;
     private AgentRenderBench? agentBench;
     private readonly PlayMenu playMenu;
+    private readonly HelpMenu helpMenu;
 
     // The base run of the Console: the engine lines of the base folder without mods (decision D516 of the console
     // filter design).
@@ -120,13 +122,14 @@ internal sealed partial class EditorWindow : Game
         GamePlay = new GamePlay(this, GameProcess.Starter(this), DllStringResourceWriter.Instance, ThornEvaluator.Instance,
             () => playClock.Elapsed);
         playMenu = new PlayMenu(this);
+        helpMenu = new HelpMenu(this);
         Mods = new ModsWindow(this);
         MakeAgent();
         // A test play changes the publish checklist of its mods.
         GamePlay.PlaysRecorded += Mods.Refresh;
         // The window gets this title when it is made. The shaders compile before the first frame, and the window
         // must not show the engine name during that time.
-        Title = AppTitle;
+        Title = TitleText(BuildInfo.Version, null, null, false, null, null);
     }
 
     public EditorSession? Session { get; private set; }
@@ -898,23 +901,37 @@ internal sealed partial class EditorWindow : Game
         centerSelections.Park(mode, item);
     }
 
-    /// <summary>
-    /// "OpenLancer Editor - sample [proof]* - New York (Li01)", without the parts that are not open. The brackets name
-    /// the active mod, and the star shows unsaved edits.
-    /// </summary>
+    /// <summary>The title of the window for the open profile and system (see <see cref="TitleText"/>).</summary>
     private string WindowTitle()
     {
-        var title = AppTitle;
-        if (Session != null)
+        var system = Scene.System;
+        return TitleText(BuildInfo.Version, Session?.Profile.Name, Session?.Edits.ActiveMod?.Id,
+            Session?.Edits.IsDirty == true, system == null ? null : Session?.ItemName(system), system?.Nickname);
+    }
+
+    /// <summary>
+    /// "OpenLancer Editor 1.0.0-dev - sample [proof]* - New York (Li01)", without the parts that are not open. The
+    /// version tells a tester which build shows a problem. The brackets name the active mod, or "read-only" without one,
+    /// and the star shows unsaved edits.
+    /// </summary>
+    /// <param name="version">The version of the editor, without the commit.</param>
+    /// <param name="profile">The name of the open profile, or null.</param>
+    /// <param name="mod">The id of the active mod, or null.</param>
+    /// <param name="dirty">True when the profile has unsaved edits.</param>
+    /// <param name="systemName">The name of the open system, or null when it has none.</param>
+    /// <param name="system">The nickname of the open system, or null.</param>
+    internal static string TitleText(string version, string? profile, string? mod, bool dirty, string? systemName,
+        string? system)
+    {
+        var title = $"{AppTitle} {version}";
+        if (profile != null)
         {
-            var mod = Session.Edits.ActiveMod?.Id ?? "read-only";
-            title += $" - {Session.Profile.Name} [{mod}]{(Session.Edits.IsDirty ? "*" : "")}";
+            title += $" - {profile} [{mod ?? "read-only"}]{(dirty ? "*" : "")}";
         }
 
-        if (Scene.System is { } system)
+        if (system != null)
         {
-            var name = Session?.ItemName(system);
-            title += string.IsNullOrEmpty(name) ? $" - {system.Nickname}" : $" - {name} ({system.Nickname})";
+            title += string.IsNullOrEmpty(systemName) ? $" - {system}" : $" - {systemName} ({system})";
         }
 
         return title;
@@ -957,6 +974,13 @@ internal sealed partial class EditorWindow : Game
         if (ImGui.BeginMenu("View"))
         {
             ViewMenu();
+            ImGui.EndMenu();
+        }
+
+        // Help is the last menu, as in Unity.
+        if (ImGui.BeginMenu("Help"))
+        {
+            helpMenu.Menu();
             ImGui.EndMenu();
         }
 

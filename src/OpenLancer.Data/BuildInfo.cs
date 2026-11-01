@@ -14,7 +14,9 @@ public static class BuildInfo
     /// from the property <c>OpenLancerEngineCommit</c>, or else from the engine submodule.</summary>
     internal const string EngineCommitKey = "EngineCommit";
 
-    private static readonly BuildVersion Current = Read(typeof(BuildInfo).Assembly);
+    /// <summary>All the version facts of this build in one value, for a view that shows several of them, for example
+    /// Help &gt; About.</summary>
+    public static BuildVersion Current { get; } = Read(typeof(BuildInfo).Assembly);
 
     /// <summary>The full informational version, for example <c>1.0.0-dev+&lt;commit&gt;</c>. It has the commit when the
     /// build has it.</summary>
@@ -57,7 +59,7 @@ public static class BuildInfo
 }
 
 /// <summary>The version facts of one build. <see cref="BuildInfo"/> gives the facts of this build.</summary>
-internal sealed record BuildVersion(string Informational, string Version, string? Commit, string? EngineCommit,
+public sealed record BuildVersion(string Informational, string Version, string? Commit, string? EngineCommit,
     bool IsDevelopment)
 {
     /// <summary>The git reference of the help pages: the tag <c>v&lt;version&gt;</c> of a build that is not a

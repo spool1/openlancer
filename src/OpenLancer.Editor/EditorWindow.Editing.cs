@@ -524,13 +524,15 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         SceneEdits.Draw();
         closeDialog.Draw();
         agentMenu.Draw();
+        helpMenu.Draw();
     }
 
     /// <summary>True while a dialog of the editor is open. The close of the window that waits for the load of the game
     /// data counts as a dialog, also when another popup hid its dialog.</summary>
     internal bool DialogOpen => Choice.IsOpen || newModDialog.IsOpen || newProfileDialog.IsOpen || Missions.DialogOpen ||
                                 templateDialog.IsOpen || SceneEdits.IsOpen || closeDialog.IsOpen || closePrompt.Waits ||
-                                exportDialog?.IsOpen == true || Mods.DialogOpen || agentMenu.DialogOpen;
+                                exportDialog?.IsOpen == true || Mods.DialogOpen || agentMenu.DialogOpen ||
+                                helpMenu.DialogOpen;
 
     /// <summary>
     /// The keys of the editor. Ctrl+S (File > Save) also works while a text field has the keyboard or a field edit is

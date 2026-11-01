@@ -53,6 +53,30 @@ internal static class FolderActions
         }
     }
 
+    /// <summary>Opens a text file in the program that the system gives to text files, for example Notepad. Only a
+    /// <c>.txt</c> file that exists opens (see <see cref="IsTextFile"/>).</summary>
+    public static void OpenTextFile(EditorWindow window, string path)
+    {
+        if (!IsTextFile(path))
+        {
+            return;
+        }
+
+        try
+        {
+            Shell.OpenCommand(path);
+        }
+        catch (Exception e) when (e is Win32Exception or InvalidOperationException)
+        {
+            window.Log.Add(ConsoleSeverity.Error, GameLinks.Source, $"The file {path} did not open: {e.Message}");
+        }
+    }
+
+    /// <summary>True for a <c>.txt</c> file that exists. The system would start a program for another file, so
+    /// <see cref="OpenTextFile"/> opens only such a file.</summary>
+    internal static bool IsTextFile(string path) =>
+        Path.GetExtension(path).Equals(".txt", StringComparison.OrdinalIgnoreCase) && File.Exists(path);
+
     /// <summary>Opens a web link in the browser. Only a link that starts with <c>http://</c> or <c>https://</c> opens,
     /// because the system would start a program for another text.</summary>
     public static void OpenWebLink(EditorWindow window, string url)
