@@ -71,9 +71,9 @@ internal sealed class SceneView : IDisposable
         grid = new GridRenderer(window.RenderContext);
     }
 
-    /// <summary>The mouse and keyboard controls of the view and the gizmo, for the help popover and the status
-    /// bar.</summary>
-    public static readonly (string Input, string Action)[] Controls =
+    /// <summary>The mouse controls of the view with the keys of the fly mode, for the help popover, the status bar and
+    /// Help &gt; Keys.</summary>
+    public static readonly (string Input, string Action)[] MouseControls =
     [
         ("Right mouse drag", "Look around"),
         ("W A S D, Q and E", "Fly, while the right mouse button is down"),
@@ -86,6 +86,13 @@ internal sealed class SceneView : IDisposable
         ("Click again at the same place", "Select the next item under the mouse"),
         ("Alt + click", "Select the next item under the mouse"),
         ("Click an axis end", "Look along the axis"),
+    ];
+
+    /// <summary>The mouse and keyboard controls of the view and the gizmo, for the help popover and the status
+    /// bar.</summary>
+    public static readonly (string Input, string Action)[] Controls =
+    [
+        .. MouseControls,
         ("F", "Focus on the selection"),
         ("W, E and R", "Move, rotate or scale tool of the gizmo, when the selected item takes it"),
         ("X", "Local or World axes of a move or a turn. A scale always uses Local"),

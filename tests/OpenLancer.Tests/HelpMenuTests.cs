@@ -202,6 +202,10 @@ public sealed class HelpMenuTests : IDisposable
             Assert.Single(rows, r => r.Group == KeysWindow.Scene && r.Keys == KeyChord.KeyName(key) &&
                                      r.Action.Contains(tool.ToString(), StringComparison.OrdinalIgnoreCase));
         Assert.Single(rows, r => r.Group == KeysWindow.Scene && r.Keys == KeyChord.KeyName(GizmoInput.SpaceKey));
+        foreach (var (input, action) in SceneView.MouseControls)
+            Assert.Contains(new KeyRow(KeysWindow.SceneMouse, input, action + "."), rows);
+        foreach (var key in EditorKeys.Hierarchy)
+            Assert.Contains(new KeyRow(KeysWindow.Hierarchy, key.Chord.Text, key.Action), rows);
         foreach (var command in Enum.GetValues<PreviewKey>().Where(k => k != PreviewKey.None))
         {
             var (_, chord, action) = PreviewKeys.Table.Single(r => r.Command == command);
@@ -209,20 +213,38 @@ public sealed class HelpMenuTests : IDisposable
         }
 
         Assert.Equal(EditorKeys.Global.Length + EditorKeys.Scene.Length + GizmoInput.ToolKeys.Length + 1 +
-                     PreviewKeys.Table.Length, rows.Count);
+                     SceneView.MouseControls.Length + EditorKeys.Hierarchy.Length + PreviewKeys.Table.Length,
+            rows.Count);
+        Assert.Equal([KeysWindow.Global, KeysWindow.Scene, KeysWindow.SceneMouse, KeysWindow.Hierarchy, KeysWindow.Preview],
+            rows.Select(r => r.Group).Distinct());
     }
 
     [Fact]
-    public void TheKeysWindowShowsTheGlobalAndTheSceneKeysOfTheIssue()
+    public void TheKeysWindowShowsTheKeysOfTheEditorTheSceneTheHierarchyAndThePreview()
     {
         string[] expected =
         [
             "Ctrl+S", "Ctrl+Z", "Ctrl+Y", "Ctrl+Shift+Z", "F5", "Ctrl+F5", "Shift+F5", "F2", "Ctrl+D", "Delete", "F", "W",
-            "E", "R", "X", "Esc", "Space", "Home", "End", "Left arrow", "Right arrow", "Shift+Left arrow",
-            "Shift+Right arrow",
+            "E", "R", "X", "Esc", "Up arrow", "Down arrow", "Enter", "Ctrl+C", "Space", "Home", "End", "Left arrow",
+            "Right arrow", "Shift+Left arrow", "Shift+Right arrow",
         ];
 
-        Assert.Equal(expected.Order(), KeysWindow.Rows.Select(r => r.Keys).Order());
+        Assert.Equal(expected.Order(),
+            KeysWindow.Rows.Where(r => r.Group != KeysWindow.SceneMouse).Select(r => r.Keys).Order());
+    }
+
+    /// <summary>The Keys window shows the mouse controls and the fly keys of the Scene camera, as the help popover of
+    /// the Scene does.</summary>
+    [Fact]
+    public void TheKeysWindowShowsTheCameraControlsOfTheScene()
+    {
+        var mouse = KeysWindow.Rows.Where(r => r.Group == KeysWindow.SceneMouse).ToList();
+
+        Assert.Contains(mouse, r => r.Keys == "Right mouse drag");
+        Assert.Contains(mouse, r => r.Keys == "W A S D, Q and E" && r.Action.Contains("right mouse button"));
+        Assert.Contains(mouse, r => r.Keys == "Alt + left mouse drag");
+        Assert.Contains(mouse, r => r.Keys == "Middle mouse drag");
+        Assert.All(SceneView.MouseControls, c => Assert.Contains(c, SceneView.Controls));
     }
 
     /// <summary>Each paragraph of a text file, with its white space merged to single spaces.</summary>

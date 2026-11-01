@@ -9,8 +9,8 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// Reads the IL of the methods of a type. It gives the calls (<c>call</c>, <c>callvirt</c>, <c>newobj</c>,
-/// <c>ldftn</c> and <c>ldvirtftn</c>), the string literals (<c>ldstr</c>) and the field loads (<c>ldfld</c>,
-/// <c>ldsfld</c> and their address forms). The reader resolves each member with the
+/// <c>ldftn</c> and <c>ldvirtftn</c>), the string literals (<c>ldstr</c>), the field loads (<c>ldfld</c>,
+/// <c>ldsfld</c> and their address forms) and each instruction of a method. The reader resolves each member with the
 /// generic arguments of the type and of the method. A compiler-generated nested type, for example the class of a lambda
 /// or a state machine, counts as the type that holds it. A local function is a method of its type.
 /// </summary>
@@ -27,6 +27,15 @@ internal static class IlWalker
     /// <summary>A load of a field or of its address: the type that holds it, the method that loads it and the
     /// field.</summary>
     public sealed record FieldLoad(Type Owner, MethodBase Method, FieldInfo Field);
+
+    /// <summary>An instruction: its opcode and its operand as a number. The operand of an instruction without an
+    /// operand, of a switch and of a floating-point constant is 0. A token is the operand of a member or a
+    /// string.</summary>
+    public readonly record struct Instruction(OpCode Op, long Operand);
+
+    /// <summary>A call whose first argument is a constant integer: the type that holds it, the method that makes it,
+    /// the method that it calls and the constant. An enum value, for example a key, is such a constant.</summary>
+    public sealed record ConstantArgument(Type Owner, MethodBase Caller, MethodBase Callee, long Value);
 
     private static readonly OpCode[] OneByte = new OpCode[0x100];
     private static readonly OpCode[] TwoByte = new OpCode[0x100];
@@ -105,6 +114,53 @@ internal static class IlWalker
         }
     }
 
+    /// <summary>
+    /// The calls of each method and constructor of a type, without its nested types, whose first argument is a constant
+    /// integer. The reader finds the first argument only when each later argument is one instruction that loads one
+    /// value, for example a constant, a local or a parameter. It skips the other calls.
+    /// </summary>
+    public static IEnumerable<ConstantArgument> ConstantFirstArguments(Type type)
+    {
+        var owner = OwnerOf(type);
+        foreach (var method in MethodsOf(type))
+        {
+            var typeArguments = method.DeclaringType is { IsGenericType: true } generic
+                ? generic.GetGenericArguments()
+                : null;
+            var methodArguments = method.IsGenericMethod ? method.GetGenericArguments() : null;
+            var code = Instructions(method).ToList();
+            for (var at = 0; at < code.Count; at++)
+            {
+                if (code[at].Op != OpCodes.Call && code[at].Op != OpCodes.Callvirt ||
+                    method.Module.ResolveMember((int)code[at].Operand, typeArguments, methodArguments) is not MethodBase
+                        callee)
+                    continue;
+                var count = callee.GetParameters().Length;
+                var first = at - count;
+                if (count == 0 || first < 0 || !code.Skip(first + 1).Take(count - 1).All(i => LoadsOneValue(i.Op)))
+                    continue;
+                if (ConstantOf(code[first]) is { } value)
+                    yield return new ConstantArgument(owner, method, callee, value);
+            }
+        }
+    }
+
+    /// <summary>True for an instruction that loads one value and takes none from the stack.</summary>
+    private static bool LoadsOneValue(OpCode op) =>
+        op.Name is { } name && (name.StartsWith("ldc.", StringComparison.Ordinal) ||
+                                name.StartsWith("ldloc", StringComparison.Ordinal) ||
+                                name.StartsWith("ldarg", StringComparison.Ordinal) ||
+                                name is "ldnull" or "ldstr" or "ldsfld" or "ldsflda");
+
+    /// <summary>The integer that an instruction loads, or null when it loads no integer constant.</summary>
+    private static long? ConstantOf(Instruction instruction) => instruction.Op.Name switch
+    {
+        "ldc.i4.m1" => -1,
+        "ldc.i4.s" or "ldc.i4" or "ldc.i8" => instruction.Operand,
+        { } name when name.StartsWith("ldc.i4.", StringComparison.Ordinal) => name[^1] - '0',
+        _ => null,
+    };
+
     /// <summary>The type that a type counts as: the first declaring type that the compiler did not make.</summary>
     public static Type OwnerOf(Type type)
     {
@@ -117,9 +173,8 @@ internal static class IlWalker
     private static IEnumerable<MethodBase> MethodsOf(Type type) =>
         type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All));
 
-    /// <summary>Each opcode of the IL of a method whose operand is the token of a method, a field or a string, with the
-    /// token.</summary>
-    private static IEnumerable<(OpCode Op, int Token)> Tokens(MethodBase method)
+    /// <summary>The instructions of the IL of a method, in their order. A method without IL has none.</summary>
+    public static IEnumerable<Instruction> Instructions(MethodBase method)
     {
         if (method.GetMethodBody()?.GetILAsByteArray() is not { } il)
             yield break;
@@ -130,11 +185,26 @@ internal static class IlWalker
             at++;
             if (op.Size == 0)
                 throw new InvalidOperationException($"{method.DeclaringType}.{method.Name}: unknown opcode at {at - 1}.");
-            if (op.OperandType is OperandType.InlineMethod or OperandType.InlineField or OperandType.InlineString)
-                yield return (op, BitConverter.ToInt32(il, at));
+            long operand = op.OperandType switch
+            {
+                OperandType.InlineNone or OperandType.InlineSwitch or OperandType.InlineR or OperandType.ShortInlineR => 0,
+                OperandType.ShortInlineI => (sbyte)il[at],
+                OperandType.ShortInlineBrTarget or OperandType.ShortInlineVar => il[at],
+                OperandType.InlineVar => BitConverter.ToUInt16(il, at),
+                OperandType.InlineI8 => BitConverter.ToInt64(il, at),
+                _ => BitConverter.ToInt32(il, at),
+            };
+            yield return new Instruction(op, operand);
             at += OperandSize(op, il, at);
         }
     }
+
+    /// <summary>Each opcode of the IL of a method whose operand is the token of a method, a field or a string, with the
+    /// token.</summary>
+    private static IEnumerable<(OpCode Op, int Token)> Tokens(MethodBase method) =>
+        Instructions(method)
+            .Where(i => i.Op.OperandType is OperandType.InlineMethod or OperandType.InlineField or OperandType.InlineString)
+            .Select(i => (i.Op, (int)i.Operand));
 
     /// <summary>The size of the operand of an opcode at a place of the IL.</summary>
     private static int OperandSize(OpCode op, byte[] il, int at) => op.OperandType switch

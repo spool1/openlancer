@@ -11,25 +11,27 @@ using OpenLancer.Runtime.Scene;
 namespace OpenLancer.Editor.Help;
 
 /// <summary>One row of Help &gt; Keys.</summary>
-/// <param name="Group">The group of the row: <see cref="KeysWindow.Global"/>, <see cref="KeysWindow.Scene"/> or
-/// <see cref="KeysWindow.Preview"/>.</param>
+/// <param name="Group">The group of the row, for example <see cref="KeysWindow.Global"/>.</param>
 /// <param name="Keys">The keys, for example "Ctrl+S".</param>
 /// <param name="Action">What the keys do.</param>
 internal sealed record KeyRow(string Group, string Keys, string Action);
 
 /// <summary>
 /// Help &gt; Keys: a floating window with one table of the keys of the editor, as the Shortcuts window of Unity lists
-/// them. The rows come from the lists that the key handlers read (<see cref="EditorKeys"/>,
-/// <see cref="GizmoInput.ToolKeys"/> and <see cref="PreviewKeys.Table"/>), so the table cannot drift from the keys.
+/// them. The rows of the keys come from the lists that the key handlers read (<see cref="EditorKeys"/>,
+/// <see cref="GizmoInput.ToolKeys"/> and <see cref="PreviewKeys.Table"/>), so the table cannot drift from the keys. The
+/// rows of the mouse come from the help popover of the Scene (<see cref="SceneView.MouseControls"/>).
 /// </summary>
 internal sealed class KeysWindow
 {
     public const string Global = "Global";
     public const string Scene = "Scene";
+    public const string SceneMouse = "Scene camera and mouse";
+    public const string Hierarchy = "Hierarchy";
     public const string Preview = "Cutscene preview";
 
     private const string Title = "Keys";
-    private static readonly Vector2 DefaultSize = new(640, 560);
+    private static readonly Vector2 DefaultSize = new(680, 640);
 
     /// <summary>The note under the name of each group: where its keys work.</summary>
     private static readonly Dictionary<string, string> GroupNotes = new()
@@ -38,15 +40,19 @@ internal sealed class KeysWindow
                    "edit is open or a dialog shows.",
         [Scene] = "These keys act on the selected item of the open system. They work while the Scene or the Hierarchy " +
                   "has the focus and no text field is active. The keys of the gizmo tools work while the mouse is over " +
-                  "the Scene or the Scene has the focus.",
+                  "the Scene or the Scene has the focus. They wait while the right mouse button is down.",
+        [SceneMouse] = "These controls work while the mouse is over the Scene. While the right mouse button is down, " +
+                       "W, A, S, D, Q and E fly the camera. The Free mode of the Cutscene tab has the same camera " +
+                       "controls.",
+        [Hierarchy] = "These keys work while the Hierarchy has the focus and no text field is active.",
         [Preview] = "These keys work while the Cutscene tab or the Timeline has the focus and no text field is active.",
     };
 
     private bool open;
     private bool focus;
 
-    /// <summary>The rows of the table, in groups: the global keys, the Scene keys with the gizmo tools, and the keys of
-    /// the cutscene preview.</summary>
+    /// <summary>The rows of the table, in groups: the global keys, the Scene keys with the gizmo tools, the mouse
+    /// controls of the Scene, the Hierarchy keys and the keys of the cutscene preview.</summary>
     public static IReadOnlyList<KeyRow> Rows { get; } = MakeRows();
 
     /// <summary>Shows the window and gives it the focus.</summary>
@@ -94,13 +100,13 @@ internal sealed class KeysWindow
             return;
         }
 
-        ImGui.TableSetupColumn("Keys", ImGuiTableColumnFlags.WidthFixed, 130 * ImGuiHelper.Scale);
+        ImGui.TableSetupColumn("Keys", ImGuiTableColumnFlags.WidthFixed, 190 * ImGuiHelper.Scale);
         ImGui.TableSetupColumn("Action", ImGuiTableColumnFlags.WidthStretch);
         foreach (var row in rows)
         {
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
-            ImGui.Text(row.Keys);
+            ImGui.TextWrapped(row.Keys);
             ImGui.TableNextColumn();
             ImGui.TextWrapped(row.Action);
         }
@@ -118,6 +124,8 @@ internal sealed class KeysWindow
             new KeyRow(Scene, KeyChord.KeyName(t.Key), $"Select the {ToolName(t.Tool)} tool of the gizmo.")));
         rows.Add(new KeyRow(Scene, KeyChord.KeyName(GizmoInput.SpaceKey),
             "Change the gizmo between Local and World. The scale tool always uses Local."));
+        rows.AddRange(SceneView.MouseControls.Select(c => new KeyRow(SceneMouse, c.Input, c.Action + ".")));
+        rows.AddRange(EditorKeys.Hierarchy.Select(k => new KeyRow(Hierarchy, k.Chord.Text, k.Action)));
         rows.AddRange(PreviewKeys.Table.Select(k => new KeyRow(Preview, k.Chord.Text, k.Action)));
         return rows;
     }

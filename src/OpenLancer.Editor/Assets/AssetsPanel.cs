@@ -462,7 +462,7 @@ internal sealed class AssetsPanel : IDisposable
         if (ImGui.MenuItem($"{EditorIcons.Pen}   Rename file...", "", false, reason == null))
             RenamePrefab(row, file: true);
         ImGui.SetItemTooltip(reason ?? $"Change the file name of the prefab. {Data.Missions.Prefabs.PrefabAsset.FileNameRule}");
-        if (ImGui.MenuItem($"{EditorIcons.TrashAlt}   Delete", "Del", false, reason == null))
+        if (ImGui.MenuItem($"{EditorIcons.TrashAlt}   Delete", "Delete", false, reason == null))
             DeletePrefab(row);
         ImGui.SetItemTooltip(reason ?? "Delete the prefab file. Its instances keep their lines and show the warning P02.");
         ImGui.Separator();
@@ -659,7 +659,7 @@ internal sealed class AssetsPanel : IDisposable
             window.SceneEdits.RenameGroup(group);
         if (groupReason != null)
             ImGui.SetItemTooltip(groupReason);
-        if (ImGui.MenuItem($"{EditorIcons.TrashAlt}   Delete", "Del", false, groupReason == null))
+        if (ImGui.MenuItem($"{EditorIcons.TrashAlt}   Delete", "Delete", false, groupReason == null))
             window.SceneEdits.DeleteGroup(group);
         if (groupReason != null)
             ImGui.SetItemTooltip(groupReason);

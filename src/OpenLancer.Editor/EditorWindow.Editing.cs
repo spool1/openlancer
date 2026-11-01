@@ -214,13 +214,15 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         var session = Session;
         var edits = session?.Edits;
         var idle = !IsEditing;
-        if (ImGui.MenuItem($"{EditorIcons.Undo}   {(edits?.UndoLabel is { } undo ? $"Undo {undo}" : "Undo")}", "Ctrl+Z",
+        if (ImGui.MenuItem($"{EditorIcons.Undo}   {(edits?.UndoLabel is { } undo ? $"Undo {undo}" : "Undo")}",
+                EditorKeys.Undo.Chord.Text,
                 false, edits is { CanUndo: true } && idle))
         {
             Edits.Undo();
         }
 
-        if (ImGui.MenuItem($"{EditorIcons.Redo}   {(edits?.RedoLabel is { } redo ? $"Redo {redo}" : "Redo")}", "Ctrl+Y",
+        if (ImGui.MenuItem($"{EditorIcons.Redo}   {(edits?.RedoLabel is { } redo ? $"Redo {redo}" : "Redo")}",
+                EditorKeys.Redo.Chord.Text,
                 false, edits is { CanRedo: true } && idle))
         {
             Edits.Redo();
@@ -259,7 +261,7 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
     private void SaveMenuItem()
     {
         var session = Session;
-        if (ImGui.MenuItem($"{EditorIcons.Save}   Save", "Ctrl+S", false, session != null))
+        if (ImGui.MenuItem($"{EditorIcons.Save}   Save", EditorKeys.Save.Chord.Text, false, session != null))
         {
             SaveCommand.Run(this);
         }

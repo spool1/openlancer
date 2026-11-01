@@ -29,10 +29,11 @@ internal readonly record struct KeyChord(ImGuiKey Key, bool Ctrl = false, bool S
 internal sealed record EditorKey(KeyChord Chord, string Action);
 
 /// <summary>
-/// The global keys and the Scene keys of the editor. The key handlers read their chords here, and Help &gt; Keys shows
-/// the same list. So the Keys window cannot show a key that the editor does not use. The keys of the gizmo tools are in
-/// <see cref="OpenLancer.Editor.Scene.GizmoInput"/>, and the keys of the cutscene preview are in
-/// <see cref="OpenLancer.Editor.Cutscene.PreviewKeys"/>.
+/// The global keys, the Scene keys and the Hierarchy keys of the editor. The key handlers read their chords here, and
+/// Help &gt; Keys shows the same lists. So the Keys window cannot show a key that the editor does not use. The keys of
+/// the gizmo tools are in <see cref="OpenLancer.Editor.Scene.GizmoInput"/>, and the keys of the cutscene preview are in
+/// <see cref="OpenLancer.Editor.Cutscene.PreviewKeys"/>. The mouse controls of the Scene are in
+/// <see cref="OpenLancer.Editor.Scene.SceneView.MouseControls"/>.
 /// </summary>
 internal static class EditorKeys
 {
@@ -67,6 +68,18 @@ internal static class EditorKeys
         "Cancel the drag of the gizmo. The item goes back to where it was before the drag. The right mouse button also " +
         "cancels the drag.");
 
+    public static readonly EditorKey SelectAbove = new(new KeyChord(ImGuiKey.UpArrow),
+        "Select the item in the row above the selected row.");
+
+    public static readonly EditorKey SelectBelow = new(new KeyChord(ImGuiKey.DownArrow),
+        "Select the item in the row below the selected row.");
+
+    public static readonly EditorKey FrameFromHierarchy = new(new KeyChord(ImGuiKey.Enter),
+        "Frame the selected item, as F does.");
+
+    public static readonly EditorKey CopyName = new(new KeyChord(ImGuiKey.C, Ctrl: true),
+        "Copy the nickname of the selected item. For a cutscene file, copy its path.");
+
     /// <summary>The keys that work in each panel. Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z and the F5 keys wait while a text field
     /// is active, a field edit is open or a dialog shows.</summary>
     public static readonly EditorKey[] Global = [Save, Undo, Redo, RedoShift, Play, PlayInGame, Stop];
@@ -74,4 +87,8 @@ internal static class EditorKeys
     /// <summary>The keys of the selected item of the open system. They work while the Scene or the Hierarchy has the
     /// focus and no text field is active.</summary>
     public static readonly EditorKey[] Scene = [Rename, Duplicate, Delete, Frame, CancelDrag];
+
+    /// <summary>The keys of the rows of the Hierarchy. They work while the Hierarchy has the focus and no text field is
+    /// active.</summary>
+    public static readonly EditorKey[] Hierarchy = [SelectAbove, SelectBelow, FrameFromHierarchy, CopyName];
 }

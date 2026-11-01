@@ -4,6 +4,10 @@ using System.Reflection;
 using ImGuiNET;
 using OpenLancer.Editor;
 using OpenLancer.Editor.Cutscene;
+using OpenLancer.Editor.Editing;
+using OpenLancer.Editor.Hierarchy;
+using OpenLancer.Editor.Play;
+using OpenLancer.Editor.Scene;
 using OpenLancer.Editor.Ui;
 using Xunit;
 
@@ -33,6 +37,10 @@ public sealed class EditorKeysTests
         { nameof(EditorKeys.Delete), (int)ImGuiKey.Delete },
         { nameof(EditorKeys.Frame), (int)ImGuiKey.F },
         { nameof(EditorKeys.CancelDrag), (int)ImGuiKey.Escape },
+        { nameof(EditorKeys.SelectAbove), (int)ImGuiKey.UpArrow },
+        { nameof(EditorKeys.SelectBelow), (int)ImGuiKey.DownArrow },
+        { nameof(EditorKeys.FrameFromHierarchy), (int)ImGuiKey.Enter },
+        { nameof(EditorKeys.CopyName), (int)(Ctrl | ImGuiKey.C) },
     };
 
     [Theory]
@@ -48,7 +56,8 @@ public sealed class EditorKeysTests
         var keys = KeyFields().Select(f => (EditorKey)f.GetValue(null)!).ToList();
 
         Assert.Equal(Chords.Count, keys.Count);
-        Assert.Equal(keys.OrderBy(k => k.Chord.Text), EditorKeys.Global.Concat(EditorKeys.Scene).OrderBy(k => k.Chord.Text));
+        Assert.Equal(keys.OrderBy(k => k.Chord.Text),
+            EditorKeys.Global.Concat(EditorKeys.Scene).Concat(EditorKeys.Hierarchy).OrderBy(k => k.Chord.Text));
         Assert.Equal(keys.Count, keys.Select(k => k.Chord).Distinct().Count());
         Assert.All(keys, k => Assert.EndsWith(".", k.Action));
     }
@@ -79,6 +88,60 @@ public sealed class EditorKeysTests
         var unread = KeyFields().Where(f => !readers.Contains(f)).Select(f => f.Name).ToList();
 
         Assert.True(unread.Count == 0, "Keys without a handler: " + string.Join(", ", unread));
+    }
+
+    /// <summary>The handlers of the keys of the lists read no key outside the lists. So the Keys window shows each key
+    /// of these handlers. A lambda of a handler counts as a part of the handler.</summary>
+    [Fact]
+    public void TheHandlersReadNoKeyOutsideTheLists()
+    {
+        (Type Type, string Method)[] handlers =
+        [
+            (typeof(EditorWindow), "Shortcuts"), (typeof(SceneEdits), "Keys"), (typeof(HierarchyPanel), "Keys"),
+            (typeof(SceneView), "Draw"), (typeof(TransformGizmo), "BeginFrame"), (typeof(TransformGizmo), "Keys"),
+        ];
+        var types = typeof(EditorWindow).Assembly.GetTypes();
+
+        foreach (var (type, name) in handlers)
+        {
+            var parts = types.Where(t => IlWalker.OwnerOf(t) == type).ToList();
+            bool InHandler(MethodBase method) => method.Name == name || method.Name.StartsWith($"<{name}>");
+
+            var queries = parts.SelectMany(IlWalker.Calls)
+                .Count(c => InHandler(c.Caller) && c.Callee is MethodInfo m && IsKeyQuery(m));
+            var literals = parts.SelectMany(IlWalker.ConstantFirstArguments)
+                .Where(a => InHandler(a.Caller) && IsKeyQuery(a.Callee))
+                .Select(a => $"{a.Caller.Name}: {a.Callee.Name}({a.Value})")
+                .ToList();
+
+            Assert.True(queries > 0, $"{type.Name}.{name} reads no key.");
+            Assert.True(literals.Count == 0, $"{type.Name}.{name} reads keys outside the lists: " +
+                                             string.Join(", ", literals));
+        }
+    }
+
+    /// <summary>The menus show the shortcut texts of the lists, so a menu and the Keys window give a key one
+    /// name.</summary>
+    [Fact]
+    public void TheMenusShowTheShortcutTextsOfTheLists()
+    {
+        Type[] menus = [typeof(EditorWindow), typeof(SceneEdits), typeof(PlayMenu)];
+        var texts = EditorKeys.Global.Concat(EditorKeys.Scene).Concat(EditorKeys.Hierarchy)
+            .Select(k => k.Chord.Text)
+            .Where(t => t.Contains('+') || t.StartsWith('F') && t.Length > 1)
+            .Append("Del")
+            .ToHashSet();
+
+        var literals = typeof(EditorWindow).Assembly.GetTypes()
+            .Where(t => menus.Contains(IlWalker.OwnerOf(t)))
+            .SelectMany(IlWalker.Literals)
+            .Where(l => texts.Contains(l.Text))
+            .Select(l => $"{l.Owner.Name}.{l.Method.Name}: {l.Text}")
+            .ToList();
+
+        Assert.Contains("Ctrl+S", texts);
+        Assert.Contains("F2", texts);
+        Assert.True(literals.Count == 0, "Shortcut texts outside the lists: " + string.Join(", ", literals));
     }
 
     [Fact]
@@ -118,6 +181,11 @@ public sealed class EditorKeysTests
         Assert.Equal(PreviewKey.PlayPause,
             PreviewKeys.Read(true, false, k => k is ImGuiKey.Space or ImGuiKey.LeftArrow, true));
     }
+
+    /// <summary>True for a method of ImGui that reads the state of a key or of a chord.</summary>
+    private static bool IsKeyQuery(MethodBase method) =>
+        method.DeclaringType == typeof(ImGui) &&
+        method.Name is "IsKeyPressed" or "IsKeyDown" or "IsKeyReleased" or "Shortcut" or "IsKeyChordPressed";
 
     private static FieldInfo[] KeyFields() => typeof(EditorKeys).GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(f => f.FieldType == typeof(EditorKey)).ToArray();

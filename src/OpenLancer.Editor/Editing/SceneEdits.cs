@@ -147,11 +147,11 @@ internal sealed class SceneEdits(EditorWindow window)
     /// its reason when it cannot run.</summary>
     public void ItemMenu(object? item)
     {
-        if (MenuItem(EditorIcons.Clone, "Duplicate", "Ctrl+D", SceneAction.Duplicate, item))
+        if (MenuItem(EditorIcons.Clone, "Duplicate", EditorKeys.Duplicate.Chord.Text, SceneAction.Duplicate, item))
             Duplicate(SectionOf(item)!);
-        if (MenuItem(EditorIcons.Pen, "Rename", "F2", SceneAction.Rename, item))
+        if (MenuItem(EditorIcons.Pen, "Rename", EditorKeys.Rename.Chord.Text, SceneAction.Rename, item))
             BeginRename(SectionOf(item)!);
-        if (MenuItem(EditorIcons.TrashAlt, "Delete", "Del", SceneAction.Delete, item))
+        if (MenuItem(EditorIcons.TrashAlt, "Delete", EditorKeys.Delete.Chord.Text, SceneAction.Delete, item))
             Delete(SectionOf(item)!);
     }
 

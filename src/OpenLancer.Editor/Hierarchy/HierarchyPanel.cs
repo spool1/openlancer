@@ -586,15 +586,15 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
 
     /// <summary>
     /// Reads the keys while the panel has the focus: Up and Down move the selection, F and Enter frame it, and Ctrl+C
-    /// copies its nickname.
+    /// copies its nickname. The chords come from <see cref="EditorKeys"/>, which Help &gt; Keys shows.
     /// </summary>
     private void Keys(HierarchyModel tree)
     {
-        if (ImGui.IsKeyPressed(ImGuiKey.DownArrow))
+        if (ImGui.IsKeyPressed(EditorKeys.SelectBelow.Chord.Key))
         {
             Move(tree, 1);
         }
-        else if (ImGui.IsKeyPressed(ImGuiKey.UpArrow))
+        else if (ImGui.IsKeyPressed(EditorKeys.SelectAbove.Chord.Key))
         {
             Move(tree, -1);
         }
@@ -604,12 +604,13 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
             return;
         }
 
-        if (ImGui.IsKeyPressed(EditorKeys.Frame.Chord.Key, false) || ImGui.IsKeyPressed(ImGuiKey.Enter, false))
+        if (ImGui.IsKeyPressed(EditorKeys.Frame.Chord.Key, false) ||
+            ImGui.IsKeyPressed(EditorKeys.FrameFromHierarchy.Chord.Key, false))
         {
             Frame(selection);
         }
 
-        if (ImGui.Shortcut((int)(ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.C)) && CopyText(tree, selection) is { } copy)
+        if (ImGui.Shortcut(EditorKeys.CopyName.Chord.Shortcut) && CopyText(tree, selection) is { } copy)
         {
             ImGui.SetClipboardText(copy);
         }

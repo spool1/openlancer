@@ -105,7 +105,7 @@ internal sealed class PlayMenu(EditorWindow window)
         var play = window.Play;
         var block = CameraBlock();
         // F5 runs one of the two items: the mission play in the Mission tab with an open mission, else this one.
-        if (ImGui.MenuItem($"{EditorIcons.Play}   Play from camera", OpenMission == null ? "F5" : "", false, block == null))
+        if (ImGui.MenuItem($"{EditorIcons.Play}   Play from camera", OpenMission == null ? EditorKeys.Play.Chord.Text : "", false, block == null))
         {
             PlayFromCamera();
         }
@@ -127,7 +127,7 @@ internal sealed class PlayMenu(EditorWindow window)
                              "The running game loads the mod files again and continues at the same place. Use it " +
                              "after a change outside the editor. A save reloads the game itself when its validation " +
                              "passes.");
-        if (ImGui.MenuItem($"{EditorIcons.Stop}   {StopLabel(ForceStop)}", "Shift+F5", false, CanStop))
+        if (ImGui.MenuItem($"{EditorIcons.Stop}   {StopLabel(ForceStop)}", EditorKeys.Stop.Chord.Text, false, CanStop))
         {
             Stop();
         }
@@ -202,7 +202,7 @@ internal sealed class PlayMenu(EditorWindow window)
             return;
         }
 
-        if (ImGui.MenuItem($"From the play start ({plays.StartNameOf(script!)})", OpenMission == script ? "F5" : ""))
+        if (ImGui.MenuItem($"From the play start ({plays.StartNameOf(script!)})", OpenMission == script ? EditorKeys.Play.Chord.Text : ""))
         {
             plays.PlayFromPlayStart(script!);
         }
@@ -296,14 +296,14 @@ internal sealed class PlayMenu(EditorWindow window)
             : null;
         if (targets.Count == 0)
         {
-            ImGui.MenuItem($"{EditorIcons.Rocket}   Play in the game", "Ctrl+F5", false, false);
+            ImGui.MenuItem($"{EditorIcons.Rocket}   Play in the game", EditorKeys.PlayInGame.Chord.Text, false, false);
             ItemTooltip.Show(GamePlay.NoTarget);
         }
 
         foreach (var target in targets)
         {
             if (ImGui.MenuItem($"{EditorIcons.Rocket}   Play in {target.Name}##{target.Root}",
-                    target == last ? "Ctrl+F5" : "", false, block == null))
+                    target == last ? EditorKeys.PlayInGame.Chord.Text : "", false, block == null))
             {
                 games.Play(target);
             }
