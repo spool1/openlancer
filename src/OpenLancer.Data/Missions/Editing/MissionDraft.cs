@@ -34,7 +34,7 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     /// <summary>The index of the command that runs now.</summary>
     public int Index { get; set; }
 
-    // The report of the batch.
+    // The report of the batch, in the order of the commands. The parts cut it into the report of each command.
     public List<string> Adds { get; } = [];
     public List<string> Changes { get; } = [];
     public List<ResultDelete> Deletes { get; } = [];
@@ -51,7 +51,39 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     /// <summary>The net row moves of the request: each line whose row changed, once, from its row before the request
     /// to its row after it (final finding 1 of MCP1-3).</summary>
     public IReadOnlyList<RowMove> RowMoves => NetRows().Moves;
+
+    /// <summary>The item that the command that runs now selects, or null. The part of the command takes it (see
+    /// <see cref="CutPart"/>).</summary>
     public string? Select { get; set; }
+
+    /// <summary>The report of each command until now, in order. The net report of the request reads them with
+    /// <see cref="EditResult.Net"/>. So an item that a command adds and a later command removes is not in the net
+    /// report, and the select follows a later rename or delete.</summary>
+    public IReadOnlyList<EditResult> Parts => parts;
+
+    private readonly List<EditResult> parts = [];
+
+    /// <summary>The counts of the report lists at the start of the part that runs now.</summary>
+    private (int Adds, int Changes, int Deletes, int Renames) partStart;
+
+    /// <summary>Ends the part that runs now and starts the next part. A part holds the adds, the changes, the deletes,
+    /// the renames and the select of one command. An inner command is a part of its own (see
+    /// <see cref="RunInner"/>).</summary>
+    private void CutPart()
+    {
+        var part = new EditResult(EditStatus.Applied)
+        {
+            Adds = Adds[partStart.Adds..],
+            Changes = Changes[partStart.Changes..],
+            Deletes = Deletes[partStart.Deletes..],
+            Renames = Renames[partStart.Renames..],
+            Select = Select,
+        };
+        if (part is not { Adds.Count: 0, Changes.Count: 0, Deletes.Count: 0, Renames.Count: 0, Select: null })
+            parts.Add(part);
+        partStart = (Adds.Count, Changes.Count, Deletes.Count, Renames.Count);
+        Select = null;
+    }
 
     /// <summary>The names that a delete or a rename of the batch takes away, by the kind of their lines. A "Missing"
     /// line that names such a name does not count in strict mode (section 4.0.5 of the M6b design).</summary>

@@ -1,19 +1,18 @@
 using System.Linq;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
-using OpenLancer.Studio.Agent;
 using Xunit;
 
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The select of the net result of a call (<see cref="EditTools.Shaped"/>, review finding of MCP1-2). The walk reads
+/// The select of the net result of a request (<see cref="EditResult.Net"/>, review finding of MCP1-2). The walk reads
 /// the parts in order. The renames and the deletes of a part apply to the select first, then the select of the part
 /// replaces it. Each test makes the parts by hand, so it shows one rule.
 /// </summary>
 public sealed class NetSelectTests
 {
-    /// <summary>A part of a call. A delete of the kind <see cref="DeleteReason.Cascade"/> names a line as its
+    /// <summary>A part of a request. A delete of the kind <see cref="DeleteReason.Cascade"/> names a line as its
     /// cause.</summary>
     private static EditResult Part(string? select = null, string[]? adds = null,
         (string From, string To)[]? renames = null, string[]? deletes = null, DeleteReason why = DeleteReason.Target) =>
@@ -27,7 +26,7 @@ public sealed class NetSelectTests
         };
 
     private static string? SelectOf(params EditResult[] parts) =>
-        EditTools.Shaped(EditResult.Merge(EditStatus.Applied, parts), parts).Select;
+        EditResult.Net(EditResult.Merge(EditStatus.Applied, parts), parts).Select;
 
     [Fact]
     public void TheSelectIsTheSelectOfTheLastPartThatHasOne()
@@ -61,8 +60,8 @@ public sealed class NetSelectTests
         Assert.Equal("obj:y", SelectOf(Part("obj:x"), Part(renames: [("obj:x", "obj:y")]), Part(deletes: ["obj:x"])));
     }
 
-    /// <summary>A delete of the selected item gives no select. This is also true for an item that the call added and
-    /// deleted, for an item that the call renamed first, and for a child that goes with its parent.</summary>
+    /// <summary>A delete of the selected item gives no select. This is also true for an item that the request added and
+    /// deleted, for an item that the request renamed first, and for a child that goes with its parent.</summary>
     [Fact]
     public void ADeleteOfTheSelectedItemGivesNoSelect()
     {
@@ -95,11 +94,11 @@ public sealed class NetSelectTests
         EditResult[] parts = [Part("obj:x", adds: ["obj:x"]), Part(renames: [("obj:x", "obj:y")])];
         var merged = EditResult.Merge(EditStatus.Applied, parts) with { Summary = "done", Revision = 4 };
 
-        var shaped = EditTools.Shaped(merged, parts);
+        var net = EditResult.Net(merged, parts);
 
-        Assert.Equal("obj:y", shaped.Select);
-        Assert.Equal(["obj:y"], shaped.Adds);
-        Assert.Empty(shaped.Renames);
-        Assert.Equal(("done", 4L), (shaped.Summary, shaped.Revision));
+        Assert.Equal("obj:y", net.Select);
+        Assert.Equal(["obj:y"], net.Adds);
+        Assert.Empty(net.Renames);
+        Assert.Equal(("done", 4L), (net.Summary, net.Revision));
     }
 }

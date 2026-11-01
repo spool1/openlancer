@@ -46,6 +46,7 @@ internal sealed class MissionPlanCommand : EditCommand
                     // (section 5.7 of the M6b design).
                     draft.FinishTemplates();
                     draft.CheckShipBuildFiles();
+                    draft.EndCommand();
                 }
                 catch (EditException e)
                 {

@@ -285,7 +285,7 @@ These steps build an NPC patrol and a wreck with cargo in a system.
 
 The mission tools change the mission scripts of the active mod with the commands of the mission studio. They work in both hosts. `mission_edit` runs any commands of the mission studio. The trigger tools of "The trigger tools" add and change triggers and their lines with named arguments. `mission_add_item` adds a ship, an NPC or another item of a mission, as "The item tool" tells. `mission_place_prefab` places a behavior prefab, as "The prefab tool" tells. The generic edit tools rename, delete, copy and change mission items, as "The generic tools on mission items" tells. In the editor, `mission_play` plays a mission from a start, as "Mission play" tells.
 
-`mission_edit` runs a list of commands. Each call is one Undo step with all its commands, as each other edit tool. It takes `preview`, `with_patch`, `if_revision` and `confirm`, as the edit tools do.
+`mission_edit` runs a list of commands. Each call is one Undo step with all its commands, as each other edit tool. It takes `preview`, `with_patch`, `if_revision` and `confirm`, as the edit tools do. The result names each item as it is after all commands of the call, as "The edit tools" tells. So a trigger that one call adds and then removes gives no add, no delete and no `select`.
 
 | Argument | What it does |
 |---|---|

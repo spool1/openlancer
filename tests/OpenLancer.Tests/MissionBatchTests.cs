@@ -53,6 +53,44 @@ public sealed class MissionBatchTests
         Assert.False(m.Session.CanUndo);
     }
 
+    /// <summary>The result of a batch is the net result of its commands (section 5.6 of the MCP1 design). Each command
+    /// is a part, and each command of a group is a part too. So an item that the batch adds and then removes is not in
+    /// the result. The select follows a later rename. A later remove of the selected item gives no select.</summary>
+    [Fact]
+    public void TheResultOfABatchIsTheNetResultOfItsCommands()
+    {
+        using var m = Create();
+        AddTrigger New(string name) => new(TestScript) { Nickname = name, Condition = LineSpec.Of("Cnd_True") };
+
+        var gone = m.Missions.Apply(new MissionBatch("Add and remove",
+            [New("ol_probe"), new RemoveTrigger(T("ol_probe"))]));
+        var grouped = m.Missions.Apply(new MissionBatch("Group",
+            [new CommandGroup([New("ol_probe"), new RemoveTrigger(T("ol_probe"))])]));
+        var renamed = m.Missions.Apply(new MissionBatch("Add and rename",
+            [New("ol_probe"), new RenameTrigger(T("ol_probe"), "ol_probe_2")]));
+        var removed = m.Missions.Apply(new MissionBatch("Rename and remove",
+        [
+            new RenameTrigger(T("ol_end"), "ol_x"),
+            new RemoveTrigger(T("ol_x")) { References = ReferencesMode.Remove },
+        ]));
+
+        Assert.All([gone, grouped], result =>
+        {
+            Assert.NotEqual(EditStatus.Refused, result.Status);
+            Assert.Empty(result.Adds);
+            Assert.Empty(result.Deletes);
+            Assert.Null(result.Select);
+        });
+        Assert.Equal(EditStatus.Applied, renamed.Status);
+        Assert.Equal([T("ol_probe_2").ToString()], renamed.Adds);
+        Assert.Empty(renamed.Renames);
+        Assert.Equal(T("ol_probe_2").ToString(), renamed.Select);
+        Assert.Equal(EditStatus.Applied, removed.Status);
+        Assert.Equal([T("ol_end").ToString()], removed.Deletes.Select(d => d.Ref));
+        Assert.Empty(removed.Renames);
+        Assert.Null(removed.Select);
+    }
+
     [Fact]
     public void ABatchWithoutAChangeGivesNoChangeAndNoEntry()
     {

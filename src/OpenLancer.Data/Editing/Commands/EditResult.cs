@@ -183,4 +183,95 @@ public record EditResult(EditStatus Status)
             .ToDictionary(g => g.Key, g => g.Last().Value, System.StringComparer.OrdinalIgnoreCase),
         Summary = parts.Select(p => p.Summary).LastOrDefault(s => s != null),
     };
+
+    /// <summary>
+    /// The net result of the parts of a request, so that each reference of the result resolves after the request
+    /// (section 5.6 of the MCP1 design). A part can add an item, and a later part can change, rename or delete it.
+    /// These are the rules:
+    /// <list type="bullet">
+    /// <item>An item that the request adds is an add with its last reference. The changes and the renames leave it out.
+    /// An example is a new object with the nickname of its request.</item>
+    /// <item>An item that the request adds and then deletes is not in the result, because it did not exist before the
+    /// request.</item>
+    /// <item>Two renames of one item are one rename from its first to its last reference. A rename back to the first
+    /// reference is no rename.</item>
+    /// <item>A change gives the last reference of the item. An item that the request deletes is not a change.</item>
+    /// <item>A delete of an item that the request renamed gives the reference before the request, and no rename.</item>
+    /// <item>The select is the item that the last part with a select selects, with its last reference. A rename of
+    /// that item in a later part gives its new reference. A delete of that item gives no select, also when the request
+    /// added it.</item>
+    /// </list>
+    /// </summary>
+    /// <remarks>
+    /// <para>The walk reads the parts in order. A rename changes an add only when the add came before it. So an
+    /// existing item that a part renames stays a rename. This is also true when a later part adds an item with its old
+    /// nickname (review finding of MCP1-2, step 4).</para>
+    /// <para>In a part, the renames and the deletes name the items before the part. The adds, the changes and the
+    /// select name the items after it. So the renames and the deletes apply first. Then the select of the part replaces
+    /// the select of the parts before it. The last select of <see cref="Merge"/> can name an item that a later rename
+    /// or delete changed (review finding of MCP1-2).</para>
+    /// <para>The agent tools give one part for each plan and for each mission request. A mission request gives the net
+    /// result of its commands, so it also follows these rules.</para>
+    /// </remarks>
+    /// <param name="result">The result with the lists of the other kinds, for example the merge of the parts.</param>
+    /// <param name="parts">The parts of the request, in order.</param>
+    internal static EditResult Net(EditResult result, IReadOnlyList<EditResult> parts)
+    {
+        var adds = new List<string>();
+        var renames = new List<ResultRename>();
+        var changes = new List<string>();
+        var deletes = new List<ResultDelete>();
+        string? select = null;
+        foreach (var part in parts)
+        {
+            foreach (var rename in part.Renames)
+            {
+                if (select == rename.From)
+                    select = rename.To;
+                Replace(changes, rename.From, rename.To);
+                if (Replace(adds, rename.From, rename.To))
+                    continue;
+                var at = renames.FindIndex(r => r.To == rename.From);
+                if (at < 0)
+                    renames.Add(rename);
+                else if (renames[at].From == rename.To)
+                    renames.RemoveAt(at);
+                else
+                    renames[at] = renames[at] with { To = rename.To };
+            }
+            foreach (var delete in part.Deletes)
+            {
+                if (select == delete.Ref)
+                    select = null;
+                changes.Remove(delete.Ref);
+                if (adds.Remove(delete.Ref))
+                    continue;
+                var at = renames.FindIndex(r => r.To == delete.Ref);
+                if (at < 0)
+                {
+                    deletes.Add(delete);
+                    continue;
+                }
+                deletes.Add(delete with { Ref = renames[at].From });
+                renames.RemoveAt(at);
+            }
+            foreach (var add in part.Adds.Where(add => !adds.Contains(add)))
+                adds.Add(add);
+            foreach (var change in part.Changes.Where(change => !adds.Contains(change) && !changes.Contains(change)))
+                changes.Add(change);
+            select = part.Select ?? select;
+        }
+        return result with { Adds = adds, Renames = renames, Changes = changes, Deletes = deletes, Select = select };
+    }
+
+    /// <summary>Replaces a reference in a list with its new reference. Gives false when the list does not have
+    /// it.</summary>
+    private static bool Replace(List<string> refs, string from, string to)
+    {
+        var at = refs.IndexOf(from);
+        if (at < 0)
+            return false;
+        refs[at] = to;
+        return true;
+    }
 }

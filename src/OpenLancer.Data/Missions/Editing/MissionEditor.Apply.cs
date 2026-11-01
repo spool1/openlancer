@@ -215,19 +215,14 @@ public sealed partial class MissionEditor
         };
     }
 
-    /// <summary>The part of the result of the plan: the adds, changes, deletes, renames, "Missing" lines, notes and
-    /// the selection.</summary>
-    private static EditResult Part(MissionDraft draft) => new(EditStatus.Applied)
+    /// <summary>The part of the result of the plan: the "Missing" lines, the notes, the warnings, and the net adds,
+    /// changes, deletes, renames and selection of its commands (see <see cref="MissionDraft.Parts"/>).</summary>
+    private static EditResult Part(MissionDraft draft) => EditResult.Net(new EditResult(EditStatus.Applied)
     {
-        Adds = draft.Adds.Distinct().ToList(),
-        Changes = draft.Changes.Distinct().Where(c => !draft.Adds.Contains(c)).ToList(),
-        Deletes = draft.Deletes,
-        Renames = draft.Renames,
         Missing = draft.Missing,
         Notes = draft.Notes.Distinct().ToList(),
         Warnings = draft.Warnings,
-        Select = draft.Select,
-    };
+    }, draft.Parts);
 
     /// <summary>
     /// The inverse of a batch (section 4.8 of the M6b design): a group of the inverses in reverse order, with a body

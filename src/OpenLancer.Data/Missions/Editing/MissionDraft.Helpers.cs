@@ -529,9 +529,12 @@ internal sealed partial class MissionDraft
             : new RenameItem(ItemOf(document, index), oldKey) { ChangeReferences = false };
     }
 
-    /// <summary>Runs a command inside the command that runs now, and gives the inverses that it recorded.</summary>
+    /// <summary>Runs a command inside the command that runs now, and gives the inverses that it recorded. The report of
+    /// the inner command is a part of its own, so a later part can rename or delete its items (see
+    /// <see cref="Parts"/>).</summary>
     public List<MissionCommand> RunInner(MissionCommand command)
     {
+        CutPart();
         var count = Inverses.Count;
         var mark = popMark;
         popMark = count;
@@ -543,6 +546,7 @@ internal sealed partial class MissionDraft
         {
             popMark = mark;
         }
+        CutPart();
         var recorded = Inverses.Skip(count).ToList();
         Inverses.RemoveRange(count, Inverses.Count - count);
         return recorded;
@@ -560,6 +564,10 @@ internal sealed partial class MissionDraft
         Index = index;
         popMark = Inverses.Count;
     }
+
+    /// <summary>Marks the end of a command of the batch. Its report until now becomes a part (see
+    /// <see cref="Parts"/>).</summary>
+    public void EndCommand() => CutPart();
 
     /// <summary>Takes the inverses that the steps of the command recorded since the start of the command or the last
     /// take, so the command can put them into its own inverse.</summary>

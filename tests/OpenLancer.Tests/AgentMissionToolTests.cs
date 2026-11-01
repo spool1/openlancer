@@ -156,6 +156,32 @@ public sealed partial class AgentMissionToolTests
         Assert.Empty(host.Edits);
     }
 
+    /// <summary>The result of a call names each item as it is after all its commands, as the result of each edit tool
+    /// does. A trigger that the call adds and then removes gives no add, no delete and no select. A trigger that the
+    /// call adds and then renames is an add with its new name.</summary>
+    [Fact]
+    public void TheResultOfACallIsTheNetResultOfItsCommands()
+    {
+        var (m, host) = Open();
+        using var _ = m;
+        var add = $$"""
+            { "kind": "add_trigger", "script": "msn:{{S}}", "nickname": "ol_probe",
+              "condition": { "key": "Cnd_True", "values": {} } }
+            """;
+        var remove = $$"""{ "kind": "remove_trigger", "trigger": "trg:{{S}}#ol_probe" }""";
+        var rename = $$"""{ "kind": "rename_trigger", "trigger": "trg:{{S}}#ol_probe", "new_name": "ol_probe_2" }""";
+
+        var gone = Ok(host, "mission_edit", $$"""{ "commands": [ {{add}}, {{remove}} ], "confirm": true }""");
+        var renamed = Ok(host, "mission_edit", Edit(add, rename));
+
+        Assert.Empty(Texts(gone["adds"]));
+        Assert.Empty(gone["deletes"]!.AsArray());
+        Assert.Null((string?)gone["select"]);
+        Assert.Equal([$"trg:{Script}#ol_probe_2"], Texts(renamed["adds"]));
+        Assert.Empty(renamed["renames"]!.AsArray());
+        Assert.Equal($"trg:{Script}#ol_probe_2", (string?)renamed["select"]);
+    }
+
     /// <summary>The tool runs in strict mode: an edit that adds an error gives new_errors, and nothing changes. A
     /// request cannot turn strict mode off. It can also refuse new warnings (section 13.1, item 15).</summary>
     [Fact]

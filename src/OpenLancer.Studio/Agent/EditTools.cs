@@ -84,15 +84,15 @@ internal sealed class EditScope
     internal EditResult StepResult()
     {
         var step = Batch.Parts.Skip(stepStart).ToList();
-        return WithMission(EditTools.Shaped(EditResult.Merge(EditStatus.Applied, step), step),
+        return WithMission(EditResult.Net(EditResult.Merge(EditStatus.Applied, step), step),
             missionRuns.Skip(stepMissionStart).ToList());
     }
 
     /// <summary>The net result of all commands of the call. Its adds, renames, changes, deletes and select come from the
-    /// parts of the batch in their order (see <see cref="EditTools.Shaped"/>). A call with mission commands gives their
+    /// parts of the batch in their order (see <see cref="EditResult.Net"/>). A call with mission commands gives their
     /// inverse and their row moves when the call applied or is a preview.</summary>
     internal EditResult CallResult(EditResult batchResult) =>
-        WithMission(EditTools.Shaped(batchResult, Batch.Parts),
+        WithMission(EditResult.Net(batchResult, Batch.Parts),
             batchResult.Status is EditStatus.Applied or EditStatus.Previewed ? missionRuns : null);
 
     /// <summary>
@@ -415,93 +415,6 @@ internal static class EditTools
                 AgentTexts.Error("limit_edit_result", ("size", size), ("max", call.Limits.ResultKilobytes))));
         }
         return text;
-    }
-
-    /// <summary>
-    /// The net result of the commands of a call, so that each reference of the result resolves after the call (section
-    /// 5.6 of the MCP1 design). A step can add an item and a later step can change, rename or delete it. These are the
-    /// rules:
-    /// <list type="bullet">
-    /// <item>An item that the call adds is an add with its last reference. The changes and the renames leave it out.
-    /// An example is a new object with the nickname of its request.</item>
-    /// <item>An item that the call adds and then deletes is not in the result, because it did not exist before the
-    /// call.</item>
-    /// <item>Two renames of one item are one rename from its first to its last reference. A rename back to the first
-    /// reference is no rename.</item>
-    /// <item>A change gives the last reference of the item. An item that the call deletes is not a change.</item>
-    /// <item>A delete of an item that the call renamed gives the reference before the call, and no rename.</item>
-    /// <item>The select is the item that the last part with a select selects, with its last reference. A rename of
-    /// that item in a later part gives its new reference. A delete of that item gives no select, also when the call
-    /// added it.</item>
-    /// </list>
-    /// </summary>
-    /// <remarks>
-    /// <para>The walk reads the parts in order. A rename changes an add only when the add came before it. So an
-    /// existing item that a step renames stays a rename. This is also true when a later step adds an item with its old
-    /// nickname (review finding of MCP1-2, step 4).</para>
-    /// <para>In a part, the renames and the deletes name the items before the part. The adds, the changes and the
-    /// select name the items after it. So the renames and the deletes apply first. Then the select of the part replaces
-    /// the select of the parts before it. The merge of the parts only takes the last select, so it keeps a reference
-    /// that a later rename or delete made stale (review finding of MCP1-2).</para>
-    /// </remarks>
-    /// <param name="result">The merged result of the parts, with the lists of the other kinds.</param>
-    /// <param name="parts">The parts of the commands, in order.</param>
-    internal static EditResult Shaped(EditResult result, IReadOnlyList<EditResult> parts)
-    {
-        var adds = new List<string>();
-        var renames = new List<ResultRename>();
-        var changes = new List<string>();
-        var deletes = new List<ResultDelete>();
-        string? select = null;
-        foreach (var part in parts)
-        {
-            foreach (var rename in part.Renames)
-            {
-                if (select == rename.From)
-                    select = rename.To;
-                Replace(changes, rename.From, rename.To);
-                if (Replace(adds, rename.From, rename.To))
-                    continue;
-                var at = renames.FindIndex(r => r.To == rename.From);
-                if (at < 0)
-                    renames.Add(rename);
-                else if (renames[at].From == rename.To)
-                    renames.RemoveAt(at);
-                else
-                    renames[at] = renames[at] with { To = rename.To };
-            }
-            foreach (var delete in part.Deletes)
-            {
-                if (select == delete.Ref)
-                    select = null;
-                changes.Remove(delete.Ref);
-                if (adds.Remove(delete.Ref))
-                    continue;
-                var at = renames.FindIndex(r => r.To == delete.Ref);
-                if (at < 0)
-                {
-                    deletes.Add(delete);
-                    continue;
-                }
-                deletes.Add(delete with { Ref = renames[at].From });
-                renames.RemoveAt(at);
-            }
-            adds.AddRange(part.Adds.Where(add => !adds.Contains(add)));
-            changes.AddRange(part.Changes.Where(change => !adds.Contains(change) && !changes.Contains(change)));
-            select = part.Select ?? select;
-        }
-        return result with { Adds = adds, Renames = renames, Changes = changes, Deletes = deletes, Select = select };
-    }
-
-    /// <summary>Replaces a reference in a list with its new reference. Gives false when the list does not have
-    /// it.</summary>
-    private static bool Replace(List<string> refs, string from, string to)
-    {
-        var at = refs.IndexOf(from);
-        if (at < 0)
-            return false;
-        refs[at] = to;
-        return true;
     }
 
     /// <summary>
