@@ -380,7 +380,7 @@ public sealed class FieldBindingTests
     {
         using var ws = SystemWorkspace.Create(SceneLi01);
         var session = ws.Session("act");
-        const string group = "This key belongs to a group of lines that belong together. This version cannot edit the group.";
+        const string group = "This key belongs to a group of lines that belong together. The Inspector cannot edit the group.";
 
         foreach (var key in new[] { "encounter", "faction", "faction_weight" })
             Assert.Equal(group, Bind(session, SceneSections[SceneSection.Zone], key).ReadOnlyReason);

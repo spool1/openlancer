@@ -201,8 +201,8 @@ public static class FieldCommands
         };
 
     /// <summary>The detail code and the reason why a field edit cannot change a key, or null. The rules are the rules of
-    /// the rows of the Inspector (see <see cref="FieldBinding.SectionLock"/> and <see cref="FieldBinding.KeyLock"/>),
-    /// with a reason for an agent at the key line.</summary>
+    /// the rows of the Inspector (see <see cref="FieldBinding.SectionLock"/> and <see cref="FieldBinding.KeyLock"/>).
+    /// The key line and a key of linked lines get a reason for an agent.</summary>
     private static (string Detail, string Reason)? Lock(EditSession session, SectionRef section, SectionView view,
         string name)
     {
@@ -210,10 +210,19 @@ public static class FieldCommands
             return (MissionErrors.ReadOnlySection, reason);
         if (name.Equals(KeyLine(session, section, view), StringComparison.OrdinalIgnoreCase))
             return (MissionErrors.KeyLine, "This key finds the section. Use rename_item to give the item a new name.");
-        return FieldBinding.KeyLock(session, section, view, session.Schema(section, name), name) is { } locked
-            ? (MissionErrors.FieldNotWritable, locked)
-            : null;
+        var key = session.Schema(section, name);
+        if (FieldBinding.KeyLock(session, section, view, key, name) is not { } locked)
+            return null;
+        return (MissionErrors.FieldNotWritable, key?.IsKeyEntry != true && view.IsLinked(name) ? LinkedLock(view) : locked);
     }
+
+    /// <summary>Why a field edit cannot change a key of a group of linked lines. The encounter lines of a zone have a
+    /// tool of their own.</summary>
+    private static string LinkedLock(SectionView view) =>
+        "This key belongs to a group of lines that belong together. set_fields cannot change the group." +
+        (view.Type.Equals("Zone", StringComparison.OrdinalIgnoreCase)
+            ? " Use scene_set_encounters to change the encounters of the zone."
+            : "");
 
     /// <summary>The value text of each line of a JSON value of <see cref="SetFields"/>.</summary>
     private static List<string> LineTexts(string field, JsonNode? value)

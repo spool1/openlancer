@@ -46,8 +46,8 @@ public sealed class ObjectComponentsTests
         Assert.Throws<ArgumentException>(() => ObjectComponents.Add(dock, ObjectComponent.JumpConnection, "x"));
     }
 
-    /// <summary>Only Solar is required, and it cannot go (Unity RequireComponent). The connections stay until
-    /// M27.</summary>
+    /// <summary>Only Solar is required, and it cannot go (Unity RequireComponent). The connections and the encounter
+    /// lines of a zone also cannot go in the Inspector.</summary>
     [Fact]
     public void SolarAndTheConnectionsCannotGo()
     {
@@ -56,6 +56,9 @@ public sealed class ObjectComponentsTests
         Assert.NotNull(ObjectComponents.RemoveProblem(ObjectComponent.JumpConnection));
         Assert.NotNull(ObjectComponents.RemoveProblem(ObjectComponent.TradeLaneRing));
         Assert.Null(ObjectComponents.RemoveProblem(ObjectComponent.PlanetRing));
+        // The agent tool scene_set_encounters edits the encounter lines, so only the Inspector cannot remove them.
+        Assert.Equal("The Inspector cannot edit the encounters of a zone.",
+            ObjectComponents.RemoveProblem(ObjectComponent.EncounterZone));
     }
 
     [Fact]

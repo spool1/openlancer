@@ -107,7 +107,7 @@ internal sealed class FieldBinding
             return $"'{name}' is the key that finds the section. The editor cannot change it.";
         // For example, a change of the encounter lines of a zone gives its faction lines to another encounter.
         if (view.IsLinked(name))
-            return "This key belongs to a group of lines that belong together. This version cannot edit the group.";
+            return "This key belongs to a group of lines that belong together. The Inspector cannot edit the group.";
         return name.Equals(SystemFileKey, StringComparison.OrdinalIgnoreCase) && IsUniverseSystem(session, section)
             ? SystemFileReason
             : null;

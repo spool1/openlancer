@@ -9,6 +9,7 @@ using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Data.Strings;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Runtime.Scene;
+using OpenLancer.Studio.Agent;
 using OpenLancer.Studio.Commands;
 using Xunit;
 using static OpenLancer.Tests.FieldBindingTests;
@@ -323,6 +324,8 @@ public sealed class FieldCommandsTests
         Assert.Equal(MissionErrors.FieldNotWritable, Assert.Single(encounter.Report(session).Errors).Detail);
         var file = FieldCommands.SetFields(session, system, Fields("""{ "file": "Systems\\Li01\\new.ini" }"""));
         Assert.Equal(MissionErrors.FieldNotWritable, Assert.Single(file.Report(session).Errors).Detail);
+        Assert.Equal("'file': Changing the file of a system moves all its contents. This version cannot change the file " +
+                     "of a system.", Assert.Single(file.Report(session).Errors).Message);
 
         var view = session.Get(Depot)!;
         Assert.True(FieldCommands.IsLocked(session, Depot, view, "nickname"));
@@ -332,6 +335,29 @@ public sealed class FieldCommandsTests
         Assert.False(FieldCommands.IsLocked(session, system, session.Get(system)!, "navmapscale"));
         Assert.Equal(EditStatus.Applied, FakeCommandHost.Runner(session).Run(FieldCommands.SetFields(session, system,
             Fields("""{ "navmapscale": 2 }"""))).Status);
+    }
+
+    /// <summary>
+    /// A key of the encounter lines of a zone refuses with the tool that changes them. The Inspector cannot edit these
+    /// lines, but the tool scene_set_encounters can, so the agent gets that tool and not "cannot edit".
+    /// </summary>
+    [Theory]
+    [InlineData("encounter", """["area_scout", 5, 0.5]""")]
+    [InlineData("faction", """["li_n_grp", 1]""")]
+    [InlineData("faction_weight", """["li_n_grp", 10]""")]
+    public void SetFieldsNamesTheEncounterToolForTheEncounterLinesOfAZone(string key, string value)
+    {
+        using var ws = SystemWorkspace.Create();
+        var session = ws.Session("act");
+        var zone = SystemWorkspace.Li01Section("Zone", "Zone_death");
+
+        var plan = FieldCommands.SetFields(session, zone, Fields($$"""{ "{{key}}": {{value}} }"""));
+
+        var error = Assert.Single(plan.Report(session).Errors);
+        Assert.Equal((EditErrorKind.Refused, MissionErrors.FieldNotWritable), (error.Kind, error.Detail));
+        Assert.Equal($"'{key}': This key belongs to a group of lines that belong together. set_fields cannot change " +
+                     "the group. Use scene_set_encounters to change the encounters of the zone.", error.Message);
+        Assert.NotNull(AgentTools.Find("scene_set_encounters"));
     }
 
     /// <summary>A session that takes no edits refuses each field of a section with the reason of the session.</summary>

@@ -177,7 +177,7 @@ A rename of an object of a system also changes the mission lines that name it, a
 - An array of arrays gives one line for each array, for example `"cargo": [["my_good", 5], ["my_other_good", 1]]`.
 - `null` or `[]` removes the key. The engine then uses its default.
 
-A value never holds a comma. The key line, a key of linked lines and the `file` of a system are locked, and `get_item` marks them. Use `rename_item` for the nickname. A value that a list check refuses still applies, as in the Inspector. The result gives the problem in `new_problems`.
+A value never holds a comma. The key line, a key of linked lines and the `file` of a system are locked, and `get_item` marks them. Use `rename_item` for the nickname. Use `scene_set_encounters` for the `encounter`, `faction` and `faction_weight` lines of a zone. A value that a list check refuses still applies, as in the Inspector. The result gives the problem in `new_problems`.
 
 A mission item takes the field forms of `mission_add_item` in place of these forms, and it runs in strict mode. See "The generic tools on mission items".
 
