@@ -33,7 +33,7 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
         var missions = window.Missions;
         if (missions.Analysis(item.Script) is not { } analysis)
         {
-            PanelStates.Message("This mission script is not in the edit view.", "Select a mission in the Missions tab.");
+            PanelStates.Message(MissionPage.NoScript);
             return;
         }
 

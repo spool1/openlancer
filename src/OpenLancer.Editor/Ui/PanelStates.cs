@@ -25,6 +25,7 @@ internal sealed record EmptyState(string Message, string Next)
 
 /// <summary>
 /// The states of a panel body that has nothing to show yet: a loading spinner or a message, centered in the free space.
+/// A message is always an <see cref="EmptyState"/> of a named field, so each message tells what to do next.
 /// </summary>
 internal static class PanelStates
 {
@@ -79,46 +80,63 @@ internal static class PanelStates
         ImGui.TextDisabled(text);
     }
 
-    /// <summary>Draws a dim message and a smaller hint below it, both centered in the free space.</summary>
-    public static void Message(string message, string hint) => Lines(message, hint, false);
-
     /// <summary>Draws an empty state: its message, and what to do next below it, both centered in the free
     /// space.</summary>
-    public static void Message(EmptyState state) => Lines(state.Message, state.Next, false);
+    /// <param name="state">The empty state, from a named field.</param>
+    /// <param name="reason">Why the panel is empty, for example the error of a read, or null. It shows between the
+    /// message and the next action.</param>
+    public static void Message(EmptyState state, string? reason = null) =>
+        Lines(state.Message, string.IsNullOrWhiteSpace(reason) ? null : reason, state.Next, false);
 
     /// <summary>
     /// Draws the message of an empty state and its next action as a link below it, both centered in the free space.
     /// Returns true when the user clicks the link.
     /// </summary>
-    public static bool MessageWithLink(EmptyState state) => Lines(state.Message, state.Next, true);
+    public static bool MessageWithLink(EmptyState state) => Lines(state.Message, null, state.Next, true);
 
-    /// <summary>Draws a message and a second line in the caption size: a dim hint, or a link.</summary>
-    private static bool Lines(string message, string second, bool isLink)
+    /// <summary>Draws a message, a reason when there is one, and the next action. The reason and the next action are
+    /// in the caption size. The reason is dim, and the next action is a dim hint or a link.</summary>
+    private static bool Lines(string message, string? reason, string next, bool isLink)
     {
         var gap = MathF.Truncate(LineGap * ImGuiHelper.Scale / 2);
         var messageSize = ImGui.CalcTextSize(message);
         ImGui.PushFont(null, EditorTheme.CaptionSize);
-        var secondSize = ImGui.CalcTextSize(second);
+        var reasonSize = reason == null ? Vector2.Zero : ImGui.CalcTextSize(reason);
+        var nextSize = ImGui.CalcTextSize(next);
         ImGui.PopFont();
+        var reasonHeight = reason == null ? 0 : reasonSize.Y + gap;
         var (start, avail) = (ImGui.GetCursorPos(), ImGui.GetContentRegionAvail());
-        var top = start.Y + MathF.Max(0, MathF.Truncate((avail.Y - messageSize.Y - gap - secondSize.Y) / 2));
+        var top = start.Y + MathF.Max(0,
+            MathF.Truncate((avail.Y - messageSize.Y - gap - reasonHeight - nextSize.Y) / 2));
 
-        ImGui.SetCursorPos(new Vector2(start.X + MathF.Max(0, MathF.Truncate((avail.X - messageSize.X) / 2)), top));
+        ImGui.SetCursorPos(new Vector2(Centered(start.X, avail.X, messageSize.X), top));
         ImGui.TextDisabled(message);
         ImGui.PushFont(null, EditorTheme.CaptionSize);
-        ImGui.SetCursorPos(new Vector2(start.X + MathF.Max(0, MathF.Truncate((avail.X - secondSize.X) / 2)),
-            top + messageSize.Y + gap));
+        var y = top + messageSize.Y + gap;
+        if (reason != null)
+        {
+            ImGui.SetCursorPos(new Vector2(Centered(start.X, avail.X, reasonSize.X), y));
+            ImGui.TextDisabled(reason);
+            y += reasonHeight;
+        }
+
+        ImGui.SetCursorPos(new Vector2(Centered(start.X, avail.X, nextSize.X), y));
         var clicked = false;
         if (isLink)
         {
-            clicked = ImGui.TextLink(second);
+            clicked = ImGui.TextLink(next);
         }
         else
         {
-            ImGui.TextDisabled(second);
+            ImGui.TextDisabled(next);
         }
 
         ImGui.PopFont();
         return clicked;
     }
+
+    /// <summary>The left edge of a line of a width, centered in the free width. A wide line starts at the left
+    /// edge.</summary>
+    private static float Centered(float left, float free, float width) =>
+        left + MathF.Max(0, MathF.Truncate((free - width) / 2));
 }

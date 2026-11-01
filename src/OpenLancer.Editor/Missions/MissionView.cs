@@ -25,6 +25,10 @@ internal sealed class MissionView : IDisposable
     internal static readonly EmptyState NoMission =
         new("No mission is open.", "Double-click a mission in the Missions tab.");
 
+    /// <summary>The empty state of the raw view when the text of the script cannot show (#56).</summary>
+    internal static readonly EmptyState NoRawText = new("The text of this mission script cannot show.",
+        "Click Graph in the toolbar to show the graph of the mission.");
+
     // Sizes in unscaled points.
     private const float SplitterWidth = 6;
     private const float MinSceneTabWidth = 640;
@@ -834,7 +838,7 @@ internal sealed class MissionView : IDisposable
         {
             if (missions.RawTextError(path) is { } error)
             {
-                PanelStates.Message("The text of this mission script cannot show.", error);
+                PanelStates.Message(NoRawText, error);
             }
             else
             {

@@ -41,9 +41,11 @@ internal sealed class CutsceneView
     /// <summary>The id of the panel. The layout reports its focus by this id.</summary>
     public const string PanelId = "cutscene";
 
-    /// <summary>The empty state of the Cutscene tab (#56).</summary>
+    // The empty states of the Cutscene tab (#56).
     internal static readonly EmptyState NoCutscene =
         new("No cutscene is open.", "Open a cutscene in the Cutscenes tab or in the list of the toolbar.");
+    internal static readonly EmptyState NoPreview = new($"{EmptyState.TextPlace} has no preview.",
+        "Open another cutscene, or pick another context in the context list.");
 
     /// <summary>The scrub bar shows the first 600 s of a long ambient script. The time field takes any time.</summary>
     private const double ScrubSeconds = 600;
@@ -257,8 +259,7 @@ internal sealed class CutsceneView
 
         if (workspace.Transport is not { } transport || workspace.Clock is not { } clock)
         {
-            PanelStates.Message($"{System.IO.Path.GetFileName(workspace.Path)} has no preview.",
-                workspace.Problem ?? "The preview cannot start.");
+            PanelStates.Message(NoPreview.With(System.IO.Path.GetFileName(workspace.Path)), workspace.Problem);
             return;
         }
 

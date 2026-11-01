@@ -30,6 +30,12 @@ namespace OpenLancer.Editor.Inspector;
 /// widget as an editable list field (section 11.1).</remarks>
 internal sealed partial class MissionPage(EditorWindow window, PropertyGrid grid) : IDisposable
 {
+    // The empty states of the mission pages of the Inspector (#56).
+    internal static readonly EmptyState NoPrefab = new($"No mod has the prefab '{EmptyState.TextPlace}'.",
+        "Select a prefab in the library or in the Assets panel.");
+    internal static readonly EmptyState NoScript =
+        new("This mission script is not in the edit view.", "Select a mission in the Missions tab.");
+
     // Sizes in unscaled points.
     private const float HeaderPaddingX = 10;
     private const float IniHeight = 220;
@@ -56,11 +62,11 @@ internal sealed partial class MissionPage(EditorWindow window, PropertyGrid grid
         {
             if (PrefabRef.OfScript(item.Script) is { } missing)
             {
-                PanelStates.Message($"No mod has the prefab '{missing.Id}'.", "Select a prefab in the library or in the Assets panel.");
+                PanelStates.Message(NoPrefab.With(missing.Id));
             }
             else
             {
-                PanelStates.Message("This mission script is not in the edit view.", "Select a mission in the Missions tab.");
+                PanelStates.Message(NoScript);
             }
 
             return;

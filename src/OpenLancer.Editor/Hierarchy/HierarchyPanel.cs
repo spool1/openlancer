@@ -35,7 +35,6 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
 
     // The empty states of the Hierarchy (#56).
     private const string ClearSearch = "Press Esc in the search field to clear the search.";
-    internal static readonly EmptyState NoSystem = new("No system is open.", "Select a system in the Scene toolbar.");
     internal static readonly EmptyState NoObjectMatch = new("No object matches the search.", ClearSearch);
     internal static readonly EmptyState NoMissionItemMatch = new("No item matches the search.", ClearSearch);
     internal static readonly EmptyState NoEntityMatch = new("No entity matches the search.", ClearSearch);
@@ -170,7 +169,7 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
         {
             if (window.Scene.Index is not { } index)
             {
-                PanelStates.Message(NoSystem);
+                PanelStates.Message(SceneView.NoSystem);
                 return;
             }
 

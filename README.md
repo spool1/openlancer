@@ -76,7 +76,7 @@ The data tests read `..\GameData\base`. Set `OPENLANCER_BASE` to use a different
 
 **Help > Documentation** opens the help pages of your version in the browser. **Help > Getting started** opens `README-FIRST.txt` of the release zip. **Help > Keys...** lists the keys of the editor, the Scene, the Hierarchy and the cutscene preview, and the mouse controls of the Scene. **Help > About OpenLancer...** shows the version, the commit and the engine commit of your build. Click **Copy** to copy them. The window title also shows the version.
 
-A menu item that is off tells why: point to it, and its tooltip gives the reason. An empty panel tells what to do next, for example "Select a system in the Scene toolbar."
+A menu item that is off tells why: point to it, and its tooltip gives the reason. An empty panel tells what to do next, for example "Select a system in the Scene toolbar." When the panel knows why it is empty, for example after the error of a read, it also shows the reason above the next action.
 
 To report a bug, click **Help > Report a problem**. The editor copies a short text with the version, the commit, the linked game and the Windows version, and opens the bug report form. Paste the text into the first field of the form.
 

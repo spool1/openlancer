@@ -42,6 +42,8 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
         "Turn off Only with events in the toolbar to show all entities.");
     internal static readonly EmptyState NoEntities =
         new("This cutscene has no entities and no events.", "Open another cutscene in the Cutscenes tab.");
+    internal static readonly EmptyState NoTimeline =
+        new($"{EmptyState.TextPlace} has no timeline.", "Open another cutscene in the Cutscenes tab.");
 
     // Sizes in unscaled points.
     private const float LabelWidth = 230;
@@ -174,8 +176,7 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
 
         if (workspace.Timeline is not { } model)
         {
-            PanelStates.Message($"{System.IO.Path.GetFileName(workspace.Path)} has no timeline.",
-                workspace.Problem ?? "The editor cannot read the cutscene.");
+            PanelStates.Message(NoTimeline.With(System.IO.Path.GetFileName(workspace.Path)), workspace.Problem);
             return;
         }
 

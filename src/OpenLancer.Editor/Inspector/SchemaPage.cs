@@ -16,6 +16,11 @@ namespace OpenLancer.Editor.Inspector;
 /// </summary>
 internal sealed class SchemaPage(EditorWindow window, PropertyGrid grid)
 {
+    /// <summary>The empty state of a selected section that the edit view does not have, for example after an undo of
+    /// its create (#56).</summary>
+    internal static readonly EmptyState NoSection = new("The edit view does not have this section.",
+        "Select another item, or click Undo or Redo to restore the section.");
+
     private readonly MarketSection market = new(window, grid);
     private readonly SectionExtras extras = new(window, grid);
     private readonly MissionUsesRows missionRows = new(window, grid);
@@ -29,7 +34,7 @@ internal sealed class SchemaPage(EditorWindow window, PropertyGrid grid)
 
         if (session.Edits.Get(section) is not { } view)
         {
-            PanelStates.Message("The edit view does not have this section.", "An undo can remove a section.");
+            PanelStates.Message(NoSection);
             return;
         }
 

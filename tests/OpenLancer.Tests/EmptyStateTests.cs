@@ -11,6 +11,7 @@ using OpenLancer.Editor.Inspector;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Missions;
 using OpenLancer.Editor.Mods;
+using OpenLancer.Editor.Scene;
 using OpenLancer.Editor.Ui;
 using Xunit;
 
@@ -18,7 +19,8 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// The empty states of the main panels (#56). Each panel keeps its empty states as named fields. Each state tells what
-/// the panel does not have, and what to do next.
+/// the panel does not have, and what to do next. A panel can draw only such a field, so each empty panel tells the next
+/// action.
 /// </summary>
 public sealed class EmptyStateTests
 {
@@ -45,11 +47,47 @@ public sealed class EmptyStateTests
         var owners = States().Select(s => s.Owner).ToHashSet();
         Type[] panels =
         [
-            typeof(PanelStates), typeof(HierarchyPanel), typeof(InspectorPanel), typeof(DatabasePanel),
-            typeof(AssetsPanel), typeof(ConsolePanel), typeof(MissionsBrowser), typeof(MissionView),
-            typeof(CutsceneBrowser), typeof(CutsceneView), typeof(TimelinePanel), typeof(ModsWindow),
+            typeof(PanelStates), typeof(SceneView), typeof(HierarchyPanel), typeof(InspectorPanel),
+            typeof(DatabasePanel), typeof(AssetsPanel), typeof(ConsolePanel), typeof(MissionsBrowser),
+            typeof(MissionView), typeof(CutsceneBrowser), typeof(CutsceneView), typeof(TimelinePanel),
+            typeof(ModsWindow),
         ];
         Assert.All(panels, p => Assert.Contains(p, owners));
+    }
+
+    /// <summary>A panel draws an empty state only from a named field. Each draw method of <see cref="PanelStates"/>
+    /// takes an <see cref="EmptyState"/>, and only a static constructor makes one. So a panel cannot draw a message
+    /// that the other tests of this class do not check.</summary>
+    [Fact]
+    public void APanelDrawsAnEmptyStateOnlyFromANamedField()
+    {
+        var draws = typeof(PanelStates).GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(m => m.Name.StartsWith("Message", StringComparison.Ordinal))
+            .ToList();
+        Assert.NotEmpty(draws);
+        Assert.All(draws, m => Assert.Equal(typeof(EmptyState), m.GetParameters()[0].ParameterType));
+
+        var made = typeof(EditorWindow).Assembly.GetTypes()
+            .Where(t => IlWalker.OwnerOf(t) != typeof(EmptyState))
+            .SelectMany(IlWalker.Calls)
+            .Where(c => c.Callee is ConstructorInfo { DeclaringType: var type } && type == typeof(EmptyState) &&
+                        c.Caller is not ConstructorInfo { IsStatic: true })
+            .Select(c => $"{c.Owner.Name}.{c.Caller.Name}")
+            .Distinct()
+            .ToList();
+        Assert.Empty(made);
+    }
+
+    /// <summary>Each empty state shows in a panel: a method that is not a static constructor reads its field.</summary>
+    [Fact]
+    public void EachStateShowsInAPanel()
+    {
+        var read = typeof(EditorWindow).Assembly.GetTypes()
+            .SelectMany(IlWalker.FieldLoads)
+            .Where(l => l.Method is not ConstructorInfo { IsStatic: true })
+            .Select(l => (l.Field.DeclaringType!, l.Field.Name))
+            .ToHashSet();
+        Assert.All(States(), s => Assert.Contains((s.Owner, s.Name), read));
     }
 
     [Theory]
@@ -78,5 +116,7 @@ public sealed class EmptyStateTests
         Assert.Equal(new EmptyState("No asset matches 'ring'.", "Clear search"), AssetsPanel.NoAssetMatch.With("ring"));
         Assert.Equal("No rows match '{text}'.", DatabasePanel.NoRowMatch.With("{text}").Message);
         Assert.Equal(InspectorPanel.NothingSelected, InspectorPanel.NothingSelected.With("ring"));
+        Assert.Equal("intro.thn has no preview.", CutsceneView.NoPreview.With("intro.thn").Message);
+        Assert.Equal("No mod has the prefab 'patrol'.", MissionPage.NoPrefab.With("patrol").Message);
     }
 }

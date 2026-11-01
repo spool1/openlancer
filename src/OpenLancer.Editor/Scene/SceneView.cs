@@ -26,6 +26,9 @@ internal sealed class SceneView : IDisposable
     /// <summary>The id of the panel. The layout reports its focus by this id.</summary>
     public const string PanelId = "scene";
 
+    /// <summary>The empty state of the Scene and of its Hierarchy (#56).</summary>
+    internal static readonly EmptyState NoSystem = new("No system is open.", "Select a system in the Scene toolbar.");
+
     private readonly EditorWindow window;
     private readonly LookAtCamera camera = new() { GameFOV = true };
 
@@ -344,7 +347,7 @@ internal sealed class SceneView : IDisposable
 
         if (stage == null)
         {
-            PanelStates.Message("No system is open.", "Select a system in the list of the toolbar.");
+            PanelStates.Message(NoSystem);
             return;
         }
 
