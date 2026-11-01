@@ -30,8 +30,10 @@ The commit to build. The default is the commit of origin/master.
 The folder for the clone and the outputs. The default is the folder olrel at the root of the drive that holds the
 repo. So the default is not on the system drive when the repo is not on it. The native binaries keep the source paths
 of the build. Step 8 refuses a release file that holds the path of the repo, the path of its parent folder, the user
-name or the word "decompiled". So the preflight refuses a work root whose path holds one of these texts, for example a
-folder in the repo or next to the repo. A drive root is not a forbidden path.
+name or a private folder word (PRIVATE_WORD in tools/release_check.py). So the preflight refuses a work root whose path
+holds one of these texts, for example a folder in the repo or next to the repo. A drive root is not a forbidden path.
+The native build makes paths of about 200 characters below the work root, and its build tools stop at 260 characters.
+So the preflight also refuses a work root of more than 50 characters (MAX_WORK_ROOT).
 
 .PARAMETER DryRun
 A test run. It allows another version than the version of the commit, a development version, texts with marks, a
@@ -218,8 +220,12 @@ Invoke-Native $python @('-B', 'tools\content_scan.py', '--fork') $src
 # 3. Engine natives and shader tools
 
 $engine = Join-Path $src 'external\Librelancer'
-Invoke-Native 'powershell' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $engine 'build.ps1'),
-    '--assemblyversion', $buildVersion, 'GenerateVersion', 'BuildNatives', 'ShaderDependencies') $engine
+# build.ps1 has no exit line at its end. So 'powershell -File' gives the exit code 0 also when the build fails. The
+# command form passes on the exit code of the build, and the release stops at this step.
+$buildArgs = @((Join-Path $engine 'build.ps1'), '--assemblyversion', $buildVersion, 'GenerateVersion', 'BuildNatives',
+    'ShaderDependencies') | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }
+Invoke-Native 'powershell' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+    "& $($buildArgs -join ' '); exit `$LASTEXITCODE") $engine
 
 # ---------------------------------------------------------------------------------------------------------------------
 # 4. Tests

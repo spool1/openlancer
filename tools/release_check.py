@@ -597,6 +597,14 @@ def check_retail(entries, hashes):
             if hashes and content_scan.digests(data) & hashes]
 
 
+# The word of a private folder that no release file and no work root may hold.
+PRIVATE_WORD = "decompiled"
+
+# The longest work root of tools/release.ps1. The native build makes paths of about 200 characters below the work root,
+# and its build tools stop at 260 characters.
+MAX_WORK_ROOT = 50
+
+
 def is_drive_root(path):
     """True for a path that names no folder, for example "X:\\" or "/"."""
     return re.fullmatch(r"(?:[A-Za-z]:)?[\\/]*", path) is not None
@@ -615,7 +623,8 @@ def work_root_problems(work_root, repo):
     build, and these paths are below the work root. So check c refuses a work root that holds a forbidden text, but
     only at the end of the run. This check finds the same texts in the path of the work root. It is stricter than
     check c in two ways. It ignores case, because a build can use the case of the folders on the disk. It also finds
-    the word "decompiled" in a longer word, because a path holds no code names."""
+    PRIVATE_WORD in a longer word, because a path holds no code names. A work root of more than MAX_WORK_ROOT
+    characters also fails, because the native build would fail two steps later with an unclear error."""
     root = work_root.rstrip("\\/")
     key = ntpath.normcase(root) + "\\"
     if key.startswith(ntpath.normcase(repo.rstrip("\\/")) + "\\"):
@@ -623,6 +632,10 @@ def work_root_problems(work_root, repo):
                 "root."]
     data = (key + "|" + key.replace("\\", "/")).encode("utf-8")
     problems = []
+    if len(root) > MAX_WORK_ROOT:
+        problems.append(f"the work root {root} has {len(root)} characters. The native build makes paths of about 200 "
+                        "characters below the work root, and its build tools stop at 260 characters. Use a work root "
+                        f"of at most {MAX_WORK_ROOT} characters, for example the default work root.")
     for label, text in forbidden_values(source_paths(repo)):
         patterns = [(l, t, "nocase" if mode == "word" else mode) for l, t, mode in search_patterns([(label, text)])]
         if find_strings(data, patterns):
@@ -634,7 +647,7 @@ def work_root_problems(work_root, repo):
 
 def forbidden_values(extra):
     """The texts that no release file may hold: the extra texts (the source_paths of the dev repo), the user profile,
-    the user name, the git e-mail and the word "decompiled". Each value is (label, text)."""
+    the user name, the git e-mail and PRIVATE_WORD. Each value is (label, text)."""
     values = [("path", e) for e in extra if e]
     for label, var in (("user profile", "USERPROFILE"), ("user name", "USERNAME"), ("home", "HOME")):
         if os.environ.get(var):
@@ -645,15 +658,15 @@ def forbidden_values(extra):
         mail = ""
     if mail:
         values.append(("git e-mail", mail))
-    values.append(("word", "decompiled"))
+    values.append(("word", PRIVATE_WORD))
     return values
 
 
 def search_patterns(values):
     """(label, text, mode) for each form of each value: as is, with "/" and with "\\\\" separators.
-    The mode "word" matches a whole word in any case, so "decompiled" does not match "IsDynamicCodeCompiled". A text of
-    fewer than 8 characters has the mode "exact": its exact case, its lower case and its upper case only, so that it
-    does not match random bytes. Each other text has the mode "nocase"."""
+    The mode "word" matches a whole word in any case, so PRIVATE_WORD does not match a part of "IsDynamicCodeCompiled".
+    A text of fewer than 8 characters has the mode "exact": its exact case, its lower case and its upper case only, so
+    that it does not match random bytes. Each other text has the mode "nocase"."""
     out = []
     for label, text in values:
         if label == "word":

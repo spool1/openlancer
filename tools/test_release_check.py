@@ -5,7 +5,9 @@ import io
 import json
 import os
 import re
+import shutil
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -193,11 +195,23 @@ class WorkRootTests(unittest.TestCase):
             self.assertTrue(rc.find_strings(native, patterns), root)
 
     def test_the_user_name_and_the_word_fail(self):
-        for root, label in (("E:\\someone\\rel", "user name"), ("E:\\My Decompiled\\rel", "word"),
-                            ("E:\\decompiledx\\rel", "word")):
+        for root, label in (("E:\\someone\\rel", "user name"), (f"E:\\My {rc.PRIVATE_WORD.title()}\\rel", "word"),
+                            (f"E:\\{rc.PRIVATE_WORD}x\\rel", "word")):
             problems = rc.work_root_problems(root, self.REPO)
             self.assertTrue(any(f"holds the {label}" in p for p in problems), (root, problems))
         self.assertEqual([], rc.work_root_problems("E:\\compiled\\rel", self.REPO))
+
+    def test_a_long_work_root_fails(self):
+        """The native build makes paths of about 200 characters below the work root, and its build tools stop at 260
+        characters. A work root of 64 characters failed in the native build with an unclear error."""
+        root = "E:\\" + "r" * (rc.MAX_WORK_ROOT - 3)
+        self.assertEqual(rc.MAX_WORK_ROOT, len(root))
+        self.assertEqual([], rc.work_root_problems(root, self.REPO))
+        self.assertEqual([], rc.work_root_problems(root + "\\", self.REPO))
+        problems = rc.work_root_problems(root + "x", self.REPO)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn(f"has {rc.MAX_WORK_ROOT + 1} characters", problems[0])
+        self.assertIn("stop at 260 characters", problems[0])
 
     def test_the_command_prints_only_the_forbidden_paths(self):
         self.assertEqual((0, "D:\\src\\openlancer\nD:\\src\n"), self.work_root_command("D:\\olrel", "--repo", self.REPO))
@@ -240,11 +254,11 @@ class StringTests(unittest.TestCase):
         self.assertFalse(rc.find_strings(b"D:\\Work\\Other", patterns))
 
     def test_the_word_matches_only_a_whole_word(self):
-        patterns = self.patterns(("word", "decompiled"))
+        patterns = self.patterns(("word", rc.PRIVATE_WORD))
         self.assertFalse(rc.find_strings(b"get_IsDynamicCodeCompiled", patterns))
         self.assertFalse(rc.find_strings("IsDynamicCodeCompiled".encode("utf-16-le"), patterns))
-        self.assertTrue(rc.find_strings(b"D:\\Freelancer Decompiled\\x", patterns))
-        self.assertTrue(rc.find_strings("/decompiled/".encode("utf-16-le"), patterns))
+        self.assertTrue(rc.find_strings(f"D:\\Game {rc.PRIVATE_WORD.title()}\\x".encode("utf-8"), patterns))
+        self.assertTrue(rc.find_strings(f"/{rc.PRIVATE_WORD}/".encode("utf-16-le"), patterns))
 
     def test_a_short_text_matches_only_its_exact_lower_and_upper_case(self):
         patterns = self.patterns(("user name", "Abc"))
@@ -735,6 +749,45 @@ class ReleaseScriptTests(unittest.TestCase):
         gates, tail = projects["tests\\OpenLancer.DataTests"]
         self.assertIn('"Category=Performance&$notNextToData"', gates)
         self.assertEqual(" -Tries 2", tail)
+
+    def test_the_help_names_no_private_folder_word(self):
+        """The help is public text. It names the constants of tools/release_check.py, not the words."""
+        self.assertNotIn(rc.PRIVATE_WORD, self.text.lower())
+        self.assertIn("PRIVATE_WORD", self.text)
+        self.assertIn(f"more than {rc.MAX_WORK_ROOT} characters (MAX_WORK_ROOT)", " ".join(self.text.split()))
+
+    def test_step_3_passes_on_the_exit_code_of_the_engine_build(self):
+        """build.ps1 has no exit line at its end. So 'powershell -File' gives the exit code 0 also when the build
+        fails, and the release went on to the tests with a wrong cause."""
+        step = self.step("3. Engine natives and shader tools")
+        self.assertNotIn("'-File'", step)
+        self.assertIn("'-Command'", step)
+        self.assertIn("exit `$LASTEXITCODE", step)
+
+    @unittest.skipUnless(os.name == "nt" and shutil.which("powershell"), "The step runs in Windows PowerShell.")
+    def test_a_failed_engine_build_stops_step_3(self):
+        """Runs the text of step 3 with a build.ps1 whose last command exits with 3, as a failed build does."""
+        step = self.step("3. Engine natives and shader tools")
+        with tempfile.TemporaryDirectory() as folder:
+            src = os.path.join(folder, "s'rc")
+            write(os.path.join(src, "external", "Librelancer", "build.ps1"),
+                  '"args: " + ($args -join "|")\ncmd /c "exit 3"\n')
+            script = os.path.join(folder, "step3.ps1")
+            write(script, "\n".join([
+                "$ErrorActionPreference = 'Stop'",
+                "$src = '" + src.replace("'", "''") + "'",
+                "$buildVersion = '1.0.0-dev'",
+                "function Invoke-Native([string]$File, [string[]]$Arguments, [string]$Folder) {",
+                "    Push-Location -LiteralPath $Folder",
+                "    try { & $File @Arguments } finally { Pop-Location }",
+                "    exit $LASTEXITCODE",
+                "}",
+                step]))
+            result = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script],
+                                    capture_output=True, text=True)
+        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
+        self.assertIn("args: --assemblyversion|1.0.0-dev|GenerateVersion|BuildNatives|ShaderDependencies",
+                      result.stdout)
 
     def test_the_publish_names_the_engine_commit(self):
         """Help > About shows the engine commit."""
