@@ -5,7 +5,8 @@ namespace OpenLancer.Editor.Ui;
 /// <summary>
 /// Draws the menu items that can be off (#56). An item with a reason is off, and its tooltip shows the reason, also
 /// while the item is off. So each item that is off tells why. Each menu of the editor draws such an item with this
-/// class. A test reads the IL of the editor and finds each other call that can turn a menu item off.
+/// class. Do not put a menu item between ImGui.BeginDisabled and ImGui.EndDisabled, because then no reason shows. A
+/// test reads the IL of the editor and finds each other call that can turn a menu item off.
 /// </summary>
 internal static class MenuItems
 {
