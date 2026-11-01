@@ -53,6 +53,9 @@ public sealed class PlayControllerTests : IDisposable
     private StubPlan plan = Game;
     private TimeSpan now = TimeSpan.FromSeconds(100);
 
+    /// <summary>When set, the command of the next start throws it after the start is in <see cref="starts"/>.</summary>
+    private Exception? commandError;
+
     public PlayControllerTests()
     {
         editor = new FakeEditor(ui);
@@ -60,7 +63,7 @@ public sealed class PlayControllerTests : IDisposable
         play = new PlayController(editor, args =>
         {
             starts.Add(args);
-            return stub.Command(plan);
+            return commandError is { } error ? throw error : stub.Command(plan);
         }, () => now);
     }
 
@@ -1058,6 +1061,30 @@ public sealed class PlayControllerTests : IDisposable
         Assert.StartsWith("Play from camera stopped: the Scene does not show", Console[^2]);
         Assert.Equal("The game stopped with exit code 1: The engine load stops. The log is " +
                      $"{OpenLancer.Editor.ProgramPaths.PlayLog}.", Console[^1]);
+        Assert.Equal(PlayStatus.Idle, play.Status);
+    }
+
+    /// <summary>A new play whose start throws while a crash report waits: the exception leaves Update, and the Console
+    /// still has the report. No new game moved the game log, so the line names the game log.</summary>
+    [Fact]
+    public void ACrashThatWaitsForAPlayWhoseStartThrowsIsReported()
+    {
+        plan = new StubPlan([Error("The engine load stops.", crash: true)], Exit: 1);
+        editor.SaveResult = new SaveOutcome(true, 2, false);
+        RequestPlay();
+        ui.Run(2);
+        play.Update(false, false);
+        Assert.Equal(PlayStatus.Validating, play.Status);
+
+        editor.SaveResult = new SaveOutcome(true, 0, false);
+        var error = new IOException("The game program cannot be read.");
+        commandError = error;
+
+        Assert.Same(error, Assert.Throws<IOException>(() => RequestPlay()));
+        Assert.Equal(2, starts.Count);
+        Assert.Equal("The game stopped with exit code 1: The engine load stops. The log is " +
+                     $"{OpenLancer.Editor.ProgramPaths.PlayLog}.", Console[^1]);
+        Assert.Single(Console, m => m.StartsWith("The game stopped"));
         Assert.Equal(PlayStatus.Idle, play.Status);
     }
 
