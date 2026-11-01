@@ -179,7 +179,8 @@ class IssueFormTests(unittest.TestCase):
         version = fields["version"]["attributes"]["description"]
         self.assertIn("Help > About OpenLancer", version)
         logs = fields["logs"]["attributes"]["description"]
-        for text in ("paths of your folders", "Windows user name", ".log.previous.txt"):
+        for text in ("paths of your folders", "Windows user name", "OpenLancer.Editor.log.previous.txt",
+                     "OpenLancer.Play.log.previous.txt"):
             self.assertIn(text, logs)
         # The public preview has no Help menu, so each field also tells a user of such a build what to do.
         self.assertIn("A build without a Help menu: write the version from the name of its zip file.", version)
