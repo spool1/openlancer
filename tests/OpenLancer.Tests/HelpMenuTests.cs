@@ -17,8 +17,8 @@ using Xunit;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The Help menu: the text of About OpenLancer, the target of each item, the header of Report a problem, the version in
-/// the window title and the rows of the Keys window.
+/// The Help menu: the text of About OpenLancer, the target of each item and the header of Report a problem. Also the
+/// version in the window title and the rows of the Keys window.
 /// </summary>
 public sealed class HelpMenuTests : IDisposable
 {

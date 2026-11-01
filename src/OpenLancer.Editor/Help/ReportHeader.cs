@@ -4,8 +4,9 @@ using OpenLancer.Data.Games;
 namespace OpenLancer.Editor.Help;
 
 /// <summary>
-/// The short text that Help &gt; Report a problem copies for the first field of the bug report form: the version, the
-/// commit, the linked game and the Windows version. It has no path, no user name and no content of a game file.
+/// The short text that Help &gt; Report a problem copies for the first field of the bug report form. It has the
+/// version, the commit, the linked game and the Windows version. It has no path, no user name and no content of a game
+/// file.
 /// </summary>
 internal static class ReportHeader
 {

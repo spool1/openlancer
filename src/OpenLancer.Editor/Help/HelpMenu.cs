@@ -10,9 +10,9 @@ using OpenLancer.Editor.Ui;
 namespace OpenLancer.Editor.Help;
 
 /// <summary>
-/// The Help menu, the last menu of the menu bar as in Unity: Documentation, Getting started, Keys, Discord, Report a
-/// problem, Open log folder and About OpenLancer. <see cref="HelpLinks"/> gives the target of each item, and
-/// <see cref="ReportHeader"/> gives the text that Report a problem copies.
+/// The Help menu, the last menu of the menu bar as in Unity. Its items are Documentation, Getting started, Keys,
+/// Discord, Report a problem, Open log folder and About OpenLancer. <see cref="HelpLinks"/> gives the target of each
+/// item, and <see cref="ReportHeader"/> gives the text that Report a problem copies.
 /// </summary>
 internal sealed class HelpMenu(EditorWindow window)
 {

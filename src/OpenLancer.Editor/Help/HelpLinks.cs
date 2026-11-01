@@ -36,8 +36,8 @@ internal static class HelpLinks
     /// <summary>The folder of Open log folder: the log files of the editor and of the game of Play.</summary>
     public static string LogFolder => RunLogs.Folder;
 
-    /// <summary>The help pages of a build: the <c>docs</c> folder of its release tag, of its commit for a development
-    /// build, or of master for a build without a commit (see <see cref="BuildVersion.DocsRef"/>).</summary>
+    /// <summary>The help pages of a build: the <c>docs</c> folder of its release tag. A development build gets the folder
+    /// of its commit, and a build without a commit gets master (see <see cref="BuildVersion.DocsRef"/>).</summary>
     public static string Documentation(BuildVersion build) => $"{Repository}/tree/{build.DocsRef}/docs";
 
     /// <summary>The file of Getting started: <see cref="ReadmeFirst"/> in the folder of the editor.</summary>
