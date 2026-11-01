@@ -6,7 +6,7 @@ project. It is not affiliated with, endorsed by or sponsored by Microsoft,
 Digital Anvil or the Librelancer project. OpenLancer uses the name
 "Freelancer" only to identify the game. All trademarks belong to their owners.
 
-This is a preview. Expect bugs. Keep a backup copy of your mods.
+@STAGE_NOTE@
 
 
 YOU NEED YOUR OWN COPY OF THE GAME
@@ -20,9 +20,10 @@ SYSTEM REQUIREMENTS
 -------------------
 - Windows 10 or Windows 11, 64-bit.
 - A graphics card and a driver with OpenGL 3.2 or later.
-- An installed copy of Freelancer. We tested this version with the English
-  Freelancer 1.1 and with Freelancer: HD Edition 0.7.1.
-- About 130 MB of disk space.
+- An installed copy of Freelancer. This version supports the English
+  Freelancer 1.1 and Freelancer: HD Edition 0.7.1. The editor also opens
+  Freelancer 1.0. Its export makes packages for Freelancer 1.1.
+- About 160 MB of disk space.
 You do not need to install .NET.
 
 
@@ -33,7 +34,7 @@ START THE EDITOR
 3. Double-click OpenLancer.Editor.exe. Its icon is a ship and a ring on a
    dark blue square.
 4. If Windows shows "Windows protected your PC", click "More info". Then
-   click "Run anyway". The preview has no digital signature.
+   click "Run anyway". OpenLancer has no digital signature.
 5. The editor shows "Link your Freelancer game". Click
    "Select game folder...".
 6. Select the folder of your game. This folder contains the EXE and DATA
@@ -45,7 +46,7 @@ START THE EDITOR
    system in 3D.
 
 On Windows 11, Smart App Control can block a program that has no digital
-signature. Windows then shows no "Run anyway" button, and this preview
+signature. Windows then shows no "Run anyway" button, and OpenLancer
 cannot start.
 
 
@@ -58,7 +59,7 @@ MAKE A CHANGE AND PLAY IT
 To make one more mod, click Mod > New mod.
 
 
-WHAT WORKS IN THIS PREVIEW
+WHAT WORKS IN THIS VERSION
 --------------------------
 - Link your game folder. The editor shows the game and its version. It
   identifies Freelancer 1.0 and 1.1, with or without JFLP, and
@@ -96,7 +97,8 @@ WHAT WORKS IN THIS PREVIEW
   start the original game.
 - Export your mod for Freelancer 1.1 and for HD Edition 0.7.1, as a
   drop-in zip and as an FLMM package, with Mod > Export mod... The
-  export checks the mod before it writes the packages.
+  export checks the mod before it writes the packages. Nobody checked the
+  FLMM package with FLMM yet.
 - Look at the cutscenes of the game, and preview them. Change the values of
   a cutscene in your mod.
 - oltool checks your game folder, and checks, merges and shows mods from
@@ -126,11 +128,12 @@ WHAT DOES NOT WORK YET
 - You cannot create or delete jump gates, jump holes and trade lane
   rings yet. You cannot make new bases, nebulae or asteroid fields yet.
 - You can select only one item at a time.
-- The nebula and field picks, Create, Duplicate, Rename, Delete and the
-  Assets panel are the newest parts of this preview. We tested them
-  mostly with automatic tests.
+- A Play start at a checkpoint restores only the triggers of the
+  checkpoint. It does not restore the objective, the dock and lane rules
+  and the reputations of a saved game.
+- You can make a new cutscene, but nobody checked yet that the retail
+  games play it.
 - There is no dialogue editor yet.
-- The mod format can change before version 1.0.
 
 
 WHERE OPENLANCER KEEPS FILES

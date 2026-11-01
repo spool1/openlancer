@@ -38,6 +38,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import textwrap
 import time
 import xml.etree.ElementTree as ET
 import zipfile
@@ -361,13 +362,49 @@ def fill(name, text, values):
     return text, [f"{name}: unknown placeholder {p}" for p in left]
 
 
+# The words of README-FIRST.txt for the stage of a version, by the first word of its suffix.
+STAGES = {"dev": "This is a development build.", "preview": "This is a preview.", "beta": "This is a beta.",
+          "rc": "This is a release candidate."}
+
+# The claim of README-FIRST.txt about the disk space of the extracted zip.
+DISK_CLAIM = re.compile(r"About (\d+) MB of disk space\.")
+
+
+def stage_note(version):
+    """The sentences under the title of README-FIRST.txt (#56). They name the stage of the version, so a beta or the
+    final version does not call itself a preview. A version before 1.0.0 also says that the mod format can change,
+    because the promise of the mod format starts at version 1.0.0."""
+    number, _, suffix = version.partition("-")
+    if suffix:
+        note = STAGES.get(re.match(r"[a-z]*", suffix).group(0), "This is a test build.") + " Expect bugs."
+    else:
+        note = "Report each bug that you find."
+    parts = tuple(int(p) for p in re.findall(r"\d+", number))
+    if parts < (1, 0, 0) or (parts == (1, 0, 0) and suffix):
+        note += " The mod format can change before version 1.0.0."
+    return textwrap.fill(note + " Keep a backup copy of your mods.", 76)
+
+
 def readme_first(repo, version):
     """The text of README-FIRST.txt of a version and the problems of its placeholders. The title rule under the first
     line is as long as the title."""
     text = read_text(os.path.join(repo, "release", "README-FIRST.txt"))
     title = f"OpenLancer {version_title(version)}"
     return fill("release/README-FIRST.txt", text.replace("@TITLE_RULE@", "=" * len(title)),
-                {"@VERSION@": version, "@VERSION_TITLE@": version_title(version)})
+                {"@VERSION@": version, "@VERSION_TITLE@": version_title(version), "@STAGE_NOTE@": stage_note(version)})
+
+
+def disk_claim_problems(readme, size):
+    """The problem of the disk space that README-FIRST.txt claims. The claim must be within 10 percent of the size of
+    the stage folder in bytes, which is the size of the extracted zip. A text without the claim has no problem."""
+    match = DISK_CLAIM.search(" ".join(readme.split()))
+    if match is None:
+        return []
+    claim, megabytes = int(match.group(1)), size / 1e6
+    if abs(claim - megabytes) <= megabytes / 10:
+        return []
+    return [f"release/README-FIRST.txt claims about {claim} MB of disk space, but the release has "
+            f"{megabytes:.0f} MB. Change the claim."]
 
 
 def component_text(component, repo, versions):
@@ -407,6 +444,8 @@ def docs(stage, repo, version, commit, fork_commit, notes_out=None, dry_run=Fals
     problems = []
     readme, found = readme_first(repo, version)
     problems += found
+    problems += disk_claim_problems(readme, sum(os.path.getsize(os.path.join(stage, *name.split("/")))
+                                                for name in files_below(stage)))
     notes_name = f"release/notes/v{version}.md"
     notes_path = os.path.join(repo, *notes_name.split("/"))
     notes = None

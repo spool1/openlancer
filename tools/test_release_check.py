@@ -423,6 +423,13 @@ class DocsTests(RepoFixture):
         self.assertFalse(os.path.exists(os.path.join(self.folder.name, "notes.md")))
         self.assertFalse(os.path.exists(os.path.join(self.stage, "README-FIRST.txt")))
 
+    def test_a_wrong_claim_of_the_disk_space_stops_the_documents(self):
+        write(os.path.join(self.repo, "release", "README-FIRST.txt"), "OpenLancer\n- About 130 MB of disk\n  space.\n")
+        problems = self.docs()
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("claims about 130 MB of disk space, but the release has 0 MB", problems[0])
+        self.assertFalse(os.path.exists(os.path.join(self.stage, "README-FIRST.txt")))
+
     def test_a_missing_text_source_is_a_problem(self):
         self.data["components"][0]["texts"] = ["repo:NOPE", "header:src/App/data/rules.json", "nuget:Other/LICENSE",
                                                "web:x"]
@@ -430,6 +437,22 @@ class DocsTests(RepoFixture):
         problems = self.docs()
         self.assertEqual(1, len(problems))
         self.assertIn("component app: repo:NOPE: the file does not exist", problems[0])
+
+
+class DiskClaimTests(unittest.TestCase):
+    """README-FIRST.txt claims the disk space of the extracted zip. The claim must be within 10 percent of it."""
+
+    def test_a_claim_near_the_size_passes(self):
+        for size in (160_623_519, 146_000_000, 177_000_000):
+            self.assertEqual([], rc.disk_claim_problems("- About 160 MB of disk space.", size), size)
+
+    def test_a_claim_far_from_the_size_fails(self):
+        problems = rc.disk_claim_problems("- About 130 MB of disk\n  space.", 160_623_519)
+        self.assertEqual(["release/README-FIRST.txt claims about 130 MB of disk space, but the release has 161 MB. "
+                          "Change the claim."], problems)
+
+    def test_a_text_without_a_claim_passes(self):
+        self.assertEqual([], rc.disk_claim_problems("No claim.", 160_623_519))
 
 
 class RuntimePackTests(unittest.TestCase):
@@ -611,19 +634,57 @@ class ReadmeFirstTests(unittest.TestCase):
             self.assertIsNone(rc.PLACEHOLDER.search(text), version)
 
     def test_the_text_makes_no_old_claim(self):
-        text = self.filled("1.0.0-beta.1")
+        text = " ".join(self.filled("1.0.0-beta.1").split())
         for claim in ("Export. No tool installs", "bases, factions", "There is no mission editor",
-                      "we did not test", "the English version 1.0"):
+                      "we did not test", "the English version 1.0", "newest parts", "We tested", "130 MB"):
             self.assertNotIn(claim, text)
 
-    def test_the_tested_games_are_freelancer_1_1_and_hd_edition_0_7_1(self):
+    def test_only_a_preview_calls_itself_a_preview(self):
+        """The first text that a new modder reads names the stage of its version (#56)."""
+        stages = {"1.0.0-dev": "This is a development build. Expect bugs.", "1.0.0-beta.1": "This is a beta. Expect bugs.",
+                  "1.0.0-rc.1": "This is a release candidate. Expect bugs.", "1.0.0": "Report each bug that you find.",
+                  "0.1.0-preview": "This is a preview. Expect bugs."}
+        for version, stage in stages.items():
+            text = " ".join(self.filled(version).split())
+            self.assertIn(f"{stage} ", text, version)
+            self.assertIn("Keep a backup copy of your mods.", text, version)
+            if version != "0.1.0-preview":
+                self.assertIsNone(re.search(r"(?i)\b(this|the|a) preview\b", text), version)
+
+    def test_only_a_version_before_1_0_0_says_that_the_format_can_change(self):
+        """The promise of the mod format starts at version 1.0.0."""
+        for version, changes in (("1.0.0-dev", True), ("1.0.0-beta.1", True), ("1.0.0-rc.2", True),
+                                 ("0.1.0-preview", True), ("1.0.0", False), ("1.1.0-dev", False)):
+            text = " ".join(self.filled(version).split())
+            self.assertEqual(changes, "The mod format can change before version 1.0.0." in text, version)
+            self.assertNotRegex(text, r"before version 1\.0\.(?!0)", version)
+
+    def test_the_stage_note_fits_the_width_of_the_text(self):
+        for version in (*self.VERSIONS, "1.0.0-rc.12", "0.1.0-preview"):
+            self.assertTrue(all(len(line) <= 76 for line in rc.stage_note(version).split("\n")), version)
+
+    def test_the_supported_games_are_freelancer_1_1_and_hd_edition_0_7_1(self):
+        """Round 3 checks the claims, so the text says supports, not tested. It also tells a user of 1.0 what works."""
         requirements = " ".join(self.section(self.filled("1.0.0"), "SYSTEM REQUIREMENTS").split())
-        self.assertIn("We tested this version with the English Freelancer 1.1 and with Freelancer: HD Edition 0.7.1.",
+        self.assertIn("This version supports the English Freelancer 1.1 and Freelancer: HD Edition 0.7.1.",
+                      requirements)
+        self.assertIn("The editor also opens Freelancer 1.0. Its export makes packages for Freelancer 1.1.",
                       requirements)
 
+    def test_the_text_claims_the_disk_space(self):
+        """The docs step compares the claim with the size of the release."""
+        self.assertRegex(" ".join(self.filled("1.0.0").split()), rc.DISK_CLAIM)
+
+    def test_what_does_not_work_yet_names_the_limits_that_the_editor_shows(self):
+        limits = " ".join(self.section(self.filled("1.0.0"), "WHAT DOES NOT WORK YET").split())
+        self.assertIn("A Play start at a checkpoint restores only the triggers of the checkpoint.", limits)
+        self.assertIn("You can make a new cutscene, but nobody checked yet that the retail games play it.", limits)
+
     def test_what_works_names_the_export_the_mission_editor_and_the_database(self):
-        works = " ".join(self.section(self.filled("1.0.0"), "WHAT WORKS IN THIS PREVIEW").split())
+        works = " ".join(self.section(self.filled("1.0.0"), "WHAT WORKS IN THIS VERSION").split())
         self.assertIn("as a drop-in zip and as an FLMM package, with Mod > Export mod...", works)
+        # The editor marks the FLMM package as not checked with FLMM (#16).
+        self.assertIn("Nobody checked the FLMM package with FLMM yet.", works)
         self.assertIn("The mission editor shows a mission as a graph of triggers.", works)
         self.assertIn("Play from a trigger starts Play, the test run of the editor, at a trigger of the mission. "
                       "It does not start the original game.", works)
