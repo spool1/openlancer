@@ -187,7 +187,8 @@ internal static class IlWalker
                 throw new InvalidOperationException($"{method.DeclaringType}.{method.Name}: unknown opcode at {at - 1}.");
             long operand = op.OperandType switch
             {
-                OperandType.InlineNone or OperandType.InlineSwitch or OperandType.InlineR or OperandType.ShortInlineR => 0,
+                OperandType.InlineNone or OperandType.InlineSwitch or OperandType.InlineR
+                    or OperandType.ShortInlineR => 0,
                 OperandType.ShortInlineI => (sbyte)il[at],
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineVar => il[at],
                 OperandType.InlineVar => BitConverter.ToUInt16(il, at),
@@ -203,7 +204,8 @@ internal static class IlWalker
     /// token.</summary>
     private static IEnumerable<(OpCode Op, int Token)> Tokens(MethodBase method) =>
         Instructions(method)
-            .Where(i => i.Op.OperandType is OperandType.InlineMethod or OperandType.InlineField or OperandType.InlineString)
+            .Where(i => i.Op.OperandType is OperandType.InlineMethod or OperandType.InlineField
+                or OperandType.InlineString)
             .Select(i => (i.Op, (int)i.Operand));
 
     /// <summary>The size of the operand of an opcode at a place of the IL.</summary>

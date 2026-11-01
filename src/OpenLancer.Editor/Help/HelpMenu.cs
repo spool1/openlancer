@@ -39,7 +39,8 @@ internal enum HelpAction
 /// <param name="Label">The label. It ends with "..." when the item opens a window of the editor.</param>
 /// <param name="Tooltip">What the item does.</param>
 /// <param name="Action">What a click does.</param>
-/// <param name="Target">The link, the file or the folder that a click opens. Null for an item that shows a window.</param>
+/// <param name="Target">The link, the file or the folder that a click opens. Null for an item that shows a
+/// window.</param>
 /// <param name="Unavailable">Why the item is off, or null when it is on.</param>
 /// <param name="StartsGroup">True when a separator comes before the item.</param>
 internal sealed record HelpItem(char Icon, string Label, string Tooltip, HelpAction Action, string? Target = null,
@@ -100,7 +101,8 @@ internal sealed class HelpMenu(EditorWindow window) : IHelpMenuHost
 
     /// <summary>The items of the Help menu, in their order, with the target of each item.</summary>
     /// <param name="build">The version facts of the editor. Documentation opens the help pages of this build.</param>
-    /// <param name="editorFolder">The folder of the editor program, for example <c>AppContext.BaseDirectory</c>.</param>
+    /// <param name="editorFolder">The folder of the editor program, for example
+    /// <c>AppContext.BaseDirectory</c>.</param>
     public static IReadOnlyList<HelpItem> Items(BuildVersion build, string editorFolder)
     {
         var readme = HelpLinks.GettingStarted(editorFolder);

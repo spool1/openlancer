@@ -296,7 +296,8 @@ public sealed class HelpMenuTests : IDisposable
         Assert.Equal(EditorKeys.Global.Length + EditorKeys.Scene.Length + GizmoInput.ToolKeys.Length + 1 +
                      SceneView.MouseControls.Length + EditorKeys.Hierarchy.Length + PreviewKeys.Table.Length,
             rows.Count);
-        Assert.Equal([KeysWindow.Global, KeysWindow.Scene, KeysWindow.SceneMouse, KeysWindow.Hierarchy, KeysWindow.Preview],
+        Assert.Equal(
+            [KeysWindow.Global, KeysWindow.Scene, KeysWindow.SceneMouse, KeysWindow.Hierarchy, KeysWindow.Preview],
             rows.Select(r => r.Group).Distinct());
     }
 

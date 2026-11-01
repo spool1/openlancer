@@ -105,7 +105,8 @@ internal sealed class PlayMenu(EditorWindow window)
         var play = window.Play;
         var block = CameraBlock();
         // F5 runs one of the two items: the mission play in the Mission tab with an open mission, else this one.
-        if (ImGui.MenuItem($"{EditorIcons.Play}   Play from camera", OpenMission == null ? EditorKeys.Play.Chord.Text : "", false, block == null))
+        var playKey = OpenMission == null ? EditorKeys.Play.Chord.Text : "";
+        if (ImGui.MenuItem($"{EditorIcons.Play}   Play from camera", playKey, false, block == null))
         {
             PlayFromCamera();
         }
@@ -202,7 +203,8 @@ internal sealed class PlayMenu(EditorWindow window)
             return;
         }
 
-        if (ImGui.MenuItem($"From the play start ({plays.StartNameOf(script!)})", OpenMission == script ? EditorKeys.Play.Chord.Text : ""))
+        if (ImGui.MenuItem($"From the play start ({plays.StartNameOf(script!)})",
+                OpenMission == script ? EditorKeys.Play.Chord.Text : ""))
         {
             plays.PlayFromPlayStart(script!);
         }
