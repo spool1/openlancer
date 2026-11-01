@@ -410,7 +410,7 @@ internal sealed partial class ModsWindow
         var folder = row.History.Newest?.Folder is { } last && Directory.Exists(last)
             ? last
             : PublishHistory.FolderOf(Workspace, row.Id);
-        FolderActions.Open(window, folder);
+        FolderActions.Open(window, Source, folder);
     }
 
     /// <summary>Opens the file dialog of Add images. The files go into the draft (decision D586).</summary>

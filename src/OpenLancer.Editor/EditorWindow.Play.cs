@@ -114,7 +114,7 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
     void IGamePlayHost.Ask(string title, string message, IReadOnlyList<Choice> choices) =>
         Choice.Show(title, message, choices);
 
-    void IGamePlayHost.ChooseFolder(Action<string> chosen) => FolderActions.Choose(this, chosen);
+    void IGamePlayHost.ChooseFolder(Action<string> chosen) => FolderActions.Choose(this, GamePlay.Source, chosen);
 
     IReadOnlyList<string> IGamePlayHost.ProtectedFolders() =>
         PlayCopy.ProtectedFolders(Settings.WorkspaceOrDefault, Session?.Profile);

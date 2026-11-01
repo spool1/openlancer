@@ -145,7 +145,7 @@ internal sealed class GameLinkWindow(EditorWindow window)
         ImGui.EndGroup();
         if (CardLayout.Buttons(true, link) == 0)
         {
-            FolderActions.Choose(window, Link);
+            FolderActions.Choose(window, GameLinks.Source, Link);
         }
 
         if (linking != null)
@@ -210,7 +210,7 @@ internal sealed class GameLinkWindow(EditorWindow window)
         CardLayout.SmallSpace();
         if (CardLayout.FolderWithOpenLink(game.Path, report is not { FolderMissing: true }))
         {
-            FolderActions.Open(window, game.Path);
+            FolderActions.Open(window, GameLinks.Source, game.Path);
         }
 
         if (CardLayout.BeginFacts("##facts"))
@@ -275,7 +275,7 @@ internal sealed class GameLinkWindow(EditorWindow window)
         CardLayout.SmallSpace();
         if (ImGui.Button("Open play copy"))
         {
-            FolderActions.Open(window, info.Folder);
+            FolderActions.Open(window, GameLinks.Source, info.Folder);
         }
 
         ImGui.SameLine();
@@ -361,7 +361,7 @@ internal sealed class GameLinkWindow(EditorWindow window)
         ImGui.SameLine();
         if (ImGui.Button("Relink..."))
         {
-            FolderActions.Choose(window, folder => links.Relink(game.Path, folder));
+            FolderActions.Choose(window, GameLinks.Source, folder => links.Relink(game.Path, folder));
         }
 
         ImGui.SetItemTooltip("Select the new folder of this game, for example after you moved it. The profiles of this " +

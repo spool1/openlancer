@@ -222,7 +222,7 @@ internal sealed class ExportDialog : ModalDialog
         ImGui.Text($"Output folder {folder}");
         ImGui.SameLine();
         if (ImGui.SmallButton("Change..."))
-            FolderActions.Choose(window, path => folder = path);
+            FolderActions.Choose(window, Source, path => folder = path);
         var versionProblem = ModVersion.SafeProblem(mod.Manifest.Version);
         if (versionProblem == null)
             CardLayout.Dim($"This export writes to {ModExport.VersionFolder(folder, mod.Manifest)}.");
@@ -561,7 +561,7 @@ internal sealed class ExportDialog : ModalDialog
         }
         ImGui.Spacing();
         if (Button("Open folder", enabled: Directory.Exists(done.OutputFolder)))
-            FolderActions.Open(window, done.OutputFolder);
+            FolderActions.Open(window, Source, done.OutputFolder);
         ImGui.SameLine();
         if (Button("Open in Mods window"))
             OpenMods(null);

@@ -123,7 +123,7 @@ internal sealed class HistoryTab(EditorWindow window, ModsWindow mods)
         ImGui.BeginDisabled(!exists);
         if (CardLayout.IconButton(EditorIcons.FolderOpen, exists ? $"Open {entry.Folder}" : $"{entry.Folder} does not exist."))
         {
-            FolderActions.Open(window, entry.Folder);
+            FolderActions.Open(window, ModsWindow.Source, entry.Folder);
         }
 
         ImGui.EndDisabled();

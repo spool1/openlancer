@@ -154,7 +154,7 @@ internal static partial class PageTextView
                 ImGui.SetTooltip($"Open {span.Url} in the browser.");
                 if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
                 {
-                    FolderActions.OpenWebLink(window, span.Url!);
+                    FolderActions.OpenWebLink(window, ModsWindow.Source, span.Url!);
                 }
             }
             else

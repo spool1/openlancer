@@ -70,7 +70,7 @@ internal sealed class ModHeader(EditorWindow window, ModsWindow mods)
         {
             if (ImGui.Button("Open folder"))
             {
-                FolderActions.Open(window, row.Folder);
+                FolderActions.Open(window, ModsWindow.Source, row.Folder);
             }
 
             return;
@@ -196,7 +196,7 @@ internal sealed class ModHeader(EditorWindow window, ModsWindow mods)
         ImGui.Separator();
         if (ImGui.MenuItem("Open folder"))
         {
-            FolderActions.Open(window, row.Folder);
+            FolderActions.Open(window, ModsWindow.Source, row.Folder);
         }
 
         if (ImGui.MenuItem("Open export folder"))

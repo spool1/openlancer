@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using OpenLancer.Data;
@@ -127,6 +128,26 @@ public sealed class HelpMenuTests : IDisposable
 
         Assert.Equal(HelpLinks.NoReadmeFirst, file.Reason);
         Assert.False(FolderActions.IsTextFile(file.Path));
+    }
+
+    /// <summary>Each folder action takes the Console source of the view that asks. The Help menu gives its own source,
+    /// so an item that does not open shows in the Console as a Help error, not as a Game link error.</summary>
+    [Fact]
+    public void TheHelpMenuGivesTheFolderActionsItsOwnConsoleSource()
+    {
+        var actions = typeof(FolderActions).GetMethods(BindingFlags.Public | BindingFlags.Static);
+        var helpCalls = IlWalker.Calls(typeof(HelpMenu))
+            .Where(c => c.Callee.DeclaringType == typeof(FolderActions))
+            .Select(c => c.Caller)
+            .Distinct()
+            .ToList();
+        var helpLiterals = IlWalker.Literals(typeof(HelpMenu)).ToList();
+
+        Assert.All(actions, m => Assert.Contains(m.GetParameters(), p => p is { Name: "source" } &&
+                                                                          p.ParameterType == typeof(string)));
+        Assert.Empty(IlWalker.Literals(typeof(FolderActions)).Where(l => l.Text == GameLinks.Source));
+        Assert.Equal(3, helpCalls.Count);
+        Assert.All(helpCalls, m => Assert.Contains(helpLiterals, l => l.Method == m && l.Text == HelpMenu.Source));
     }
 
     [Fact]

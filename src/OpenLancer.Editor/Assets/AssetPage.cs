@@ -156,7 +156,7 @@ internal sealed class AssetPage(EditorWindow window)
         ImGui.SameLine();
         if (ImGui.Button($"{EditorIcons.FolderOpen}  Show in folder"))
         {
-            FolderActions.Open(window, Path.GetDirectoryName(group.File)!);
+            FolderActions.Open(window, AssetsPanel.Source, Path.GetDirectoryName(group.File)!);
         }
 
         foreach (var problem in group.Problems)

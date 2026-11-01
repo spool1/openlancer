@@ -88,6 +88,10 @@ internal interface IHelpMenuHost
 /// </summary>
 internal sealed class HelpMenu(EditorWindow window) : IHelpMenuHost
 {
+    /// <summary>The Console source of the lines of the Help menu: the info line of Report a problem and the error of
+    /// an item that does not open.</summary>
+    internal const string Source = "Help";
+
     /// <summary>The Console line after Report a problem copied the header.</summary>
     internal const string ReportCopied =
         "The editor copied the version, the commit, the game and the Windows version. Paste the text into the first " +
@@ -196,15 +200,15 @@ internal sealed class HelpMenu(EditorWindow window) : IHelpMenuHost
         ProfileGame is { } root && window.Links.ReportOf(root) == null &&
         (window.Links.IsChecking(root) || window.Links.Find(root) != null);
 
-    void IHelpMenuHost.OpenWebLink(string url) => FolderActions.OpenWebLink(window, url);
+    void IHelpMenuHost.OpenWebLink(string url) => FolderActions.OpenWebLink(window, Source, url);
 
-    void IHelpMenuHost.OpenTextFile(string path) => FolderActions.OpenTextFile(window, path);
+    void IHelpMenuHost.OpenTextFile(string path) => FolderActions.OpenTextFile(window, Source, path);
 
-    void IHelpMenuHost.OpenFolder(string path) => FolderActions.Open(window, path);
+    void IHelpMenuHost.OpenFolder(string path) => FolderActions.Open(window, Source, path);
 
     void IHelpMenuHost.CopyText(string text) => ImGui.SetClipboardText(text);
 
-    void IHelpMenuHost.Info(string text) => window.Log.Add(ConsoleSeverity.Info, EditorWindow.EditorSource, text);
+    void IHelpMenuHost.Info(string text) => window.Log.Add(ConsoleSeverity.Info, Source, text);
 
     void IHelpMenuHost.ShowKeys() => keys.Open();
 

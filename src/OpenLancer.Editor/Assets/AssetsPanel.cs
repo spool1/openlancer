@@ -30,6 +30,9 @@ internal sealed class AssetsPanel : IDisposable
 {
     public const string PanelId = "assets";
 
+    /// <summary>The Console source of the errors of the panel, for example a folder that does not open.</summary>
+    public const string Source = "Assets";
+
     // The empty states of the Assets panel (#56). The next action of a search without a match is a link.
     internal static readonly EmptyState NoAssetMatch =
         new($"No asset matches '{EmptyState.TextPlace}'.", "Clear search");
@@ -664,7 +667,7 @@ internal sealed class AssetsPanel : IDisposable
         if (MenuItems.Item(EditorIcons.TrashAlt, "Delete", groupReason, shortcut: "Delete"))
             window.SceneEdits.DeleteGroup(group);
         if (Theme.IconMenuItem(EditorIcons.FolderOpen, "Show in folder", true))
-            FolderActions.Open(window, Path.GetDirectoryName(group.File)!);
+            FolderActions.Open(window, Source, Path.GetDirectoryName(group.File)!);
     }
 
     /// <summary>The keys of the panel while it has the focus and no text field is active (section 6.4).</summary>

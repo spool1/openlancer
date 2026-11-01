@@ -181,7 +181,7 @@ internal sealed class NewProfileForm(EditorWindow window)
 
     /// <summary>Asks for a new workspace folder. A folder whose profiles or mods folder is in a game folder is refused
     /// (decision D204). The new folder applies to new profiles only (decision D216).</summary>
-    private void ChangeWorkspace() => FolderActions.Choose(window, folder =>
+    private void ChangeWorkspace() => FolderActions.Choose(window, GameLinks.Source, folder =>
     {
         try
         {

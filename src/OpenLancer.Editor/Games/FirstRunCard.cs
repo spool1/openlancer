@@ -156,7 +156,7 @@ internal sealed class FirstRunCard(EditorWindow window)
         // The check read the folder right now, so it exists.
         if (CardLayout.FolderWithOpenLink(found.Root!, true))
         {
-            FolderActions.Open(window, found.Root!);
+            FolderActions.Open(window, GameLinks.Source, found.Root!);
         }
 
         CardLayout.Gap();
@@ -200,7 +200,7 @@ internal sealed class FirstRunCard(EditorWindow window)
         CardLayout.SmallSpace();
         if (CardLayout.FolderWithOpenLink(found.Folder, !found.FolderMissing))
         {
-            FolderActions.Open(window, found.Folder);
+            FolderActions.Open(window, GameLinks.Source, found.Folder);
         }
 
         GameReportView.Details(found, GameReportView.Notes(found));
@@ -224,5 +224,5 @@ internal sealed class FirstRunCard(EditorWindow window)
         ImGui.SetItemTooltip("Shows the normal Welcome page for this start.");
     }
 
-    private void ChooseFolder() => FolderActions.Choose(window, Check);
+    private void ChooseFolder() => FolderActions.Choose(window, GameLinks.Source, Check);
 }
