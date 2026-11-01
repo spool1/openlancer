@@ -113,7 +113,8 @@ internal sealed class HelpMenu(EditorWindow window) : IHelpMenuHost
         return
         [
             new HelpItem(EditorIcons.Book, "Documentation",
-                "Opens the help pages of this version of OpenLancer in the browser.", HelpAction.WebLink,
+                "Opens the README of this version of OpenLancer in the browser. It links the help pages.",
+                HelpAction.WebLink,
                 HelpLinks.Documentation(build)),
             new HelpItem(EditorIcons.QuestionCircle, "Getting started",
                 "Opens README-FIRST.txt: the first steps, the system requirements and what this version can do.",

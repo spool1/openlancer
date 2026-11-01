@@ -36,9 +36,10 @@ internal static class HelpLinks
     /// <summary>The folder of Open log folder: the log files of the editor and of the game of Play.</summary>
     public static string LogFolder => RunLogs.Folder;
 
-    /// <summary>The help pages of a build: the <c>docs</c> folder of its release tag. A development build gets the folder
-    /// of its commit, and a build without a commit gets master (see <see cref="BuildVersion.DocsRef"/>).</summary>
-    public static string Documentation(BuildVersion build) => $"{Repository}/tree/{build.DocsRef}/docs";
+    /// <summary>The start page of the help of a build: the README of its release tag, which tells how to use the editor
+    /// and links each help page. The <c>docs</c> folder has no start page. A development build gets the README of its
+    /// commit, and a build without a commit gets master (see <see cref="BuildVersion.DocsRef"/>).</summary>
+    public static string Documentation(BuildVersion build) => $"{Repository}/blob/{build.DocsRef}/README.md";
 
     /// <summary>The file of Getting started: <see cref="ReadmeFirst"/> in the folder of the editor.</summary>
     /// <param name="editorFolder">The folder of the editor program, for example <c>AppContext.BaseDirectory</c>.</param>

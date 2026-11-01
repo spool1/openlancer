@@ -70,16 +70,30 @@ public sealed class HelpMenuTests : IDisposable
     [Fact]
     public void DocumentationOpensTheTagOfAReleaseAndTheCommitOfADevelopmentBuild()
     {
-        Assert.Equal("https://github.com/spool1/openlancer/tree/v1.0.0-beta.1/docs",
+        Assert.Equal("https://github.com/spool1/openlancer/blob/v1.0.0-beta.1/README.md",
             HelpLinks.Documentation(BuildInfo.Parse("1.0.0-beta.1+abc1234", null)));
-        Assert.Equal("https://github.com/spool1/openlancer/tree/v1.0.0/docs",
+        Assert.Equal("https://github.com/spool1/openlancer/blob/v1.0.0/README.md",
             HelpLinks.Documentation(BuildInfo.Parse("1.0.0", null)));
-        Assert.Equal($"https://github.com/spool1/openlancer/tree/{Hash}/docs",
+        Assert.Equal($"https://github.com/spool1/openlancer/blob/{Hash}/README.md",
             HelpLinks.Documentation(BuildInfo.Parse($"1.0.0-dev+{Hash}", null)));
-        Assert.Equal("https://github.com/spool1/openlancer/tree/master/docs",
+        Assert.Equal("https://github.com/spool1/openlancer/blob/master/README.md",
             HelpLinks.Documentation(BuildInfo.Parse("1.0.0-dev", null)));
-        Assert.Equal($"https://github.com/spool1/openlancer/tree/{BuildInfo.DocsRef}/docs",
+        Assert.Equal($"https://github.com/spool1/openlancer/blob/{BuildInfo.DocsRef}/README.md",
             HelpLinks.Documentation(BuildInfo.Current));
+    }
+
+    /// <summary>Documentation opens a start page for a player: the README, which has the Help menu part and links the
+    /// help pages. The docs folder has no start page, so GitHub would show a bare file list.</summary>
+    [Fact]
+    public void DocumentationOpensAStartPageThatLinksTheHelpPages()
+    {
+        var link = HelpLinks.Documentation(BuildInfo.Parse("1.0.0", null));
+        var readme = File.ReadAllText(RepoFiles.Of(link[link.LastIndexOf('/')..].TrimStart('/')));
+
+        Assert.Contains("## Help menu", readme);
+        Assert.All(new[] { "GAME_LINK", "PLAY", "MOD_FORMAT", "MISSIONS", "CUTSCENES", "MCP" },
+            page => Assert.Contains($"(docs/{page}.md)", readme));
+        Assert.False(File.Exists(RepoFiles.Of("docs", "README.md")));
     }
 
     [Fact]
@@ -249,7 +263,7 @@ public sealed class HelpMenuTests : IDisposable
             return host.Calls;
         });
 
-        Assert.Equal([$"web {HelpLinks.Repository}/tree/{Hash}/docs"], calls["Documentation"]);
+        Assert.Equal([$"web {HelpLinks.Repository}/blob/{Hash}/README.md"], calls["Documentation"]);
         Assert.Equal([$"text {Path.GetFullPath(readme)}"], calls["Getting started"]);
         Assert.Equal(["keys"], calls["Keys..."]);
         Assert.Equal([$"web {HelpLinks.Discord}"], calls["Discord"]);
