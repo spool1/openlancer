@@ -6,10 +6,13 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Authors>OpenLancer contributors</Authors>
     <Copyright>Copyright (c) OpenLancer contributors 2026</Copyright>
-    <!-- The version of the next release. A release changes only these two lines. The file version is 0.1.0.0, and the
-         product version is 0.1.0-preview. tools/release.ps1 adds "+<commit>" to the product version. -->
-    <VersionPrefix>0.1.0</VersionPrefix>
-    <VersionSuffix>preview</VersionSuffix>
+    <!-- The version. Master holds the next version with the suffix "dev", for example 1.0.0-dev. A release commit sets
+         the suffix of the release, for example beta.1 or rc.1, or no suffix for the final version. After each release,
+         master goes to the next version with the suffix dev. A version change touches only these two lines. The file
+         version is 1.0.0.0. tools/release.ps1 adds "+<commit>" to the product version, and Source Link adds it in a
+         Debug build. BuildInfo reads the version. -->
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionSuffix>dev</VersionSuffix>
   </PropertyGroup>
   <!-- A Release build maps the repo folder to a neutral path, so the binaries and PDBs do not hold the folder of the
        build machine. Source Link is off, because its map holds the same folder and the repo URLs.

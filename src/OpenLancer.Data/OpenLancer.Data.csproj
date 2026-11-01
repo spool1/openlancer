@@ -23,6 +23,32 @@
     <EmbeddedResource Include="..\..\data-manifest\*.tsv" LogicalName="OpenLancer.Data.Games.%(Filename).tsv" />
   </ItemGroup>
 
+  <!-- The engine commit of the build, as the assembly metadata "EngineCommit" (BuildInfo.EngineCommit). tools/release.ps1
+       gives it in the property OpenLancerEngineCommit. Else the build reads the HEAD of the engine checkout with git.
+       Only a checkout of its own has a .git entry. Without it, git would give the commit of the folder above. The
+       command drops the error output, and the build keeps the output only when it is 40 hex characters. So without git
+       or without the checkout, the build writes no metadata and gives no warning. -->
+  <Target Name="AddEngineCommit" BeforeTargets="GetAssemblyAttributes">
+    <PropertyGroup>
+      <_EngineFolder>$(MSBuildThisFileDirectory)../../external/Librelancer</_EngineFolder>
+      <_NullDevice Condition="$([MSBuild]::IsOSPlatform('Windows'))">nul</_NullDevice>
+      <_NullDevice Condition="'$(_NullDevice)' == ''">/dev/null</_NullDevice>
+    </PropertyGroup>
+    <Exec Condition="'$(OpenLancerEngineCommit)' == '' and Exists('$(_EngineFolder)/.git')"
+          Command="git -C &quot;$(_EngineFolder)&quot; rev-parse HEAD 2&gt;$(_NullDevice)"
+          EchoOff="true" ConsoleToMSBuild="true" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true"
+          StandardOutputImportance="low" StandardErrorImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_EngineHead" />
+    </Exec>
+    <PropertyGroup Condition="'$(OpenLancerEngineCommit)' == '' and
+                              $([System.Text.RegularExpressions.Regex]::IsMatch('$(_EngineHead)', '^[0-9a-f]{40}$'))">
+      <OpenLancerEngineCommit>$(_EngineHead)</OpenLancerEngineCommit>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(OpenLancerEngineCommit)' != ''">
+      <AssemblyMetadata Include="EngineCommit" Value="$(OpenLancerEngineCommit)" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <!-- The shared command layer and the agent tools read the edit session as the commands of DA do: the system files,
          the nicknames, the data lists and the documents (section 4.0.2 of the M6b design). -->

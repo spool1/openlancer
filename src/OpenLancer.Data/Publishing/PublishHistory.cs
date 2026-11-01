@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -261,9 +260,7 @@ public sealed class PublishHistory
     public List<HistoryCheck> Checks { get; set; } = [];
 
     /// <summary>The informational version of OpenLancer, with the commit when the build has it.</summary>
-    public static string OpenLancerVersion { get; } =
-        typeof(PublishHistory).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-        ?? "unknown";
+    public static string OpenLancerVersion => BuildInfo.Informational;
 
     /// <summary>The history folder of a mod: <c>&lt;workspace&gt;\exports\&lt;mod id&gt;</c>.</summary>
     public static string FolderOf(string workspace, string modId) =>

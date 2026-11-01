@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -61,8 +60,7 @@ public static class McpBinding
     };
 
     /// <summary>The version of OpenLancer, for the server information.</summary>
-    public static string Version =>
-        typeof(McpBinding).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0";
+    public static string Version => BuildInfo.Informational;
 
     /// <summary>
     /// Sets the server information, the instructions, the capabilities and the handlers of the tools, the resources and
