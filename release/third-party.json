@@ -35,7 +35,7 @@
       "files": ["LibreLancer.dll", "LibreLancer.*.dll"],
       "texts": ["repo:external/Librelancer/LICENSE"],
       "holders": ["Callum McGing", "Librelancer Contributors", "Malte Rupprecht", "Mono.Xna Team", "Lazrius", "@Giperionn"],
-      "note": "Includes the Mono.Xna portions, and empty-bullet.ttf, bell.ogg and checkerboard.png in LibreLancer.ImUI.dll (R1-D7). file.png and folder.png in LibreLancer.ImUI.dll are new images of the fork commit OL-0037 (R1-D20). The thorncompiler wrapper in x64/thorncompiler.dll has no license file. The Librelancer maintainer wrote it, so it is listed here."
+      "note": "Includes the Mono.Xna portions, and empty-bullet.ttf, bell.ogg and checkerboard.png in LibreLancer.ImUI.dll. file.png and folder.png in LibreLancer.ImUI.dll are new images of the fork commit OL-0037. The thorncompiler wrapper in x64/thorncompiler.dll has no license file. The Librelancer maintainer wrote it, so it is listed here."
     },
     {
       "id": "sdl2-cs", "name": "SDL2# (C# bindings by Ethan Lee)", "version": "in LibreLancer.Base", "license": "Zlib",
@@ -158,7 +158,7 @@
       "packages": ["ModelContextProtocol.Core", "ModelContextProtocol", "ModelContextProtocol.AspNetCore"],
       "copyright": ["Copyright (c) 2024-2026 Model Context Protocol a Series of LF Projects, LLC.", "Copyright (c) 2024 Peder Holdgaard Pedersen (mcpdotnet)", "Copyright (c) .NET Foundation and Contributors (Polyfills)"],
       "texts": ["repo:release/licenses/Apache-2.0.txt", "repo:release/licenses/MIT.txt"],
-      "note": "The agent server of oltool and of the editor (milestone MCP1). The repository of the SDK moves from the MIT License to the Apache License 2.0. Parts whose authors did not agree to the change stay under the MIT License. The packages hold no license file, so the texts come from release/licenses."
+      "note": "The agent server of oltool and of the editor uses this SDK. The repository of the SDK moves from the MIT License to the Apache License 2.0. Parts whose authors did not agree to the change stay under the MIT License. The packages hold no license file, so the texts come from release/licenses."
     },
     {
       "id": "castle-core", "name": "Castle Core", "version": "NuGet package", "license": "Apache-2.0",
@@ -181,7 +181,7 @@
       "id": "aspnetcore-runtime", "name": "ASP.NET Core shared framework (self-contained)", "version": "runtime pack of the publish", "license": "MIT, with third-party notices",
       "packages": ["runtimepack.Microsoft.AspNetCore.App.Runtime.win-x64"],
       "texts": ["nuget:Microsoft.AspNetCore.App.Runtime.win-x64/LICENSE.txt", "nuget:Microsoft.AspNetCore.App.Runtime.win-x64/THIRD-PARTY-NOTICES.TXT"],
-      "note": "The agent server of the editor (milestone MCP1) uses Kestrel of ASP.NET Core on 127.0.0.1."
+      "note": "The agent server of the editor uses Kestrel of ASP.NET Core on 127.0.0.1."
     },
     {
       "id": "sdl3", "name": "SDL", "version": "3.2.0", "license": "Zlib",
@@ -194,7 +194,7 @@
       "files": ["x64/soft_oal.dll"],
       "copyright": ["x64/soft_oal.dll is OpenAL Soft. OpenLancer uses it as a library that it loads at run time. You can replace the file with your own build of OpenAL Soft.", "The source code is the file openal-soft-1.25.2.tar.gz on the release page of this release."],
       "texts": ["repo:external/Librelancer/deps/openal-soft-sourceurl.txt", "repo:external/Librelancer/deps/openal-soft-license.txt"],
-      "note": "The DLL holds the version 1.25.2 and the commit b2c48f771 of the tag 1.25.2, so the tag is its source. Its version resource says 1.25.1, from an older object of an incremental build (R1-D19). The other components with 'OpenAL Soft' in their name are the parts under other licenses. Its bundled fmt 11.2.0 (MIT with an exception for object code) and its public-domain AL headers need no notice in the DLL. The ghc filesystem code (MIT) is not compiled, because GCC 15 has std::filesystem. The LGPL text in this file comes from the engine fork. It has the old address of the Free Software Foundation and the appendix of the license. COPYING of the 1.25.2 archive has the new address and no appendix. The terms are the same."
+      "note": "The DLL holds the version 1.25.2 and the commit b2c48f771 of the tag 1.25.2, so the tag is its source. Its version resource says 1.25.1, from an older object of an incremental build. The other components with 'OpenAL Soft' in their name are the parts under other licenses. Its bundled fmt 11.2.0 (MIT with an exception for object code) and its public-domain AL headers need no notice in the DLL. The ghc filesystem code (MIT) is not compiled, because GCC 15 has std::filesystem. The LGPL text in this file comes from the engine fork. It has the old address of the Free Software Foundation and the appendix of the license. COPYING of the 1.25.2 archive has the new address and no appendix. The terms are the same."
     },
     {
       "id": "openal-soft-pffft", "name": "PFFFT (in OpenAL Soft)", "version": "in OpenAL Soft 1.25.2", "license": "BSD-style (FFTPACK)",

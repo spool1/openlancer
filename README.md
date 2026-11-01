@@ -181,6 +181,6 @@ The server also gives the rules of the missions and the catalog of the prefabs a
 
 | Part | Tools |
 |---|---|
-| Cutscene edits (MCP1-4) | `cutscene_create`, `cutscene_add_entity`, `cutscene_add_event`, `cutscene_move_events`, `cutscene_set_duration`, `cutscene_set_flags` |
+| Cutscene edits | `cutscene_create`, `cutscene_add_entity`, `cutscene_add_event`, `cutscene_move_events`, `cutscene_set_duration`, `cutscene_set_flags` |
 
 Examples of requests to an agent now: "Show me an image of New York from above." "Which triggers of Mission 4 spawn ships, and when?" "Run Mission 1 in a dry run up to the first checkpoint, and tell me which triggers wait." "Make a patrol route with three legs in New York, put a wreck with cargo at its end, and save the mod." "Add a pirate ambush with two triggers after the launch of Mission 2, and run it in a dry run."

@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 import struct
 import sys
 import tempfile
@@ -390,6 +391,49 @@ class ZipTests(RepoFixture):
         with zipfile.ZipFile(bad, "w") as z:
             z.writestr("OpenLancer-v1/app.dll", b"retail!!!")
         self.assertEqual(["b: identical to a retail file: app.dll"], rc.check_zip(bad, self.repo))
+
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def internal_ids(repo):
+    """A pattern of the internal IDs of the project. It finds the word "milestone" and a decision ID such as D81 or
+    R1-D8. It also finds an ID of the first column of ROADMAP.md, with or without a part suffix. A folder of a path is
+    not an ID."""
+    ids = set()
+    with open(os.path.join(repo, "ROADMAP.md"), encoding="utf-8") as f:
+        for line in f:
+            cell = line.split("|")[1].strip() if line.startswith("|") else ""
+            if re.match(r"[A-Za-z]+\d", cell):
+                ids.add(re.sub(r"-\d+$", "", cell))
+    roadmap = "|".join(sorted(map(re.escape, ids), key=len, reverse=True))
+    return re.compile(rf"(?i:\bmilestone\b)|(?<![\w\\/])(?:{roadmap})(?:-\d+)?(?!\w)|\b(?:R\d+-)?D\d+\b")
+
+
+class InternalIdTests(unittest.TestCase):
+    """The texts for players and new contributors give plain reasons, not the internal IDs of the project (#56)."""
+
+    def setUp(self):
+        self.pattern = internal_ids(REPO)
+
+    def test_the_pattern_finds_the_internal_ids(self):
+        for text, found in (("(milestone MCP1)", "milestone"), ("MCP1-4", "MCP1-4"), ("R1-D8", "R1"),
+                            ("decision D81", "D81"), ("the M3b part", "M3b")):
+            self.assertEqual(found, self.pattern.search(text).group(0), text)
+        for text in ("CC0", "SDL3", "OL-0037", "the milestones", r"DATA\MISSIONS\M11\m11.ini", "M02"):
+            self.assertIsNone(self.pattern.search(text), text)
+
+    def test_the_component_notes_name_no_internal_id(self):
+        """Each note goes into licenses/<id>.txt of the release zip."""
+        with open(os.path.join(REPO, "release", "third-party.json"), encoding="utf-8") as f:
+            data = json.load(f)
+        found = [(c["id"], m.group(0)) for c in data["components"] for m in self.pattern.finditer(c.get("note", ""))]
+        self.assertEqual([], found)
+
+    def test_the_readme_names_no_internal_id(self):
+        with open(os.path.join(REPO, "README.md"), encoding="utf-8") as f:
+            found = [(n, m.group(0)) for n, line in enumerate(f, 1) for m in self.pattern.finditer(line)]
+        self.assertEqual([], found)
 
 
 if __name__ == "__main__":
