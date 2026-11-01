@@ -269,7 +269,9 @@ For an exit code other than 0 or 3, the Console gives the cause and the path of 
 
 When the validation finds errors and the game closes during its load, the Console names the validation errors as the cause.
 
-Each start of the game moves the log of the last run to the previous log, `OpenLancer.Play.log.previous.txt` in the same folder. So a new Play does not delete the log of a crash. When a log reaches its size limit of 32 MiB, its older lines go to `OpenLancer.Play.log.old.txt`. That file moves with the log, to `OpenLancer.Play.log.previous.old.txt`. The editor keeps the log of its last session in the same way, in `OpenLancer.Editor.log.previous.txt`.
+Each start of the game moves the log of the last run to the previous log, `OpenLancer.Play.log.previous.txt` in the same folder. So the next Play keeps the log of a crash. The Play after that replaces the previous log, so copy the log of a crash before that Play. When a log reaches its size limit of 32 MiB, its older lines go to `OpenLancer.Play.log.old.txt`. That file moves with the log, to `OpenLancer.Play.log.previous.old.txt`.
+
+The editor keeps the log of its last session in the same way, in `OpenLancer.Editor.log.previous.txt`. As for the game, the second start of the editor after a crash replaces the log of the crash.
 
 The Console report of a crash during the validation of its save waits for the result of the validation. When you stop Play first, the Console reports the crash at once. When you start Play again first, the Console reports the crash when the new game starts. Then the line names the previous log, because the new game moved the log of the crash there. When the new Play does not start, the line names the game log.
 
