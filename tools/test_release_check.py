@@ -579,12 +579,53 @@ class InternalIdTests(unittest.TestCase):
 
 
 class ReleaseScriptTests(unittest.TestCase):
-    def test_the_release_script_names_no_folder_of_a_machine(self):
-        """The default work root of tools/release.ps1 is a rule, not a folder of one machine (#57)."""
+    """The rules of the steps of tools/release.ps1 (#57). The tools tests cannot run the script, so they read its text."""
+
+    @classmethod
+    def setUpClass(cls):
         with open(os.path.join(REPO, "tools", "release.ps1"), encoding="utf-8") as f:
-            found = [(n, m.group(0)) for n, line in enumerate(f, 1)
-                     for m in re.finditer(r"(?<![\w$])[A-Za-z]:[\\/][^\s'\"]*", line)]
+            cls.text = f.read()
+
+    def step(self, heading):
+        """The text of one step: from its heading comment to the next rule line."""
+        match = re.search(rf"^# {re.escape(heading)}\n(.*?)^# -{{20,}}$", self.text, re.M | re.S)
+        self.assertIsNotNone(match, heading)
+        return match.group(1)
+
+    def test_the_release_script_names_no_folder_of_a_machine(self):
+        """The default work root of tools/release.ps1 is a rule, not a folder of one machine."""
+        found = [(n, m.group(0)) for n, line in enumerate(self.text.splitlines(), 1)
+                 for m in re.finditer(r"(?<![\w$])[A-Za-z]:[\\/][^\s'\"]*", line)]
         self.assertEqual([], found)
+
+    def test_the_preflight_checks_the_work_root_and_names_the_zip(self):
+        """Both checks stop the run before it writes a file or clones. The zip name comes only from the name command."""
+        preflight = self.step("1. Preflight")
+        work_root = preflight.index("'work-root', $script:Root")
+        self.assertLess(work_root, preflight.index("New-Item -ItemType Directory"))
+        self.assertIn("'name', '--version', $buildVersion", preflight)
+        self.assertIn("$forbid = @($sourcePaths | ForEach-Object", self.text)
+        self.assertNotIn("Split-Path -Parent $devFull", self.text)
+        steps = self.text[self.text.index("# 1. Preflight"):]
+        self.assertNotIn("win-x64.zip", steps)
+
+    def test_the_tests_leave_out_the_tests_that_write_next_to_the_game_data(self):
+        tests = self.step("4. Tests")
+        left_out = re.search(r"\$notNextToData = '([^']*)'", tests).group(1).split("&")
+        self.assertEqual(["FullyQualifiedName!~PlayCopyRetailTests", "FullyQualifiedName!~RandomEditTests",
+                          "FullyQualifiedName!~SampleModTests"], left_out)
+        runs = re.findall(r"Invoke-Native \$dotnet @\('test', '([^']+)'(.*?)\) \$src([^\n]*)", tests, re.S)
+        projects = {project: (arguments, tail) for project, arguments, tail in runs}
+        self.assertEqual({"OpenLancer.slnx", "tests\\OpenLancer.DataTests",
+                          "external\\Librelancer\\src\\LibreLancer.Tests\\LibreLancer.Tests.csproj"}, set(projects))
+        self.assertIn('"$notNextToData&Category!=Performance"', projects["OpenLancer.slnx"][0])
+        gates, tail = projects["tests\\OpenLancer.DataTests"]
+        self.assertIn('"Category=Performance&$notNextToData"', gates)
+        self.assertEqual(" -Tries 2", tail)
+
+    def test_the_publish_names_the_engine_commit(self):
+        """Help > About shows the engine commit."""
+        self.assertIn('"-p:OpenLancerEngineCommit=$forkSha"', self.step("5. Publish"))
 
 
 if __name__ == "__main__":
