@@ -161,8 +161,8 @@ public static class ThnEdits
         $"{(timeDelta == 0 && lengthDelta != 0 ? "Change the length of" : "Move")} {(count == 1 ? "event" : $"{count} events")}";
 
     /// <summary>
-    /// Why <see cref="MoveEvents"/> cannot give the events of W their new values now, or null when it can: a time or a
-    /// length to change is not a number, or the move puts an event before 0 or gives it a negative length. The run of
+    /// Why <see cref="MoveEvents"/> cannot give the events of W their new values now, or null when it can. The reasons
+    /// are: a time or a length to change is not a number, an event starts before 0, or a length is negative. The run of
     /// the move refuses with the same reason, so a caller can refuse before the run.
     /// </summary>
     /// <remarks>This check looks only at the values. The run can refuse an event for another reason first: W does not

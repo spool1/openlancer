@@ -127,8 +127,8 @@ public static class CutsceneCommands
             ? curve
             : null;
 
-    /// <summary>The install path of a script in the form that the session stores, or the path as it is when the
-    /// session cannot open the script. So a plan names a script in one form, whatever the letter case or the separators
-    /// of the caller.</summary>
+    /// <summary>The install path of a script in the form that the session stores, or the given path when the session
+    /// cannot open the script. So a plan names a script in one form, whatever the letter case or the separators of the
+    /// caller.</summary>
     private static string ScriptPath(EditSession session, string path) => session.CutsceneDocument(path)?.Path ?? path;
 }

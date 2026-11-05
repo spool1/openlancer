@@ -62,7 +62,7 @@ public sealed class CutscenePlan : EditPlan
     /// <param name="label">The label of the entry of the edit history.</param>
     /// <param name="path">The install path of the script, in the form that the session stores.</param>
     /// <param name="changed">The elements of the script that the command changes and keeps, or null. They can repeat,
-    /// and their paths can have another letter case.</param>
+    /// and each path can name the script in another form.</param>
     /// <param name="deleted">The elements of the script that the command deletes, or null, as for
     /// <paramref name="changed"/>.</param>
     /// <param name="newEntities">The number of entities that the command adds at the end of the entities.</param>
