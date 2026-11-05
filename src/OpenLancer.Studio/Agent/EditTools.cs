@@ -8,6 +8,7 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Ini;
 using OpenLancer.Data.Missions.Editing;
+using OpenLancer.Studio.Commands;
 
 namespace OpenLancer.Studio.Agent;
 
@@ -39,6 +40,9 @@ internal sealed class EditScope
 {
     private readonly EditChecks checks;
 
+    /// <summary>The <c>thn:</c> references of the cutscene plans of the call (decision D767).</summary>
+    private readonly CutsceneResults cutscenes;
+
     /// <summary>The index in the parts of the batch of the first part of the step.</summary>
     private int stepStart;
 
@@ -60,6 +64,7 @@ internal sealed class EditScope
         Batch = batch;
         checks = new EditChecks(session, batch, limits.EditSections);
         batch.AddCommitCheck(checks);
+        cutscenes = new CutsceneResults(session);
     }
 
     public EditSession Session { get; }
@@ -77,22 +82,31 @@ internal sealed class EditScope
         stepStart = Batch.Parts.Count;
         stepMissionStart = missionRuns.Count;
         stepConfirmations.Clear();
+        cutscenes.StartStep();
     }
 
     /// <summary>The result of the commands of the step until now. A step with mission commands gives their inverse and
-    /// their row moves. So each mission step of <c>edit_batch</c> keeps its own inverse.</summary>
+    /// their row moves. So each mission step of <c>edit_batch</c> keeps its own inverse. A step with cutscene plans
+    /// gives the references of its cutscene items as they are after the step (see
+    /// <see cref="CutsceneResults"/>).</summary>
     internal EditResult StepResult()
     {
         var step = Batch.Parts.Skip(stepStart).ToList();
-        return WithMission(EditResult.Net(EditResult.Merge(EditStatus.Applied, step), step),
-            missionRuns.Skip(stepMissionStart).ToList());
+        return WithMission(cutscenes.Step(EditResult.Net(EditResult.Merge(EditStatus.Applied, step), step), Batch.Parts,
+            stepStart), missionRuns.Skip(stepMissionStart).ToList());
     }
 
+    /// <summary>Makes the cutscene references of the call after its last command (see <see cref="CutsceneResults"/>).
+    /// Call it before the preview or the commit, because a preview puts back W before the call.</summary>
+    internal void EndCall() => cutscenes.EndCall();
+
     /// <summary>The net result of all commands of the call. Its adds, renames, changes, deletes and select come from the
-    /// parts of the batch in their order (see <see cref="EditResult.Net"/>). A call with mission commands gives their
-    /// inverse and their row moves when the call applied or is a preview.</summary>
+    /// parts of the batch in their order (see <see cref="EditResult.Net"/>). The references of cutscene items come after
+    /// them (see <see cref="CutsceneResults"/>). An event reference holds an index, and a later part can change the
+    /// index, so the text compare of the net result cannot follow it. A call with mission commands gives their inverse
+    /// and their row moves when the call applied or is a preview.</summary>
     internal EditResult CallResult(EditResult batchResult) =>
-        WithMission(EditResult.Net(batchResult, Batch.Parts),
+        WithMission(cutscenes.Call(EditResult.Net(batchResult, Batch.Parts), Batch.Parts),
             batchResult.Status is EditStatus.Applied or EditStatus.Previewed ? missionRuns : null);
 
     /// <summary>
@@ -196,6 +210,8 @@ internal sealed class EditScope
     /// Runs the session command of a plan in the batch, on top of the commands before it. Then it reports the part of
     /// the result that the plan gives. A plan that refuses throws its refusal, and the caller cancels the batch.
     /// </summary>
+    /// <remarks>A cutscene plan also notes its script for the problems of the cutscene checks, and its elements for the
+    /// references of the result (see <see cref="CutsceneResults"/>).</remarks>
     /// <param name="targets">The sections that the request names, for the problems before and after the
     /// edit.</param>
     /// <param name="asks">False for a plan that the request needs and that the agent cannot confirm. An example is the
@@ -207,6 +223,12 @@ internal sealed class EditScope
     {
         if (!plan.CanRun)
             throw new EditException(EditTools.RefusalOf(Session, plan));
+        var cutscene = plan as CutscenePlan;
+        if (cutscene != null)
+        {
+            cutscenes.Before(cutscene);
+            checks.BeforeCutscene(cutscene.Path);
+        }
         checks.Before(plan, targets ?? []);
         Batch.Label ??= plan.Label;
         try
@@ -220,6 +242,8 @@ internal sealed class EditScope
         checks.After(plan);
         var part = plan.Report(Session);
         Report(asks ? part : part with { NeedsConfirmation = false });
+        if (cutscene != null)
+            cutscenes.After(cutscene, Batch.Parts.Count - 1);
         if (asks && EditTools.ConfirmationOf(Session, plan) is { } reason)
             stepConfirmations.Add(reason);
     }
@@ -354,6 +378,7 @@ internal static class EditTools
             var scope = new EditScope(session, batch, call.Limits);
             scope.StartStep();
             body(scope);
+            scope.EndCall();
             var confirmations = scope.Confirmations;
             if (confirmations.Count > 0 && !confirm && !preview)
                 throw new EditException(NeedsConfirmation(confirmations));
@@ -477,15 +502,15 @@ internal static class EditTools
             : null;
 
     /// <summary>The error of a plan that refuses: the kind of its first refusal, with the reasons of all refusals. A
-    /// refusal of a nickname that another section has gives <c>name_taken</c>, and a value that a field cannot hold
-    /// gives <c>invalid_value</c>.</summary>
+    /// refusal of a nickname that another section has, or of a path that a file has, gives <c>name_taken</c>. A value
+    /// that a field cannot hold gives <c>invalid_value</c>.</summary>
     internal static EditError RefusalOf(EditSession session, EditPlan plan)
     {
         var errors = plan.Report(session).Errors;
         var first = errors[0];
         var kind = first.Detail switch
         {
-            MissionErrors.NameTaken => EditErrorKind.NameTaken,
+            MissionErrors.NameTaken or MissionErrors.PathInUse => EditErrorKind.NameTaken,
             MissionErrors.ItemNotFound => EditErrorKind.NotFound,
             MissionErrors.FieldValue => EditErrorKind.InvalidValue,
             MissionErrors.NotTextId => EditErrorKind.InvalidArgument,
@@ -623,8 +648,10 @@ internal static class EditTools
 /// <summary>
 /// The commit checks of an agent batch. They check the limit of the sections of one call. They also give the problems
 /// that the batch adds and removes (section 4.0.5 of the M6b design, item 2). The problems are the field checks and the
-/// list checks of the sections that the commands name, before and after the batch. They are data, not errors. So the
-/// edit applies, as an edit of the user applies.
+/// list checks of the sections that the commands name, before and after the batch. A cutscene that a command changes
+/// gives the errors of its cutscene checks before and after the batch (see <see cref="EditSession.CutsceneErrors"/>,
+/// section 12.6 of the MCP1 design). The problems are data, not errors. So the edit applies, as an edit of the user
+/// applies.
 /// </summary>
 /// <remarks>
 /// <para>The problems of a section that the batch removes do not count as fixed. A renamed section compares its
@@ -642,6 +669,18 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
     private readonly HashSet<SectionRef> added = [];
     private readonly List<SectionRef> touched = [];
     private readonly HashSet<SectionRef> seen = [];
+
+    /// <summary>The errors of the cutscene checks of each touched cutscene before the batch, in the order of the first
+    /// touch. A new cutscene of the batch had no errors.</summary>
+    private readonly List<(string Path, IReadOnlyList<Diagnostic> Errors)> cutscenesBefore = [];
+
+    /// <summary>Notes a cutscene that a plan changes, and the errors of its cutscene checks now, at the first
+    /// touch.</summary>
+    public void BeforeCutscene(string path)
+    {
+        if (!cutscenesBefore.Any(c => OpenLancer.Data.IO.VfsPath.Comparer.Equals(c.Path, path)))
+            cutscenesBefore.Add((path, session.CutsceneErrors(path)));
+    }
 
     /// <summary>Notes the sections of a plan before its command runs, and their problems now.</summary>
     /// <param name="targets">The sections that the request names.</param>
@@ -719,6 +758,18 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
             }
             foreach (var problem in was.Where(p => left.Remove(Key(p))))
                 fixedProblems.Add(AgentRows.ProblemOf(session, problem));
+        }
+        // A cutscene problem names its element by the entity name or the event key, not by the place, so the messages
+        // compare across adds and deletes of other elements (see ThnChecks.Errors).
+        foreach (var (path, was) in cutscenesBefore)
+        {
+            Problem Of(Diagnostic problem) => AgentRows.ProblemOf(session, problem) with { Ref = CutsceneQueries.Ref(path) };
+            var left = was.Select(Key).ToList();
+            foreach (var problem in session.CutsceneErrors(path).Where(p => !left.Remove(Key(p))))
+                newProblems.Add(Of(problem));
+            var after = session.CutsceneErrors(path).Select(Key).ToList();
+            foreach (var problem in was.Where(p => !after.Remove(Key(p))))
+                fixedProblems.Add(Of(problem));
         }
         return new EditResult(EditStatus.Applied) { NewProblems = newProblems, FixedProblems = fixedProblems };
     }

@@ -400,9 +400,14 @@ public static class ItemRefs
 
     /// <summary>The reference of an entity or an event of a cutscene: the name of an entity, or the index of an
     /// event.</summary>
-    public static string Of(EditSession session, ThnRef element)
+    public static string Of(EditSession session, ThnRef element) => Of(session.Cutscene(element.Path), element);
+
+    /// <summary>The reference of an entity or an event in a version of W of its cutscene, for example W before a call
+    /// that deletes it: the name of the entity, or the index of the event in that version. An element that the version
+    /// does not have gives the reference of the cutscene.</summary>
+    /// <param name="model">The version of W, or null when the cutscene does not exist in it.</param>
+    public static string Of(ThnScriptModel? model, ThnRef element)
     {
-        var model = session.Cutscene(element.Path);
         var found = model?.Element(element.Kind, element.Id);
         if (model == null || found == null)
             return Format(new ItemReference(ItemRefKind.Cutscene, "") { Path = element.Path });
