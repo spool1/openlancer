@@ -331,6 +331,15 @@ public static class ThnSchema
             ? TypeName(element["type"], "EntityTypes", symbols)
             : element.List.Length > 1 ? TypeName(element.List[1], "EventTypes", symbols) : null;
 
+    /// <summary>
+    /// True when an event of a type has a length (<c>props.duration</c>) that the editor shows and changes. A
+    /// SET_CAMERA cuts to its camera at its time and has no props, so it has no length. An event of a type that the
+    /// editor does not know has a length.
+    /// </summary>
+    /// <param name="type">The THN name of the event type, for example <c>START_SOUND</c>, or null when the type is not
+    /// known (see <see cref="TypeOf"/>).</param>
+    public static bool HasLength(string? type) => type != "SET_CAMERA";
+
     private static bool IsUserProp(ThnPath path) => path.Keys is [UserPropsKey, _];
 
     private static ThnPath Parent(ThnPath path) => path.Parent ?? path;

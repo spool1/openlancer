@@ -317,7 +317,7 @@ public sealed class AgentSceneToolTests
         Assert.Equal(("refused", EditPlan.PlanRefused, "The engine reads no size for an object."), scale);
         Assert.Equal(("refused", EditPlan.PlanRefused, "The engine reads no rotation for a light."), lamp);
         Assert.Equal(("refused", "Give a position, a rotation or a size."), (empty.Code, empty.Message));
-        Assert.Equal(("limit", SceneEditTools.EditItems, "One call can give at most 2 moves. Split the call."), many);
+        Assert.Equal(("limit", EditTools.EditItems, "One call can give at most 2 moves. Split the call."), many);
         Assert.Equal("refused", twice.Code);
         Assert.False(session.CanUndo);
     }

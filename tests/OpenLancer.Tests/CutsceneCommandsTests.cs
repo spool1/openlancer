@@ -218,6 +218,26 @@ public sealed partial class CutsceneCommandsTests
         Assert.True(CutsceneCommands.MoveEvents(session, [textLength], 1, 0).CanRun);
     }
 
+    /// <summary>A SET_CAMERA has no length, so the Inspector does not show one. A change of its length refuses before
+    /// it runs, with the detail FieldValue and the index of the event. A move of its time applies.</summary>
+    [Fact]
+    public void AChangeOfTheLengthOfASetCameraRefuses()
+    {
+        using var ws = Workspace();
+        var session = ws.Session("act");
+        var cut = Event(session, 0);
+        var psys = Event(session, 1);
+        var before = W(session);
+
+        AssertRefused(session, CutsceneCommands.MoveEvents(session, [psys, cut], 0, 1),
+            "Event 0 is a SET_CAMERA event. An event of this type has no length.", MissionErrors.FieldValue);
+        Assert.True(CutsceneCommands.MoveEvents(session, [psys, cut], 1, 0).CanRun);
+        Assert.True(CutsceneCommands.MoveEvents(session, [psys], 0, 1).CanRun);
+        Assert.Same(before, W(session));
+        Assert.Equal((false, true, true),
+            (ThnSchema.HasLength("SET_CAMERA"), ThnSchema.HasLength("START_SOUND"), ThnSchema.HasLength(null)));
+    }
+
     /// <summary>
     /// A plan names its script in the form that the session stores, and each element one time. This is also true when
     /// the caller writes the path of the script in another letter case or with other separators.

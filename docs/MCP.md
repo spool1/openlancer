@@ -93,7 +93,7 @@ When another program uses the port, the server does not start. The status bar th
 | Time of a check or an image (s) | 60 | How long a check of a retail target or an image can take. |
 | Size of a request (MB) | 4 | The largest request. The change applies at the next start of the server. |
 | Largest side of an image (pixels) | 2048 | The most pixels on each side of an image. A larger panel capture becomes smaller. A `render_scene` or `render_cutscene` call with a larger `width` or `height` gives the error `limit`. |
-| Items of one edit | 200 | The most items that one call of `delete_items`, `duplicate_items` or `prop_group_save` names, and the most moves of one `scene_transform` call. |
+| Items of one edit | 200 | The most items that one call of `delete_items`, `duplicate_items` or `prop_group_save` names. Also the most moves of one `scene_transform` call and the most events of one `cutscene_move_events` call. |
 | Sections of one edit | 2000 | The most sections that one edit call changes, adds or removes. A larger edit changes nothing and gives the error `limit`. |
 | Steps of one batch | 100 | The most steps of one `edit_batch` call, and the most commands of one `mission_edit` call. |
 | Legs of one route | 50 | The most legs of one `scene_place_patrol_route` call. Each leg is one zone. A retail route has at most 12 legs. |
@@ -511,9 +511,11 @@ The cutscene tools change the cutscene scripts of the active mod with the comman
 | `cutscene_set_duration` | Sets the length of a script in seconds, as the duration field of the Inspector does. |
 | `cutscene_set_flags` | Sets the flags of one entity, as the flag boxes of the Inspector do. The flags are REFERENCE, LIT_DYNAMIC, LIT_AMBIENT and HIDDEN. A SOUND has SPATIAL in place of LIT_DYNAMIC. The flags that the list does not name go off. |
 
-A new cutscene goes into the folder `DATA\MODS\<mod id>\CUTSCENES` of the active mod, and a save writes it as a whole file. A name can have letters, digits, `_` and `-`. Another name gives `refused`. A name of a cutscene that exists gives `name_taken`, also in other letter case.
+A new cutscene goes into the folder `DATA\MODS\<mod id>\CUTSCENES` of the active mod, and a save writes it as a whole file. A name can have letters, digits, `_` and `-`, and at most 64 characters, as in the name field of **New cutscene**. Another name gives `refused` with the detail `NameInvalid`. A name of a cutscene that exists gives `name_taken`, also in other letter case.
 
-`cutscene_move_events` rounds each new time and length to the 1 ms grid, as the Timeline does. A length of 0 removes the length of an event when the lower cutscene has no length for it. `cutscene_set_duration` writes the value as you give it, as the duration field does. A time below 0, a negative length and a negative duration give `invalid_value`. A flag that the entity type does not have gives `invalid_value` too. A flags value that the engine cannot read gives `refused` with the reason.
+`cutscene_move_events` rounds each new time and length to the 1 ms grid, as the Timeline does. When the lower cutscene has the event and the event has no length there, a length of 0 removes the key `props.duration`. Else the event keeps the length 0. A SET_CAMERA event has no length, as the Inspector shows. So a `length_delta` other than 0 on a SET_CAMERA event gives `invalid_value`, and the message names the event. A time below 0 and a negative length give `invalid_value` too.
+
+`cutscene_set_duration` writes the value as you give it, as the duration field does. A negative duration gives `invalid_value`. A flag that the entity type does not have gives `invalid_value` too. A flags value that the engine cannot read gives `refused` with the reason.
 
 Each argument takes one kind of `thn:` reference. `cutscene` takes a script, `entity` takes an entity, and `events` takes events. Another reference gives `invalid_argument`. All events of one call must be in one cutscene. One call names at most 200 events.
 
@@ -529,7 +531,7 @@ The result gives each new and changed item as it is after the call. So an event 
 
 The result also gives the errors of the cutscene checks that the call adds and removes, in `new_problems` and `fixed_problems`. The game crashes when it plays a cutscene with such an error, so the save stops.
 
-`get_cutscene` gives the entities and the events of a script. The generic edit tools of this version do not change cutscene items, so a `thn:` reference gives them `not_available`. In this version, the Console entry of a cutscene edit links to no item, and follow mode does not open the Cutscene tab.
+`get_cutscene` gives the entities and the events of a script. The other edit tools of this version do not change cutscene items. A `thn:` reference gives them `not_available`, and the message names the cutscene tools. In this version, the Console entry of a cutscene edit links to no item, and follow mode does not open the Cutscene tab.
 
 ### Save
 

@@ -415,7 +415,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
             grid.ThnTextRow("Time", time, info.AfterEnd, Parser(ThnKeyKind.Number), NotSet,
                 ThnFieldCommand.Time(ev, NumberOf(time)));
             grid.Text("Type", info.Type);
-            if (rows.FirstOrDefault(r => r.Path.Text == "props.duration") is { } length && info.Kind != EventTypes.SetCamera)
+            if (rows.FirstOrDefault(r => r.Path.Text == "props.duration") is { } length && ThnSchema.HasLength(type))
             {
                 var field = workspace.Field(ev, length.Path, length.Kind) with { Evidence = length.Evidence };
                 grid.ThnTextRow(length.Label, field, length.Note, Parser(ThnKeyKind.Number), NotSet,

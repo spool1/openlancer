@@ -273,11 +273,20 @@ public static class ThnEdits
     /// <summary>The refusal of a name with other characters.</summary>
     public const string BadName = "Use only letters, digits, \"_\" and \"-\" in the name.";
 
+    /// <summary>The most characters of the name of a new cutscene. The name field of New cutscene takes no more. A
+    /// file name of Windows has at most 255 characters, so a save cannot write a script with a much longer
+    /// name.</summary>
+    public const int MaxNameLength = 64;
+
+    /// <summary>The refusal of a name with more than <see cref="MaxNameLength"/> characters.</summary>
+    public static readonly string LongName = $"Use a name of at most {MaxNameLength} characters.";
+
     /// <summary>
     /// Why the user cannot make a new cutscene at an install path, or null (decision D134 of the M8b design): the
     /// session has no active mod or is read-only, the path is not <c>DATA\MODS\&lt;active mod id&gt;\CUTSCENES\&lt;name&gt;.thn</c>,
-    /// the name has a character other than letters, digits, <c>_</c> and <c>-</c>, the edit view or W has a file at the
-    /// path in any letter case, or the active mod is in the OpenLancer repo (decision D70).
+    /// the name has a character other than letters, digits, <c>_</c> and <c>-</c> or has more than
+    /// <see cref="MaxNameLength"/> characters, the edit view or W has a file at the path in any letter case, or the
+    /// active mod is in the OpenLancer repo (decision D70).
     /// </summary>
     public static string? NewCutsceneRefusal(EditSession session, string path) =>
         NewCutsceneProblem(session, path)?.Message;
@@ -338,9 +347,9 @@ public static class ThnEdits
         var name = System.IO.Path.GetFileNameWithoutExtension(normal);
         if (name.Length == 0)
             return "Type a name for the cutscene.";
-        return name.All(c => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '_' or '-')
-            ? null
-            : BadName;
+        if (!name.All(c => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '_' or '-'))
+            return BadName;
+        return name.Length > MaxNameLength ? LongName : null;
     }
 
     private static void CheckKind(ThnRef target, ThnElementKind kind)

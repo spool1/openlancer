@@ -381,6 +381,25 @@ public sealed class AgentEditToolTests
 
         Assert.Equal((code, detail, "ref"), (error.Code, error.Detail, field));
         Assert.Equal(detail == EditTools.MissionItem, error.Message!.Contains("mission_edit", StringComparison.Ordinal));
+        Assert.Equal(detail == EditTools.CutsceneEdits,
+            error.Message == AgentTexts.Error("edit_cutscenes_later", ("tool", "set_fields")));
+        Assert.False(session.CanUndo);
+    }
+
+    /// <summary>A scene tool also refuses a cutscene reference, and its message names the scene tool, not the generic
+    /// edit tools.</summary>
+    [Fact]
+    public void ASceneToolNamesItselfForACutsceneReference()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+
+        var error = Error(host, "scene_transform",
+            """{ "moves": [{ "ref": "thn:DATA\\MODS\\act\\CUTSCENES\\x.thn#entity/Camera_01", "position": [1, 2, 3] }] }""");
+
+        Assert.Equal(("not_available", EditTools.CutsceneEdits), (error.Code, error.Detail));
+        Assert.Equal("scene_transform does not change cutscenes. Use the cutscene tools, for example " +
+                     "cutscene_move_events and cutscene_set_flags.", error.Message);
         Assert.False(session.CanUndo);
     }
 

@@ -48,7 +48,9 @@ public static class CutsceneCommands
     /// </summary>
     /// <remarks>The plan checks the values of the events in W before it runs (see <see cref="ThnEdits.MoveRefusal"/>).
     /// A time below 0, a negative length, or a time or a length to change that is not a number refuses with the detail
-    /// <see cref="MissionErrors.FieldValue"/>.</remarks>
+    /// <see cref="MissionErrors.FieldValue"/>. A change of the length of an event whose type has no length refuses with
+    /// that detail too (see <see cref="ThnSchema.HasLength"/>). The Inspector does not show the length of such an
+    /// event.</remarks>
     /// <param name="events">Events of one cutscene.</param>
     /// <param name="timeDelta">The change of each time, in seconds.</param>
     /// <param name="lengthDelta">The change of each length, in seconds. An event without a length has the length
@@ -72,7 +74,8 @@ public static class CutsceneCommands
             var move = ThnEdits.MoveEvents(events, timeDelta, lengthDelta);
             return timeDelta == 0 && lengthDelta == 0 ? EditCommand.Group(move.Label, []) : move;
         }, changed: events);
-        if (plan.CanRun && ThnEdits.MoveRefusal(session, events, timeDelta, lengthDelta) is { } refusal)
+        if (plan.CanRun && (NoLengthRefusal(session, events, lengthDelta) ??
+                            ThnEdits.MoveRefusal(session, events, timeDelta, lengthDelta)) is { } refusal)
             return CutscenePlan.Refused(label, path, refusal, MissionErrors.FieldValue);
         return plan;
     }
@@ -501,6 +504,25 @@ public static class CutsceneCommands
         var actual = type == null ? "has no type" : $"is a {type}";
         return ($"{role.Type} needs a {fits} as target {target}. The entity {EntityName(working, name)} {actual}.",
             MissionErrors.TargetType);
+    }
+
+    /// <summary>
+    /// Why a move cannot change the length of the events, or null: an event of W has a type without a length (see
+    /// <see cref="ThnSchema.HasLength"/>). A change of 0 gives null. The message names the first such event by its
+    /// index in W.
+    /// </summary>
+    private static string? NoLengthRefusal(EditSession session, IReadOnlyList<ThnRef> events, float lengthDelta)
+    {
+        if (lengthDelta == 0 || events.Count == 0 || session.Cutscene(events[0].Path) is not { } working)
+            return null;
+        foreach (var ev in events)
+        {
+            var index = working.Events.FindIndex(e => e.Id == ev.Id);
+            if (index >= 0 && ThnSchema.TypeOf(ThnElementKind.Event, working.Events[index].Table, session.ThnSymbols) is
+                    { } type && !ThnSchema.HasLength(type))
+                return $"Event {index} is a {type} event. An event of this type has no length.";
+        }
+        return null;
     }
 
     /// <summary>The reason why an event of a role cannot have the number of targets of a request.</summary>

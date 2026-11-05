@@ -50,8 +50,8 @@ public sealed partial class CutsceneCommandsTests
     }
 
     /// <summary>
-    /// A path in use gives the detail PathInUse in any letter case, a name with other characters gives NameInvalid,
-    /// and a session without an active mod gives NotEditable. Nothing changes.
+    /// A path in use gives the detail PathInUse in any letter case, a name with other characters or with more than 64
+    /// characters gives NameInvalid, and a session without an active mod gives NotEditable. Nothing changes.
     /// </summary>
     [Fact]
     public void CreateRefusesWithTheDetailOfEachReason()
@@ -66,6 +66,9 @@ public sealed partial class CutsceneCommandsTests
         AssertRefused(session, CutsceneCommands.Create(session, "my cut"), ThnEdits.BadName, MissionErrors.NameInvalid);
         AssertRefused(session, CutsceneCommands.Create(session, ""), "Type a name for the cutscene.",
             MissionErrors.NameInvalid);
+        AssertRefused(session, CutsceneCommands.Create(session, new string('a', ThnEdits.MaxNameLength + 1)),
+            "Use a name of at most 64 characters.", MissionErrors.NameInvalid);
+        Assert.True(CutsceneCommands.Create(session, new string('a', ThnEdits.MaxNameLength)).CanRun);
         var folder = CutsceneCommands.Create(session, @"..\x");
         Assert.Equal(MissionErrors.NameInvalid, Assert.Single(folder.Report(session).Errors).Detail);
         AssertRefused(viewer, CutsceneCommands.Create(viewer, "my_cut"), ThnEdits.NoActiveMod, MissionErrors.NotEditable);

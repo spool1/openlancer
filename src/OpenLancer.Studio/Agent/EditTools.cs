@@ -281,6 +281,10 @@ internal static class EditTools
     /// tools change them (see <see cref="CutsceneEditTools"/>).</summary>
     public const string CutsceneEdits = "CutsceneEdits";
 
+    /// <summary>The detail code of a call that names more items than the item limit of the host (see
+    /// <see cref="RequireItemLimit"/>).</summary>
+    public const string EditItems = "EditItems";
+
     /// <summary>The most references that the text of a confirmation names for each kind of change.</summary>
     private const int ShownRefs = 3;
 
@@ -458,7 +462,7 @@ internal static class EditTools
         var session = call.Session;
         var reference = ItemRefs.Parse(text);
         if (IsCutscene(reference.Kind))
-            throw CutsceneLater(text);
+            throw CutsceneLater(call, text);
         if (IsMission(reference))
             throw MissionItemRefusal(call, text);
         var section = ItemRefs.ResolveSection(session, reference);
@@ -574,13 +578,28 @@ internal static class EditTools
             throw new EditException(new EditError(EditErrorKind.ReadOnly, MissionErrors.NotEditable, reason));
     }
 
-    /// <summary>The refusal of a reference of a cutscene in a tool that does not change cutscenes. The text names the
-    /// cutscene tools.</summary>
-    internal static EditException CutsceneLater(string reference) =>
-        new(new EditError(EditErrorKind.NotAvailable, CutsceneEdits, AgentTexts.Error("edit_cutscenes_later"))
+    /// <summary>Refuses a list argument with more items than the item limit of the host
+    /// (<see cref="AgentLimits.EditItems"/>), before the tool reads an item.</summary>
+    /// <param name="count">The number of items of the argument.</param>
+    /// <param name="text">The key of the error text in <c>agent-tools.json</c>. The text takes <c>{max}</c>.</param>
+    /// <param name="field">The list argument.</param>
+    /// <exception cref="EditException"><see cref="EditErrorKind.Limit"/> with the detail
+    /// <see cref="EditItems"/>.</exception>
+    internal static void RequireItemLimit(ToolCall call, int count, string text, string field)
+    {
+        var limit = call.Limits.EditItems;
+        if (count > limit)
         {
-            Target = reference,
-        });
+            throw new EditException(new EditError(EditErrorKind.Limit, EditItems,
+                AgentTexts.Error(text, ("max", limit))) { Field = field });
+        }
+    }
+
+    /// <summary>The refusal of a reference of a cutscene in a tool that does not change cutscenes. The text names the
+    /// tool and the cutscene tools.</summary>
+    internal static EditException CutsceneLater(ToolCall call, string reference) =>
+        new(new EditError(EditErrorKind.NotAvailable, CutsceneEdits,
+            AgentTexts.Error("edit_cutscenes_later", ("tool", call.Tool))) { Target = reference });
 
     /// <summary>The refusal of a reference of a mission item in a tool that does not change mission items. The text
     /// names the tools that change them.</summary>

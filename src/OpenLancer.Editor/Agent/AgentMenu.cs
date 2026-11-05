@@ -242,8 +242,8 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
             "smaller. A large image takes more time in a frame of the editor.", limits.RenderPixels,
             AgentLimits.RenderPixelsRange, v => limits = limits with { RenderPixels = v });
         changed |= RangeField("Items of one edit",
-            "The most items that one agent call deletes or copies. A larger change is not one gesture.", limits.EditItems,
-            AgentLimits.EditItemsRange, v => limits = limits with { EditItems = v });
+            "The most items that one agent call deletes, copies, moves or saves into a prop group. A larger change is " +
+            "not one gesture.", limits.EditItems, AgentLimits.EditItemsRange, v => limits = limits with { EditItems = v });
         changed |= RangeField("Sections of one edit",
             "The most sections that one agent edit changes, adds or removes. A larger edit changes nothing and gives the " +
             "agent an error.", limits.EditSections, AgentLimits.EditSectionsRange, v => limits = limits with { EditSections = v });

@@ -71,7 +71,7 @@ internal static partial class ItemEditTools
         var session = call.Session;
         var reference = ItemRefs.Parse(text);
         if (EditTools.IsCutscene(reference.Kind))
-            throw EditTools.CutsceneLater(text);
+            throw EditTools.CutsceneLater(call, text);
         if (!EditTools.IsMission(reference))
         {
             var section = ItemRefs.ResolveSection(session, reference);

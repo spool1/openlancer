@@ -28,9 +28,6 @@ internal static class CutsceneEditTools
     /// <summary>The detail code of the events of more than one cutscene in one call.</summary>
     public const string OneCutscene = "OneCutscene";
 
-    /// <summary>The detail code of a limit of the events of one call.</summary>
-    public const string EditItems = "EditItems";
-
     /// <summary>The row of an event with its guards (decision D767 of the MCP1 design).</summary>
     public static readonly IReadOnlyList<ToolParam> EventRow =
     [
@@ -79,12 +76,7 @@ internal static class CutsceneEditTools
     public static ToolStep MoveEvents(ToolCall call) => EditTools.Apply(call, scope =>
     {
         var rows = call.Args.Rows("events")!;
-        var limit = call.Limits.EditItems;
-        if (rows.Count > limit)
-        {
-            throw new EditException(new EditError(EditErrorKind.Limit, EditItems,
-                AgentTexts.Error("limit_events", ("max", limit))) { Field = "events" });
-        }
+        EditTools.RequireItemLimit(call, rows.Count, "limit_events", "events");
         var events = rows.Select((row, i) => Event(call, row, $"events[{i}]")).ToList();
         if (events.Select(e => e.Path).Distinct(VfsPath.Comparer).Count() > 1)
         {
@@ -94,8 +86,13 @@ internal static class CutsceneEditTools
         var time = (float)(call.Args.Number("time_delta") ?? 0);
         var length = (float)(call.Args.Number("length_delta") ?? 0);
         // Two rows can name one event. The move changes it once, so the label counts it once.
-        var plan = CutsceneCommands.MoveEvents(scope.Session, events.Distinct().ToList(), time, length);
-        var valueField = plan.Refusals.FirstOrDefault()?.Message == ThnEdits.NegativeLength ? "length_delta" : "time_delta";
+        var moved = events.Distinct().ToList();
+        var plan = CutsceneCommands.MoveEvents(scope.Session, moved, time, length);
+        // A refusal of a value is about length_delta when the move of the times alone can run.
+        var valueField = !plan.CanRun && length != 0 &&
+                         CutsceneCommands.MoveEvents(scope.Session, moved, time, 0).CanRun
+            ? "length_delta"
+            : "time_delta";
         Run(scope, plan, valueField, "events");
     });
 

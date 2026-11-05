@@ -554,7 +554,7 @@
       "title": "Make a new cutscene",
       "description": "Makes a new cutscene script in the active mod, as New cutscene does. The script has a camera, a monitor and a cut to the camera at 0. The tool makes one Undo step.",
       "fields": {
-        "name": "The file name of the script without .thn. Use letters, digits, _ and -. The script goes into DATA\\MODS\\<mod id>\\CUTSCENES.",
+        "name": "The file name of the script without .thn. Use letters, digits, _ and -, at most 64 characters. The script goes into DATA\\MODS\\<mod id>\\CUTSCENES.",
         "duration": "The length of the cutscene in seconds. The default is 10."
       }
     },
@@ -567,7 +567,7 @@
         "expect_type": "The type that the event must have, for example SET_CAMERA. Another type refuses with RowChanged.",
         "expect_time": "The time in seconds that the event must have. Another time refuses with RowChanged.",
         "time_delta": "The seconds to add to the time of each event. A negative value moves the events earlier. The default is 0.",
-        "length_delta": "The seconds to add to the length of each event. An event without a length has the length 0. The default is 0."
+        "length_delta": "The seconds to add to the length of each event. An event without a length has the length 0. A SET_CAMERA event has no length, so a value other than 0 gives invalid_value. The default is 0."
       }
     },
     "cutscene_set_duration": {
@@ -1359,7 +1359,7 @@
     "edit_mission_item": "{tool} does not change items of mission files. Use the mission tools, for example mission_edit. The tools set_fields, set_text, rename_item, delete_items and duplicate_items also change mission items.",
     "edit_mission_world_file": "{path} is a world file of the missions, not a mission script. The mission tools do not change its lines. The generic tools take a sec: or list: reference of a section of the file, as the Inspector does.",
     "edit_mission_shared_build": "{path} is a shared file of ship builds. Random encounters and bases can use its builds too, so {tool} does not change it. To change a line of a build, ask the user first. Then use mission_edit with set_item_key or set_line and confirm: true. The mission commands do not rename, delete or copy a build of this file.",
-    "edit_cutscenes_later": "The generic edit tools of this version do not change cutscenes. Use the cutscene tools, for example cutscene_move_events and cutscene_set_flags.",
+    "edit_cutscenes_later": "{tool} does not change cutscenes. Use the cutscene tools, for example cutscene_move_events and cutscene_set_flags.",
     "cutscene_script_ref": "'{ref}' is not a reference of a cutscene script. Give thn: and the install path of the script, without # and the part after it.",
     "cutscene_entity_ref": "'{ref}' is not a reference of a cutscene entity. Give thn:<install path>#entity/<name>. get_cutscene gives the entities.",
     "cutscene_event_ref": "'{ref}' is not a reference of a cutscene event. Give thn:<install path>#event/<index>. get_cutscene gives the events.",

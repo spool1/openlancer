@@ -267,7 +267,9 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
         }
 
         ImGui.SetNextItemWidth(260 * scale);
-        var enter = ImGui.InputText("Name", ref newName, 64, ImGuiInputTextFlags.EnterReturnsTrue);
+        // The buffer of the field also holds the zero at the end of the text.
+        var enter = ImGui.InputText("Name", ref newName, ThnEdits.MaxNameLength + 1,
+            ImGuiInputTextFlags.EnterReturnsTrue);
         var path = session?.Edits.NewCutscenePath(newName);
         ImGui.TextDisabled(path ?? "No active mod");
         ImGui.SetItemTooltip("The install path of the new cutscene. A save writes it as a whole Lua text file into the " +

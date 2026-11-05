@@ -27,6 +27,9 @@ public sealed class AgentCutsceneToolTests
     private const string Script = "thn:" + ScriptPath;
     private const string NewPath = @"DATA\MODS\act\CUTSCENES\my_intro.thn";
 
+    /// <summary>A name of 65 characters, one more than <see cref="ThnEdits.MaxNameLength"/>.</summary>
+    private const string LongName = "a123456789a123456789a123456789a123456789a123456789a123456789a1234";
+
     /// <summary>The calls of the four tools on the script of <see cref="ThnSessions"/>, with the label of the entry, and
     /// the plan of the same edit through the command layer of the UI.</summary>
     public static TheoryData<string, string, string> Calls => new()
@@ -188,6 +191,7 @@ public sealed class AgentCutsceneToolTests
     [InlineData("cutscene_create", """{ "name": "..\\x" }""", "refused", MissionErrors.NameInvalid, "name")]
     [InlineData("cutscene_create", """{ "name": "C:x" }""", "refused", MissionErrors.NameInvalid, "name")]
     [InlineData("cutscene_create", """{ "name": "a:b" }""", "refused", MissionErrors.NameInvalid, "name")]
+    [InlineData("cutscene_create", $$"""{ "name": "{{LongName}}" }""", "refused", MissionErrors.NameInvalid, "name")]
     [InlineData("cutscene_create", """{ "name": "my_intro", "duration": -1 }""", "invalid_value", MissionErrors.FieldValue, "duration")]
     [InlineData("cutscene_set_duration", """{ "cutscene": "thn:DATA\\SCRIPTS\\x.thn", "seconds": -1 }""", "invalid_value", MissionErrors.FieldValue, "seconds")]
     [InlineData("cutscene_set_duration", """{ "cutscene": "thn:DATA\\SCRIPTS\\x.thn#entity/Fx", "seconds": 1 }""", "invalid_argument", ItemRefs.BadReference, "cutscene")]
@@ -205,6 +209,9 @@ public sealed class AgentCutsceneToolTests
     [InlineData("cutscene_set_flags", """{ "entity": "thn:DATA\\SCRIPTS\\x.thn#entity/Cam_A", "flags": ["SHINY"] }""", "invalid_value", MissionErrors.FieldValue, "flags")]
     [InlineData("cutscene_move_events", """{ "events": [ { "ref": "thn:DATA\\SCRIPTS\\x.thn#event/0" } ], "time_delta": -1 }""", "invalid_value", MissionErrors.FieldValue, "time_delta")]
     [InlineData("cutscene_move_events", """{ "events": [ { "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1" } ], "length_delta": -5 }""", "invalid_value", MissionErrors.FieldValue, "length_delta")]
+    [InlineData("cutscene_move_events", """{ "events": [ { "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1" } ], "time_delta": 1, "length_delta": 1e39 }""", "invalid_value", MissionErrors.FieldValue, "length_delta")]
+    [InlineData("cutscene_move_events", """{ "events": [ { "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1" } ], "time_delta": 1e39, "length_delta": 1 }""", "invalid_value", MissionErrors.FieldValue, "time_delta")]
+    [InlineData("cutscene_move_events", """{ "events": [ { "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1" }, { "ref": "thn:DATA\\SCRIPTS\\x.thn#event/0" } ], "length_delta": 1 }""", "invalid_value", MissionErrors.FieldValue, "length_delta")]
     [InlineData("cutscene_move_events", """{ "events": [ { "ref": "thn:DATA\\SCRIPTS\\x.thn#entity/Fx" } ], "time_delta": 1 }""", "invalid_argument", ItemRefs.BadReference, "events[0].ref")]
     [InlineData("cutscene_move_events", """{ "events": [ { "ref": "thn:DATA\\SCRIPTS\\x.thn#event/9" } ], "time_delta": 1 }""", "not_found", ItemRefs.NotFound, "events[0].ref")]
     [InlineData("cutscene_move_events", """{ "events": [ { "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1", "expect_type": "START_SOUND" } ], "time_delta": 1 }""", "stale_revision", MissionErrors.RowChanged, "events[0].ref")]
@@ -244,10 +251,15 @@ public sealed class AgentCutsceneToolTests
         var kind = Error(host, "cutscene_set_flags", $$"""{ "entity": {{Json(Script)}}, "flags": [] }""");
         var stale = Error(host, "cutscene_move_events",
             $$"""{ "events": [ { "ref": {{Json(Script + "#event/1")}}, "expect_type": "START_SOUND" } ] }""");
+        var longName = Error(host, "cutscene_create", $$"""{ "name": "{{LongName}}" }""");
+        var cutLength = Error(host, "cutscene_move_events",
+            $$"""{ "events": [ { "ref": {{Json(Script + "#event/0")}} } ], "length_delta": 1 }""");
 
         Assert.Equal(("name_taken", MissionErrors.PathInUse), (taken.Code, taken.Detail));
         Assert.Equal(ThnEdits.PathInUse, taken.Message);
         Assert.Equal(ThnEdits.BadName, name.Message);
+        Assert.Equal("Use a name of at most 64 characters.", longName.Message);
+        Assert.Equal("Event 0 is a SET_CAMERA event. An event of this type has no length.", cutLength.Message);
         Assert.Equal("SPATIAL is not a flag of an entity that is not a SOUND. The flags are REFERENCE, LIT_DYNAMIC, " +
                      "LIT_AMBIENT, HIDDEN.", spatial.Message);
         Assert.Equal(ThnEdits.StartsBeforeZero, early.Message);
@@ -331,7 +343,7 @@ public sealed class AgentCutsceneToolTests
         var atLimit = Ok(host, "cutscene_move_events",
             $$"""{ "events": [ {{string.Join(", ", Enumerable.Repeat(row, 200))}} ], "time_delta": 1 }""");
 
-        Assert.Equal(("limit", CutsceneEditTools.EditItems, "events"),
+        Assert.Equal(("limit", EditTools.EditItems, "events"),
             ((string?)error.Content["code"], (string?)error.Content["detail"], (string?)error.Content["field"]));
         Assert.Equal(AgentTexts.Error("limit_events", ("max", 200)), (string?)error.Content["message"]);
         Assert.Equal("applied", (string?)atLimit["status"]);
@@ -353,6 +365,25 @@ public sealed class AgentCutsceneToolTests
         var added = TestWorkspace.Files(ws.ModFolder("act")).Keys.Except(before).ToList();
         Assert.Equal([Path.Combine("files", NewPath)], added.Where(f => f.EndsWith(".thn", StringComparison.OrdinalIgnoreCase)));
         Assert.Equal(8, session.Cutscene(NewPath)!.Duration);
+    }
+
+    /// <summary>A name of 64 characters applies, and the save writes its script. A longer name refuses, so the agent
+    /// cannot make a cutscene that the save cannot write.</summary>
+    [Fact]
+    public void ANameAtTheLimitSavesAndALongerNameRefuses()
+    {
+        var (ws, session, host) = Open();
+        using var _ = ws;
+        var name = LongName[..ThnEdits.MaxNameLength];
+        var path = $@"DATA\MODS\act\CUTSCENES\{name}.thn";
+
+        var tooLong = Error(host, "cutscene_create", $$"""{ "name": "{{LongName}}" }""");
+        Ok(host, "cutscene_create", $$"""{ "name": "{{name}}" }""");
+        AssertSaved(session.Save());
+
+        Assert.Equal(("refused", MissionErrors.NameInvalid), (tooLong.Code, tooLong.Detail));
+        Assert.True(File.Exists(Path.Combine(ws.ModFolder("act"), "files", path)));
+        Assert.Equal([path], session.NewCutscenes);
     }
 
     /// <summary>A batch with a new script, its duration and a move of its event is one entry. Each step gives its

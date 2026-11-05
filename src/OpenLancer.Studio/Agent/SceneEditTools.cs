@@ -51,9 +51,6 @@ internal static class SceneEditTools
     /// such line names an entry that the profile does not have.</summary>
     public const string PlacementErrors = "PlacementErrors";
 
-    /// <summary>The detail code of a scene_transform with more moves than the item limit.</summary>
-    public const string EditItems = "EditItems";
-
     /// <summary>The most characters of the name of a new object (section 7.8 of the MCP1 design).</summary>
     public const int MaxName = 128;
 
@@ -173,12 +170,7 @@ internal static class SceneEditTools
     {
         var session = scope.Session;
         var rows = call.Args.Rows("moves")!;
-        var limit = call.Limits.EditItems;
-        if (rows.Count > limit)
-        {
-            throw new EditException(new EditError(EditErrorKind.Limit, EditItems,
-                AgentTexts.Error("limit_moves", ("max", limit))) { Field = "moves" });
-        }
+        EditTools.RequireItemLimit(call, rows.Count, "limit_moves", "moves");
         var moves = rows.Select((row, i) =>
         {
             var field = $"moves[{i}].ref";

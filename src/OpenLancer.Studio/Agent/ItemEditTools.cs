@@ -205,12 +205,7 @@ internal static partial class ItemEditTools
     private static IReadOnlyList<string> Refs(ToolCall call)
     {
         var refs = call.Args.Texts("refs")!;
-        var limit = call.Limits.EditItems;
-        if (refs.Count > limit)
-        {
-            throw new EditException(new EditError(EditErrorKind.Limit, "EditItems",
-                AgentTexts.Error("limit_items", ("max", limit))) { Field = "refs" });
-        }
+        EditTools.RequireItemLimit(call, refs.Count, "limit_items", "refs");
         return refs;
     }
 

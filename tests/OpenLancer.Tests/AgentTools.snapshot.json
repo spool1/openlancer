@@ -39851,7 +39851,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The file name of the script without .thn. Use letters, digits, _ and -. The script goes into DATA\\MODS\\\u003Cmod id\u003E\\CUTSCENES."
+            "description": "The file name of the script without .thn. Use letters, digits, _ and -, at most 64 characters. The script goes into DATA\\MODS\\\u003Cmod id\u003E\\CUTSCENES."
           },
           "duration": {
             "type": "number",
@@ -40423,7 +40423,7 @@
           },
           "length_delta": {
             "type": "number",
-            "description": "The seconds to add to the length of each event. An event without a length has the length 0. The default is 0."
+            "description": "The seconds to add to the length of each event. An event without a length has the length 0. A SET_CAMERA event has no length, so a value other than 0 gives invalid_value. The default is 0."
           },
           "preview": {
             "type": "boolean",
