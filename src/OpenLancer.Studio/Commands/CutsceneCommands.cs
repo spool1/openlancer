@@ -21,9 +21,6 @@ namespace OpenLancer.Studio.Commands;
 /// </remarks>
 public static class CutsceneCommands
 {
-    /// <summary>The path of the length of an event.</summary>
-    private static readonly ThnPath LengthPath = new("props.duration");
-
     /// <summary>
     /// Plans a value at a path of an entity or an event. Each missing record on the path is made. See
     /// <see cref="ThnEdits.Set"/>.
@@ -41,9 +38,9 @@ public static class CutsceneCommands
     /// and lengths round to the 1 ms grid. A change of 0 and 0 gives a plan that changes nothing. See
     /// <see cref="ThnEdits.MoveEvents"/>.
     /// </summary>
-    /// <remarks>The plan checks the new values against W before it runs. A time below 0 or a negative length refuses
-    /// with the detail <see cref="MissionErrors.FieldValue"/>. A time or a length that is not a number refuses when the
-    /// session command runs.</remarks>
+    /// <remarks>The plan checks the values of the events in W before it runs (see <see cref="ThnEdits.MoveRefusal"/>).
+    /// A time below 0, a negative length, or a time or a length to change that is not a number refuses with the detail
+    /// <see cref="MissionErrors.FieldValue"/>.</remarks>
     /// <param name="events">Events of one cutscene.</param>
     /// <param name="timeDelta">The change of each time, in seconds.</param>
     /// <param name="lengthDelta">The change of each length, in seconds. An event without a length has the length
@@ -67,7 +64,7 @@ public static class CutsceneCommands
             var move = ThnEdits.MoveEvents(events, timeDelta, lengthDelta);
             return timeDelta == 0 && lengthDelta == 0 ? EditCommand.Group(move.Label, []) : move;
         }, changed: events.Distinct().ToList());
-        if (plan.CanRun && NewValueRefusal(session, events, timeDelta, lengthDelta) is { } refusal)
+        if (plan.CanRun && ThnEdits.MoveRefusal(session, events, timeDelta, lengthDelta) is { } refusal)
             return CutscenePlan.Refused(label, path, refusal, MissionErrors.FieldValue);
         return plan;
     }
@@ -127,34 +124,4 @@ public static class CutsceneCommands
         ThnCurve.Path.ValueIn(ThnElementKind.Event, table) is ThnTable { IsRecord: true } curve
             ? curve
             : null;
-
-    /// <summary>
-    /// Why a move gives an event of W a time below 0 or a negative length, or null. The checks run in the order of the
-    /// session command, so the reason is the reason that the run would give.
-    /// </summary>
-    private static string? NewValueRefusal(EditSession session, IReadOnlyList<ThnRef> events, float timeDelta,
-        float lengthDelta)
-    {
-        var working = session.Cutscene(events[0].Path);
-        foreach (var ev in events)
-        {
-            if (working?.Element(ThnElementKind.Event, ev.Id)?.Table is not { } table)
-                continue;
-            if (timeDelta != 0 && table.List.FirstOrDefault() is ThnNumber time &&
-                ThnEdits.OnGrid((double)time.Value + timeDelta) < 0)
-                return ThnEdits.StartsBeforeZero;
-            if (lengthDelta != 0 && LengthOf(table) is { } length && ThnEdits.OnGrid((double)length + lengthDelta) < 0)
-                return ThnEdits.NegativeLength;
-        }
-        return null;
-    }
-
-    /// <summary>The length of an event: 0 without <c>props.duration</c>, or null when the value is not a
-    /// number.</summary>
-    private static float? LengthOf(ThnTable ev) => LengthPath.ValueIn(ThnElementKind.Event, ev) switch
-    {
-        null => 0,
-        ThnNumber number => number.Value,
-        _ => null,
-    };
 }

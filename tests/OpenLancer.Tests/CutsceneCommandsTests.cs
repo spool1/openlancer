@@ -189,6 +189,22 @@ public sealed class CutsceneCommandsTests
         Assert.Same(before, W(session));
     }
 
+    /// <summary>A move of a length that is not a number refuses before it runs, with the detail FieldValue and the
+    /// reason of the session command. A move of the time of that event applies.</summary>
+    [Fact]
+    public void AMoveOfAValueThatIsNotANumberRefusesBeforeItRuns()
+    {
+        using var ws = Workspace(script: Script.Replace("{ duration = 3 }", "{ duration = \"3\" }"));
+        var session = ws.Session("act");
+        var textLength = Event(session, 2);
+        const string notANumber = "The length of the event (props.duration) is not a number.";
+
+        Assert.Equal(notANumber, ThnEdits.MoveRefusal(session, [textLength], 0, 1));
+        AssertRefused(session, CutsceneCommands.MoveEvents(session, [textLength], 0, 1), notANumber,
+            MissionErrors.FieldValue);
+        Assert.True(CutsceneCommands.MoveEvents(session, [textLength], 1, 0).CanRun);
+    }
+
     /// <summary>A curve point that the event does not have refuses with the number of the point, also on an event
     /// without a curve.</summary>
     [Fact]

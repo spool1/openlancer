@@ -345,6 +345,54 @@ public sealed class ThnEditsTests
         Assert.Equal(("props.duration", (ThnValue)N(0)), (Assert.Single(entry.Sets).Path.Text, entry.Sets[0].Value));
     }
 
+    /// <summary>
+    /// MoveRefusal gives the reason that the run of the move gives, in the same order, and null when the run applies.
+    /// Here an event has a time that is not a number, and another event has a length that is not a number. The script
+    /// is a whole file of the active mod, because a patch cannot change an event whose time is not a number.
+    /// </summary>
+    [Fact]
+    public void MoveRefusalGivesTheReasonOfTheRunOfTheMove()
+    {
+        var script = Script.Replace("{ duration = 3 }", "{ duration = \"3\" }")
+            .Replace("{ 6, START_SOUND", "{ \"6\", START_SOUND");
+        using var ws = Workspace(new() { [WholeFile] = script });
+        var session = ws.Session("act");
+        var (cut, psys, textLength, sound) = (Event(session, 0), Event(session, 1), Event(session, 2), Event(session, 4));
+        const string timeNotANumber = "The time of the event is not a number.";
+        const string lengthNotANumber = "The length of the event (props.duration) is not a number.";
+
+        AssertSameReason([psys], -5.001f, 0, ThnEdits.StartsBeforeZero);
+        // The time 5 moves to -0.0004, which rounds to 0 on the 1 ms grid.
+        AssertSameReason([psys], -5.0004f, 0, null);
+        AssertSameReason([psys], 0, -2.001f, ThnEdits.NegativeLength);
+        // An event without props.duration has the length 0.
+        AssertSameReason([cut], 0, -0.001f, ThnEdits.NegativeLength);
+        AssertSameReason([textLength], 0, 1, lengthNotANumber);
+        AssertSameReason([textLength], 1, 0, null);
+        AssertSameReason([sound], 1, 0, timeNotANumber);
+        AssertSameReason([sound], 0, 1, null);
+        AssertSameReason([psys, sound], -6, 0, ThnEdits.StartsBeforeZero);
+        AssertSameReason([sound, psys], -6, 0, timeNotANumber);
+        AssertSameReason([psys], -6, -3, ThnEdits.StartsBeforeZero);
+        Assert.False(session.CanUndo);
+
+        void AssertSameReason(ThnRef[] events, float timeDelta, float lengthDelta, string? expected)
+        {
+            var refusal = ThnEdits.MoveRefusal(session, events, timeDelta, lengthDelta);
+            Assert.Equal(expected, refusal);
+            if (expected == null)
+            {
+                session.Execute(ThnEdits.MoveEvents(events, timeDelta, lengthDelta));
+                session.Undo();
+                return;
+            }
+            var before = W(session);
+            Assert.Equal(expected, Assert.Throws<InvalidOperationException>(() =>
+                session.Execute(ThnEdits.MoveEvents(events, timeDelta, lengthDelta))).Message);
+            Assert.Same(before, W(session));
+        }
+    }
+
     /// <summary>A drag is one transaction: each step takes the place of the step before, and the commit adds one
     /// entry.</summary>
     [Fact]

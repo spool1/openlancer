@@ -38,6 +38,12 @@ public static class ThnEdits
     /// <summary>The refusal of a negative duration of a script.</summary>
     public const string NegativeDuration = "The duration cannot be negative.";
 
+    /// <summary>The path of the time of an event.</summary>
+    private static readonly ThnPath EventTimePath = new(ThnElementPaths.EventSlots[0]);
+
+    /// <summary>The path of the length of an event.</summary>
+    private static readonly ThnPath EventLengthPath = new("props.duration");
+
     /// <summary>Sets a value. Each missing record on the path is made.</summary>
     /// <remarks>Use <see cref="RenameEntity"/> for <c>entity_name</c>, and <see cref="SetFlags"/> for the flags of the
     /// Inspector.</remarks>
@@ -153,6 +159,28 @@ public static class ThnEdits
     /// or "Change the length of event".</summary>
     public static string MoveLabel(int count, float timeDelta, float lengthDelta) =>
         $"{(timeDelta == 0 && lengthDelta != 0 ? "Change the length of" : "Move")} {(count == 1 ? "event" : $"{count} events")}";
+
+    /// <summary>
+    /// Why <see cref="MoveEvents"/> cannot give the events of W their new values now, or null when it can: a time or a
+    /// length to change is not a number, or the move puts an event before 0 or gives it a negative length. The run of
+    /// the move refuses with the same reason, so a caller can refuse before the run.
+    /// </summary>
+    /// <remarks>This check looks only at the values. The run can refuse an event for another reason first: W does not
+    /// have the event, the cutscene or the entity is read-only, or a patch cannot change the event.</remarks>
+    public static string? MoveRefusal(EditSession session, IReadOnlyList<ThnRef> events, float timeDelta,
+        float lengthDelta)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(events);
+        var working = events.Count > 0 ? session.Cutscene(events[0].Path) : null;
+        foreach (var ev in events)
+        {
+            if (working?.Element(ThnElementKind.Event, ev.Id)?.Table is { } table &&
+                Moved(table, timeDelta, lengthDelta).Refusal is { } refusal)
+                return refusal;
+        }
+        return null;
+    }
 
     /// <summary>
     /// Why <see cref="Reorder"/> cannot move <paramref name="ev"/> before <paramref name="before"/> now, or null when it
@@ -448,6 +476,37 @@ public static class ThnEdits
     public static float OnGrid(double seconds) =>
         (float)(Math.Round(seconds * StepsPerSecond, MidpointRounding.AwayFromZero) / StepsPerSecond);
 
+    /// <summary>
+    /// The new time and length of an event after a move, on the 1 ms grid, or why the move cannot change the event. A
+    /// delta of 0 keeps that value, so it gives null. <see cref="MoveRefusal"/> and the run of the move use this one
+    /// rule.
+    /// </summary>
+    private static (float? Time, float? Length, string? Refusal) Moved(ThnTable ev, float timeDelta, float lengthDelta)
+    {
+        float? time = null;
+        if (timeDelta != 0)
+        {
+            if (ev.List.FirstOrDefault() is not ThnNumber oldTime)
+                return (null, null, "The time of the event is not a number.");
+            time = OnGrid((double)oldTime.Value + timeDelta);
+            if (time < 0)
+                return (null, null, StartsBeforeZero);
+        }
+        if (lengthDelta == 0)
+            return (time, null, null);
+        // An event without props.duration has the length 0 (ThnEvent.cs:14, :55).
+        var oldLength = ThnElementPaths.Get(ThnElementKind.Event, ev, EventLengthPath) switch
+        {
+            null => 0f,
+            ThnNumber number => number.Value,
+            _ => (float?)null,
+        };
+        if (oldLength is not { } length)
+            return (null, null, "The length of the event (props.duration) is not a number.");
+        var newLength = OnGrid((double)length + lengthDelta);
+        return newLength < 0 ? (null, null, NegativeLength) : (time, newLength, null);
+    }
+
     /// <summary>Applies a change to a table with a path command. A path that cannot take the change throws an
     /// <see cref="InvalidOperationException"/>.</summary>
     private static ThnTable PathChange(Func<ThnTable> change)
@@ -620,9 +679,6 @@ public static class ThnEdits
     private sealed class MoveCommand(string label, IReadOnlyList<ThnRef> events, float timeDelta, float lengthDelta)
         : EditCommand(label)
     {
-        private static readonly ThnPath TimePath = new(ThnElementPaths.EventSlots[0]);
-        private static readonly ThnPath LengthPath = new("props.duration");
-
         internal override void Run(EditSession.CommandScope scope)
         {
             var document = scope.Cutscene(events[0].Path);
@@ -634,43 +690,28 @@ public static class ThnEdits
                     continue;
                 // The loop changes only tables, so each index of W is an index of the list.
                 var (_, index, element) = Find(scope, ev);
+                var (time, length, refusal) = Moved(element.Table, timeDelta, lengthDelta);
+                if (refusal != null)
+                    throw new InvalidOperationException(refusal);
                 var table = element.Table;
-                if (timeDelta != 0)
+                if (time is { } newTime)
+                    table = ThnElementPaths.Set(ThnElementKind.Event, table, EventTimePath, new ThnNumber(newTime));
+                if (length is { } newLength)
                 {
-                    var time = table.List.FirstOrDefault() as ThnNumber ??
-                               throw new InvalidOperationException("The time of the event is not a number.");
-                    table = ThnElementPaths.Set(ThnElementKind.Event, table, TimePath,
-                        new ThnNumber(Step((double)time.Value + timeDelta, StartsBeforeZero)));
-                }
-                if (lengthDelta != 0)
-                {
-                    var length = ThnElementPaths.Get(ThnElementKind.Event, table, LengthPath) switch
-                    {
-                        null => 0f,
-                        ThnNumber number => number.Value,
-                        _ => throw new InvalidOperationException("The length of the event (props.duration) is not a number."),
-                    };
-                    var newLength = Step((double)length + lengthDelta, NegativeLength);
-                    // An event without props.duration has the length 0 (ThnEvent.cs:14, :55). So when the lower event
-                    // has no length, the length 0 removes the key, and the props that a move made, and the patch gets
-                    // no value for them.
+                    // When the lower event has no length, the length 0 removes the key, and the props that a move
+                    // made, so the patch gets no value for them.
                     var lower = document.LowerTable(ThnElementKind.Event, element);
                     table = PathChange(() =>
-                        newLength == 0 && lower != null && ThnElementPaths.Get(ThnElementKind.Event, lower, LengthPath) == null
-                            ? ThnElementPaths.RemoveWithMadeRecords(ThnElementKind.Event, table, LengthPath, lower)
-                            : ThnElementPaths.Set(ThnElementKind.Event, table, LengthPath, new ThnNumber(newLength)));
+                        newLength == 0 && lower != null &&
+                        ThnElementPaths.Get(ThnElementKind.Event, lower, EventLengthPath) == null
+                            ? ThnElementPaths.RemoveWithMadeRecords(ThnElementKind.Event, table, EventLengthPath, lower)
+                            : ThnElementPaths.Set(ThnElementKind.Event, table, EventLengthPath, new ThnNumber(newLength)));
                 }
                 list = list.SetItem(index, element with { Table = table });
             }
             document.Change(document.Working with { Events = list }, p => p.Element is { } id && moved.Contains(id) &&
-                                                   (timeDelta != 0 && p.Path.IsWithin(TimePath) ||
-                                                    lengthDelta != 0 && p.Path.IsWithin(LengthPath)));
-        }
-
-        private static float Step(double seconds, string negative)
-        {
-            var value = OnGrid(seconds);
-            return value < 0 ? throw new InvalidOperationException(negative) : value;
+                                                   (timeDelta != 0 && p.Path.IsWithin(EventTimePath) ||
+                                                    lengthDelta != 0 && p.Path.IsWithin(EventLengthPath)));
         }
     }
 
