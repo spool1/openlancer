@@ -6961,7 +6961,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -7393,7 +7393,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -7540,7 +7540,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -7973,7 +7973,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -8114,7 +8114,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           },
           "confirm": {
             "type": "boolean",
@@ -8551,7 +8551,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -8690,7 +8690,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           },
           "confirm": {
             "type": "boolean",
@@ -9126,7 +9126,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -9274,7 +9274,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -9705,7 +9705,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -9904,7 +9904,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -10305,7 +10305,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -10493,7 +10493,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -10892,7 +10892,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -11050,7 +11050,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -11449,7 +11449,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -11614,7 +11614,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -12014,7 +12014,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -12202,7 +12202,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -12600,7 +12600,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -12766,7 +12766,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -13166,7 +13166,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -13400,7 +13400,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -13801,7 +13801,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -14091,7 +14091,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -14491,7 +14491,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -14741,7 +14741,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -15140,7 +15140,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -15304,7 +15304,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -15704,7 +15704,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -16256,7 +16256,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -16799,7 +16799,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -17335,7 +17335,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -17531,7 +17531,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -17930,7 +17930,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -18082,7 +18082,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -18482,7 +18482,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -18648,7 +18648,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           },
           "confirm": {
             "type": "boolean",
@@ -33304,7 +33304,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -33484,7 +33484,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -33960,7 +33960,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -34099,7 +34099,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -34575,7 +34575,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -34720,7 +34720,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -35196,7 +35196,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -35357,7 +35357,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -35789,7 +35789,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -35930,7 +35930,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -36361,7 +36361,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -36517,7 +36517,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -36949,7 +36949,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -37103,7 +37103,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -37579,7 +37579,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -37759,7 +37759,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -38235,7 +38235,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -38409,7 +38409,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the edit changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the edit changes."
           }
         },
         "additionalProperties": false,
@@ -38841,7 +38841,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [
@@ -40414,7 +40414,7 @@
           "with_patch": {
             "type": "boolean",
             "default": false,
-            "description": "With preview: also give the patch text of each INI file that the batch changes."
+            "description": "With preview: also give the patch text of each INI file and each cutscene that the batch changes."
           }
         },
         "additionalProperties": false,
@@ -40850,7 +40850,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "description": "With with_patch: the patch text of each changed INI file, by install path."
+                  "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
                 },
                 "summary": {
                   "type": [
@@ -41011,7 +41011,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "With with_patch: the patch text of each changed INI file, by install path."
+            "description": "With with_patch: the patch text of each changed INI file and cutscene, by install path."
           },
           "summary": {
             "type": [

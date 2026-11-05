@@ -236,9 +236,10 @@ public sealed class EditBatch : IDisposable
     internal IReadOnlyList<EditResult> Parts => parts;
 
     /// <summary>
-    /// The text that a save writes now for each INI file that the steps changed, by install path. The text is the patch
-    /// of the file, or the text of a whole file of the mod (<c>with_patch</c>, section 7.0 of the MCP1 design). It holds
-    /// the unsaved edits before the batch too. A file that a save does not write, or cannot write, has no text.
+    /// The text that a save writes now for each INI file and each cutscene that the steps changed, by install path. The
+    /// text is the patch of the file, or the text of a whole file of the mod (<c>with_patch</c>, section 7.0 of the
+    /// MCP1 design). It holds the unsaved edits before the batch too. A file that a save does not write, or cannot
+    /// write, has no text.
     /// </summary>
     /// <exception cref="InvalidOperationException">The batch has ended.</exception>
     internal IReadOnlyDictionary<string, string> PatchTexts()

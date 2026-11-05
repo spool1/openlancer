@@ -40,7 +40,7 @@
     "height": "The height of the image in pixels. studio_status gives the largest value.",
     "preview": "Show what the edit does, and change nothing. The revision stays the same.",
     "if_revision": "Refuse the edit when the edit view changed after this revision. Give the rev of a result that you read.",
-    "with_patch": "With preview: also give the patch text of each INI file that the edit changes.",
+    "with_patch": "With preview: also give the patch text of each INI file and each cutscene that the edit changes.",
     "confirm": "Apply an edit that changes more than its targets. Without it, such an edit gives needs_confirmation.",
     "$defs.line": "A line of a trigger or of an order list: its key, and its values by name or its texts by position.",
     "$defs.line.key": "A condition key (Cnd_...), an action key (Act_...) or an order key, for example Cnd_Timer or GotoVec.",
@@ -571,7 +571,7 @@
         "tool": "The name of an edit tool, for example set_fields.",
         "arguments": "The arguments of the tool. A step cannot have preview or with_patch.",
         "preview": "Show what the batch does, and change nothing. The revision stays the same.",
-        "with_patch": "With preview: also give the patch text of each INI file that the batch changes."
+        "with_patch": "With preview: also give the patch text of each INI file and each cutscene that the batch changes."
       }
     },
     "export_mod": {
@@ -2075,7 +2075,7 @@
     "EditResult.needs_confirmation": "True when the edit changes more than its targets. The real call then needs confirm: true.",
     "EditResult.select": "The item that the editor selects after the edit, or none.",
     "EditResult.notes": "Notes about the edit.",
-    "EditResult.patch": "With with_patch: the patch text of each changed INI file, by install path.",
+    "EditResult.patch": "With with_patch: the patch text of each changed INI file and cutscene, by install path.",
     "EditResult.summary": "One sentence that tells what the call did.",
     "ResultDelete.ref": "The reference of the removed item.",
     "ResultDelete.why": "target for an item of the request, cascade for an item that goes with a target.",

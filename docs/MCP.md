@@ -188,7 +188,7 @@ Each edit tool takes these arguments:
 | Argument | What it does |
 |---|---|
 | `preview` | Runs the edit and gives its result, then changes nothing. The revision, the history and the unsaved state stay the same. The views do not change. |
-| `with_patch` | With `preview`: also gives the patch text of each INI file that the edit changes. |
+| `with_patch` | With `preview`: also gives the text that a save writes for each INI file and each cutscene that the edit changes. This is the patch, or the whole file when the mod has one. |
 | `if_revision` | Refuses the edit with `stale_revision` when the edit view changed after this revision. Each result gives the revision as `rev`. A save does not change it. |
 | `confirm` | `rename_item`, `delete_items` and `mission_edit`: applies an edit that changes more than its targets. The prop group writes: writes the files. |
 

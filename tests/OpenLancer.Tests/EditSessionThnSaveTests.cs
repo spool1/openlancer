@@ -59,6 +59,53 @@ public sealed class EditSessionThnSaveTests
             """.Replace("\r", ""), File.ReadAllText(file));
     }
 
+    /// <summary>The text of a cutscene for <c>with_patch</c> is the text that the save writes: the THN patch, the whole
+    /// script of a new cutscene, and an empty text for a patch that the save deletes. A cutscene without a change has no
+    /// text.</summary>
+    [Fact]
+    public void TheSaveTextOfACutsceneIsTheTextThatTheSaveWrites()
+    {
+        using var ws = Workspace(new() { [PatchFile] = HandPatch });
+        var session = ws.Session("act");
+        var cam = Entity(session, "Cam_A");
+        const string newPath = @"DATA\MODS\act\CUTSCENES\my_shot.thn";
+
+        Assert.Null(session.SaveText(ScriptPath));
+        session.Execute(ThnEdits.Set(cam, Hvaspect, N(2)));
+        var patch = session.SaveText(ScriptPath);
+        session.Execute(ThnEdits.Revert(ScriptPath));
+        var deleted = session.SaveText(ScriptPath);
+        session.Execute(ThnEdits.NewCutscene(newPath, ThnTemplates.NewScript()));
+        var whole = session.SaveText(newPath.ToLowerInvariant());
+        session.Undo();
+        session.Undo();
+        session.Execute(ThnEdits.Set(cam, Hvaspect, N(2)));
+        var saved = session.Save();
+
+        AssertSaved(saved);
+        Assert.Equal(File.ReadAllText(Path.Combine(ws.ModFolder("act"), PatchFile)), patch);
+        Assert.Equal("", deleted);
+        Assert.Equal(ThnWriter.Write(ThnTemplates.NewScript()), whole);
+    }
+
+    /// <summary>A read-only cutscene, or a cutscene text that the save check refuses, has no text, because the save
+    /// does not write it. Here the evaluator reads the patch with a wrong number, as in
+    /// <see cref="ASaveWritesNothingWhenTheSaveCheckFails"/>.</summary>
+    [Fact]
+    public void ACutsceneThatTheSaveCannotWriteHasNoSaveText()
+    {
+        using var broken = Workspace(new() { [PatchFile] = BrokenPatch });
+        var readOnly = broken.Session("act");
+        using var ws = Workspace();
+        var session = ws.Session("act", new WrongPatchNumbers());
+        session.Execute(ThnEdits.Set(Entity(session, "Cam_A"), Fovh, N(20)));
+
+        Assert.NotNull(readOnly.CutsceneReadOnlyReason(ScriptPath));
+        Assert.Null(readOnly.SaveText(ScriptPath));
+        Assert.Null(session.SaveText(ScriptPath));
+        Assert.False(session.Save().Saved);
+    }
+
     [Fact]
     public void APatchWithoutChangesIsDeleted()
     {

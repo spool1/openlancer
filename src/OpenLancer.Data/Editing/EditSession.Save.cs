@@ -22,13 +22,24 @@ public sealed partial class EditSession
     private string? textHash;
 
     /// <summary>
-    /// The text that a save writes now for an INI file that the session opened. The text is the patch of the file, or
-    /// the text of a whole file of the mod. Null when a save does not write the file, or cannot write it. A patch
-    /// without sections gives an empty text, because the save then deletes the patch file.
+    /// The text that a save writes now for an INI file or a cutscene that the session opened. The text is the patch of
+    /// the file, or the text of a whole file of the mod. A cutscene gives its THN patch, or its whole script. Null when
+    /// a save does not write the file, or cannot write it. A patch without entries gives an empty text, because the
+    /// save then deletes the patch file.
     /// </summary>
+    /// <remarks>A cutscene text passes the save check of <see cref="ThnDocument.SaveProblem"/> first, as in a save. A
+    /// whole cutscene file of a mod in the OpenLancer repo has no text, because a save does not write it (decision
+    /// D70).</remarks>
     /// <param name="path">An install path in normal form.</param>
     internal string? SaveText(string path)
     {
+        if (cutscenes.TryGetValue(path, out var cutscene))
+        {
+            if (cutscene.ChangedFile() is not { Problem: null } file || cutscene.SaveProblem(file) != null ||
+                cutscene.IsWholeFile && ActiveMod is { } mod && WholeCutsceneInRepo(mod) != null)
+                return null;
+            return file.Text ?? "";
+        }
         if (!documents.TryGetValue(path, out var document))
             return null;
         if (document.IsWholeFile)
