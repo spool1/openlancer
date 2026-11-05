@@ -207,7 +207,7 @@
               },
               "edit_items": {
                 "type": "integer",
-                "description": "The most items that one call of delete_items or duplicate_items names."
+                "description": "The most items that one call of delete_items or duplicate_items names, and the most rows of scene_transform and cutscene_move_events."
               },
               "edit_sections": {
                 "type": "integer",
