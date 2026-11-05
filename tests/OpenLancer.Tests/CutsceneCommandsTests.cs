@@ -16,7 +16,7 @@ namespace OpenLancer.Tests;
 /// W of the session command that it wraps, a cutscene that takes no edits refuses with its reason, and a value that the
 /// data cannot hold refuses with the detail FieldValue. A command never throws for a rule of the edit.
 /// </summary>
-public sealed class CutsceneCommandsTests
+public sealed partial class CutsceneCommandsTests
 {
     /// <summary>The script of <see cref="ThnSessions.Script"/> with a curve of three points on the first START_PSYS of
     /// Fx.</summary>
@@ -31,16 +31,26 @@ public sealed class CutsceneCommandsTests
 
     /// <summary>
     /// Runs the session command and then, after its undo, the plan of the command of the layer through the runner of
-    /// the editor. Both give the same W, and the plan is one entry with its label.
+    /// the editor. Both give the same W, and the plan is one entry with its label. The label is the label of the
+    /// session command, so the edit history of the editor shows the same entry as before the command layer.
     /// </summary>
+    /// <param name="setup">An edit before the two runs, or null.</param>
+    /// <param name="state">The text of the state to compare, or null for the text of W of the script.</param>
+    /// <param name="path">The script of the plan.</param>
+    /// <param name="sameLabel">False for a command whose label tells more than the label of its session
+    /// command.</param>
     private static CutscenePlan AssertSameW(Func<EditSession, CutscenePlan> plan, Func<EditSession, EditCommand> raw,
-        string script = Script)
+        string script = Script, Action<EditSession>? setup = null, Func<EditSession, string>? state = null,
+        string path = ScriptPath, bool sameLabel = true)
     {
         using var ws = Workspace(script: script);
         var session = ws.Session("act");
-        var before = Text(session);
+        setup?.Invoke(session);
+        state ??= Text;
+        var before = state(session);
         session.Execute(raw(session));
-        var expected = Text(session);
+        var expected = state(session);
+        var rawLabel = session.UndoLabel;
         Assert.NotEqual(before, expected);
         session.Undo();
 
@@ -48,9 +58,11 @@ public sealed class CutsceneCommandsTests
         var result = FakeCommandHost.Runner(session).Run(made);
 
         Assert.Equal(EditStatus.Applied, result.Status);
-        Assert.Equal(expected, Text(session));
+        Assert.Equal(expected, state(session));
         Assert.Equal((made.Label, EditOrigin.User), (session.UndoLabel, session.UndoOrigin));
-        Assert.Equal(ScriptPath, made.Path);
+        if (sameLabel)
+            Assert.Equal(rawLabel, made.Label);
+        Assert.Equal(path, made.Path);
         return made;
     }
 
@@ -105,7 +117,8 @@ public sealed class CutsceneCommandsTests
         var point = new ThnCurvePoint(0.75f, 0.5f, 1, 2);
         var plan = AssertSameW(s => CutsceneCommands.SetCurvePoint(s, Event(s, 1), 1, point),
             s => ThnEdits.Set(Event(s, 1), ThnCurve.Path,
-                ThnCurve.WithPoint((ThnTable)Value(s, Event(s, 1), ThnCurve.Path.Text)!, 1, point)), CurveScript);
+                ThnCurve.WithPoint((ThnTable)Value(s, Event(s, 1), ThnCurve.Path.Text)!, 1, point)), CurveScript,
+            sameLabel: false);
 
         Assert.Equal("Move point 2 of the curve", plan.Label);
         Assert.Equal(ThnElementKind.Event, Assert.Single(plan.Changed).Kind);
