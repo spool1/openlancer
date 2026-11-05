@@ -108,11 +108,7 @@ public sealed class ThnDocumentTests
     [Fact]
     public void APatchWithAnErrorMakesTheCutsceneReadOnly()
     {
-        const string broken = """
-            ol_thn_patch = 1
-            entities = { { ol_match = "Nobody", ol_set = { ["cameraprops.fovh"] = 20 } } }
-            """;
-        using var ws = Workspace(new() { [PatchFile] = broken });
+        using var ws = Workspace(new() { [PatchFile] = BrokenPatch });
         var session = ws.Session("act");
 
         Assert.Equal("The THN patch of the active mod has an error, so the editor cannot apply it: entities entry 1: no " +

@@ -151,6 +151,35 @@ public sealed class TimelineDragTests
         Assert.False(session.CanUndo);
     }
 
+    /// <summary>
+    /// A cutscene that is read-only by itself refuses to open a drag, also when the editor and the session take edits.
+    /// The message is the reason of the cutscene, so the Timeline shows the warning that the drag did not start. No
+    /// gesture stays open, and nothing changes.
+    /// </summary>
+    [Fact]
+    public void ADragDoesNotOpenOnACutsceneThatIsReadOnlyByItself()
+    {
+        using var ws = Workspace(new() { [PatchFile] = BrokenPatch });
+        var session = ws.Session("act");
+        var commands = Commands(session);
+        var motion = Ev(session, Motion);
+        var reason = session.CutsceneReadOnlyReason(ScriptPath);
+        var before = W(session);
+        Assert.Null(session.ReadOnlyReason);
+        Assert.NotNull(reason);
+
+        Assert.Equal(reason, Assert.Throws<InvalidOperationException>(() =>
+            TimelineDrag.Begin(commands, [motion], TimelineDragKind.Move, 6, [])).Message);
+        Assert.Equal(reason, Assert.Throws<InvalidOperationException>(() =>
+            TimelineDrag.Begin(commands, [Ev(session, Psys)], TimelineDragKind.End, 7, [])).Message);
+        Assert.Equal(reason, Assert.Throws<InvalidOperationException>(() =>
+            TimelineDrag.BeginDuration(commands, ScriptPath, 10, 10, [])).Message);
+
+        commands.Gesture("No gesture is open").Cancel();
+        Assert.Same(before, W(session));
+        Assert.False(session.CanUndo);
+    }
+
     /// <summary>A drag of the start of a bar moves its time and keeps its end. It stops at 0 and at the end of the bar.
     /// A drag of the end changes the length, and stops at the start.</summary>
     [Fact]

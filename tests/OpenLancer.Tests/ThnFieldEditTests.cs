@@ -378,6 +378,30 @@ public sealed class ThnFieldEditTests
             CurvePointDrag.Begin(FakeCommandHost.Runner(viewer), Event(viewer, 1), 1)).Message);
     }
 
+    /// <summary>A cutscene that is read-only by itself refuses to open a curve drag, also when the editor and the
+    /// session take edits. The message is the reason of the cutscene. No gesture stays open, and nothing
+    /// changes.</summary>
+    [Fact]
+    public void ACurveDragDoesNotOpenOnACutsceneThatIsReadOnlyByItself()
+    {
+        using var ws = Workspace(new() { [PatchFile] = BrokenPatch }, CurveScript());
+        var session = ws.Session("act");
+        var commands = FakeCommandHost.Runner(session);
+        var psys = Event(session, 1);
+        var reason = session.CutsceneReadOnlyReason(ScriptPath);
+        var before = W(session);
+        Assert.Null(session.ReadOnlyReason);
+        Assert.NotNull(reason);
+        Assert.Equal(3, CutsceneCommands.CurvePoints(session, psys)!.Count);
+
+        Assert.Equal(reason, Assert.Throws<InvalidOperationException>(() =>
+            CurvePointDrag.Begin(commands, psys, 1)).Message);
+
+        commands.Gesture("No gesture is open").Cancel();
+        Assert.Same(before, W(session));
+        Assert.False(session.CanUndo);
+    }
+
     /// <summary>A field of a point of the curve table gives the curve with that point.</summary>
     [Fact]
     public void AFieldOfAPointOfTheCurveTableGivesTheCurve()

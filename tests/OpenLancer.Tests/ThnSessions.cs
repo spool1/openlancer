@@ -17,6 +17,13 @@ internal static class ThnSessions
     internal const string PatchFile = ModOverlayThnTests.PatchFile;
     internal const string WholeFile = @"files\" + ScriptPath;
 
+    /// <summary>A patch of the script with an error: its entity entry matches no entity. It makes the cutscene
+    /// read-only, but the session still takes edits.</summary>
+    internal const string BrokenPatch = """
+        ol_thn_patch = 1
+        entities = { { ol_match = "Nobody", ol_set = { ["cameraprops.fovh"] = 20 } } }
+        """;
+
     /// <summary>
     /// A character with an Actor value that is its own name, two sounds whose speaker names it in other letter cases,
     /// events that name it in other letter cases, and two events with one key.
