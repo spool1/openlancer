@@ -285,14 +285,17 @@ public static class CutsceneCommands
     /// <summary>Plans a delete of events of one cutscene, as one entry. See <see cref="ThnEdits.Delete"/>.</summary>
     public static CutscenePlan DeleteEvents(EditSession session, IReadOnlyList<ThnRef> events)
     {
-        var unique = events.DistinctBy(e => e.Id).ToList();
+        // Each script counts its element ids, so two scripts can have the same id. Thus the check for one cutscene
+        // uses the list as given, and only the elements of one script lose their duplicates.
+        var oneCutscene = ThnEdits.InOneCutscene(events);
+        IReadOnlyList<ThnRef> unique = oneCutscene ? [.. events.DistinctBy(e => e.Id)] : events;
         var label = unique.Count == 1 ? "Delete event" : $"Delete {unique.Count} events";
         var path = unique.Count > 0 ? ScriptPath(session, unique[0].Path) : "";
         if (unique.Count == 0)
             return CutscenePlan.Refused(label, path, "There is no event to delete.");
         if (unique.Any(e => e.Kind != ThnElementKind.Event))
             return CutscenePlan.Refused(label, path, "Each element of the delete must be an event.");
-        if (!ThnEdits.InOneCutscene(unique))
+        if (!oneCutscene)
             return CutscenePlan.Refused(label, path, ThnEdits.OneCutscene);
         if (session.CutsceneReadOnlyReason(path) is { } reason)
             return CutscenePlan.Refused(label, path, reason);

@@ -213,12 +213,17 @@ public sealed partial class CutsceneCommandsTests
             s => ThnEdits.Delete(Event(s, Cut))).Label);
     }
 
+    /// <summary>
+    /// A delete refuses an entity and events of two cutscenes. Each script counts its element ids, so an event of
+    /// another script with the same id is not a duplicate: the plan refuses it too, and W does not change.
+    /// </summary>
     [Fact]
     public void DeleteEventsRefusesAnEntityAndEventsOfTwoCutscenes()
     {
         using var ws = Workspace();
         var session = ws.Session("act");
         var psys = Event(session, Psys);
+        var before = Text(session);
 
         AssertRefused(session, CutsceneCommands.DeleteEvents(session, []), "There is no event to delete.",
             EditPlan.PlanRefused);
@@ -227,6 +232,10 @@ public sealed partial class CutsceneCommandsTests
         var other = Event(session, Cut) with { Path = @"DATA\y.thn" };
         AssertRefused(session, CutsceneCommands.DeleteEvents(session, [psys, other]), ThnEdits.OneCutscene,
             EditPlan.PlanRefused);
+        var sameId = CutsceneCommands.DeleteEvents(session, [psys, psys with { Path = @"DATA\y.thn" }]);
+        AssertRefused(session, sameId, ThnEdits.OneCutscene, EditPlan.PlanRefused);
+        Assert.Equal(EditStatus.Refused, FakeCommandHost.Runner(session).Run(sameId).Status);
+        Assert.Equal(before, Text(session));
         Assert.False(session.CanUndo);
     }
 
