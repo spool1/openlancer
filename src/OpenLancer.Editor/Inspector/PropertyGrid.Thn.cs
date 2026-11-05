@@ -269,12 +269,12 @@ internal sealed partial class PropertyGrid
                 locked ?? (field.CanRevert ? null : MenuItems.NoRevert),
                 "Puts back the value of the cutscene as the base data and the mods before the active mod have it."))
         {
-            window.Commands.Execute(() => ThnEdits.Revert(field.Target.Path, field.Target, field.Path));
+            window.Commands.Run(s => CutsceneCommands.Revert(s, field.Target, field.Path));
         }
 
         if (MenuItems.Item(EditorIcons.TrashAlt, "Remove", locked ?? (field.Value == null ? noValue : null)))
         {
-            window.Commands.Execute(() => ThnEdits.Remove(field.Target, field.Path));
+            window.Commands.Run(s => CutsceneCommands.RemoveValue(s, field.Target, field.Path));
         }
 
         if (MenuItems.Item(EditorIcons.Copy, "Copy value", field.Value == null ? noValue : null))

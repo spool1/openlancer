@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Thn;
@@ -35,9 +34,10 @@ internal sealed record TimelineClip(IReadOnlyList<ThnTable> Events)
 internal sealed record TimelineAddChoice(ThnEventRole Role, string? Second, string? Refusal);
 
 /// <summary>
-/// The edits of the Timeline that are not drags (section 7.3 of the M8 design): Add event, copy, paste and duplicate,
-/// and the delete of an entity with the events that name it. Each one is one command, so it is one entry of the edit
-/// history. They have no ImGui call.
+/// The edits of the Timeline that are not drags (section 7.3 of the M8 design): the choices of Add event, copy, paste
+/// and duplicate, and the delete of an entity with the events that name it. Each one is one command, so it is one entry
+/// of the edit history. They have no ImGui call. The editor runs them through the plans of
+/// <see cref="CutsceneCommands"/>.
 /// </summary>
 internal static class TimelineEdits
 {
@@ -71,8 +71,13 @@ internal static class TimelineEdits
                 list = list.SetItem(2, new ThnTable(targets.List.SetItem(0, new ThnText(row)), targets.Record));
             return ThnEdits.AddEvent(path, new ThnTable(list, ev.Record));
         }).ToList();
-        return EditCommand.Group(clip.Events.Count == 1 ? $"{label} event" : $"{label} {clip.Events.Count} events", commands);
+        return EditCommand.Group(ClipLabel(label, clip.Events.Count), commands);
     }
+
+    /// <summary>The label of the entry of a paste or a duplicate of events, for example "Paste event" or "Duplicate 3
+    /// events".</summary>
+    /// <param name="verb">"Paste" or "Duplicate".</param>
+    public static string ClipLabel(string verb, int count) => count == 1 ? $"{verb} event" : $"{verb} {count} events";
 
     /// <summary>
     /// The command that adds a copy of each event right after the events, as Duplicate of Unity does: the copies keep
@@ -98,8 +103,11 @@ internal static class TimelineEdits
 
     /// <summary>The command that deletes events and an entity in one entry: the events first, then the entity.</summary>
     public static EditCommand DeleteWithEvents(ThnRef entity, IReadOnlyList<ThnRef> events) =>
-        EditCommand.Group(events.Count == 0 ? "Delete entity" : $"Delete entity and {events.Count} events",
-            [.. events.Select(ThnEdits.Delete), ThnEdits.Delete(entity)]);
+        EditCommand.Group(DeleteEntityLabel(events.Count), [.. events.Select(ThnEdits.Delete), ThnEdits.Delete(entity)]);
+
+    /// <summary>The label of the entry of a delete of an entity with the events that name it.</summary>
+    public static string DeleteEntityLabel(int events) =>
+        events == 0 ? "Delete entity" : $"Delete entity and {events} events";
 
     /// <summary>
     /// The events that the Add event menu of a row offers, in the order of the menu (section 7.3): the types whose first
@@ -132,19 +140,4 @@ internal static class TimelineEdits
 
         static string Name(ThnElement e) => ThnScriptModel.NameOf(e.Table) ?? "";
     }
-
-    /// <summary>The command of a choice of the Add event menu: a new event of the type at a time, on the entity of the
-    /// row (see <see cref="ThnTemplates.NewEvent"/>).</summary>
-    /// <exception cref="InvalidOperationException">The choice has a reason that refuses it.</exception>
-    public static EditCommand Add(string path, TimelineAddChoice choice, string entityName, double time)
-    {
-        if (choice.Refusal != null)
-            throw new InvalidOperationException(choice.Refusal);
-        return ThnEdits.AddEvent(path, ThnTemplates.NewEvent(choice.Role.Type, ThnEdits.OnGrid(Math.Max(0, time)),
-            entityName, choice.Second));
-    }
-
-    /// <summary>The ids of the last events of W: the events that a paste, a duplicate or an Add event added.</summary>
-    public static ImmutableArray<ThnElementId> Added(ThnScriptModel working, int count) =>
-        [.. working.Events.Skip(Math.Max(0, working.Events.Count - count)).Select(e => e.Id)];
 }

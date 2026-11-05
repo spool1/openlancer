@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Dialogs;
@@ -86,32 +88,25 @@ internal sealed partial class CutsceneWorkspace
             return;
         }
 
-        if (window.Commands.Execute(() => TimelineEdits.Paste(path, clip, time, row)))
-        {
-            SelectEvents(TimelineEdits.Added(Working!, clip.Events.Count));
-        }
+        Run(CutsceneCommands.Paste(window.Session!.Edits, path, clip, time, row));
     }
 
     /// <summary>Adds a copy of each selected event right after the selected events, and selects the copies (Ctrl+D, see
     /// <see cref="TimelineEdits.Duplicate"/>).</summary>
     public void Duplicate()
     {
-        if (Path is not { } path || Working is not { } working || SelectedEvents is not { Count: > 0 } events)
+        if (Path == null || SelectedEvents is not { Count: > 0 } events)
         {
             return;
         }
 
-        var clip = TimelineEdits.Copy(working, events);
-        if (window.Commands.Execute(() => TimelineEdits.Duplicate(path, clip)))
-        {
-            SelectEvents(TimelineEdits.Added(Working!, clip.Events.Count));
-        }
+        Run(CutsceneCommands.Duplicate(window.Session!.Edits, events));
     }
 
     /// <summary>Deletes the selected events (Delete), or the selected entity with the events that name it.</summary>
     public void DeleteSelection()
     {
-        if (Path is not { } path)
+        if (Path == null)
         {
             return;
         }
@@ -122,10 +117,9 @@ internal sealed partial class CutsceneWorkspace
             return;
         }
 
-        var events = SelectedEvents;
-        if (events.Count > 0 && window.Commands.Execute(EventsDelete(events)))
+        if (SelectedEvents is { Count: > 0 } events)
         {
-            window.Selection = Root;
+            Run(CutsceneCommands.DeleteEvents(window.Session!.Edits, events));
         }
     }
 
@@ -135,22 +129,20 @@ internal sealed partial class CutsceneWorkspace
     /// </summary>
     public void DeleteEntity(ThnRef entity)
     {
-        if (Path is not { } path || Working is not { } working || working.Element(ThnElementKind.Entity, entity.Id) is not { } element)
+        if (Working?.Element(ThnElementKind.Entity, entity.Id) is not { } element)
         {
+            return;
+        }
+
+        var plan = CutsceneCommands.DeleteEntity(window.Session!.Edits, entity);
+        if (!plan.CanRun || !plan.NeedsConfirmation)
+        {
+            Run(plan);
             return;
         }
 
         var name = ThnScriptModel.NameOf(element.Table) ?? "";
-        // An earlier entity with the same name is not the entity that the events find.
-        var events = ReferenceEquals(working.EntityNamed(name), element)
-            ? TimelineEdits.EventsNaming(path, working, name)
-            : [];
-        if (events.Count == 0)
-        {
-            Run(TimelineEdits.DeleteWithEvents(entity, []));
-            return;
-        }
-
+        var events = plan.Deleted.Where(e => e.Kind == ThnElementKind.Event).ToList();
         var timeline = Timeline;
         var lines = new StringBuilder($"{events.Count} events name the entity {name}:\n\n");
         foreach (var ev in events.Take(20))
@@ -169,17 +161,9 @@ internal sealed partial class CutsceneWorkspace
         lines.Append("\nThe engine cannot play an event whose target is gone. Delete the entity with these events?");
         window.Choice.Show("Delete entity", lines.ToString(),
         [
-            new Choice("Delete with events", () => Run(TimelineEdits.DeleteWithEvents(entity, events))),
+            new Choice("Delete with events", () => Run(plan)),
             new Choice("Cancel", () => { }),
         ]);
-
-        void Run(Data.Editing.EditCommand command)
-        {
-            if (window.Commands.Execute(command))
-            {
-                window.Selection = Root;
-            }
-        }
     }
 
     /// <summary>
@@ -195,15 +179,16 @@ internal sealed partial class CutsceneWorkspace
         }
 
         var uses = RenameUses(path, oldName);
-        if (uses.Count == 0)
+        var plan = CutsceneCommands.RenameEntity(window.Session!.Edits, entity, newName, uses);
+        if (!plan.CanRun || !plan.NeedsConfirmation)
         {
-            window.Commands.Execute(() => ThnEdits.RenameEntity(entity, newName));
+            Run(plan);
             return;
         }
 
         window.Choice.Show("Rename entity", CutsceneRename.Message(oldName, newName, uses),
         [
-            new Choice("Rename in this file", () => window.Commands.Execute(() => ThnEdits.RenameEntity(entity, newName))),
+            new Choice("Rename in this file", () => Run(plan)),
             new Choice("Cancel", () => { }),
         ]);
     }
@@ -212,10 +197,56 @@ internal sealed partial class CutsceneWorkspace
     public IReadOnlyList<ThnNameUse> RenameUses(string path, string name) =>
         CutsceneRename.Uses(References(), path, name, ScriptModel, Symbols);
 
-    /// <summary>The command that deletes events in one entry.</summary>
-    private static Data.Editing.EditCommand EventsDelete(IReadOnlyList<ThnRef> events) =>
-        Data.Editing.EditCommand.Group(events.Count == 1 ? "Delete event" : $"Delete {events.Count} events",
-            [.. events.Select(ThnEdits.Delete)]);
+    /// <summary>
+    /// Runs a plan of a cutscene command through the command runner, which tells why it cannot run. After the edit, the
+    /// selection follows Unity (see <see cref="SelectionAfter"/>). Returns true when the edit applied.
+    /// </summary>
+    /// <remarks>Run a plan at once after it is made, or after the dialog that asks about it.</remarks>
+    public bool Run(CutscenePlan plan)
+    {
+        if (window.Commands.Run(plan).Status != EditStatus.Applied)
+        {
+            return false;
+        }
+
+        if (Path is { } path && window.Session is { } current)
+        {
+            window.Selection = SelectionAfter(plan, current.Edits, path, window.Selection);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// The selection after an edit of the open cutscene, as Unity does (decision D249): the new events of a paste, a
+    /// duplicate or an Add event, else a new entity. A delete selects the cutscene. Each other edit keeps the
+    /// selection, for example a rename.
+    /// </summary>
+    /// <remarks>Call it right after the run, because <see cref="CutscenePlan.Added"/> reads the last elements of
+    /// W.</remarks>
+    /// <param name="path">The install path of the open cutscene, in normal form.</param>
+    /// <param name="current">The selection before the edit.</param>
+    internal static object? SelectionAfter(CutscenePlan plan, EditSession session, string path, object? current)
+    {
+        if (!VfsPath.Comparer.Equals(plan.Path, path))
+        {
+            return current;
+        }
+
+        var added = plan.Added(session);
+        var events = added.Where(e => e.Kind == ThnElementKind.Event).Select(e => e.Id).ToList();
+        if (events.Count > 0)
+        {
+            return ThnEventSet.Of(path, events);
+        }
+
+        if (added.Count > 0)
+        {
+            return added[^1] with { Path = path };
+        }
+
+        return plan.Deleted.Count > 0 ? new CutsceneRoot(path) : current;
+    }
 
     /// <summary>W of a script of the session, or the script of the edit view, or null when it cannot be read.</summary>
     private ThnScriptModel? ScriptModel(string path)

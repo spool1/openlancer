@@ -120,7 +120,7 @@ public sealed class ThnReferencesTests
             ThnElementId.Counter());
         var withCopy = OpenLancer.Data.Thn.ThnScriptModel.From(ThnScripts.Evaluate(
             "duration = 1\nentities = { { entity_name = \"Camera_0\", type = CAMERA } }\nevents = {}\n"), ThnElementId.Counter());
-        var list = OpenLancer.Editor.Cutscene.CutsceneRename.Uses(references, @"DATA\Scripts\set.thn", "Camera_0",
+        var list = OpenLancer.Studio.Commands.CutsceneRename.Uses(references, @"DATA\Scripts\set.thn", "Camera_0",
             path => path.EndsWith("enter.thn", StringComparison.OrdinalIgnoreCase) ? withReference
                 : path.EndsWith("ambi.thn", StringComparison.OrdinalIgnoreCase) ? withCopy : null,
             ThnScripts.Evaluator.Symbols);

@@ -30,10 +30,8 @@ internal interface ICommandHost
 /// <para>The runner writes each refusal and each problem of an edit to the Console with the source "Edit". A plan that
 /// refuses gives an error for each refusal. When the editor takes no edits, the runner gives a warning with the reason
 /// and runs nothing. After an edit, the warnings of its plan follow.</para>
-/// <para>Only the cutscene callers still run session commands through <see cref="Execute(EditCommand)"/>, until
-/// milestone MCP1-4 moves them to the cutscene commands. A test of the editor assembly checks the other types
-/// (<c>EditorLayerTests</c>). It fails when a type makes a session command, gets a delegate that makes one, runs one,
-/// or calls <c>Execute</c>.</para>
+/// <para>A test of the editor assembly checks each other type (<c>EditorLayerTests</c>). It fails when a type makes a
+/// session command, gets a delegate that makes one, or runs one.</para>
 /// </remarks>
 internal sealed class CommandRunner(ICommandHost host)
 {
@@ -172,58 +170,6 @@ internal sealed class CommandRunner(ICommandHost host)
         foreach (var note in result.Notes)
             Log.Add(ConsoleSeverity.Info, MissionChecks.Source, note);
         return result;
-    }
-
-    /// <summary>
-    /// Runs a session command as one entry of the edit history. When the editor takes no edits, or the command does not
-    /// apply, the Console tells why and the result is false.
-    /// </summary>
-    public bool Execute(EditCommand command)
-    {
-        if (host.Session is not { } session)
-            return false;
-        if (host.NoEditReason is { } reason)
-        {
-            Log.Add(ConsoleSeverity.Warning, Source, reason);
-            return false;
-        }
-
-        try
-        {
-            session.Execute(command);
-            return true;
-        }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException)
-        {
-            Log.Add(ConsoleSeverity.Error, Source, ErrorText.Of(e));
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Makes a session command and runs it, for a command that reads the edit view when it is made. When the command
-    /// cannot be made, the Console tells why and the result is false.
-    /// </summary>
-    public bool Execute(Func<EditCommand> make)
-    {
-        if (host.NoEditReason is { } reason)
-        {
-            Log.Add(ConsoleSeverity.Warning, Source, reason);
-            return false;
-        }
-
-        EditCommand command;
-        try
-        {
-            command = make();
-        }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException)
-        {
-            Log.Add(ConsoleSeverity.Error, Source, ErrorText.Of(e));
-            return false;
-        }
-
-        return Execute(command);
     }
 
     /// <summary>The text of a request while no profile is open.</summary>

@@ -78,7 +78,6 @@ public sealed class CommandRunnerTests
         var error = Assert.Throws<InvalidOperationException>(() => runner.Gesture("Move Li01_depot"));
         Assert.Equal("The editor waits for a confirmation.", error.Message);
         Assert.False(session.InTransaction);
-        Assert.False(runner.Execute(EditCommand.SetLinesFromText(Depot, "pos", ["1, 2, 3"])));
         Assert.Null(runner.Apply(new Data.Missions.Editing.MissionBatch("Nothing", [])));
         Assert.False(session.CanUndo);
     }
@@ -153,7 +152,8 @@ public sealed class CommandRunnerTests
         var runner = new CommandRunner(host);
 
         Assert.Equal(EditStatus.Refused, runner.Run(CommandPlan.Refused("Nothing", "No.")).Status);
-        Assert.False(runner.Execute(EditCommand.SetLinesFromText(Depot, "pos", ["1, 2, 3"])));
+        Assert.Equal(EditStatus.Refused, runner.Run(SetPos(1)).Status);
+        Assert.Equal(EditStatus.Refused, runner.Run(_ => SetPos(1)).Status);
         Assert.Empty(host.Log.Entries);
     }
 

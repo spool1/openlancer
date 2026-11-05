@@ -67,9 +67,11 @@ public sealed class CutscenePlan : EditPlan
     /// <paramref name="changed"/>.</param>
     /// <param name="newEntities">The number of entities that the command adds at the end of the entities.</param>
     /// <param name="newEvents">The number of events that the command adds at the end of the events.</param>
+    /// <param name="needsConfirmation">True when the editor asks before it runs the command (see
+    /// <see cref="EditPlan.NeedsConfirmation"/>).</param>
     internal static CutscenePlan Of(string label, string path, Func<EditCommand> make,
         IReadOnlyList<ThnRef>? changed = null, IReadOnlyList<ThnRef>? deleted = null, int newEntities = 0,
-        int newEvents = 0)
+        int newEvents = 0, bool needsConfirmation = false)
     {
         EditCommand command;
         try
@@ -88,6 +90,7 @@ public sealed class CutscenePlan : EditPlan
             Deleted = InScript(path, deleted),
             NewEntities = newEntities,
             NewEvents = newEvents,
+            NeedsConfirmation = needsConfirmation,
         };
     }
 

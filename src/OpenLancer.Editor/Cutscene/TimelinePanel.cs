@@ -879,7 +879,7 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
                         $"Runs the event before {label}. The engine runs the events of one time in the order of the " +
                         "file (ThnScript.cs:150-152)."))
                 {
-                    window.Commands.Execute(ThnEdits.Reorder(ev.Ref, other.Ref));
+                    workspace.Run(CutsceneCommands.Reorder(session.Edits, ev.Ref, other.Ref));
                 }
             }
 
@@ -910,10 +910,10 @@ internal sealed class TimelinePanel(EditorWindow window, CutsceneWorkspace works
                         $"Adds a {choice.Role.Type} at {Seconds(target.Time)} s" +
                         (choice.Second != null ? $" with the second target {choice.Second}." : ".")))
                 {
-                    if (window.Commands.Execute(() => TimelineEdits.Add(path, choice, name!, target.Time)))
-                    {
-                        workspace.SelectEvents(TimelineEdits.Added(workspace.Working!, 1));
-                    }
+                    // A click left of 0 adds the event at 0.
+                    string[] targets = choice.Second == null ? [name!] : [name!, choice.Second];
+                    workspace.Run(CutsceneCommands.AddEvent(session!.Edits, path, choice.Role.Type,
+                        Math.Max(0, target.Time), targets));
                 }
             }
 

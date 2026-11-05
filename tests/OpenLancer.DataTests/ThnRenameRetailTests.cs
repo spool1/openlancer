@@ -4,7 +4,7 @@ using System.Linq;
 using LibreLancer;
 using LibreLancer.Data.IO;
 using OpenLancer.Data.Thn;
-using OpenLancer.Editor.Cutscene;
+using OpenLancer.Studio.Commands;
 using OpenLancer.Runtime.Thn;
 using Xunit;
 

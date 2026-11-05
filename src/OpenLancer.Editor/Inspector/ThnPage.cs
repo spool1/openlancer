@@ -230,7 +230,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
                     return parse.Error;
                 }
 
-                window.Commands.Execute(() => ThnEdits.SetDuration(path, number.Value));
+                window.Commands.Run(s => CutsceneCommands.SetDuration(s, path, number.Value));
                 return null;
             });
     }
@@ -254,7 +254,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
                 if (ImGui.Button("Move", new System.Numerics.Vector2(ToolbarItems.IconWidth * 3, 0)) &&
                     float.TryParse(shift, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds))
                 {
-                    window.Commands.Execute(() => ThnEdits.MoveEvents(set.Events, seconds, 0));
+                    window.Commands.Run(s => CutsceneCommands.MoveEvents(s, set.Events, seconds, 0));
                 }
 
                 ImGui.EndDisabled();
@@ -505,9 +505,9 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
                     foreach (var choice in choices)
                     {
                         var selected = choice.Equals(name, StringComparison.OrdinalIgnoreCase);
-                        if (ImGui.Selectable(choice, selected) && !selected && table.List[2] is ThnTable targets)
+                        if (ImGui.Selectable(choice, selected) && !selected)
                         {
-                            window.Commands.Execute(() => ThnEdits.Set(ev, path, ThnFieldEdit.TargetsValue(targets, index, choice)));
+                            window.Commands.Run(s => CutsceneCommands.SetTarget(s, ev, index, choice));
                         }
                     }
 
@@ -660,7 +660,8 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         ImGui.BeginDisabled(field.ReadOnly != null);
         if (ImGui.Checkbox("##value", ref on))
         {
-            window.Commands.Execute(() => ThnEdits.Set(field.Target, field.Path, ThnFieldEdit.BoolValue(field.Value, on)));
+            window.Commands.Run(s =>
+                CutsceneCommands.SetValue(s, field.Target, field.Path, ThnFieldEdit.BoolValue(field.Value, on)));
         }
 
         ImGui.EndDisabled();
@@ -692,8 +693,8 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
                 var selected = name == current;
                 if (ImGui.Selectable(name, selected) && !selected)
                 {
-                    window.Commands.Execute(() =>
-                        ThnEdits.Set(field.Target, field.Path, ThnFieldEdit.SymbolValue(field.Value, name, Symbols)));
+                    window.Commands.Run(s => CutsceneCommands.SetValue(s, field.Target, field.Path,
+                        ThnFieldEdit.SymbolValue(field.Value, name, Symbols)));
                 }
             }
 
@@ -721,7 +722,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         }
 
         grid.ThnRow(label, field, note, () => Checkboxes(ThnFlags.Shown(sound), on, field.ReadOnly, chosen =>
-            window.Commands.Execute(() => ThnEdits.SetFlags(entity, chosen))));
+            window.Commands.Run(s => CutsceneCommands.SetFlags(s, entity, chosen))));
     }
 
     /// <summary>The bits of a flags key of an event, with the write rules of <see cref="ThnFlags.WriteBits"/>.</summary>
@@ -739,9 +740,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         }
 
         grid.ThnRow(label, field, note, () => Checkboxes(row.Bits.Select(b => b.Name).ToList(), on, field.ReadOnly, chosen =>
-            window.Commands.Execute(() => ThnFlags.WriteBits(field.Value, row, chosen, Symbols) is { } value
-                ? ThnEdits.Set(field.Target, field.Path, value)
-                : ThnEdits.Remove(field.Target, field.Path))));
+            window.Commands.Run(s => CutsceneCommands.SetFlagBits(s, field.Target, row, chosen))));
     }
 
     /// <summary>A checkbox for each name, two in each line when they fit. A click gives the names that are on after

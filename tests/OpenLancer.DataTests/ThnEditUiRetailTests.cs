@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using LibreLancer;
 using LibreLancer.Thn;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Cutscene;
 using OpenLancer.Editor.Editing;
@@ -20,7 +21,7 @@ using Xunit;
 namespace OpenLancer.DataTests;
 
 /// <summary>
-/// Each kind of edit of the cutscene editor through its command path, on s002xe in a temporary mod (step 7 of the M8
+/// Each kind of edit of the cutscene editor through its plan of the command layer, on s002xe in a temporary mod (step 7 of the M8
 /// design): the drags of the Timeline, the fields, checkboxes and lists of the Inspector, Add event, paste, duplicate,
 /// delete, Move before, the curve editor, the path keys, the gizmo, Set camera from view, and the rename. Each edit is one
 /// entry of the history. The save writes a patch that has only the entries of these edits, and every other value of
@@ -101,44 +102,43 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         expected.Change(news);
         var medic = Entity("Char_medic_1");
         var medicTable = W().Element(ThnElementKind.Entity, medic.Id)!.Table;
-        session.Execute(ThnEdits.SetFlags(medic, new HashSet<string>(ThnFlags.On(medicTable[ThnFlags.Key],
+        Run(CutsceneCommands.SetFlags(session, medic, new HashSet<string>(ThnFlags.On(medicTable[ThnFlags.Key],
             ThnFlags.IsSound(medicTable, symbols), symbols)) { ThnFlags.Hidden }));
         Done("Set flags");
         expected.Change(medic);
         var lonnigan = Event(0, "ATTACH_ENTITY", "Prop_Char_Lonnigan", "Mrk_offscreen_Location");
         var attachFlags = ThnSchema.Find(ThnElementKind.Event, "ATTACH_ENTITY", new ThnPath("props.flags"))!;
         var flags = Value(lonnigan, "props.flags");
-        session.Execute(ThnEdits.Set(lonnigan, attachFlags.Path, ThnFlags.WriteBits(flags, attachFlags,
-            new HashSet<string>(ThnFlags.BitsOn(flags, attachFlags, symbols)) { "ORIENTATION" }, symbols)!));
+        Run(CutsceneCommands.SetFlagBits(session, lonnigan, attachFlags,
+            new HashSet<string>(ThnFlags.BitsOn(flags, attachFlags, symbols)) { "ORIENTATION" }));
         Done("Set props.flags");
         expected.Change(lonnigan);
         // s002xe stores these two values as a name and as Y, so the edits keep a name and a bool. A stored number stays a
         // number (ThnFieldEditTests).
         var maglev = Event(0, "ATTACH_ENTITY", "Prop_Maglev", "Mrk_offscreen_Location");
         Assert.IsType<ThnSymbol>(Value(maglev, "props.target_type"));
-        session.Execute(ThnEdits.Set(maglev, new ThnPath("props.target_type"),
+        Run(CutsceneCommands.SetValue(session, maglev, new ThnPath("props.target_type"),
             ThnFieldEdit.SymbolValue(Value(maglev, "props.target_type"), "PART", symbols)));
         Done("Set props.target_type");
         Assert.Equal(new ThnSymbol("PART"), Value(maglev, "props.target_type"));
         expected.Change(maglev);
         var sky = Entity("ambi_LtG04_Direct_City_Sky_6ocTransport");
         Assert.Equal(new ThnBool(true), Value(sky, "lightprops.on"));
-        session.Execute(ThnEdits.Set(sky, new ThnPath("lightprops.on"),
+        Run(CutsceneCommands.SetValue(session, sky, new ThnPath("lightprops.on"),
             ThnFieldEdit.BoolValue(Value(sky, "lightprops.on"), on: false)));
         Done("Set lightprops.on");
         Assert.Equal(new ThnBool(false), Value(sky, "lightprops.on"));
         expected.Change(sky);
         var staticCut = Event(3.281f, "SET_CAMERA", "Cam_Monitor_s002xe_min_spec", "Cam_01_VideoCam_A_static_mon_b");
-        session.Execute(ThnEdits.Set(staticCut, new ThnPath("targets"),
-            ThnFieldEdit.TargetsValue((ThnTable)Value(staticCut, "targets")!, 1, "Cam_01_VideoCam_A")));
+        Run(CutsceneCommands.SetTarget(session, staticCut, 1, "Cam_01_VideoCam_A"));
         Done("Set targets");
         expected.Change(staticCut);
 
         // Add event with a template, the gizmo on the target pose of the new spatial animation, paste, duplicate,
         // delete, the delete of an entity with its events, and Move before.
-        session.Execute(Add("Cam_02_Intro_Trent_A", "START_CAMERA_PROP_ANIM", 14));
+        Run(Add("Cam_02_Intro_Trent_A", "START_CAMERA_PROP_ANIM", 14));
         Done("Add START_CAMERA_PROP_ANIM");
-        session.Execute(Add("Char_Extra_01", "START_SPATIAL_PROP_ANIM", 1));
+        Run(Add("Char_Extra_01", "START_SPATIAL_PROP_ANIM", 1));
         Done("Add START_SPATIAL_PROP_ANIM");
         expected.News += 2;
         var anim = new ThnRef(S002xe, ThnElementKind.Event, W().Events[^1].Id);
@@ -146,21 +146,23 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         Gizmo(anim, GizmoTool.Move, Matrix4x4.CreateTranslation(0, 1, 0));
         Done("Move the target pose of Char_Extra_01");
         var clip = TimelineEdits.Copy(W(), [Event(0.312f, "START_PSYS", "gf_ci_smallengine_EXTRA_SHIP")]);
-        session.Execute(TimelineEdits.Paste(S002xe, clip, 50, "vfx_TV_Lines_2"));
+        Run(CutsceneCommands.Paste(session, S002xe, clip, 50, "vfx_TV_Lines_2"));
         Done("Paste event");
-        session.Execute(TimelineEdits.Duplicate(S002xe,
-            TimelineEdits.Copy(W(), [Event(2.5f, "ATTACH_ENTITY", "vfx_TV_Lines_2", "Cam_01_VideoCam_A")])));
+        Run(CutsceneCommands.Duplicate(session, [Event(2.5f, "ATTACH_ENTITY", "vfx_TV_Lines_2", "Cam_01_VideoCam_A")]));
         Done("Duplicate event");
         // The copy goes after its source, so the key of the source still names one event.
         Assert.NotNull(Event(2.5f, "ATTACH_ENTITY", "vfx_TV_Lines_2", "Cam_01_VideoCam_A"));
         expected.News += 2;
         var distortion = Event(4.684f, "START_PSYS", "vfx_TV_Distortion_2");
-        session.Execute(ThnEdits.Delete(distortion));
+        Run(CutsceneCommands.DeleteEvents(session, [distortion]));
         Done("Delete event");
         expected.Delete(distortion);
         var cigarette = Entity("prop_cigarette_2");
         var cigaretteEvents = TimelineEdits.EventsNaming(S002xe, W(), "prop_cigarette_2");
-        session.Execute(TimelineEdits.DeleteWithEvents(cigarette, cigaretteEvents));
+        var deleteCigarette = CutsceneCommands.DeleteEntity(session, cigarette);
+        Assert.True(deleteCigarette.NeedsConfirmation);
+        Assert.Equal([.. cigaretteEvents, cigarette], deleteCigarette.Deleted);
+        Run(deleteCigarette);
         Done("Delete entity and 5 events");
         expected.Delete(cigarette);
         foreach (var ev in cigaretteEvents)
@@ -169,7 +171,7 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         var fade = Event(3.092f, "START_PSYS_PROP_ANIM", "vfx_rtc_fadeblack_variable_1");
         Assert.Null(ThnEdits.ReorderRefusal(session, fadeStatic, fade));
         var kept = W().Events.Where(e => e.Origin >= 0).Select(e => e.Id).ToHashSet();
-        session.Execute(ThnEdits.Reorder(fadeStatic, fade));
+        Run(CutsceneCommands.Reorder(session, fadeStatic, fade));
         Done("Move event before");
         var renewed = W().Events.Where(e => e.Origin < 0 && kept.Contains(e.Id)).ToList();
         Assert.Equal([fade.Id], renewed.Select(e => e.Id));
@@ -209,17 +211,20 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         Done("Rotate Cam_02_Intro_Trent_B");
         expected.Change(trentB);
         var medics = Entity("Cam_03_ACOH_Trent_Medics_A");
-        session.Execute(ThnGizmoTarget.SetStartPose(medics, new ThnPoseValue(new Vector3(52, 1.75f, -12),
+        Run(CutsceneCommands.SetStartPose(session, medics, new ThnPoseValue(new Vector3(52, 1.75f, -12),
             Quaternion.CreateFromAxisAngle(Vector3.UnitY, -MathF.PI / 2)), "Set camera from view"));
         Done("Set camera from view");
         expected.Change(medics);
 
         // The rename: no other data uses the name, so it runs at once, and it changes the events that name the entity.
         var extra = Entity("Char_Extra_03");
-        Assert.Empty(CutsceneRename.Uses(ThnReferences.Scan(session.EditView.CreateFileSystem()), S002xe, "Char_Extra_03",
-            _ => null, symbols));
+        var uses = CutsceneRename.Uses(ThnReferences.Scan(session.EditView.CreateFileSystem()), S002xe, "Char_Extra_03",
+            _ => null, symbols);
+        Assert.Empty(uses);
         var naming = TimelineEdits.EventsNaming(S002xe, W(), "Char_Extra_03");
-        session.Execute(ThnEdits.RenameEntity(extra, "Char_Extra_03_renamed"));
+        var rename = CutsceneCommands.RenameEntity(session, extra, "Char_Extra_03_renamed", uses);
+        Assert.False(rename.NeedsConfirmation);
+        Run(rename);
         Done("Rename to Char_Extra_03_renamed");
         expected.Change(extra);
         foreach (var ev in naming)
@@ -314,11 +319,17 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
             Assert.Null(edit.End(keep: true, interactive: true));
         }
 
-        EditCommand Add(string entity, string type, double time)
+        // A choice of the Add event menu of the row of an entity, as the Timeline runs it.
+        CutscenePlan Add(string entity, string type, double time)
         {
             var choice = TimelineEdits.AddChoices(W(), entity, symbols).Single(c => c.Role.Type == type);
-            return TimelineEdits.Add(S002xe, choice, entity, time);
+            Assert.Null(choice.Refusal);
+            return CutsceneCommands.AddEvent(session, S002xe, type, time,
+                choice.Second == null ? [entity] : [entity, choice.Second]);
         }
+
+        // A discrete edit of the UI: its plan through the runner of the editor.
+        void Run(CutscenePlan plan) => Assert.Equal(EditStatus.Applied, commands.Run(plan).Status);
 
         void Gizmo(ThnRef element, GizmoTool tool, Matrix4x4 change)
         {

@@ -7,9 +7,7 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor;
-using OpenLancer.Editor.Cutscene;
 using OpenLancer.Editor.Editing;
-using OpenLancer.Editor.Inspector;
 using OpenLancer.Runtime.Scene;
 using Xunit;
 
@@ -21,34 +19,19 @@ namespace OpenLancer.Tests;
 /// no editor type makes a session command, gets a delegate that makes one, or runs one.
 /// </summary>
 /// <remarks>
-/// <para>The cutscene callers of discrete edits keep their session commands and
-/// <see cref="CommandRunner.Execute(EditCommand)"/> until milestone MCP1-4 moves them to the cutscene commands. A fixed
-/// allow-list names each of these types, and a test fails when an entry of the list has no edit call any more. The
-/// gestures of the cutscene editor (the drags of the Timeline and of the curve editor, and the field gestures) are not
-/// on the list: they run the cutscene commands in a gesture of the layer.</para>
+/// <para>The rule covers each type of the editor: the scene and data edits, the mission edits and the cutscene edits.
+/// The discrete cutscene edits and the gestures of the cutscene editor (the drags of the Timeline and of the curve
+/// editor, and the field gestures) run the plans of the cutscene commands.</para>
 /// <para>A second rule reads the IL of the runtime assembly. No runtime method runs a session command, so the editor
 /// cannot reach a raw edit through a runtime helper.</para>
 /// </remarks>
 public sealed class EditorLayerTests
 {
-    /// <summary>The cutscene callers that keep the edit calls of their discrete edits until milestone MCP1-4, one entry
-    /// for each type.</summary>
-    private static readonly IReadOnlyList<Allowed> AllowList =
-    [
-        new(nameof(CutsceneWorkspace), t => t == typeof(CutsceneWorkspace), _ => true),
-        new(nameof(TimelinePanel), t => t == typeof(TimelinePanel), _ => true),
-        new(nameof(CutsceneBrowser), t => t == typeof(CutsceneBrowser), _ => true),
-        new(nameof(CutsceneView), t => t == typeof(CutsceneView), _ => true),
-        new(nameof(ThnPage), t => t == typeof(ThnPage), _ => true),
-        new($"{nameof(PropertyGrid)}, for calls of {nameof(ThnEdits)} and of {nameof(CommandRunner.Execute)}",
-            t => t == typeof(PropertyGrid), m => m.DeclaringType == typeof(ThnEdits) || IsExecute(m)),
-    ];
-
     [Fact]
     public void NoEditorTypeOutsideTheRunnerMakesOrRunsASessionCommand()
     {
         var found = EditCalls(typeof(EditorWindow).Assembly, EditRule)
-            .Where(c => c.Owner != typeof(CommandRunner) && !AllowList.Any(a => a.Covers(c)))
+            .Where(c => c.Owner != typeof(CommandRunner))
             .Select(c => c.ToString())
             .Distinct()
             .ToList();
@@ -62,17 +45,6 @@ public sealed class EditorLayerTests
         var found = EditCalls(typeof(GizmoDrag).Assembly, RunRule).Select(c => c.ToString()).Distinct().ToList();
 
         Assert.True(found.Count == 0, "Runtime calls that run a session command:\n" + string.Join("\n", found));
-    }
-
-    /// <summary>Each entry of the allow-list has an edit call. When milestone MCP1-4 moves a caller, its entry
-    /// goes.</summary>
-    [Fact]
-    public void EachEntryOfTheAllowListHasAnEditCall()
-    {
-        var calls = EditCalls(typeof(EditorWindow).Assembly, EditRule).ToList();
-
-        foreach (var entry in AllowList)
-            Assert.True(calls.Any(entry.Covers), $"The allow-list entry '{entry.Name}' has no edit call. Remove it.");
     }
 
     /// <summary>The walker finds each form of an edit call of <see cref="RawEditSample"/>, and gives each one to the
@@ -94,7 +66,7 @@ public sealed class EditorLayerTests
         var delegateCalls = calls.Where(c => c.Caller.Name == nameof(RawEditSample.Delegate)).ToList();
         Assert.Contains(delegateCalls, c => c.Callee.Name == "get_" + nameof(RawEditField.Make));
         Assert.Contains(delegateCalls, c => c.Callee.Name == nameof(Func<ThnValue, EditCommand>.Invoke));
-        Assert.Contains(delegateCalls, c => IsExecute(c.Callee));
+        Assert.Contains(delegateCalls, c => c.Callee.Name == nameof(EditSession.Execute));
     }
 
     /// <summary>Why an editor type cannot call a member, or null. The rule of section 5.2, item 5 of the MCP1
@@ -110,7 +82,6 @@ public sealed class EditorLayerTests
         MethodInfo m when m.DeclaringType == typeof(EditBatch) && m.Name == nameof(EditBatch.Run) => "runs a session command",
         MethodInfo m when m.DeclaringType == typeof(CommandTransaction) && m.Name == nameof(CommandTransaction.Begin) =>
             "opens a gesture",
-        MethodInfo m when IsExecute(m) => "runs a session command without a plan",
         _ => RunRule(member),
     };
 
@@ -127,11 +98,6 @@ public sealed class EditorLayerTests
         typeof(Delegate).IsAssignableFrom(type) && type.GetMethod(nameof(Action.Invoke)) is { } invoke &&
         typeof(EditCommand).IsAssignableFrom(invoke.ReturnType);
 
-    /// <summary>True for <see cref="CommandRunner.Execute(EditCommand)"/> and its overload. They run a session command
-    /// without a plan. Only the cutscene callers use them until milestone MCP1-4.</summary>
-    private static bool IsExecute(MemberInfo member) =>
-        member.DeclaringType == typeof(CommandRunner) && member.Name == nameof(CommandRunner.Execute);
-
     /// <summary>Each call of an assembly that a rule names, with the type that holds it.</summary>
     /// <remarks>A call of a member of the same type, for example of its own lambda, does not count. The walker reads
     /// the body of that member as a part of the type.</remarks>
@@ -146,12 +112,6 @@ public sealed class EditorLayerTests
     {
         public override string ToString() =>
             $"{Owner.FullName}.{Caller.Name} {Reason}: {Callee.DeclaringType?.Name}.{Callee.Name}";
-    }
-
-    /// <summary>An entry of the allow-list: the types that it covers, and the members that they can call.</summary>
-    private sealed record Allowed(string Name, Func<Type, bool> Owner, Func<MemberInfo, bool> Callee)
-    {
-        public bool Covers(EditCall call) => Owner(call.Owner) && Callee(call.Callee);
     }
 }
 
@@ -177,8 +137,8 @@ internal static class RawEditSample
 
     public static bool Plan(EditPlan plan) => plan.CanRun && plan.Command != null;
 
-    public static bool Delegate(CommandRunner runner, RawEditField field, ThnValue value) =>
-        runner.Execute(field.Make(value));
+    public static void Delegate(EditSession session, RawEditField field, ThnValue value) =>
+        session.Execute(field.Make(value));
 }
 
 /// <summary>A type that gives a delegate that makes a session command, for the form of

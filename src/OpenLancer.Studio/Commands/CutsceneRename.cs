@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using OpenLancer.Data.Thn;
 
-namespace OpenLancer.Editor.Cutscene;
+namespace OpenLancer.Studio.Commands;
 
 /// <summary>A use of the name of an entity in other data, which a rename does not change.</summary>
 /// <param name="File">The install path of the file.</param>
@@ -17,6 +17,8 @@ internal sealed record ThnNameUse(string File, string Text);
 /// entities with the name in the other scripts that play in those rooms. Those scripts skip such an entity and use the
 /// object of the set by name (ThnScriptInstance.cs:70-71). A rename changes only the open file.
 /// </summary>
+/// <remarks>The caller scans the data for the uses and gives them to <see cref="CutsceneCommands.RenameEntity"/>. The
+/// editor scans the game data.</remarks>
 internal static class CutsceneRename
 {
     /// <summary>The uses of a name of an entity of a script, in the order of the scan.</summary>

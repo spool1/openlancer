@@ -11,6 +11,7 @@ using OpenLancer.Editor.Scene;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Runtime.Scene;
 using OpenLancer.Runtime.Thn;
+using OpenLancer.Studio.Commands;
 
 namespace OpenLancer.Editor.Cutscene;
 
@@ -212,8 +213,8 @@ internal sealed class CutsceneView
                 "Set camera from view: write the pose of the free camera into the start pose of the selected camera, " +
                 $"in one edit.{(cameraReason != null ? $"\n\n{cameraReason}" : "")}", camera != null))
         {
-            window.Commands.Execute(ThnGizmoTarget.SetStartPose(camera!, new ThnPoseValue(freeCamera.Position,
-                freeCamera.Orientation), "Set camera from view"));
+            var pose = new ThnPoseValue(freeCamera.Position, freeCamera.Orientation);
+            window.Commands.Run(s => CutsceneCommands.SetStartPose(s, camera!, pose, "Set camera from view"));
         }
 
         ImGui.SameLine();

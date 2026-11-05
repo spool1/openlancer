@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.IO;
+using OpenLancer.Data.Missions.Editing;
 
 namespace OpenLancer.Data.Thn;
 
@@ -37,6 +38,9 @@ public static class ThnEdits
 
     /// <summary>The refusal of a negative duration of a script.</summary>
     public const string NegativeDuration = "The duration cannot be negative.";
+
+    /// <summary>The refusal of an edit of events of more than one cutscene.</summary>
+    public const string OneCutscene = "The events must be in one cutscene.";
 
     /// <summary>The path of the time of an event.</summary>
     private static readonly ThnPath EventTimePath = new(ThnElementPaths.EventSlots[0]);
@@ -150,10 +154,33 @@ public static class ThnEdits
             throw new ArgumentException("There is no event to move.", nameof(events));
         foreach (var ev in events)
             CheckKind(ev, ThnElementKind.Event);
-        if (events.Select(e => VfsPath.Normalize(e.Path)).Distinct(VfsPath.Comparer).Count() > 1)
-            throw new ArgumentException("The events must be in one cutscene.", nameof(events));
+        if (!InOneCutscene(events))
+            throw new ArgumentException(OneCutscene, nameof(events));
         return new MoveCommand(MoveLabel(events.Count, timeDelta, lengthDelta), events, timeDelta, lengthDelta);
     }
+
+    /// <summary>True when all elements are in one cutscene, whatever the letter case or the separators of their
+    /// paths. A list without elements is in one cutscene.</summary>
+    public static bool InOneCutscene(IEnumerable<ThnRef> elements) =>
+        elements.Select(e => VfsPath.Normalize(e.Path)).Distinct(VfsPath.Comparer).Count() <= 1;
+
+    /// <summary>
+    /// Why an entity cannot have a name in W, or null: another entity has the name, without regard to letter case. The
+    /// engine finds an entity by its name without letter case (Cutscene.cs:41), so two such entities give one entity.
+    /// <see cref="AddEntity"/> and <see cref="RenameEntity"/> refuse with this reason when they run.
+    /// </summary>
+    /// <param name="except">The entity that gets the name, or null for a new entity.</param>
+    public static string? NameTakenRefusal(ThnScriptModel working, string name, ThnElementId? except = null)
+    {
+        ArgumentNullException.ThrowIfNull(working);
+        return working.Entities.Any(e => e.Id != except && Names(e.Table[ThnKeys.EntityName], name))
+            ? $"Another entity has the name {name}."
+            : null;
+    }
+
+    /// <summary>The reason why an edit cannot find an element in W, for example after an undo removed it.</summary>
+    public static string NoSuchElement(ThnElementKind kind) =>
+        $"The cutscene has no such {ThnPatch.Singular(kind)}. An undo can have removed it.";
 
     /// <summary>The label of the entry of a move of events (see <see cref="MoveEvents"/>), for example "Move 2 events"
     /// or "Change the length of event".</summary>
@@ -252,18 +279,27 @@ public static class ThnEdits
     /// the name has a character other than letters, digits, <c>_</c> and <c>-</c>, the edit view or W has a file at the
     /// path in any letter case, or the active mod is in the OpenLancer repo (decision D70).
     /// </summary>
-    public static string? NewCutsceneRefusal(EditSession session, string path)
+    public static string? NewCutsceneRefusal(EditSession session, string path) =>
+        NewCutsceneProblem(session, path)?.Message;
+
+    /// <summary>
+    /// The reason of <see cref="NewCutsceneRefusal"/> with the detail code of its error (see
+    /// <see cref="MissionErrors"/>), or null. A path that the edit view or W has gives
+    /// <c>PathInUse</c>. A name or a folder that the rules do not allow gives <c>NameInvalid</c>. A session without an
+    /// active mod, a read-only session and a mod in the OpenLancer repo give <c>NotEditable</c>.
+    /// </summary>
+    internal static (string Message, string Detail)? NewCutsceneProblem(EditSession session, string path)
     {
         ArgumentNullException.ThrowIfNull(session);
         if (session.ActiveMod is not { } mod)
-            return NoActiveMod;
+            return (NoActiveMod, MissionErrors.NotEditable);
         if (session.ReadOnlyReason is { } reason)
-            return reason;
+            return (reason, MissionErrors.NotEditable);
         if (NewCutscenePathProblem(mod, path) is { } problem)
-            return problem;
+            return (problem, MissionErrors.NameInvalid);
         if (session.HasCutsceneFile(VfsPath.Normalize(path)!))
-            return PathInUse;
-        return EditSession.WholeCutsceneInRepo(mod);
+            return (PathInUse, MissionErrors.PathInUse);
+        return EditSession.WholeCutsceneInRepo(mod) is { } inRepo ? (inRepo, MissionErrors.NotEditable) : null;
     }
 
     /// <summary>
@@ -407,8 +443,8 @@ public static class ThnEdits
         const string userProps = "userprops";
         var oldName = EntityName(entity.Table) ?? throw new InvalidOperationException("The entity has no text name to change.");
         var working = document.Working;
-        if (working.Entities.Any(e => e.Id != entity.Id && Names(e.Table[ThnKeys.EntityName], newName)))
-            throw new InvalidOperationException($"Another entity has the name {newName}.");
+        if (NameTakenRefusal(working, newName, entity.Id) is { } taken)
+            throw new InvalidOperationException(taken);
 
         var namePath = new ThnPath(ThnKeys.EntityName);
         changed.Add(new ThnPin(entity.Id, namePath));
@@ -538,7 +574,7 @@ public static class ThnEdits
         var from = document.IndexOf(ThnElementKind.Event, ev.Id);
         var to = document.IndexOf(ThnElementKind.Event, before.Id);
         if (from < 0 || to < 0)
-            return "The cutscene has no such event. An undo can have removed it.";
+            return NoSuchElement(ThnElementKind.Event);
         var time = events[from].Table.List.FirstOrDefault();
         if (time == null || !time.Equals(events[to].Table.List.FirstOrDefault()))
             return "Move before changes the order of the events of one time. These events have different times.";
@@ -649,8 +685,8 @@ public static class ThnEdits
         {
             var document = scope.Cutscene(path);
             if (kind == ThnElementKind.Entity && EntityName(table) is { } name &&
-                document.Working.Entities.Any(e => string.Equals(EntityName(e.Table), name, StringComparison.OrdinalIgnoreCase)))
-                throw new InvalidOperationException($"Another entity has the name {name}.");
+                NameTakenRefusal(document.Working, name) is { } taken)
+                throw new InvalidOperationException(taken);
             var elements = document.Working.Elements(kind).Add(new ThnElement(document.NewId(), -1, table));
             document.Change(With(document.Working, kind, elements));
         }

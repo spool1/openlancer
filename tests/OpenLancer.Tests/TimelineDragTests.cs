@@ -42,7 +42,7 @@ public sealed class TimelineDragTests
 
     /// <summary>The tables of the last events of W: the events that a paste or a duplicate added.</summary>
     private static List<ThnTable> Added(EditSession session, int count) =>
-        TimelineEdits.Added(W(session), count).Select(id => W(session).Element(ThnElementKind.Event, id)!.Table).ToList();
+        W(session).Events.TakeLast(count).Select(e => e.Table).ToList();
 
     /// <summary>An event with another time.</summary>
     private static ThnTable At(ThnTable ev, float time) => new(ev.List.SetItem(0, N(time)), ev.Record);
@@ -449,13 +449,15 @@ public sealed class TimelineDragTests
         var path = character.Single(c => c.Role.Type == "START_PATH_ANIMATION");
         Assert.Equal("START_PATH_ANIMATION needs a second target, and no other entity of this script is a MOTION_PATH.",
             path.Refusal);
-        Assert.Throws<InvalidOperationException>(() => TimelineEdits.Add(ScriptPath, path, "Char_trent", 1));
+        Assert.False(CutsceneCommands.AddEvent(session, ScriptPath, path.Role.Type, 1, ["Char_trent"]).CanRun);
 
+        // The commands of the plans of the menu, in one entry.
         var commands = new List<EditCommand>();
         foreach (var name in new[] { "Monitor", "Cam_A", "Char_trent", "Voice_trent", "Fx", "Lamp", "Scene" })
         {
             commands.AddRange(TimelineEdits.AddChoices(W(session), name, Evaluator.Symbols).Where(c => c.Refusal == null)
-                .Select(c => TimelineEdits.Add(ScriptPath, c, name, 1.2346)));
+                .Select(c => CutsceneCommands.AddEvent(session, ScriptPath, c.Role.Type, 1.2346,
+                    c.Second == null ? [name] : [name, c.Second]).Command!));
         }
 
         session.Execute(EditCommand.Group("Add all", commands));

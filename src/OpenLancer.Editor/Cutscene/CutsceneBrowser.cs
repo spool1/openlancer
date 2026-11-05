@@ -6,6 +6,7 @@ using System.Numerics;
 using ImGuiNET;
 using LibreLancer;
 using LibreLancer.ImUI;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Logs;
@@ -286,7 +287,8 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
         {
             ImGui.CloseCurrentPopup();
         }
-        else if (create && refusal == null && window.Commands.Execute(ThnEdits.NewCutscene(path!, ThnTemplates.NewScript())))
+        else if (create && refusal == null &&
+                 window.Commands.Run(CutsceneCommands.Create(session!.Edits, newName)).Status == EditStatus.Applied)
         {
             ImGui.CloseCurrentPopup();
             selected = path;
@@ -351,7 +353,7 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
 
     private void Revert(string path)
     {
-        if (window.Commands.Execute(ThnEdits.Revert(path)))
+        if (window.Commands.Run(s => CutsceneCommands.RevertFile(s, path)).Status == EditStatus.Applied)
         {
             window.Log.Add(ConsoleSeverity.Info, EditorWindow.EditorSource,
                 $"Reverted cutscene {path}. The next save deletes the patch of the active mod.");

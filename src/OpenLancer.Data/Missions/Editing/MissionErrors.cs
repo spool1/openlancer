@@ -87,6 +87,9 @@ public static class MissionErrors
     public const string NotATemplate = "NotATemplate";
     public const string PrefabInPrefab = "PrefabInPrefab";
 
+    // Codes of the cutscene commands that the table of the design does not have (milestone MCP1-4).
+    public const string TargetType = "TargetType";
+
     internal static EditError NotEditableError(string reason) => new(EditErrorKind.ReadOnly, NotEditable, NotEditableMessage(reason));
 
     /// <summary>The text of <see cref="NotEditable"/>. The Mission tab and the mission pages show it as their read-only
