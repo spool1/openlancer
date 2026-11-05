@@ -183,7 +183,8 @@ public static class ThnFlags
         var shown = Shown(sound);
         if (chosen.FirstOrDefault(n => !shown.Contains(n)) is { } other)
             throw new ArgumentException(Values.ContainsKey(other)
-                ? $"The Inspector does not show {other} for this entity type."
+                ? $"{other} is not a flag of {(sound ? "a SOUND" : "an entity that is not a SOUND")}. The flags are " +
+                  $"{string.Join(", ", shown)}."
                 : $"'{other}' is not an entity flag. The flags are {string.Join(", ", shown)}.", nameof(chosen));
         var current = Read(stored, sound, symbols);
         var mask = shown.Sum(n => Values[n]);

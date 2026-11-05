@@ -20,8 +20,9 @@ namespace OpenLancer.Tests;
 public sealed class AgentToolTableTests
 {
     /// <summary>The order follows the sections of the design. The query tools of section 7.1 come first. Then come the
-    /// edit tools of section 7.2, the Scene and data tools of section 7.3, the tools of section 7.6 with the play tools
-    /// at their end, and the view tools of section 7.7.</summary>
+    /// edit tools of section 7.2, the Scene and data tools of section 7.3, the mission tools of section 7.4, the
+    /// cutscene tools of section 7.5, the tools of section 7.6 with the play tools at their end, and the view tools of
+    /// section 7.7.</summary>
     [Fact]
     public void TheToolsHaveTheFixedOrderOfTheSectionsOfTheDesign()
     {
@@ -86,8 +87,9 @@ public sealed class AgentToolTableTests
 
     /// <summary>The kind and the hints of each tool (section 7.0 of the MCP1 design, review finding R7 of MCP1-2). A
     /// query changes nothing. <c>open_view</c> and <c>select_items</c> change what the user sees, so they are not
-    /// read-only. An edit that can change or remove data is destructive, and only <c>set_fields</c> is idempotent,
-    /// because MCP has one hint for each tool. The Console, the play tools and the view tools need the window of the
+    /// read-only. An edit that can change or remove data is destructive. Only <c>set_fields</c> and the cutscene tools
+    /// with an absolute value, <c>cutscene_set_duration</c> and <c>cutscene_set_flags</c>, are idempotent, because MCP
+    /// has one hint for each tool. The Console, the play tools and the view tools need the window of the
     /// editor. Pause refuses each tool that changes something, except play_stop.</summary>
     [Fact]
     public void EachToolHasTheKindAndTheHintsOfWhatItChanges()
@@ -371,6 +373,10 @@ public sealed class AgentToolTableTests
         ["mission_start_plan"] = (ToolKind.Query, new ToolHints(true, false, true)),
         ["mission_play"] = (ToolKind.Play, new ToolHints(false, true, false)),
         ["mission_play_trace"] = (ToolKind.Query, new ToolHints(true, false, true)),
+        ["cutscene_create"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["cutscene_move_events"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+        ["cutscene_set_duration"] = (ToolKind.Edit, new ToolHints(false, true, true)),
+        ["cutscene_set_flags"] = (ToolKind.Edit, new ToolHints(false, true, true)),
         ["save"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["undo"] = (ToolKind.Session, new ToolHints(false, true, false)),
         ["redo"] = (ToolKind.Session, new ToolHints(false, true, false)),

@@ -182,6 +182,9 @@ public static class CutsceneCommands
     }
 
     /// <summary>Plans the flags of an entity that the Inspector shows. See <see cref="ThnEdits.SetFlags"/>.</summary>
+    /// <remarks>The plan checks the flags against the entity in W before it runs. A name that is not a flag of the
+    /// entity type refuses with the detail <see cref="MissionErrors.FieldValue"/>, for example SPATIAL on an entity
+    /// that is not a SOUND. A stored value that the engine cannot read as flags refuses with the reason.</remarks>
     /// <param name="flags">The flags that are on after the edit.</param>
     public static CutscenePlan SetFlags(EditSession session, ThnRef entity, IReadOnlySet<string> flags)
     {
@@ -189,6 +192,23 @@ public static class CutsceneCommands
         var script = ScriptPath(session, entity.Path);
         if (session.CutsceneReadOnlyReason(entity) is { } reason)
             return CutscenePlan.Refused(label, script, reason);
+        if (entity.Kind == ThnElementKind.Entity && Table(session, entity) is { } table)
+        {
+            var symbols = session.ThnSymbols;
+            try
+            {
+                ThnFlags.Write(table[ThnFlags.Key], ThnFlags.IsSound(table, symbols), flags, symbols);
+            }
+            catch (ArgumentException e)
+            {
+                return CutscenePlan.Refused(label, script, ErrorText.Of(e), MissionErrors.FieldValue);
+            }
+            catch (InvalidOperationException e)
+            {
+                return CutscenePlan.Refused(label, script, ErrorText.Of(e));
+            }
+        }
+
         return CutscenePlan.Of(label, script, () => ThnEdits.SetFlags(entity, flags), changed: [entity]);
     }
 

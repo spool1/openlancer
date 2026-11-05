@@ -21,8 +21,9 @@ namespace OpenLancer.Studio.Agent;
 /// <remarks>This build has the query tools of section 7.1 (milestone MCP1-1a) and the dry run query of M6c-1. It also
 /// has the edit tools of sections 7.2, 7.3 and 7.6 and the play tools of section 7.6 (milestone MCP1-2), the view
 /// tools of section 7.7 (milestone MCP1-1b), and the mission edit tools, the start plan query, the mission play and the
-/// live trace of section 7.4 (milestone MCP1-3). The order of the rows follows the sections of the design, so a later
-/// part puts its tools at the place of its section. The view tools are tools of the editor host.</remarks>
+/// live trace of section 7.4 (milestone MCP1-3), and the cutscene tools of section 7.5 (milestone MCP1-4). The order of
+/// the rows follows the sections of the design, so a later part puts its tools at the place of its section. The view
+/// tools are tools of the editor host.</remarks>
 public static class AgentTools
 {
     private static readonly ToolParam Cursor = new TextParam("cursor", false, null, null);
@@ -220,6 +221,21 @@ public static class AgentTools
         Query("mission_play_trace", ToolGroup.Missions,
             new ToolInput(new WholeParam("play", 0, 0), new WholeParam("since", 0, 0), Limit),
             typeof(MissionTraceView), PlayTools.MissionTrace, ToolHosts.Editor),
+        Edit("cutscene_create", ToolHints.Adding,
+            EditTools.Input(false, Text("name", true), new NumberParam("duration", false, double.NegativeInfinity)),
+            CutsceneEditTools.Create, ToolGroup.Cutscenes),
+        Edit("cutscene_move_events", ToolHints.Changing, EditTools.Input(false,
+                new RowsParam("events", true, CutsceneEditTools.EventRow),
+                new NumberParam("time_delta", false, double.NegativeInfinity),
+                new NumberParam("length_delta", false, double.NegativeInfinity)),
+            CutsceneEditTools.MoveEvents, ToolGroup.Cutscenes),
+        // The duration and the flags are absolute values, so a second call changes nothing (section 7.0).
+        Edit("cutscene_set_duration", ToolHints.ChangingIdempotent,
+            EditTools.Input(false, Text("cutscene", true), new NumberParam("seconds", true, double.NegativeInfinity)),
+            CutsceneEditTools.SetDuration, ToolGroup.Cutscenes),
+        Edit("cutscene_set_flags", ToolHints.ChangingIdempotent,
+            EditTools.Input(false, Text("entity", true), new TextListParam("flags", true, minItems: 0)),
+            CutsceneEditTools.SetFlags, ToolGroup.Cutscenes),
         SessionTool("save", ToolHints.Changing, ToolInput.None, typeof(SaveView), SaveTools.Save),
         SessionTool("undo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Undo),
         SessionTool("redo", ToolHints.Changing, ToolInput.None, typeof(HistoryStepView), HistoryTools.Redo),

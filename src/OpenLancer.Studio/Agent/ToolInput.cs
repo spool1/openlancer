@@ -113,21 +113,29 @@ internal sealed class WholeParam(string name, int minimum, int? fallback = null,
         value.GetValueKind() == JsonValueKind.Number && value.AsValue().TryGetValue(out long number) && number >= Minimum;
 }
 
-/// <summary>A number from a minimum, and up to a maximum when the argument has one.</summary>
+/// <summary>A number from a minimum, and up to a maximum when the argument has one. A minimum of
+/// <see cref="double.NegativeInfinity"/> takes each number up to the maximum, for example a change of a time that can
+/// be negative.</summary>
 internal sealed class NumberParam(string name, bool required, double minimum, double maximum = double.PositiveInfinity)
     : ToolParam(name, required)
 {
     public override JsonObject Schema(string tool)
     {
-        var schema = new JsonObject { ["type"] = "number", ["minimum"] = minimum };
+        var schema = new JsonObject { ["type"] = "number" };
+        if (double.IsFinite(minimum))
+            schema["minimum"] = minimum;
         if (double.IsFinite(maximum))
             schema["maximum"] = maximum;
         return schema;
     }
 
-    public override string Expected => double.IsFinite(maximum)
-        ? $"a number from {Text(minimum)} to {Text(maximum)}"
-        : $"a number from {Text(minimum)}";
+    public override string Expected => (double.IsFinite(minimum), double.IsFinite(maximum)) switch
+    {
+        (true, true) => $"a number from {Text(minimum)} to {Text(maximum)}",
+        (true, false) => $"a number from {Text(minimum)}",
+        (false, true) => $"a number up to {Text(maximum)}",
+        _ => "a number",
+    };
 
     public override bool Fits(JsonNode value) =>
         value.GetValueKind() == JsonValueKind.Number && value.AsValue().TryGetValue(out double number) &&
@@ -181,19 +189,23 @@ internal sealed class ChoicesParam(string name, IReadOnlyList<string> choices) :
 
 /// <summary>A list of texts, for example item references, with at least one text. Each text has at most
 /// <see cref="TextParam.MaxLength"/> characters.</summary>
-internal sealed class TextListParam(string name, bool required) : ToolParam(name, required)
+/// <param name="minItems">The fewest texts, 1 by default. A list that can be empty, for example the flags that are
+/// on, has 0.</param>
+internal sealed class TextListParam(string name, bool required, int minItems = 1) : ToolParam(name, required)
 {
     public override JsonObject Schema(string tool) => new()
     {
         ["type"] = "array",
         ["items"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = TextParam.MaxLength },
-        ["minItems"] = 1,
+        ["minItems"] = minItems,
     };
 
-    public override string Expected => $"a list of texts of 1 to {TextParam.MaxLength} characters";
+    public override string Expected => minItems > 0
+        ? $"a list of texts of 1 to {TextParam.MaxLength} characters"
+        : $"a list of texts of 1 to {TextParam.MaxLength} characters, or an empty list";
 
     public override bool Fits(JsonNode value) =>
-        value is JsonArray { Count: > 0 } array && array.All(item =>
+        value is JsonArray array && array.Count >= minItems && array.All(item =>
             item?.GetValueKind() == JsonValueKind.String && item.GetValue<string>() is { Length: > 0 and <= TextParam.MaxLength });
 }
 
