@@ -205,6 +205,32 @@ public sealed class CutsceneCommandsTests
         Assert.True(CutsceneCommands.MoveEvents(session, [textLength], 1, 0).CanRun);
     }
 
+    /// <summary>
+    /// A plan names its script in the form that the session stores, and each element one time. This is also true when
+    /// the caller writes the path of the script in another letter case or with other separators.
+    /// </summary>
+    [Fact]
+    public void APlanNamesTheScriptAndEachElementInOneForm()
+    {
+        using var ws = Workspace(script: CurveScript);
+        var session = ws.Session("act");
+        var psys = Event(session, 1);
+        var camera = Entity(session, "Cam_A");
+        const string other = "data/scripts/X.THN";
+
+        var move = CutsceneCommands.MoveEvents(session, [psys, psys with { Path = other }], 1, 0);
+        Assert.Equal(ScriptPath, move.Path);
+        Assert.Equal(psys, Assert.Single(move.Changed));
+        var set = CutsceneCommands.SetValue(session, camera with { Path = other }, Fovh, N(25));
+        Assert.Equal((ScriptPath, camera), (set.Path, Assert.Single(set.Changed)));
+        var point = CutsceneCommands.SetCurvePoint(session, psys with { Path = other }, 1, new(0.5f, 1, 0, 0));
+        Assert.Equal((ScriptPath, psys), (point.Path, Assert.Single(point.Changed)));
+        Assert.Equal(ScriptPath, CutsceneCommands.SetDuration(session, other, 4).Path);
+
+        Assert.Equal(EditStatus.Applied, FakeCommandHost.Runner(session).Run(move).Status);
+        Assert.Equal(N(6), Value(session, psys, "time"));
+    }
+
     /// <summary>A curve point that the event does not have refuses with the number of the point, also on an event
     /// without a curve.</summary>
     [Fact]

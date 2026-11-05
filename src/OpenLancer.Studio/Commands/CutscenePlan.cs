@@ -26,13 +26,14 @@ public sealed class CutscenePlan : EditPlan
         Path = path;
     }
 
-    /// <summary>The install path of the script.</summary>
+    /// <summary>The install path of the script, in the form that the session stores.</summary>
     public string Path { get; }
 
-    /// <summary>The elements that the command changes and keeps.</summary>
+    /// <summary>The elements that the command changes and keeps. Each element is in the list one time, and its
+    /// reference has <see cref="Path"/>.</summary>
     public IReadOnlyList<ThnRef> Changed { get; private init; } = [];
 
-    /// <summary>The elements that the command deletes.</summary>
+    /// <summary>The elements that the command deletes, each one time, with <see cref="Path"/>.</summary>
     public IReadOnlyList<ThnRef> Deleted { get; private init; } = [];
 
     /// <summary>The number of entities that the command adds.</summary>
@@ -59,9 +60,11 @@ public sealed class CutscenePlan : EditPlan
     /// with the reason, so a command of the layer never throws for a rule of the edit.
     /// </summary>
     /// <param name="label">The label of the entry of the edit history.</param>
-    /// <param name="path">The install path of the script.</param>
-    /// <param name="changed">The elements that the command changes and keeps, or null.</param>
-    /// <param name="deleted">The elements that the command deletes, or null.</param>
+    /// <param name="path">The install path of the script, in the form that the session stores.</param>
+    /// <param name="changed">The elements of the script that the command changes and keeps, or null. They can repeat,
+    /// and their paths can have another letter case.</param>
+    /// <param name="deleted">The elements of the script that the command deletes, or null, as for
+    /// <paramref name="changed"/>.</param>
     /// <param name="newEntities">The number of entities that the command adds at the end of the entities.</param>
     /// <param name="newEvents">The number of events that the command adds at the end of the events.</param>
     internal static CutscenePlan Of(string label, string path, Func<EditCommand> make,
@@ -81,8 +84,8 @@ public sealed class CutscenePlan : EditPlan
         return new CutscenePlan(label, path)
         {
             Command = command,
-            Changed = changed ?? [],
-            Deleted = deleted ?? [],
+            Changed = InScript(path, changed),
+            Deleted = InScript(path, deleted),
             NewEntities = newEntities,
             NewEvents = newEvents,
         };
@@ -96,6 +99,11 @@ public sealed class CutscenePlan : EditPlan
     /// for <see cref="EditPlan.PlanRefused"/>.</param>
     internal static CutscenePlan Refused(string label, string path, string message, string? detail = null) =>
         new(label, path) { Refusals = [Diagnostic.Error(path, message) with { Rule = detail }] };
+
+    /// <summary>The references of elements of the script, each one time, with the path of the plan. A plan changes one
+    /// script, so each element is in it.</summary>
+    private static IReadOnlyList<ThnRef> InScript(string path, IReadOnlyList<ThnRef>? elements) =>
+        elements == null ? [] : elements.Select(e => e with { Path = path }).Distinct().ToList();
 
     /// <summary>The references of the last elements of a kind of W.</summary>
     private IEnumerable<ThnRef> Last(ThnScriptModel working, ThnElementKind kind, int count)

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions.Editing;
@@ -28,9 +27,10 @@ public static class CutsceneCommands
     public static CutscenePlan SetValue(EditSession session, ThnRef target, ThnPath path, ThnValue value)
     {
         var label = $"Set {path}";
+        var script = ScriptPath(session, target.Path);
         if (session.CutsceneReadOnlyReason(target) is { } reason)
-            return CutscenePlan.Refused(label, target.Path, reason);
-        return CutscenePlan.Of(label, target.Path, () => ThnEdits.Set(target, path, value), changed: [target]);
+            return CutscenePlan.Refused(label, script, reason);
+        return CutscenePlan.Of(label, script, () => ThnEdits.Set(target, path, value), changed: [target]);
     }
 
     /// <summary>
@@ -49,7 +49,7 @@ public static class CutsceneCommands
         float lengthDelta)
     {
         var label = ThnEdits.MoveLabel(events.Count, timeDelta, lengthDelta);
-        var path = events.Count > 0 ? events[0].Path : "";
+        var path = events.Count > 0 ? ScriptPath(session, events[0].Path) : "";
         if (!float.IsFinite(timeDelta) || !float.IsFinite(lengthDelta))
             return CutscenePlan.Refused(label, path, ThnNumber.NotFiniteMessage, MissionErrors.FieldValue);
         foreach (var ev in events)
@@ -63,7 +63,7 @@ public static class CutsceneCommands
             // The session command checks the events also for a change of 0 and 0.
             var move = ThnEdits.MoveEvents(events, timeDelta, lengthDelta);
             return timeDelta == 0 && lengthDelta == 0 ? EditCommand.Group(move.Label, []) : move;
-        }, changed: events.Distinct().ToList());
+        }, changed: events);
         if (plan.CanRun && ThnEdits.MoveRefusal(session, events, timeDelta, lengthDelta) is { } refusal)
             return CutscenePlan.Refused(label, path, refusal, MissionErrors.FieldValue);
         return plan;
@@ -77,6 +77,7 @@ public static class CutsceneCommands
     public static CutscenePlan SetDuration(EditSession session, string path, float seconds)
     {
         const string label = "Set duration";
+        path = ScriptPath(session, path);
         if (session.CutsceneReadOnlyReason(path) is { } reason)
             return CutscenePlan.Refused(label, path, reason);
         if (!float.IsFinite(seconds))
@@ -97,15 +98,16 @@ public static class CutsceneCommands
     public static CutscenePlan SetCurvePoint(EditSession session, ThnRef ev, int index, ThnCurvePoint point)
     {
         var label = $"Move point {index + 1} of the curve";
+        var script = ScriptPath(session, ev.Path);
         if (session.CutsceneReadOnlyReason(ev) is { } reason)
-            return CutscenePlan.Refused(label, ev.Path, reason);
+            return CutscenePlan.Refused(label, script, reason);
         if (!float.IsFinite(point.Time) || !float.IsFinite(point.Value) || !float.IsFinite(point.In) ||
             !float.IsFinite(point.Out))
-            return CutscenePlan.Refused(label, ev.Path, ThnNumber.NotFiniteMessage, MissionErrors.FieldValue);
+            return CutscenePlan.Refused(label, script, ThnNumber.NotFiniteMessage, MissionErrors.FieldValue);
         if (CurveOf(session, ev) is not { } curve || ThnCurve.Points(curve) is not { } points || index < 0 ||
             index >= points.Count)
-            return CutscenePlan.Refused(label, ev.Path, NoCurvePoint(index));
-        return CutscenePlan.Of(label, ev.Path,
+            return CutscenePlan.Refused(label, script, NoCurvePoint(index));
+        return CutscenePlan.Of(label, script,
             () => ThnEdits.Set(ev, ThnCurve.Path, ThnCurve.WithPoint(curve, index, point)), changed: [ev]);
     }
 
@@ -124,4 +126,9 @@ public static class CutsceneCommands
         ThnCurve.Path.ValueIn(ThnElementKind.Event, table) is ThnTable { IsRecord: true } curve
             ? curve
             : null;
+
+    /// <summary>The install path of a script in the form that the session stores, or the path as it is when the
+    /// session cannot open the script. So a plan names a script in one form, whatever the letter case or the separators
+    /// of the caller.</summary>
+    private static string ScriptPath(EditSession session, string path) => session.CutsceneDocument(path)?.Path ?? path;
 }
