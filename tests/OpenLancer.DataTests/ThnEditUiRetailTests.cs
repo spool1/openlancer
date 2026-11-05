@@ -21,8 +21,8 @@ using Xunit;
 namespace OpenLancer.DataTests;
 
 /// <summary>
-/// Each kind of edit of the cutscene editor through its plan of the command layer, on s002xe in a temporary mod (step 7 of the M8
-/// design): the drags of the Timeline, the fields, checkboxes and lists of the Inspector, Add event, paste, duplicate,
+/// Each kind of edit of the cutscene editor through its plan of the command layer, on s002xe in a temporary mod
+/// (step 7 of the M8 design): the drags of the Timeline, the fields, checkboxes and lists of the Inspector, Add event, paste, duplicate,
 /// delete, Move before, the curve editor, the path keys, the gizmo, Set camera from view, and the rename. Each edit is one
 /// entry of the history. The save writes a patch that has only the entries of these edits, and every other value of
 /// the cutscene stays the same object.

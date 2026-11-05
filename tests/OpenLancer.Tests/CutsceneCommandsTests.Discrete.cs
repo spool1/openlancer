@@ -59,7 +59,8 @@ public sealed partial class CutsceneCommandsTests
         using var ws = Workspace();
         var session = ws.Session("act");
         var viewer = ws.SecondSession(null);
-        Assert.Equal(EditStatus.Applied, FakeCommandHost.Runner(session).Run(CutsceneCommands.Create(session, "my_cut")).Status);
+        var created = FakeCommandHost.Runner(session).Run(CutsceneCommands.Create(session, "my_cut"));
+        Assert.Equal(EditStatus.Applied, created.Status);
 
         AssertRefused(session, CutsceneCommands.Create(session, "MY_CUT"), ThnEdits.PathInUse, MissionErrors.PathInUse);
         AssertRefused(session, CutsceneCommands.Create(session, "my cut"), ThnEdits.BadName, MissionErrors.NameInvalid);
@@ -91,7 +92,8 @@ public sealed partial class CutsceneCommandsTests
     [Fact]
     public void RemoveValueGivesTheWOfTheRemove()
     {
-        AssertSameW(s => CutsceneCommands.RemoveValue(s, Entity(s, "Cam_A"), Fovh), s => ThnEdits.Remove(Entity(s, "Cam_A"), Fovh));
+        AssertSameW(s => CutsceneCommands.RemoveValue(s, Entity(s, "Cam_A"), Fovh),
+            s => ThnEdits.Remove(Entity(s, "Cam_A"), Fovh));
 
         using var ws = Workspace();
         var session = ws.Session("act");
@@ -103,8 +105,9 @@ public sealed partial class CutsceneCommandsTests
     [Fact]
     public void SetFlagsGivesTheWOfTheFlags()
     {
-        var plan = AssertSameW(s => CutsceneCommands.SetFlags(s, Entity(s, "Cam_A"), new HashSet<string> { ThnFlags.Hidden }),
-            s => ThnEdits.SetFlags(Entity(s, "Cam_A"), new HashSet<string> { ThnFlags.Hidden }));
+        var hidden = new HashSet<string> { ThnFlags.Hidden };
+        var plan = AssertSameW(s => CutsceneCommands.SetFlags(s, Entity(s, "Cam_A"), hidden),
+            s => ThnEdits.SetFlags(Entity(s, "Cam_A"), hidden));
 
         Assert.Equal("Set flags", plan.Label);
     }
@@ -200,8 +203,10 @@ public sealed partial class CutsceneCommandsTests
     [Fact]
     public void DeleteEventsGivesTheWOfTheDeletes()
     {
-        var plan = AssertSameW(s => CutsceneCommands.DeleteEvents(s, [Event(s, Psys), Event(s, Motion), Event(s, Psys)]),
-            s => EditCommand.Group("Delete 2 events", [ThnEdits.Delete(Event(s, Psys)), ThnEdits.Delete(Event(s, Motion))]));
+        var plan = AssertSameW(
+            s => CutsceneCommands.DeleteEvents(s, [Event(s, Psys), Event(s, Motion), Event(s, Psys)]),
+            s => EditCommand.Group("Delete 2 events",
+                [ThnEdits.Delete(Event(s, Psys)), ThnEdits.Delete(Event(s, Motion))]));
 
         Assert.Equal(2, plan.Deleted.Count);
         Assert.Equal("Delete event", AssertSameW(s => CutsceneCommands.DeleteEvents(s, [Event(s, Cut)]),
@@ -219,8 +224,9 @@ public sealed partial class CutsceneCommandsTests
             EditPlan.PlanRefused);
         AssertRefused(session, CutsceneCommands.DeleteEvents(session, [psys, Entity(session, "Fx")]),
             "Each element of the delete must be an event.", EditPlan.PlanRefused);
-        AssertRefused(session, CutsceneCommands.DeleteEvents(session, [psys, Event(session, Cut) with { Path = @"DATA\y.thn" }]),
-            ThnEdits.OneCutscene, EditPlan.PlanRefused);
+        var other = Event(session, Cut) with { Path = @"DATA\y.thn" };
+        AssertRefused(session, CutsceneCommands.DeleteEvents(session, [psys, other]), ThnEdits.OneCutscene,
+            EditPlan.PlanRefused);
         Assert.False(session.CanUndo);
     }
 

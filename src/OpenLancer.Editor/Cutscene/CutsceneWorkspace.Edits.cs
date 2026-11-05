@@ -218,9 +218,9 @@ internal sealed partial class CutsceneWorkspace
     }
 
     /// <summary>
-    /// The selection after an edit of the open cutscene, as Unity does (decision D249): the new events of a paste, a
-    /// duplicate or an Add event, else a new entity. A delete selects the cutscene. Each other edit keeps the
-    /// selection, for example a rename.
+    /// The selection after an edit of the open cutscene, as Unity does (decision D249). A paste, a duplicate and an Add
+    /// event select the new events, and an edit that adds only an entity selects it. A delete selects the cutscene.
+    /// Each other edit keeps the selection, for example a rename.
     /// </summary>
     /// <remarks>Call it right after the run, because <see cref="CutscenePlan.Added"/> reads the last elements of
     /// W.</remarks>

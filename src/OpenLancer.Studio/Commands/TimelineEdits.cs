@@ -103,7 +103,8 @@ internal static class TimelineEdits
 
     /// <summary>The command that deletes events and an entity in one entry: the events first, then the entity.</summary>
     public static EditCommand DeleteWithEvents(ThnRef entity, IReadOnlyList<ThnRef> events) =>
-        EditCommand.Group(DeleteEntityLabel(events.Count), [.. events.Select(ThnEdits.Delete), ThnEdits.Delete(entity)]);
+        EditCommand.Group(DeleteEntityLabel(events.Count),
+            [.. events.Select(ThnEdits.Delete), ThnEdits.Delete(entity)]);
 
     /// <summary>The label of the entry of a delete of an entity with the events that name it.</summary>
     public static string DeleteEntityLabel(int events) =>

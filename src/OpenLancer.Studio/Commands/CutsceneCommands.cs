@@ -143,7 +143,8 @@ public static class CutsceneCommands
     /// Plans a revert of a whole script: W gets the values of the lower cutscene B, and the next save deletes the patch
     /// of the active mod. See <see cref="ThnEdits.Revert"/>.
     /// </summary>
-    /// <remarks>A whole file of the active mod has no lower values. The run then refuses, and nothing changes.</remarks>
+    /// <remarks>A whole file of the active mod has no lower values. The run then refuses, and nothing changes. The plan
+    /// names no element, because a revert of the script can change, add and delete each element.</remarks>
     /// <param name="path">The install path of the script.</param>
     public static CutscenePlan RevertFile(EditSession session, string path)
     {
@@ -155,8 +156,8 @@ public static class CutsceneCommands
     }
 
     /// <summary>
-    /// Plans a revert of the value at a path of an entity or an event: the value of the lower cutscene B comes back. See
-    /// <see cref="ThnEdits.Revert"/>.
+    /// Plans a revert of the value at a path of an entity or an event: the value of the lower cutscene B comes back.
+    /// See <see cref="ThnEdits.Revert"/>.
     /// </summary>
     /// <remarks>An element that the active mod adds has no lower values. The run then refuses, and nothing
     /// changes.</remarks>
@@ -259,9 +260,13 @@ public static class CutsceneCommands
     /// Plans a new name of an entity. The event targets and the speakers of the script that name the entity get the new
     /// name too. See <see cref="ThnEdits.RenameEntity"/>.
     /// </summary>
-    /// <remarks>A name of another entity, without regard to letter case, refuses with the detail
+    /// <remarks>
+    /// <para>A name of another entity, without regard to letter case, refuses with the detail
     /// <see cref="MissionErrors.NameTaken"/>. Other data that uses the old name keeps it. So the plan needs a
-    /// confirmation when the caller gives such uses (decision D242).</remarks>
+    /// confirmation when the caller gives such uses (decision D242).</para>
+    /// <para><see cref="CutscenePlan.Changed"/> names only the entity. The events and the speakers that the rename
+    /// changes too are not in it.</para>
+    /// </remarks>
     /// <param name="uses">The uses of the old name in other data (see <see cref="CutsceneRename.Uses"/>).</param>
     internal static CutscenePlan RenameEntity(EditSession session, ThnRef entity, string newName,
         IReadOnlyList<ThnNameUse> uses)
@@ -296,11 +301,12 @@ public static class CutsceneCommands
     }
 
     /// <summary>
-    /// Plans a delete of an entity with the events that name it, as one entry (section 7.3 of the M8 design). The engine
-    /// cannot play an event whose target is gone. So the plan needs a confirmation when events name the entity.
+    /// Plans a delete of an entity with the events that name it, as one entry (section 7.3 of the M8 design). The
+    /// engine cannot play an event whose target is gone. So the plan needs a confirmation when events name the
+    /// entity.
     /// </summary>
-    /// <remarks>The events are the events of W that name the entity without regard to letter case, as the engine finds a
-    /// target (see <see cref="TimelineEdits.EventsNaming"/>). The events do not find an earlier entity that a later
+    /// <remarks>The events are the events of W that name the entity without regard to letter case, as the engine finds
+    /// a target (see <see cref="TimelineEdits.EventsNaming"/>). The events do not find an earlier entity that a later
     /// entity with the same name hides, so such an entity goes alone.</remarks>
     public static CutscenePlan DeleteEntity(EditSession session, ThnRef entity)
     {
@@ -392,10 +398,10 @@ public static class CutsceneCommands
     }
 
     /// <summary>
-    /// Plans a new event of a type at a time, with the usual props of the type (see <see cref="ThnTemplates.NewEvent"/>).
-    /// The time rounds to the 1 ms grid. Each target names an entity of W that fits the role of the target, and the
-    /// event gets the name in the letter case of the entity. The engine runs the new event after the events of the
-    /// same time.
+    /// Plans a new event of a type at a time, with the usual props of the type (see
+    /// <see cref="ThnTemplates.NewEvent"/>). The time rounds to the 1 ms grid. Each target names an entity of W that
+    /// fits the role of the target, and the event gets the name in the letter case of the entity. The engine runs the
+    /// new event after the events of the same time.
     /// </summary>
     /// <remarks>A type that is not in <see cref="ThnTemplates.Roles"/>, a time below 0 and a time that is not finite
     /// refuse with the detail <see cref="MissionErrors.FieldValue"/>. A target refuses as in
