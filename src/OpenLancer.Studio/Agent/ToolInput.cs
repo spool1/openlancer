@@ -187,8 +187,8 @@ internal sealed class ChoicesParam(string name, IReadOnlyList<string> choices) :
     }
 }
 
-/// <summary>A list of texts, for example item references, with at least one text. Each text has at most
-/// <see cref="TextParam.MaxLength"/> characters.</summary>
+/// <summary>A list of texts, for example item references. Each text has at most <see cref="TextParam.MaxLength"/>
+/// characters.</summary>
 /// <param name="minItems">The fewest texts, 1 by default. A list that can be empty, for example the flags that are
 /// on, has 0.</param>
 internal sealed class TextListParam(string name, bool required, int minItems = 1) : ToolParam(name, required)

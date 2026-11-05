@@ -277,7 +277,8 @@ internal static class EditTools
     /// generic edit tools change mission items.</summary>
     public const string MissionItem = "MissionItem";
 
-    /// <summary>The detail code of a reference of a cutscene before the cutscene tools.</summary>
+    /// <summary>The detail code of a reference of a cutscene in a tool that does not change cutscenes. The cutscene
+    /// tools change them (see <see cref="CutsceneEditTools"/>).</summary>
     public const string CutsceneEdits = "CutsceneEdits";
 
     /// <summary>The most references that the text of a confirmation names for each kind of change.</summary>
@@ -446,8 +447,8 @@ internal static class EditTools
     /// The section of a reference argument of an edit tool that changes sections of INI files that are not mission
     /// files, for example a scene tool or a builder. A reference of a mission item gives <c>invalid_argument</c> with
     /// the detail <see cref="MissionItem"/>: the mission tools and the generic edit tools change mission items (see
-    /// <see cref="ItemEditTools.Target"/>). A reference of a cutscene gives <c>not_available</c> until the cutscene
-    /// tools (MCP1-4). An item of a tool group that the user hides gives <c>not_available</c> too (decision D725).
+    /// <see cref="ItemEditTools.Target"/>). A reference of a cutscene gives <c>not_available</c>, and the text names the
+    /// cutscene tools. An item of a tool group that the user hides gives <c>not_available</c> too (decision D725).
     /// </summary>
     /// <param name="field">The argument, for the error.</param>
     /// <exception cref="EditException">The reference is not valid, does not resolve, or names an item that the tool
@@ -573,8 +574,8 @@ internal static class EditTools
             throw new EditException(new EditError(EditErrorKind.ReadOnly, MissionErrors.NotEditable, reason));
     }
 
-    /// <summary>The refusal of a reference of a cutscene: the edit tools of this version do not change
-    /// cutscenes.</summary>
+    /// <summary>The refusal of a reference of a cutscene in a tool that does not change cutscenes. The text names the
+    /// cutscene tools.</summary>
     internal static EditException CutsceneLater(string reference) =>
         new(new EditError(EditErrorKind.NotAvailable, CutsceneEdits, AgentTexts.Error("edit_cutscenes_later"))
         {
@@ -764,10 +765,11 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
         foreach (var (path, was) in cutscenesBefore)
         {
             Problem Of(Diagnostic problem) => AgentRows.ProblemOf(session, problem) with { Ref = CutsceneQueries.Ref(path) };
+            var now = session.CutsceneErrors(path);
             var left = was.Select(Key).ToList();
-            foreach (var problem in session.CutsceneErrors(path).Where(p => !left.Remove(Key(p))))
+            foreach (var problem in now.Where(p => !left.Remove(Key(p))))
                 newProblems.Add(Of(problem));
-            var after = session.CutsceneErrors(path).Select(Key).ToList();
+            var after = now.Select(Key).ToList();
             foreach (var problem in was.Where(p => !after.Remove(Key(p))))
                 fixedProblems.Add(Of(problem));
         }

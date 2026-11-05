@@ -515,11 +515,15 @@ A new cutscene goes into the folder `DATA\MODS\<mod id>\CUTSCENES` of the active
 
 `cutscene_move_events` rounds each new time and length to the 1 ms grid, as the Timeline does. A length of 0 removes the length of an event when the lower cutscene has no length for it. `cutscene_set_duration` writes the value as you give it, as the duration field does. A time below 0, a negative length and a negative duration give `invalid_value`. A flag that the entity type does not have gives `invalid_value` too. A flags value that the engine cannot read gives `refused` with the reason.
 
-Each argument takes one kind of `thn:` reference. `cutscene` takes a script, `entity` takes an entity, and `events` takes events. Another reference gives `invalid_argument`. All events of one call must be in one cutscene. One call names at most 200 events. A cutscene that the editor cannot change gives `refused` with the reason. An example is a cutscene whose THN patch in the active mod has an error.
+Each argument takes one kind of `thn:` reference. `cutscene` takes a script, `entity` takes an entity, and `events` takes events. Another reference gives `invalid_argument`. All events of one call must be in one cutscene. One call names at most 200 events.
+
+A cutscene that the editor cannot change gives `refused` with the reason. An example is a cutscene whose THN patch in the active mod has an error.
 
 #### Event references and guards
 
-An event reference is `thn:<install path>#event/<index>`. The index is the place of the event in the event list of the script, from 0. An add, a delete and a reorder of an event can change the index of the events after it. So each row of `events` can also give `expect_type` and `expect_time`: the type and the time that the agent read. When the event at the index has another type or time, the call gives `stale_revision` with the detail `RowChanged`, and nothing changes. The agent then reads the cutscene again with `get_cutscene`. With the guards, a replay of the audit log on a copy of the profile changes the same events.
+An event reference is `thn:<install path>#event/<index>`. The index is the place of the event in the event list of the script, from 0. An add, a delete and a reorder of an event can change the index of the events after it. So each row of `events` can also give `expect_type` and `expect_time`: the type and the time that the agent read.
+
+When the event at the index has another type or time, the call gives `stale_revision` with the detail `RowChanged`, and nothing changes. The agent then reads the cutscene again with `get_cutscene`. With the guards, a replay of the audit log on a copy of the profile changes the same events.
 
 The result gives each new and changed item as it is after the call. So an event reference in `adds` or `changes` has the index after the call. A deleted event has its index before the call, because the script does not have the event after the call. A new script is one add, and `select` names the last new item. Each step of `edit_batch` gives its references as they are after that step.
 
