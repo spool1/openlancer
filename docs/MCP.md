@@ -574,6 +574,8 @@ The result also gives the errors of the cutscene checks that the call adds and r
 
 `get_cutscene` and `get_item` give the fields of an element by their THN paths. An entity gives each key of its record, and an event gives each key of its props, for example `cameraprops.fovh`, `spatialprops.pos` and `props.duration`. A record gives the keys in it, at each depth. The name, the type, the template and the flags of an entity are own properties, not fields. So are the time, the type and the targets of an event. Each value has the form that `set_fields` takes. So you can give a field back to `set_fields` as it is, and the call changes nothing.
 
+The game uses the last entity with a name, also in other letter case. Some retail scripts have two entities with one name. The earlier entity then has `read_only_reason` and no fields, because its reference names the later entity. So the edit tools change only the later entity.
+
 The value forms of the THN keys:
 
 | Kind of key | Form | Example |

@@ -2503,6 +2503,13 @@
               "fields": {
                 "type": "object",
                 "description": "The value of each key that set_fields sets, by its THN path, for example props.duration or spatialprops.pos. A record gives the keys in it. Each value goes back into set_fields as it is."
+              },
+              "read_only_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Why the edit tools do not change this entity, or none. Then its fields are empty."
               }
             },
             "required": [
@@ -6086,6 +6093,13 @@
                 "fields": {
                   "type": "object",
                   "description": "The value of each key that set_fields sets, by its THN path, for example props.duration or spatialprops.pos. A record gives the keys in it. Each value goes back into set_fields as it is."
+                },
+                "read_only_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Why the edit tools do not change this entity, or none. Then its fields are empty."
                 }
               },
               "required": [

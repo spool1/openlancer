@@ -63,6 +63,10 @@ internal sealed record CutsceneElementView(string Ref, ThnElementKind Element, s
     /// <summary>The value of each key of the element that <c>set_fields</c> sets, by its THN path, in the JSON form of
     /// <see cref="ThnJson"/> (see <see cref="CutsceneQueries.Fields"/>).</summary>
     public IReadOnlyDictionary<string, JsonNode> Fields { get; init; } = new Dictionary<string, JsonNode>();
+
+    /// <summary>Why the edit tools do not change this entity, or null. A later entity with the same name hides it, so
+    /// its reference names the later entity, and its fields are empty.</summary>
+    public string? ReadOnlyReason { get; init; }
 }
 
 /// <summary>A cutscene with its entities, its events and its problems (tool <c>get_cutscene</c>).</summary>
@@ -115,12 +119,18 @@ internal static class CutsceneQueries
         var symbols = session.ThnSymbols;
         if (element.Kind == ThnElementKind.Entity)
         {
+            var name = ThnScriptModel.NameOf(table);
+            // The reference of an entity names the entity that the engine uses for the name. When a later entity has
+            // the same name, set_fields with the fields of this entity would change the later entity. So the view
+            // gives no fields for it, and tells why.
+            var hidden = name != null && model.EntityNamed(name)?.Id != element.Id;
             return new CutsceneElementView(reference, ThnElementKind.Entity, type)
             {
-                Name = ThnScriptModel.NameOf(table),
+                Name = name,
                 Template = (table[TemplateKey] as ThnText)?.Value,
                 Flags = FlagsOf(table, symbols),
-                Fields = Fields(session, ThnElementKind.Entity, type, table),
+                Fields = hidden ? new Dictionary<string, JsonNode>() : Fields(session, ThnElementKind.Entity, type, table),
+                ReadOnlyReason = hidden ? AgentTexts.Error("cutscene_entity_hidden") : null,
             };
         }
         var props = table.List.Length > 3 ? table.List[3] as ThnTable : null;

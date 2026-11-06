@@ -184,11 +184,27 @@ public sealed partial class AgentCutsceneToolTests
         Assert.Null(view["entities"]![0]!["fields"]!["entity_name"]);
     }
 
+    /// <summary>A script with two lights of one name in other letter case. The engine uses the last light, so a
+    /// reference of the name names the second light.</summary>
+    private const string Twins = """
+        duration = 10
+        entities = {
+            { entity_name = "Lamp", type = LIGHT, lightprops = { type = L_POINT, on = Y, range = 10 }, spatialprops = { pos = { 1, 2, 3 } } },
+            { entity_name = "Monitor", type = MONITOR },
+            { entity_name = "LAMP", type = LIGHT, lightprops = { type = L_POINT, on = N, range = 20 }, spatialprops = { pos = { 4, 5, 6 } } }
+        }
+        events = {
+            { 0, START_LIGHT_PROP_ANIM, { "Lamp" }, { duration = 1 } }
+        }
+        """;
+
     /// <summary>Each field that <c>get_cutscene</c> gives goes back into <c>set_fields</c> and changes nothing, also a
-    /// rotation, whose degrees do not give the same floats back.</summary>
+    /// rotation, whose degrees do not give the same floats back. An entity that a later entity with the same name
+    /// hides gives no fields, because its reference names the later entity.</summary>
     [Theory]
     [InlineData(Kinds)]
     [InlineData(ThnSessions.Script)]
+    [InlineData(Twins)]
     public void EachFieldOfGetCutsceneGoesBackIntoSetFieldsAndGivesNoChange(string script)
     {
         var (ws, session, host) = Open(script);
@@ -206,6 +222,27 @@ public sealed partial class AgentCutsceneToolTests
 
         Assert.NotEmpty(elements);
         Assert.False(session.CanUndo);
+    }
+
+    /// <summary>In <c>get_cutscene</c>, an entity that a later entity with the same name hides gives the reason and no
+    /// fields. The game does not use it, and its reference names the later entity, as the edit tools resolve it. The
+    /// later entity gives its fields.</summary>
+    [Fact]
+    public void AnEntityThatALaterEntityHidesGivesTheReasonAndNoFields()
+    {
+        var (ws, _, host) = Open(Twins);
+        using var __ = ws;
+
+        var entities = Ok(host, "get_cutscene", $$"""{ "ref": {{Json(Script)}} }""")["entities"]!.AsArray();
+
+        Assert.Equal([Script + "#entity/Lamp", Script + "#entity/Monitor", Script + "#entity/LAMP"],
+            entities.Select(e => (string?)e!["ref"]));
+        Assert.Equal(AgentTexts.Error("cutscene_entity_hidden"), (string?)entities[0]!["read_only_reason"]);
+        Assert.Empty(entities[0]!["fields"]!.AsObject());
+        Assert.Equal("LIGHT", (string?)entities[0]!["type"]);
+        Assert.Null(entities[1]!["read_only_reason"]);
+        Assert.Null(entities[2]!["read_only_reason"]);
+        Assert.Equal(20, (double)entities[2]!["fields"]!["lightprops.range"]!);
     }
 
     /// <summary>A call with two fields is one entry with the label of the fields, and its result names the element as
