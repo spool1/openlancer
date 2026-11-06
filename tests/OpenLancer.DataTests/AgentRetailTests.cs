@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using LibreLancer;
 using OpenLancer.Studio.Agent;
 
 using Xunit;
@@ -18,6 +20,10 @@ namespace OpenLancer.DataTests;
 /// </summary>
 public sealed class AgentRetailTests(ITestOutputHelper output)
 {
+    /// <summary>The cutscene tools read Lua text with the native compiler of the engine. So the test adds the folder of
+    /// the native libraries to the search path, as the editor does when it starts.</summary>
+    static AgentRetailTests() => AppHandler.ConsoleInit(silent: true);
+
     /// <summary>The time of one frame at 60 frames each second (section 13.4 of the MCP1 design).</summary>
     private const double FrameMilliseconds = 16;
 
@@ -316,10 +322,11 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
     private const double MissionEditMilliseconds = 50;
 
     /// <summary>Runs a tool and asserts that it gives no error and that the result fits the output schema of the
-    /// tool. Gives the content of the result.</summary>
+    /// tool. Gives the content of the result. The arguments go through JSON text, as the arguments of a client
+    /// do.</summary>
     private static JsonObject Ok(AgentHost host, string tool, JsonObject arguments)
     {
-        var result = AgentTools.Run(host, tool, arguments).Result!;
+        var result = AgentTools.Run(host, tool, JsonNode.Parse(arguments.ToJsonString())!.AsObject()).Result!;
         Assert.False(result.IsError, $"{tool} {arguments.ToJsonString()}: {result.Text}");
         Assert.Empty(OpenLancer.Tests.SchemaCheck.Problems(AgentTools.Find(tool)!.OutputSchema, result.Content));
         return result.Content;
@@ -481,5 +488,162 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
         Assert.True(best.TotalMilliseconds < MissionEditMilliseconds,
             $"The median of one call took {best.TotalMilliseconds:0.0} ms.");
         Assert.False(session.CanUndo);
+    }
+
+    /// <summary>The thn: references of the retail cutscene scripts of a folder group, from list_cutscenes, page by
+    /// page.</summary>
+    private static List<string> Cutscenes(AgentHost host, string category)
+    {
+        var refs = new List<string>();
+        string? cursor = null;
+        do
+        {
+            var arguments = new JsonObject { ["category"] = category, ["limit"] = 200 };
+            if (cursor != null)
+                arguments["cursor"] = cursor;
+            var page = Ok(host, "list_cutscenes", arguments);
+            refs.AddRange(page["rows"]!.AsArray().Select(r => (string)r!["ref"]!));
+            cursor = (string?)page["next_cursor"];
+        }
+        while (cursor != null);
+        return refs;
+    }
+
+    /// <summary>The text of W of a script, to compare two states.</summary>
+    private static string ScriptText(OpenLancer.Data.Editing.EditSession session, string script) =>
+        OpenLancer.Data.Thn.ThnWriter.Write(session.Cutscene(script["thn:".Length..])!.ToGlobals());
+
+    /// <summary>
+    /// Previews of the cutscene edits on a retail base script give a result and change nothing (section 13.3, retail
+    /// variant, of the MCP1 design, for MCP1-4). The script is the first base script that the editor can change, with
+    /// an event and a camera. The previews move the first event with its guards, set its time and a number of the
+    /// camera, add a camera move and rename the camera. The revision, the history, the unsaved state, the new
+    /// cutscenes and W stay. The test writes the time of the first and the second rename_item, because the first
+    /// rename of an entity reads the uses of the name in the INI files on the session thread.
+    /// </summary>
+    [Fact]
+    public void PreviewsOfTheCutsceneEditsOnARetailBaseScriptChangeNothing()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "mcp1thnpreview");
+        using var host = OpenToEdit(workspace);
+        var session = host.Session!;
+        var (script, view) = Cutscenes(host, "bases")
+            .Select(s => (Ref: s, View: Ok(host, "get_cutscene", new JsonObject { ["ref"] = s })))
+            .First(s => s.View["read_only_reason"] == null && s.View["events"]!.AsArray().Count > 0 &&
+                        s.View["entities"]!.AsArray().Any(e => (string?)e!["type"] == "CAMERA"));
+        var before = ScriptText(session, script);
+        var ev = view["events"]![0]!;
+        var camera = view["entities"]!.AsArray().First(e => (string?)e!["type"] == "CAMERA")!;
+        var number = camera["fields"]!.AsObject().First(f => f.Value!.GetValueKind() == JsonValueKind.Number);
+        static double Number(JsonNode node) => double.Parse(node.ToJsonString(), CultureInfo.InvariantCulture);
+        JsonObject Guarded() => new()
+        {
+            ["ref"] = (string)ev["ref"]!, ["expect_type"] = (string?)ev["type"], ["expect_time"] = ev["time"]!.DeepClone(),
+        };
+        var setTime = Guarded();
+        setTime["fields"] = new JsonObject { ["time"] = Number(ev["time"]!) + 1 };
+        var calls = new List<(string Tool, JsonObject Arguments, string Items)>
+        {
+            ("cutscene_move_events", new JsonObject { ["events"] = new JsonArray(Guarded()), ["time_delta"] = 0.5 }, "changes"),
+            ("set_fields", setTime, "changes"),
+            ("set_fields", new JsonObject
+            {
+                ["ref"] = (string)camera["ref"]!, ["fields"] = new JsonObject { [number.Key] = Number(number.Value!) + 1 },
+            }, "changes"),
+            ("cutscene_add_event", new JsonObject
+            {
+                ["cutscene"] = script, ["type"] = "START_SPATIAL_PROP_ANIM", ["time"] = 0,
+                ["targets"] = new JsonArray((string)camera["name"]!), ["length"] = 2,
+            }, "adds"),
+        };
+
+        foreach (var (tool, arguments, items) in calls)
+        {
+            arguments["preview"] = true;
+            arguments["with_patch"] = true;
+            var result = Ok(host, tool, arguments);
+            Assert.Equal("previewed", (string?)result["status"]);
+            Assert.NotEmpty(result[items]!.AsArray());
+            Assert.False(string.IsNullOrEmpty((string?)result["patch"]![script["thn:".Length..]]), tool);
+        }
+        var rename = new JsonObject
+        {
+            ["ref"] = (string)camera["ref"]!, ["new_name"] = (string)camera["name"]! + "_ol", ["preview"] = true,
+        };
+        var times = Enumerable.Range(0, 2).Select(_ =>
+        {
+            JsonObject? result = null;
+            var time = Timing.Measure(() => result = Ok(host, "rename_item", (JsonObject)rename.DeepClone()));
+            Assert.Equal("previewed", (string?)result!["status"]);
+            Assert.Single(result["renames"]!.AsArray());
+            return time.TotalMilliseconds;
+        }).ToList();
+
+        Assert.Equal((0, false, false), (session.Revision, session.IsDirty, session.CanUndo));
+        Assert.Null(session.OpenBatch);
+        Assert.Empty(session.NewCutscenes);
+        Assert.Equal(before, ScriptText(session, script));
+        output.WriteLine($"{view["entities"]!.AsArray().Count} entities, {view["events"]!.AsArray().Count} events: " +
+                         $"{calls.Count + 2} previews. rename_item: first call {times[0]:0} ms with the scan of the uses, " +
+                         $"second call {times[1]:0.0} ms");
+    }
+
+    /// <summary>The sample of <see cref="EachFieldOfARetailBaseScriptGoesBackIntoSetFields"/> takes each fifth base
+    /// script.</summary>
+    private const int SampleStep = 5;
+
+    /// <summary>
+    /// On a sample of the retail base scripts, each field of each element that get_cutscene gives goes back into a
+    /// preview of set_fields, and the preview gives no_change. So an agent can read a retail cutscene, change one value
+    /// and write the fields back. Some retail scripts have two entities with one name. The earlier entity gives no
+    /// fields, because its reference names the later entity. The sample is each fifth script in the order of
+    /// list_cutscenes. The test writes counts only.
+    /// </summary>
+    [Fact]
+    public void EachFieldOfARetailBaseScriptGoesBackIntoSetFields()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "mcp1thnfields");
+        using var host = OpenToEdit(workspace);
+        var session = host.Session!;
+        var scripts = Cutscenes(host, "bases").Where((_, i) => i % SampleStep == 0).ToList();
+        var (elements, fields, readOnly, hidden) = (0, 0, 0, 0);
+        var changed = new List<string>();
+
+        foreach (var script in scripts)
+        {
+            var view = Ok(host, "get_cutscene", new JsonObject { ["ref"] = script });
+            if (view["read_only_reason"] != null)
+            {
+                readOnly++;
+                continue;
+            }
+            foreach (var element in view["entities"]!.AsArray().Concat(view["events"]!.AsArray()))
+            {
+                var values = element!["fields"]!.AsObject();
+                // A later entity with the same name hides the entity, and its reference names the later entity. So
+                // the view gives no fields for it.
+                if (element["read_only_reason"] != null)
+                {
+                    hidden++;
+                    Assert.Empty(values);
+                }
+                if (values.Count == 0)
+                    continue;
+                var result = Ok(host, "set_fields", new JsonObject
+                {
+                    ["ref"] = (string)element["ref"]!, ["fields"] = values.DeepClone(), ["preview"] = true,
+                });
+                elements++;
+                fields += values.Count;
+                if ((string?)result["status"] != "no_change")
+                    changed.Add((string)element["ref"]!);
+            }
+        }
+
+        Assert.NotEmpty(scripts);
+        Assert.True(changed.Count == 0, $"{changed.Count} elements changed, the first is {changed.FirstOrDefault()}");
+        Assert.Equal((0, false, false), (session.Revision, session.IsDirty, session.CanUndo));
+        output.WriteLine($"{scripts.Count} base scripts ({readOnly} read-only), {elements} elements, {fields} fields: " +
+                         $"each preview gave no_change. {hidden} entities that a later entity hides gave no fields.");
     }
 }
