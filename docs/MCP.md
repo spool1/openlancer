@@ -557,7 +557,7 @@ The result gives each new and changed item as it is after the call. So an event 
 
 The result also gives the errors of the cutscene checks that the call adds and removes, in `new_problems` and `fixed_problems`. The game crashes when it plays a cutscene with such an error, so the save stops.
 
-`get_cutscene` gives the entities and the events of a script, each with its fields. In this version, the Console entry of a cutscene edit links to no item, and follow mode does not open the Cutscene tab.
+`get_cutscene` gives the entities and the events of a script, each with its fields. In the editor, the Console entry of a cutscene edit links to its element, and follow mode opens the script in the Cutscene tab. "What you see in the editor" tells more.
 
 #### The generic tools on cutscene items
 
@@ -697,9 +697,9 @@ The editor shows each agent edit in the Console, in the Scene, in the Hierarchy 
 
 | Place | What it shows |
 |---|---|
-| Console | Each agent edit adds an Info entry with the source "Agent" and the label of the edit, for example "Create Zone_test_01.". Click the entry to select its item. A refused call of a tool that changes data adds a warning with the tool and the reason, also a call that waited too long. An error in the second part of a call adds no entry yet. Examples are a Play that you cancel, an export with `guard_conflict` and a save that the save gate of Play stops. An undo and a redo of the agent add an entry too. A preview, a read tool and the question `needs_confirmation` add no entry. When the editor cannot show an agent edit, it adds an Error entry with the reason. The edit stays in the Undo history. **Agent > Show agent messages** shows only the entries of the agent. |
+| Console | Each agent edit adds an Info entry with the source "Agent" and the label of the edit, for example "Create Zone_test_01.". Click the entry to select its item. The entry of a cutscene edit opens the cutscene and selects its element. A refused call of a tool that changes data adds a warning with the tool and the reason, also a call that waited too long. An error in the second part of a call adds no entry yet. Examples are a Play that you cancel, an export with `guard_conflict` and a save that the save gate of Play stops. An undo and a redo of the agent add an entry too. A preview, a read tool and the question `needs_confirmation` add no entry. When the editor cannot show an agent edit, it adds an Error entry with the reason. The edit stays in the Undo history. **Agent > Show agent messages** shows only the entries of the agent. |
 | Scene | A pulse ring in the agent color goes around each item of an agent edit for 4 seconds. |
-| Hierarchy | A robot glyph at the right end of a row shows an item that an agent edit changed after the last save. The blue mark of the unsaved edit stays, so the row shows both marks. `list_items` gives the same mark as `agent_changed`. In the tree of a mission, the row of a trigger or of another section of the script shows the glyph too. The header row shows it for the `[Mission]` section. The rows of a mission have no blue mark. |
+| Hierarchy | A robot glyph at the right end of a row shows an item that an agent edit changed after the last save. The blue mark of the unsaved edit stays, so the row shows both marks. `list_items` gives the same mark as `agent_changed`. In the tree of a mission, the row of a trigger or of another section of the script shows the glyph too. The header row shows it for the `[Mission]` section. The rows of a mission have no blue mark. While the Cutscene tab shows, the top row of the cutscene shows the glyph after an agent edit of the script. The editor records a cutscene edit for the whole script, so the rows of the entities have no glyph. |
 | Status bar | The agent program and the number of its edits since the last save, or "Agent paused". |
 
 An undo of an agent edit removes its marks, and a redo puts them back. A save clears the marks.
@@ -720,9 +720,11 @@ With **Agent > Follow agent** on, the editor opens the system of each agent edit
 
 The selection follows Unity. A create or a copy selects the new item, a delete clears the selection, and a rename keeps it. When the agent undoes its delete, follow mode selects the item again. When you undo an agent delete, the Scene selects the item again, as after the undo of your own delete. This is also true with follow mode off. An undo of an agent delete in a mission keeps the selection of the Mission tab, as the undo of your own mission edit does.
 
+An agent edit of a cutscene opens the script in the Cutscene tab and shows the Timeline. An add selects the new entity or event, and a new script gets the selection. A change or a rename keeps the selection. A delete selects the cutscene, as your own delete in the Timeline does. When the agent undoes its delete, follow mode selects the element again. The Cutscene view keeps its mode and its camera, so it does not move to an entity.
+
 Follow mode does not leave prefab mode, as Unity keeps prefab mode open when the scene changes. While the Mission tab shows a prefab, an agent edit of a mission script or of its ship build file shows only in the Console. The selection and the view stay.
 
-When you move the camera of the Scene, pan or zoom the graph of the Mission tab, or select an item, follow mode stops. Click **Follow agent** to start it again. The settings keep the last value that you clicked, so follow mode is on again at the next start of the editor. With follow mode off, the agent changes the view and the selection only with `open_view` and `select_items`. When an agent edit removes the selected item, the selection goes, as after an undo. When an agent edit renames the selected item or moves the row of a selected line, the selection stays on the same item.
+When you move the camera of the Scene, pan or zoom the graph of the Mission tab, or select an item, follow mode stops. A selection in the Timeline or in the Hierarchy of a cutscene stops it too. A move of the camera of the Cutscene view does not stop it. Click **Follow agent** to start it again. The settings keep the last value that you clicked, so follow mode is on again at the next start of the editor. With follow mode off, the agent changes the view and the selection only with `open_view` and `select_items`. When an agent edit removes the selected item, the selection goes, as after an undo. When an agent edit renames the selected item or moves the row of a selected line, the selection stays on the same item.
 
 #### Pause
 

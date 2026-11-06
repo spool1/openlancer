@@ -145,7 +145,7 @@ public sealed partial class EditSession : IDisposable
     public EditOrigin? RedoUndoneBy => history.RedoUndoneBy;
 
     /// <summary>The agent entries since the last save, at the version of the history that it read.</summary>
-    private (long Version, int Count, HashSet<SectionRef> Sections)? agentEdits;
+    private (long Version, int Count, HashSet<SectionRef> Sections, HashSet<string> Cutscenes)? agentEdits;
 
     /// <summary>
     /// The sections that the entries of an agent changed since the last save, by their references now (section 8.5 of the
@@ -156,14 +156,23 @@ public sealed partial class EditSession : IDisposable
     /// </summary>
     public IReadOnlySet<SectionRef> AgentSections => AgentEditsNow().Sections;
 
+    /// <summary>
+    /// The install paths of the cutscene scripts that the entries of an agent changed since the last save, in normal
+    /// form (section 8.5 of the MCP1 design). An undo of the entry removes its scripts, a redo puts them back, and a save
+    /// clears them. The history records a cutscene change by the path of its script, so the Hierarchy marks the row of
+    /// the script, not the rows of its elements.
+    /// </summary>
+    public IReadOnlySet<string> AgentCutscenes => AgentEditsNow().Cutscenes;
+
     /// <summary>The number of agent entries since the last save. The status bar shows it.</summary>
     public int AgentEdits => AgentEditsNow().Count;
 
-    private (long Version, int Count, HashSet<SectionRef> Sections) AgentEditsNow()
+    private (long Version, int Count, HashSet<SectionRef> Sections, HashSet<string> Cutscenes) AgentEditsNow()
     {
         if (agentEdits is { } known && known.Version == history.Version)
             return known;
         var sections = new HashSet<SectionRef>();
+        var cutscenes = new HashSet<string>(VfsPath.Comparer);
         var count = 0;
         foreach (var entry in history.SinceSave)
         {
@@ -177,14 +186,16 @@ public sealed partial class EditSession : IDisposable
             if (entry.Origin == EditOrigin.Agent)
             {
                 count++;
-                sections.UnionWith(entry.Change.Sections);
+                var change = entry.Change;
+                sections.UnionWith(change.Sections);
+                cutscenes.UnionWith(change.Cutscenes);
             }
             // The sections of an entry hold the deleted sections and the old reference of each rename. An example is a
             // create with a nickname: it adds the item under a free nickname, then renames it in the same entry. These
             // references name no item now, so they lose the mark (review finding of MCP1-2, step 8).
             sections.ExceptWith(entry.Removed);
         }
-        agentEdits = (history.Version, count, sections);
+        agentEdits = (history.Version, count, sections, cutscenes);
         return agentEdits.Value;
     }
 

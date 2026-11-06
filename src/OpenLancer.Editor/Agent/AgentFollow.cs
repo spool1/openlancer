@@ -6,6 +6,7 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.IO;
+using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Missions;
 using OpenLancer.Studio.Agent;
 
@@ -43,6 +44,16 @@ internal interface IFollowView
     /// <returns>False when the Mission tab cannot show the item, for example a section of a script that the mission run
     /// did not read yet.</returns>
     bool ShowInMission(string script, string reference, bool select);
+
+    /// <summary>
+    /// Opens a cutscene in the Cutscene tab and shows the tab and the Timeline. With <paramref name="select"/>, it also
+    /// selects the element, or the cutscene when <paramref name="element"/> is null, as a click does. The open of another
+    /// cutscene selects that cutscene, as the open of a cutscene does. The Cutscene view keeps its mode and its camera.
+    /// </summary>
+    /// <param name="path">The install path of the cutscene, in the form that the session stores.</param>
+    /// <param name="element">An entity or an event of the cutscene, or null for the cutscene.</param>
+    /// <returns>False when the Cutscene tab cannot open the cutscene, for example while the game data loads.</returns>
+    bool ShowInCutscene(string path, ThnRef? element, bool select);
 }
 
 /// <summary>What the panels did in one frame, for follow mode. The window reads it before and after the panels
@@ -71,8 +82,10 @@ internal readonly record struct FollowFrame(
 /// <summary>
 /// Follow mode of the agent edits (section 8.5 of the MCP1 design, decisions D719 and D720). With follow mode on, the
 /// editor opens the system of each agent edit and frames its item. An edit of a mission opens its script in the Mission
-/// tab and frames the item in the graph. The selection then follows Unity (decision D249): a create or a duplicate
-/// selects the new item, a delete clears the selection, and a rename keeps it. An item without a place in the Scene, for
+/// tab and frames the item in the graph. An edit of a cutscene opens its script in the Cutscene tab. The selection then
+/// follows Unity (decision D249): a create or a duplicate selects the new item, a delete clears the selection, and a
+/// rename keeps it. A delete in a cutscene selects the cutscene, as a delete of the user in the Timeline does. An item
+/// without a place in the Scene, for
 /// example a loadout, shows in the Inspector, and the view does not change. Follow mode does not leave prefab mode, as
 /// Unity keeps prefab mode open when the scene changes. An edit of a mission then shows only in the Console. A camera
 /// input, a pan or a zoom of the mission graph, or a selection of the user stops follow mode until the user turns it on
@@ -88,8 +101,8 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
 
     /// <summary>The tooltip of the menu item (section 10 of the MCP1 design).</summary>
     internal const string Tip =
-        "Opens and frames the item of each agent edit. Follow mode stops when you move the camera or the mission graph, " +
-        "or select an item.";
+        "Opens and frames the item of each agent edit. Follow mode stops when you move the camera of the Scene or the " +
+        "mission graph, or select an item.";
 
     /// <summary>The first removed item of each agent delete, by the label of its entry, so an undo of the delete selects
     /// the item again (decision D249).</summary>
@@ -165,6 +178,11 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
             return;
         if (result.Adds.Count == 0 && result.Deletes.Count > 0)
         {
+            // A delete in a cutscene selects the cutscene, as a delete of the user in the Timeline does
+            // (CutsceneWorkspace.SelectionAfter).
+            var target = result.Deletes.FirstOrDefault(d => d.Why == DeleteReason.Target) ?? result.Deletes[0];
+            if (CutsceneItemOf(target.Ref) is var (path, _) && view.ShowInCutscene(path, null, select: true))
+                return;
             // Follow mode does not leave prefab mode, so a delete of items of mission files keeps the selection of prefab
             // mode.
             if (!(view.InPrefabMode && result.Deletes.All(d => MissionFileOf(d.Ref) != null)))
@@ -199,17 +217,24 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
             : null;
 
     /// <summary>
-    /// Shows the first item of an edit: in the Mission tab for an item of a mission script, in the Scene for an item of a
-    /// system, else in the Inspector. An item that the Mission tab or the Scene cannot show also shows in the Inspector,
-    /// for example a section of a ship build file. In prefab mode, an item of a mission file does not show.
+    /// Shows the first item of an edit: in the Cutscene tab for a cutscene or an element of a cutscene, in the Mission
+    /// tab for an item of a mission script, in the Scene for an item of a system, else in the Inspector. An item that the
+    /// Mission tab or the Scene cannot show also shows in the Inspector, for example a section of a ship build file. In
+    /// prefab mode, an item of a mission file does not show.
     /// </summary>
-    /// <param name="select">True to select an item of the Scene or of the Mission tab. An item that shows only in the
-    /// Inspector always gets the selection, because the Inspector shows only the selection.</param>
+    /// <param name="select">True to select an item of the Cutscene tab, the Scene or the Mission tab. An item that shows
+    /// only in the Inspector always gets the selection, because the Inspector shows only the selection.</param>
     private void Show(IEnumerable<string> references, bool select)
     {
         SectionRef? inspector = null;
         foreach (var reference in references)
         {
+            if (CutsceneItemOf(reference) is var (cutscene, element))
+            {
+                if (view.ShowInCutscene(cutscene, element, select))
+                    return;
+                continue;
+            }
             if (MissionFileOf(reference) is var (path, script))
             {
                 // Follow mode does not leave prefab mode, so the edit shows only in the Console.
@@ -280,6 +305,37 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
                     (path, session.Missions.ScriptPaths().Contains(path, VfsPath.Comparer)),
                 _ => null,
             };
+        }
+        catch (Exception e) when (e is EditException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The cutscene of a <c>thn:</c> reference of a result, with its entity or its event in W now, or null for another
+    /// reference and for a cutscene that the edit view does not have. The reference of an entity or an event that W does
+    /// not have gives the cutscene. An example is the index of an event that a delete gives: it is the index before the
+    /// delete.
+    /// </summary>
+    private (string Path, ThnRef? Element)? CutsceneItemOf(string reference)
+    {
+        try
+        {
+            var parsed = ItemRefs.Parse(reference);
+            if (parsed.Kind is not (ItemRefKind.Cutscene or ItemRefKind.CutsceneEntity or ItemRefKind.CutsceneEvent))
+                return null;
+            var path = ItemRefs.ResolveCutscene(session!, parsed);
+            if (parsed.Kind == ItemRefKind.Cutscene)
+                return (path, null);
+            try
+            {
+                return (path, ItemRefs.ResolveCutsceneElement(session!, parsed));
+            }
+            catch (EditException)
+            {
+                return (path, null);
+            }
         }
         catch (Exception e) when (e is EditException or ArgumentException)
         {

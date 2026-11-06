@@ -1873,7 +1873,7 @@
     "AgentConsoleEntry.severity": "info, warning or error.",
     "AgentConsoleEntry.source": "What wrote the entry, for example Editor, Agent or a mod.",
     "AgentConsoleEntry.message": "The message of the entry.",
-    "AgentConsoleEntry.ref": "The reference of the item that the entry is about, or none.",
+    "AgentConsoleEntry.ref": "The reference of the item that the entry is about, or none. An entry about a cutscene gives the element as the cutscene has it now, or the script.",
     "AgentConsoleEntry.origin": "Who causes the entry: base_game, mod, some_mod, openlancer or unknown.",
     "CutsceneRow.ref": "The thn: reference.",
     "CutsceneRow.path": "The install path of the script.",

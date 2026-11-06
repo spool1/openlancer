@@ -434,9 +434,11 @@ internal sealed partial class HierarchyPanel(EditorWindow window)
         }
 
         // The robot glyph of an agent edit takes the right end of the row, so the text and the problem glyph end before
-        // it. A row of a mission shows it for its section. It has no blue mark (section 8.5 of the MCP1 design).
+        // it. A row of a mission shows it for its section, and the row of a cutscene for its script. They have no blue
+        // mark (section 8.5 of the MCP1 design).
         var agentSection = section ?? tree.SectionOfMissionRow(node.Item);
-        var agentMarked = agentSection != null && window.AgentMarks.Marked(agentSection);
+        var agentMarked = agentSection != null ? window.AgentMarks.Marked(agentSection)
+            : node.Item is CutsceneRoot cutscene && window.AgentMarks.Marked(cutscene);
         var textRight = agentMarked ? right - AgentMarkWidth() : right;
         ListRow.Text(start, textStart, textRight, node.Kind.Icon, node.Kind.Abgr, node.Name, node.Detail, node.CountText);
         ProblemMark(node.Problem, start, textRight);

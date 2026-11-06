@@ -4,8 +4,10 @@ using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Agent;
 using OpenLancer.Editor.Logs;
+using OpenLancer.Studio.Agent;
 using Xunit;
 using static OpenLancer.Tests.AgentCalls;
 
@@ -97,6 +99,47 @@ public sealed class AgentConsoleTests
             entries.Select(e => e.Target));
         Assert.Equal("Wait longer.", entries[1].Message);
         Assert.All(entries, e => Assert.Equal((ConsoleSeverity.Info, -1), (e.Severity, e.EntryIndex)));
+    }
+
+    /// <summary>
+    /// The entry of an agent cutscene edit links to the place in the cutscene (section 9 of the M8 design): the new event
+    /// of an add, and the script of a new duration. A click on the entry then opens the cutscene and selects the element.
+    /// A refusal links to the event of the error. A delete links to nothing, because its event is gone. get_console
+    /// gives the reference of each link, as the cutscene has its elements now.
+    /// </summary>
+    [Fact]
+    public void TheEntryOfACutsceneEditLinksToThePlaceInTheCutscene()
+    {
+        using var ws = ThnSessions.Workspace();
+        var session = ws.Session("act");
+        var editor = new FakeAgentEditor { Edits = session };
+        var host = new EditorAgentHost(editor);
+        const string script = "thn:" + ThnSessions.ScriptPath;
+
+        Ok(host, "cutscene_add_event", $$"""{ "cutscene": {{Json(script)}}, "type": "START_PSYS", "time": 1.5, "targets": ["Fx"] }""");
+        var added = ThnSessions.Event(session, 6);
+        var link = Agent(editor)[0].Cutscene!;
+        Assert.Equal((ThnSessions.ScriptPath, (ThnElementKind?)ThnElementKind.Event, 6), (link.Path, link.Kind, link.Index));
+        Assert.Equal(added.Id, link.ElementIn(ThnSessions.W(session))!.Id);
+        var refs = host.Console(new ConsoleFilter(AgentController.Source, AgentSeverity.Info, false, null)).Select(e => e.Ref);
+        Assert.Equal([script + "#event/6"], refs);
+
+        Ok(host, "cutscene_set_duration", $$"""{ "cutscene": {{Json(script)}}, "seconds": 12 }""");
+        var stale = Error(host, "cutscene_move_events",
+            $$"""{ "events": [ { "ref": {{Json(script + "#event/3")}}, "expect_type": "SET_CAMERA" } ], "time_delta": 1 }""");
+        Ok(host, "delete_items", $$"""{ "refs": [{{Json(script + "#event/0")}}] }""");
+
+        var entries = Agent(editor);
+        Assert.Equal(["Add START_PSYS.", "Set duration.", $"cutscene_move_events: {stale.Message}"],
+            entries.Take(3).Select(e => e.Message));
+        Assert.Equal(new ThnLocation(ThnSessions.ScriptPath), entries[1].Cutscene);
+        Assert.Equal((ThnSessions.ScriptPath, (ThnElementKind?)ThnElementKind.Event, 3),
+            (entries[2].Cutscene!.Path, entries[2].Cutscene!.Kind, entries[2].Cutscene!.Index));
+        Assert.Null(entries[3].Cutscene);
+        Assert.All(entries, e => Assert.Null(e.Target));
+        // The delete of event 0 moves each later event one index down, so each link gives the reference of its event now.
+        refs = host.Console(new ConsoleFilter(AgentController.Source, AgentSeverity.Info, false, null)).Select(e => e.Ref);
+        Assert.Equal([script + "#event/5", script, script + "#event/2", null], refs);
     }
 
     /// <summary>A preview, a query and a view tool add no entry.</summary>

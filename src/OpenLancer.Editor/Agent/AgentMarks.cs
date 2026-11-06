@@ -2,15 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Editing;
+using OpenLancer.Editor.Cutscene;
 
 namespace OpenLancer.Editor.Agent;
 
 /// <summary>
 /// The marks of the agent edits (section 8.5 of the MCP1 design, decision D718). The Scene draws a pulse ring around each
 /// item of an agent entry for 4 seconds. The Hierarchy shows the robot glyph on each row that an agent entry changed
-/// since the last save, also on a row of a mission. The marks follow <see cref="EditSession.Changed"/>: an undo of the
-/// entry removes them, a redo puts them back, and a save clears them. The blue mark of an unsaved edit stays as it
-/// is.
+/// since the last save, also on a row of a mission and on the row of a cutscene. The marks follow
+/// <see cref="EditSession.Changed"/>: an undo of the entry removes them, a redo puts them back, and a save clears them.
+/// The blue mark of an unsaved edit stays as it is.
 /// </summary>
 /// <param name="clock">The time now. The tests give a fake clock.</param>
 internal sealed class AgentMarks(Func<DateTime> clock)
@@ -56,6 +57,11 @@ internal sealed class AgentMarks(Func<DateTime> clock)
     /// <summary>True when an agent entry changed the section after the last save, so its Hierarchy row shows the robot
     /// glyph.</summary>
     public bool Marked(SectionRef section) => session?.AgentSections.Contains(section) == true;
+
+    /// <summary>True when an agent entry changed the script of a cutscene after the last save, so the row of the
+    /// cutscene in the Hierarchy shows the robot glyph. The history records a cutscene change by the path of its script,
+    /// so the rows of the entities have no glyph.</summary>
+    public bool Marked(CutsceneRoot cutscene) => session?.AgentCutscenes.Contains(cutscene.Path) == true;
 
     private void OnChanged(EditChange change)
     {

@@ -35,6 +35,22 @@ public sealed record ThnLocation(string Path, ThnElementKind? Kind = null, int I
         return elements.Where(e => KeyOf(kind, e.Table) == Key).Take(2).ToList() is [var one] ? one : null;
     }
 
+    /// <summary>
+    /// The place of an element in a version of W of its cutscene, for example W after an agent edit: its kind, its index
+    /// in that version and its key. <see cref="ElementIn"/> finds the element in that version, and in a later version
+    /// by its key.
+    /// </summary>
+    /// <param name="script">The version of W, or null when the cutscene does not exist in it.</param>
+    /// <returns>The place of the element, or the place of the whole script when the version does not have the
+    /// element.</returns>
+    public static ThnLocation Of(ThnScriptModel? script, ThnRef element)
+    {
+        if (script?.Element(element.Kind, element.Id) is not { } found)
+            return new ThnLocation(element.Path);
+        return new ThnLocation(element.Path, element.Kind, script.Elements(element.Kind).IndexOf(found), null,
+            KeyOf(element.Kind, found.Table));
+    }
+
     /// <summary>The key text of an element (see <see cref="Key"/>), or null when it has no key.</summary>
     internal static string? KeyOf(ThnElementKind kind, ThnTable element) =>
         ThnKeys.Match(kind, element) is { } match ? ThnKeys.Text(match) : null;

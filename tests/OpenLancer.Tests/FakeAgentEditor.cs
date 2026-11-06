@@ -1,5 +1,6 @@
 using System;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Thn;
 using OpenLancer.Editor;
 using OpenLancer.Editor.Agent;
 using OpenLancer.Editor.Editing;
@@ -89,8 +90,8 @@ internal sealed record FakeSceneItem(SectionRef Section);
 /// it, as the real Scene has none for a mission item.</summary>
 internal sealed record FakeMissionItem(string Reference);
 
-/// <summary>The views of follow mode for the tests: the selection, and each request to show an item in the Scene or in
-/// the Mission tab.</summary>
+/// <summary>The views of follow mode for the tests: the selection, and each request to show an item in the Scene, in the
+/// Mission tab or in the Cutscene tab.</summary>
 internal sealed class FakeFollowView : IFollowView
 {
     public object? Selection { get; set; }
@@ -128,6 +129,24 @@ internal sealed class FakeFollowView : IFollowView
         MissionShown.Add((script, reference, select));
         if (select)
             Selection = new FakeMissionItem(reference);
+        return true;
+    }
+
+    /// <summary>Each request to show a cutscene: the path, the element and the selection flag.</summary>
+    public System.Collections.Generic.List<(string Path, ThnRef? Element, bool Select)> CutsceneShown { get; } = [];
+
+    /// <summary>False to act as a Cutscene tab that cannot open the cutscene, for example while the game data
+    /// loads.</summary>
+    public bool CanShowCutscene { get; set; } = true;
+
+    /// <summary>Selects the element, or the cutscene, as the Cutscene tab does.</summary>
+    public bool ShowInCutscene(string path, ThnRef? element, bool select)
+    {
+        if (!CanShowCutscene)
+            return false;
+        CutsceneShown.Add((path, element, select));
+        if (select)
+            Selection = element ?? (object)new OpenLancer.Editor.Cutscene.CutsceneRoot(path);
         return true;
     }
 

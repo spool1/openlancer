@@ -6808,7 +6808,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "The reference of the item that the entry is about, or none."
+                  "description": "The reference of the item that the entry is about, or none. An entry about a cutscene gives the element as the cutscene has it now, or the script."
                 },
                 "origin": {
                   "enum": [

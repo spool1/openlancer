@@ -7,7 +7,9 @@ using System.Threading.Tasks;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.IO;
 using OpenLancer.Data.Mods;
+using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Runtime.Validation;
@@ -172,23 +174,27 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
 
     /// <summary>
     /// The Console entry of an applied edit (section 8.5 of the MCP1 design). It is an Info entry with the source "Agent"
-    /// and the label of the request. It links to the first item that the edit adds, renames or changes. The entry has the
-    /// origin OpenLancer, as each message of the editor has. So the toggle of the base-game messages never hides it
-    /// (decision D718).
+    /// and the label of the request. It links to the first item that the edit adds, renames or changes: a section, or a
+    /// cutscene or an element of a cutscene. The entry has the origin OpenLancer, as each message of the editor has. So
+    /// the toggle of the base-game messages never hides it (decision D718).
     /// </summary>
     /// <remarks>Follow mode then opens and frames the item of the edit (decision D719).</remarks>
     public override void Edited(string tool, EditResult result) => AfterChange(() =>
     {
+        var (section, cutscene) = result.Adds.Concat(result.Renames.Select(r => r.To)).Concat(result.Changes)
+            .Select(LinkOf).FirstOrDefault(l => l.Section != null || l.Cutscene != null);
         editor.Log.Add(ConsoleSeverity.Info, AgentController.Source, Sentence(result.Label ?? result.UndoLabel ?? tool),
-            FirstItem(result));
+            section, cutscene);
         editor.Follow.Edited(result);
     });
 
     /// <summary>The Console entry of a refused call of a tool that changes something: a Warning "{tool}:
-    /// {message}".</summary>
-    public override void Refused(string tool, EditError error) =>
-        editor.Log.Add(ConsoleSeverity.Warning, AgentController.Source, $"{tool}: {error.Message}",
-            error.Target is { } target ? SectionOf(target) : null);
+    /// {message}". It links to the item of the error when the edit view has it.</summary>
+    public override void Refused(string tool, EditError error)
+    {
+        var (section, cutscene) = error.Target is { } target ? LinkOf(target) : default;
+        editor.Log.Add(ConsoleSeverity.Warning, AgentController.Source, $"{tool}: {error.Message}", section, cutscene);
+    }
 
     /// <summary>The Console entry of an undo or a redo of the agent, for example "Undo Agent: Create Zone_1.". The undo
     /// does not run the selection rule of an undo of the user. Only follow mode selects the item of an undone delete
@@ -223,25 +229,33 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
     /// <summary>A label as a sentence with a full stop.</summary>
     private static string Sentence(string label) => label.TrimEnd().TrimEnd('.') + ".";
 
-    /// <summary>The section of the first item of a result that the edit view has: a new item, a renamed item, then a
-    /// changed item. A delete links to nothing, because its items are gone.</summary>
-    private SectionRef? FirstItem(EditResult result) =>
-        result.Adds.Concat(result.Renames.Select(r => r.To)).Concat(result.Changes).Select(SectionOf)
-            .FirstOrDefault(s => s != null);
-
-    /// <summary>The section of an item reference of a result. It is null when the reference names no section of the edit
-    /// view now, for example a prop group.</summary>
-    private SectionRef? SectionOf(string reference)
+    /// <summary>
+    /// The link of a Console entry to an item reference: the section, or the place of a cutscene or of an element of a
+    /// cutscene in W now. A click on the entry selects the section, or opens the cutscene and selects the element. Both
+    /// are null when the edit view does not have the item now, for example a deleted item or a prop group. So a delete
+    /// links to nothing.
+    /// </summary>
+    private (SectionRef? Section, ThnLocation? Cutscene) LinkOf(string reference)
     {
         if (Session is not { } session)
-            return null;
+            return default;
         try
         {
-            return ItemRefs.ResolveSection(session, ItemRefs.Parse(reference));
+            var parsed = ItemRefs.Parse(reference);
+            switch (parsed.Kind)
+            {
+                case ItemRefKind.Cutscene:
+                    return (null, new ThnLocation(ItemRefs.ResolveCutscene(session, parsed)));
+                case ItemRefKind.CutsceneEntity or ItemRefKind.CutsceneEvent:
+                    var element = ItemRefs.ResolveCutsceneElement(session, parsed);
+                    return (null, ThnLocation.Of(session.Cutscene(element.Path), element));
+                default:
+                    return (ItemRefs.ResolveSection(session, parsed), null);
+            }
         }
         catch (Exception e) when (e is EditException or ArgumentException)
         {
-            return null;
+            return default;
         }
     }
 
@@ -261,8 +275,21 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
             .Where(e => filter.Source == null || e.Source.Equals(filter.Source, StringComparison.OrdinalIgnoreCase))
             .Where(e => e.Origin.Kind != OriginKind.Pending && (filter.BaseGame || !e.Origin.IsBaseGame))
             .Select(e => new AgentConsoleEntry(e.Sequence, e.Time.ToUniversalTime(), Severity(e.Severity), e.Source, e.Message,
-                e.Target is { } target && session != null ? ItemRefs.Canonical(session, target) : null, e.Origin.Kind))
+                session == null ? null
+                : e.Target is { } target ? ItemRefs.Canonical(session, target)
+                : e.Cutscene is { } place ? RefOf(session, place) : null, e.Origin.Kind))
             .ToList();
+    }
+
+    /// <summary>The item reference of the place of an entry in a cutscene: the element that the place names in W now
+    /// (see <see cref="ThnLocation.ElementIn"/>), or else the cutscene.</summary>
+    private static string RefOf(EditSession session, ThnLocation place)
+    {
+        var path = VfsPath.Normalize(place.Path) ?? place.Path;
+        var script = session.Cutscene(path);
+        return script != null && place.Kind is { } kind && place.ElementIn(script) is { } element
+            ? ItemRefs.Of(script, new ThnRef(path, kind, element.Id))
+            : CutsceneQueries.Ref(path);
     }
 
     /// <summary>

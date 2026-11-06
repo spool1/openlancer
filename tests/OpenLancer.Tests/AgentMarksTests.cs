@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Missions;
+using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Agent;
+using OpenLancer.Editor.Cutscene;
 using OpenLancer.Editor.Hierarchy;
 using Xunit;
 using static OpenLancer.Tests.SceneWorkspace;
@@ -170,6 +172,50 @@ public sealed class AgentMarksTests
         Assert.Equal([header], edited);
         Assert.Empty(MarkedRows(m, marks));
     }
+
+    /// <summary>The row of a cutscene in the Hierarchy shows the robot glyph after an agent edit of its script, also of
+    /// a new script. An undo removes the glyph, a redo puts it back, and a save clears it. An edit of the user gives no
+    /// glyph. The history records a cutscene change by the path of its script, so the rows of the entities have no glyph
+    /// (section 8.5 of the MCP1 design).</summary>
+    [Fact]
+    public void TheRowOfACutsceneHasTheGlyphAfterAnAgentEditUntilTheUndoOrTheSave()
+    {
+        using var ws = ThnSessions.Workspace();
+        var session = ws.Session("act");
+        var marks = Marks();
+        marks.Track(session);
+        var host = new TestAgentHost(session);
+        var script = AgentCalls.Json("thn:" + ThnSessions.ScriptPath);
+        var root = CutsceneTree(session).Root;
+        var cutscene = Assert.IsType<CutsceneRoot>(root.Item);
+
+        using (var user = session.BeginBatch("Set duration"))
+        {
+            user.Run(ThnEdits.SetDuration(ThnSessions.ScriptPath, 11));
+            user.Commit();
+        }
+        Assert.False(marks.Marked(cutscene));
+
+        AgentCalls.Ok(host, "cutscene_set_duration", $$"""{ "cutscene": {{script}}, "seconds": 12 }""");
+        Assert.True(marks.Marked(cutscene));
+        Assert.True(marks.Marked(new CutsceneRoot(ThnSessions.ScriptPath.ToLowerInvariant())));
+        Assert.Empty(marks.Pulses());
+        session.Undo();
+        Assert.False(marks.Marked(cutscene));
+        session.Redo();
+        Assert.True(marks.Marked(cutscene));
+
+        AgentCalls.Ok(host, "cutscene_create", """{ "name": "my_intro" }""");
+        Assert.True(marks.Marked(new CutsceneRoot(Assert.Single(session.NewCutscenes))));
+        Assert.True(session.Save().Saved);
+        Assert.False(marks.Marked(cutscene));
+        Assert.Empty(session.AgentCutscenes);
+    }
+
+    /// <summary>The tree of the cutscene script of <see cref="ThnSessions"/> in the Hierarchy.</summary>
+    private static HierarchyModel CutsceneTree(EditSession session) =>
+        HierarchyModel.ForCutscene(TimelineModel.Build(ThnSessions.ScriptPath, ThnSessions.W(session),
+            ThnScripts.Evaluator.Symbols, OpenLancer.Runtime.Thn.ScriptPlay.Normal), null);
 
     /// <summary>The tree of the test mission now.</summary>
     private static HierarchyModel Tree(MissionEdits m) =>

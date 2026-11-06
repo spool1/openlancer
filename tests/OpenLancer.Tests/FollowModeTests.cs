@@ -2,7 +2,9 @@ using System.Linq;
 using System.Numerics;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Missions;
+using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Agent;
+using OpenLancer.Editor.Cutscene;
 using Xunit;
 using static OpenLancer.Tests.AgentCalls;
 
@@ -10,8 +12,8 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// Follow mode of the agent edits (section 8.5 of the MCP1 design, decisions D719 and D720), with the editor host and a
-/// fake view of the window. With follow mode on, the editor opens and frames the item of each agent edit, and the
-/// selection follows Unity. With follow mode off, the agent never changes the view or the selection, except that a
+/// fake view of the window. With follow mode on, the editor opens and frames the item of each agent edit, also in the
+/// Mission tab and in the Cutscene tab, and the selection follows Unity. With follow mode off, the agent never changes the view or the selection, except that a
 /// selected section that an agent edit removes goes.
 /// </summary>
 public sealed class FollowModeTests
@@ -650,5 +652,145 @@ public sealed class FollowModeTests
             """));
         Assert.Empty(view.MissionShown);
         Assert.Equal(new SectionRef(MissionEdits.Ships, new SectionIdentity("NPCShipArch", "ol_build_1")), view.Selection);
+    }
+
+    /// <summary>The editor host of a session with the cutscene script of <see cref="ThnSessions"/>.</summary>
+    private static (TestWorkspace Ws, EditSession Session, FakeAgentEditor Editor, EditorAgentHost Host) Cutscenes()
+    {
+        var ws = ThnSessions.Workspace();
+        var session = ws.Session("act");
+        var editor = new FakeAgentEditor { Edits = session };
+        return (ws, session, editor, new EditorAgentHost(editor));
+    }
+
+    private const string Script = "thn:" + ThnSessions.ScriptPath;
+
+    /// <summary>An agent add in a cutscene opens the script in the Cutscene tab and selects the new element, as an add of
+    /// the user selects the new event (decision D249). A new script opens and gets the selection. The Scene and the
+    /// Mission tab do not change.</summary>
+    [Fact]
+    public void AnAgentAddInACutsceneOpensTheScriptAndSelectsTheNewElement()
+    {
+        var (ws, session, editor, host) = Cutscenes();
+        using var _ = ws;
+        var view = editor.FollowView;
+        view.Selection = ThnSessions.Event(session, 0);
+
+        Ok(host, "cutscene_add_event", $$"""{ "cutscene": {{Json(Script)}}, "type": "START_PSYS", "time": 1.5, "targets": ["Fx"] }""");
+        var added = ThnSessions.Event(session, ThnSessions.W(session).Events.Count - 1);
+        Assert.Equal([(ThnSessions.ScriptPath, (ThnRef?)added, true)], view.CutsceneShown);
+        Assert.Equal(added, view.Selection);
+
+        Ok(host, "cutscene_create", """{ "name": "my_intro" }""");
+        var created = Assert.Single(session.NewCutscenes);
+        Assert.Equal((created, (ThnRef?)null, true), view.CutsceneShown[^1]);
+        Assert.Equal(new CutsceneRoot(created), view.Selection);
+        Assert.Empty(view.Shown);
+        Assert.Empty(view.MissionShown);
+    }
+
+    /// <summary>An agent change or rename in a cutscene opens the script and keeps the selection, as a change in the
+    /// Scene does. A rename keeps the element, because an element keeps its id.</summary>
+    [Fact]
+    public void AChangeOrARenameInACutsceneOpensTheScriptAndKeepsTheSelection()
+    {
+        var (ws, session, editor, host) = Cutscenes();
+        using var _ = ws;
+        var view = editor.FollowView;
+        var selected = ThnSessions.Entity(session, "Fx");
+        view.Selection = selected;
+
+        Ok(host, "set_fields", $$"""{ "ref": {{Json(Script + "#event/1")}}, "fields": { "props.duration": 4 } }""");
+        Ok(host, "rename_item", $$"""{ "ref": {{Json(Script + "#entity/Fx")}}, "new_name": "Fx_new", "confirm": true }""");
+
+        Assert.Equal([(ThnSessions.ScriptPath, (ThnRef?)ThnSessions.Event(session, 1), false),
+            (ThnSessions.ScriptPath, (ThnRef?)ThnSessions.Entity(session, "Fx_new"), false)], view.CutsceneShown);
+        Assert.Equal(selected, view.Selection);
+        Assert.Equal(selected, ThnSessions.Entity(session, "Fx_new"));
+    }
+
+    /// <summary>An agent delete in a cutscene opens the script and selects the cutscene, as a delete of the user in the
+    /// Timeline does. An undo of the agent then selects the deleted event again (decision D249). The reference of the
+    /// delete gives the index before the call, so the undo finds the same event.</summary>
+    [Fact]
+    public void ADeleteInACutsceneSelectsTheCutsceneAndAnAgentUndoSelectsTheEventAgain()
+    {
+        var (ws, session, editor, host) = Cutscenes();
+        using var _ = ws;
+        var view = editor.FollowView;
+        view.Selection = ThnSessions.Event(session, 2);
+
+        Ok(host, "delete_items", $$"""{ "refs": [{{Json(Script + "#event/2")}}] }""");
+        Assert.Equal((ThnSessions.ScriptPath, (ThnRef?)null, true), view.CutsceneShown[^1]);
+        Assert.Equal(new CutsceneRoot(ThnSessions.ScriptPath), view.Selection);
+
+        Ok(host, "undo");
+        var restored = ThnSessions.Event(session, 2);
+        Assert.Equal((ThnSessions.ScriptPath, (ThnRef?)restored, true), view.CutsceneShown[^1]);
+        Assert.Equal(restored, view.Selection);
+    }
+
+    /// <summary>When the Cutscene tab cannot open the script, for example while the game data loads, a delete clears the
+    /// selection, and an add changes nothing of the view.</summary>
+    [Fact]
+    public void ACutsceneThatTheTabCannotOpenChangesNoView()
+    {
+        var (ws, session, editor, host) = Cutscenes();
+        using var _ = ws;
+        var view = editor.FollowView;
+        view.CanShowCutscene = false;
+        var selected = ThnSessions.Event(session, 0);
+        view.Selection = selected;
+
+        Ok(host, "cutscene_add_event", $$"""{ "cutscene": {{Json(Script)}}, "type": "START_PSYS", "time": 1.5, "targets": ["Fx"] }""");
+        Assert.Equal(selected, view.Selection);
+        Ok(host, "delete_items", $$"""{ "refs": [{{Json(Script + "#event/2")}}] }""");
+
+        Assert.Null(view.Selection);
+        Assert.Empty(view.CutsceneShown);
+        Assert.Empty(view.Shown);
+    }
+
+    /// <summary>With follow mode off, an agent edit of a cutscene changes nothing of the view and the selection
+    /// (decision D720). An agent undo of a delete selects nothing.</summary>
+    [Fact]
+    public void WithFollowModeOffACutsceneEditChangesNothing()
+    {
+        var (ws, session, editor, host) = Cutscenes();
+        using var _ = ws;
+        editor.Follow.Set(false);
+        var view = editor.FollowView;
+        var selected = ThnSessions.Event(session, 0);
+        view.Selection = selected;
+
+        Ok(host, "cutscene_add_event", $$"""{ "cutscene": {{Json(Script)}}, "type": "START_PSYS", "time": 1.5, "targets": ["Fx"] }""");
+        Ok(host, "cutscene_set_duration", $$"""{ "cutscene": {{Json(Script)}}, "seconds": 12 }""");
+        Ok(host, "delete_items", $$"""{ "refs": [{{Json(Script + "#event/2")}}] }""");
+        Ok(host, "undo");
+
+        Assert.Empty(view.CutsceneShown);
+        Assert.Equal(selected, view.Selection);
+    }
+
+    /// <summary>A selection of the user in the Timeline or in the Hierarchy of a cutscene stops follow mode, as a
+    /// selection in the Scene does. The selection of follow mode comes in the session part of the call, before the panels
+    /// draw, so it is not a selection of the user. The camera of the Cutscene view is not the camera of the Scene, so a
+    /// frame without a selection and without a move of the Scene camera does not stop follow mode.</summary>
+    [Fact]
+    public void ASelectionOfTheUserInACutsceneStopsFollowMode()
+    {
+        var (ws, session, editor, host) = Cutscenes();
+        using var _ = ws;
+        var follow = editor.Follow;
+        var view = editor.FollowView;
+
+        Ok(host, "cutscene_add_event", $$"""{ "cutscene": {{Json(Script)}}, "type": "START_PSYS", "time": 1.5, "targets": ["Fx"] }""");
+        var added = view.Selection;
+        follow.Watch(Frame(added, added, input: true));
+        Assert.True(follow.On);
+
+        follow.Watch(Frame(added, ThnSessions.Event(session, 0), input: true));
+        Assert.False(follow.On);
+        Assert.True(editor.Settings.FollowAgent);
     }
 }

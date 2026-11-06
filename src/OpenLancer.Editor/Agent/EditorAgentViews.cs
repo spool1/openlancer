@@ -283,18 +283,30 @@ internal sealed class EditorAgentViews(EditorWindow window) : IAgentViews
     /// <param name="field">The argument that names the cutscene, for the error.</param>
     private void OpenCutscene(string path, string field)
     {
-        if (VfsPath.Comparer.Equals(window.Cutscenes.Path, path))
-        {
-            window.ShowPanel(Cutscene.CutsceneView.PanelId);
-            window.ShowPanel(TimelinePanel.PanelId);
-            return;
-        }
-
-        if (!window.Cutscenes.OpenAndShow(path))
+        if (!ShowCutscene(path))
         {
             throw Refused("NoCutscene", AgentTexts.Error("view_cutscene_failed", ("cutscene", path),
                 ("reason", window.Cutscenes.Problem ?? "")), field);
         }
+    }
+
+    /// <summary>
+    /// Opens a cutscene in the Cutscene tab and shows the tab and the Timeline, for the view tools and for follow mode.
+    /// The open cutscene stays as it is, so its preview keeps its playhead. The open of another cutscene selects that
+    /// cutscene.
+    /// </summary>
+    /// <returns>False when the cutscene does not open. <see cref="CutsceneWorkspace.Problem"/> then tells why, and the
+    /// Console has a warning.</returns>
+    internal bool ShowCutscene(string path)
+    {
+        if (VfsPath.Comparer.Equals(window.Cutscenes.Path, path))
+        {
+            window.ShowPanel(Cutscene.CutsceneView.PanelId);
+            window.ShowPanel(TimelinePanel.PanelId);
+            return true;
+        }
+
+        return window.Cutscenes.OpenAndShow(path);
     }
 
     /// <summary>The loaded game data of the open profile.</summary>
