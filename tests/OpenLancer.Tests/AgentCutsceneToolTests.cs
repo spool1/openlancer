@@ -22,7 +22,7 @@ namespace OpenLancer.Tests;
 /// 12: one entry with the edit origin Agent, the preview, the parity with the UI path, the error codes, the limit, the
 /// event guards (decision D767) and the write scope.
 /// </summary>
-public sealed class AgentCutsceneToolTests
+public sealed partial class AgentCutsceneToolTests
 {
     private const string Script = "thn:" + ScriptPath;
     private const string NewPath = @"DATA\MODS\act\CUTSCENES\my_intro.thn";
