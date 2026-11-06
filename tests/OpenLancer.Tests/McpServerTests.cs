@@ -219,8 +219,9 @@ public sealed class McpServerTests
         Assert.Equal(["application/json", "application/json", "application/json", "application/json", "application/json",
             "text/plain", "text/plain"], resources.Select(r => r.MimeType));
         var catalog = JsonNode.Parse(Assert.IsType<TextResourceContents>(Assert.Single(lists.Contents)).Text)!;
-        Assert.Equal(59, catalog["lists"]!.AsArray().Count);
+        Assert.Equal(60, catalog["lists"]!.AsArray().Count);
         Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "object_of_system" && (bool)l["one_system"]!);
+        Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "costume");
         var guide = Assert.IsType<TextResourceContents>(Assert.Single(refs.Contents)).Text;
         Assert.Contains("thn:<install path>#event/<index>", guide);
         // The catalog of the prefabs gives the references of both forms.
