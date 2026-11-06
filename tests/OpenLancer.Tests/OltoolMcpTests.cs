@@ -20,7 +20,8 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// <c>oltool mcp</c> (section 6.2 and section 13, items 1.1, 2.6 and 3 of the MCP1 design). The tests cover the
-/// snapshot of the tool list and the end-to-end tests of the server without a window. A test starts <c>oltool mcp serve</c> as a child
+/// snapshot of the tool list and the end-to-end tests of the server without a window, also workflows 2, 3 and 4 of
+/// section 9.5. A test starts <c>oltool mcp serve</c> as a child
 /// process through the stdio client of the SDK. It calls the tools, stops the server, and replays the recorded calls
 /// with <c>oltool mcp replay</c>.
 /// </summary>
@@ -596,6 +597,189 @@ public sealed class OltoolMcpTests
 
         Assert.True(replay.Exit == 0, replay.Errors);
         Assert.Equal(TestWorkspace.Files(ws.ModFolder("act")), TestWorkspace.Files(copy.ModFolder("act")));
+    }
+
+    /// <summary>The new cutscene script of workflow 4 in the active mod <c>act</c>.</summary>
+    private const string Intro = @"DATA\MODS\act\CUTSCENES\my_intro.thn";
+
+    /// <summary>The workspace of workflow 4: the files of <see cref="ThnSessions"/>, and a costume file that
+    /// <c>freelancer.ini</c> names, for the list <c>costume</c>. All names are invented.</summary>
+    private static TestWorkspace CutsceneWorkspace()
+    {
+        var ws = ThnSessions.Workspace();
+        ws.WriteBase(@"EXE\freelancer.ini", "[Freelancer]\ndata path = ..\\data\n\n[Data]\ncostumes = characters\\costumes.ini\n\n" +
+                                            TestWorkspace.ResourcesSection);
+        ws.WriteBase(@"DATA\CHARACTERS\costumes.ini", "[Costume]\nnickname = my_costume\nbody = my_body\nhead = my_head\n");
+        return ws;
+    }
+
+    /// <summary>The entities and the events of a <c>get_cutscene</c> result as lines of text, to compare two
+    /// reads.</summary>
+    private static string[] CutsceneLines(JsonElement view) =>
+    [
+        $"duration {view.GetProperty("duration").GetDouble()}",
+        .. view.GetProperty("entities").EnumerateArray().Select(e =>
+            $"{Text(e, "type")} {Text(e, "name")} {(e.TryGetProperty("template", out var t) ? t.GetString() : null)}"),
+        .. view.GetProperty("events").EnumerateArray().Select(e =>
+            $"{e.GetProperty("time").GetDouble()} {Text(e, "type")} {string.Join(", ", Texts(e.GetProperty("targets")))}"),
+    ];
+
+    /// <summary>
+    /// The end-to-end test of workflow 4 of section 9.5 of the MCP1 design, through the server without a window (step 7
+    /// of MCP1-4). The agent makes a room cutscene of 8 s with a second camera, a character with a costume of the
+    /// data and a marker. It adds a camera move with its end position and a cut to the second camera. A camera as the
+    /// target of a motion gives <c>refused</c> with the types that fit, and a stale event reference gives
+    /// <c>stale_revision</c>. The agent moves the cut, undoes a wrong duration, checks and saves. A new server reads
+    /// the cutscene back. A replay of the recorded calls on a fresh copy exits 0 and gives the same files of the mod.
+    /// The step <c>render_cutscene</c> needs the editor, so the manual check covers it.
+    /// </summary>
+    [Fact]
+    public async Task WorkflowFourThroughTheServerSavesAndTheReplayGivesTheSameFiles()
+    {
+        using var ws = CutsceneWorkspace();
+        using var copy = CutsceneWorkspace();
+        var calls = new CallLog();
+        var script = Json($"thn:{Intro}");
+        string Event(int index) => $"thn:{Intro}#event/{index}";
+        string[] read;
+
+        await using (var server = await Server.Start(ws.ProfilePath))
+        {
+            var client = server.Client;
+            Task<JsonElement> Call(string tool, string arguments = "{}") => calls.Call(client, tool, arguments);
+
+            // 1. and 2. A new script of 8 s.
+            var status = await Call("studio_status");
+            var created = await Call("cutscene_create", """{ "name": "my_intro", "duration": 8 }""");
+
+            // 3. A second camera, a character with a costume of the data, and a marker.
+            var costume = First(await Call("list_values", """{ "list": "costume" }"""));
+            var camera = await Call("cutscene_add_entity",
+                $$"""{ "cutscene": {{script}}, "type": "CAMERA", "name": "my_cam_2", "position": [30, 10, 0] }""");
+            var character = await Call("cutscene_add_entity", $$"""
+                { "cutscene": {{script}}, "type": "DEFORMABLE", "name": "my_char", "template": {{Json(costume)}},
+                  "position": [0, 0, -20] }
+                """);
+            await Call("cutscene_add_entity",
+                $$"""{ "cutscene": {{script}}, "type": "MARKER", "name": "my_mark", "position": [0, 0, -25] }""");
+
+            // 4. A camera move of 4 s, then the end position on the new event, with the guards of the event.
+            var move = await Call("cutscene_add_event", $$"""
+                { "cutscene": {{script}}, "type": "START_SPATIAL_PROP_ANIM", "time": 0, "targets": ["Camera_01"], "length": 4 }
+                """);
+            var end = await Call("set_fields", $$"""
+                { "ref": {{Json(Event(1))}}, "expect_type": "START_SPATIAL_PROP_ANIM", "expect_time": 0,
+                  "fields": { "props.spatialprops.pos": [0, 5, -10] } }
+                """);
+
+            // 5. The cut to the second camera at 4 s.
+            var cut = await Call("cutscene_add_event",
+                $$"""{ "cutscene": {{script}}, "type": "SET_CAMERA", "time": 4, "targets": ["Monitor", "my_cam_2"] }""");
+
+            // 6. A camera does not play a motion. The error names the types that fit.
+            var motion = await calls.Error(client, "cutscene_add_event",
+                $$"""{ "cutscene": {{script}}, "type": "START_MOTION", "time": 1, "targets": ["my_cam_2"] }""", "refused");
+
+            // 7. A guard with another time refuses the event reference, and nothing changes.
+            var stale = await calls.Error(client, "cutscene_move_events", $$"""
+                { "events": [ { "ref": {{Json(Event(2))}}, "expect_type": "SET_CAMERA", "expect_time": 3 } ], "time_delta": 0.5 }
+                """, "stale_revision");
+
+            // 8. The cut moves 0.5 s after the end of the camera move.
+            var moved = await Call("cutscene_move_events", $$"""
+                { "events": [ { "ref": {{Json(Event(2))}}, "expect_type": "SET_CAMERA", "expect_time": 4 } ], "time_delta": 0.5 }
+                """);
+
+            // 9. A wrong duration and its undo. W has the duration 8 again, and the move stays.
+            await Call("cutscene_set_duration", $$"""{ "cutscene": {{script}}, "seconds": 3 }""");
+            var undone = await Call("undo");
+            var view = await Call("get_cutscene", $$"""{ "ref": {{script}} }""");
+
+            // 10. Check, then save.
+            var check = await Call("check", $$"""{ "scope": "cutscene", "ref": {{script}} }""");
+            var saved = await Call("save");
+
+            Assert.True(status.GetProperty("can_edit").GetBoolean());
+            Assert.Equal([$"thn:{Intro}"], Texts(created.GetProperty("adds")));
+            Assert.Equal([$"thn:{Intro}#entity/my_cam_2"], Texts(camera.GetProperty("adds")));
+            Assert.Equal([$"thn:{Intro}#entity/my_char"], Texts(character.GetProperty("adds")));
+            Assert.Empty(character.GetProperty("new_problems").EnumerateArray());
+            Assert.Equal([Event(1)], Texts(move.GetProperty("adds")));
+            Assert.Equal([Event(1)], Texts(end.GetProperty("changes")));
+            Assert.Equal([Event(2)], Texts(cut.GetProperty("adds")));
+            Assert.Equal("TargetType", Text(motion, "detail"));
+            Assert.Equal("START_MOTION needs a DEFORMABLE or COMPOUND as target 1. The entity my_cam_2 is a CAMERA.",
+                Text(motion, "message"));
+            Assert.Equal(("RowChanged", "events[0].ref"), (Text(stale, "detail"), Text(stale, "field")));
+            Assert.Equal([Event(2)], Texts(moved.GetProperty("changes")));
+            Assert.Equal("Agent: Set duration", Text(undone, "label"));
+            read = CutsceneLines(view);
+            Assert.Equal([
+                "duration 8",
+                "SCENE Scene ", "MONITOR Monitor ", "CAMERA Camera_01 ", "CAMERA my_cam_2 ", $"DEFORMABLE my_char {costume}",
+                "MARKER my_mark ",
+                "0 SET_CAMERA Monitor, Camera_01", "0 START_SPATIAL_PROP_ANIM Camera_01", "4.5 SET_CAMERA Monitor, my_cam_2",
+            ], read);
+            var cameraMove = view.GetProperty("events")[1];
+            Assert.Equal(4, cameraMove.GetProperty("length").GetDouble());
+            Assert.Equal([0.0, 5, -10], cameraMove.GetProperty("fields").GetProperty("props.spatialprops.pos").EnumerateArray()
+                .Select(v => v.GetDouble()));
+            Assert.Equal(0, check.GetProperty("errors").GetInt32());
+            Assert.Empty(check.GetProperty("problems").EnumerateArray());
+            Assert.True(saved.GetProperty("saved").GetBoolean(), saved.GetRawText());
+        }
+
+        // The mod has the new script as a whole file in its cutscene folder, and no recovery file.
+        Assert.True(File.Exists(Path.Combine(ws.ModFolder("act"), "files", Intro)));
+        Assert.False(File.Exists(RecoveryFile.PathOf(ws.ModFolder("act"))));
+
+        // 11. A new server on the same mod reads the cutscene back as the agent saved it.
+        await using (var again = await Server.Start(ws.ProfilePath))
+        {
+            var view = await again.Client.CallToolAsync("get_cutscene", Arguments($$"""{ "ref": {{script}} }"""),
+                cancellationToken: Token);
+
+            Assert.NotEqual(true, view.IsError);
+            Assert.Equal(read, CutsceneLines(view.StructuredContent!.Value));
+        }
+
+        // 12. The replay of the recorded calls on a fresh copy gives the same files of the mod.
+        var replay = calls.Replay(copy);
+
+        Assert.True(replay.Exit == 0, replay.Errors);
+        Assert.Equal(TestWorkspace.Files(ws.ModFolder("act")), TestWorkspace.Files(copy.ModFolder("act")));
+    }
+
+    /// <summary>The server makes a new cutscene and ends without a save and without the end of stdin. The recovery
+    /// file then has the new script, and a new session finds it (section 13.2, item 6 of the MCP1 design, for a
+    /// cutscene). The mod folder has no script file, because nothing saved.</summary>
+    /// <remarks>The test waits for the file before it ends the process, as
+    /// <see cref="AnEditStaysInTheRecoveryFileWhenTheServerEndsWithoutTheEndOfStdin"/> does.</remarks>
+    [Fact]
+    public async Task ANewCutsceneStaysInTheRecoveryFileWhenTheServerEndsWithoutASave()
+    {
+        using var ws = CutsceneWorkspace();
+        var recovery = RecoveryFile.PathOf(ws.ModFolder("act"));
+
+        await using (var server = await Server.Start(ws.ProfilePath))
+        {
+            var created = await server.Client.CallToolAsync("cutscene_create",
+                Arguments("""{ "name": "my_intro", "duration": 8 }"""), cancellationToken: Token);
+            Assert.NotEqual(true, created.IsError);
+            await Task.Delay(TimeSpan.FromSeconds(3), Token);
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+            while (!File.Exists(recovery) && DateTime.UtcNow < deadline)
+                await Task.Delay(100, Token);
+            server.Kill();
+        }
+        var session = ws.Session("act");
+
+        Assert.True(File.Exists(recovery));
+        Assert.False(File.Exists(Path.Combine(ws.ModFolder("act"), "files", Intro)));
+        Assert.True(session.HasRecovery);
+        Assert.Empty(session.RestoreRecovery());
+        Assert.Equal([Intro], session.NewCutscenes);
+        Assert.Equal(8, session.Cutscene(Intro)!.Duration);
     }
 
     [Fact]
