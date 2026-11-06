@@ -2,7 +2,7 @@
 
 [![Join the OpenLancer Discord server](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/BUh3nucfmP)
 
-OpenLancer makes Freelancer (2003) openly moddable. It adds a mod overlay with a load order, and an editor for the game content. The editor has data editors, a 3D scene editor for star systems, a mission studio, and a cutscene editor. An MCP server lets AI agents read the game content, see the editor views and edit the systems, the data and the missions of a mod. Cutscene edits for agents come next. OpenLancer runs on its own fork of the [Librelancer](https://codeberg.org/Librelancer/Librelancer) engine. The fork is a git submodule at `external/Librelancer` (see docs/UPSTREAM.md).
+OpenLancer makes Freelancer (2003) openly moddable. It adds a mod overlay with a load order, and an editor for the game content. The editor has data editors, a 3D scene editor for star systems, a mission studio, and a cutscene editor. An MCP server lets AI agents read the game content, see the editor views and edit the systems, the data, the missions and the cutscenes of a mod. OpenLancer runs on its own fork of the [Librelancer](https://codeberg.org/Librelancer/Librelancer) engine. The fork is a git submodule at `external/Librelancer` (see docs/UPSTREAM.md).
 
 ![The OpenLancer editor: the Scene view of New York (Li01) with the Hierarchy and the Assets panel](docs/images/editor-view.gif)
 
@@ -151,7 +151,7 @@ Open the Cutscenes tab of the editor to browse the retail cutscenes and the cuts
 
 ## Agents (MCP)
 
-OpenLancer has an agent server: an MCP (Model Context Protocol) server. An AI agent, for example Claude Code, uses it. The agent reads the game content of a profile, sees the views of the editor and edits the active mod. The goal is that agents make content with the same tools as a modder: systems and areas, NPC ships, loot wrecks, missions and cutscenes. The agent edits the items of the systems, the data and the mission scripts of the active mod now. It also runs a mission in a dry run, saves, exports and starts Play, also a play of a mission from a trigger. The cutscene edit tools come next.
+OpenLancer has an agent server: an MCP (Model Context Protocol) server. An AI agent, for example Claude Code, uses it. The agent reads the game content of a profile, sees the views of the editor and edits the active mod. The goal is that agents make content with the same tools as a modder: systems and areas, NPC ships, loot wrecks, missions and cutscenes. The agent edits the items of the systems, the data, the mission scripts and the cutscenes of the active mod now. It also runs a mission in a dry run, saves, exports and starts Play, also a play of a mission from a trigger.
 
 **Connect an agent**
 
@@ -180,17 +180,12 @@ Without the editor, `oltool mcp serve <profile.json> --mod <id>` starts the same
 | Cutscenes | `list_cutscenes`, `get_cutscene` | The cutscene scripts with their entities and events |
 | Checks | `check`, `get_console` | The problems of the mod, and the Console of the editor |
 | Views (editor only) | `open_view`, `select_items`, `render_scene`, `render_cutscene`, `capture_panel` | Open a system, a mission or a cutscene, select an item, and get images of the Scene, a cutscene frame or a panel. The views of the user do not move. |
-| Edits | `set_fields`, `set_text`, `rename_item`, `delete_items`, `duplicate_items`, `undo`, `redo`, `edit_batch` | Change the fields, the texts and the nicknames of items, delete and copy items of a system and mission items, and undo the edits of the agent |
+| Edits | `set_fields`, `set_text`, `rename_item`, `delete_items`, `duplicate_items`, `undo`, `redo`, `edit_batch` | Change the fields, the texts and the nicknames of items, delete and copy items of a system, mission items and cutscene items, and undo the edits of the agent |
 | Scene and data | `scene_create_object`, `scene_create_zone`, `scene_create_light`, `scene_spawn_asset`, `scene_transform`, `scene_set_component`, `scene_place_wreck`, `scene_place_patrol_route`, `scene_set_encounters`, `prop_group_place`, `prop_group_save`, `prop_group_rename`, `prop_group_delete`, `create_loadout`, `create_from_template` | Create and move the items of a system, place wrecks, patrol routes and prop groups, and make loadouts and items from templates |
 | Mission edits | `mission_edit`, `mission_add_trigger`, `mission_set_condition`, `mission_add_action`, `mission_set_action`, `mission_move_action`, `mission_link_triggers`, `mission_insert_trigger`, `mission_add_item`, `mission_place_prefab` | Add and change triggers, conditions and actions, add ships, NPCs and other mission items, and place behavior prefabs. The tools use the commands of the mission studio, and the checks refuse each edit that adds an error. |
+| Cutscene edits | `cutscene_create`, `cutscene_add_entity`, `cutscene_add_event`, `cutscene_move_events`, `cutscene_set_duration`, `cutscene_set_flags` | Make a cutscene script, add entities and events, move events in time, and set the duration and the flags of entities. The tools use the commands of the Cutscene tab, and the target of each event must fit its type. |
 | Save, export and Play | `save`, `export_mod`, `publish_checklist`, `play`, `play_stop`, `mission_play`, `mission_play_trace` | Save the active mod, export it, give the publish checklist, start and stop Play, and play a mission from a trigger with the trace of its triggers (editor only) |
 
-The server also gives the rules of the missions and the catalog of the prefabs as resources. Its prompt `two_trigger_mission` gives the steps of a mission with two triggers.
+The server also gives the rules of the missions, the catalog of the prefabs and the event types of the cutscenes as resources. Its prompts `two_trigger_mission` and `short_cutscene` give the steps of a mission with two triggers and of a short cutscene.
 
-**Tools that come next (edits)**
-
-| Part | Tools |
-|---|---|
-| Cutscene edits | `cutscene_create`, `cutscene_add_entity`, `cutscene_add_event`, `cutscene_move_events`, `cutscene_set_duration`, `cutscene_set_flags` |
-
-Examples of requests to an agent now: "Show me an image of New York from above." "Which triggers of Mission 4 spawn ships, and when?" "Run Mission 1 in a dry run up to the first checkpoint, and tell me which triggers wait." "Make a patrol route with three legs in New York, put a wreck with cargo at its end, and save the mod." "Add a pirate ambush with two triggers after the launch of Mission 2, and run it in a dry run."
+Examples of requests to an agent now: "Show me an image of New York from above." "Which triggers of Mission 4 spawn ships, and when?" "Run Mission 1 in a dry run up to the first checkpoint, and tell me which triggers wait." "Make a patrol route with three legs in New York, put a wreck with cargo at its end, and save the mod." "Add a pirate ambush with two triggers after the launch of Mission 2, and run it in a dry run." "Make a short cutscene with two cameras, a character and a cut, and show me two images of it."
