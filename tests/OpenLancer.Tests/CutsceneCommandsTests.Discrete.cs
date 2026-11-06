@@ -182,7 +182,7 @@ public sealed partial class CutsceneCommandsTests
     /// <summary>
     /// A rename gives the W of the session command. Uses of the old name in other data make the plan ask first
     /// (decision D242). A name of another entity refuses with the detail NameTaken, in any letter case, and the entity
-    /// can take its own name in another letter case.
+    /// can take its own name in another letter case. A name that a save cannot write refuses with NameInvalid.
     /// </summary>
     [Fact]
     public void RenameEntityGivesTheWOfTheRenameAndAsksWhenOtherDataUsesTheName()
@@ -199,6 +199,8 @@ public sealed partial class CutsceneCommandsTests
         Assert.True(used.CanRun && used.NeedsConfirmation);
         AssertRefused(session, CutsceneCommands.RenameEntity(session, trent, "MONITOR", []),
             "Another entity has the name MONITOR.", MissionErrors.NameTaken);
+        AssertRefused(session, CutsceneCommands.RenameEntity(session, trent, "Char_\xFC", []),
+            ThnWriter.TextProblem("Char_\xFC")!, MissionErrors.NameInvalid);
         Assert.True(CutsceneCommands.RenameEntity(session, trent, "CHAR_TRENT", []).CanRun);
     }
 
@@ -423,21 +425,30 @@ public sealed partial class CutsceneCommandsTests
 
     /// <summary>
     /// An unknown type refuses with the detail FieldValue, an empty name with NameInvalid, and a name of another
-    /// entity in other letter case with NameTaken. A place for a MONITOR or a SCENE refuses with NoPlace, and a second
-    /// SCENE with OneScene.
+    /// entity in other letter case with NameTaken. A name that a save cannot write refuses with NameInvalid, and such a
+    /// template with FieldValue. A place for a MONITOR or a SCENE refuses with NoPlace, and a second SCENE with
+    /// OneScene.
     /// </summary>
     [Fact]
     public void AddEntityRefusesATypeANameAPlaceAndASecondScene()
     {
         using var ws = Workspace();
         var session = ws.Session("act");
-        CutscenePlan Add(string type, string name, Vector3? position = null, Matrix4x4? rotation = null) =>
-            CutsceneCommands.AddEntity(session, ScriptPath, type, name, null, position, rotation);
+        CutscenePlan Add(string type, string name, Vector3? position = null, Matrix4x4? rotation = null,
+            string? template = null) =>
+            CutsceneCommands.AddEntity(session, ScriptPath, type, name, template, position, rotation);
 
         AssertRefused(session, Add("ROBOT", "r"), "ROBOT is not an entity type that the editor can add. The types are " +
                                                   string.Join(", ", ThnTemplates.EntityTypes) + ".", MissionErrors.FieldValue);
         AssertRefused(session, Add("MARKER", " "), "The name of an entity cannot be empty. Give a name.",
             MissionErrors.NameInvalid);
+        AssertRefused(session, Add("MARKER", "Kamera_\xFC"),
+            "The text \"Kamera_\xFC\" has the character U+00FC. A THN text must be ASCII without U+0000.",
+            MissionErrors.NameInvalid);
+        AssertRefused(session, Add("DEFORMABLE", "c", template: "kost\xFCm"), ThnWriter.TextProblem("kost\xFCm")!,
+            MissionErrors.FieldValue);
+        AssertRefused(session, Add("COMPOUND", "c", template: "box\0"), ThnWriter.TextProblem("box\0")!,
+            MissionErrors.FieldValue);
         AssertRefused(session, Add("MARKER", "CAM_a"), "Another entity has the name CAM_a.", MissionErrors.NameTaken);
         AssertRefused(session, Add("MONITOR", "m2", Vector3.One), ThnTemplates.NoPlace("MONITOR"), MissionErrors.NoPlace);
         AssertRefused(session, Add("SCENE", "s", rotation: Matrix4x4.Identity), ThnTemplates.NoPlace("SCENE"),

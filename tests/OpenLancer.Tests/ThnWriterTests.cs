@@ -224,6 +224,10 @@ public sealed class ThnWriterTests
         Assert.Throws<ArgumentException>(() => ThnWriter.Value(Record(F("clé", N(1)))));
         // The VM drops U+0000 at the end of a text (Undump.cs:69).
         Assert.Contains("U+0000", Assert.Throws<ArgumentException>(() => ThnWriter.Value(T("a\0"))).Message);
+        // TextProblem gives the reason of the writer without a write.
+        Assert.Equal(e.Message, ThnWriter.TextProblem("Café"));
+        Assert.Contains("U+0000", ThnWriter.TextProblem("a\0"));
+        Assert.Null(ThnWriter.TextProblem("Cafe \"1\"\n\x7F"));
         Assert.Contains("cannot be written", ThnWriter.RoundTripProblem(Record(F("x", T("é"))), Evaluator, "t"));
     }
 

@@ -13,7 +13,7 @@ namespace OpenLancer.DataTests;
 /// <summary>
 /// The lens of the camera of a new cutscene (decision D134, retail test 3 of the M8b design): the camera values of
 /// <see cref="ThnTemplates.NewScript"/> are the medians of the retail CAMERA entities in <c>SCRIPTS\BASES</c>. The light
-/// of a new LIGHT has the most common values of the retail lights.
+/// of a new LIGHT has the most common values of the retail lights. No retail script has two SCENE entities.
 /// </summary>
 public sealed class ThnTemplatesRetailTests(ITestOutputHelper output)
 {
@@ -104,6 +104,30 @@ public sealed class ThnTemplatesRetailTests(ITestOutputHelper output)
         Assert.Equal(Most("diffuse", v => v != black), ThnWriter.Value(light["diffuse"]!));
         foreach (var key in new[] { "direction", "range", "atten" })
             Assert.Equal(Most(key), ThnWriter.Value(light[key]!));
+    }
+
+    /// <summary>
+    /// No retail script has two SCENE entities (milestone MCP1-4). This fact is the reason why the command that adds an
+    /// entity refuses a second SCENE. Some retail scripts have no SCENE.
+    /// </summary>
+    [Fact]
+    public void NoRetailScriptHasTwoSceneEntities()
+    {
+        var fs = FileSystem.FromPath(GameDataPaths.RequireBase());
+        var evaluator = ThornEvaluator.Instance;
+        var scenes = new Dictionary<int, int>();
+        foreach (var file in VfsFiles.Find(fs, ".thn"))
+        {
+            var model = ThnScriptModel.From(evaluator.Evaluate(fs.ReadAllBytes(file), file), ThnElementId.Counter());
+            var count = model.Entities.Count(e =>
+                ThnSchema.TypeOf(ThnElementKind.Entity, e.Table, evaluator.Symbols) == "SCENE");
+            scenes[count] = scenes.GetValueOrDefault(count) + 1;
+        }
+
+        foreach (var (count, files) in scenes.OrderBy(s => s.Key))
+            output.WriteLine($"{files} scripts with {count} SCENE entities.");
+        Assert.True(scenes.GetValueOrDefault(1) > 1000, "Most retail scripts have one SCENE entity.");
+        Assert.All(scenes.Keys, count => Assert.InRange(count, 0, 1));
     }
 
     /// <summary>The median of the values: the value in the middle, or for an even count the lower of the two middle

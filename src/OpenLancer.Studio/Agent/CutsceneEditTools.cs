@@ -66,12 +66,15 @@ internal static class CutsceneEditTools
         var position = call.Args.Point("position");
         var degrees = call.Args.Point("orientation");
         var rotation = degrees is { } angles ? MathHelper.MatrixFromEulerDegrees(angles) : (Matrix4x4?)null;
-        var plan = CutsceneCommands.AddEntity(session, path, call.Args.Text("type")!, call.Args.Text("name")!.Trim(),
+        var type = call.Args.Text("type")!;
+        var plan = CutsceneCommands.AddEntity(session, path, type, call.Args.Text("name")!.Trim(),
             call.Args.Text("template"), position, rotation);
         Run(scope, plan, error => error.Detail switch
         {
             MissionErrors.NameTaken or MissionErrors.NameInvalid => "name",
             MissionErrors.NoPlace => position != null ? "position" : "orientation",
+            // A known type refuses only a value of its template.
+            MissionErrors.FieldValue when ThnTemplates.EntityTypes.Contains(type) => "template",
             MissionErrors.FieldValue or MissionErrors.OneScene => "type",
             _ => "cutscene",
         });

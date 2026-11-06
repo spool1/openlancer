@@ -183,6 +183,21 @@ public static class ThnWriter
         text.Append(']');
     }
 
+    /// <summary>Why the writer refuses a text, or null. A text must be ASCII without the character U+0000 (see
+    /// <see cref="WriteText"/>).</summary>
+    public static string? TextProblem(string value)
+    {
+        foreach (var c in value)
+        {
+            if (c is '\0' or > '\x7F')
+                return BadCharacter(value, c);
+        }
+        return null;
+    }
+
+    private static string BadCharacter(string value, char c) =>
+        $"The text \"{value}\" has the character U+{(int)c:X4}. A THN text must be ASCII without U+0000.";
+
     /// <summary>Writes a quoted text. The VM reads a text as ASCII (Undump.cs:69), and it drops U+0000 at the end of a
     /// text, so the writer refuses other characters and U+0000.</summary>
     private static void WriteText(StringBuilder text, string value)
@@ -199,8 +214,7 @@ public static class ThnWriter
                     text.Append("\\n");
                     break;
                 case '\0' or > '\x7F':
-                    throw new ArgumentException(
-                        $"The text \"{value}\" has the character U+{(int)c:X4}. A THN text must be ASCII without U+0000.");
+                    throw new ArgumentException(BadCharacter(value, c));
                 case < ' ' or '\x7F':
                     // Three digits, so that a digit after the escape is not part of it.
                     text.Append('\\').Append(((int)c).ToString("D3", CultureInfo.InvariantCulture));

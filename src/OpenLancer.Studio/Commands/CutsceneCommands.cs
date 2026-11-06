@@ -285,8 +285,9 @@ public static class CutsceneCommands
     /// name too. See <see cref="ThnEdits.RenameEntity"/>.
     /// </summary>
     /// <remarks>
-    /// <para>A name of another entity, without regard to letter case, refuses with the detail
-    /// <see cref="MissionErrors.NameTaken"/>. Other data that uses the old name keeps it. So the plan needs a
+    /// <para>A name that a save cannot write (see <see cref="ThnWriter.TextProblem"/>) refuses with the detail
+    /// <see cref="MissionErrors.NameInvalid"/>. A name of another entity, without regard to letter case, refuses with
+    /// the detail <see cref="MissionErrors.NameTaken"/>. Other data that uses the old name keeps it. So the plan needs a
     /// confirmation when the caller gives such uses (decision D242).</para>
     /// <para><see cref="CutscenePlan.Changed"/> names only the entity. The events and the speakers that the rename
     /// changes too are not in it. The plan keeps the uses (<see cref="CutscenePlan.Uses"/>) for the question.</para>
@@ -299,6 +300,8 @@ public static class CutsceneCommands
         var script = ScriptPath(session, entity.Path);
         if (session.CutsceneReadOnlyReason(entity) is { } reason)
             return CutscenePlan.Refused(label, script, reason);
+        if (ThnWriter.TextProblem(newName) is { } badName)
+            return CutscenePlan.Refused(label, script, badName, MissionErrors.NameInvalid);
         if (session.Cutscene(entity.Path) is { } working &&
             ThnEdits.NameTakenRefusal(working, newName, entity.Id) is { } taken)
             return CutscenePlan.Refused(label, script, taken, MissionErrors.NameTaken);
@@ -461,12 +464,14 @@ public static class CutsceneCommands
     /// </summary>
     /// <remarks>
     /// <para>A type that is not in <see cref="ThnTemplates.EntityTypes"/> refuses with the detail
-    /// <see cref="MissionErrors.FieldValue"/>. An empty name refuses with <see cref="MissionErrors.NameInvalid"/>. A
-    /// name that another entity has, without regard to letter case, refuses with
-    /// <see cref="MissionErrors.NameTaken"/>, because the engine finds an entity by its name without letter case.</para>
+    /// <see cref="MissionErrors.FieldValue"/>. An empty name, and a name that a save cannot write (see
+    /// <see cref="ThnWriter.TextProblem"/>), refuse with <see cref="MissionErrors.NameInvalid"/>. A template that a save
+    /// cannot write refuses with <see cref="MissionErrors.FieldValue"/>. A name that another entity has, without regard
+    /// to letter case, refuses with <see cref="MissionErrors.NameTaken"/>, because the engine finds an entity by its name
+    /// without letter case.</para>
     /// <para>A position or a rotation for a type without a place (see <see cref="ThnTemplates.HasPlace"/>) refuses with
-    /// <see cref="MissionErrors.NoPlace"/>. A script has one SCENE entity, as each retail script has. So a second
-    /// SCENE refuses with <see cref="MissionErrors.OneScene"/>.</para>
+    /// <see cref="MissionErrors.NoPlace"/>. No retail script has two SCENE entities. So a second SCENE refuses with
+    /// <see cref="MissionErrors.OneScene"/>.</para>
     /// <para>The checks of the session do not read the game data. So a template that the game data does not have is
     /// not a refusal. The save validation of the editor and the check of a cutscene with game data report it.</para>
     /// </remarks>
@@ -483,7 +488,7 @@ public static class CutsceneCommands
         path = ScriptPath(session, path);
         if (session.CutsceneReadOnlyReason(path) is { } reason)
             return CutscenePlan.Refused(label, path, reason);
-        if (ThnTemplates.NewEntityProblem(type, name, position != null || rotation != null) is { } problem)
+        if (ThnTemplates.NewEntityProblem(type, name, template, position != null || rotation != null) is { } problem)
             return CutscenePlan.Refused(label, path, problem.Message, problem.Detail);
         var working = session.Cutscene(path)!;
         if (ThnEdits.NameTakenRefusal(working, name) is { } taken)
@@ -497,7 +502,7 @@ public static class CutsceneCommands
     }
 
     /// <summary>The reason why a script cannot get a second SCENE entity.</summary>
-    internal const string OneScene = "The script has a SCENE entity. A script has one SCENE, as each retail script has.";
+    internal const string OneScene = "The script has a SCENE entity. No retail script has two SCENE entities.";
 
     private const string SceneType = "SCENE";
 

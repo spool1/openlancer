@@ -243,7 +243,8 @@ internal static partial class ItemEditTools
     /// finds the uses in the edit view (see <see cref="CutsceneRename.Uses(EditSession, string, string)"/>).
     /// </summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.NameTaken"/> for a name of another entity, and
-    /// <see cref="EditErrorKind.Refused"/> for an empty name or a cutscene that takes no edits.</exception>
+    /// <see cref="EditErrorKind.Refused"/> for an empty name, a name that is not ASCII text, or a cutscene that takes no
+    /// edits.</exception>
     private static void RenameCutsceneEntity(EditScope scope, ThnRef entity, string name)
     {
         var session = scope.Session;
@@ -256,7 +257,7 @@ internal static partial class ItemEditTools
         var table = session.Cutscene(entity.Path)!.Element(ThnElementKind.Entity, entity.Id)!.Table;
         var uses = CutsceneRename.Uses(session, entity.Path, ThnScriptModel.NameOf(table) ?? "");
         Run(scope, CutsceneCommands.RenameEntity(session, entity, newName, uses),
-            error => error.Detail == MissionErrors.NameTaken ? "new_name" : "ref");
+            error => error.Detail is MissionErrors.NameTaken or MissionErrors.NameInvalid ? "new_name" : "ref");
     }
 
     // ---- delete_items ----

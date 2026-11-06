@@ -130,11 +130,12 @@ public static class ThnTemplates
     /// <param name="template">The template, for example the costume of a DEFORMABLE, or null or empty for none.</param>
     /// <param name="position">The position, or null for the origin.</param>
     /// <param name="rotation">The rotation, or null for no turn.</param>
-    /// <exception cref="ArgumentException">The type is not in <see cref="EntityTypes"/>, the name is empty, or a type
-    /// without a place gets a position or a rotation.</exception>
+    /// <exception cref="ArgumentException">The type is not in <see cref="EntityTypes"/>, the name is empty, the name or
+    /// the template is not a THN text (see <see cref="ThnWriter.TextProblem"/>), or a type without a place gets a
+    /// position or a rotation.</exception>
     public static ThnTable NewEntity(string type, string name, string? template, Vector3? position, Matrix4x4? rotation)
     {
-        if (NewEntityProblem(type, name, position != null || rotation != null) is { } problem)
+        if (NewEntityProblem(type, name, template, position != null || rotation != null) is { } problem)
             throw new ArgumentException(problem.Message, nameof(type));
         var fields = new List<ThnField> { Field("entity_name", new ThnText(name)), Field("type", new ThnSymbol(type)) };
         if (!string.IsNullOrEmpty(template))
@@ -160,11 +161,12 @@ public static class ThnTemplates
     /// <summary>
     /// Why <see cref="NewEntity"/> cannot make an entity, with the detail code of the error (see
     /// <see cref="MissionErrors"/>), or null. A type that is not in <see cref="EntityTypes"/> gives
-    /// <c>FieldValue</c>, an empty name gives <c>NameInvalid</c>, and a place for a type without a place gives
-    /// <c>NoPlace</c>.
+    /// <c>FieldValue</c>. An empty name, or a name that is not a THN text, gives <c>NameInvalid</c>. A template that is
+    /// not a THN text gives <c>FieldValue</c>. A place for a type without a place gives <c>NoPlace</c>.
     /// </summary>
     /// <param name="placed">True when the caller gives a position or a rotation.</param>
-    internal static (string Message, string Detail)? NewEntityProblem(string type, string name, bool placed)
+    internal static (string Message, string Detail)? NewEntityProblem(string type, string name, string? template,
+        bool placed)
     {
         if (!EntityTypes.Contains(type, StringComparer.Ordinal))
         {
@@ -173,6 +175,10 @@ public static class ThnTemplates
         }
         if (string.IsNullOrWhiteSpace(name))
             return ("The name of an entity cannot be empty. Give a name.", MissionErrors.NameInvalid);
+        if (ThnWriter.TextProblem(name) is { } badName)
+            return (badName, MissionErrors.NameInvalid);
+        if (template != null && ThnWriter.TextProblem(template) is { } badTemplate)
+            return (badTemplate, MissionErrors.FieldValue);
         return placed && !HasPlace(type) ? (NoPlace(type), MissionErrors.NoPlace) : null;
     }
 

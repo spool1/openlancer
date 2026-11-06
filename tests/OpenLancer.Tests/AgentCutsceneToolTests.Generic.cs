@@ -263,6 +263,7 @@ public sealed partial class AgentCutsceneToolTests
     [InlineData("rename_item", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/2", "new_name": "x" }""", "invalid_argument", EditTools.CutsceneItem, "ref")]
     [InlineData("rename_item", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#entity/Cam", "new_name": "monitor" }""", "name_taken", MissionErrors.NameTaken, "new_name")]
     [InlineData("rename_item", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#entity/Cam", "new_name": "  " }""", "refused", MissionErrors.NameInvalid, "new_name")]
+    [InlineData("rename_item", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#entity/Cam", "new_name": "Kamera_\u00fc" }""", "refused", MissionErrors.NameInvalid, "new_name")]
     [InlineData("delete_items", """{ "refs": ["thn:DATA\\SCRIPTS\\x.thn"] }""", "invalid_argument", EditTools.CutsceneItem, "refs[0]")]
     [InlineData("delete_items", """{ "refs": ["thn:DATA\\SCRIPTS\\x.thn#event/1"], "expect_events": [ { "ref": "thn:DATA\\SCRIPTS\\x.thn#event/2" } ] }""", "invalid_argument", ItemRefs.BadReference, "expect_events[0].ref")]
     [InlineData("delete_items", """{ "refs": ["thn:DATA\\SCRIPTS\\x.thn#event/1"], "expect_events": [ { "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1", "expect_type": "SET_CAMERA" } ] }""", "stale_revision", MissionErrors.RowChanged, "expect_events[0].ref")]

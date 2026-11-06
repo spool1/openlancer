@@ -109,7 +109,8 @@ public sealed class ThnTemplatesTests
             model.EntityNamed(ThnTemplates.NewCamera)!.Table);
     }
 
-    /// <summary>An unknown type, an empty name and a place for a type without a place throw.</summary>
+    /// <summary>An unknown type, an empty name, a name or a template that a save cannot write, and a place for a type
+    /// without a place throw.</summary>
     [Fact]
     public void NewEntityRefusesATypeANameAndAPlaceThatDoNotFit()
     {
@@ -117,6 +118,10 @@ public sealed class ThnTemplatesTests
             () => ThnTemplates.NewEntity("ROBOT", "r", null, null, null)).Message);
         Assert.Contains("cannot be empty", Assert.Throws<ArgumentException>(
             () => ThnTemplates.NewEntity("MARKER", "", null, null, null)).Message);
+        Assert.Contains("U+00FC", Assert.Throws<ArgumentException>(
+            () => ThnTemplates.NewEntity("MARKER", "m\xFC", null, null, null)).Message);
+        Assert.Contains("U+0000", Assert.Throws<ArgumentException>(
+            () => ThnTemplates.NewEntity("DEFORMABLE", "c", "costume\0", null, null)).Message);
         Assert.Contains(ThnTemplates.NoPlace("MONITOR"), Assert.Throws<ArgumentException>(
             () => ThnTemplates.NewEntity("MONITOR", "m", null, Vector3.Zero, null)).Message);
         Assert.False(ThnTemplates.HasPlace("SCENE"));
