@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Numerics;
+using OpenLancer.Data.Missions.Editing;
 
 namespace OpenLancer.Data.Thn;
 
@@ -24,7 +25,8 @@ public sealed record ThnEventRole(string Type, IReadOnlyList<string> First, IRea
 
 /// <summary>
 /// The events that the Add event menu of a Timeline row offers, and the event that each one adds. A new event has the
-/// usual props of its type in retail, so the engine plays it at once, and the Inspector shows its rows.
+/// usual props of its type in retail, so the engine plays it at once, and the Inspector shows its rows. The entities
+/// that an agent adds, and the script of a new cutscene, come from here too.
 /// </summary>
 public static class ThnTemplates
 {
@@ -88,6 +90,116 @@ public static class ThnTemplates
         return Props(type) is { } props ? ThnTable.FromList([.. head, props]) : ThnTable.FromList(head);
     }
 
+    /// <summary>The entity types that the editor adds, in the order of the types of the agent tool
+    /// <c>cutscene_add_entity</c>. These are the entity types of the retail scripts.</summary>
+    public static readonly ImmutableArray<string> EntityTypes =
+        ["CAMERA", "MARKER", "DEFORMABLE", "COMPOUND", "LIGHT", "SOUND", "PSYS", "MOTION_PATH", "MONITOR", "SCENE"];
+
+    /// <summary>
+    /// True when the engine puts an entity of a type at its place in the scene (<c>spatialprops</c>). The engine makes
+    /// no object for a MONITOR or for the SCENE entity (ThnScriptInstance.cs:206-213, :290-293), so their place has no
+    /// effect.
+    /// </summary>
+    public static bool HasPlace(string type) => type is not ("MONITOR" or "SCENE");
+
+    /// <summary>The reason why an entity of a type takes no position and no rotation (see
+    /// <see cref="HasPlace"/>).</summary>
+    public static string NoPlace(string type) =>
+        $"The engine does not put a {type} at a place in the scene. So it takes no position and no rotation.";
+
+    /// <summary>
+    /// A new entity: <c>entity_name</c>, <c>type</c>, the <c>template_name</c> when the caller gives one, and the
+    /// records that the engine needs for the type. The engine plays it at once, and the Inspector shows its rows.
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item>Each type with a place gets <c>spatialprops</c> with the position and the rotation, as each such entity of
+    /// the retail scripts has them.</item>
+    /// <item>A CAMERA gets the median lens of the retail cameras of the bases, as the camera of
+    /// <see cref="NewScript"/>.</item>
+    /// <item>A LIGHT gets <c>lightprops</c> (see <see cref="NewLight"/>). A LIGHT without a type does not load
+    /// (ThnScript.cs:452-453), and a light without a color gives no light.</item>
+    /// <item>The SCENE gets the ambient color 0, 0, 0, as in <see cref="NewScript"/>.</item>
+    /// <item>A COMPOUND gets no <c>userprops.category</c>, because the category depends on the template. The checks
+    /// report a COMPOUND with a template and no category. A DEFORMABLE without a template and without
+    /// <c>userprops.Actor</c> loads no costume, and the checks report it too.</item>
+    /// <item>A MOTION_PATH gets no path. The keys of the path depend on the shot.</item>
+    /// </list>
+    /// </remarks>
+    /// <param name="type">The THN name of the entity type: one of <see cref="EntityTypes"/>.</param>
+    /// <param name="template">The template, for example the costume of a DEFORMABLE, or null or empty for none.</param>
+    /// <param name="position">The position, or null for the origin.</param>
+    /// <param name="rotation">The rotation, or null for no turn.</param>
+    /// <exception cref="ArgumentException">The type is not in <see cref="EntityTypes"/>, the name is empty, or a type
+    /// without a place gets a position or a rotation.</exception>
+    public static ThnTable NewEntity(string type, string name, string? template, Vector3? position, Matrix4x4? rotation)
+    {
+        if (NewEntityProblem(type, name, position != null || rotation != null) is { } problem)
+            throw new ArgumentException(problem.Message, nameof(type));
+        var fields = new List<ThnField> { Field("entity_name", new ThnText(name)), Field("type", new ThnSymbol(type)) };
+        if (!string.IsNullOrEmpty(template))
+            fields.Add(Field("template_name", new ThnText(template)));
+        if (type == "SCENE")
+            fields.Add(Field("ambient", Vector(Vector3.Zero)));
+        if (HasPlace(type))
+        {
+            fields.Add(Field("spatialprops", Record(Field("pos", Vector(position ?? Vector3.Zero)),
+                Field("orient", ThnPose.Orient(rotation ?? Matrix4x4.Identity)))));
+        }
+        if (type == "CAMERA")
+        {
+            fields.Add(Field("cameraprops", Record(Field("fovh", Number(MedianFovH)),
+                Field("hvaspect", Number(MedianHvAspect)), Field("nearplane", Number(MedianNearPlane)),
+                Field("farplane", Number(MedianFarPlane)))));
+        }
+        if (type == "LIGHT")
+            fields.Add(Field("lightprops", NewLight()));
+        return Record([.. fields]);
+    }
+
+    /// <summary>
+    /// Why <see cref="NewEntity"/> cannot make an entity, with the detail code of the error (see
+    /// <see cref="MissionErrors"/>), or null. A type that is not in <see cref="EntityTypes"/> gives
+    /// <c>FieldValue</c>, an empty name gives <c>NameInvalid</c>, and a place for a type without a place gives
+    /// <c>NoPlace</c>.
+    /// </summary>
+    /// <param name="placed">True when the caller gives a position or a rotation.</param>
+    internal static (string Message, string Detail)? NewEntityProblem(string type, string name, bool placed)
+    {
+        if (!EntityTypes.Contains(type, StringComparer.Ordinal))
+        {
+            return ($"{type} is not an entity type that the editor can add. The types are {string.Join(", ", EntityTypes)}.",
+                MissionErrors.FieldValue);
+        }
+        if (string.IsNullOrWhiteSpace(name))
+            return ("The name of an entity cannot be empty. Give a name.", MissionErrors.NameInvalid);
+        return placed && !HasPlace(type) ? (NoPlace(type), MissionErrors.NoPlace) : null;
+    }
+
+    /// <summary>
+    /// The <c>lightprops</c> of a new LIGHT. Each key that the engine reads for a directional and a point light gets
+    /// the value that most LIGHT entities of the retail scripts have: a directional light that is on, that points
+    /// along its Z axis, with the range 2000 and the attenuation 1, 0, 0.000004. Most retail lights have no diffuse
+    /// color, and these lights give no light. So a new light gets the color that most of the other retail lights have:
+    /// white.
+    /// </summary>
+    private static ThnTable NewLight() => Record(
+        Field("type", new ThnSymbol(NewLightType)),
+        Field("on", new ThnBool(true)),
+        Field("diffuse", Vector(Vector3.One)),
+        Field("direction", Vector(Vector3.UnitZ)),
+        Field("range", Number(NewLightRange)),
+        Field("atten", Vector(NewLightAttenuation)));
+
+    /// <summary>The light type of a new LIGHT.</summary>
+    internal const string NewLightType = "L_DIRECT";
+
+    /// <summary>The range of a new LIGHT.</summary>
+    internal const float NewLightRange = 2000;
+
+    /// <summary>The attenuation of a new LIGHT: constant, linear and squared.</summary>
+    internal static readonly Vector3 NewLightAttenuation = new(1, 0, 0.000004f);
+
     /// <summary>The length of a new cutscene, in seconds.</summary>
     public const float NewScriptDuration = 10;
 
@@ -122,14 +234,9 @@ public static class ThnTemplates
     /// </remarks>
     public static ThnTable NewScript()
     {
-        var scene = Record(Field("entity_name", new ThnText("Scene")), Field("type", new ThnSymbol("SCENE")),
-            Field("ambient", Vector(Vector3.Zero)));
-        var monitor = Record(Field("entity_name", new ThnText(NewMonitor)), Field("type", new ThnSymbol("MONITOR")));
-        var camera = Record(Field("entity_name", new ThnText(NewCamera)), Field("type", new ThnSymbol("CAMERA")),
-            Field("spatialprops", Record(Field("pos", Vector(Vector3.Zero)),
-                Field("orient", ThnPose.Orient(Matrix4x4.Identity)))),
-            Field("cameraprops", Record(Field("fovh", Number(MedianFovH)), Field("hvaspect", Number(MedianHvAspect)),
-                Field("nearplane", Number(MedianNearPlane)), Field("farplane", Number(MedianFarPlane)))));
+        var scene = NewEntity("SCENE", "Scene", null, null, null);
+        var monitor = NewEntity("MONITOR", NewMonitor, null, null, null);
+        var camera = NewEntity("CAMERA", NewCamera, null, null, null);
         var cut = NewEvent("SET_CAMERA", 0, NewMonitor, NewCamera);
         return Record(Field(ThnScriptModel.DurationGlobal, Number(NewScriptDuration)),
             Field(ThnScriptModel.EntitiesGlobal, ThnTable.FromList(scene, monitor, camera)),

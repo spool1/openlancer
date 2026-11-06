@@ -90,6 +90,15 @@ public static class MissionErrors
     // Codes of the cutscene commands that the table of the design does not have (milestone MCP1-4).
     public const string TargetType = "TargetType";
 
+    /// <summary>An event gets another number of targets than its type takes.</summary>
+    public const string TargetCount = "TargetCount";
+
+    /// <summary>An entity of a type without a place, for example a MONITOR, gets a position or a rotation.</summary>
+    public const string NoPlace = "NoPlace";
+
+    /// <summary>A script that has a SCENE entity gets another one.</summary>
+    public const string OneScene = "OneScene";
+
     internal static EditError NotEditableError(string reason) => new(EditErrorKind.ReadOnly, NotEditable, NotEditableMessage(reason));
 
     /// <summary>The text of <see cref="NotEditable"/>. The Mission tab and the mission pages show it as their read-only
