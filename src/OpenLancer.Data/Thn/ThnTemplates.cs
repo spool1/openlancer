@@ -179,9 +179,9 @@ public static class ThnTemplates
     /// <summary>
     /// The <c>lightprops</c> of a new LIGHT. Each key that the engine reads for a directional and a point light gets
     /// the value that most LIGHT entities of the retail scripts have: a directional light that is on, that points
-    /// along its Z axis, with the range 2000 and the attenuation 1, 0, 0.000004. Most retail lights have no diffuse
-    /// color, and these lights give no light. So a new light gets the color that most of the other retail lights have:
-    /// white.
+    /// along its Z axis, with the range 2000 and the attenuation 1, 0, 0.000004. Most retail lights have the diffuse
+    /// color black, and such a light gives no light. So a new light gets the color that most of the other retail
+    /// lights have: white.
     /// </summary>
     private static ThnTable NewLight() => Record(
         Field("type", new ThnSymbol(NewLightType)),

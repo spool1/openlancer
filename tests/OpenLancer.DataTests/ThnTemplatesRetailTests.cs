@@ -58,8 +58,8 @@ public sealed class ThnTemplatesRetailTests(ITestOutputHelper output)
 
     /// <summary>
     /// The light of a new LIGHT entity (milestone MCP1-4): for each key, the value that most LIGHT entities of the retail
-    /// scripts have. Most retail lights have no diffuse color, so the color of a new light is the most common color of
-    /// the other lights.
+    /// scripts have. Most retail lights have the diffuse color black, so the color of a new light is the most common
+    /// color of the other lights.
     /// </summary>
     [Fact]
     public void TheLightOfANewEntityHasTheMostCommonValuesOfTheRetailLights()

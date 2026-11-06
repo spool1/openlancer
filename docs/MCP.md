@@ -507,19 +507,45 @@ The cutscene tools change the cutscene scripts of the active mod with the comman
 | Tool | What it does |
 |---|---|
 | `cutscene_create` | Makes a new cutscene script, as **New cutscene** does. The script has a scene, the monitor `Monitor`, the camera `Camera_01` and a cut to the camera at 0. `name` is the file name without `.thn`. `duration` is the length in seconds, and the default is 10. |
+| `cutscene_add_entity` | Adds an entity to a script, with the records that the game needs for its type. `type` is the entity type, `name` the name of the entity, and `template` its template. `position` is in meters, and `orientation` is three angles in degrees, as the Inspector shows them. `fields` gives more values. |
+| `cutscene_add_event` | Adds an event to a script, as **Add event** of a Timeline row does. `type` is the event type, `time` the time in seconds, and `targets` the names of the target entities. `length` is the length in seconds. `fields` gives more values. |
 | `cutscene_move_events` | Moves events of one cutscene in time and changes their length, as a drag on the Timeline does. `time_delta` and `length_delta` give the seconds to add. An event without a length has the length 0. |
 | `cutscene_set_duration` | Sets the length of a script in seconds, as the duration field of the Inspector does. |
 | `cutscene_set_flags` | Sets the flags of one entity, as the flag boxes of the Inspector do. The flags are REFERENCE, LIT_DYNAMIC, LIT_AMBIENT and HIDDEN. A SOUND has SPATIAL in place of LIT_DYNAMIC. The flags that the list does not name go off. |
 
 A new cutscene goes into the folder `DATA\MODS\<mod id>\CUTSCENES` of the active mod, and a save writes it as a whole file. A name can have letters, digits, `_` and `-`, and at most 64 characters, as in the name field of **New cutscene**. Another name gives `refused` with the detail `NameInvalid`. A name of a cutscene that exists gives `name_taken`, also in other letter case.
 
+Each argument takes one kind of `thn:` reference. `cutscene` takes a script, `entity` takes an entity, and `events` takes events. `targets` of `cutscene_add_event` takes entity names, not references. Another reference gives `invalid_argument`. All events of one call must be in one cutscene. One call names at most 200 events.
+
+A cutscene that the editor cannot change gives `refused` with the reason. An example is a cutscene whose THN patch in the active mod has an error.
+
+#### New entities and events
+
+`cutscene_add_entity` takes the entity types of the retail scripts: CAMERA, MARKER, DEFORMABLE, COMPOUND, LIGHT, SOUND, PSYS, MOTION_PATH, MONITOR and SCENE. A new entity gets the records that the game needs for its type:
+
+- Each type except MONITOR and SCENE gets `spatialprops` with the position and the rotation. The default is the origin without a turn. The game does not put a MONITOR or a SCENE at a place, so `position` and `orientation` give `invalid_argument` for them.
+- A CAMERA gets the lens of the camera of a new cutscene.
+- A LIGHT gets `lightprops` for a directional light that is on, as most retail lights are. Its color is white. Change `lightprops.type` and the other keys with `fields` or `set_fields`.
+- A SCENE gets the ambient color 0, 0, 0. A script has one SCENE, so a second SCENE gives `refused`.
+- A MOTION_PATH gets no path. Give the keys in `pathprops.path_data` with `fields`.
+
+`template` is the costume of a DEFORMABLE, the sound of a SOUND, the effect of a PSYS or the model of a COMPOUND. `list_values` with the list `costume` gives the costumes. A COMPOUND with a template needs `userprops.category` too, for example `"Prop"` or `"Spaceship"`. The tool does not write a default category, because the category depends on the template.
+
+The tool adds a DEFORMABLE without a template and without `userprops.Actor`, and a COMPOUND with a template and no category. The result gives the error in `new_problems`, and the save stops until you correct it. The checks of a call do not read the game data. So a template that the game data does not have is not an error of the call. The save validation of the editor and `check` with a target report it.
+
+A name of another entity of the script gives `name_taken`, also in other letter case, because the game finds an entity by its name without letter case. An empty name gives `refused`.
+
+`cutscene_add_event` takes the event types of the **Add event** menu. Another type gives `invalid_value`, and the message gives the types. Each target must be an entity of a type that fits its place, as the target list of the Inspector shows. For example, SET_CAMERA takes a MONITOR, then a CAMERA. START_MOTION takes a DEFORMABLE or a COMPOUND, so a CAMERA gives `refused`, and the message names the types that fit. Too many targets, or a missing second target that the type needs, give `invalid_argument`. A name that no entity of the script has gives `not_found` with the closest names.
+
+The new event gets the usual values of its type, as **Add event** gives them. The time rounds to the 1 ms grid. `length` sets `props.duration` on the 1 ms grid. A SET_CAMERA event has no length, so `length` gives `invalid_value` there. Without `length`, the event has the length of its type, mostly 1 s.
+
+`fields` of both tools takes the THN paths and the value forms of `set_fields`, with the same rules (see "The generic tools on cutscene items"). The tool sets them after it adds the item, in the same Undo step. An error names its field, for example `fields.props.duration`, and nothing changes. The result gives only the add of the new item.
+
+#### Times, durations and flags
+
 `cutscene_move_events` rounds each new time and length to the 1 ms grid, as the Timeline does. When the lower cutscene has the event and the event has no length there, a length of 0 removes the key `props.duration`. Else the event keeps the length 0. A SET_CAMERA event has no length, as the Inspector shows. So a `length_delta` other than 0 on a SET_CAMERA event gives `invalid_value`, and the message names the event. A time below 0 and a negative length give `invalid_value` too.
 
 `cutscene_set_duration` writes the value as you give it, as the duration field does. A negative duration gives `invalid_value`. A flag that the entity type does not have gives `invalid_value` too. A flags value that the engine cannot read gives `refused` with the reason.
-
-Each argument takes one kind of `thn:` reference. `cutscene` takes a script, `entity` takes an entity, and `events` takes events. Another reference gives `invalid_argument`. All events of one call must be in one cutscene. One call names at most 200 events.
-
-A cutscene that the editor cannot change gives `refused` with the reason. An example is a cutscene whose THN patch in the active mod has an error.
 
 #### Event references and guards
 
