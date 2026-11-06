@@ -357,22 +357,99 @@ public sealed partial class CutsceneCommandsTests
         CutscenePlan Add(string type, double time, params string[] targets) =>
             CutsceneCommands.AddEvent(session, ScriptPath, type, time, targets);
 
-        AssertRefused(session, Add("NO_SUCH_EVENT", 1, "Fx"), "NO_SUCH_EVENT is not an event type that the editor can add.",
+        AssertRefused(session, Add("NO_SUCH_EVENT", 1, "Fx"), "NO_SUCH_EVENT is not an event type that the editor can add. " +
+                                                              "The types are " + string.Join(", ", ThnTemplates.Roles.Select(r => r.Type)) + ".",
             MissionErrors.FieldValue);
         AssertRefused(session, Add("START_PSYS", -0.001, "Fx"), ThnEdits.StartsBeforeZero, MissionErrors.FieldValue);
         AssertRefused(session, Add("START_PSYS", double.NaN, "Fx"), ThnNumber.NotFiniteMessage, MissionErrors.FieldValue);
-        AssertRefused(session, Add("START_PSYS", 1), "START_PSYS takes one target.", EditPlan.PlanRefused);
-        AssertRefused(session, Add("START_PSYS", 1, "Fx", "Cam_A"), "START_PSYS takes one target.", EditPlan.PlanRefused);
-        AssertRefused(session, Add("SET_CAMERA", 1, "Monitor"), "SET_CAMERA needs two targets.", EditPlan.PlanRefused);
+        AssertRefused(session, Add("START_PSYS", 1e39, "Fx"), ThnNumber.NotFiniteMessage, MissionErrors.FieldValue);
+        AssertRefused(session, Add("START_PSYS", 1), "START_PSYS takes one target.", MissionErrors.TargetCount);
+        AssertRefused(session, Add("START_PSYS", 1, "Fx", "Cam_A"), "START_PSYS takes one target.", MissionErrors.TargetCount);
+        AssertRefused(session, Add("SET_CAMERA", 1, "Monitor"), "SET_CAMERA needs two targets.", MissionErrors.TargetCount);
         AssertRefused(session, Add("START_SPATIAL_PROP_ANIM", 1), "START_SPATIAL_PROP_ANIM takes one or two targets.",
-            EditPlan.PlanRefused);
+            MissionErrors.TargetCount);
         AssertRefused(session, Add("START_MOTION", 1, "Cam_A"),
             "START_MOTION needs a DEFORMABLE or COMPOUND as target 1. The entity Cam_A is a CAMERA.",
             MissionErrors.TargetType);
         AssertRefused(session, Add("SET_CAMERA", 1, "Monitor", "Nobody"), "No entity of this script has the name Nobody.",
             MissionErrors.ItemNotFound);
+        AssertRefused(session, Add("SET_CAMERA", 1, "Monitor", "Cam_B"),
+            "No entity of this script has the name Cam_B. The closest names are: Cam_A.", MissionErrors.ItemNotFound);
         // The time -0.0004 rounds to 0 on the 1 ms grid.
         Assert.True(Add("START_PSYS", -0.0004, "Fx").CanRun);
+        Assert.False(session.CanUndo);
+    }
+
+    /// <summary>A length sets <c>props.duration</c> of the new event on the 1 ms grid, also for a type whose template
+    /// has no length. A type without a length, a negative length and a length that is not finite refuse with the detail
+    /// FieldValue.</summary>
+    [Fact]
+    public void AddEventSetsTheLengthOnTheGrid()
+    {
+        var psys = AssertSameW(s => CutsceneCommands.AddEvent(s, ScriptPath, "START_PSYS", 1, ["Fx"], 2.34567),
+            _ => ThnEdits.AddEvent(ScriptPath, ThnElementPaths.Set(ThnElementKind.Event,
+                ThnTemplates.NewEvent("START_PSYS", 1, "Fx", null), new ThnPath("props.duration"), N(2.346f))));
+        Assert.Equal(1, psys.NewEvents);
+        AssertSameW(s => CutsceneCommands.AddEvent(s, ScriptPath, "ATTACH_ENTITY", 1, ["Cam_A", "Char_trent"], 0.5),
+            _ => ThnEdits.AddEvent(ScriptPath, ThnElementPaths.Set(ThnElementKind.Event,
+                ThnTemplates.NewEvent("ATTACH_ENTITY", 1, "Cam_A", "Char_trent"), new ThnPath("props.duration"), N(0.5f))));
+
+        using var ws = Workspace();
+        var session = ws.Session("act");
+        CutscenePlan Add(string type, double length, params string[] targets) =>
+            CutsceneCommands.AddEvent(session, ScriptPath, type, 1, targets, length);
+        AssertRefused(session, Add("SET_CAMERA", 1, "Monitor", "Cam_A"), "A SET_CAMERA event has no length.",
+            MissionErrors.FieldValue);
+        AssertRefused(session, Add("START_PSYS", -0.001, "Fx"), ThnEdits.NegativeLength, MissionErrors.FieldValue);
+        AssertRefused(session, Add("START_PSYS", 1e39, "Fx"), ThnNumber.NotFiniteMessage, MissionErrors.FieldValue);
+        Assert.True(Add("START_PSYS", 0, "Fx").CanRun);
+        Assert.False(session.CanUndo);
+    }
+
+    /// <summary>Add entity gives the W of the entity of the template at the end of the entities, with the label of the
+    /// session command. The result names the new entity.</summary>
+    [Fact]
+    public void AddEntityGivesTheWOfTheNewEntity()
+    {
+        var rotation = Matrix4x4.CreateRotationY(0.5f);
+        var plan = AssertSameW(
+            s => CutsceneCommands.AddEntity(s, ScriptPath, "CAMERA", "my_cam", null, new Vector3(1, 2, 3), rotation),
+            _ => ThnEdits.AddEntity(ScriptPath, ThnTemplates.NewEntity("CAMERA", "my_cam", null, new Vector3(1, 2, 3), rotation)));
+        Assert.Equal(("Add my_cam", 1, 0), (plan.Label, plan.NewEntities, plan.NewEvents));
+
+        AssertSameW(s => CutsceneCommands.AddEntity(s, ScriptPath, "DEFORMABLE", "my_char", "my_costume", null, null),
+            _ => ThnEdits.AddEntity(ScriptPath, ThnTemplates.NewEntity("DEFORMABLE", "my_char", "my_costume", null, null)));
+    }
+
+    /// <summary>
+    /// An unknown type refuses with the detail FieldValue, an empty name with NameInvalid, and a name of another
+    /// entity in other letter case with NameTaken. A place for a MONITOR or a SCENE refuses with NoPlace, and a second
+    /// SCENE with OneScene.
+    /// </summary>
+    [Fact]
+    public void AddEntityRefusesATypeANameAPlaceAndASecondScene()
+    {
+        using var ws = Workspace();
+        var session = ws.Session("act");
+        CutscenePlan Add(string type, string name, Vector3? position = null, Matrix4x4? rotation = null) =>
+            CutsceneCommands.AddEntity(session, ScriptPath, type, name, null, position, rotation);
+
+        AssertRefused(session, Add("ROBOT", "r"), "ROBOT is not an entity type that the editor can add. The types are " +
+                                                  string.Join(", ", ThnTemplates.EntityTypes) + ".", MissionErrors.FieldValue);
+        AssertRefused(session, Add("MARKER", " "), "The name of an entity cannot be empty. Give a name.",
+            MissionErrors.NameInvalid);
+        AssertRefused(session, Add("MARKER", "CAM_a"), "Another entity has the name CAM_a.", MissionErrors.NameTaken);
+        AssertRefused(session, Add("MONITOR", "m2", Vector3.One), ThnTemplates.NoPlace("MONITOR"), MissionErrors.NoPlace);
+        AssertRefused(session, Add("SCENE", "s", rotation: Matrix4x4.Identity), ThnTemplates.NoPlace("SCENE"),
+            MissionErrors.NoPlace);
+        Assert.True(Add("MONITOR", "m2").CanRun);
+        Assert.True(Add("SCENE", "Scene").CanRun);
+
+        using var withScene = Workspace(script: Script.Replace("{ entity_name = \"Monitor\", type = MONITOR },",
+            "{ entity_name = \"Monitor\", type = MONITOR }, { entity_name = \"Room\", type = 9 },", System.StringComparison.Ordinal));
+        var sceneSession = withScene.Session("act");
+        AssertRefused(sceneSession, CutsceneCommands.AddEntity(sceneSession, ScriptPath, "SCENE", "Scene", null, null, null),
+            CutsceneCommands.OneScene, MissionErrors.OneScene);
         Assert.False(session.CanUndo);
     }
 

@@ -523,7 +523,8 @@ internal static class EditTools
 
     /// <summary>The error of a plan that refuses: the kind of its first refusal, with the reasons of all refusals. A
     /// refusal of a nickname that another section has, or of a path that a file has, gives <c>name_taken</c>. A value
-    /// that a field cannot hold gives <c>invalid_value</c>.</summary>
+    /// that a field cannot hold gives <c>invalid_value</c>. An event with another number of targets than its type
+    /// takes, and a place for a cutscene entity without a place, give <c>invalid_argument</c>.</summary>
     internal static EditError RefusalOf(EditSession session, EditPlan plan)
     {
         var errors = plan.Report(session).Errors;
@@ -533,7 +534,7 @@ internal static class EditTools
             MissionErrors.NameTaken or MissionErrors.PathInUse => EditErrorKind.NameTaken,
             MissionErrors.ItemNotFound => EditErrorKind.NotFound,
             MissionErrors.FieldValue => EditErrorKind.InvalidValue,
-            MissionErrors.NotTextId => EditErrorKind.InvalidArgument,
+            MissionErrors.NotTextId or MissionErrors.TargetCount or MissionErrors.NoPlace => EditErrorKind.InvalidArgument,
             _ => EditErrorKind.Refused,
         };
         return first with { Kind = kind, Message = string.Join(" ", errors.Select(e => e.Message).Distinct()) };

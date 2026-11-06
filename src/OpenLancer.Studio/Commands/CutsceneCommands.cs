@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions.Editing;
@@ -455,36 +456,104 @@ public static class CutsceneCommands
     }
 
     /// <summary>
+    /// Plans a new entity at the end of the entities: the entity of <see cref="ThnTemplates.NewEntity"/>, with the
+    /// records that the engine needs for its type. See <see cref="ThnEdits.AddEntity"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>A type that is not in <see cref="ThnTemplates.EntityTypes"/> refuses with the detail
+    /// <see cref="MissionErrors.FieldValue"/>. An empty name refuses with <see cref="MissionErrors.NameInvalid"/>. A
+    /// name that another entity has, without regard to letter case, refuses with
+    /// <see cref="MissionErrors.NameTaken"/>, because the engine finds an entity by its name without letter case.</para>
+    /// <para>A position or a rotation for a type without a place (see <see cref="ThnTemplates.HasPlace"/>) refuses with
+    /// <see cref="MissionErrors.NoPlace"/>. A script has one SCENE entity, as each retail script has. So a second
+    /// SCENE refuses with <see cref="MissionErrors.OneScene"/>.</para>
+    /// <para>The checks of the session do not read the game data. So a template that the game data does not have is
+    /// not a refusal. The save validation of the editor and the check of a cutscene with game data report it.</para>
+    /// </remarks>
+    /// <param name="path">The install path of the script.</param>
+    /// <param name="type">The THN name of the entity type, for example <c>CAMERA</c>.</param>
+    /// <param name="name">The name of the entity.</param>
+    /// <param name="template">The template, for example the costume of a DEFORMABLE, or null for none.</param>
+    /// <param name="position">The position, or null for the origin.</param>
+    /// <param name="rotation">The rotation, or null for no turn.</param>
+    public static CutscenePlan AddEntity(EditSession session, string path, string type, string name, string? template,
+        Vector3? position, Matrix4x4? rotation)
+    {
+        var label = $"Add {name}";
+        path = ScriptPath(session, path);
+        if (session.CutsceneReadOnlyReason(path) is { } reason)
+            return CutscenePlan.Refused(label, path, reason);
+        if (ThnTemplates.NewEntityProblem(type, name, position != null || rotation != null) is { } problem)
+            return CutscenePlan.Refused(label, path, problem.Message, problem.Detail);
+        var working = session.Cutscene(path)!;
+        if (ThnEdits.NameTakenRefusal(working, name) is { } taken)
+            return CutscenePlan.Refused(label, path, taken, MissionErrors.NameTaken);
+        if (type == SceneType &&
+            working.Entities.Any(e => ThnSchema.TypeOf(ThnElementKind.Entity, e.Table, session.ThnSymbols) == SceneType))
+            return CutscenePlan.Refused(label, path, OneScene, MissionErrors.OneScene);
+        return CutscenePlan.Of(label, path,
+            () => ThnEdits.AddEntity(path, ThnTemplates.NewEntity(type, name, template, position, rotation)),
+            newEntities: 1);
+    }
+
+    /// <summary>The reason why a script cannot get a second SCENE entity.</summary>
+    internal const string OneScene = "The script has a SCENE entity. A script has one SCENE, as each retail script has.";
+
+    private const string SceneType = "SCENE";
+
+    /// <summary>
     /// Plans a new event of a type at a time, with the usual props of the type (see
     /// <see cref="ThnTemplates.NewEvent"/>). The time rounds to the 1 ms grid. Each target names an entity of W that
     /// fits the role of the target, and the event gets the name in the letter case of the entity. The engine runs the
     /// new event after the events of the same time.
     /// </summary>
-    /// <remarks>A type that is not in <see cref="ThnTemplates.Roles"/>, a time below 0 and a time that is not finite
-    /// refuse with the detail <see cref="MissionErrors.FieldValue"/>. A target refuses as in
-    /// <see cref="SetTarget"/>.</remarks>
+    /// <remarks>
+    /// <para>A type that is not in <see cref="ThnTemplates.Roles"/>, a time below 0 and a time that is not finite
+    /// refuse with the detail <see cref="MissionErrors.FieldValue"/>. Another number of targets than the type takes
+    /// refuses with <see cref="MissionErrors.TargetCount"/>. A target refuses as in <see cref="SetTarget"/>.</para>
+    /// <para>A length rounds to the 1 ms grid, as the length field of the Inspector does. A length for a type without
+    /// a length (see <see cref="ThnSchema.HasLength"/>), a negative length and a length that is not finite refuse with
+    /// <see cref="MissionErrors.FieldValue"/>.</para>
+    /// </remarks>
     /// <param name="path">The install path of the script.</param>
     /// <param name="type">The THN name of the event type, for example <c>START_PSYS</c>.</param>
     /// <param name="time">The time of the event, in seconds.</param>
     /// <param name="targets">The names of the entities of the targets: one, or two for a type with a second
     /// target.</param>
+    /// <param name="length">The length of the event in seconds (<c>props.duration</c>), or null for the length of the
+    /// template.</param>
     public static CutscenePlan AddEvent(EditSession session, string path, string type, double time,
-        IReadOnlyList<string> targets)
+        IReadOnlyList<string> targets, double? length = null)
     {
         var label = $"Add {type}";
         path = ScriptPath(session, path);
         if (session.CutsceneReadOnlyReason(path) is { } reason)
             return CutscenePlan.Refused(label, path, reason);
         if (ThnTemplates.Role(type) is not { } role)
-            return CutscenePlan.Refused(label, path, $"{type} is not an event type that the editor can add.",
+        {
+            return CutscenePlan.Refused(label, path, $"{type} is not an event type that the editor can add. The types " +
+                                                     $"are {string.Join(", ", ThnTemplates.Roles.Select(r => r.Type))}.",
                 MissionErrors.FieldValue);
-        if (!double.IsFinite(time))
-            return CutscenePlan.Refused(label, path, ThnNumber.NotFiniteMessage, MissionErrors.FieldValue);
+        }
+        // A time is a float, so a finite double can still give a time that is not finite.
         var onGrid = ThnEdits.OnGrid(time);
+        if (!float.IsFinite(onGrid))
+            return CutscenePlan.Refused(label, path, ThnNumber.NotFiniteMessage, MissionErrors.FieldValue);
         if (onGrid < 0)
             return CutscenePlan.Refused(label, path, ThnEdits.StartsBeforeZero, MissionErrors.FieldValue);
+        float? newLength = null;
+        if (length is { } seconds)
+        {
+            if (!ThnSchema.HasLength(type))
+                return CutscenePlan.Refused(label, path, $"A {type} event has no length.", MissionErrors.FieldValue);
+            newLength = ThnEdits.OnGrid(seconds);
+            if (!float.IsFinite(newLength.Value))
+                return CutscenePlan.Refused(label, path, ThnNumber.NotFiniteMessage, MissionErrors.FieldValue);
+            if (newLength < 0)
+                return CutscenePlan.Refused(label, path, ThnEdits.NegativeLength, MissionErrors.FieldValue);
+        }
         if (targets.Count == 0 || targets.Count > (role.Has(2) ? 2 : 1) || role.SecondRequired && targets.Count < 2)
-            return CutscenePlan.Refused(label, path, TargetCount(role));
+            return CutscenePlan.Refused(label, path, TargetCount(role), MissionErrors.TargetCount);
         var working = session.Cutscene(path)!;
         var symbols = session.ThnSymbols;
         for (var i = 0; i < targets.Count; i++)
@@ -495,8 +564,13 @@ public static class CutsceneCommands
 
         var first = EntityName(working, targets[0]);
         var second = targets.Count > 1 ? EntityName(working, targets[1]) : null;
-        return CutscenePlan.Of(label, path,
-            () => ThnEdits.AddEvent(path, ThnTemplates.NewEvent(type, onGrid, first, second)), newEvents: 1);
+        return CutscenePlan.Of(label, path, () =>
+        {
+            var ev = ThnTemplates.NewEvent(type, onGrid, first, second);
+            if (newLength is { } value)
+                ev = ThnElementPaths.Set(ThnElementKind.Event, ev, LengthPath, new ThnNumber(value));
+            return ThnEdits.AddEvent(path, ev);
+        }, newEvents: 1);
     }
 
     /// <summary>The points of the curve of an event in W, or null when the event has no curve with a list of
@@ -511,6 +585,9 @@ public static class CutsceneCommands
     /// <summary>The path of the targets of an event.</summary>
     private static readonly ThnPath TargetsPath = new(ThnElementPaths.EventSlots[2]);
 
+    /// <summary>The path of the length of an event.</summary>
+    private static readonly ThnPath LengthPath = new("props.duration");
+
     /// <summary>
     /// Why an entity of W with a name cannot be a target of an event of a role, with the detail code of the error, or
     /// null. The engine finds a target by its name without letter case (Cutscene.cs:41), so the entity is the entity
@@ -523,7 +600,10 @@ public static class CutsceneCommands
         int target, string name, IReadOnlyDictionary<string, ThnSymbolInfo> symbols)
     {
         if (working.EntityNamed(name) is not { } entity)
-            return ($"No entity of this script has the name {name}.", MissionErrors.ItemNotFound);
+        {
+            var names = working.Entities.Select(e => ThnScriptModel.NameOf(e.Table)).OfType<string>();
+            return ($"No entity of this script has the name {name}.{ItemRefs.Hint(name, names)}", MissionErrors.ItemNotFound);
+        }
         if (role == null)
             return null;
         if (!role.Has(target))
