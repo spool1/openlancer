@@ -170,6 +170,7 @@ public sealed partial class AgentCutsceneToolTests
     [InlineData("cutscene_add_entity", """{ "type": "MARKER", "name": "m", "position": [0, 0, 1e39] }""", "invalid_argument", ToolInput.BadArgument, "position")]
     [InlineData("cutscene_add_entity", """{ "type": "MARKER", "name": "m", "fields": { "spatialprops.pos": "x" } }""", "invalid_value", MissionErrors.FieldValue, "fields.spatialprops.pos")]
     [InlineData("cutscene_add_entity", """{ "type": "MARKER", "name": "m", "fields": { "entity_name": "n" } }""", "refused", EditTools.CutsceneItem, "fields.entity_name")]
+    [InlineData("cutscene_add_entity", """{ "type": "MARKER", "name": "m", "fields": { "userprops.ü": "1" } }""", "invalid_argument", ItemRefs.BadReference, "fields.userprops.ü")]
     [InlineData("cutscene_add_entity", """{ "type": "MARKER", "name": "m", "fields": { "spatialprops": { "pos": [1, 1, 1] } } }""", "invalid_argument", ItemRefs.BadReference, "fields.spatialprops")]
     [InlineData("cutscene_add_event", """{ "type": "START_DANCE", "time": 1, "targets": ["Fx"] }""", "invalid_value", MissionErrors.FieldValue, "type")]
     [InlineData("cutscene_add_event", """{ "type": "START_PSYS", "time": -1, "targets": ["Fx"] }""", "invalid_value", MissionErrors.FieldValue, "time")]
@@ -183,6 +184,7 @@ public sealed partial class AgentCutsceneToolTests
     [InlineData("cutscene_add_event", """{ "type": "START_PSYS", "time": 1, "targets": ["Fx"], "fields": { "props.duration": "x" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.duration")]
     [InlineData("cutscene_add_event", """{ "type": "START_MOTION", "time": 1, "targets": ["Char_trent"], "fields": { "props.animation": "Sc_wü" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.animation")]
     [InlineData("cutscene_add_event", """{ "type": "START_PSYS", "time": 1, "targets": ["Fx"], "fields": { "targets": ["Cam_A"] } }""", "refused", MissionErrors.TargetType, "fields.targets")]
+    [InlineData("cutscene_add_event", """{ "type": "START_PSYS", "time": 1, "targets": ["Fx"], "fields": { "props.ü": 1 } }""", "invalid_argument", ItemRefs.BadReference, "fields.props.ü")]
     public void EachErrorOfTheAddsHasItsCodeAndChangesNothing(string tool, string arguments, string code, string detail,
         string field)
     {

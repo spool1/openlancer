@@ -593,7 +593,9 @@ The value forms of the THN keys:
 | Turn | `degrees`, and an optional `axis`: an axis name or three numbers. | `"props.spatialprops.axisrot": { "degrees": 90, "axis": "Y_AXIS" }` |
 | Other key | Lua text in a JSON text, as the engine reads it. A key that the THN schema does not know has this form too. | `"props.custom": "{ 1, 2 }"` |
 
-Only `null` removes the key. A key of a record goes with its own path. A record as a value gives `invalid_argument`. A value of the wrong form gives `invalid_value`, and the message gives the form. A THN file is ASCII. So a text with a character outside ASCII, or with the character U+0000, gives `invalid_value` too, also in Lua text. A stored value that does not fit its form shows as Lua text, and the same text keeps the value.
+Only `null` removes the key. A key of a record goes with its own path. A record as a value gives `invalid_argument`. A value of the wrong form gives `invalid_value`, and the message gives the form. A stored value that does not fit its form shows as Lua text, and the same text keeps the value.
+
+A THN file is ASCII. So a text with a character outside ASCII, or with the character U+0000, gives `invalid_value`, also in Lua text. A path with such a character gives `invalid_argument`.
 
 Some keys have their own rules, as in the Inspector:
 

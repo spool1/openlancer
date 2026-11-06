@@ -86,13 +86,20 @@ public sealed class ThnEditsTests
         Assert.Null(Value(session, cam, "cameraprops.hvaspect"));
     }
 
+    /// <summary>A command refuses a value or a key of a path that a save cannot write, so the edit view never holds
+    /// a cutscene that a save or the recovery file cannot write.</summary>
     [Fact]
-    public void ACommandRefusesAValueThatASaveCannotWrite()
+    public void ACommandRefusesAValueOrAKeyThatASaveCannotWrite()
     {
         using var ws = Workspace();
         var session = ws.Session("act");
         var cam = Entity(session, "Cam_A");
 
+        var key = Assert.Throws<ArgumentException>(() => ThnEdits.Set(cam, new ThnPath("userprops.\u00fc"), T("x")));
+        Assert.StartsWith(ThnWriter.TextProblem("userprops.\u00fc")!, key.Message);
+        Assert.Throws<ArgumentException>(() => ThnEdits.Set(Event(session, 0), new ThnPath("props.a\u0000"), N(1)));
+        Assert.Throws<ArgumentException>(() => ThnEdits.Remove(cam, new ThnPath("userprops.\u00fc")));
+        Assert.Throws<ArgumentException>(() => ThnEdits.Revert(ScriptPath, cam, new ThnPath("userprops.\u00fc")));
         Assert.Throws<ArgumentException>(() => ThnEdits.Set(cam, new ThnPath("userprops.note"), T("café")));
         Assert.Throws<ArgumentException>(() => ThnEdits.Set(cam, new ThnPath("entity_name"), T("Cam_B")));
         Assert.Throws<ArgumentException>(() => ThnEdits.Set(Event(session, 0), new ThnPath("time.x"), N(1)));

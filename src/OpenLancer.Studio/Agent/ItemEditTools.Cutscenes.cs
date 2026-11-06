@@ -151,6 +151,9 @@ internal static partial class ItemEditTools
         var symbols = session.ThnSymbols;
         if (ThnPath.Problem(key) != null)
             throw FieldError(EditErrorKind.InvalidArgument, ItemRefs.BadReference, AgentTexts.Error("cutscene_path", ("path", key)));
+        // A save cannot write a key with a character outside ASCII, so the session command refuses it too.
+        if (ThnWriter.TextProblem(key) is { } badKey)
+            throw FieldError(EditErrorKind.InvalidArgument, ItemRefs.BadReference, badKey);
         var path = new ThnPath(key);
         var kind = element.Kind;
         if (ThnElementPaths.Problem(kind, path, value == null) is { } problem)

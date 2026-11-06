@@ -359,11 +359,15 @@ public static class ThnEdits
             throw new ArgumentException($"The element must be an {ThnPatch.Singular(kind)}.", nameof(target));
     }
 
+    /// <summary>Refuses a path that is not a path of the element, and a path with a key that a save cannot write, as
+    /// <see cref="CheckValue"/> refuses such a value. The separator is ASCII, so the text of the path tells.</summary>
     private static void CheckPath(ThnRef target, ThnPath path, bool remove)
     {
         ArgumentNullException.ThrowIfNull(target);
         if (path.Text == null)
             throw new ArgumentException("The path is empty.", nameof(path));
+        if (ThnWriter.TextProblem(path.Text) is { } badKey)
+            throw new ArgumentException(badKey, nameof(path));
         if (ThnElementPaths.Problem(target.Kind, path, remove) is { } problem)
             throw new ArgumentException(problem, nameof(path));
         if (target.Kind == ThnElementKind.Entity && path.Text == ThnKeys.EntityName)
