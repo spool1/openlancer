@@ -102,6 +102,8 @@
       "source": { "role": "bodyparts", "sections": ["RightHand"] } },
     { "id": "accessory", "label": "Accessory", "kind": "BodyPart",
       "source": { "role": "bodyparts", "sections": ["Accessory"] } },
+    { "id": "costume", "label": "Costume", "kind": "Costume",
+      "source": { "role": "costumes", "sections": ["Costume"] }, "detail": ["body", "head"] },
     { "id": "curve", "label": "Curve", "kind": "Curve", "unique": true, "requires": ["point"],
       "source": { "role": "igraph", "sections": ["IGraph"], "where": { "type": "FLOAT" } } },
     { "id": "gate_tunnel", "label": "Tunnel", "kind": "Effect",

@@ -37,7 +37,7 @@ public sealed class ListRetailTests(ITestOutputHelper output)
             ["pilot"] = 318, ["voice"] = 109, ["sound"] = 1817, ["effect"] = 705, ["vis_effect"] = 1218,
             ["effect_type"] = 45, ["beam"] = 55, ["explosion_fx"] = 70, ["explosion_equipment"] = 86, ["motor"] = 76,
             ["munition"] = 513, ["fuse"] = 192, ["good"] = 855, ["head"] = 104, ["body"] = 88, ["left_hand"] = 6,
-            ["right_hand"] = 6, ["accessory"] = 106, ["curve"] = 6, ["gate_tunnel"] = 4, ["jump_gate_effect"] = 5,
+            ["right_hand"] = 6, ["accessory"] = 106, ["costume"] = 154, ["curve"] = 6, ["gate_tunnel"] = 4, ["jump_gate_effect"] = 5,
             ["weapon_type"] = 21, ["shield_type"] = 9, ["dock_sphere_type"] = 7, ["cutscene"] = 1506,
         };
         foreach (var (id, count) in expected)

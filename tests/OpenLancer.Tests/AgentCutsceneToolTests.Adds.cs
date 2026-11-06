@@ -313,6 +313,30 @@ public sealed partial class AgentCutsceneToolTests
 
     private static ThnTable Evaluate(string text) => ThnScripts.Evaluate(text);
 
+    /// <summary>The data list costume gives the <c>[Costume]</c> sections of the costume file of <c>freelancer.ini</c>,
+    /// with the body and the head as the detail. A DEFORMABLE takes such a costume as its template.</summary>
+    [Fact]
+    public void TheListCostumeGivesTheCostumesForADeformable()
+    {
+        using var ws = Workspace();
+        ws.WriteBase(@"EXE\freelancer.ini", "[Freelancer]\ndata path = ..\\data\n\n[Data]\ncostumes = characters\\costumes.ini\n\n" +
+                                            TestWorkspace.ResourcesSection);
+        ws.WriteBase(@"DATA\CHARACTERS\costumes.ini",
+            "[Costume]\nnickname = my_costume\nbody = my_body\nhead = my_head\n\n[Costume]\nnickname = my_other\nbody = my_body\n");
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+
+        var rows = Ok(host, "list_values", """{ "list": "costume" }""")["rows"]!.AsArray();
+        var costume = (string)rows[0]!["value"]!;
+        var added = Ok(host, "cutscene_add_entity",
+            $$"""{ "cutscene": {{Json(Script)}}, "type": "DEFORMABLE", "name": "my_char", "template": {{Json(costume)}} }""");
+
+        Assert.Equal(["my_costume", "my_other"], rows.Select(r => (string?)r!["value"]).Order());
+        Assert.Contains(rows, r => ((string?)r!["detail"])?.Contains("my_head", StringComparison.Ordinal) == true);
+        Assert.Empty(added["new_problems"]!.AsArray());
+        Assert.Equal(new ThnText(costume), Value(session, Entity(session, "my_char"), "template_name"));
+    }
+
     /// <summary>A hidden group Cutscenes gives not_available for the adds too (decision D725).</summary>
     [Fact]
     public void TheAddsGiveNotAvailableForTheHiddenGroup()
