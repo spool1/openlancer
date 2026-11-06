@@ -595,7 +595,7 @@ The value forms of the THN keys:
 
 Only `null` removes the key. A key of a record goes with its own path. A record as a value gives `invalid_argument`. A value of the wrong form gives `invalid_value`, and the message gives the form. A stored value that does not fit its form shows as Lua text, and the same text keeps the value.
 
-A THN file is ASCII. So a text with a character outside ASCII, or with the character U+0000, gives `invalid_value`, also in Lua text. A path with such a character gives `invalid_argument`.
+A THN file is ASCII. So a text with a character outside ASCII, or with the character U+0000, gives `invalid_value`. This rule applies also to a text in Lua text, and to an escape such as `\200` that gives such a character. A path with such a character gives `invalid_argument`.
 
 Some keys have their own rules, as in the Inspector:
 

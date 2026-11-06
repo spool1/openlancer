@@ -32,6 +32,9 @@ namespace OpenLancer.Data.Thn;
 /// </remarks>
 public static class ThnWriter
 {
+    /// <summary>The rule of the characters of a THN text, as the last sentence of a refusal.</summary>
+    public const string TextRule = "A THN text must be ASCII without U+0000.";
+
     /// <summary>The reserved words of Lua 3.2 (llex.c:30-32).</summary>
     private static readonly FrozenSet<string> ReservedWords = FrozenSet.Create(StringComparer.Ordinal,
         "and", "do", "else", "elseif", "end", "function", "if", "local", "nil", "not", "or", "repeat", "return", "then",
@@ -196,7 +199,7 @@ public static class ThnWriter
     }
 
     private static string BadCharacter(string value, char c) =>
-        $"The text \"{value}\" has the character U+{(int)c:X4}. A THN text must be ASCII without U+0000.";
+        $"The text \"{value}\" has the character U+{(int)c:X4}. {TextRule}";
 
     /// <summary>Writes a quoted text. The VM reads a text as ASCII (Undump.cs:69), and it drops U+0000 at the end of a
     /// text, so the writer refuses other characters and U+0000.</summary>

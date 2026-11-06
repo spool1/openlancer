@@ -74,6 +74,38 @@ public sealed class ThnFieldEditTests
         Assert.Equal(ThnWriter.TextProblem("{ \"ü\" }"), outside.Error);
     }
 
+    /// <summary>A decimal escape in a Lua text that gives a character outside ASCII or U+0000 refuses. The evaluator
+    /// would read the first as '?' and drop the second at the end of the text. The scan finds an escape after a
+    /// '--' or a quote in another string.</summary>
+    [Theory]
+    [InlineData("{ \"\\200\" }", "\\200", "00C8")]
+    [InlineData("{ 'a\\255b' }", "\\255", "00FF")]
+    [InlineData("{ \"a\\0\" }", "\\0", "0000")]
+    [InlineData("{ \"\\\"\\000\" }", "\\000", "0000")]
+    [InlineData("{ \"x\", \"\\1289\" }", "\\128", "0080")]
+    [InlineData("{ \"--\", \"'\", \"\\200\" }", "\\200", "00C8")]
+    public void AnEscapeOutsideAsciiInLuaTextRefuses(string text, string escape, string code)
+    {
+        var parse = Parse(ThnKeyKind.Value, text);
+
+        Assert.Null(parse.Value);
+        Assert.Equal($"The escape {escape} gives the character U+{code}. {ThnWriter.TextRule}", parse.Error);
+    }
+
+    /// <summary>An escape inside ASCII keeps its value. A long string has no escapes, and a comment is not a part of
+    /// the value, so the escape check does not refuse them.</summary>
+    [Theory]
+    [InlineData("{ \"\\065\\0109\" }", "A\n9")]
+    [InlineData("{ \"\\\\200\" }", "\\200")]
+    [InlineData("{ [[\\200]] }", "\\200")]
+    [InlineData("{ [[a [[\" ]] \"\\200]] }", "a [[\" ]] \"\\200")]
+    [InlineData("-- \"\\200\"\n{ \"b\" }", "b")]
+    [InlineData("{ \"--\\127\" }", "--\u007f")]
+    public void AnEscapeInsideAsciiInLuaTextKeepsItsValue(string text, string value)
+    {
+        Assert.Equal(List(T(value)), Parse(ThnKeyKind.Value, text).Value);
+    }
+
     /// <summary>
     /// A field edit is one transaction: each text shows at once, a text that is not valid keeps the last valid value
     /// and gives the error, and the end adds one entry. A text back to the start text adds no entry, and an end with a
