@@ -40,15 +40,21 @@ public sealed record ThnLocation(string Path, ThnElementKind? Kind = null, int I
     /// in that version and its key. <see cref="ElementIn"/> finds the element in that version, and in a later version
     /// by its key.
     /// </summary>
+    /// <remarks>A twin is another element of the same kind with the same key, for example a second event with the same
+    /// time, type and targets. An add or a delete before the element can move the twin to the index of the element. The
+    /// place would then name the twin, so an element with a twin gives the place of the whole script.</remarks>
     /// <param name="script">The version of W, or null when the cutscene does not exist in it.</param>
-    /// <returns>The place of the element, or the place of the whole script when the version does not have the
-    /// element.</returns>
+    /// <returns>The place of the element, or the place of the whole script when the version does not have the element
+    /// or when the element has a twin.</returns>
     public static ThnLocation Of(ThnScriptModel? script, ThnRef element)
     {
         if (script?.Element(element.Kind, element.Id) is not { } found)
             return new ThnLocation(element.Path);
-        return new ThnLocation(element.Path, element.Kind, script.Elements(element.Kind).IndexOf(found), null,
-            KeyOf(element.Kind, found.Table));
+        var elements = script.Elements(element.Kind);
+        var key = KeyOf(element.Kind, found.Table);
+        if (elements.Any(e => e.Id != found.Id && KeyOf(element.Kind, e.Table) == key))
+            return new ThnLocation(element.Path);
+        return new ThnLocation(element.Path, element.Kind, elements.IndexOf(found), null, key);
     }
 
     /// <summary>The key text of an element (see <see cref="Key"/>), or null when it has no key.</summary>

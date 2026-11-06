@@ -6,6 +6,7 @@ using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Agent;
+using OpenLancer.Editor.Cutscene;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Studio.Agent;
 using Xunit;
@@ -140,6 +141,33 @@ public sealed class AgentConsoleTests
         // The delete of event 0 moves each later event one index down, so each link gives the reference of its event now.
         refs = host.Console(new ConsoleFilter(AgentController.Source, AgentSeverity.Info, false, null)).Select(e => e.Ref);
         Assert.Equal([script + "#event/5", script, script + "#event/2", null], refs);
+    }
+
+    /// <summary>
+    /// The entry of an edit of an event with a twin links to the whole script. Events 1 and 2 of the script have the
+    /// same time, type and targets. After a delete of event 0, the edited event is at index 0 and its twin at index 1.
+    /// A link by the index and the key would then name the twin, and a guard of the twin would match too.
+    /// </summary>
+    [Fact]
+    public void TheEntryOfAnEditOfAnEventWithATwinLinksToTheScript()
+    {
+        using var ws = ThnSessions.Workspace();
+        var session = ws.Session("act");
+        var editor = new FakeAgentEditor { Edits = session };
+        var host = new EditorAgentHost(editor);
+        const string script = "thn:" + ThnSessions.ScriptPath;
+        var edited = ThnSessions.Event(session, 1);
+
+        Ok(host, "set_fields", $$"""{ "ref": {{Json(script + "#event/1")}}, "fields": { "props.duration": 4 } }""");
+        Ok(host, "delete_items", $$"""{ "refs": [{{Json(script + "#event/0")}}] }""");
+
+        Assert.Equal(edited, ThnSessions.Event(session, 0));
+        var link = Agent(editor)[0].Cutscene;
+        Assert.Equal(new ThnLocation(ThnSessions.ScriptPath), link);
+        Assert.Equal(new CutsceneRoot(ThnSessions.ScriptPath),
+            CutsceneWorkspace.SelectionAt(ThnSessions.ScriptPath, ThnSessions.W(session), link!));
+        var refs = host.Console(new ConsoleFilter(AgentController.Source, AgentSeverity.Info, false, null)).Select(e => e.Ref);
+        Assert.Equal([script, null], refs);
     }
 
     /// <summary>A preview, a query and a view tool add no entry.</summary>
