@@ -574,9 +574,9 @@
       "description": "Adds an entity to a cutscene script, with the records that the game needs for its type. The tool makes one Undo step. The result gives the reference of the new entity. Get the scripts from list_cutscenes.",
       "fields": {
         "cutscene": "The reference of the script, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn.",
-        "type": "The entity type: CAMERA, MARKER, DEFORMABLE, COMPOUND, LIGHT, SOUND, PSYS, MOTION_PATH, MONITOR or SCENE. A script has one SCENE.",
+        "type": "The entity type: CAMERA, MARKER, DEFORMABLE, COMPOUND, LIGHT, SOUND, PSYS, MOTION_PATH, MONITOR or SCENE. A script can have only one SCENE.",
         "name": "The name of the entity. Another entity of the script cannot have this name, also in other letter case.",
-        "template": "The template of the entity. A DEFORMABLE takes a costume: list_values gives them in the list costume. A SOUND takes a sound, and a PSYS takes an effect. A COMPOUND takes a model nickname, and it needs the field userprops.category too.",
+        "template": "The template of the entity. A DEFORMABLE takes a costume: list_values gives them in the list costume. A SOUND takes a sound, and a PSYS takes an effect. A COMPOUND takes the nickname of an item of its category, for example a solar archetype for Solar or a ship for Spaceship. Give the category in the field userprops.category.",
         "position": "The position in meters: X, Y and Z. The default is 0, 0, 0. A MONITOR and a SCENE take no position.",
         "orientation": "The rotation in degrees: X, Y and Z, as the Inspector shows it. The default is 0, 0, 0. A MONITOR and a SCENE take no rotation.",
         "fields": "More values of the new entity by THN path, in the forms of set_fields, for example \"userprops.category\": \"Prop\". The tool sets them after it adds the entity."

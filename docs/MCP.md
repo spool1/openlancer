@@ -515,7 +515,7 @@ The cutscene tools change the cutscene scripts of the active mod with the comman
 
 A new cutscene goes into the folder `DATA\MODS\<mod id>\CUTSCENES` of the active mod, and a save writes it as a whole file. A name can have letters, digits, `_` and `-`, and at most 64 characters, as in the name field of **New cutscene**. Another name gives `refused` with the detail `NameInvalid`. A name of a cutscene that exists gives `name_taken`, also in other letter case.
 
-Each argument takes one kind of `thn:` reference. `cutscene` takes a script, `entity` takes an entity, and `events` takes events. `targets` of `cutscene_add_event` takes entity names, not references. Another reference gives `invalid_argument`. All events of one call must be in one cutscene. One call names at most 200 events.
+Each argument takes one kind of `thn:` reference. `cutscene` takes a script, `entity` takes an entity, and `events` takes events. Another reference gives `invalid_argument`. All events of one call must be in one cutscene. One call names at most 200 events. `targets` of `cutscene_add_event` takes entity names, not references. A reference in `targets` gives `not_found`, because no entity has that name.
 
 A cutscene that the editor cannot change gives `refused` with the reason. An example is a cutscene whose THN patch in the active mod has an error.
 
@@ -526,14 +526,14 @@ A cutscene that the editor cannot change gives `refused` with the reason. An exa
 - Each type except MONITOR and SCENE gets `spatialprops` with the position and the rotation. The default is the origin without a turn. The game does not put a MONITOR or a SCENE at a place, so `position` and `orientation` give `invalid_argument` for them.
 - A CAMERA gets the lens of the camera of a new cutscene.
 - A LIGHT gets `lightprops` for a directional light that is on, as most retail lights are. Its color is white. Change `lightprops.type` and the other keys with `fields` or `set_fields`.
-- A SCENE gets the ambient color 0, 0, 0. A script has one SCENE, so a second SCENE gives `refused`.
+- A SCENE gets the ambient color 0, 0, 0. No retail script has two SCENE entities, so a second SCENE gives `refused`.
 - A MOTION_PATH gets no path. Give the keys in `pathprops.path_data` with `fields`.
 
-`template` is the costume of a DEFORMABLE, the sound of a SOUND, the effect of a PSYS or the model of a COMPOUND. `list_values` with the list `costume` gives the costumes. A COMPOUND with a template needs `userprops.category` too, for example `"Prop"` or `"Spaceship"`. The tool does not write a default category, because the category depends on the template.
+`template` is the costume of a DEFORMABLE, the sound of a SOUND or the effect of a PSYS. `list_values` with the list `costume` gives the costumes. A COMPOUND takes the nickname of an item of its category in `userprops.category`, for example a solar archetype for `"Solar"` or a ship for `"Spaceship"`. So a COMPOUND with a template needs `userprops.category` too. The tool does not write a default category, because the category depends on the template. A template with a character outside ASCII, or with the character U+0000, gives `invalid_value`.
 
 The tool adds a DEFORMABLE without a template and without `userprops.Actor`, and a COMPOUND with a template and no category. The result gives the error in `new_problems`, and the save stops until you correct it. The checks of a call do not read the game data. So a template that the game data does not have is not an error of the call. The save validation of the editor and `check` with a target report it.
 
-A name of another entity of the script gives `name_taken`, also in other letter case, because the game finds an entity by its name without letter case. An empty name gives `refused`.
+A name of another entity of the script gives `name_taken`, also in other letter case, because the game finds an entity by its name without letter case. An empty name gives `refused` with the detail `NameInvalid`. A name with a character outside ASCII, or with the character U+0000, gives the same error.
 
 `cutscene_add_event` takes the event types of the **Add event** menu. Another type gives `invalid_value`, and the message gives the types. Each target must be an entity of a type that fits its place, as the target list of the Inspector shows. For example, SET_CAMERA takes a MONITOR, then a CAMERA. START_MOTION takes a DEFORMABLE or a COMPOUND, so a CAMERA gives `refused`, and the message names the types that fit. Too many targets, or a missing second target that the type needs, give `invalid_argument`. A name that no entity of the script has gives `not_found` with the closest names.
 
@@ -602,7 +602,9 @@ Some keys have their own rules, as in the Inspector:
 
 `set_fields` takes `expect_type` and `expect_time` for an event reference. `delete_items` and `duplicate_items` take them in the rows of `expect_events`: each row names one event of `refs`. These guards work as the guards of `cutscene_move_events`. A guard for a reference that is not an event gives `invalid_argument`.
 
-A rename of an entity needs `confirm: true` when other data uses the name. An example is the `name` of a `[Camera]` in a room that plays the script as its set script. Another example is a REFERENCE entity with the name in another script of the room. The rename changes only the script, so these uses keep the old name, and the message names them. The tool reads the files of the mod folders on disk for the uses. Its first call after an open or a save reads each INI file. A name of another entity gives `name_taken`, also in other letter case. The result gives the rename and the events that the rename changes.
+A rename of an entity needs `confirm: true` when other data uses the name. An example is the `name` of a `[Camera]` in a room that plays the script as its set script. Another example is a REFERENCE entity with the name in another script of the room. The rename changes only the script, so these uses keep the old name, and the message names them. The tool reads the files of the mod folders on disk for the uses. Its first call after an open or a save reads each INI file.
+
+A new name that another entity has gives `name_taken`, also in other letter case. A new name with a character outside ASCII, or with the character U+0000, gives `refused` with the detail `NameInvalid`. The result gives the rename and the events that the rename changes.
 
 A delete of an entity that events name needs `confirm: true`, as the editor asks. The message names the events with their indexes before the call. One call that deletes more than one entity asks with one message for all of them. The result gives each event with its index before the call, and the reason `cascade`. In `edit_batch`, the message and the result of a step give the indexes before the step.
 

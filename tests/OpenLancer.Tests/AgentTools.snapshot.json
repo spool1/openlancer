@@ -40486,7 +40486,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The entity type: CAMERA, MARKER, DEFORMABLE, COMPOUND, LIGHT, SOUND, PSYS, MOTION_PATH, MONITOR or SCENE. A script has one SCENE."
+            "description": "The entity type: CAMERA, MARKER, DEFORMABLE, COMPOUND, LIGHT, SOUND, PSYS, MOTION_PATH, MONITOR or SCENE. A script can have only one SCENE."
           },
           "name": {
             "type": "string",
@@ -40498,7 +40498,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The template of the entity. A DEFORMABLE takes a costume: list_values gives them in the list costume. A SOUND takes a sound, and a PSYS takes an effect. A COMPOUND takes a model nickname, and it needs the field userprops.category too."
+            "description": "The template of the entity. A DEFORMABLE takes a costume: list_values gives them in the list costume. A SOUND takes a sound, and a PSYS takes an effect. A COMPOUND takes the nickname of an item of its category, for example a solar archetype for Solar or a ship for Spaceship. Give the category in the field userprops.category."
           },
           "position": {
             "type": "array",
