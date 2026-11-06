@@ -60,7 +60,8 @@ public sealed class ThnFieldEditTests
         Assert.Equal(matrix, Parse(ThnKeyKind.Orient, "0, 30, 0").Value);
     }
 
-    /// <summary>A key that the schema does not know edits as Lua value text, which the evaluator reads.</summary>
+    /// <summary>A key that the schema does not know edits as Lua value text, which the evaluator reads. A character
+    /// outside ASCII refuses, because the evaluator would read it as '?'.</summary>
     [Fact]
     public void AnUnknownKeyEditsAsLuaText()
     {
@@ -68,6 +69,9 @@ public sealed class ThnFieldEditTests
         Assert.Equal(new ThnBool(true), Parse(ThnKeyKind.Value, "Y").Value);
         Assert.StartsWith("field: The script does not compile", Parse(ThnKeyKind.Value, "{ 1,").Error);
         Assert.StartsWith("The field needs a value.", Parse(ThnKeyKind.Value, "  ").Error);
+        var outside = Parse(ThnKeyKind.Value, "{ \"ü\" }");
+        Assert.Null(outside.Value);
+        Assert.Equal(ThnWriter.TextProblem("{ \"ü\" }"), outside.Error);
     }
 
     /// <summary>

@@ -132,11 +132,14 @@ internal static class ThnFieldEdit
     public static Vector3 Degrees(Matrix4x4 rotation) => TransformValues.EulerNear(rotation, Vector3.Zero);
 
     /// <summary>The value of a Lua value text, as the engine reads it, for example <c>{ 1, 2 }</c> or
-    /// <c>"text"</c>.</summary>
+    /// <c>"text"</c>. A THN file is ASCII, so a character outside ASCII refuses. The evaluator would read it as
+    /// <c>?</c>.</summary>
     public static ThnFieldParse ParseValue(string text, IThnEvaluator evaluator)
     {
         if (text.Trim().Length == 0)
             return ThnFieldParse.Fail("The field needs a value. Use Remove in the menu of the label to remove the key.");
+        if (ThnWriter.TextProblem(text) is { } problem)
+            return ThnFieldParse.Fail(problem);
         try
         {
             var globals = evaluator.Evaluate(Encoding.ASCII.GetBytes($"{ValueGlobal} = {text}\n"), "field");

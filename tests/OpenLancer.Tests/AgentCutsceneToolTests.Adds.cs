@@ -181,6 +181,7 @@ public sealed partial class AgentCutsceneToolTests
     [InlineData("cutscene_add_event", """{ "type": "START_PSYS", "time": 1, "targets": ["Fx", "Cam_A"] }""", "invalid_argument", MissionErrors.TargetCount, "targets")]
     [InlineData("cutscene_add_event", """{ "type": "START_PSYS", "time": 1, "targets": ["Fy"] }""", "not_found", MissionErrors.ItemNotFound, "targets")]
     [InlineData("cutscene_add_event", """{ "type": "START_PSYS", "time": 1, "targets": ["Fx"], "fields": { "props.duration": "x" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.duration")]
+    [InlineData("cutscene_add_event", """{ "type": "START_MOTION", "time": 1, "targets": ["Char_trent"], "fields": { "props.animation": "Sc_wü" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.animation")]
     [InlineData("cutscene_add_event", """{ "type": "START_PSYS", "time": 1, "targets": ["Fx"], "fields": { "targets": ["Cam_A"] } }""", "refused", MissionErrors.TargetType, "fields.targets")]
     public void EachErrorOfTheAddsHasItsCodeAndChangesNothing(string tool, string arguments, string code, string detail,
         string field)

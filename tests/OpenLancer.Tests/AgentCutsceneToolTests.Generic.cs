@@ -281,6 +281,8 @@ public sealed partial class AgentCutsceneToolTests
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#entity/Lamp", "fields": { "lightprops.type": 99 } }""", "invalid_value", MissionErrors.FieldValue, "fields.lightprops.type")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/2", "fields": { "props.event_flags": ["Fast"] } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.event_flags")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/3", "fields": { "props.custom": "{ 1," } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.custom")]
+    [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/2", "fields": { "props.animation": "Sc_wü" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.animation")]
+    [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/3", "fields": { "props.custom": "{ \"ü\" }" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.custom")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#entity/Path", "fields": { "pathprops.path_data": { "closed": true, "keys": [ { "point": [0, 0, 0] }, { "point": [1, 0, 0], "orientation": [1, 0, 0, 0] } ] } } }""", "invalid_value", MissionErrors.FieldValue, "fields.pathprops.path_data")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1", "fields": { "time": "x" } }""", "invalid_value", MissionErrors.FieldValue, "fields.time")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1", "fields": { "time": -1 } }""", "invalid_value", MissionErrors.FieldValue, "fields.time")]

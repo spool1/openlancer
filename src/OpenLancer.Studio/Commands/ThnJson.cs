@@ -82,11 +82,37 @@ internal static class ThnJson
     /// <param name="path">The path of the key, for the error.</param>
     /// <param name="json">The JSON value. The caller handles <c>null</c>, which removes the key.</param>
     /// <param name="stored">The value of the key now, or null.</param>
+    /// <remarks>A new value must be a value that a save can write. Else the read gives the reason of the writer, for
+    /// example for a text with a character outside ASCII. So the error names the key, and the plan of the edit does
+    /// not refuse the value later.</remarks>
     public static ThnJsonInput Read(ThnKeyRow? row, string path, JsonNode json, ThnValue? stored,
         IReadOnlyDictionary<string, ThnSymbolInfo> symbols, IThnEvaluator evaluator)
     {
         if (stored != null && Same(Write(row, stored, symbols, evaluator), json))
             return ThnJsonInput.Of(stored);
+        var input = ReadNew(row, path, json, stored, symbols, evaluator);
+        return input.Value is { } value && WriteProblem(value) is { } problem ? ThnJsonInput.Fail(problem) : input;
+    }
+
+    /// <summary>Why the writer of a save cannot write a value, or null.</summary>
+    private static string? WriteProblem(ThnValue value)
+    {
+        try
+        {
+            ThnWriter.Value(value);
+            return null;
+        }
+        catch (ArgumentException e)
+        {
+            return e.Message;
+        }
+    }
+
+    /// <summary>The value of a key that a JSON value gives, when the JSON value is not the form of the stored
+    /// value.</summary>
+    private static ThnJsonInput ReadNew(ThnKeyRow? row, string path, JsonNode json, ThnValue? stored,
+        IReadOnlyDictionary<string, ThnSymbolInfo> symbols, IThnEvaluator evaluator)
+    {
         var kind = row?.Kind ?? ThnKeyKind.Value;
         var bad = ThnJsonInput.Fail($"The value of {path} must be {Expected(row, symbols)}.");
         switch (kind)
