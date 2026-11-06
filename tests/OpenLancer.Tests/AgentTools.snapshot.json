@@ -6959,7 +6959,7 @@
           "fields": {
             "type": "object",
             "minProperties": 1,
-            "description": "The new values by INI key. A text, a number or true or false is one line with one value. An array of values is one line, for example [1, 2, 3]. An array of arrays gives one line for each array. null or [] removes the key. A text cannot hold \u0027,\u0027. A mission item takes the field forms of mission_add_item. A cutscene item takes the THN paths and the value forms of get_cutscene, for example \u0022props.duration\u0022: 2."
+            "description": "The new values by INI key. A text, a number or true or false is one line with one value. An array of values is one line, for example [1, 2, 3]. An array of arrays gives one line for each array. null or [] removes the key. A text cannot hold \u0027,\u0027. A mission item takes the field forms of mission_add_item. A cutscene item takes the THN paths and the value forms of get_cutscene, for example \u0022props.duration\u0022: 2. For a cutscene item, only null removes a key, and [] turns off the named bits of a bits key. A Lua text of a cutscene item can hold \u0027,\u0027."
           },
           "expect_type": {
             "type": "string",

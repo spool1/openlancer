@@ -111,7 +111,7 @@ These tools work in both hosts. They change nothing.
 |---|---|
 | `studio_status` | The profile, the active mod, the revision, the tool groups and the limits. The agent calls it first. |
 | `list_systems`, `get_system` | The star systems, and one system with its counts, bases, connections and problems. |
-| `list_items`, `get_item` | The items of a system, and one item with its fields, their origins and their problems. |
+| `list_items`, `get_item` | The items of a system, and one item with its fields, their origins and their problems. A cutscene entity or event gives its fields by their THN paths. |
 | `find_references` | Each line and each file that names an item, also in the mission scripts. |
 | `list_values` | The values that a field can take, from one data list. |
 | `search_assets`, `list_prop_groups` | The assets of the Assets panel, and the prop groups of the mods. |
@@ -154,7 +154,7 @@ These tools change the data of the active mod. They work in both hosts. The olto
 | Tool | What it does |
 |---|---|
 | `set_fields` | Sets fields of one item by their INI keys, or of a cutscene entity or event by their THN paths. |
-| `set_text` | Sets the name, the infocard or another text of one item, or a text id of a mission line. The text goes into the `strings.json` of the active mod. |
+| `set_text` | Sets the name, the infocard or another text of one item, or a text id of a mission line. The text goes into the `strings.json` of the active mod. It does not change cutscene items. Use `set_fields` for their texts. |
 | `rename_item` | Gives an item a new nickname, and changes each line that names it. A line that the active mod cannot change keeps the old nickname and shows "Missing". A data item must be an item that the active mod adds. A cutscene entity gets a new name, and the events of its script that name it change too. |
 | `delete_items` | Deletes items of a system with their children, mission items, and cutscene entities and events. Other lines that name them show "Missing". A cutscene entity goes with the events that name it. |
 | `duplicate_items` | Copies items of a system with their children, mission items and cutscene events. With `offset`, the copies of a system move by the offset. A copy without a position, a mission copy and a copy of a cutscene event do not move, and the result warns about them. With `time_offset`, each copy of an event is at the time of its event plus the offset. |
@@ -565,7 +565,7 @@ The value forms of the THN keys:
 | Turn | `degrees`, and an optional `axis`: an axis name or three numbers. | `"props.spatialprops.axisrot": { "degrees": 90, "axis": "Y_AXIS" }` |
 | Other key | Lua text in a JSON text, as the engine reads it. A key that the THN schema does not know has this form too. | `"props.custom": "{ 1, 2 }"` |
 
-`null` removes the key. A key of a record goes with its own path. A record as a value gives `invalid_argument`. A value of the wrong form gives `invalid_value`, and the message gives the form. A stored value that does not fit its form shows as Lua text, and the same text keeps the value.
+Only `null` removes the key. A key of a record goes with its own path. A record as a value gives `invalid_argument`. A value of the wrong form gives `invalid_value`, and the message gives the form. A stored value that does not fit its form shows as Lua text, and the same text keeps the value.
 
 Some keys have their own rules, as in the Inspector:
 

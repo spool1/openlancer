@@ -79,6 +79,8 @@ public sealed partial class AgentCutsceneToolTests
         { "value", Script + "#event/3", """ "props.custom": "{ 3, 4 }" """, "value" },
         { "time", Script + "#event/2", """ "time": 1.5 """, "time" },
         { "length", Script + "#event/2", """ "props.duration": 3 """, "length" },
+        { "time off the grid", Script + "#event/2", """ "time": 1.2345 """, "time-grid" },
+        { "length off the grid", Script + "#event/2", """ "props.duration": 0.33333 """, "length-grid" },
         { "targets", Script + "#event/0", """ "targets": ["Monitor", "Cam2"] """, "targets" },
         { "remove", KindsCam, """ "cameraprops.hvaspect": null """, "remove" },
     };
@@ -113,6 +115,8 @@ public sealed partial class AgentCutsceneToolTests
             "value" => Text(Event(s, 3), "props.custom", ThnKeyKind.Value, "{ 3, 4 }"),
             "time" => ThnFieldCommand.Time(Event(s, 2), 2).Make(s, new ThnNumber(1.5f)),
             "length" => ThnFieldCommand.Length(Event(s, 2), 2).Make(s, new ThnNumber(3)),
+            "time-grid" => ThnFieldCommand.Time(Event(s, 2), 2).Make(s, new ThnNumber(1.2345f)),
+            "length-grid" => ThnFieldCommand.Length(Event(s, 2), 2).Make(s, new ThnNumber(0.33333f)),
             "targets" => CutsceneCommands.SetTarget(s, Event(s, 0), 1, "Cam2"),
             _ => CutsceneCommands.RemoveValue(s, cam, new ThnPath("cameraprops.hvaspect")),
         };
