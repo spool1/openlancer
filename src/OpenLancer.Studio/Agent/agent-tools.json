@@ -2128,7 +2128,7 @@
     "SelectionView.place": "Where the editor selects the item: scene, mission or cutscene for the item of a tab, else inspector.",
     "SelectionView.shown": "True when the user sees the selection after the call. False when the tab of the item does not show. That tab then selects the item when the user shows it.",
     "EditError.step_code": "For the error step_failed: the code of the error of the step, for example not_found. Else none.",
-    "AgentLimits.edit_items": "The most items that one call of delete_items or duplicate_items names, and the most rows of scene_transform and cutscene_move_events.",
+    "AgentLimits.edit_items": "The most items that one call of delete_items or duplicate_items names, and the most rows of scene_transform, cutscene_move_events and expect_events.",
     "AgentLimits.edit_sections": "The most sections that one edit call changes, adds or removes.",
     "AgentLimits.batch_steps": "The most steps of one edit_batch call, and the most commands of one mission_edit call. A command_group counts as one command.",
     "AgentLimits.route_legs": "The most legs of one route of scene_place_patrol_route.",

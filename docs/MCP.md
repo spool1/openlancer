@@ -84,7 +84,7 @@ When another program uses the port, the server does not start. The status bar th
 |---|---|---|
 | Agent server port | 47815 | The port of the server on this computer. Stop the server to change it. |
 | Auto-save and continue when an MCP agent starts Play | Off | When an agent starts Play and the active mod has unsaved edits, the editor saves them and plays. Off: the editor asks you first. See "Agent Play" in [PLAY.md](PLAY.md). The setting applies to the tools `play` and `mission_play`. |
-| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions, Cutscenes and Play. The `scene_` tools, the `prop_group_` tools and `render_scene` are in the group Scene. The `cutscene_` tools, `list_cutscenes`, `get_cutscene` and `render_cutscene` are in the group Cutscenes. `play`, `play_stop` and `mission_play` are in the group Play. The other `mission_` tools and the read tools of the missions are in the group Missions. `mission_play` plays a mission script, so it also refuses when you clear the group Missions. These read tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check` and `get_console`. The edit tools of "The edit tools" are always available too, and so are `save`, `export_mod`, `publish_checklist`, `create_loadout`, `create_from_template`, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene. |
+| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions, Cutscenes and Play. The `scene_` tools, the `prop_group_` tools and `render_scene` are in the group Scene. The `cutscene_` tools, `list_cutscenes`, `get_cutscene` and `render_cutscene` are in the group Cutscenes. `play`, `play_stop` and `mission_play` are in the group Play. The other `mission_` tools and the read tools of the missions are in the group Missions. `mission_play` plays a mission script, so it also refuses when you clear the group Missions. These read tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check` and `get_console`. The edit tools of "The edit tools" are always available too, and so are `save`, `export_mod`, `publish_checklist`, `create_loadout`, `create_from_template`, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene, or a cutscene event when you clear the group Cutscenes. |
 | Rows of a page without a limit | 50 | The rows of a list result when the agent gives no limit. |
 | Largest page limit | 200 | The largest limit that the agent can ask for in one list result. |
 | Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
@@ -93,7 +93,7 @@ When another program uses the port, the server does not start. The status bar th
 | Time of a check or an image (s) | 60 | How long a check of a retail target or an image can take. |
 | Size of a request (MB) | 4 | The largest request. The change applies at the next start of the server. |
 | Largest side of an image (pixels) | 2048 | The most pixels on each side of an image. A larger panel capture becomes smaller. A `render_scene` or `render_cutscene` call with a larger `width` or `height` gives the error `limit`. |
-| Items of one edit | 200 | The most items that one call of `delete_items`, `duplicate_items` or `prop_group_save` names. Also the most moves of one `scene_transform` call and the most events of one `cutscene_move_events` call. |
+| Items of one edit | 200 | The most items that one call of `delete_items`, `duplicate_items` or `prop_group_save` names. Also the most moves of one `scene_transform` call, the most events of one `cutscene_move_events` call and the most rows of `expect_events`. |
 | Sections of one edit | 2000 | The most sections that one edit call changes, adds or removes. A larger edit changes nothing and gives the error `limit`. |
 | Steps of one batch | 100 | The most steps of one `edit_batch` call, and the most commands of one `mission_edit` call. |
 | Legs of one route | 50 | The most legs of one `scene_place_patrol_route` call. Each leg is one zone. A retail route has at most 12 legs. |
@@ -118,7 +118,7 @@ These tools work in both hosts. They change nothing.
 | `list_missions`, `get_mission`, `get_trigger`, `describe_mission_name` | The mission scripts, one script, one trigger, and the plain name of a condition or an action. |
 | `mission_dry_run` | A dry run of one mission script, without a game world. The trigger rules of the game run step by step on the inputs that the agent gives. The result gives each step and the state after the last step. The section "The dry run" of `docs/MISSIONS.md` gives the rules. |
 | `mission_start_plan` | The plan of a play of one mission script from a start, as the Play start page shows it. A plan that cannot start gives the status `refused` and the reason. See "The start plan". |
-| `list_cutscenes`, `get_cutscene` | The cutscene scripts, and one script with its entities and events. |
+| `list_cutscenes`, `get_cutscene` | The cutscene scripts, and one script with its entities, its events and their fields. |
 | `get_raw_ini` | The INI text of a section or a file, with the problems of each line. |
 | `check` | The problems of the checks of the editor, in pages. |
 
@@ -153,18 +153,18 @@ These tools change the data of the active mod. They work in both hosts. The olto
 
 | Tool | What it does |
 |---|---|
-| `set_fields` | Sets fields of one item by their INI keys. |
+| `set_fields` | Sets fields of one item by their INI keys, or of a cutscene entity or event by their THN paths. |
 | `set_text` | Sets the name, the infocard or another text of one item, or a text id of a mission line. The text goes into the `strings.json` of the active mod. |
-| `rename_item` | Gives an item a new nickname, and changes each line that names it. A line that the active mod cannot change keeps the old nickname and shows "Missing". A data item must be an item that the active mod adds. |
-| `delete_items` | Deletes items of a system with their children, and mission items. Other lines that name them show "Missing". |
-| `duplicate_items` | Copies items of a system with their children, and mission items. With `offset`, the copies of a system move by the offset. A copy without a position does not move, and the result warns about it. |
+| `rename_item` | Gives an item a new nickname, and changes each line that names it. A line that the active mod cannot change keeps the old nickname and shows "Missing". A data item must be an item that the active mod adds. A cutscene entity gets a new name, and the events of its script that name it change too. |
+| `delete_items` | Deletes items of a system with their children, mission items, and cutscene entities and events. Other lines that name them show "Missing". A cutscene entity goes with the events that name it. |
+| `duplicate_items` | Copies items of a system with their children, mission items and cutscene events. With `offset`, the copies of a system move by the offset. A copy without a position does not move, and the result warns about it. With `time_offset`, each copy of an event is at the time of its event plus the offset. |
 | `undo` | Undoes the last edit of the agent. |
 | `redo` | Redoes the last edit that the agent undid. |
 | `edit_batch` | Runs edit steps as one Undo step, all or nothing. |
 
 Each edit is one Undo step. The Edit menu shows its label with "Agent: " before it, for example "Undo Agent: Delete my_station_1". You can undo and redo each agent edit, as each of your own edits. `undo` undoes only an agent edit at the top of the history. `redo` redoes only an agent edit that the agent undid. So the agent never undoes your edit, and never redoes an edit that you undid with Ctrl+Z. All agent programs of one editor have the same edit origin. So `undo` of one agent program can undo the last edit of another agent program.
 
-The five tools `set_fields`, `set_text`, `rename_item`, `delete_items` and `duplicate_items` also change mission items. "The generic tools on mission items" tells which references each tool takes. The other edit tools change only items of INI files that are not mission files. A reference of a mission item gives them `invalid_argument` with the detail `MissionItem`. A reference of a cutscene gives the error `not_available`, and the message names the cutscene tools. "The cutscene tools" tells how to change a cutscene.
+The five tools `set_fields`, `set_text`, `rename_item`, `delete_items` and `duplicate_items` also change mission items. "The generic tools on mission items" tells which references each tool takes. Four of them also change cutscene items, as "The generic tools on cutscene items" tells. The other edit tools change only items of INI files that are not mission files. A reference of a mission item gives them `invalid_argument` with the detail `MissionItem`. A reference of a cutscene item gives them `invalid_argument` with the detail `CutsceneItem`, and the message names the tools that change cutscenes.
 
 A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. Of the items of a system, `delete_items` takes objects, zones, lights, nebulae and asteroid fields. `duplicate_items` takes objects, zones and lights of a system. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. Another section, for example a loadout, gives `refused`.
 
@@ -179,7 +179,7 @@ A rename of an object of a system also changes the mission lines that name it, a
 
 A value never holds a comma. The key line, a key of linked lines and the `file` of a system are locked, and `get_item` marks them. Use `rename_item` for the nickname. Use `scene_set_encounters` for the `encounter`, `faction` and `faction_weight` lines of a zone. A value that a list check refuses still applies, as in the Inspector. The result gives the problem in `new_problems`.
 
-A mission item takes the field forms of `mission_add_item` in place of these forms, and it runs in strict mode. See "The generic tools on mission items".
+A mission item takes the field forms of `mission_add_item` in place of these forms, and it runs in strict mode. See "The generic tools on mission items". A cutscene item takes THN paths and the value forms of "The generic tools on cutscene items".
 
 #### Preview, confirmation and revision
 
@@ -531,7 +531,56 @@ The result gives each new and changed item as it is after the call. So an event 
 
 The result also gives the errors of the cutscene checks that the call adds and removes, in `new_problems` and `fixed_problems`. The game crashes when it plays a cutscene with such an error, so the save stops.
 
-`get_cutscene` gives the entities and the events of a script. The other edit tools of this version do not change cutscene items. A `thn:` reference gives them `not_available`, and the message names the cutscene tools. In this version, the Console entry of a cutscene edit links to no item, and follow mode does not open the Cutscene tab.
+`get_cutscene` gives the entities and the events of a script, each with its fields. In this version, the Console entry of a cutscene edit links to no item, and follow mode does not open the Cutscene tab.
+
+#### The generic tools on cutscene items
+
+`set_fields`, `rename_item`, `delete_items` and `duplicate_items` also change the entities and the events of a cutscene, with the commands of the Cutscene tab and the Inspector. Each call is one Undo step. One call can name cutscene items with items of a system and mission items. A cutscene item is in the group Cutscenes, so these tools refuse it with `not_available` when you clear that group.
+
+| Tool | Cutscene references | What it does with them |
+|---|---|---|
+| `set_fields` | `#entity/` and `#event/` | Sets each value by its THN path, as the fields of the Inspector do. See below. |
+| `rename_item` | `#entity/` | Renames the entity, as its name field does. The event targets and the speakers of the script that name the entity change too. |
+| `delete_items` | `#entity/` and `#event/` | Deletes as Delete in the Timeline does. An entity goes with the events that name it. |
+| `duplicate_items` | `#event/` | Copies the events as Duplicate in the Timeline does. The copies start at the end of the events. |
+
+`set_text` does not change cutscene items. It gives `invalid_argument`, and the message names `set_fields`. A reference of a whole script gives `set_fields` the error `refused`: use `cutscene_set_duration` for the duration. `duplicate_items` gives `refused` for an entity, because the editor has no copy of an entity. Another kind of `thn:` reference gives `invalid_argument` with the detail `CutsceneItem`.
+
+`get_cutscene` and `get_item` give the fields of an element by their THN paths. An entity gives each key of its record, and an event gives each key of its props, for example `cameraprops.fovh`, `spatialprops.pos` and `props.duration`. A record gives the keys in it, at each depth. The name, the type, the template and the flags of an entity are own properties, not fields. So are the time, the type and the targets of an event. Each value has the form that `set_fields` takes. So you can give a field back to `set_fields` as it is, and the call changes nothing.
+
+The value forms of the THN keys:
+
+| Kind of key | Form | Example |
+|---|---|---|
+| Number | A number. | `"cameraprops.fovh": 20` |
+| Text | A text. | `"props.animation": "Sc_wave"` |
+| Yes or no | `true` or `false`. A stored number stays a number, 0 or 1. | `"lightprops.on": false` |
+| Vector | Three numbers. | `"spatialprops.pos": [0, 10, -50]` |
+| Quaternion | Four numbers: w, x, y and z. | `"props.spatialprops.q_orient": [1, 0, 0, 0]` |
+| Rotation | Three angles in degrees, as the Inspector shows them. The file holds a matrix. | `"spatialprops.orient": [0, 90, 0]` |
+| Name | A THN name of the group of the key. A stored number stays a number. | `"lightprops.type": "L_DIRECT"` |
+| Bits | A list of the names of the bits that are on, or a whole number. The other bits keep their state. | `"props.event_flags": ["Loop"]` |
+| Motion path | `closed`, and one row for each key: a `point`, and an `orientation` (w, x, y and z) when the path has them. | `"pathprops.path_data": { "closed": false, "keys": [ { "point": [0, 0, 0], "orientation": [1, 0, 0, 0] } ] }` |
+| Curve | `clsid`, and one row for each point: `time`, `value`, `in` and `out`. | `"props.param_curve": { "clsid": "FreeFormPCurve", "points": [ { "time": 0, "value": 0, "in": 0, "out": 0 } ] }` |
+| Turn | `degrees`, and an optional `axis`: an axis name or three numbers. | `"props.spatialprops.axisrot": { "degrees": 90, "axis": "Y_AXIS" }` |
+| Other key | Lua text in a JSON text, as the engine reads it. A key that the THN schema does not know has this form too. | `"props.custom": "{ 1, 2 }"` |
+
+`null` removes the key. A key of a record goes with its own path. A record as a value gives `invalid_argument`. A value of the wrong form gives `invalid_value`, and the message gives the form. A stored value that does not fit its form shows as Lua text, and the same text keeps the value.
+
+Some keys have their own rules, as in the Inspector:
+
+- `time` and `props.duration` move the event, as the time and length fields do. They round to the 1 ms grid, and a time below 0 gives `invalid_value`. A SET_CAMERA event has no length, so `props.duration` gives `invalid_value` there.
+- `targets` takes one entity name for each target of the event, for example `["Monitor", "Camera_01"]`. Each entity must fit the role of its target. A target of the wrong type gives `refused`, and the message names the types that fit. A name that no entity of the script has gives `not_found`.
+- `entity_name` and `type` give `refused`. Use `rename_item` for the name. To change the type, delete the element and add another one.
+- The `flags` of an entity give `refused`. Use `cutscene_set_flags`.
+
+`set_fields` takes `expect_type` and `expect_time` for an event reference. `delete_items` and `duplicate_items` take them in the rows of `expect_events`: each row names one event of `refs`. These guards work as the guards of `cutscene_move_events`. A guard for a reference that is not an event gives `invalid_argument`.
+
+A rename of an entity needs `confirm: true` when other data uses the name. An example is the `name` of a `[Camera]` in a room that plays the script as its set script. Another example is a REFERENCE entity with the name in another script of the room. The rename changes only the script, so these uses keep the old name, and the message names them. The tool reads the files of the mod folders on disk for the uses. Its first call after an open or a save reads each INI file. A name of another entity gives `name_taken`, also in other letter case. The result gives the rename and the events that the rename changes.
+
+A delete of an entity that events name needs `confirm: true`, as the editor asks. The message names the events. The result gives each event with its index before the call, and the reason `cascade`.
+
+`duplicate_items` with `time_offset` puts each copy at the time of its event plus the offset, in seconds. A copy at the time of its event has the key of the event, so an offset of 0 gives `invalid_value`. A copy before 0 gives `invalid_value` too. `time_offset` without an event gives `invalid_argument`.
 
 ### Save
 
