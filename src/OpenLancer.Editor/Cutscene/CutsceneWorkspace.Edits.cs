@@ -219,8 +219,9 @@ internal sealed partial class CutsceneWorkspace
 
     /// <summary>
     /// The selection after an edit of the open cutscene, as Unity does (decision D249). A paste, a duplicate and an Add
-    /// event select the new events, and an edit that adds only an entity selects it. A delete selects the cutscene.
-    /// Each other edit keeps the selection, for example a rename.
+    /// event select the new events, and an edit that adds only an entity selects it (see
+    /// <see cref="SelectionOfAdded"/>). A delete selects the cutscene. Each other edit keeps the selection, for example a
+    /// rename.
     /// </summary>
     /// <remarks>Call it right after the run, because <see cref="CutscenePlan.Added"/> reads the last elements of
     /// W.</remarks>
@@ -233,19 +234,25 @@ internal sealed partial class CutsceneWorkspace
             return current;
         }
 
-        var added = plan.Added(session);
+        return SelectionOfAdded(path, plan.Added(session)) ?? (plan.Deleted.Count > 0 ? new CutsceneRoot(path) : current);
+    }
+
+    /// <summary>
+    /// The selection of the new elements of a cutscene, as Unity selects new items (decision D249): the new events, else
+    /// the last new entity, else null. The Timeline and follow mode of the agent edits use it.
+    /// </summary>
+    /// <param name="path">The install path of the cutscene, in normal form.</param>
+    /// <param name="added">The new elements of the cutscene, in the order of their adds.</param>
+    /// <returns>An event, a set of events, an entity, or null when <paramref name="added"/> is empty.</returns>
+    internal static object? SelectionOfAdded(string path, IReadOnlyList<ThnRef> added)
+    {
         var events = added.Where(e => e.Kind == ThnElementKind.Event).Select(e => e.Id).ToList();
         if (events.Count > 0)
         {
             return ThnEventSet.Of(path, events);
         }
 
-        if (added.Count > 0)
-        {
-            return added[^1] with { Path = path };
-        }
-
-        return plan.Deleted.Count > 0 ? new CutsceneRoot(path) : current;
+        return added.Count > 0 ? added[^1] with { Path = path } : null;
     }
 
     /// <summary>W of a script of the session, or the script of the edit view, or null when it cannot be read.</summary>

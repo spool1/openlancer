@@ -7,6 +7,7 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Thn;
+using OpenLancer.Editor.Cutscene;
 using OpenLancer.Editor.Missions;
 using OpenLancer.Studio.Agent;
 
@@ -47,13 +48,15 @@ internal interface IFollowView
 
     /// <summary>
     /// Opens a cutscene in the Cutscene tab and shows the tab and the Timeline. With <paramref name="select"/>, it also
-    /// selects the element, or the cutscene when <paramref name="element"/> is null, as a click does. The open of another
-    /// cutscene selects that cutscene, as the open of a cutscene does. The Cutscene view keeps its mode and its camera.
+    /// makes the selection, or selects the cutscene when <paramref name="selection"/> is null, as a click does. The open
+    /// of another cutscene selects that cutscene, as the open of a cutscene does. The Cutscene view keeps its mode and its
+    /// camera.
     /// </summary>
     /// <param name="path">The install path of the cutscene, in the form that the session stores.</param>
-    /// <param name="element">An entity or an event of the cutscene, or null for the cutscene.</param>
+    /// <param name="selection">An entity, an event or a set of events of the cutscene (<see cref="ThnEventSet"/>), or
+    /// null for the cutscene.</param>
     /// <returns>False when the Cutscene tab cannot open the cutscene, for example while the game data loads.</returns>
-    bool ShowInCutscene(string path, ThnRef? element, bool select);
+    bool ShowInCutscene(string path, object? selection, bool select);
 }
 
 /// <summary>What the panels did in one frame, for follow mode. The window reads it before and after the panels
@@ -84,14 +87,14 @@ internal readonly record struct FollowFrame(
 /// editor opens the system of each agent edit and frames its item. An edit of a mission opens its script in the Mission
 /// tab and frames the item in the graph. An edit of a cutscene opens its script in the Cutscene tab. The selection then
 /// follows Unity (decision D249): a create or a duplicate selects the new item, a delete clears the selection, and a
-/// rename keeps it. A delete in a cutscene selects the cutscene, as a delete of the user in the Timeline does. An item
-/// without a place in the Scene, for
-/// example a loadout, shows in the Inspector, and the view does not change. Follow mode does not leave prefab mode, as
-/// Unity keeps prefab mode open when the scene changes. An edit of a mission then shows only in the Console. A camera
-/// input, a pan or a zoom of the mission graph, or a selection of the user stops follow mode until the user turns it on
-/// again. With follow mode off, the agent
-/// never changes the view or the selection. Only a selection of a section that an agent edit removed goes, as after an
-/// undo. A selected item keeps its item when an agent edit renames it or moves its row.
+/// rename keeps it. In a cutscene, the selection is the same as after an edit of the user in the Timeline
+/// (<see cref="CutsceneWorkspace.SelectionAfter"/>): the new events, else the last new entity. A delete in a cutscene
+/// selects the cutscene. An item without a place in the Scene, for example a loadout, shows in the Inspector, and the
+/// view does not change. Follow mode does not leave prefab mode, as Unity keeps prefab mode open when the scene changes.
+/// An edit of a mission then shows only in the Console. A camera input, a pan or a zoom of the mission graph, or a
+/// selection of the user stops follow mode until the user turns it on again. With follow mode off, the agent never
+/// changes the view or the selection. Only a selection of a section that an agent edit removed goes, as after an undo. A
+/// selected item keeps its item when an agent edit renames it or moves its row.
 /// </summary>
 /// <param name="settings">The setting "Follow agent". It keeps the last value that the user clicked.</param>
 internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
@@ -192,7 +195,7 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
         if (result.Adds.Count > 0)
             Show(result.Adds, select: true);
         else
-            Show(result.Renames.Select(r => r.To).Concat(result.Changes), select: false);
+            Show([.. result.Renames.Select(r => r.To), .. result.Changes], select: false);
     }
 
     /// <summary>Follows an undo or a redo of the agent. With follow mode on, the undo of an agent delete selects its
@@ -222,16 +225,18 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
     /// Mission tab or the Scene cannot show also shows in the Inspector, for example a section of a ship build file. In
     /// prefab mode, an item of a mission file does not show.
     /// </summary>
-    /// <param name="select">True to select an item of the Cutscene tab, the Scene or the Mission tab. An item that shows
-    /// only in the Inspector always gets the selection, because the Inspector shows only the selection.</param>
-    private void Show(IEnumerable<string> references, bool select)
+    /// <param name="select">True to select an item of the Cutscene tab, the Scene or the Mission tab. In the Cutscene
+    /// tab, the selection is that of all the elements of the cutscene in <paramref name="references"/> (see
+    /// <see cref="SelectionIn"/>). An item that shows only in the Inspector always gets the selection, because the
+    /// Inspector shows only the selection.</param>
+    private void Show(IReadOnlyList<string> references, bool select)
     {
         SectionRef? inspector = null;
         foreach (var reference in references)
         {
             if (CutsceneItemOf(reference) is var (cutscene, element))
             {
-                if (view.ShowInCutscene(cutscene, element, select))
+                if (view.ShowInCutscene(cutscene, select ? SelectionIn(cutscene, references) : element, select))
                     return;
                 continue;
             }
@@ -342,6 +347,17 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
             return null;
         }
     }
+
+    /// <summary>
+    /// The selection of the elements of a cutscene in the items to select, as the Timeline selects the new elements of
+    /// an edit of the user (<see cref="CutsceneWorkspace.SelectionOfAdded"/>). Examples are the two copies of a duplicate
+    /// of two events, and the new entity of a batch that makes a script and adds the entity.
+    /// </summary>
+    /// <returns>The events, else the last entity, else null for the cutscene, for example for a new script.</returns>
+    private object? SelectionIn(string path, IEnumerable<string> references) =>
+        CutsceneWorkspace.SelectionOfAdded(path, [.. references.Select(CutsceneItemOf)
+            .Where(item => item is { Element: not null } && VfsPath.Comparer.Equals(item.Value.Path, path))
+            .Select(item => item!.Value.Element!)]);
 
     /// <summary>The section of an item reference of a result, or null when the edit view has no such section, for
     /// example for a prop group.</summary>

@@ -8,7 +8,6 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Editing;
-using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Agent;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
@@ -201,11 +200,11 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
 
     /// <summary>
     /// Follow mode of the agent edits: opens a cutscene in the Cutscene tab with the code of <c>open_view</c>, shows the
-    /// tab and the Timeline, and selects the element or the cutscene on request, as <c>select_items</c> does. The Cutscene
-    /// view does not frame an entity, because a frame moves the view to Free mode and the user then loses the shot of
-    /// the cutscene camera.
+    /// tab and the Timeline, and makes the selection or selects the cutscene on request, as <c>select_items</c> does.
+    /// The Cutscene view does not frame an entity, because a frame moves the view to Free mode and the user then loses
+    /// the shot of the cutscene camera.
     /// </summary>
-    bool IFollowView.ShowInCutscene(string path, ThnRef? element, bool select)
+    bool IFollowView.ShowInCutscene(string path, object? selection, bool select)
     {
         // Without the game data, the Cutscene tab cannot open a cutscene, as the Scene cannot open a system.
         if (Session?.GameData == null || !agentViews.ShowCutscene(path))
@@ -215,7 +214,7 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
 
         if (select && Cutscenes.Root is { } root)
         {
-            SelectInTab(CenterMode.Cutscene, element ?? (object)root);
+            SelectInTab(CenterMode.Cutscene, selection ?? root);
         }
 
         return true;

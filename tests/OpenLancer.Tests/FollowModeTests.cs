@@ -13,8 +13,8 @@ namespace OpenLancer.Tests;
 /// <summary>
 /// Follow mode of the agent edits (section 8.5 of the MCP1 design, decisions D719 and D720), with the editor host and a
 /// fake view of the window. With follow mode on, the editor opens and frames the item of each agent edit, also in the
-/// Mission tab and in the Cutscene tab, and the selection follows Unity. With follow mode off, the agent never changes the view or the selection, except that a
-/// selected section that an agent edit removes goes.
+/// Mission tab and in the Cutscene tab, and the selection follows Unity. With follow mode off, the agent never changes
+/// the view or the selection, except that a selected section that an agent edit removes goes.
 /// </summary>
 public sealed class FollowModeTests
 {
@@ -678,15 +678,72 @@ public sealed class FollowModeTests
 
         Ok(host, "cutscene_add_event", $$"""{ "cutscene": {{Json(Script)}}, "type": "START_PSYS", "time": 1.5, "targets": ["Fx"] }""");
         var added = ThnSessions.Event(session, ThnSessions.W(session).Events.Count - 1);
-        Assert.Equal([(ThnSessions.ScriptPath, (ThnRef?)added, true)], view.CutsceneShown);
+        Assert.Equal([(ThnSessions.ScriptPath, (object?)added, true)], view.CutsceneShown);
         Assert.Equal(added, view.Selection);
 
         Ok(host, "cutscene_create", """{ "name": "my_intro" }""");
         var created = Assert.Single(session.NewCutscenes);
-        Assert.Equal((created, (ThnRef?)null, true), view.CutsceneShown[^1]);
+        Assert.Equal((created, (object?)null, true), view.CutsceneShown[^1]);
         Assert.Equal(new CutsceneRoot(created), view.Selection);
         Assert.Empty(view.Shown);
         Assert.Empty(view.MissionShown);
+    }
+
+    /// <summary>An agent copy of two events selects the two copies, as Duplicate in the Timeline does
+    /// (<see cref="CutsceneWorkspace.SelectionAfter"/>). The select of the result names only the last copy.</summary>
+    [Fact]
+    public void ACopyOfTwoEventsInACutsceneSelectsTheTwoCopies()
+    {
+        var (ws, session, editor, host) = Cutscenes();
+        using var _ = ws;
+        var view = editor.FollowView;
+
+        var result = Ok(host, "duplicate_items",
+            $$"""{ "refs": [{{Json(Script + "#event/3")}}, {{Json(Script + "#event/4")}}], "time_offset": 1 }""");
+
+        Assert.Equal([Script + "#event/6", Script + "#event/7"], AgentEditToolTests.Texts(result["adds"]));
+        Assert.Equal(Script + "#event/7", (string?)result["select"]);
+        var copies = new ThnEventSet(ThnSessions.ScriptPath,
+            [ThnSessions.Event(session, 6).Id, ThnSessions.Event(session, 7).Id]);
+        Assert.Equal([(ThnSessions.ScriptPath, (object?)copies, true)], view.CutsceneShown);
+        Assert.Equal(copies, view.Selection);
+    }
+
+    /// <summary>
+    /// A batch of adds in a cutscene selects as the Timeline does after an add: the new events, else the last new entity.
+    /// A batch that adds an entity and then an event selects the event. A batch that makes a script and adds an entity to
+    /// it selects the entity, not the script, as the select of the result does.
+    /// </summary>
+    [Fact]
+    public void ABatchOfAddsInACutsceneSelectsTheNewEventsElseTheLastNewEntity()
+    {
+        var (ws, session, editor, host) = Cutscenes();
+        using var _ = ws;
+        var view = editor.FollowView;
+
+        Ok(host, "edit_batch", $$"""
+            { "steps": [
+                { "tool": "cutscene_add_entity", "arguments": { "cutscene": {{Json(Script)}}, "type": "CAMERA", "name": "my_cam_2" } },
+                { "tool": "cutscene_add_event", "arguments": { "cutscene": {{Json(Script)}}, "type": "START_PSYS", "time": 1.5, "targets": ["Fx"] } }
+            ] }
+            """);
+        var ev = ThnSessions.Event(session, 6);
+        Assert.Equal((ThnSessions.ScriptPath, (object?)ev, true), view.CutsceneShown[^1]);
+        Assert.Equal(ev, view.Selection);
+
+        const string newPath = @"DATA\MODS\act\CUTSCENES\my_intro.thn";
+        var made = Ok(host, "edit_batch", $$"""
+            { "steps": [
+                { "tool": "cutscene_create", "arguments": { "name": "my_intro" } },
+                { "tool": "cutscene_add_entity", "arguments": { "cutscene": {{Json("thn:" + newPath)}}, "type": "MARKER", "name": "my_mark" } }
+            ] }
+            """);
+        Assert.Equal($"thn:{newPath}#entity/my_mark", (string?)made["select"]);
+        var created = Assert.Single(session.NewCutscenes);
+        var entity = new ThnRef(created, ThnElementKind.Entity,
+            session.Cutscene(created)!.Entities.Single(e => ThnScriptModel.NameOf(e.Table) == "my_mark").Id);
+        Assert.Equal((created, (object?)entity, true), view.CutsceneShown[^1]);
+        Assert.Equal(entity, view.Selection);
     }
 
     /// <summary>An agent change or rename in a cutscene opens the script and keeps the selection, as a change in the
@@ -703,8 +760,8 @@ public sealed class FollowModeTests
         Ok(host, "set_fields", $$"""{ "ref": {{Json(Script + "#event/1")}}, "fields": { "props.duration": 4 } }""");
         Ok(host, "rename_item", $$"""{ "ref": {{Json(Script + "#entity/Fx")}}, "new_name": "Fx_new", "confirm": true }""");
 
-        Assert.Equal([(ThnSessions.ScriptPath, (ThnRef?)ThnSessions.Event(session, 1), false),
-            (ThnSessions.ScriptPath, (ThnRef?)ThnSessions.Entity(session, "Fx_new"), false)], view.CutsceneShown);
+        Assert.Equal([(ThnSessions.ScriptPath, (object?)ThnSessions.Event(session, 1), false),
+            (ThnSessions.ScriptPath, (object?)ThnSessions.Entity(session, "Fx_new"), false)], view.CutsceneShown);
         Assert.Equal(selected, view.Selection);
         Assert.Equal(selected, ThnSessions.Entity(session, "Fx_new"));
     }
@@ -721,12 +778,12 @@ public sealed class FollowModeTests
         view.Selection = ThnSessions.Event(session, 2);
 
         Ok(host, "delete_items", $$"""{ "refs": [{{Json(Script + "#event/2")}}] }""");
-        Assert.Equal((ThnSessions.ScriptPath, (ThnRef?)null, true), view.CutsceneShown[^1]);
+        Assert.Equal((ThnSessions.ScriptPath, (object?)null, true), view.CutsceneShown[^1]);
         Assert.Equal(new CutsceneRoot(ThnSessions.ScriptPath), view.Selection);
 
         Ok(host, "undo");
         var restored = ThnSessions.Event(session, 2);
-        Assert.Equal((ThnSessions.ScriptPath, (ThnRef?)restored, true), view.CutsceneShown[^1]);
+        Assert.Equal((ThnSessions.ScriptPath, (object?)restored, true), view.CutsceneShown[^1]);
         Assert.Equal(restored, view.Selection);
     }
 

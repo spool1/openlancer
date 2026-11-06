@@ -1,6 +1,5 @@
 using System;
 using OpenLancer.Data.Editing;
-using OpenLancer.Data.Thn;
 using OpenLancer.Editor;
 using OpenLancer.Editor.Agent;
 using OpenLancer.Editor.Editing;
@@ -132,21 +131,21 @@ internal sealed class FakeFollowView : IFollowView
         return true;
     }
 
-    /// <summary>Each request to show a cutscene: the path, the element and the selection flag.</summary>
-    public System.Collections.Generic.List<(string Path, ThnRef? Element, bool Select)> CutsceneShown { get; } = [];
+    /// <summary>Each request to show a cutscene: the path, the selection and the selection flag.</summary>
+    public System.Collections.Generic.List<(string Path, object? Selection, bool Select)> CutsceneShown { get; } = [];
 
     /// <summary>False to act as a Cutscene tab that cannot open the cutscene, for example while the game data
     /// loads.</summary>
     public bool CanShowCutscene { get; set; } = true;
 
-    /// <summary>Selects the element, or the cutscene, as the Cutscene tab does.</summary>
-    public bool ShowInCutscene(string path, ThnRef? element, bool select)
+    /// <summary>Makes the selection, or selects the cutscene, as the Cutscene tab does.</summary>
+    public bool ShowInCutscene(string path, object? selection, bool select)
     {
         if (!CanShowCutscene)
             return false;
-        CutsceneShown.Add((path, element, select));
+        CutsceneShown.Add((path, selection, select));
         if (select)
-            Selection = element ?? (object)new OpenLancer.Editor.Cutscene.CutsceneRoot(path);
+            Selection = selection ?? new OpenLancer.Editor.Cutscene.CutsceneRoot(path);
         return true;
     }
 
