@@ -288,7 +288,7 @@ public static class CutsceneCommands
     /// <see cref="MissionErrors.NameTaken"/>. Other data that uses the old name keeps it. So the plan needs a
     /// confirmation when the caller gives such uses (decision D242).</para>
     /// <para><see cref="CutscenePlan.Changed"/> names only the entity. The events and the speakers that the rename
-    /// changes too are not in it.</para>
+    /// changes too are not in it. The plan keeps the uses (<see cref="CutscenePlan.Uses"/>) for the question.</para>
     /// </remarks>
     /// <param name="uses">The uses of the old name in other data (see <see cref="CutsceneRename.Uses"/>).</param>
     internal static CutscenePlan RenameEntity(EditSession session, ThnRef entity, string newName,
@@ -302,7 +302,7 @@ public static class CutsceneCommands
             ThnEdits.NameTakenRefusal(working, newName, entity.Id) is { } taken)
             return CutscenePlan.Refused(label, script, taken, MissionErrors.NameTaken);
         return CutscenePlan.Of(label, script, () => ThnEdits.RenameEntity(entity, newName), changed: [entity],
-            needsConfirmation: uses.Count > 0);
+            needsConfirmation: uses.Count > 0, uses: uses);
     }
 
     /// <summary>Plans a delete of events of one cutscene, as one entry. See <see cref="ThnEdits.Delete"/>.</summary>
@@ -374,7 +374,23 @@ public static class CutsceneCommands
     /// Plans a copy of events of one cutscene right after the events, as Duplicate of Unity does, in one entry. See
     /// <see cref="TimelineEdits.Duplicate"/>.
     /// </summary>
-    public static CutscenePlan Duplicate(EditSession session, IReadOnlyList<ThnRef> events)
+    public static CutscenePlan Duplicate(EditSession session, IReadOnlyList<ThnRef> events) =>
+        Duplicate(session, events, null);
+
+    /// <summary>
+    /// Plans a copy of events of one cutscene, each copy at the time of its event plus an offset, in one entry. The
+    /// times round to the 1 ms grid. See <see cref="TimelineEdits.Paste"/>.
+    /// </summary>
+    /// <remarks>A copy at the time of its event has the time, the type and the targets of the event, so a later mod
+    /// that names the event by that key finds two events (see <see cref="TimelineEdits.Duplicate"/>). Such an offset,
+    /// for example 0, refuses with the detail <see cref="MissionErrors.FieldValue"/>. A copy before 0 and an offset
+    /// that is not finite refuse with that detail too.</remarks>
+    /// <param name="timeOffset">The seconds from the time of each event to the time of its copy.</param>
+    public static CutscenePlan Duplicate(EditSession session, IReadOnlyList<ThnRef> events, double timeOffset) =>
+        Duplicate(session, events, (double?)timeOffset);
+
+    /// <summary>A copy of events after the events, or at an offset from them.</summary>
+    private static CutscenePlan Duplicate(EditSession session, IReadOnlyList<ThnRef> events, double? timeOffset)
     {
         var path = events.Count > 0 ? ScriptPath(session, events[0].Path) : "";
         var clip = session.Cutscene(path) is { } working ? TimelineEdits.Copy(working, events) : new TimelineClip([]);
@@ -387,8 +403,22 @@ public static class CutsceneCommands
             return CutscenePlan.Refused(label, path, reason);
         if (clip.Events.Count == 0)
             return CutscenePlan.Refused(label, path, ThnEdits.NoSuchElement(ThnElementKind.Event));
-        return CutscenePlan.Of(label, path, () => TimelineEdits.Duplicate(path, clip), newEvents: clip.Events.Count);
+        if (timeOffset is not { } offset)
+            return CutscenePlan.Of(label, path, () => TimelineEdits.Duplicate(path, clip), newEvents: clip.Events.Count);
+        if (!double.IsFinite(offset))
+            return CutscenePlan.Refused(label, path, ThnNumber.NotFiniteMessage, MissionErrors.FieldValue);
+        var start = clip.Start + offset;
+        if (start < 0)
+            return CutscenePlan.Refused(label, path, ThnEdits.StartsBeforeZero, MissionErrors.FieldValue);
+        if (clip.Events.Any(e => ThnEdits.OnGrid(TimelineClip.TimeOf(e) + offset) == TimelineClip.TimeOf(e)))
+            return CutscenePlan.Refused(label, path, SameKeyCopy, MissionErrors.FieldValue);
+        return CutscenePlan.Of(label, path, () => TimelineEdits.Paste(path, clip, start, null, "Duplicate"),
+            newEvents: clip.Events.Count);
     }
+
+    /// <summary>The reason why a copy cannot have the time of its event.</summary>
+    internal const string SameKeyCopy = "A copy at the time of its event has the key of the event, so a mod that names " +
+                                        "the event finds two events. Use an offset of 1 ms or more.";
 
     /// <summary>Plans a move of an event before another event of the same time (Move before). See
     /// <see cref="ThnEdits.Reorder"/>.</summary>

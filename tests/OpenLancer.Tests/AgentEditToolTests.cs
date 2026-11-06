@@ -362,15 +362,15 @@ public sealed class AgentEditToolTests
         Assert.Equal(1, session.Revision);
     }
 
-    /// <summary>The edit tools of this version do not change cutscenes, so a cutscene reference gives not_available
-    /// until the cutscene tools of MCP1-4. A mission script, an act and a prefab are not items of the generic tools, so
-    /// set_fields refuses them with the detail MissionItem and names mission_edit (step 5 of MCP1-3).</summary>
+    /// <summary>A mission script, an act and a prefab are not items of the generic tools, so set_fields refuses them
+    /// with the detail MissionItem and names mission_edit (step 5 of MCP1-3). A whole cutscene is not an item of
+    /// set_fields either: it refuses with the detail CutsceneItem and names cutscene_set_duration (step 4 of
+    /// MCP1-4).</summary>
     [Theory]
     [InlineData(@"msn:DATA\MISSIONS\M01A\m01a.ini", "invalid_argument", EditTools.MissionItem)]
     [InlineData(@"act:DATA\MISSIONS\M01A\m01a.ini#act_1", "invalid_argument", EditTools.MissionItem)]
     [InlineData("prefab:builtin:patrol", "invalid_argument", EditTools.MissionItem)]
-    [InlineData(@"thn:DATA\MODS\act\CUTSCENES\x.thn", "not_available", EditTools.CutsceneEdits)]
-    [InlineData(@"thn:DATA\MODS\act\CUTSCENES\x.thn#entity/Camera_01", "not_available", EditTools.CutsceneEdits)]
+    [InlineData(@"thn:DATA\MODS\act\CUTSCENES\x.thn", "refused", EditTools.CutsceneItem)]
     public void AScriptAPrefabOrACutsceneReferenceRefuses(string reference, string code, string detail)
     {
         var (ws, session, host) = Scene();
@@ -381,13 +381,12 @@ public sealed class AgentEditToolTests
 
         Assert.Equal((code, detail, "ref"), (error.Code, error.Detail, field));
         Assert.Equal(detail == EditTools.MissionItem, error.Message!.Contains("mission_edit", StringComparison.Ordinal));
-        Assert.Equal(detail == EditTools.CutsceneEdits,
-            error.Message == AgentTexts.Error("edit_cutscenes_later", ("tool", "set_fields")));
+        Assert.Equal(detail == EditTools.CutsceneItem, error.Message!.Contains("cutscene_set_duration", StringComparison.Ordinal));
         Assert.False(session.CanUndo);
     }
 
-    /// <summary>A scene tool also refuses a cutscene reference, and its message names the scene tool, not the generic
-    /// edit tools.</summary>
+    /// <summary>A scene tool refuses a cutscene reference with the detail CutsceneItem. Its message names the scene
+    /// tool and the tools that change cutscenes.</summary>
     [Fact]
     public void ASceneToolNamesItselfForACutsceneReference()
     {
@@ -397,9 +396,9 @@ public sealed class AgentEditToolTests
         var error = Error(host, "scene_transform",
             """{ "moves": [{ "ref": "thn:DATA\\MODS\\act\\CUTSCENES\\x.thn#entity/Camera_01", "position": [1, 2, 3] }] }""");
 
-        Assert.Equal(("not_available", EditTools.CutsceneEdits), (error.Code, error.Detail));
-        Assert.Equal("scene_transform does not change cutscenes. Use the cutscene tools, for example " +
-                     "cutscene_move_events and cutscene_set_flags.", error.Message);
+        Assert.Equal(("invalid_argument", EditTools.CutsceneItem), (error.Code, error.Detail));
+        Assert.Equal("scene_transform does not change cutscenes. Use set_fields, rename_item, delete_items, " +
+                     "duplicate_items or the cutscene tools.", error.Message);
         Assert.False(session.CanUndo);
     }
 

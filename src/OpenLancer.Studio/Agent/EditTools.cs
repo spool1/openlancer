@@ -8,6 +8,7 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Ini;
 using OpenLancer.Data.Missions.Editing;
+using OpenLancer.Data.Thn;
 using OpenLancer.Studio.Commands;
 
 namespace OpenLancer.Studio.Agent;
@@ -224,10 +225,13 @@ internal sealed class EditScope
         if (!plan.CanRun)
             throw new EditException(EditTools.RefusalOf(Session, plan));
         var cutscene = plan as CutscenePlan;
+        string? question = null;
         if (cutscene != null)
         {
             cutscenes.Before(cutscene);
             checks.BeforeCutscene(cutscene.Path);
+            // The question of a cutscene plan names the elements as W has them before the run.
+            question = asks ? EditTools.ConfirmationOf(Session, plan) : null;
         }
         checks.Before(plan, targets ?? []);
         Batch.Label ??= plan.Label;
@@ -244,7 +248,7 @@ internal sealed class EditScope
         Report(asks ? part : part with { NeedsConfirmation = false });
         if (cutscene != null)
             cutscenes.After(cutscene, Batch.Parts.Count - 1);
-        if (asks && EditTools.ConfirmationOf(Session, plan) is { } reason)
+        if (asks && (cutscene != null ? question : EditTools.ConfirmationOf(Session, plan)) is { } reason)
             stepConfirmations.Add(reason);
     }
 
@@ -277,9 +281,9 @@ internal static class EditTools
     /// generic edit tools change mission items.</summary>
     public const string MissionItem = "MissionItem";
 
-    /// <summary>The detail code of a reference of a cutscene in a tool that does not change cutscenes. The cutscene
-    /// tools change them (see <see cref="CutsceneEditTools"/>).</summary>
-    public const string CutsceneEdits = "CutsceneEdits";
+    /// <summary>The detail code of a reference of a cutscene item that a tool does not change. The cutscene tools and
+    /// the generic edit tools change cutscene items.</summary>
+    public const string CutsceneItem = "CutsceneItem";
 
     /// <summary>The detail code of a call that names more items than the item limit of the host (see
     /// <see cref="RequireItemLimit"/>).</summary>
@@ -451,8 +455,9 @@ internal static class EditTools
     /// The section of a reference argument of an edit tool that changes sections of INI files that are not mission
     /// files, for example a scene tool or a builder. A reference of a mission item gives <c>invalid_argument</c> with
     /// the detail <see cref="MissionItem"/>: the mission tools and the generic edit tools change mission items (see
-    /// <see cref="ItemEditTools.Target"/>). A reference of a cutscene gives <c>not_available</c>, and the text names the
-    /// cutscene tools. An item of a tool group that the user hides gives <c>not_available</c> too (decision D725).
+    /// <see cref="ItemEditTools.Target"/>). A reference of a cutscene item gives <c>invalid_argument</c> with the detail
+    /// <see cref="CutsceneItem"/>, and the text names the tools that change cutscenes. An item of a tool group that the
+    /// user hides gives <c>not_available</c> (decision D725).
     /// </summary>
     /// <param name="field">The argument, for the error.</param>
     /// <exception cref="EditException">The reference is not valid, does not resolve, or names an item that the tool
@@ -462,7 +467,7 @@ internal static class EditTools
         var session = call.Session;
         var reference = ItemRefs.Parse(text);
         if (IsCutscene(reference.Kind))
-            throw CutsceneLater(call, text);
+            throw CutsceneItemRefusal(call, text);
         if (IsMission(reference))
             throw MissionItemRefusal(call, text);
         var section = ItemRefs.ResolveSection(session, reference);
@@ -531,6 +536,8 @@ internal static class EditTools
     /// </summary>
     internal static string? ConfirmationOf(EditSession session, EditPlan plan)
     {
+        if (plan is CutscenePlan cutscene)
+            return CutsceneConfirmation(session, cutscene);
         if (!plan.NeedsConfirmation && plan.Missing.Count == 0 && plan.MissionMissing.Count == 0)
             return null;
         string Ref(SectionRef section) => ItemRefs.Canonical(session, section);
@@ -556,6 +563,29 @@ internal static class EditTools
         if (plan.Mentions.Count > 0)
             parts.Add(AgentTexts.Error("confirm_mentions", ("files", Shown(plan.Mentions.Select(m => m.Path).Distinct().ToList()))));
         parts.AddRange(plan.Warnings.Select(w => w.Message).Distinct());
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>
+    /// Why a cutscene plan needs <c>confirm: true</c>, or null. The editor asks before a delete of an entity that events
+    /// name, and before a rename of an entity whose name other data uses (section 7.5 of the M8 design). The text names
+    /// the events that go with the entity, and the uses that keep the old name.
+    /// </summary>
+    /// <remarks>Call it before the plan runs, because a deleted event has its index in W before the run.</remarks>
+    private static string? CutsceneConfirmation(EditSession session, CutscenePlan plan)
+    {
+        if (!plan.NeedsConfirmation)
+            return null;
+        var parts = new List<string> { AgentTexts.Error("confirm_intro", ("label", plan.Label)) };
+        var working = session.Cutscene(plan.Path);
+        var events = plan.Deleted.Any(d => d.Kind == ThnElementKind.Entity)
+            ? plan.Deleted.Where(d => d.Kind == ThnElementKind.Event).Select(e => ItemRefs.Of(working, e))
+                .ToList()
+            : [];
+        if (events.Count > 0)
+            parts.Add(AgentTexts.Error("confirm_cascade", ("refs", Shown(events))));
+        if (plan.Uses.Count > 0)
+            parts.Add(AgentTexts.Error("confirm_uses", ("uses", Shown(plan.Uses.Select(u => u.Text).ToList()))));
         return string.Join(" ", parts);
     }
 
@@ -595,11 +625,11 @@ internal static class EditTools
         }
     }
 
-    /// <summary>The refusal of a reference of a cutscene in a tool that does not change cutscenes. The text names the
-    /// tool and the cutscene tools.</summary>
-    internal static EditException CutsceneLater(ToolCall call, string reference) =>
-        new(new EditError(EditErrorKind.NotAvailable, CutsceneEdits,
-            AgentTexts.Error("edit_cutscenes_later", ("tool", call.Tool))) { Target = reference });
+    /// <summary>The refusal of a reference of a cutscene item in a tool that does not change cutscenes. The text names
+    /// the tools that change them.</summary>
+    internal static EditException CutsceneItemRefusal(ToolCall call, string reference) =>
+        new(new EditError(EditErrorKind.InvalidArgument, CutsceneItem,
+            AgentTexts.Error("edit_cutscene_item", ("tool", call.Tool))) { Target = reference });
 
     /// <summary>The refusal of a reference of a mission item in a tool that does not change mission items. The text
     /// names the tools that change them.</summary>

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Nodes;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
@@ -46,6 +47,10 @@ internal sealed record CutsceneElementView(string Ref, ThnElementKind Element, s
     /// <summary>The template of an entity, else null.</summary>
     public string? Template { get; init; }
 
+    /// <summary>The flags of an entity that are on, as <c>cutscene_set_flags</c> takes them. Null for an event, and for
+    /// a flags value that the engine cannot read.</summary>
+    public IReadOnlyList<string>? Flags { get; init; }
+
     /// <summary>The time of an event in seconds, else null.</summary>
     public float? Time { get; init; }
 
@@ -55,9 +60,9 @@ internal sealed record CutsceneElementView(string Ref, ThnElementKind Element, s
     /// <summary>The entity names that an event targets.</summary>
     public IReadOnlyList<string> Targets { get; init; } = [];
 
-    /// <summary>The keys of the record of an entity or of the properties of an event, with their values as Lua
-    /// text. <c>set_fields</c> later takes the same THN paths.</summary>
-    public IReadOnlyDictionary<string, string> Fields { get; init; } = new Dictionary<string, string>();
+    /// <summary>The value of each key of the element that <c>set_fields</c> sets, by its THN path, in the JSON form of
+    /// <see cref="ThnJson"/> (see <see cref="CutsceneQueries.Fields"/>).</summary>
+    public IReadOnlyDictionary<string, JsonNode> Fields { get; init; } = new Dictionary<string, JsonNode>();
 }
 
 /// <summary>A cutscene with its entities, its events and its problems (tool <c>get_cutscene</c>).</summary>
@@ -107,13 +112,15 @@ internal static class CutsceneQueries
         var table = model.Element(element.Kind, element.Id)!.Table;
         var type = ThnSchema.TypeOf(element.Kind, table, session.ThnSymbols);
         var reference = ItemRefs.Of(session, element);
+        var symbols = session.ThnSymbols;
         if (element.Kind == ThnElementKind.Entity)
         {
             return new CutsceneElementView(reference, ThnElementKind.Entity, type)
             {
                 Name = ThnScriptModel.NameOf(table),
-                Template = (table["template_name"] as ThnText)?.Value,
-                Fields = table.Record.ToDictionary(f => f.Key, f => ThnWriter.Value(f.Value)),
+                Template = (table[TemplateKey] as ThnText)?.Value,
+                Flags = FlagsOf(table, symbols),
+                Fields = Fields(session, ThnElementKind.Entity, type, table),
             };
         }
         var props = table.List.Length > 3 ? table.List[3] as ThnTable : null;
@@ -122,8 +129,66 @@ internal static class CutsceneQueries
             Time = table.List.Length > 0 && table.List[0] is ThnNumber time ? time.Value : null,
             Length = props?["duration"] is ThnNumber length ? length.Value : null,
             Targets = table.List.Length > 2 ? Targets(table.List[2]) : [],
-            Fields = props?.Record.ToDictionary(f => f.Key, f => ThnWriter.Value(f.Value)) ?? new Dictionary<string, string>(),
+            Fields = Fields(session, ThnElementKind.Event, type, table),
         };
+    }
+
+    /// <summary>The key of the template of an entity.</summary>
+    private const string TemplateKey = "template_name";
+
+    /// <summary>The keys of an entity that the view gives as own properties, not in its fields.</summary>
+    private static readonly string[] OwnKeys = [ThnScriptModel.EntityNameKey, "type", TemplateKey, ThnFlags.Key];
+
+    /// <summary>
+    /// The value of each key of an element that <c>set_fields</c> sets, by its THN path, in the JSON form of
+    /// <see cref="ThnJson"/>. Each value goes back into <c>set_fields</c> without a change. A record gives the keys in
+    /// it, at each depth, but a curve stays one value. An entity leaves out its name, its type, its template and its
+    /// flags, which the view gives as own properties. An event gives the keys of its props. Its time, type and targets
+    /// are own properties.
+    /// </summary>
+    /// <remarks>A key that a path cannot name, for example a key with a '.', is not in the fields. No retail key has
+    /// one.</remarks>
+    internal static IReadOnlyDictionary<string, JsonNode> Fields(EditSession session, ThnElementKind kind, string? type,
+        ThnTable element)
+    {
+        var fields = new Dictionary<string, JsonNode>(StringComparer.Ordinal);
+        void Add(string prefix, ThnTable record)
+        {
+            foreach (var (key, value) in record.Record)
+            {
+                var text = prefix.Length == 0 ? key : prefix + ThnPath.Separator + key;
+                if (ThnPath.Problem(text) != null || key.Contains(ThnPath.Separator) || prefix.Length == 0 &&
+                    kind == ThnElementKind.Entity && OwnKeys.Contains(key, StringComparer.Ordinal))
+                    continue;
+                var row = ThnSchema.Find(kind, type, new ThnPath(text));
+                if (value is ThnTable { IsRecord: true } inner && row?.Kind != ThnKeyKind.Curve)
+                    Add(text, inner);
+                else
+                    fields[text] = ThnJson.Write(row, value, session.ThnSymbols, session.ThnEvaluator);
+            }
+        }
+
+        if (kind == ThnElementKind.Entity)
+            Add("", element);
+        else if (element.List.Length > 3 && element.List[3] is ThnTable { IsRecord: true } props)
+            Add("props", props);
+        return fields;
+    }
+
+    /// <summary>The flags of an entity that are on, in the order of the Inspector, or null when the engine cannot read
+    /// the value.</summary>
+    private static IReadOnlyList<string>? FlagsOf(ThnTable entity, IReadOnlyDictionary<string, ThnSymbolInfo> symbols)
+    {
+        var sound = ThnFlags.IsSound(entity, symbols);
+        try
+        {
+            var on = ThnFlags.On(entity[ThnFlags.Key], sound, symbols);
+            return ThnFlags.Shown(sound).Where(on.Contains).ToList();
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     /// <summary>The <c>thn:</c> reference of a cutscene script.</summary>

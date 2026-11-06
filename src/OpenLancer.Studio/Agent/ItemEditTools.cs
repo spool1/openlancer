@@ -6,6 +6,7 @@ using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.Thn;
 using OpenLancer.Runtime.Scene;
 using OpenLancer.Studio.Commands;
 
@@ -16,8 +17,9 @@ namespace OpenLancer.Studio.Agent;
 /// command of the command layer that the editor UI calls for the item, through the shared edit call of
 /// <see cref="EditTools"/>. A section of an INI file gets the commands of the Scene, the Inspector and the Database. An
 /// item of a mission file gets the mission commands of the mission studio (the first item of section 7.4, see
-/// <c>ItemEditTools.Missions.cs</c>). One call with items of both kinds runs all commands in one batch, so it is one
-/// Undo step.
+/// <c>ItemEditTools.Missions.cs</c>). An entity or an event of a cutscene gets the commands of the Cutscene tab
+/// (section 7.5 of the MCP1 design, see <c>ItemEditTools.Cutscenes.cs</c>). One call with items of more than one kind
+/// runs all commands in one batch, so it is one Undo step.
 /// </summary>
 internal static partial class ItemEditTools
 {
@@ -36,8 +38,13 @@ internal static partial class ItemEditTools
 
     public static ToolStep SetFields(ToolCall call) => EditTools.Apply(call, scope =>
     {
-        var target = Target(call, call.Args.Text("ref")!, "ref");
+        var target = Target(call, call.Args.Text("ref")!, "ref", GuardOf(call));
         var fields = call.Args.Node("fields")!.AsObject();
+        if (target.Cutscene is { } element)
+        {
+            SetCutsceneFields(scope, element, fields);
+            return;
+        }
         if (target.Mission is { } mission)
         {
             SetMissionFields(call, scope, mission, fields);
@@ -96,6 +103,11 @@ internal static partial class ItemEditTools
         var session = scope.Session;
         var target = Target(call, call.Args.Text("ref")!, "ref");
         var name = call.Args.Text("new_name")!;
+        if (target.Cutscene is { } entity)
+        {
+            RenameCutsceneEntity(scope, entity, name);
+            return;
+        }
         if (target.Mission is { } mission)
         {
             RenameMissionItem(call, scope, mission, name);
@@ -128,11 +140,13 @@ internal static partial class ItemEditTools
     /// </summary>
     public static ToolStep DeleteItems(ToolCall call) => EditTools.Apply(call, scope =>
     {
-        var (scene, missions) = Split(call, scope, "Delete");
+        var (scene, missions, cutscene) = Split(call, scope, "Delete");
         if (scene.Count > 0)
             scope.Run(SceneCommands.Delete(scope.Session, scene), scene);
         if (missions.Count > 0)
             DeleteMissionItems(call, scope, missions);
+        if (cutscene.Count > 0)
+            DeleteCutsceneItems(scope, cutscene);
     });
 
     /// <summary>
@@ -144,12 +158,17 @@ internal static partial class ItemEditTools
     /// </summary>
     public static ToolStep DuplicateItems(ToolCall call) => EditTools.Apply(call, scope =>
     {
-        var (scene, missions) = Split(call, scope, "Duplicate");
+        var (scene, missions, cutscene) = Split(call, scope, "Duplicate");
         var offset = call.Args.Point("offset") is { } point && point != Vector3.Zero ? point : (Vector3?)null;
+        var timeOffset = call.Args.Number("time_offset");
+        if (timeOffset != null && cutscene.Count == 0)
+            throw ToolInput.Bad("time_offset", AgentTexts.Error("cutscene_time_offset"));
         if (scene.Count > 0)
             DuplicateSceneItems(scope, scene, offset);
         if (missions.Count > 0)
             DuplicateMissionItems(call, scope, missions, offset != null);
+        if (cutscene.Count > 0)
+            DuplicateCutsceneEvents(scope, cutscene, timeOffset);
     });
 
     /// <summary>Copies items of a system, then moves the copies with a position by the offset.</summary>
@@ -176,21 +195,31 @@ internal static partial class ItemEditTools
 
     /// <summary>
     /// The items of the argument <c>refs</c> of <c>delete_items</c> and <c>duplicate_items</c>, each one time: the
-    /// sections of INI files that are not mission files, and the mission items with the place of their reference in the
-    /// list. A call with items of both kinds gets the label "{verb} {count} items".
+    /// sections of INI files that are not mission files, and the mission items and the cutscene elements with the place
+    /// of their reference in the list. The rows of <c>expect_events</c> guard the cutscene events. A call that runs
+    /// more than one plan gets the label "{verb} {count} items": a call with items of more than one kind, a call with
+    /// items of two cutscenes, and a delete of a cutscene entity with other cutscene items.
     /// </summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.Limit"/> above the item limit, or the error of a
     /// reference with the place of the reference in the list as the field.</exception>
-    private static (IReadOnlyList<SectionRef> Scene, IReadOnlyList<(int Index, MissionTarget Item)> Missions) Split(
-        ToolCall call, EditScope scope, string verb)
+    private static (IReadOnlyList<SectionRef> Scene, IReadOnlyList<(int Index, MissionTarget Item)> Missions,
+        IReadOnlyList<(int Index, ThnRef Element)> Cutscene) Split(ToolCall call, EditScope scope, string verb)
     {
         var targets = Refs(call).Select((r, i) => (Index: i, Target: Target(call, r, $"refs[{i}]"))).ToList();
         var scene = targets.Select(t => t.Target.Section).OfType<SectionRef>().Distinct().ToList();
         var missions = targets.Where(t => t.Target.Mission != null).Select(t => (t.Index, Item: t.Target.Mission!))
             .DistinctBy(t => t.Item.Key).ToList();
-        if (scene.Count > 0 && missions.Count > 0)
-            scope.Batch.Label ??= $"{verb} {scene.Count + missions.Count} items";
-        return (scene, missions);
+        var cutscene = targets.Where(t => t.Target.Cutscene != null).Select(t => (t.Index, Element: t.Target.Cutscene!))
+            .DistinctBy(t => t.Element).ToList();
+        CheckGuards(call, cutscene);
+        var cutscenePlans = cutscene.GroupBy(t => t.Element.Path, OpenLancer.Data.IO.VfsPath.Comparer)
+            .Sum(g => verb == "Delete"
+                ? (g.Any(t => t.Element.Kind == ThnElementKind.Event) ? 1 : 0) +
+                  g.Count(t => t.Element.Kind == ThnElementKind.Entity)
+                : 1);
+        if ((scene.Count > 0 ? 1 : 0) + (missions.Count > 0 ? 1 : 0) + cutscenePlans > 1)
+            scope.Batch.Label ??= $"{verb} {scene.Count + missions.Count + cutscene.Count} items";
+        return (scene, missions, cutscene);
     }
 
     /// <summary>The sections of the argument <c>refs</c> of a tool that changes only sections of INI files that are not

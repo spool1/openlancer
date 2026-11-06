@@ -2469,6 +2469,16 @@
                 ],
                 "description": "The template of an entity, else none."
               },
+              "flags": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "description": "The flags of an entity that are on, for example REFERENCE. none for an event, and for flags that the engine cannot read."
+              },
               "time": {
                 "type": [
                   "number",
@@ -2492,10 +2502,7 @@
               },
               "fields": {
                 "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "description": "The keys of an entity or of the properties of an event, with their values as Lua text."
+                "description": "The value of each key that set_fields sets, by its THN path, for example props.duration or spatialprops.pos. A record gives the keys in it. Each value goes back into set_fields as it is."
               }
             },
             "required": [
@@ -5973,7 +5980,7 @@
     {
       "name": "get_cutscene",
       "title": "Get a cutscene",
-      "description": "Gives one cutscene script: its duration, its entities, its events with their times and targets, and its errors. This tool changes nothing. Get the cutscenes from list_cutscenes first.",
+      "description": "Gives one cutscene script: its duration, its entities, its events with their times and targets, and its errors. Each element gives its fields by THN path, in the forms that set_fields takes. This tool changes nothing. Get the cutscenes from list_cutscenes first.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6044,6 +6051,16 @@
                   ],
                   "description": "The template of an entity, else none."
                 },
+                "flags": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The flags of an entity that are on, for example REFERENCE. none for an event, and for flags that the engine cannot read."
+                },
                 "time": {
                   "type": [
                     "number",
@@ -6067,10 +6084,7 @@
                 },
                 "fields": {
                   "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "description": "The keys of an entity or of the properties of an event, with their values as Lua text."
+                  "description": "The value of each key that set_fields sets, by its THN path, for example props.duration or spatialprops.pos. A record gives the keys in it. Each value goes back into set_fields as it is."
                 }
               },
               "required": [
@@ -6932,7 +6946,7 @@
     {
       "name": "set_fields",
       "title": "Set the fields of an item",
-      "description": "Sets fields of one section by their INI keys. The tool makes one Undo step. Use get_item to see the keys and the values first. A value that a list check refuses applies, and the result gives the new problem. A mission item runs in strict mode, so an edit that adds an error to its script refuses.",
+      "description": "Sets fields of one item: a section by its INI keys, or a cutscene entity or event by its THN paths. The tool makes one Undo step. Use get_item or get_cutscene to see the keys and the values first. A value that a list check refuses applies, and the result gives the new problem. A mission item runs in strict mode, so an edit that adds an error to its script refuses.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6940,12 +6954,22 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The reference of the item, for example obj:my_station_1 or list:ship/my_ship. A mission item takes its sec: reference, for example of a ship or an NPC. A trigger refuses. Use the mission tools for its lines."
+            "description": "The reference of the item, for example obj:my_station_1 or list:ship/my_ship. A mission item takes its sec: reference, for example of a ship or an NPC. A trigger refuses. Use the mission tools for its lines. A cutscene entity or event takes its thn: reference, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#event/0."
           },
           "fields": {
             "type": "object",
             "minProperties": 1,
-            "description": "The new values by INI key. A text, a number or true or false is one line with one value. An array of values is one line, for example [1, 2, 3]. An array of arrays gives one line for each array. null or [] removes the key. A text cannot hold \u0027,\u0027. A mission item takes the field forms of mission_add_item."
+            "description": "The new values by INI key. A text, a number or true or false is one line with one value. An array of values is one line, for example [1, 2, 3]. An array of arrays gives one line for each array. null or [] removes the key. A text cannot hold \u0027,\u0027. A mission item takes the field forms of mission_add_item. A cutscene item takes the THN paths and the value forms of get_cutscene, for example \u0022props.duration\u0022: 2."
+          },
+          "expect_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "With an event reference: the type that the event must have, for example START_SOUND. Another type refuses with RowChanged."
+          },
+          "expect_time": {
+            "type": "number",
+            "description": "With an event reference: the time in seconds that the event must have. Another time refuses with RowChanged."
           },
           "preview": {
             "type": "boolean",
@@ -7512,7 +7536,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The reference of the item, for example obj:my_station_1. A mission item takes a line: reference, a trg: reference or its sec: reference."
+            "description": "The reference of the item, for example obj:my_station_1. A mission item takes a line: reference, a trg: reference or its sec: reference. A cutscene item refuses. Use set_fields for its texts."
           },
           "field": {
             "type": "string",
@@ -8084,7 +8108,7 @@
     {
       "name": "rename_item",
       "title": "Rename an item",
-      "description": "Gives an item a new nickname and changes each line that names it. The tool makes one Undo step. When the rename warns, cannot change a line that names the item, or other files name it as text, the tool asks for confirm: true.",
+      "description": "Gives an item a new nickname and changes each line that names it. A cutscene entity gets a new name, and the events of its script that name it change too. The tool makes one Undo step. When the rename warns, cannot change a line that names the item, or other files name it, the tool asks for confirm: true.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8092,13 +8116,13 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The reference of the item, for example obj:my_station_1. A data item must be an item that the active mod adds. A trigger takes its trg: reference, and another mission item its sec: reference."
+            "description": "The reference of the item, for example obj:my_station_1. A data item must be an item that the active mod adds. A trigger takes its trg: reference, and another mission item its sec: reference. A cutscene entity takes its thn: reference, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#entity/Camera_01."
           },
           "new_name": {
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The new nickname. A refusal tells why a nickname is not valid."
+            "description": "The new nickname, or the new name of a cutscene entity. A refusal tells why a name is not valid."
           },
           "preview": {
             "type": "boolean",
@@ -8662,7 +8686,7 @@
     {
       "name": "delete_items",
       "title": "Delete items",
-      "description": "Deletes items with their children. Other lines that name them show \u0027Missing\u0027. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true.",
+      "description": "Deletes items with their children. Other lines that name them show \u0027Missing\u0027. A cutscene entity goes with the events that name it. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8674,7 +8698,37 @@
               "maxLength": 1024
             },
             "minItems": 1,
-            "description": "The references of the items, for example obj:my_station_1. The tool deletes objects, zones, lights, nebulae and asteroid fields of a system. It also deletes triggers, prefab instances and other mission items: trg:, inst: and sec: references. studio_status gives the most items of one call."
+            "description": "The references of the items, for example obj:my_station_1. The tool deletes objects, zones, lights, nebulae and asteroid fields of a system. It also deletes triggers, prefab instances and other mission items: trg:, inst: and sec: references. It also deletes cutscene entities and events: thn: references with #entity/ or #event/. studio_status gives the most items of one call."
+          },
+          "expect_events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024,
+                  "description": "The reference of an event of refs, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#event/2."
+                },
+                "expect_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024,
+                  "description": "The type that the event must have, for example START_SOUND. Another type refuses with RowChanged."
+                },
+                "expect_time": {
+                  "type": "number",
+                  "description": "The time in seconds that the event must have. Another time refuses with RowChanged."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "ref"
+              ]
+            },
+            "minItems": 1,
+            "description": "Guards for the cutscene events of refs. Each row names one event of refs with the type and the time that you read."
           },
           "preview": {
             "type": "boolean",
@@ -9237,7 +9291,7 @@
     {
       "name": "duplicate_items",
       "title": "Copy items",
-      "description": "Copies items of a system with their children, and mission items. Each copy gets the next free nickname. The tool makes one Undo step. The result gives the references of the copies.",
+      "description": "Copies items of a system with their children, mission items and cutscene events. Each copy gets the next free nickname. The tool makes one Undo step. The result gives the references of the copies.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9249,7 +9303,7 @@
               "maxLength": 1024
             },
             "minItems": 1,
-            "description": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. It also copies triggers and other mission items: trg: and sec: references. studio_status gives the most items of one call."
+            "description": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. It also copies triggers and other mission items: trg: and sec: references. It also copies cutscene events: thn: references with #event/. studio_status gives the most items of one call."
           },
           "offset": {
             "type": "array",
@@ -9259,6 +9313,40 @@
             "minItems": 3,
             "maxItems": 3,
             "description": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position and a mission copy do not move, and the result warns about them. Without it, each copy is at the place of its item."
+          },
+          "time_offset": {
+            "type": "number",
+            "description": "The seconds from the time of each cutscene event to the time of its copy. 0 refuses, because a copy at the time of its event has the key of the event. Without it, the copies start at the end of the events."
+          },
+          "expect_events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024,
+                  "description": "The reference of an event of refs, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#event/2."
+                },
+                "expect_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024,
+                  "description": "The type that the event must have, for example START_SOUND. Another type refuses with RowChanged."
+                },
+                "expect_time": {
+                  "type": "number",
+                  "description": "The time in seconds that the event must have. Another time refuses with RowChanged."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "ref"
+              ]
+            },
+            "minItems": 1,
+            "description": "Guards for the cutscene events of refs. Each row names one event of refs with the type and the time that you read."
           },
           "preview": {
             "type": "boolean",

@@ -11,12 +11,14 @@ using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Data.Missions.Prefabs;
+using OpenLancer.Data.Thn;
 
 namespace OpenLancer.Studio.Agent;
 
 /// <summary>An item that a generic edit tool names (see <see cref="ItemEditTools.Target"/>): a section of an INI file
-/// that is not a mission file, or an item of a mission file. Exactly one of the two is not null.</summary>
-internal sealed record ItemTarget(SectionRef? Section, MissionTarget? Mission);
+/// that is not a mission file, an item of a mission file, or an entity or an event of a cutscene. Exactly one of the
+/// three is not null.</summary>
+internal sealed record ItemTarget(SectionRef? Section, MissionTarget? Mission, ThnRef? Cutscene = null);
 
 /// <summary>
 /// An item of a mission file that a generic edit tool names (section 7.2 and the first item of section 7.4 of the MCP1
@@ -55,23 +57,28 @@ internal static partial class ItemEditTools
     /// <c>sec:</c>, <c>line:</c>, <c>label:</c> or <c>inst:</c> reference. In prefab mode, a <c>trg:</c>,
     /// <c>sec:</c> or <c>line:</c> reference can name the template of a prefab. The mission command then finds the
     /// item and gives its error. Each tool takes some of these kinds and refuses the others with the detail
-    /// <see cref="EditTools.MissionItem"/>.
+    /// <see cref="EditTools.MissionItem"/>. A <c>thn:</c> reference names an entity or an event of a cutscene (see
+    /// <see cref="CutsceneTarget"/>).
     /// </summary>
     /// <remarks>A section of another file under <c>DATA\MISSIONS</c>, for example a pilot file, is a section of an INI
     /// file: the tools change it with the commands of the Inspector, as the user does (section 8.1 of the MCP1 design,
     /// final finding 7 of MCP1-3). A section of the shared ship build file refuses with the detail
     /// <c>SharedBuildChange</c>, because random encounters can use its builds and only <c>mission_edit</c> asks for the
     /// confirmation. An item of a tool group that the user hides gives <c>not_available</c> (decision D725): a mission
-    /// item is in the group Missions.</remarks>
+    /// item is in the group Missions, and a cutscene item in the group Cutscenes.</remarks>
     /// <param name="field">The argument, for the error.</param>
+    /// <param name="guard">The guards of an event reference, or null. Another reference refuses them.</param>
     /// <exception cref="EditException">The reference is not valid, does not resolve, or names an item that the generic
     /// tools do not change.</exception>
-    internal static ItemTarget Target(ToolCall call, string text, string field) => EditTools.At(field, () =>
+    internal static ItemTarget Target(ToolCall call, string text, string field, EventGuard? guard = null) =>
+        EditTools.At(field, () =>
     {
         var session = call.Session;
         var reference = ItemRefs.Parse(text);
+        if (guard != null && reference.Kind != ItemRefKind.CutsceneEvent)
+            throw GuardRefusal(guard, text);
         if (EditTools.IsCutscene(reference.Kind))
-            throw EditTools.CutsceneLater(call, text);
+            return new ItemTarget(null, null, CutsceneTarget(call, reference, text, guard));
         if (!EditTools.IsMission(reference))
         {
             var section = ItemRefs.ResolveSection(session, reference);

@@ -201,6 +201,9 @@ public sealed partial class EditSession
     /// <summary>The names of the THN environment, with their group and number.</summary>
     internal IReadOnlyDictionary<string, ThnSymbolInfo> ThnSymbols => thn.Symbols;
 
+    /// <summary>The evaluator that runs the cutscene scripts of the session, for a Lua value text of an edit.</summary>
+    internal IThnEvaluator ThnEvaluator => thn;
+
     /// <summary>The files of the lower layer, made at the first use.</summary>
     private FileSystem LowerFiles => lowerFiles ??= lowerView.CreateFileSystem();
 

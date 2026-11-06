@@ -164,7 +164,7 @@
     },
     "get_cutscene": {
       "title": "Get a cutscene",
-      "description": "Gives one cutscene script: its duration, its entities, its events with their times and targets, and its errors. This tool changes nothing. Get the cutscenes from list_cutscenes first.",
+      "description": "Gives one cutscene script: its duration, its entities, its events with their times and targets, and its errors. Each element gives its fields by THN path, in the forms that set_fields takes. This tool changes nothing. Get the cutscenes from list_cutscenes first.",
       "fields": {
         "ref": "The reference of the cutscene, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_scene.thn."
       }
@@ -198,42 +198,53 @@
     },
     "set_fields": {
       "title": "Set the fields of an item",
-      "description": "Sets fields of one section by their INI keys. The tool makes one Undo step. Use get_item to see the keys and the values first. A value that a list check refuses applies, and the result gives the new problem. A mission item runs in strict mode, so an edit that adds an error to its script refuses.",
+      "description": "Sets fields of one item: a section by its INI keys, or a cutscene entity or event by its THN paths. The tool makes one Undo step. Use get_item or get_cutscene to see the keys and the values first. A value that a list check refuses applies, and the result gives the new problem. A mission item runs in strict mode, so an edit that adds an error to its script refuses.",
       "fields": {
-        "ref": "The reference of the item, for example obj:my_station_1 or list:ship/my_ship. A mission item takes its sec: reference, for example of a ship or an NPC. A trigger refuses. Use the mission tools for its lines.",
-        "fields": "The new values by INI key. A text, a number or true or false is one line with one value. An array of values is one line, for example [1, 2, 3]. An array of arrays gives one line for each array. null or [] removes the key. A text cannot hold ','. A mission item takes the field forms of mission_add_item."
+        "ref": "The reference of the item, for example obj:my_station_1 or list:ship/my_ship. A mission item takes its sec: reference, for example of a ship or an NPC. A trigger refuses. Use the mission tools for its lines. A cutscene entity or event takes its thn: reference, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#event/0.",
+        "fields": "The new values by INI key. A text, a number or true or false is one line with one value. An array of values is one line, for example [1, 2, 3]. An array of arrays gives one line for each array. null or [] removes the key. A text cannot hold ','. A mission item takes the field forms of mission_add_item. A cutscene item takes the THN paths and the value forms of get_cutscene, for example \"props.duration\": 2.",
+        "expect_type": "With an event reference: the type that the event must have, for example START_SOUND. Another type refuses with RowChanged.",
+        "expect_time": "With an event reference: the time in seconds that the event must have. Another time refuses with RowChanged."
       }
     },
     "set_text": {
       "title": "Set a text of an item",
       "description": "Sets the name, the infocard or another text of one section, or a text id of a mission line. The text goes into the strings.json of the active mod. The tool makes one Undo step.",
       "fields": {
-        "ref": "The reference of the item, for example obj:my_station_1. A mission item takes a line: reference, a trg: reference or its sec: reference.",
+        "ref": "The reference of the item, for example obj:my_station_1. A mission item takes a line: reference, a trg: reference or its sec: reference. A cutscene item refuses. Use set_fields for its texts.",
         "field": "name for the name, info for the infocard, or the INI key of another text, for example ids_short_name. With a line: reference, the name of the value, for example text. With a trigger or another mission item, the key of the line, for example individual_name.",
         "text": "The plain text. An infocard gets one paragraph for each line."
       }
     },
     "rename_item": {
       "title": "Rename an item",
-      "description": "Gives an item a new nickname and changes each line that names it. The tool makes one Undo step. When the rename warns, cannot change a line that names the item, or other files name it as text, the tool asks for confirm: true.",
+      "description": "Gives an item a new nickname and changes each line that names it. A cutscene entity gets a new name, and the events of its script that name it change too. The tool makes one Undo step. When the rename warns, cannot change a line that names the item, or other files name it, the tool asks for confirm: true.",
       "fields": {
-        "ref": "The reference of the item, for example obj:my_station_1. A data item must be an item that the active mod adds. A trigger takes its trg: reference, and another mission item its sec: reference.",
-        "new_name": "The new nickname. A refusal tells why a nickname is not valid."
+        "ref": "The reference of the item, for example obj:my_station_1. A data item must be an item that the active mod adds. A trigger takes its trg: reference, and another mission item its sec: reference. A cutscene entity takes its thn: reference, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#entity/Camera_01.",
+        "new_name": "The new nickname, or the new name of a cutscene entity. A refusal tells why a name is not valid."
       }
     },
     "delete_items": {
       "title": "Delete items",
-      "description": "Deletes items with their children. Other lines that name them show 'Missing'. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true.",
+      "description": "Deletes items with their children. Other lines that name them show 'Missing'. A cutscene entity goes with the events that name it. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true.",
       "fields": {
-        "refs": "The references of the items, for example obj:my_station_1. The tool deletes objects, zones, lights, nebulae and asteroid fields of a system. It also deletes triggers, prefab instances and other mission items: trg:, inst: and sec: references. studio_status gives the most items of one call."
+        "refs": "The references of the items, for example obj:my_station_1. The tool deletes objects, zones, lights, nebulae and asteroid fields of a system. It also deletes triggers, prefab instances and other mission items: trg:, inst: and sec: references. It also deletes cutscene entities and events: thn: references with #entity/ or #event/. studio_status gives the most items of one call.",
+        "expect_events": "Guards for the cutscene events of refs. Each row names one event of refs with the type and the time that you read.",
+        "expect_events.ref": "The reference of an event of refs, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#event/2.",
+        "expect_events.expect_type": "The type that the event must have, for example START_SOUND. Another type refuses with RowChanged.",
+        "expect_events.expect_time": "The time in seconds that the event must have. Another time refuses with RowChanged."
       }
     },
     "duplicate_items": {
       "title": "Copy items",
-      "description": "Copies items of a system with their children, and mission items. Each copy gets the next free nickname. The tool makes one Undo step. The result gives the references of the copies.",
+      "description": "Copies items of a system with their children, mission items and cutscene events. Each copy gets the next free nickname. The tool makes one Undo step. The result gives the references of the copies.",
       "fields": {
-        "refs": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. It also copies triggers and other mission items: trg: and sec: references. studio_status gives the most items of one call.",
-        "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position and a mission copy do not move, and the result warns about them. Without it, each copy is at the place of its item."
+        "refs": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. It also copies triggers and other mission items: trg: and sec: references. It also copies cutscene events: thn: references with #event/. studio_status gives the most items of one call.",
+        "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position and a mission copy do not move, and the result warns about them. Without it, each copy is at the place of its item.",
+        "time_offset": "The seconds from the time of each cutscene event to the time of its copy. 0 refuses, because a copy at the time of its event has the key of the event. Without it, the copies start at the end of the events.",
+        "expect_events": "Guards for the cutscene events of refs. Each row names one event of refs with the type and the time that you read.",
+        "expect_events.ref": "The reference of an event of refs, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#event/2.",
+        "expect_events.expect_type": "The type that the event must have, for example START_SOUND. Another type refuses with RowChanged.",
+        "expect_events.expect_time": "The time in seconds that the event must have. Another time refuses with RowChanged."
       }
     },
     "scene_create_object": {
@@ -1359,11 +1370,30 @@
     "edit_mission_item": "{tool} does not change items of mission files. Use the mission tools, for example mission_edit. The tools set_fields, set_text, rename_item, delete_items and duplicate_items also change mission items.",
     "edit_mission_world_file": "{path} is a world file of the missions, not a mission script. The mission tools do not change its lines. The generic tools take a sec: or list: reference of a section of the file, as the Inspector does.",
     "edit_mission_shared_build": "{path} is a shared file of ship builds. Random encounters and bases can use its builds too, so {tool} does not change it. To change a line of a build, ask the user first. Then use mission_edit with set_item_key or set_line and confirm: true. The mission commands do not rename, delete or copy a build of this file.",
-    "edit_cutscenes_later": "{tool} does not change cutscenes. Use the cutscene tools, for example cutscene_move_events and cutscene_set_flags.",
+    "edit_cutscene_item": "{tool} does not change cutscenes. Use set_fields, rename_item, delete_items, duplicate_items or the cutscene tools.",
     "cutscene_script_ref": "'{ref}' is not a reference of a cutscene script. Give thn: and the install path of the script, without # and the part after it.",
     "cutscene_entity_ref": "'{ref}' is not a reference of a cutscene entity. Give thn:<install path>#entity/<name>. get_cutscene gives the entities.",
     "cutscene_event_ref": "'{ref}' is not a reference of a cutscene event. Give thn:<install path>#event/<index>. get_cutscene gives the events.",
     "cutscene_events_one_cutscene": "All events of one call must be in one cutscene. Make one call for each cutscene.",
+    "cutscene_ref_set_fields": "set_fields does not change the whole cutscene {ref}. Use cutscene_set_duration for its duration. Give an entity or an event to set its fields.",
+    "cutscene_ref_set_text": "set_text does not change cutscenes, so it does not take {ref}. Use set_fields with the THN path of the text, for example props.animation.",
+    "cutscene_ref_rename_item": "rename_item takes the reference of a cutscene entity, thn:<install path>#entity/<name>. It does not take {ref}.",
+    "cutscene_ref_delete_items": "delete_items takes the references of cutscene entities and events. It does not take {ref}. The tools do not delete a cutscene script.",
+    "cutscene_ref_duplicate_items": "duplicate_items takes the references of cutscene events. It does not take {ref}.",
+    "cutscene_duplicate_entity": "The editor has no copy of a cutscene entity, so duplicate_items does not take {ref}. Copy the events of the entity.",
+    "cutscene_time_offset": "time_offset moves only the copies of cutscene events, and refs names no event. Remove time_offset, or give events.",
+    "cutscene_guard_ref": "expect_type and expect_time guard only a cutscene event, thn:<install path>#event/<index>. {ref} is not an event reference.",
+    "cutscene_guard_unknown": "A row of expect_events names {ref}, but refs does not name this event. Give each event of expect_events in refs too.",
+    "limit_guards": "One call can guard at most {max} events in expect_events. Split the call.",
+    "cutscene_path": "'{path}' is not a THN path. A path is keys joined with '.', for example props.duration. get_cutscene gives the paths.",
+    "cutscene_field_name": "Use rename_item to rename an entity. It also changes the events and the speakers that name the entity.",
+    "cutscene_field_type": "The type of a cutscene element cannot change. Delete the element, then add an element of the new type.",
+    "cutscene_field_flags": "Use cutscene_set_flags for the flags of an entity.",
+    "cutscene_field_record": "{path} holds a record. Set each key in it with its own path, for example {path}.<key>.",
+    "cutscene_field_targets": "The value of targets must be a list of entity names, for example [\"Monitor\", \"Camera_01\"].",
+    "cutscene_field_target_count": "The event has {count} targets. Give {count} entity names in targets.",
+    "cutscene_field_number": "The value of {path} must be a number of seconds.",
+    "cutscene_name_empty": "The name of an entity cannot be empty. Give a new name.",
     "limit_events": "One call can name at most {max} events. Split the call.",
     "confirm_intro": "The edit '{label}' changes more than its targets.",
     "confirm_cascade": "It also removes {refs}.",
@@ -1372,6 +1402,7 @@
     "confirm_mission": "It also changes 1 section of a mission script that names the item, in {files}.",
     "confirm_missions": "It also changes {count} sections of mission scripts that name the item, in {files}.",
     "confirm_mentions": "These files name the item as text: {files}.",
+    "confirm_uses": "The rename changes only this script. These uses in other files keep the old name: {uses}.",
     "confirm_more": " and {count} more",
     "confirm_end": "Use preview: true to see all changes. Show the changes to the user and ask the user. When the user agrees, call the tool again with confirm: true.",
     "limit_sections": "The edit changes {count} sections, and one call can change at most {max}. Split the edit.",
@@ -1597,6 +1628,7 @@
         "Each add, delete and reorder of an event can change the index of the events after it. So read the cutscene again after such an edit.",
         "A result gives the index of an added or changed event after the call. A deleted event has its index before the call.",
         "A tool that takes an event can also take expect_type and expect_time, the type and the time that you read.",
+        "delete_items and duplicate_items take them in the rows of expect_events.",
         "When the event at the index has another type or time, the tool gives stale_revision with the detail RowChanged and changes nothing.",
         "group:<nickname> is a prop group of the active mod. group:<mod id>/<nickname> is a prop group of another mod.",
         "asset:<kind>/<id> is an asset of the Assets panel, for example asset:solar_archetype/my_archetype.",
@@ -1831,10 +1863,11 @@
     "CutsceneElementView.type": "The THN name of the type, for example CAMERA or START_SOUND, or none.",
     "CutsceneElementView.name": "The name of an entity, else none.",
     "CutsceneElementView.template": "The template of an entity, else none.",
+    "CutsceneElementView.flags": "The flags of an entity that are on, for example REFERENCE. none for an event, and for flags that the engine cannot read.",
     "CutsceneElementView.time": "The time of an event in seconds, else none.",
     "CutsceneElementView.length": "The length of an event in seconds, or none.",
     "CutsceneElementView.targets": "The names of the entities that an event targets.",
-    "CutsceneElementView.fields": "The keys of an entity or of the properties of an event, with their values as Lua text.",
+    "CutsceneElementView.fields": "The value of each key that set_fields sets, by its THN path, for example props.duration or spatialprops.pos. A record gives the keys in it. Each value goes back into set_fields as it is.",
     "MissionsView.scripts": "The mission scripts: the story slots, then the other scripts.",
     "MissionListRow.ref": "The msn: reference of the script.",
     "MissionListRow.slot": "The story slot that loads the script, for example M02, or none.",

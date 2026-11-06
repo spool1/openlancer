@@ -22,7 +22,10 @@ namespace OpenLancer.Studio.Agent;
 /// call, because the element is not in W after it.</item>
 /// <item>An element that the call adds and then deletes is not in the result. An element that the call adds is not a
 /// change. An element of a new script of the call is a change of nothing, so only its add counts.</item>
-/// <item>A change counts only when the element differs from W before the call.</item>
+/// <item>A plan changes the elements that it names, and each other element whose table its run changes. An example is
+/// a rename of an entity, which also changes the events that name the entity.</item>
+/// <item>A change counts only when the element differs from W before the call. An entity with another name than
+/// before the call is a rename, from its reference before the call to its reference after the call.</item>
 /// <item>The select is the last add that W after the call still has, as the editor selects a new item (decision
 /// D249).</item>
 /// </list>
@@ -38,10 +41,10 @@ internal sealed class CutsceneResults(EditSession session)
         IReadOnlyList<ThnRef> Deleted, bool NamesScript);
 
     /// <summary>The references of a net change, and the part of the batch that gave the select.</summary>
-    private sealed record Refs(IReadOnlyList<string> Adds, IReadOnlyList<string> Changes, IReadOnlyList<ResultDelete> Deletes,
-        string? Select, int SelectPart)
+    private sealed record Refs(IReadOnlyList<string> Adds, IReadOnlyList<ResultRename> Renames,
+        IReadOnlyList<string> Changes, IReadOnlyList<ResultDelete> Deletes, string? Select, int SelectPart)
     {
-        public bool IsEmpty => Adds.Count == 0 && Changes.Count == 0 && Deletes.Count == 0;
+        public bool IsEmpty => Adds.Count == 0 && Renames.Count == 0 && Changes.Count == 0 && Deletes.Count == 0;
     }
 
     private readonly List<Run> runs = [];
@@ -53,6 +56,9 @@ internal sealed class CutsceneResults(EditSession session)
     private readonly Dictionary<string, ThnScriptModel?> stepScripts = new(VfsPath.Comparer);
 
     private int stepStart;
+
+    /// <summary>W of the script of the plan that runs now, before its run.</summary>
+    private ThnScriptModel? planBefore;
 
     /// <summary>The references of the call, made after its last command, while the batch is still open.</summary>
     private Refs? call;
@@ -68,8 +74,9 @@ internal sealed class CutsceneResults(EditSession session)
     /// and in the step. W cannot change, so a reference keeps it.</summary>
     public void Before(CutscenePlan plan)
     {
-        callScripts.TryAdd(plan.Path, session.Cutscene(plan.Path));
-        stepScripts.TryAdd(plan.Path, session.Cutscene(plan.Path));
+        planBefore = session.Cutscene(plan.Path);
+        callScripts.TryAdd(plan.Path, planBefore);
+        stepScripts.TryAdd(plan.Path, planBefore);
     }
 
     /// <summary>Notes the elements of a plan right after it ran. The new elements exist only now (see
@@ -78,8 +85,29 @@ internal sealed class CutsceneResults(EditSession session)
     public void After(CutscenePlan plan, int part)
     {
         var added = plan.Added(session);
-        runs.Add(new Run(plan.Path, part, added, plan.Changed, plan.Deleted,
-            added.Count == 0 && plan.Changed.Count == 0 && plan.Deleted.Count == 0));
+        var namesScript = added.Count == 0 && plan.Changed.Count == 0 && plan.Deleted.Count == 0;
+        var changed = namesScript
+            ? plan.Changed
+            : plan.Changed.Concat(Differ(plan.Path, planBefore, session.Cutscene(plan.Path))).Distinct().ToList();
+        runs.Add(new Run(plan.Path, part, added, changed, plan.Deleted, namesScript));
+    }
+
+    /// <summary>The elements of a script whose table differs between two versions of W. An element that one version
+    /// does not have is an add or a delete, not a change.</summary>
+    private static IEnumerable<ThnRef> Differ(string path, ThnScriptModel? was, ThnScriptModel? now)
+    {
+        if (was == null || now == null || ReferenceEquals(was, now))
+            yield break;
+        foreach (var kind in new[] { ThnElementKind.Entity, ThnElementKind.Event })
+        {
+            var earlier = was.Elements(kind).ToDictionary(e => e.Id, e => e.Table);
+            foreach (var element in now.Elements(kind))
+            {
+                if (earlier.TryGetValue(element.Id, out var table) && !ReferenceEquals(table, element.Table) &&
+                    !Equals(table, element.Table))
+                    yield return new ThnRef(path, kind, element.Id);
+            }
+        }
     }
 
     /// <summary>Makes the references of the call. Call it after the last command and before the preview or the commit,
@@ -115,6 +143,7 @@ internal sealed class CutsceneResults(EditSession session)
         return result with
         {
             Adds = [.. result.Adds, .. refs.Adds],
+            Renames = [.. result.Renames, .. refs.Renames],
             Changes = [.. result.Changes, .. refs.Changes],
             Deletes = [.. result.Deletes, .. refs.Deletes],
             Select = refs.Select != null && refs.SelectPart > otherSelect ? refs.Select : result.Select,
@@ -180,12 +209,17 @@ internal sealed class CutsceneResults(EditSession session)
         var adds = newScripts.Where(p => session.Cutscene(p) != null).Select(CutsceneQueries.Ref)
             .Concat(added.Where(a => After(a) != null).Select(a => ItemRefs.Of(session, a)))
             .Distinct().ToList();
+        var netChanged = changed.Where(c => !IsNew(c.Path) && After(c) is { } now && Earlier(c) is { } was &&
+                                            !Equals(now.Table, was.Table)).ToList();
+        bool Renamed(ThnRef c) => c.Kind == ThnElementKind.Entity &&
+                                  ThnScriptModel.NameOf(Earlier(c)!.Table) != ThnScriptModel.NameOf(After(c)!.Table);
+        var renames = netChanged.Where(Renamed)
+            .Select(c => new ResultRename(ItemRefs.Of(before.GetValueOrDefault(c.Path), c), ItemRefs.Of(session, c)))
+            .ToList();
         var changes = changedScripts
             .Where(p => session.Cutscene(p) is { } now && !ReferenceEquals(now, before.GetValueOrDefault(p)))
             .Select(CutsceneQueries.Ref)
-            .Concat(changed.Where(c => !IsNew(c.Path) && After(c) is { } now && Earlier(c) is { } was &&
-                                       !Equals(now.Table, was.Table))
-                .Select(c => ItemRefs.Of(session, c)))
+            .Concat(netChanged.Where(c => !Renamed(c)).Select(c => ItemRefs.Of(session, c)))
             .Distinct().ToList();
         // An event that goes with its entity gives the targets line that names the entity as its cause.
         string? CauseOf(ThnRef? entity) =>
@@ -197,6 +231,6 @@ internal sealed class CutsceneResults(EditSession session)
             .Select(d => new ResultDelete(ItemRefs.Of(before.GetValueOrDefault(d.Element.Path), d.Element),
                 d.Cause == null ? DeleteReason.Target : DeleteReason.Cascade, d.Cause))
             .ToList();
-        return new Refs(adds, changes, deletes, Selected(), selectPart);
+        return new Refs(adds, renames, changes, deletes, Selected(), selectPart);
     }
 }

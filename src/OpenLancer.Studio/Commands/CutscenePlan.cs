@@ -42,6 +42,10 @@ public sealed class CutscenePlan : EditPlan
     /// <summary>The number of events that the command adds.</summary>
     public int NewEvents { get; private init; }
 
+    /// <summary>The uses of an old name in other data that a rename does not change (see
+    /// <see cref="CutsceneRename.Uses"/>). They are why a rename needs a confirmation.</summary>
+    internal IReadOnlyList<ThnNameUse> Uses { get; private init; } = [];
+
     /// <summary>
     /// The new elements after the run: the last <see cref="NewEntities"/> entities of W, then the last
     /// <see cref="NewEvents"/> events of W. Call it right after the run, before the next edit of the script.
@@ -69,9 +73,10 @@ public sealed class CutscenePlan : EditPlan
     /// <param name="newEvents">The number of events that the command adds at the end of the events.</param>
     /// <param name="needsConfirmation">True when the editor asks before it runs the command (see
     /// <see cref="EditPlan.NeedsConfirmation"/>).</param>
+    /// <param name="uses">The uses of an old name that a rename does not change, or null.</param>
     internal static CutscenePlan Of(string label, string path, Func<EditCommand> make,
         IReadOnlyList<ThnRef>? changed = null, IReadOnlyList<ThnRef>? deleted = null, int newEntities = 0,
-        int newEvents = 0, bool needsConfirmation = false)
+        int newEvents = 0, bool needsConfirmation = false, IReadOnlyList<ThnNameUse>? uses = null)
     {
         EditCommand command;
         try
@@ -91,6 +96,7 @@ public sealed class CutscenePlan : EditPlan
             NewEntities = newEntities,
             NewEvents = newEvents,
             NeedsConfirmation = needsConfirmation,
+            Uses = uses ?? [],
         };
     }
 
