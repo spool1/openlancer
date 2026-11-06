@@ -241,6 +241,9 @@ public sealed partial class AgentCutsceneToolTests
         Assert.Equal("No entity of this script has the name Fy. The closest names are: Fx.", unknown.Message);
         Assert.StartsWith("START_DANCE is not an event type that the editor can add. The types are SET_CAMERA, START_MOTION,",
             type.Message);
+        // The tool adds the resource of the event types to the text of the command.
+        Assert.EndsWith(". " + AgentTexts.Error("cutscene_event_types"), type.Message);
+        Assert.Contains("openlancer://catalog/thn-events", type.Message);
         Assert.Equal("SET_CAMERA needs two targets.", cut.Message);
         Assert.Equal(("refused", MissionErrors.OneScene, "type", Studio.Commands.CutsceneCommands.OneScene),
             ((string?)scene["code"], (string?)scene["detail"], (string?)scene["field"], (string?)scene["message"]));

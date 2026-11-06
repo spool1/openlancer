@@ -177,7 +177,8 @@ public sealed class AgentToolTableTests
 
     /// <summary>A prompt gives the steps of a workflow with the names of real tools (section 9.4 of the MCP1 design).
     /// Each <c>{name}</c> of its lines is an argument, and each argument shows in the lines. A host lists the prompt
-    /// only when it has each tool of the steps, so a host that only reads lists no prompt.</summary>
+    /// only when it has each tool that the steps need, so a host that only reads lists no prompt. An optional tool of a
+    /// prompt shows in its lines, and a host without it still lists the prompt.</summary>
     [Fact]
     public void EachPromptNamesItsArgumentsAndTheToolsOfItsSteps()
     {
@@ -188,12 +189,27 @@ public sealed class AgentToolTableTests
                 .Distinct();
             Assert.Equal(prompt.Arguments.Select(a => a.Name).Order(), placeholders.Order());
             Assert.All(prompt.Tools, t => Assert.NotNull(AgentTools.Find(t)));
+            Assert.All(prompt.OptionalTools, t =>
+            {
+                Assert.NotNull(AgentTools.Find(t));
+                Assert.Matches($@"(?<!\w){t}(?!\w)", text);
+                Assert.DoesNotContain(t, prompt.Tools);
+            });
         }
         var mission = Assert.Single(AgentPrompts.All, p => p.Name == "two_trigger_mission");
         Assert.Equal(["studio_status", "list_values", "get_mission", "mission_dry_run", "check", "mission_add_trigger",
             "mission_add_item", "edit_batch"], mission.Tools);
         Assert.Equal(["script"], mission.Arguments.Select(a => a.Name));
-        Assert.Equal([mission], AgentPrompts.For(AgentTools.All));
+        Assert.Empty(mission.OptionalTools);
+        var cutscene = Assert.Single(AgentPrompts.All, p => p.Name == "short_cutscene");
+        Assert.Equal(["studio_status", "list_values", "check", "set_fields", "cutscene_create", "cutscene_add_entity",
+            "cutscene_add_event", "cutscene_move_events"], cutscene.Tools);
+        Assert.Equal(["render_cutscene", "save"], cutscene.OptionalTools);
+        Assert.Equal(["name"], cutscene.Arguments.Select(a => a.Name));
+        Assert.Equal([mission, cutscene], AgentPrompts.For(AgentTools.All));
+        Assert.Equal([mission, cutscene],
+            AgentPrompts.For(AgentTools.All.Where(t => !HeadlessHost.SaveTools.Contains(t.Name) && t.Name != "render_cutscene")));
+        Assert.Equal([mission], AgentPrompts.For(AgentTools.All.Where(t => !t.Name.StartsWith("cutscene_"))));
         Assert.Empty(AgentPrompts.For(AgentTools.ReadOnly));
         Assert.Contains(@"msn:DATA\MISSIONS\my_mission.ini 1", mission.Text(new Dictionary<string, string>
         {

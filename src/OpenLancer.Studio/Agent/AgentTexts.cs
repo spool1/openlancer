@@ -17,9 +17,11 @@ internal sealed record ResourceTexts(string Name, string Title, string Descripti
 
 /// <summary>The texts of one prompt.</summary>
 /// <param name="Arguments">The help of each argument, in order. Each argument of a prompt is required.</param>
+/// <param name="OptionalTools">The tools that the lines name, but that a host does not need to list the prompt. The
+/// lines tell what to do without such a tool.</param>
 /// <param name="Text">The lines of the message of the prompt. Each <c>{name}</c> is the value of an argument.</param>
 internal sealed record PromptTexts(string Title, string Description, IReadOnlyList<(string Name, string Help)> Arguments,
-    IReadOnlyList<string> Text);
+    IReadOnlyList<string> OptionalTools, IReadOnlyList<string> Text);
 
 /// <summary>The help of one mission command of the input schema of <c>mission_edit</c>.</summary>
 /// <param name="Fields">The help of the fields of this command only, by JSON name.</param>
@@ -177,6 +179,9 @@ internal static class AgentTexts
                 p.Value.GetProperty("title").GetString()!,
                 p.Value.GetProperty("description").GetString()!,
                 p.Value.GetProperty("arguments").EnumerateObject().Select(a => (a.Name, a.Value.GetString()!)).ToList(),
+                p.Value.TryGetProperty("optional_tools", out var optional)
+                    ? optional.EnumerateArray().Select(e => e.GetString()!).ToList()
+                    : [],
                 p.Value.GetProperty("text").EnumerateArray().Select(e => e.GetString()!).ToList())),
             Strings(root.GetProperty("results")),
             Strings(root.GetProperty("mission_fields")),

@@ -40486,7 +40486,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The entity type: CAMERA, MARKER, DEFORMABLE, COMPOUND, LIGHT, SOUND, PSYS, MOTION_PATH, MONITOR or SCENE. A script can have only one SCENE."
+            "description": "The entity type: CAMERA, MARKER, DEFORMABLE, COMPOUND, LIGHT, SOUND, PSYS, MOTION_PATH, MONITOR or SCENE. A script can have only one SCENE. The resource openlancer://catalog/thn-events gives the event types that take each entity type."
           },
           "name": {
             "type": "string",
@@ -41065,7 +41065,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The event type, for example SET_CAMERA, START_MOTION or START_SPATIAL_PROP_ANIM. A type that the editor cannot add gives invalid_value, and the message gives the types."
+            "description": "The event type, for example SET_CAMERA, START_MOTION or START_SPATIAL_PROP_ANIM. The resource openlancer://catalog/thn-events gives the types and the entity types of their targets. Another type gives invalid_value."
           },
           "time": {
             "type": "number",

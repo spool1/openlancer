@@ -17,6 +17,7 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Prefabs;
 using OpenLancer.Data.Mods;
+using OpenLancer.Data.Thn;
 using OpenLancer.Mcp;
 using OpenLancer.Runtime.Missions;
 using OpenLancer.Studio.Agent;
@@ -214,10 +215,10 @@ public sealed class McpServerTests
         Assert.Equal([
             "openlancer://schema/mission-names", "openlancer://schema/mission-sections",
             "openlancer://schema/objlist-directives", "openlancer://catalog/prefabs", "openlancer://catalog/lists",
-            "openlancer://guide/rules", "openlancer://guide/refs",
+            "openlancer://catalog/thn-events", "openlancer://guide/rules", "openlancer://guide/refs",
         ], resources.Select(r => r.Uri));
         Assert.Equal(["application/json", "application/json", "application/json", "application/json", "application/json",
-            "text/plain", "text/plain"], resources.Select(r => r.MimeType));
+            "application/json", "text/plain", "text/plain"], resources.Select(r => r.MimeType));
         var catalog = JsonNode.Parse(Assert.IsType<TextResourceContents>(Assert.Single(lists.Contents)).Text)!;
         Assert.Equal(60, catalog["lists"]!.AsArray().Count);
         Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "object_of_system" && (bool)l["one_system"]!);
@@ -405,7 +406,8 @@ public sealed class McpServerTests
         var result = await client.GetPromptAsync("two_trigger_mission",
             new Dictionary<string, object?> { ["script"] = script }, cancellationToken: Token);
 
-        var prompt = Assert.Single(prompts).ProtocolPrompt;
+        Assert.Equal(["two_trigger_mission", "short_cutscene"], prompts.Select(p => p.Name));
+        var prompt = prompts[0].ProtocolPrompt;
         Assert.Equal(("two_trigger_mission", AgentTexts.Prompts["two_trigger_mission"].Title), (prompt.Name, prompt.Title));
         var argument = Assert.Single(prompt.Arguments!);
         Assert.Equal(("script", true), (argument.Name, argument.Required));
@@ -426,6 +428,81 @@ public sealed class McpServerTests
             new Dictionary<string, object?> { ["script"] = " " }, cancellationToken: Token).AsTask());
         await Assert.ThrowsAsync<McpProtocolException>(() => client.GetPromptAsync("build_rocket",
             new Dictionary<string, object?> { ["script"] = script }, cancellationToken: Token).AsTask());
+    }
+
+    /// <summary>The resource of the event types (section 9.3 of the MCP1 design) gives each role of the Add event menu
+    /// with the entity types of its targets and its length, and each entity type that the editor adds with its place.
+    /// It needs no profile, so its read does not wait for the session thread.</summary>
+    [Fact]
+    public async Task TheResourceOfTheEventTypesGivesEachRole()
+    {
+        await using var connection = new Connection(new TestAgentHost(null));
+        var client = await connection.Client();
+
+        var catalog = await ReadJson(client, "openlancer://catalog/thn-events");
+
+        var events = catalog["events"]!.AsArray();
+        Assert.Equal(ThnTemplates.Roles.Select(r => r.Type), events.Select(e => (string?)e!["type"]));
+        foreach (var (role, row) in ThnTemplates.Roles.Zip(events))
+        {
+            Assert.Equal(role.First, row!["first"]!.AsArray().Select(t => (string?)t));
+            Assert.Equal(role.Second, row["second"]!.AsArray().Select(t => (string?)t));
+            Assert.Equal(role.SecondRequired, (bool)row["second_required"]!);
+            Assert.Equal(ThnSchema.HasLength(role.Type), (bool)row["has_length"]!);
+        }
+        var camera = events.Single(e => (string?)e!["type"] == "SET_CAMERA")!;
+        Assert.Equal("""{"type":"SET_CAMERA","first":["MONITOR"],"second":["CAMERA"],"second_required":true,"has_length":false}""",
+            camera.ToJsonString());
+        Assert.DoesNotContain("CAMERA", events.Single(e => (string?)e!["type"] == "START_MOTION")!["first"]!.AsArray()
+            .Select(t => (string?)t));
+        var entities = catalog["entities"]!.AsArray();
+        Assert.Equal(ThnTemplates.EntityTypes, entities.Select(e => (string?)e!["type"]));
+        Assert.Equal(["MONITOR", "SCENE"], entities.Where(e => !(bool)e!["has_place"]!).Select(e => (string?)e!["type"]));
+        Assert.Equal(0, connection.Thread.Queue.Waiting);
+    }
+
+    /// <summary>The prompt short_cutscene (sections 9.4 and 9.5 of the MCP1 design) gives the steps of workflow 4 with the
+    /// name of its argument. The editor host, the host without a window and the host without the save list it. The
+    /// steps of the images and of the save tell what to do without these tools.</summary>
+    [Fact]
+    public async Task ThePromptOfTheShortCutsceneGivesItsStepsInEachHostWithTheEditTools()
+    {
+        using var ws = SceneWorkspace.Create();
+        using var other = SceneWorkspace.Create();
+        var headless = HeadlessHost.Open(ws.ProfilePath, "act", new HeadlessOptions { WritesRecovery = false });
+        var noSave = HeadlessHost.Open(other.ProfilePath, "act",
+            new HeadlessOptions { WritesRecovery = false, NoSave = true });
+        await using (var connection = new Connection(new OpenLancer.Editor.Agent.EditorAgentHost(new FakeAgentEditor())))
+        {
+            var client = await connection.Client();
+
+            var prompts = await client.ListPromptsAsync(cancellationToken: Token);
+            var result = await client.GetPromptAsync("short_cutscene",
+                new Dictionary<string, object?> { ["name"] = "my_intro" }, cancellationToken: Token);
+
+            Assert.Equal(["two_trigger_mission", "short_cutscene"], prompts.Select(p => p.Name));
+            var argument = Assert.Single(prompts[1].ProtocolPrompt.Arguments!);
+            Assert.Equal(("name", true), (argument.Name, argument.Required));
+            var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Messages).Content).Text;
+            Assert.StartsWith("Make a short cutscene with the name my_intro.", text);
+            Assert.Contains("2. Call cutscene_create with the name my_intro and the duration 8.", text);
+            Assert.Contains("Call list_values with the list costume", text);
+            Assert.Contains("the targets [Monitor, my_cam_2]", text);
+            Assert.Contains("8. Call render_cutscene with the time 2, then with the time 6.", text);
+            Assert.Contains("10. Call check with the scope cutscene", text);
+            Assert.EndsWith("Do not call save until the user asks for it.", text);
+            Assert.DoesNotContain("{name}", text);
+            Assert.Equal(AgentTexts.Prompts["short_cutscene"].Description, result.Description);
+        }
+        Assert.DoesNotContain(noSave.Tools, t => t.Name == "save");
+        // Each connection closes its host at its end.
+        foreach (var host in new AgentHost[] { headless, noSave })
+        {
+            await using var connection = new Connection(host);
+            var client = await connection.Client();
+            Assert.Equal(["two_trigger_mission", "short_cutscene"],
+                (await client.ListPromptsAsync(cancellationToken: Token)).Select(p => p.Name));
+        }
     }
 
     [Fact]

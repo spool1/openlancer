@@ -7,6 +7,7 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Editing;
+using OpenLancer.Data.Thn;
 using OpenLancer.Runtime.Missions;
 
 namespace OpenLancer.Studio.Agent;
@@ -87,6 +88,25 @@ internal sealed record PrefabCatalogView(IReadOnlyList<MissionPrefabView> Prefab
     IReadOnlyList<SceneTemplateRow> SceneTemplates, IReadOnlyList<BuilderRow> Builders,
     IReadOnlyList<PropGroupRow> PropGroups);
 
+/// <summary>An event type that <c>cutscene_add_event</c> adds, with the entity types of its targets (the role of the
+/// type in <see cref="ThnTemplates.Roles"/>).</summary>
+/// <param name="Type">The event type, as a THN name, for example <c>SET_CAMERA</c>.</param>
+/// <param name="First">The entity types of the first target.</param>
+/// <param name="Second">The entity types of the second target, or none when the event has one target.</param>
+/// <param name="SecondRequired">True when the event needs a second target, false when it can have one.</param>
+/// <param name="HasLength">True when the event has a length, the key <c>props.duration</c>.</param>
+internal sealed record ThnEventRow(string Type, IReadOnlyList<string> First, IReadOnlyList<string> Second,
+    bool SecondRequired, bool HasLength);
+
+/// <summary>An entity type that <c>cutscene_add_entity</c> adds.</summary>
+/// <param name="Type">The entity type, as a THN name, for example <c>CAMERA</c>.</param>
+/// <param name="HasPlace">True when the entity takes a position and an orientation.</param>
+internal sealed record ThnEntityRow(string Type, bool HasPlace);
+
+/// <summary>The resource <c>openlancer://catalog/thn-events</c>: the event types with the entity types of their
+/// targets, and the entity types.</summary>
+internal sealed record ThnEventsView(IReadOnlyList<ThnEventRow> Events, IReadOnlyList<ThnEntityRow> Entities);
+
 /// <summary>The resources of this build: the schema of the missions, the catalogs and the guides (section 9.3 of the
 /// MCP1 design). The texts of each resource are in <c>agent-tools.json</c>.</summary>
 public static class AgentResources
@@ -105,6 +125,7 @@ public static class AgentResources
         ["openlancer://schema/objlist-directives"] = (false, _ => Directives()),
         ["openlancer://catalog/prefabs"] = (true, PrefabCatalog),
         ["openlancer://catalog/lists"] = (false, _ => ListCatalog()),
+        ["openlancer://catalog/thn-events"] = (false, _ => ThnEvents()),
     };
 
     /// <summary>The resources in the order of <c>resources/list</c>.</summary>
@@ -195,6 +216,13 @@ public static class AgentResources
         }
         return new JsonObject { ["lists"] = lists }.ToJsonString(Compact);
     }
+
+    /// <summary>The event types of the Add event menu with the entity types of their targets and their length, in the
+    /// order of the menu, and the entity types that the editor adds. The same rules check the cutscene tools, the
+    /// Timeline and the Inspector.</summary>
+    private static string ThnEvents() => Json(new ThnEventsView(
+        [.. ThnTemplates.Roles.Select(r => new ThnEventRow(r.Type, r.First, r.Second, r.SecondRequired, ThnSchema.HasLength(r.Type)))],
+        [.. ThnTemplates.EntityTypes.Select(t => new ThnEntityRow(t, ThnTemplates.HasPlace(t)))]));
 
     /// <summary>A name of the schema with the mark of the mission runtime of OpenLancer, as the editor loads it.</summary>
     private static MissionNameRow Row(MissionName name) => new(name.Name, name.Plain, name.Kind, name.Group,

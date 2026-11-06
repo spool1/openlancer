@@ -535,7 +535,7 @@ The tool adds a DEFORMABLE without a template and without `userprops.Actor`, and
 
 A name of another entity of the script gives `name_taken`, also in other letter case, because the game finds an entity by its name without letter case. An empty name gives `refused` with the detail `NameInvalid`. A name with a character outside ASCII, or with the character U+0000, gives the same error.
 
-`cutscene_add_event` takes the event types of the **Add event** menu. Another type gives `invalid_value`, and the message gives the types. Each target must be an entity of a type that fits its place, as the target list of the Inspector shows. For example, SET_CAMERA takes a MONITOR, then a CAMERA. START_MOTION takes a DEFORMABLE or a COMPOUND, so a CAMERA gives `refused`, and the message names the types that fit. Too many targets, or a missing second target that the type needs, give `invalid_argument`. A name that no entity of the script has gives `not_found` with the closest names.
+`cutscene_add_event` takes the event types of the **Add event** menu. The resource `openlancer://catalog/thn-events` gives them with the entity types of their targets. Another type gives `invalid_value`, and the message gives the types and names the resource. Each target must be an entity of a type that fits its place, as the target list of the Inspector shows. For example, SET_CAMERA takes a MONITOR, then a CAMERA. START_MOTION takes a DEFORMABLE or a COMPOUND, so a CAMERA gives `refused`, and the message names the types that fit. Too many targets, or a missing second target that the type needs, give `invalid_argument`. A name that no entity of the script has gives `not_found` with the closest names.
 
 The new event gets the usual values of its type, as **Add event** gives them. The time rounds to the 1 ms grid. `length` sets `props.duration` on the 1 ms grid. A SET_CAMERA event has no length, so `length` gives `invalid_value` there. Without `length`, the event has the length of its type, mostly 1 s.
 
@@ -741,18 +741,20 @@ The server gives these resources. An agent program can read them before its firs
 | `openlancer://schema/objlist-directives` | The 23 orders of an order list, with their values. The `steps` of `mission_add_item` take them. |
 | `openlancer://catalog/prefabs` | The behavior prefabs with their fields: the built-in prefabs and the prefab assets of the mods. Also the templates of `scene_create_object`, the builders `scene_place_wreck` and `scene_place_patrol_route`, and the prop groups of the profile. Without a profile, it gives the built-in prefabs and the rule data only. |
 | `openlancer://catalog/lists` | The data lists with their ids and labels. `list_values` takes the ids. |
+| `openlancer://catalog/thn-events` | The event types that `cutscene_add_event` adds, in the order of the Add event menu. Each one has the entity types of its first and its second target, if it needs the second target, and if it has a length. Also the entity types that `cutscene_add_entity` adds, and if each one takes a position. |
 | `openlancer://guide/rules` | The rules of the editor and what they mean for an agent. |
 | `openlancer://guide/refs` | The forms of the item references. |
 
 The catalog of the prefabs reads the open profile, so its read waits in the queue of the tool calls. It waits while you edit a field or do a gesture, as a call does. It counts in the calls each second. Above the calls each second or after the wait limit, the read gives a protocol error with the reason. The other resources read only the rule data, so they do not wait.
 
-The server gives one prompt. An agent program shows a prompt as a command. In Claude Code, the command is `/mcp__openlancer__two_trigger_mission`.
+The server gives two prompts. An agent program shows a prompt as a command. In Claude Code, the commands are `/mcp__openlancer__two_trigger_mission` and `/mcp__openlancer__short_cutscene`.
 
 | Prompt | Argument | What it gives |
 |---|---|---|
 | `two_trigger_mission` | `script`: the `msn:` reference of a mission script. `list_missions` gives the scripts. | The steps to add a pirate ambush with two triggers. The agent adds the ship build, the NPC and the ship with `mission_add_item`. It adds the two triggers and the loot in one `edit_batch`. Then it runs `mission_dry_run` and `check`. The names in the steps are examples. |
+| `short_cutscene` | `name`: the name of the new cutscene script, for example `my_intro`. | The steps to make a short cutscene. The agent makes the script with `cutscene_create`. It adds a second camera, a character with a costume of `list_values` and a marker with `cutscene_add_entity`. It adds a camera move and a cut to the second camera with `cutscene_add_event` and `set_fields`. Then it makes two images with `render_cutscene`, corrects the timing and runs `check`. It does not save until you ask. The names in the steps are examples. |
 
-The prompt needs the edit tools. So a host that only reads, for example `oltool mcp serve --read-only`, lists no prompt. The prompts `build_outpost` and `patrol_and_wreck` and the resource `openlancer://guide/workflows` are not in this version. They come after version 1.0 ([#70](https://github.com/spool1/openlancer/issues/70)). The prompt `short_cutscene` comes with the cutscene tools.
+The prompts need the edit tools. So a host that only reads, for example `oltool mcp serve --read-only`, lists no prompt. A host without `save`, for example `oltool mcp serve --no-save`, lists both prompts. Only the editor host makes the images of `short_cutscene`. In the host without a window, the agent goes to the next step. The prompts `build_outpost` and `patrol_and_wreck` and the resource `openlancer://guide/workflows` are not in this version. They come after version 1.0 ([#70](https://github.com/spool1/openlancer/issues/70)).
 
 ## Permission rules for the agent program
 

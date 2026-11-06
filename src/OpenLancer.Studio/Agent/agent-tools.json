@@ -574,7 +574,7 @@
       "description": "Adds an entity to a cutscene script, with the records that the game needs for its type. The tool makes one Undo step. The result gives the reference of the new entity. Get the scripts from list_cutscenes.",
       "fields": {
         "cutscene": "The reference of the script, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn.",
-        "type": "The entity type: CAMERA, MARKER, DEFORMABLE, COMPOUND, LIGHT, SOUND, PSYS, MOTION_PATH, MONITOR or SCENE. A script can have only one SCENE.",
+        "type": "The entity type: CAMERA, MARKER, DEFORMABLE, COMPOUND, LIGHT, SOUND, PSYS, MOTION_PATH, MONITOR or SCENE. A script can have only one SCENE. The resource openlancer://catalog/thn-events gives the event types that take each entity type.",
         "name": "The name of the entity. Another entity of the script cannot have this name, also in other letter case.",
         "template": "The template of the entity. A DEFORMABLE takes a costume: list_values gives them in the list costume. A SOUND takes a sound, and a PSYS takes an effect. A COMPOUND takes the nickname of an item of its category, for example a solar archetype for Solar or a ship for Spaceship. Give the category in the field userprops.category.",
         "position": "The position in meters: X, Y and Z. The default is 0, 0, 0. A MONITOR and a SCENE take no position.",
@@ -587,7 +587,7 @@
       "description": "Adds an event to a cutscene script, with the usual values of its type. Each target must be an entity of a type that fits the event. The tool makes one Undo step. The result gives the reference of the new event.",
       "fields": {
         "cutscene": "The reference of the script, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn.",
-        "type": "The event type, for example SET_CAMERA, START_MOTION or START_SPATIAL_PROP_ANIM. A type that the editor cannot add gives invalid_value, and the message gives the types.",
+        "type": "The event type, for example SET_CAMERA, START_MOTION or START_SPATIAL_PROP_ANIM. The resource openlancer://catalog/thn-events gives the types and the entity types of their targets. Another type gives invalid_value.",
         "time": "The time of the event in seconds, from 0. The time rounds to 1 ms.",
         "targets": "The names of the target entities in order: one, or two for a type with a second target. SET_CAMERA takes a MONITOR, then a CAMERA. A target of the wrong type refuses, and the message gives the types that fit.",
         "length": "The length of the event in seconds, from 0. It rounds to 1 ms. Without it, the event has the length of its type, mostly 1 s. A SET_CAMERA event has no length.",
@@ -1399,6 +1399,7 @@
     "cutscene_script_ref": "'{ref}' is not a reference of a cutscene script. Give thn: and the install path of the script, without # and the part after it.",
     "cutscene_entity_ref": "'{ref}' is not a reference of a cutscene entity. Give thn:<install path>#entity/<name>. get_cutscene gives the entities.",
     "cutscene_event_ref": "'{ref}' is not a reference of a cutscene event. Give thn:<install path>#event/<index>. get_cutscene gives the events.",
+    "cutscene_event_types": "The resource openlancer://catalog/thn-events gives the entity types of the targets of each event type.",
     "cutscene_events_one_cutscene": "All events of one call must be in one cutscene. Make one call for each cutscene.",
     "cutscene_ref_set_fields": "set_fields does not change the whole cutscene {ref}. Use cutscene_set_duration for its duration. Give an entity or an event to set its fields.",
     "cutscene_ref_set_text": "set_text does not change cutscenes, so it does not take {ref}. Use set_fields with the THN path of the text, for example props.animation.",
@@ -1588,6 +1589,12 @@
       "description": "The data lists with their ids, labels and the section types that give their values. list_values takes the ids.",
       "text": []
     },
+    "openlancer://catalog/thn-events": {
+      "name": "thn-events",
+      "title": "The event types and entity types of the cutscenes",
+      "description": "The event types that cutscene_add_event adds, with the entity types of their targets and if they have a length. Also the entity types that cutscene_add_entity adds, and if they take a position.",
+      "text": []
+    },
     "openlancer://guide/rules": {
       "name": "rules",
       "title": "The rules of the editor for agents",
@@ -1699,6 +1706,39 @@
         "   Make sure that my_reward runs.",
         "8. Call check with the scope mission and the ref {script}. Then call check with the scope all. It also finds errors outside the mission checks, for example a loadout without an engine. Correct each error.",
         "9. Tell the user what you added."
+      ]
+    },
+    "short_cutscene": {
+      "title": "Make a short cutscene",
+      "description": "Gives the steps to make a short cutscene script with two cameras, a character and a marker, with images and the checks.",
+      "arguments": {
+        "name": "The name of the new cutscene script, for example my_intro. The script goes into the CUTSCENES folder of the active mod."
+      },
+      "optional_tools": ["render_cutscene", "save"],
+      "text": [
+        "Make a short cutscene with the name {name}. Do the steps in this order.",
+        "The names my_cam_2, my_char and my_mark are examples. Use names that fit the cutscene.",
+        "The resource openlancer://catalog/thn-events gives the entity types that each event type takes as targets.",
+        "",
+        "1. Call studio_status. Make sure that can_edit is true.",
+        "2. Call cutscene_create with the name {name} and the duration 8. The new script has the monitor Monitor and the camera Camera_01.",
+        "   Camera_01 is at [0, 0, 0] and looks along -Z.",
+        "   The result gives the thn: reference of the new script. Give it as cutscene to each tool of the next steps.",
+        "3. Call cutscene_add_entity with the type CAMERA, the name my_cam_2 and the position [30, 2, -20].",
+        "   Give the orientation [0, 90, 0], so the camera looks along -X at the place of the character.",
+        "4. Call list_values with the list costume and pick a costume. Then call cutscene_add_entity with these values:",
+        "   - the type DEFORMABLE, the name my_char and the costume as template.",
+        "   - the position [0, 0, -20].",
+        "5. Call cutscene_add_entity with the type MARKER, the name my_mark and the position [0, 0, -10]. A later event can use the marker as a place.",
+        "6. Call cutscene_add_event with the type START_SPATIAL_PROP_ANIM, the time 0, the targets [Camera_01] and the length 4.",
+        "   Then call set_fields on the event reference of the result, with expect_type START_SPATIAL_PROP_ANIM and expect_time 0.",
+        "   Give the field props.spatialprops.pos with the end position of the camera, for example [0, 2, -8].",
+        "7. Call cutscene_add_event with the type SET_CAMERA, the time 4 and the targets [Monitor, my_cam_2]. From the time 4, the cutscene shows the view of my_cam_2.",
+        "8. Call render_cutscene with the time 2, then with the time 6. Look at the two images.",
+        "   Only the editor host can render. If render_cutscene gives not_available, go to the next step.",
+        "9. To correct the timing, call cutscene_move_events or set_fields. Give expect_type and expect_time with each event reference.",
+        "10. Call check with the scope cutscene and the ref of the new script. Correct each error.",
+        "11. Tell the user what you added. Do not call save until the user asks for it."
       ]
     }
   },

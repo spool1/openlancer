@@ -84,7 +84,8 @@ internal static class CutsceneEditTools
     /// <summary>
     /// Adds an event at the end of the events of a script, with the usual props of its type (see
     /// <see cref="CutsceneCommands.AddEvent"/>). Each target must fit the role of its place. The fields then go through
-    /// the rules of <c>set_fields</c> in the same Undo step.
+    /// the rules of <c>set_fields</c> in the same Undo step. The error of a type that the editor cannot add also names
+    /// the resource of the event types.
     /// </summary>
     public static ToolStep AddEvent(ToolCall call) => EditTools.Apply(call, scope =>
     {
@@ -94,14 +95,21 @@ internal static class CutsceneEditTools
         var time = call.Args.Number("time")!.Value;
         var plan = CutsceneCommands.AddEvent(session, path, type, time, call.Args.Texts("targets")!,
             call.Args.Number("length"));
-        Run(scope, plan, error => error.Detail switch
+        try
         {
-            MissionErrors.TargetCount or MissionErrors.TargetType or MissionErrors.ItemNotFound => "targets",
-            MissionErrors.FieldValue when ThnTemplates.Role(type) == null => "type",
-            MissionErrors.FieldValue when ThnEdits.OnGrid(time) is var grid && (!float.IsFinite(grid) || grid < 0) => "time",
-            MissionErrors.FieldValue => "length",
-            _ => "cutscene",
-        });
+            Run(scope, plan, error => error.Detail switch
+            {
+                MissionErrors.TargetCount or MissionErrors.TargetType or MissionErrors.ItemNotFound => "targets",
+                MissionErrors.FieldValue when ThnTemplates.Role(type) == null => "type",
+                MissionErrors.FieldValue when ThnEdits.OnGrid(time) is var grid && (!float.IsFinite(grid) || grid < 0) => "time",
+                MissionErrors.FieldValue => "length",
+                _ => "cutscene",
+            });
+        }
+        catch (EditException e) when (e.Error.Field == "type")
+        {
+            throw new EditException(e.Error with { Message = $"{e.Error.Message} {AgentTexts.Error("cutscene_event_types")}" });
+        }
         AddFields(scope, call, plan);
     });
 
