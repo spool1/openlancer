@@ -34,6 +34,25 @@ public sealed class ThnJsonTests
         Assert.Equal("\"L_DIRECT\"", ThnJson.Write(type, new ThnNumber(direct), Evaluator.Symbols, Evaluator).ToJsonString());
     }
 
+    /// <summary>A THN name key takes the number of a name of its group as a choice of that name. A number that no name
+    /// of the group has refuses with the names, because the Inspector offers only these names.</summary>
+    [Fact]
+    public void ANameKeyTakesOnlyTheNumberOfANameOfItsGroup()
+    {
+        var type = Row(ThnElementKind.Entity, "LIGHT", "lightprops.type");
+        var direct = Evaluator.Symbols["L_DIRECT"].Value;
+        var unused = Enumerable.Range(0, 1000).First(n => Evaluator.Symbols.Values.All(s => s.Value != n));
+
+        Assert.Equal(new ThnSymbol("L_DIRECT"), Read(type, direct.ToString(), new ThnSymbol("L_POINT")).Value);
+        Assert.Equal(new ThnNumber(direct), Read(type, direct.ToString(), new ThnNumber(9)).Value);
+        Assert.Equal(new ThnSymbol("L_DIRECT"), Read(type, direct.ToString(), null).Value);
+        var error = Read(type, unused.ToString(), new ThnSymbol("L_POINT")).Error;
+        Assert.StartsWith("The value of lightprops.type must be one of these names: ", error);
+        Assert.Contains("L_DIRECT", error);
+        Assert.NotNull(Read(type, direct + ".5", null).Error);
+        Assert.NotNull(Read(type, "1e39", null).Error);
+    }
+
     /// <summary>The form of the stored value gives the stored value, also when the form does not give the same floats
     /// back. A stored value that does not fit its row is Lua text.</summary>
     [Fact]

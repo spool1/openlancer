@@ -73,7 +73,9 @@ internal static class ThnJson
     /// <summary>
     /// The value of a key that a JSON value gives. A JSON value that is the form of the stored value gives the stored
     /// value. A stored number of a checkbox or of a THN name stays a number, as the Inspector keeps it (see
-    /// <see cref="ThnFieldEdit.BoolValue"/> and <see cref="ThnFieldEdit.SymbolValue"/>).
+    /// <see cref="ThnFieldEdit.BoolValue"/> and <see cref="ThnFieldEdit.SymbolValue"/>). A THN name key also takes the
+    /// number of a name of its group, as a choice of that name. Another number refuses, because the Inspector offers
+    /// only the names of the group.
     /// </summary>
     /// <param name="row">The row of the key, or null when the schema does not know the key. The caller refuses a
     /// record and the flags of an entity before the read.</param>
@@ -106,13 +108,11 @@ internal static class ThnJson
                     ? Finite(() => ThnPose.Orient(MathHelper.MatrixFromEulerDegrees(new Vector3(x, y, z))))
                     : bad;
             case ThnKeyKind.Symbol:
-                if (Text(json) is { } name)
-                {
-                    return symbols.TryGetValue(name, out var info) && info.Group == row!.Group
-                        ? ThnJsonInput.Of(ThnFieldEdit.SymbolValue(stored, name, symbols))
-                        : bad;
-                }
-                return NumberOf(json) is { } symbol ? Finite(() => new ThnNumber(symbol)) : bad;
+                var name = Text(json) ??
+                           (NumberOf(json) is { } symbolNumber ? NameOf(row!.Group, symbolNumber, symbols) : null);
+                return name != null && symbols.TryGetValue(name, out var info) && info.Group == row!.Group
+                    ? ThnJsonInput.Of(ThnFieldEdit.SymbolValue(stored, name, symbols))
+                    : bad;
             case ThnKeyKind.Flags:
                 return Bits(row!, path, json) ?? bad;
             case ThnKeyKind.PathData:
@@ -219,6 +219,12 @@ internal static class ThnJson
     /// <summary>The THN names of a group, in the order of their numbers.</summary>
     private static IEnumerable<string> GroupNames(string? group, IReadOnlyDictionary<string, ThnSymbolInfo> symbols) =>
         symbols.Where(s => s.Value.Group == group).OrderBy(s => s.Value.Value).Select(s => s.Key);
+
+    /// <summary>The THN name of a group that has a number, or null when no name of the group has it.</summary>
+    private static string? NameOf(string? group, float number, IReadOnlyDictionary<string, ThnSymbolInfo> symbols) =>
+        number == MathF.Floor(number)
+            ? symbols.FirstOrDefault(s => s.Value.Group == group && s.Value.Value == number).Key
+            : null;
 
     /// <summary>The THN name of a stored value of a symbol key: the name, or the name of the number in the group of
     /// the key. Null for another value.</summary>

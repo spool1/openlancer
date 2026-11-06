@@ -558,8 +558,8 @@ The value forms of the THN keys:
 | Vector | Three numbers. | `"spatialprops.pos": [0, 10, -50]` |
 | Quaternion | Four numbers: w, x, y and z. | `"props.spatialprops.q_orient": [1, 0, 0, 0]` |
 | Rotation | Three angles in degrees, as the Inspector shows them. The file holds a matrix. | `"spatialprops.orient": [0, 90, 0]` |
-| Name | A THN name of the group of the key. A stored number stays a number. | `"lightprops.type": "L_DIRECT"` |
-| Bits | A list of the names of the bits that are on, or a whole number. The other bits keep their state. | `"props.event_flags": ["Loop"]` |
+| Name | A THN name of the group of the key, or the number of such a name. Another number gives `invalid_value`. A stored number stays a number. | `"lightprops.type": "L_DIRECT"` |
+| Bits | A list of the names of the bits that are on, or a whole number. The other named bits of the key go off, so `[]` turns off all named bits. A bit without a name keeps its state. | `"props.event_flags": ["Loop"]` |
 | Motion path | `closed`, and one row for each key: a `point`, and an `orientation` (w, x, y and z) when the path has them. | `"pathprops.path_data": { "closed": false, "keys": [ { "point": [0, 0, 0], "orientation": [1, 0, 0, 0] } ] }` |
 | Curve | `clsid`, and one row for each point: `time`, `value`, `in` and `out`. | `"props.param_curve": { "clsid": "FreeFormPCurve", "points": [ { "time": 0, "value": 0, "in": 0, "out": 0 } ] }` |
 | Turn | `degrees`, and an optional `axis`: an axis name or three numbers. | `"props.spatialprops.axisrot": { "degrees": 90, "axis": "Y_AXIS" }` |
