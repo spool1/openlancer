@@ -239,7 +239,7 @@
       "description": "Copies items of a system with their children, mission items and cutscene events. Each copy gets the next free nickname. The tool makes one Undo step. The result gives the references of the copies.",
       "fields": {
         "refs": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. It also copies triggers and other mission items: trg: and sec: references. It also copies cutscene events: thn: references with #event/. studio_status gives the most items of one call.",
-        "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position and a mission copy do not move, and the result warns about them. Without it, each copy is at the place of its item.",
+        "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position, a mission copy and a copy of a cutscene event do not move, and the result warns about them. Without it, each copy is at the place of its item.",
         "time_offset": "The seconds from the time of each cutscene event to the time of its copy. 0 refuses, because a copy at the time of its event has the key of the event. Without it, the copies start at the end of the events.",
         "expect_events": "Guards for the cutscene events of refs. Each row names one event of refs with the type and the time that you read.",
         "expect_events.ref": "The reference of an event of refs, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#event/2.",
@@ -1456,6 +1456,7 @@
     "mission_delete_header": "The [Mission] section holds the settings of the script, so delete_items does not delete it. To delete the script, use mission_edit with delete_script.",
     "mission_copy_not_moved": "The copy {ref} is an item of a mission, so the offset did not move it. To move it, set its position with set_fields.",
     "mission_copy_no_position": "The copy {ref} has no position, so the offset did not move it.",
+    "cutscene_copy_not_moved": "The copy {ref} is a cutscene event, so the offset did not move it. To move the copy in time, use time_offset.",
     "prefab_field_form": "Field {field} of the prefab takes {form}.",
     "prefab_form_value": "one value, or a list of numbers for a position or a rotation",
     "prefab_form_list": "a list of rows, each an object of values by column id. The columns are {columns}",

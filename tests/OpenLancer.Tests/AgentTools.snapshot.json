@@ -9312,7 +9312,7 @@
             },
             "minItems": 3,
             "maxItems": 3,
-            "description": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position and a mission copy do not move, and the result warns about them. Without it, each copy is at the place of its item."
+            "description": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position, a mission copy and a copy of a cutscene event do not move, and the result warns about them. Without it, each copy is at the place of its item."
           },
           "time_offset": {
             "type": "number",

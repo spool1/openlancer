@@ -383,8 +383,8 @@ public static class CutsceneCommands
     /// </summary>
     /// <remarks>A copy at the time of its event has the time, the type and the targets of the event, so a later mod
     /// that names the event by that key finds two events (see <see cref="TimelineEdits.Duplicate"/>). Such an offset,
-    /// for example 0, refuses with the detail <see cref="MissionErrors.FieldValue"/>. A copy before 0 and an offset
-    /// that is not finite refuse with that detail too.</remarks>
+    /// for example 0, refuses with the detail <see cref="MissionErrors.FieldValue"/>. A copy before 0 and a copy time
+    /// that is not a finite float refuse with that detail too.</remarks>
     /// <param name="timeOffset">The seconds from the time of each event to the time of its copy.</param>
     public static CutscenePlan Duplicate(EditSession session, IReadOnlyList<ThnRef> events, double timeOffset) =>
         Duplicate(session, events, (double?)timeOffset);
@@ -405,7 +405,8 @@ public static class CutsceneCommands
             return CutscenePlan.Refused(label, path, ThnEdits.NoSuchElement(ThnElementKind.Event));
         if (timeOffset is not { } offset)
             return CutscenePlan.Of(label, path, () => TimelineEdits.Duplicate(path, clip), newEvents: clip.Events.Count);
-        if (!double.IsFinite(offset))
+        // A time is a float, so an offset that is finite as a double can still give a copy time that is not finite.
+        if (clip.Events.Any(e => !float.IsFinite((float)(TimelineClip.TimeOf(e) + offset))))
             return CutscenePlan.Refused(label, path, ThnNumber.NotFiniteMessage, MissionErrors.FieldValue);
         var start = clip.Start + offset;
         if (start < 0)

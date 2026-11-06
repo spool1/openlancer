@@ -267,6 +267,7 @@ public sealed partial class AgentCutsceneToolTests
     [InlineData("duplicate_items", """{ "refs": ["thn:DATA\\SCRIPTS\\x.thn#event/1"], "time_offset": 0 }""", "invalid_value", MissionErrors.FieldValue, "time_offset")]
     [InlineData("duplicate_items", """{ "refs": ["thn:DATA\\SCRIPTS\\x.thn#event/1"], "time_offset": 0.0001 }""", "invalid_value", MissionErrors.FieldValue, "time_offset")]
     [InlineData("duplicate_items", """{ "refs": ["thn:DATA\\SCRIPTS\\x.thn#event/1"], "time_offset": -5 }""", "invalid_value", MissionErrors.FieldValue, "time_offset")]
+    [InlineData("duplicate_items", """{ "refs": ["thn:DATA\\SCRIPTS\\x.thn#event/1"], "time_offset": 1e300 }""", "invalid_value", MissionErrors.FieldValue, "time_offset")]
     [InlineData("duplicate_items", """{ "refs": ["sec:DATA\\EQUIPMENT\\goods.ini#Good/g1"], "time_offset": 1 }""", "invalid_argument", ToolInput.BadArgument, "time_offset")]
     public void EachCutsceneErrorOfTheGenericToolsHasItsCodeAndChangesNothing(string tool, string arguments, string code,
         string detail, string field)
@@ -500,6 +501,26 @@ public sealed partial class AgentCutsceneToolTests
         Assert.Equal("Agent: Duplicate event", session.UndoLabel);
         Assert.Equal([$"{Script}#event/8"], AgentEditToolTests.Texts(offset["adds"]));
         Assert.Equal([8f, 8f, 7.5f], W(session).Events.Skip(6).Select(e => ((ThnNumber)e.Table.List[0]).Value));
+        Assert.True(copies["warnings"] is null or JsonArray { Count: 0 });
+    }
+
+    /// <summary>An event has no position, so <c>offset</c> does not move a copy of an event. The result warns about
+    /// each copy, as for a mission copy. The copies start at the end of the events, as without the offset.</summary>
+    [Fact]
+    public void AnOffsetDoesNotMoveACopyOfAnEventAndTheResultWarns()
+    {
+        var (ws, session, host) = Open();
+        using var _ = ws;
+
+        var result = Ok(host, "duplicate_items",
+            $$"""{ "refs": [{{Json(Script + "#event/1")}}, {{Json(Script + "#event/2")}}], "offset": [10, 0, 0] }""");
+
+        Assert.Equal([$"{Script}#event/6", $"{Script}#event/7"], AgentEditToolTests.Texts(result["adds"]));
+        Assert.Equal([$"{Script}#event/6", $"{Script}#event/7"],
+            result["warnings"]!.AsArray().Select(w => (string?)w!["ref"]));
+        Assert.Equal($"The copy {Script}#event/6 is a cutscene event, so the offset did not move it. To move the copy " +
+                     "in time, use time_offset.", (string?)result["warnings"]![0]!["message"]);
+        Assert.Equal([8f, 8f], W(session).Events.Skip(6).Select(e => ((ThnNumber)e.Table.List[0]).Value));
     }
 
     /// <summary>A preview of set_fields changes nothing and gives the result of the real call (section 13.1, item 6 of

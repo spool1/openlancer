@@ -154,7 +154,9 @@ internal static partial class ItemEditTools
     /// copies are at the place of their items. With an offset, the same batch moves each copy and each copy of a child by
     /// the offset (review finding R6 of MCP1-2). A copy without a position does not move, and the result warns about it.
     /// So the result tells the agent each copy that is not at the offset. Mission items get the copies of the mission
-    /// studio (see <see cref="DuplicateMissionItems"/>).
+    /// studio (see <see cref="DuplicateMissionItems"/>), and cutscene events get the copies of the Timeline (see
+    /// <see cref="DuplicateCutsceneEvents"/>). The offset does not move these copies either, and the result warns about
+    /// them too.
     /// </summary>
     public static ToolStep DuplicateItems(ToolCall call) => EditTools.Apply(call, scope =>
     {
@@ -168,7 +170,7 @@ internal static partial class ItemEditTools
         if (missions.Count > 0)
             DuplicateMissionItems(call, scope, missions, offset != null);
         if (cutscene.Count > 0)
-            DuplicateCutsceneEvents(scope, cutscene, timeOffset);
+            DuplicateCutsceneEvents(scope, cutscene, timeOffset, offset != null);
     });
 
     /// <summary>Copies items of a system, then moves the copies with a position by the offset.</summary>

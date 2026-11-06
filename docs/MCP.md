@@ -157,7 +157,7 @@ These tools change the data of the active mod. They work in both hosts. The olto
 | `set_text` | Sets the name, the infocard or another text of one item, or a text id of a mission line. The text goes into the `strings.json` of the active mod. |
 | `rename_item` | Gives an item a new nickname, and changes each line that names it. A line that the active mod cannot change keeps the old nickname and shows "Missing". A data item must be an item that the active mod adds. A cutscene entity gets a new name, and the events of its script that name it change too. |
 | `delete_items` | Deletes items of a system with their children, mission items, and cutscene entities and events. Other lines that name them show "Missing". A cutscene entity goes with the events that name it. |
-| `duplicate_items` | Copies items of a system with their children, mission items and cutscene events. With `offset`, the copies of a system move by the offset. A copy without a position does not move, and the result warns about it. With `time_offset`, each copy of an event is at the time of its event plus the offset. |
+| `duplicate_items` | Copies items of a system with their children, mission items and cutscene events. With `offset`, the copies of a system move by the offset. A copy without a position, a mission copy and a copy of a cutscene event do not move, and the result warns about them. With `time_offset`, each copy of an event is at the time of its event plus the offset. |
 | `undo` | Undoes the last edit of the agent. |
 | `redo` | Redoes the last edit that the agent undid. |
 | `edit_batch` | Runs edit steps as one Undo step, all or nothing. |
@@ -580,7 +580,7 @@ A rename of an entity needs `confirm: true` when other data uses the name. An ex
 
 A delete of an entity that events name needs `confirm: true`, as the editor asks. The message names the events with their indexes before the call. One call that deletes more than one entity asks with one message for all of them. The result gives each event with its index before the call, and the reason `cascade`. In `edit_batch`, the message and the result of a step give the indexes before the step.
 
-`duplicate_items` with `time_offset` puts each copy at the time of its event plus the offset, in seconds. A copy at the time of its event has the key of the event, so an offset of 0 gives `invalid_value`. A copy before 0 gives `invalid_value` too. `time_offset` without an event gives `invalid_argument`.
+`duplicate_items` with `time_offset` puts each copy at the time of its event plus the offset, in seconds. A copy at the time of its event has the key of the event, so an offset of 0 gives `invalid_value`. A copy before 0 gives `invalid_value` too. `time_offset` without an event gives `invalid_argument`. An event has no position, so `offset` does not move a copy of an event, and the result warns about each copy.
 
 ### Save
 

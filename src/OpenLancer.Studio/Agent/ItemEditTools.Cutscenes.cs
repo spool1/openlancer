@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
@@ -284,20 +285,32 @@ internal static partial class ItemEditTools
     /// <summary>
     /// Copies cutscene events, one plan for each script. Without an offset, the copies go after the events, as Duplicate
     /// of Unity and of the Timeline does (see <see cref="TimelineEdits.Duplicate"/>). With an offset, each copy is at
-    /// the time of its event plus the offset.
+    /// the time of its event plus the offset. An event has no position, so the argument <c>offset</c> does not move a
+    /// copy, and the result warns about each copy, as for a mission copy.
     /// </summary>
-    /// <param name="offset">The argument <c>time_offset</c> in seconds, or null.</param>
+    /// <param name="timeOffset">The argument <c>time_offset</c> in seconds, or null.</param>
+    /// <param name="offset">True when the call has the argument <c>offset</c>.</param>
     private static void DuplicateCutsceneEvents(EditScope scope, IReadOnlyList<(int Index, ThnRef Element)> items,
-        double? offset)
+        double? timeOffset, bool offset)
     {
         var session = scope.Session;
         foreach (var script in items.GroupBy(t => t.Element.Path, VfsPath.Comparer))
         {
             var events = script.Select(t => t.Element).Distinct().ToList();
-            Run(scope, offset is { } seconds
-                    ? CutsceneCommands.Duplicate(session, events, seconds)
-                    : CutsceneCommands.Duplicate(session, events),
-                error => error.Detail == MissionErrors.FieldValue ? "time_offset" : "refs");
+            var plan = timeOffset is { } seconds
+                ? CutsceneCommands.Duplicate(session, events, seconds)
+                : CutsceneCommands.Duplicate(session, events);
+            Run(scope, plan, error => error.Detail == MissionErrors.FieldValue ? "time_offset" : "refs");
+            if (!offset)
+                continue;
+            scope.Report(new EditResult(EditStatus.Applied)
+            {
+                Warnings = plan.Added(session).Select(copy => ItemRefs.Of(session, copy)).Select(copy =>
+                    new Problem(DiagnosticSeverity.Warning, AgentTexts.Error("cutscene_copy_not_moved", ("ref", copy)))
+                    {
+                        Ref = copy,
+                    }).ToList(),
+            });
         }
     }
 
