@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
+using System.Text.Json.Nodes;
+using LibreLancer;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
@@ -50,6 +53,62 @@ internal static class CutsceneEditTools
         if (call.Args.Number("duration") is { } seconds)
             Run(scope, CutsceneCommands.SetDuration(session, plan.Path, (float)seconds), "duration", "duration");
     });
+
+    /// <summary>
+    /// Adds an entity at the end of the entities of a script, with the records that the engine needs for its type (see
+    /// <see cref="CutsceneCommands.AddEntity"/>). The orientation is in Euler degrees, as the Inspector shows a
+    /// rotation. The fields then go through the rules of <c>set_fields</c> in the same Undo step.
+    /// </summary>
+    public static ToolStep AddEntity(ToolCall call) => EditTools.Apply(call, scope =>
+    {
+        var session = scope.Session;
+        var path = Script(call, "cutscene");
+        var position = call.Args.Point("position");
+        var degrees = call.Args.Point("orientation");
+        var rotation = degrees is { } angles ? MathHelper.MatrixFromEulerDegrees(angles) : (Matrix4x4?)null;
+        var plan = CutsceneCommands.AddEntity(session, path, call.Args.Text("type")!, call.Args.Text("name")!.Trim(),
+            call.Args.Text("template"), position, rotation);
+        Run(scope, plan, error => error.Detail switch
+        {
+            MissionErrors.NameTaken or MissionErrors.NameInvalid => "name",
+            MissionErrors.NoPlace => position != null ? "position" : "orientation",
+            MissionErrors.FieldValue or MissionErrors.OneScene => "type",
+            _ => "cutscene",
+        });
+        AddFields(scope, call, plan);
+    });
+
+    /// <summary>
+    /// Adds an event at the end of the events of a script, with the usual props of its type (see
+    /// <see cref="CutsceneCommands.AddEvent"/>). Each target must fit the role of its place. The fields then go through
+    /// the rules of <c>set_fields</c> in the same Undo step.
+    /// </summary>
+    public static ToolStep AddEvent(ToolCall call) => EditTools.Apply(call, scope =>
+    {
+        var session = scope.Session;
+        var path = Script(call, "cutscene");
+        var type = call.Args.Text("type")!;
+        var time = call.Args.Number("time")!.Value;
+        var plan = CutsceneCommands.AddEvent(session, path, type, time, call.Args.Texts("targets")!,
+            call.Args.Number("length"));
+        Run(scope, plan, error => error.Detail switch
+        {
+            MissionErrors.TargetCount or MissionErrors.TargetType or MissionErrors.ItemNotFound => "targets",
+            MissionErrors.FieldValue when ThnTemplates.Role(type) == null => "type",
+            MissionErrors.FieldValue when ThnEdits.OnGrid(time) is var grid && (!float.IsFinite(grid) || grid < 0) => "time",
+            MissionErrors.FieldValue => "length",
+            _ => "cutscene",
+        });
+        AddFields(scope, call, plan);
+    });
+
+    /// <summary>Sets the argument <c>fields</c> on the element that a plan added, with the rules of
+    /// <c>set_fields</c>. An error names the field, for example <c>fields.spatialprops.pos</c>.</summary>
+    private static void AddFields(EditScope scope, ToolCall call, CutscenePlan plan)
+    {
+        if (call.Args.Node("fields") is JsonObject fields)
+            ItemEditTools.SetCutsceneFields(scope, plan.Added(scope.Session)[0], fields);
+    }
 
     /// <summary>Sets the duration of a script, as the duration field of the Inspector does. The value does not
     /// round.</summary>
@@ -146,7 +205,12 @@ internal static class CutsceneEditTools
 
     /// <summary>Runs a plan in the scope. A refusal of a value names the argument of the value, and another refusal
     /// names the argument of the item, for example the reason why a cutscene takes no edits.</summary>
-    private static void Run(EditScope scope, CutscenePlan plan, string valueField, string itemField)
+    private static void Run(EditScope scope, CutscenePlan plan, string valueField, string itemField) =>
+        Run(scope, plan, error => error.Detail == MissionErrors.FieldValue ? valueField : itemField);
+
+    /// <summary>Runs a plan in the scope. A refusal that names no argument names the argument that
+    /// <paramref name="fieldOf"/> gives.</summary>
+    private static void Run(EditScope scope, CutscenePlan plan, Func<EditError, string> fieldOf)
     {
         try
         {
@@ -154,10 +218,7 @@ internal static class CutsceneEditTools
         }
         catch (EditException e) when (e.Error.Field == null)
         {
-            throw new EditException(e.Error with
-            {
-                Field = e.Error.Detail == MissionErrors.FieldValue ? valueField : itemField,
-            });
+            throw new EditException(e.Error with { Field = fieldOf(e.Error) });
         }
     }
 }

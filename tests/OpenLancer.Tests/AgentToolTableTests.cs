@@ -374,6 +374,8 @@ public sealed class AgentToolTableTests
         ["mission_play"] = (ToolKind.Play, new ToolHints(false, true, false)),
         ["mission_play_trace"] = (ToolKind.Query, new ToolHints(true, false, true)),
         ["cutscene_create"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["cutscene_add_entity"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["cutscene_add_event"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["cutscene_move_events"] = (ToolKind.Edit, new ToolHints(false, true, false)),
         ["cutscene_set_duration"] = (ToolKind.Edit, new ToolHints(false, true, true)),
         ["cutscene_set_flags"] = (ToolKind.Edit, new ToolHints(false, true, true)),

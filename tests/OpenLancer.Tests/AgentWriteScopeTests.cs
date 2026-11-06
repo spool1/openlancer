@@ -64,6 +64,8 @@ public sealed class AgentWriteScopeTests
         ("mission_add_item", """{ "script": REF, "kind": "solar", "fields": { "system": "ol_system" } }"""),
         ("mission_place_prefab", """{ "script": REF, "prefab": "prefab:builtin:spawnWave" }"""),
         ("mission_place_prefab", """{ "script": "msn:DATA\\MISSIONS\\x.ini", "prefab": "prefab:builtin:branch", "outputs": { "ifActive": [REF] } }"""),
+        ("cutscene_add_entity", """{ "cutscene": REF, "type": "MARKER", "name": "my_mark" }"""),
+        ("cutscene_add_event", """{ "cutscene": REF, "type": "START_PSYS", "time": 1, "targets": ["Fx"] }"""),
         ("cutscene_move_events", """{ "events": [{ "ref": REF }], "time_delta": 1 }"""),
         ("cutscene_set_duration", """{ "cutscene": REF, "seconds": 1 }"""),
         ("cutscene_set_flags", """{ "entity": REF, "flags": [] }"""),
@@ -72,6 +74,8 @@ public sealed class AgentWriteScopeTests
     /// <summary>Each cutscene tool with a <c>thn:</c> reference. <c>PATH</c> marks the path, as JSON text.</summary>
     private static readonly (string Tool, string Arguments)[] CutsceneCalls =
     [
+        ("cutscene_add_entity", """{ "cutscene": "thn:PATH", "type": "MARKER", "name": "my_mark" }"""),
+        ("cutscene_add_event", """{ "cutscene": "thn:PATH", "type": "START_PSYS", "time": 1, "targets": ["Fx"] }"""),
         ("cutscene_move_events", """{ "events": [{ "ref": "thn:PATH#event/0" }], "time_delta": 1 }"""),
         ("cutscene_set_duration", """{ "cutscene": "thn:PATH", "seconds": 1 }"""),
         ("cutscene_set_flags", """{ "entity": "thn:PATH#entity/Cam_A", "flags": [] }"""),

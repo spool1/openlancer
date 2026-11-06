@@ -569,6 +569,31 @@
         "duration": "The length of the cutscene in seconds. The default is 10."
       }
     },
+    "cutscene_add_entity": {
+      "title": "Add an entity to a cutscene",
+      "description": "Adds an entity to a cutscene script, with the records that the game needs for its type. The tool makes one Undo step. The result gives the reference of the new entity. Get the scripts from list_cutscenes.",
+      "fields": {
+        "cutscene": "The reference of the script, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn.",
+        "type": "The entity type: CAMERA, MARKER, DEFORMABLE, COMPOUND, LIGHT, SOUND, PSYS, MOTION_PATH, MONITOR or SCENE. A script has one SCENE.",
+        "name": "The name of the entity. Another entity of the script cannot have this name, also in other letter case.",
+        "template": "The template of the entity. A DEFORMABLE takes a costume: list_values gives them in the list costume. A SOUND takes a sound, and a PSYS takes an effect. A COMPOUND takes a model nickname, and it needs the field userprops.category too.",
+        "position": "The position in meters: X, Y and Z. The default is 0, 0, 0. A MONITOR and a SCENE take no position.",
+        "orientation": "The rotation in degrees: X, Y and Z, as the Inspector shows it. The default is 0, 0, 0. A MONITOR and a SCENE take no rotation.",
+        "fields": "More values of the new entity by THN path, in the forms of set_fields, for example \"userprops.category\": \"Prop\". The tool sets them after it adds the entity."
+      }
+    },
+    "cutscene_add_event": {
+      "title": "Add an event to a cutscene",
+      "description": "Adds an event to a cutscene script, with the usual values of its type. Each target must be an entity of a type that fits the event. The tool makes one Undo step. The result gives the reference of the new event.",
+      "fields": {
+        "cutscene": "The reference of the script, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn.",
+        "type": "The event type, for example SET_CAMERA, START_MOTION or START_SPATIAL_PROP_ANIM. A type that the editor cannot add gives invalid_value, and the message gives the types.",
+        "time": "The time of the event in seconds, from 0. The time rounds to 1 ms.",
+        "targets": "The names of the target entities in order: one, or two for a type with a second target. SET_CAMERA takes a MONITOR, then a CAMERA. A target of the wrong type refuses, and the message gives the types that fit.",
+        "length": "The length of the event in seconds, from 0. It rounds to 1 ms. Without it, the event has the length of its type, mostly 1 s. A SET_CAMERA event has no length.",
+        "fields": "More values of the new event by THN path, in the forms of set_fields, for example \"props.spatialprops.pos\": [0, 10, -50]. The tool sets them after it adds the event."
+      }
+    },
     "cutscene_move_events": {
       "title": "Move cutscene events in time",
       "description": "Moves events of one cutscene in time and changes their length, as a drag on the Timeline does. The tool makes one Undo step. Get the events from get_cutscene.",

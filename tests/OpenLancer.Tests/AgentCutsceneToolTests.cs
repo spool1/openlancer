@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Text.Json.Nodes;
+using LibreLancer;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions.Editing;
@@ -17,8 +19,8 @@ using static OpenLancer.Tests.ThnSessions;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The cutscene tools of section 7.5 of the MCP1 design: <c>cutscene_create</c>, <c>cutscene_move_events</c>,
-/// <c>cutscene_set_duration</c> and <c>cutscene_set_flags</c>. The tests cover section 13.1, items 5 to 8 and 10 to
+/// The cutscene tools of section 7.5 of the MCP1 design: <c>cutscene_create</c>, <c>cutscene_add_entity</c>,
+/// <c>cutscene_add_event</c>, <c>cutscene_move_events</c>, <c>cutscene_set_duration</c> and <c>cutscene_set_flags</c>. The tests cover section 13.1, items 5 to 8 and 10 to
 /// 12: one entry with the edit origin Agent, the preview, the parity with the UI path, the error codes, the limit, the
 /// event guards (decision D767) and the write scope.
 /// </summary>
@@ -30,11 +32,21 @@ public sealed partial class AgentCutsceneToolTests
     /// <summary>A name of 65 characters, one more than <see cref="ThnEdits.MaxNameLength"/>.</summary>
     private const string LongName = "a123456789a123456789a123456789a123456789a123456789a123456789a1234";
 
-    /// <summary>The calls of the four tools on the script of <see cref="ThnSessions"/>, with the label of the entry, and
+    /// <summary>The calls of the six tools on the script of <see cref="ThnSessions"/>, with the label of the entry, and
     /// the plan of the same edit through the command layer of the UI.</summary>
     public static TheoryData<string, string, string> Calls => new()
     {
         { "cutscene_create", $$"""{ "name": "my_intro", "duration": 8 }""", "New cutscene my_intro" },
+        {
+            "cutscene_add_entity",
+            $$"""{ "cutscene": {{Json(Script)}}, "type": "CAMERA", "name": "my_cam_2", "position": [30, 10, 0], "orientation": [0, 90, 0] }""",
+            "Add my_cam_2"
+        },
+        {
+            "cutscene_add_event",
+            $$"""{ "cutscene": {{Json(Script)}}, "type": "START_PSYS", "time": 1.5, "targets": ["fx"], "length": 2 }""",
+            "Add START_PSYS"
+        },
         { "cutscene_set_duration", $$"""{ "cutscene": {{Json(Script)}}, "seconds": 4 }""", "Set duration" },
         { "cutscene_set_flags", $$"""{ "entity": {{Json(Script + "#entity/Fx")}}, "flags": ["HIDDEN"] }""", "Set flags" },
         {
@@ -48,6 +60,9 @@ public sealed partial class AgentCutsceneToolTests
     private static CutscenePlan UiPlan(EditSession session, string tool) => tool switch
     {
         "cutscene_create" => CutsceneCommands.Create(session, "my_intro"),
+        "cutscene_add_entity" => CutsceneCommands.AddEntity(session, ScriptPath, "CAMERA", "my_cam_2", null,
+            new Vector3(30, 10, 0), MathHelper.MatrixFromEulerDegrees(new Vector3(0, 90, 0))),
+        "cutscene_add_event" => CutsceneCommands.AddEvent(session, ScriptPath, "START_PSYS", 1.5, ["fx"], 2),
         "cutscene_set_duration" => CutsceneCommands.SetDuration(session, ScriptPath, 4),
         "cutscene_set_flags" => CutsceneCommands.SetFlags(session, Entity(session, "Fx"),
             new HashSet<string> { ThnFlags.Hidden }),
