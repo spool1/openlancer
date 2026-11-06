@@ -49,6 +49,10 @@ internal sealed class EditScope
 
     private readonly List<string> stepConfirmations = [];
 
+    /// <summary>The cutscene plans of the step that need <c>confirm: true</c>, in order. They give one question (see
+    /// <see cref="EditTools.CutsceneConfirmation"/>).</summary>
+    private readonly List<CutscenePlan> stepCutsceneAsks = [];
+
     /// <summary>The inverse and the row map of each mission request of the call, in order.</summary>
     private readonly List<(MissionCommand? Inverse, RowMap? Rows)> missionRuns = [];
 
@@ -72,9 +76,12 @@ internal sealed class EditScope
 
     public EditBatch Batch { get; }
 
-    /// <summary>Why the commands of the step until now need <c>confirm: true</c>, one text for each plan that
-    /// asks.</summary>
-    public IReadOnlyList<string> Confirmations => stepConfirmations;
+    /// <summary>Why the commands of the step until now need <c>confirm: true</c>: one text for each plan that asks,
+    /// and one text for all cutscene plans that ask.</summary>
+    public IReadOnlyList<string> Confirmations =>
+        EditTools.CutsceneConfirmation(stepCutsceneAsks, cutscenes.StepScript) is { } cutscene
+            ? [.. stepConfirmations, cutscene]
+            : stepConfirmations;
 
     /// <summary>Starts a step: the parts and the confirmations of the next commands belong to it. A call that is not a
     /// step of <c>edit_batch</c> has one step.</summary>
@@ -83,6 +90,7 @@ internal sealed class EditScope
         stepStart = Batch.Parts.Count;
         stepMissionStart = missionRuns.Count;
         stepConfirmations.Clear();
+        stepCutsceneAsks.Clear();
         cutscenes.StartStep();
     }
 
@@ -225,13 +233,10 @@ internal sealed class EditScope
         if (!plan.CanRun)
             throw new EditException(EditTools.RefusalOf(Session, plan));
         var cutscene = plan as CutscenePlan;
-        string? question = null;
         if (cutscene != null)
         {
             cutscenes.Before(cutscene);
             checks.BeforeCutscene(cutscene.Path);
-            // The question of a cutscene plan names the elements as W has them before the run.
-            question = asks ? EditTools.ConfirmationOf(Session, plan) : null;
         }
         checks.Before(plan, targets ?? []);
         Batch.Label ??= plan.Label;
@@ -247,11 +252,16 @@ internal sealed class EditScope
         var part = plan.Report(Session);
         Report(asks ? part : part with { NeedsConfirmation = false });
         if (cutscene != null)
+        {
             cutscenes.After(cutscene, Batch.Parts.Count - 1);
-        if (asks && (cutscene != null ? question : EditTools.ConfirmationOf(Session, plan)) is { } reason)
+            if (asks && cutscene.NeedsConfirmation)
+                stepCutsceneAsks.Add(cutscene);
+        }
+        else if (asks && EditTools.ConfirmationOf(Session, plan) is { } reason)
+        {
             stepConfirmations.Add(reason);
+        }
     }
-
 
     /// <summary>Adds a part of the result, for example the warnings of a text that other sections share.</summary>
     public void Report(EditResult part) => Batch.Report(part);
@@ -534,10 +544,9 @@ internal static class EditTools
     /// D242), or the plan leaves "Missing" lines, also mission lines (section 4.0.5 of the M6b design, item 6). The
     /// text names what the plan changes beside its targets.
     /// </summary>
+    /// <remarks>The cutscene plans of a step ask with one text (see <see cref="CutsceneConfirmation"/>).</remarks>
     internal static string? ConfirmationOf(EditSession session, EditPlan plan)
     {
-        if (plan is CutscenePlan cutscene)
-            return CutsceneConfirmation(session, cutscene);
         if (!plan.NeedsConfirmation && plan.Missing.Count == 0 && plan.MissionMissing.Count == 0)
             return null;
         string Ref(SectionRef section) => ItemRefs.Canonical(session, section);
@@ -567,25 +576,40 @@ internal static class EditTools
     }
 
     /// <summary>
-    /// Why a cutscene plan needs <c>confirm: true</c>, or null. The editor asks before a delete of an entity that events
-    /// name, and before a rename of an entity whose name other data uses (section 7.5 of the M8 design). The text names
-    /// the events that go with the entity, and the uses that keep the old name.
+    /// Why the cutscene plans of a step need <c>confirm: true</c>, in one text, or null when no plan asks. The editor
+    /// asks before a delete of an entity that events name, and before a rename of an entity whose name other data uses
+    /// (section 7.5 of the M8 design). The text names the events that go with the entities, and the uses that keep the
+    /// old name.
     /// </summary>
-    /// <remarks>Call it before the plan runs, because a deleted event has its index in W before the run.</remarks>
-    private static string? CutsceneConfirmation(EditSession session, CutscenePlan plan)
+    /// <remarks>An event reference holds an index, and each plan of the step can change the indexes. So the text names
+    /// each event with its index in W before the step, as the deletes of the result of the step do (see
+    /// <see cref="CutsceneResults"/>). An event that W before the step does not have is new in the step, and the result
+    /// does not name it either.</remarks>
+    /// <param name="plans">The cutscene plans of the step that ask, in order.</param>
+    /// <param name="before">W of a script before the step.</param>
+    internal static string? CutsceneConfirmation(IReadOnlyList<CutscenePlan> plans, Func<string, ThnScriptModel?> before)
     {
-        if (!plan.NeedsConfirmation)
+        if (plans.Count == 0)
             return null;
-        var parts = new List<string> { AgentTexts.Error("confirm_intro", ("label", plan.Label)) };
-        var working = session.Cutscene(plan.Path);
-        var events = plan.Deleted.Any(d => d.Kind == ThnElementKind.Entity)
-            ? plan.Deleted.Where(d => d.Kind == ThnElementKind.Event).Select(e => ItemRefs.Of(working, e))
-                .ToList()
-            : [];
+        var labels = plans.Select(p => p.Label).Distinct().ToList();
+        var many = plans.Count > 1;
+        var parts = new List<string>
+        {
+            many
+                ? AgentTexts.Error("confirm_intro_many", ("count", plans.Count),
+                    ("labels", Shown(labels.Select(l => $"'{l}'").ToList())))
+                : AgentTexts.Error("confirm_intro", ("label", labels[0])),
+        };
+        var events = plans.Where(p => p.Deleted.Any(d => d.Kind == ThnElementKind.Entity))
+            .SelectMany(p => p.Deleted.Where(d => d.Kind == ThnElementKind.Event))
+            .Where(e => before(e.Path)?.Element(e.Kind, e.Id) != null)
+            .Select(e => ItemRefs.Of(before(e.Path), e))
+            .Distinct().ToList();
         if (events.Count > 0)
-            parts.Add(AgentTexts.Error("confirm_cascade", ("refs", Shown(events))));
-        if (plan.Uses.Count > 0)
-            parts.Add(AgentTexts.Error("confirm_uses", ("uses", Shown(plan.Uses.Select(u => u.Text).ToList()))));
+            parts.Add(AgentTexts.Error(many ? "confirm_cascade_many" : "confirm_cascade", ("refs", Shown(events))));
+        var uses = plans.SelectMany(p => p.Uses).Select(u => u.Text).Distinct().ToList();
+        if (uses.Count > 0)
+            parts.Add(AgentTexts.Error("confirm_uses", ("uses", Shown(uses))));
         return string.Join(" ", parts);
     }
 

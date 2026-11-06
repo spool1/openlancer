@@ -385,6 +385,68 @@ public sealed partial class AgentCutsceneToolTests
         Assert.Equal(before, State(session));
     }
 
+    /// <summary>The question of a delete names each event with its index before the call, as the deletes of the result
+    /// do. An earlier plan of the call that deletes an event before them does not change the indexes of the question.
+    /// The preview gives the same text as a warning.</summary>
+    [Fact]
+    public void TheQuestionOfADeleteGivesTheIndexesOfTheResult()
+    {
+        var (ws, session, host) = Open();
+        using var _ = ws;
+        var arguments = $$"""{ "refs": [{{Json(Script + "#event/1")}}, {{Json(Script + "#entity/Cam_A")}}] }""";
+
+        var asked = Error(host, "delete_items", arguments);
+        var preview = Ok(host, "delete_items", """{ "preview": true, """ + arguments[2..]);
+        var deleted = Ok(host, "delete_items", """{ "confirm": true, """ + arguments[2..]);
+
+        var question = $"The edit 'Delete entity and 2 events' changes more than its targets. It also removes " +
+                       $"{Script}#event/0, {Script}#event/5.";
+        Assert.StartsWith(question + " ", asked.Message);
+        Assert.Contains(preview["warnings"]!.AsArray(), w => (string?)w!["message"] == question);
+        Assert.Equal([$"{Script}#event/1", $"{Script}#event/0 cascade", $"{Script}#event/5 cascade", $"{Script}#entity/Cam_A"],
+            deleted["deletes"]!.AsArray().Select(d => $"{d!["ref"]}{((string?)d["why"] == "cascade" ? " cascade" : "")}"));
+    }
+
+    /// <summary>A delete of two entities that events name asks with one text: one intro, then the events of both
+    /// entities with their indexes before the call.</summary>
+    [Fact]
+    public void ADeleteOfTwoEntitiesAsksWithOneText()
+    {
+        var (ws, _, host) = Open();
+        using var __ = ws;
+        var arguments = $$"""{ "refs": [{{Json(Script + "#entity/Cam_A")}}, {{Json(Script + "#entity/Fx")}}] }""";
+
+        var asked = Error(host, "delete_items", arguments);
+        var deleted = Ok(host, "delete_items", """{ "confirm": true, """ + arguments[2..]);
+
+        Assert.StartsWith("The 2 edits 'Delete entity and 2 events' change more than their targets. They also remove " +
+                          $"{Script}#event/0, {Script}#event/5, {Script}#event/1 and 1 more. Use preview: true", asked.Message);
+        Assert.Equal([$"{Script}#event/0", $"{Script}#event/5", $"{Script}#event/1", $"{Script}#event/2"],
+            deleted["deletes"]!.AsArray().Where(d => (string?)d!["why"] == "cascade").Select(d => (string?)d!["ref"]));
+    }
+
+    /// <summary>In <c>edit_batch</c>, the question of a step names each event with its index before the step, as the
+    /// deletes of the step do.</summary>
+    [Fact]
+    public void TheQuestionOfAStepGivesTheIndexesOfTheStep()
+    {
+        var (ws, _, host) = Open();
+        using var __ = ws;
+        string Batch(bool confirm) => $$"""
+            { "steps": [
+                { "tool": "delete_items", "arguments": { "refs": [ {{Json(Script + "#event/1")}} ] } },
+                { "tool": "delete_items", "arguments": { "refs": [ {{Json(Script + "#entity/Cam_A")}} ], "confirm": {{(confirm ? "true" : "false")}} } }
+            ] }
+            """;
+
+        var asked = Error(host, "edit_batch", Batch(false));
+        var batch = Ok(host, "edit_batch", Batch(true));
+
+        Assert.Contains($"It also removes {Script}#event/0, {Script}#event/4.", asked.Message);
+        Assert.Equal([$"{Script}#event/0", $"{Script}#event/4"], batch["steps"]![1]!["deletes"]!.AsArray()
+            .Where(d => (string?)d!["why"] == "cascade").Select(d => (string?)d!["ref"]));
+    }
+
     /// <summary>A delete of events of two cutscenes is one entry with one plan for each script. A batch that copies an
     /// event and deletes an earlier event gives the copy with its index after the call, and the deleted event with its
     /// index before the call.</summary>

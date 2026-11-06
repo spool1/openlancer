@@ -70,6 +70,10 @@ internal sealed class CutsceneResults(EditSession session)
         stepScripts.Clear();
     }
 
+    /// <summary>W of a script before the step, or null for a script that the step did not touch or that did not exist
+    /// before the step.</summary>
+    public ThnScriptModel? StepScript(string path) => stepScripts.GetValueOrDefault(path);
+
     /// <summary>Notes W of the script of a plan before the plan runs, at the first touch of the script in the call
     /// and in the step. W cannot change, so a reference keeps it.</summary>
     public void Before(CutscenePlan plan)

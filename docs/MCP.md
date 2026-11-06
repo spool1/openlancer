@@ -578,7 +578,7 @@ Some keys have their own rules, as in the Inspector:
 
 A rename of an entity needs `confirm: true` when other data uses the name. An example is the `name` of a `[Camera]` in a room that plays the script as its set script. Another example is a REFERENCE entity with the name in another script of the room. The rename changes only the script, so these uses keep the old name, and the message names them. The tool reads the files of the mod folders on disk for the uses. Its first call after an open or a save reads each INI file. A name of another entity gives `name_taken`, also in other letter case. The result gives the rename and the events that the rename changes.
 
-A delete of an entity that events name needs `confirm: true`, as the editor asks. The message names the events. The result gives each event with its index before the call, and the reason `cascade`.
+A delete of an entity that events name needs `confirm: true`, as the editor asks. The message names the events with their indexes before the call. One call that deletes more than one entity asks with one message for all of them. The result gives each event with its index before the call, and the reason `cascade`. In `edit_batch`, the message and the result of a step give the indexes before the step.
 
 `duplicate_items` with `time_offset` puts each copy at the time of its event plus the offset, in seconds. A copy at the time of its event has the key of the event, so an offset of 0 gives `invalid_value`. A copy before 0 gives `invalid_value` too. `time_offset` without an event gives `invalid_argument`.
 

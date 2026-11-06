@@ -1397,6 +1397,8 @@
     "limit_events": "One call can name at most {max} events. Split the call.",
     "confirm_intro": "The edit '{label}' changes more than its targets.",
     "confirm_cascade": "It also removes {refs}.",
+    "confirm_intro_many": "The {count} edits {labels} change more than their targets.",
+    "confirm_cascade_many": "They also remove {refs}.",
     "confirm_fixes": "It also changes the lines of {refs} that name the targets.",
     "confirm_missing": "After the edit, lines of {refs} show 'Missing'.",
     "confirm_mission": "It also changes 1 section of a mission script that names the item, in {files}.",
