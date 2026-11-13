@@ -118,7 +118,7 @@ public sealed class MissionBatchTests
         Assert.Equal(EditStatus.Refused, result.Status);
         var error = Assert.Single(result.Errors);
         Assert.Equal((EditErrorKind.NewErrors, MissionErrors.NewErrors), (error.Kind, error.Detail));
-        Assert.StartsWith("The edit adds 1 error, so the editor did not apply it. Start trigger names trigger 'ol_nowhere'.",
+        Assert.StartsWith("The edit adds 1 error, so the editor did not apply it. 'Start trigger' names trigger 'ol_nowhere'.",
             error.Message);
         Assert.Equal(before, m.State());
         Assert.False(m.Session.CanUndo);

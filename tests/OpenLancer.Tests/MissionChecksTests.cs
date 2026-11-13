@@ -65,7 +65,7 @@ public sealed class MissionChecksTests
     {
         var problem = Assert.Single(Rule(Check(With("[Trigger]\nnickname = t2\nCnd_True = no_params\nAct_ActTrig = no_such\n")), "M05"));
 
-        Assert.Equal("Start trigger names trigger 'no_such'. This script has no such trigger. The game ignores this line. " +
+        Assert.Equal("'Start trigger' names trigger 'no_such'. This script has no such trigger. The game ignores this line. " +
                      "Pick a trigger of this script.", problem.Message);
         Assert.Equal("M05|t2|no_such", problem.Subject);
     }
@@ -75,7 +75,7 @@ public sealed class MissionChecksTests
     {
         var problem = Assert.Single(Rule(Check(With("[Trigger]\nnickname = t2\nCnd_True = no_params\nAct_GiveObjList = Player, ol_x\n")), "M06"));
 
-        Assert.Equal("Give orders names order list 'ol_x'. This script has no such order list. The game ignores this " +
+        Assert.Equal("'Give orders' names order list 'ol_x'. This script has no such order list. The game ignores this " +
                      "line. Pick an order list of this script.", problem.Message);
     }
 
@@ -140,7 +140,7 @@ public sealed class MissionChecksTests
         Assert.Empty(Rule(Check(text, coverage: coverage), "M11"));
         var problem = Assert.Single(Rule(Check(text, options: new MissionCheckOptions(true), coverage: coverage), "M11"));
         Assert.Equal(DiagnosticSeverity.Error, problem.Severity);
-        Assert.Equal("OpenLancer cannot load Give meta behavior. The mission does not start in OpenLancer. Remove the " +
+        Assert.Equal("OpenLancer cannot load 'Give meta behavior'. The mission does not start in OpenLancer. Remove the " +
                      "line, or remove OpenLancer from the targets of the mod.", problem.Message);
     }
 
@@ -251,7 +251,7 @@ public sealed class MissionChecksTests
                      "from the list.", Assert.Single(Rule(problems, "M21")).Message);
         Assert.Equal("File 'missions\\\\missing.thn' does not exist. The game loads nothing for this line. Pick a file " +
                      "that exists.", Assert.Single(Rule(problems, "M22")).Message);
-        Assert.Equal("On enter system names system 'sys_x'. The game data has no system with this name. The game ignores " +
+        Assert.Equal("'On enter system' names system 'sys_x'. The game data has no system with this name. The game ignores " +
                      "this line. Pick a system from the list.", Assert.Single(Rule(problems, "M23")).Message);
     }
 
@@ -394,7 +394,7 @@ public sealed class MissionChecksTests
                                   "Act_LockDock = Player, gate_x, lock\n"), world);
 
         var problem = Assert.Single(Rule(problems, "M06"));
-        Assert.Equal("Lock or unlock dock names 'gate_x'. This script has no ship, formation, solar, loot or label with " +
+        Assert.Equal("'Lock or unlock dock' names 'gate_x'. This script has no ship, formation, solar, loot or label with " +
                      "this name, and no system has an object with this name. The game ignores this line. Pick a name from " +
                      "the list.", problem.Message);
     }
