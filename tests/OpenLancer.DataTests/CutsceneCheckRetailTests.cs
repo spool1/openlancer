@@ -19,12 +19,21 @@ namespace OpenLancer.DataTests;
 
 /// <summary>
 /// The cutscene checks on the retail data (tests 13.2 items 3 and 10 of the M8 design): no error in the 1,506 retail
-/// cutscenes with the retail game data, also for the 15 REFERENCE COMPOUNDs without a category. <c>oltool validate
+/// cutscenes with the retail game data, also for the 15 REFERENCE COMPOUNDs without a category, and one retail name
+/// problem. <c>oltool validate
 /// --active</c> reports no new problem for the edit of the manual check A, one error with its place for a LIGHT without
 /// a type, and no new problem when the lower mod has that error already.
 /// </summary>
 public sealed class CutsceneCheckRetailTests(ITestOutputHelper output)
 {
+    /// <summary>The intro scene with the one retail name problem.</summary>
+    public const string WaterPlanet = @"DATA\Scripts\Intro\Intro_waterplanet.thn";
+
+    /// <summary>The one name problem of the retail cutscenes: the PSYS "ring_2" names the effect "ring", which the game
+    /// data does not have. The engine does not stop for it, and the scene does not show the entity.</summary>
+    public const string RetailNameProblem =
+        "entity \"ring_2\", template_name: The game data has no effect \"ring\". The scene does not show this entity.";
+
     static CutsceneCheckRetailTests() => AppHandler.ConsoleInit(silent: true);
 
     [Fact]
@@ -68,7 +77,8 @@ public sealed class CutsceneCheckRetailTests(ITestOutputHelper output)
             output.WriteLine(error.ToString());
         Assert.Equal(1506, files);
         Assert.Equal((41_250, 50_785), (entities, events));
-        Assert.Empty(errors);
+        // The one retail name problem: an intro scene names an effect that the game data does not have.
+        Assert.Equal([(WaterPlanet, RetailNameProblem)], errors.Select(e => (e.Source, e.Message)));
         Assert.Equal(15, references.Count);
         Assert.All(withoutFlag, e => Assert.Contains("userprops.category: The key is missing", Assert.Single(e).Message));
     }

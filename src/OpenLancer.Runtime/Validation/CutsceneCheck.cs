@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using LibreLancer.Data;
+using LibreLancer.Data.GameData;
 using LibreLancer.Data.GameData.World;
 using LibreLancer.Data.IO;
 using OpenLancer.Data;
@@ -17,9 +18,10 @@ namespace OpenLancer.Runtime.Validation;
 /// </summary>
 /// <remarks>
 /// <para>A script that does not run is one error, for example a text that does not compile, or a number that is not
-/// finite. Else <see cref="ThnChecks"/> checks the tree with the game data of the view. A script text with a
-/// character outside ASCII is an error too, because THN text is ASCII (decision D60). The engine runs such a text,
-/// but the VM reads the texts of the script as ASCII (Undump.cs:69).</para>
+/// finite. Else <see cref="ThnChecks"/> checks the tree with the game data of the view, and gives its errors and its
+/// name problems, both as errors. A script text with a character outside ASCII is an error too, because THN text is
+/// ASCII (decision D60). The engine runs such a text, but the VM reads the texts of the script as ASCII
+/// (Undump.cs:69).</para>
 /// <para>The rooms of a base fill in the <c>$terrain_*</c> templates (ThnRoomHandler.cs:23-51). So, for such a
 /// template, the check reads the INI lines that name the cutscene (<see cref="ThnReferences"/>), and checks the
 /// template of each base that plays it. The INI lines also tell when the game plays the cutscene only in space, where
@@ -32,7 +34,11 @@ public static class CutsceneCheck
 {
     private static readonly IReadOnlyDictionary<string, string> NoSubstitutions = new Dictionary<string, string>();
 
-    /// <summary>The errors of the listed cutscenes that the lower view does not have.</summary>
+    /// <summary>The errors of the listed cutscenes that the lower view does not have. The errors compare by their
+    /// messages (<see cref="Diagnostic.NewIn"/>). A message names its entity, and the retail data has a name problem, so
+    /// the name problems compare by their subjects: the path of the value and the text, without the entity
+    /// (<see cref="Diagnostic.Subject"/>). So a mod that renames an entity with a lower name problem gets no new
+    /// problem.</summary>
     /// <param name="paths">The install paths of the cutscenes to check, for example the <c>.thn</c> files of the
     /// merged view of the mods.</param>
     /// <param name="lowerData">The game data of the lower view, or null when it did not load. The checks of templates
@@ -45,14 +51,31 @@ public static class CutsceneCheck
         var moddedView = new View(modded, moddedData);
         var problems = new List<Diagnostic>();
         foreach (var path in paths.Distinct(VfsPath.Comparer).Order(StringComparer.OrdinalIgnoreCase))
-            problems.AddRange(Diagnostic.NewIn(lowerView.Errors(path), moddedView.Errors(path)));
+        {
+            var (below, now) = (lowerView.Problems(path), moddedView.Problems(path));
+            problems.AddRange(Diagnostic.NewIn(below.Errors, now.Errors));
+            var known = below.NameProblems.CountBy(Subject).ToDictionary(c => c.Key, c => c.Value);
+            foreach (var problem in now.NameProblems)
+            {
+                if (known.TryGetValue(Subject(problem), out var count) && count > 0)
+                    known[Subject(problem)] = count - 1;
+                else
+                    problems.Add(problem);
+            }
+        }
         return problems;
     }
 
-    /// <summary>The errors of one cutscene of a view, or none when the view has no file at the path.</summary>
+    private static string Subject(Diagnostic problem) => problem.Subject ?? problem.Message;
+
+    /// <summary>The errors of one cutscene of a view, with its name problems, or none when the view has no file at the
+    /// path.</summary>
     /// <param name="data">The game data of the view, or null to skip the checks of templates and costumes.</param>
-    public static IReadOnlyList<Diagnostic> Errors(FileSystem fs, string path, GameItemDb? data) =>
-        new View(fs, data).Errors(path);
+    public static IReadOnlyList<Diagnostic> Errors(FileSystem fs, string path, GameItemDb? data)
+    {
+        var result = new View(fs, data).Problems(path);
+        return [.. result.Errors, .. result.NameProblems];
+    }
 
     /// <summary>The cutscenes, the INI lines and the game data of one view.</summary>
     private sealed class View(FileSystem fs, GameItemDb? data)
@@ -66,10 +89,12 @@ public static class CutsceneCheck
         /// it.</summary>
         public ThnReferences References => references ??= ThnReferences.Scan(fs);
 
-        public IReadOnlyList<Diagnostic> Errors(string path)
+        /// <summary>The errors and the name problems of a cutscene. A script that does not run has one error and no name
+        /// problem.</summary>
+        public ThnCheckResult Problems(string path)
         {
             if (!fs.FileExists(path))
-                return [];
+                return new ThnCheckResult([], []);
             var bytes = fs.ReadAllBytes(path);
             var place = new ThnLocation(path);
             var errors = new List<Diagnostic>();
@@ -88,10 +113,11 @@ public static class CutsceneCheck
             {
                 // The message starts with the path.
                 errors.Add(Diagnostic.Error(path, e.Message) with { Cutscene = place });
-                return errors;
+                return new ThnCheckResult(errors, []);
             }
-            errors.AddRange(ThnChecks.Errors(path, globals, ThornEvaluator.Instance, new Script(this, path)));
-            return errors;
+            var result = ThnChecks.Check(path, globals, ThornEvaluator.Instance, new Script(this, path));
+            errors.AddRange(result.Errors);
+            return new ThnCheckResult(errors, result.NameProblems);
         }
 
         /// <summary>True for Lua bytecode. The VM compiles each other file as Lua text (ThornRuntime.cs:49-59,
@@ -111,7 +137,7 @@ public static class CutsceneCheck
         {
             if (view.Data is not { } db)
                 return null;
-            if (!template.StartsWith('$'))
+            if (!template.StartsWith('$') || !ThnTemplateRules.RoomFillsIn(kind))
                 return State(db, kind, template);
             // Only a template that starts with $ has a substitution.
             bases ??= Substitutions(db);
@@ -127,20 +153,32 @@ public static class CutsceneCheck
             return substitutions.Count > 0 ? substitutions : [NoSubstitutions];
         }
 
-        /// <summary>The state of an item, as the engine finds it (ThnScriptInstance.cs:120-155, :260-264).</summary>
+        /// <summary>The state of an item, as the engine finds it (ThnScriptInstance.cs:120-155, :192-196, :260-264).
+        /// The collection of the asteroids also holds the mines (AsteroidArchIni.cs).</summary>
         private static ThnItemState State(GameItemDb db, ThnItemKind kind, string nickname) => kind switch
         {
             ThnItemKind.Archetype => Model(db.Archetypes.Get(nickname), a => a.ModelFile),
             ThnItemKind.Ship => Model(db.Ships.Get(nickname), s => s.ModelFile),
             ThnItemKind.Equipment => Model(db.Equipment.Get(nickname), e => e.ModelFile),
             ThnItemKind.Asteroid => Model(db.Asteroids.Get(nickname), a => a.ModelFile),
-            ThnItemKind.Costume => Model(db.Costumes.Get(nickname), c => c.Body),
-            ThnItemKind.Room => db.Ini.PetalDb.Rooms.ContainsKey(nickname) ? ThnItemState.Ready : ThnItemState.Missing,
-            ThnItemKind.Cart => db.Ini.PetalDb.Carts.ContainsKey(nickname) ? ThnItemState.Ready : ThnItemState.Missing,
+            ThnItemKind.Costume => db.Costumes.Get(nickname) is not { } costume ? ThnItemState.Missing
+                : costume.Body == null ? ThnItemState.NoModel : ThnItemState.Ready,
+            ThnItemKind.Room => Has(db.Ini.PetalDb.Rooms.ContainsKey(nickname)),
+            ThnItemKind.Cart => Has(db.Ini.PetalDb.Carts.ContainsKey(nickname)),
+            ThnItemKind.Prop => Has(db.Ini.PetalDb.Props.ContainsKey(nickname)),
+            ThnItemKind.Effect => Has(db.Effects.Get(nickname) != null || db.VisEffects.Get(nickname) != null),
+            ThnItemKind.Sound => Has(db.Ini.Audio.Entries.Any(e => e.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase))),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
 
-        private static ThnItemState Model<T>(T? item, Func<T, object?> model) where T : class =>
-            item == null ? ThnItemState.Missing : model(item) == null ? ThnItemState.NoModel : ThnItemState.Ready;
+        private static ThnItemState Has(bool found) => found ? ThnItemState.Ready : ThnItemState.Missing;
+
+        /// <summary>The state of an item whose model the engine loads. The engine stops when the item has no model,
+        /// or when the file of the model does not exist: the model then has no file (GameItemDb.cs:122-138,
+        /// :2088-2105, ResourceLoadExtensions.cs:30-35).</summary>
+        private static ThnItemState Model<T>(T? item, Func<T, ResolvedModel?> model) where T : class =>
+            item == null ? ThnItemState.Missing
+            : model(item)?.ModelFile == null ? ThnItemState.NoModel
+            : ThnItemState.Ready;
     }
 }

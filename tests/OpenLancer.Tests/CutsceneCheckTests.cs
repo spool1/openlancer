@@ -75,6 +75,8 @@ public sealed class CutsceneCheckTests
                                                 "number there.") with
             {
                 Cutscene = new ThnLocation(Path, ThnElementKind.Entity, 1, "cameraprops.fovh", "\"Cam_B\""),
+                // The subject names the problem without its element.
+                Subject = "cameraprops.fovh: The value is \"wide\", but the engine reads a number there.",
             }, Assert.Single(problems));
         }
 
@@ -185,6 +187,79 @@ public sealed class CutsceneCheckTests
         Assert.Equal([Rock, .. others], Messages());
 
         string[] Messages() => [.. CutsceneCheck.Errors(FileSystem.FromPath(ws.Base), Ambient, db).Select(p => p.Message)];
+    }
+
+    /// <summary>
+    /// The engine loads the model of a solar archetype, and stops when the file of its <c>DA_archetype</c> line does
+    /// not exist: the game data then gives the model no file (GameItemDb.cs:122-138, :2088-2105). The validation gives
+    /// the name problems as errors too: a missing prop of petalDB and a missing effect. The engine reads the template of
+    /// a PSYS without the terrain of the room, gives PlayerShipEngines to the engine of the player ship, and finds an
+    /// effect also among the visual effects and an asteroid also among the mines.
+    /// </summary>
+    [Fact]
+    public void AModelFileThatDoesNotExistStopsTheEngineAndTheNameProblemsAreErrors()
+    {
+        using var ws = Workspace();
+        const string Shot = @"DATA\SCRIPTS\shot.thn";
+        ws.WriteBase(Shot, """
+            duration = 10
+            entities = {
+                { entity_name = "Lost", type = COMPOUND, template_name = "lost_arch", userprops = { category = "solar" } },
+                { entity_name = "Cup", type = COMPOUND, template_name = "no_cup", userprops = { category = "prop" } },
+                { entity_name = "Mug", type = COMPOUND, template_name = "mug", userprops = { category = "prop" } },
+                { entity_name = "Mine", type = COMPOUND, template_name = "mine1", userprops = { category = "asteroid" } },
+                { entity_name = "Fx", type = PSYS, template_name = "no_fx" },
+                { entity_name = "Vis", type = PSYS, template_name = "vis1" },
+                { entity_name = "Terrain", type = PSYS, template_name = "$terrain_dyna_01" },
+                { entity_name = "Engines", type = PSYS, template_name = "PlayerShipEngines" }
+            }
+            events = {}
+            """);
+        var db = new GameItemDb(FileSystem.FromPath(ws.Base));
+        db.Ini.PetalDb = new PetalDbIni();
+        db.Ini.PetalDb.Props["mug"] = @"props\mug.3db";
+        Add(db.Archetypes, new Archetype
+        {
+            Nickname = "lost_arch", ModelFile = new ResolvedModel { ModelFile = null, SourcePath = @"solar\lost.cmp" },
+        });
+        Add(db.Asteroids, new Asteroid { Nickname = "mine1", ModelFile = new ResolvedModel { ModelFile = "mine1.3db", SourcePath = "x" } });
+        Add(db.VisEffects, new ResolvedFx { Nickname = "vis1", LibraryFiles = [] });
+
+        Assert.Equal([
+            "entity \"Lost\", template_name: The solar archetype \"lost_arch\" has no model.",
+            "entity \"Cup\", template_name: The game data has no prop of petalDB \"no_cup\". The scene shows the entity without a model.",
+            "entity \"Fx\", template_name: The game data has no effect \"no_fx\". The scene does not show this entity.",
+            "entity \"Terrain\", template_name: The game data has no effect \"$terrain_dyna_01\". The scene does not show this entity.",
+        ], CutsceneCheck.Errors(FileSystem.FromPath(ws.Base), Shot, db).Select(p => p.Message));
+        Assert.All(CutsceneCheck.Errors(FileSystem.FromPath(ws.Base), Shot, db),
+            p => Assert.Equal(DiagnosticSeverity.Error, p.Severity));
+    }
+
+    /// <summary>
+    /// A message names its entity, and the retail data has a name problem. So the validation compares the name problems
+    /// by their subjects: a patch that renames the entity of a lower name problem adds no problem, and a patch that
+    /// sets another missing effect adds one.
+    /// </summary>
+    [Fact]
+    public void ARenameOfAnEntityWithALowerNameProblemAddsNoProblem()
+    {
+        static string[] Problems(string patch)
+        {
+            using var ws = Workspace();
+            var db = new GameItemDb(FileSystem.FromPath(ws.Base));
+            ws.WriteBase(Path, """
+                duration = 10
+                entities = { { entity_name = "Fx", type = PSYS, template_name = "no_fx" } }
+                events = {}
+                """);
+            var overlay = ws.Build(ws.Mod("m", new() { [PatchFile] = Patch(patch) }));
+            return [.. CutsceneCheck.NewProblems(FileSystem.FromPath(ws.Base), overlay.CreateFileSystem(), overlay.CutscenePaths,
+                db, db).Select(p => p.Message)];
+        }
+
+        Assert.Empty(Problems("""{ ol_match = "Fx", ol_set = { entity_name = "Fx_2" } }"""));
+        Assert.Equal(["entity \"Fx\", template_name: The game data has no effect \"other_fx\". The scene does not show this entity."],
+            Problems("""{ ol_match = "Fx", ol_set = { template_name = "other_fx" } }"""));
     }
 
     /// <summary>

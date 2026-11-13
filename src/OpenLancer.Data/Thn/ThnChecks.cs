@@ -30,6 +30,15 @@ public enum ThnItemKind
 
     /// <summary>A costume (ThnScriptInstance.cs:260-264).</summary>
     Costume,
+
+    /// <summary>A prop of petalDB (GameDataManager.cs:377-386).</summary>
+    Prop,
+
+    /// <summary>An effect or a visual effect (ThnScriptInstance.cs:192-196).</summary>
+    Effect,
+
+    /// <summary>A sound (ThnScriptInstance.cs:282-288).</summary>
+    Sound,
 }
 
 /// <summary>What the game data has for the template of an entity. The states go from the worst to the best.</summary>
@@ -38,7 +47,8 @@ public enum ThnItemState
     /// <summary>The game data has no item with the nickname.</summary>
     Missing,
 
-    /// <summary>The item has no model: no model file, or a costume without a body.</summary>
+    /// <summary>The item has no model: no model file, or a costume without a body. Only the kinds of
+    /// <see cref="ThnTemplateRules.NeedsModel"/> and a costume have this state.</summary>
     NoModel,
 
     /// <summary>The item has a model.</summary>
@@ -51,9 +61,10 @@ public enum ThnItemState
 public interface IThnGameData
 {
     /// <summary>
-    /// What the game data has for the template of an entity, or null when the game data did not load. A room fills in
-    /// some templates, for example <c>$terrain_dyna_01</c>, with the terrain of its base (ThnScriptInstance.cs:106-109).
-    /// When more than one room plays the script, the result is the worst state of the filled-in templates.
+    /// What the game data has for the template of an entity, or null when the game data did not load or cannot tell. A
+    /// room fills in some templates, for example <c>$terrain_dyna_01</c>, with the terrain of its base
+    /// (ThnScriptInstance.cs:106-109, <see cref="ThnTemplateRules.RoomFillsIn"/>). When more than one room plays the
+    /// script, the result is the worst state of the filled-in templates.
     /// </summary>
     ThnItemState? Item(ThnItemKind kind, string template);
 
@@ -64,10 +75,17 @@ public interface IThnGameData
     bool MakesCompounds { get; }
 }
 
+/// <summary>The problems of one walk of a script (see <see cref="ThnChecks.Check"/>).</summary>
+/// <param name="Errors">The values that stop the engine.</param>
+/// <param name="NameProblems">The templates that name no item, where the engine does not stop.</param>
+public sealed record ThnCheckResult(IReadOnlyList<Diagnostic> Errors, IReadOnlyList<Diagnostic> NameProblems);
+
 /// <summary>
 /// The error checks of a cutscene script (section 9 of the M8 design). An error is a value that makes the engine throw
 /// while it reads the script (ThnScript.cs:122-487, ThnEvent.cs:43-90 and the event classes), while it builds the
-/// scene (ThnScriptInstance.cs:63-293), or when an event reads its targets. The cutscene then does not play.
+/// scene (ThnScriptInstance.cs:63-293), or when an event reads its targets. The cutscene then does not play. A name
+/// problem is a template that names no item of the game data, where the engine does not stop but the scene shows less,
+/// for example an entity without a model (section 12.1 of the M8b design).
 /// </summary>
 /// <remarks>
 /// <para>The engine reads the keys of an entity of each type, and the props of an event by the type of the event.
@@ -91,10 +109,6 @@ public static class ThnChecks
     /// <summary>The longest value text in a message.</summary>
     private const int ShownLength = 60;
 
-    /// <summary>The template of a COMPOUND that takes the player ship of the scene (ThnScriptInstance.cs:79-96). The
-    /// game gives a player ship to the scene of each room (RoomGameplay.cs:1038-1046).</summary>
-    private const string PlayerShip = "PlayerShip";
-
     /// <summary>The keys of an entity. The engine reads them from an entity of each type (ThnScript.cs:253-487).</summary>
     private static readonly ImmutableArray<ThnKeyRow> EntityRows =
         [.. ThnSchema.Rows.Where(r => r.Element == ThnElementKind.Entity).DistinctBy(r => r.Path.Text, StringComparer.Ordinal)];
@@ -116,26 +130,11 @@ public static class ThnChecks
     private static readonly string[] NoClass = ["UNDEFINED_EVENT", "USER_EVENT"];
 
     /// <summary>
-    /// The mesh categories of a COMPOUND and their game data (ThnScriptInstance.cs:120-154). The engine stops when a
-    /// solar, a ship, a room or a cart does not exist, and when the item has no model. A missing prop, equipment or
-    /// asteroid gives an object without a model. A category that is not in this table stops the engine.
-    /// </summary>
-    private static readonly FrozenDictionary<string, Category> Categories = new Dictionary<string, Category>
-    {
-        ["solar"] = new(ThnItemKind.Archetype, "solar archetype", MissingStops: true),
-        ["ship"] = new(ThnItemKind.Ship, "ship", MissingStops: true),
-        ["spaceship"] = new(ThnItemKind.Ship, "ship", MissingStops: true),
-        ["prop"] = new(null, "prop", MissingStops: false),
-        ["room"] = new(ThnItemKind.Room, "room of petalDB", MissingStops: true),
-        ["equipment cart"] = new(ThnItemKind.Cart, "cart of petalDB", MissingStops: true),
-        ["equipment"] = new(ThnItemKind.Equipment, "equipment", MissingStops: false),
-        ["asteroid"] = new(ThnItemKind.Asteroid, "asteroid", MissingStops: false),
-    }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
     /// The errors of a script: each value that stops the engine, with its element and its path. A message names an
     /// element by its entity name or its event key, not by its place. So a problem keeps its message when an edit adds
-    /// or deletes another element, and <see cref="Diagnostic.NewIn"/> can compare two versions of a script.
+    /// or deletes another element, and <see cref="Diagnostic.NewIn"/> can compare two versions of a script. The
+    /// <see cref="Diagnostic.Subject"/> of a problem is the path of the value and the text, without the element. So a
+    /// compare by the element can find the problem of an element after a rename.
     /// </summary>
     /// <param name="path">The install path of the script, for the source and the place of each problem.</param>
     /// <param name="globals">The globals of the script, as the evaluator gives them.</param>
@@ -144,14 +143,21 @@ public static class ThnChecks
     /// costumes do not run, and the checks of a COMPOUND run as for a script that a room plays.</param>
     public static IReadOnlyList<Diagnostic> Errors(string path, ThnTable globals, IThnEvaluator evaluator,
         IThnGameData? data = null) =>
-        new Checker(path, evaluator, data).Run(globals);
+        Check(path, globals, evaluator, data).Errors;
 
-    /// <param name="Kind">The game data of the template, or null when the engine makes an object for each
-    /// template.</param>
-    /// <param name="What">The name of the item for a message.</param>
-    /// <param name="MissingStops">True when the engine stops for a template that does not exist. The engine always
-    /// stops for an item without a model.</param>
-    private readonly record struct Category(ThnItemKind? Kind, string What, bool MissingStops);
+    /// <summary>
+    /// The name problems of a script: each template that names no item of the game data, where the engine does not
+    /// stop. A message names the element as in <see cref="Errors"/>, and it tells what the scene does without the item.
+    /// Without game data, the result is empty.
+    /// </summary>
+    public static IReadOnlyList<Diagnostic> NameProblems(string path, ThnTable globals, IThnEvaluator evaluator,
+        IThnGameData? data) =>
+        Check(path, globals, evaluator, data).NameProblems;
+
+    /// <summary>The errors and the name problems of a script, from one walk of the script (see <see cref="Errors"/> and
+    /// <see cref="NameProblems"/>).</summary>
+    public static ThnCheckResult Check(string path, ThnTable globals, IThnEvaluator evaluator, IThnGameData? data = null) =>
+        new Checker(path, evaluator, data).Run(globals);
 
     /// <summary>An element of the <c>entities</c> or the <c>events</c> table.</summary>
     /// <param name="Index">The place in the list, from 0, or -1 for an element in the record part of the table.</param>
@@ -163,8 +169,9 @@ public static class ThnChecks
     {
         private readonly IReadOnlyDictionary<string, ThnSymbolInfo> symbols = evaluator.Symbols;
         private readonly List<Diagnostic> errors = [];
+        private readonly List<Diagnostic> names = [];
 
-        public IReadOnlyList<Diagnostic> Run(ThnTable globals)
+        public ThnCheckResult Run(ThnTable globals)
         {
             // ThnScript.cs:124-125, :141.
             if (globals[ThnScriptModel.DurationGlobal] is not ThnNumber)
@@ -192,7 +199,7 @@ public static class ThnChecks
                 Build(entity);
             foreach (var ev in events)
                 EventReads(ev, made);
-            return errors;
+            return new ThnCheckResult(errors, names);
         }
 
         /// <summary>The elements of a global, in the order of the engine: the list and then the record part
@@ -377,10 +384,13 @@ public static class ThnChecks
                 // The game data reads the INI files to know how the game plays the script, so the check asks only
                 // for a COMPOUND with a problem.
                 case "COMPOUND" when Compound(table) is { } problem && data?.MakesCompounds != false:
-                    Add(entity, problem.Value, problem.Message);
+                    Add(entity, problem.Value, problem.Message, problem.Name);
                     break;
                 case "DEFORMABLE":
                     Deformable(entity);
+                    break;
+                case "PSYS":
+                    Psys(entity);
                     break;
             }
         }
@@ -388,27 +398,41 @@ public static class ThnChecks
         /// <summary>The problem of a COMPOUND that the scene makes, or null. A COMPOUND with a template needs a known
         /// category, and a template of that category (ThnScriptInstance.cs:113-160). An empty template gives an object
         /// without a model.</summary>
-        private (string Value, string Message)? Compound(ThnTable entity)
+        /// <returns>The problem, with <c>Name</c> true for a name problem.</returns>
+        private (string Value, string Message, bool Name)? Compound(ThnTable entity)
         {
             if (entity["template_name"] is not ThnText { Value.Length: > 0 } template ||
-                template.Value.Equals(PlayerShip, StringComparison.OrdinalIgnoreCase))
+                template.Value.Equals(ThnTemplateRules.PlayerShip, StringComparison.OrdinalIgnoreCase))
                 return null;
             if (Get(entity[UserProps], "category", userProps: true) is not ThnText category)
-                return ("userprops.category", "The key is missing. The engine needs it for a COMPOUND with a template.");
-            if (!Categories.TryGetValue(category.Value, out var known))
+                return ("userprops.category", "The key is missing. The engine needs it for a COMPOUND with a template.", false);
+            var categories = ThnTemplateRules.Categories;
+            if (!categories.TryGetValue(category.Value, out var rule))
             {
                 return ("userprops.category", $"The value is {Shown(category)}, but the engine knows only the categories " +
-                                              $"{string.Join(", ", Categories.Keys.Order(StringComparer.Ordinal))}.");
+                                              $"{string.Join(", ", categories.Keys.Order(StringComparer.Ordinal))}.", false);
             }
-            return known.Kind is { } kind && data?.Item(kind, template.Value) is { } state
-                ? state switch
-                {
-                    ThnItemState.NoModel => ("template_name", $"The {known.What} {Shown(template)} has no model."),
-                    ThnItemState.Missing when known.MissingStops =>
-                        ("template_name", $"The game data has no {known.What} {Shown(template)}."),
-                    _ => null,
-                }
-                : null;
+            return data?.Item(rule.Kind, template.Value) switch
+            {
+                ThnItemState.NoModel => ("template_name", $"The {rule.What} {Shown(template)} has no model.", false),
+                ThnItemState.Missing when rule.MissingStops =>
+                    ("template_name", $"The game data has no {rule.What} {Shown(template)}.", false),
+                ThnItemState.Missing => ("template_name", Missing(rule, template), true),
+                _ => null,
+            };
+        }
+
+        /// <summary>A PSYS gets the effect of its template, or no effect (ThnScriptInstance.cs:192-205). The engine
+        /// gives the template <c>PlayerShipEngines</c> to the engine of the player ship (ThnScriptInstance.cs:98-104),
+        /// and an empty template gives no effect.</summary>
+        private void Psys(Element entity)
+        {
+            if (entity.Table["template_name"] is not ThnText { Value.Length: > 0 } template ||
+                template.Value.Equals(ThnTemplateRules.PlayerShipEngines, StringComparison.OrdinalIgnoreCase))
+                return;
+            var rule = ThnTemplateRules.Effect;
+            if (data?.Item(rule.Kind, template.Value) == ThnItemState.Missing)
+                Add(entity, "template_name", Missing(rule, template), name: true);
         }
 
         /// <summary>A DEFORMABLE without an Actor loads its costume (ThnScriptInstance.cs:255-264). The engine reads an
@@ -423,7 +447,7 @@ public static class ThnChecks
                 Add(entity, "template_name", "The key is missing. A DEFORMABLE without userprops.Actor needs a costume.");
                 return;
             }
-            var state = data?.Item(ThnItemKind.Costume, template.Value);
+            var state = data?.Item(ThnTemplateRules.Costume.Kind, template.Value);
             if (state == ThnItemState.Missing)
                 Add(entity, "template_name", $"The costume {Shown(template)} is not in the game data. A DEFORMABLE without " +
                                              "userprops.Actor needs it.");
@@ -470,13 +494,18 @@ public static class ThnChecks
 
         /// <param name="element">The element, or null for a problem of the whole script.</param>
         /// <param name="value">The path of the value in the element, or a global name, or null.</param>
-        private void Add(Element? element, string? value, string message)
+        /// <param name="name">True for a name problem, false for an error.</param>
+        private void Add(Element? element, string? value, string message, bool name = false)
         {
             var place = element is { Index: >= 0 } placed
                 ? new ThnLocation(path, placed.Kind, placed.Index, value, placed.Key)
                 : new ThnLocation(path);
             var subject = string.Join(", ", new[] { element?.Label, value }.OfType<string>());
-            errors.Add(Diagnostic.Error(path, subject.Length == 0 ? message : $"{subject}: {message}") with { Cutscene = place });
+            (name ? names : errors).Add(Diagnostic.Error(path, subject.Length == 0 ? message : $"{subject}: {message}") with
+            {
+                Cutscene = place,
+                Subject = value == null ? message : $"{value}: {message}",
+            });
         }
     }
 
@@ -520,6 +549,10 @@ public static class ThnChecks
 
     private static bool HasNumbers(ThnValue? value, int count) =>
         value is ThnTable { List: var items } && items.Length >= count && items.Take(count).All(i => i is ThnNumber);
+
+    /// <summary>The message of a template that names no item, where the engine does not stop.</summary>
+    private static string Missing(ThnTemplateRule rule, ThnValue template) =>
+        $"The game data has no {rule.What} {Shown(template)}. {rule.Consequence}";
 
     /// <summary>The message of a value of another kind.</summary>
     private static string Value(ThnValue value, string expected) =>

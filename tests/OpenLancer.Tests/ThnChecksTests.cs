@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data;
+using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Thn;
 using Xunit;
 using static OpenLancer.Tests.ThnScripts;
@@ -256,6 +257,68 @@ public sealed class ThnChecksTests
     }
 
     /// <summary>
+    /// A missing prop, equipment or asteroid of a COMPOUND, and a missing effect of a PSYS, do not stop the engine: the
+    /// scene shows the entity without a model, or does not show the PSYS (ThnScriptInstance.cs:135-151, :192-205). So
+    /// they are name problems, not errors, and their message tells what the scene does. A thing with a model, or an
+    /// unknown state, gives no name problem.
+    /// </summary>
+    [Theory]
+    [InlineData("""{ entity_name = "C", type = COMPOUND, template_name = "x", userprops = { category = "prop" } }""",
+        ThnItemKind.Prop, "entity \"C\", template_name: The game data has no prop of petalDB \"x\". The scene shows the entity without a model.")]
+    [InlineData("""{ entity_name = "C", type = COMPOUND, template_name = "x", userprops = { category = "Equipment" } }""",
+        ThnItemKind.Equipment, "entity \"C\", template_name: The game data has no equipment \"x\". The scene shows the entity without a model.")]
+    [InlineData("""{ entity_name = "C", type = COMPOUND, template_name = "x", userprops = { category = "asteroid" } }""",
+        ThnItemKind.Asteroid, "entity \"C\", template_name: The game data has no asteroid \"x\". The scene shows the entity without a model.")]
+    [InlineData("""{ entity_name = "P", type = PSYS, template_name = "x" }""",
+        ThnItemKind.Effect, "entity \"P\", template_name: The game data has no effect \"x\". The scene does not show this entity.")]
+    public void AMissingPropEquipmentAsteroidOrEffectIsANameProblem(string entity, ThnItemKind kind, string expected)
+    {
+        var globals = Globals(entity, "");
+
+        var missing = ThnChecks.Check(Script, globals, Evaluator, new FakeData());
+
+        Assert.Empty(missing.Errors);
+        var problem = Assert.Single(missing.NameProblems);
+        Assert.Equal((DiagnosticSeverity.Error, expected), (problem.Severity, problem.Message));
+        Assert.Equal(new ThnLocation(Script, ThnElementKind.Entity, 0, "template_name", "\"" + entity.Split('"')[1] + "\""),
+            problem.Cutscene);
+        Assert.Equal([problem.Message], ThnChecks.NameProblems(Script, globals, Evaluator, new FakeData()).Select(p => p.Message));
+        Assert.Empty(ThnChecks.NameProblems(Script, globals, Evaluator, new FakeData((kind, "x", ThnItemState.Ready))));
+        Assert.Empty(ThnChecks.NameProblems(Script, globals, Evaluator, new FakeData { Loaded = false }));
+        Assert.Empty(ThnChecks.NameProblems(Script, globals, Evaluator, null));
+    }
+
+    /// <summary>
+    /// The engine gives the template PlayerShipEngines of a PSYS to the engine of the player ship, and the template
+    /// PlayerShip of a COMPOUND to the player ship (ThnScriptInstance.cs:79-104). An empty template gives no effect and
+    /// no model. So these templates give no problem. A SOUND can name a voice line, so its template gives no problem
+    /// either. The game makes no COMPOUND of a script that it plays only in space, so a missing prop there gives no name
+    /// problem, but a missing effect does.
+    /// </summary>
+    [Fact]
+    public void TheFixedTemplatesAndASoundGiveNoProblem()
+    {
+        const string entities = """
+            { entity_name = "E", type = PSYS, template_name = "playershipengines" },
+            { entity_name = "S", type = COMPOUND, template_name = "PlayerShip", userprops = { category = "ship" } },
+            { entity_name = "Empty", type = PSYS, template_name = "" },
+            { entity_name = "None", type = PSYS },
+            { entity_name = "V", type = SOUND, template_name = "x" }
+            """;
+        var fixedTemplates = ThnChecks.Check(Script, Globals(entities, ""), Evaluator, new FakeData());
+        Assert.Empty(fixedTemplates.Errors);
+        Assert.Empty(fixedTemplates.NameProblems);
+
+        const string space = """
+            { entity_name = "C", type = COMPOUND, template_name = "x", userprops = { category = "prop" } },
+            { entity_name = "P", type = PSYS, template_name = "x" }
+            """;
+        var problems = ThnChecks.NameProblems(Script, Globals(space, ""), Evaluator, new FakeData { MakesCompounds = false });
+        Assert.Equal(["entity \"P\", template_name: The game data has no effect \"x\". The scene does not show this entity."],
+            problems.Select(p => p.Message));
+    }
+
+    /// <summary>
     /// The game makes no COMPOUND of a script that it plays only in space: the space scene uses the objects of the
     /// mission in their place (Cutscene.cs:101-113, ThnScriptInstance.cs:113). So no check of a COMPOUND applies there.
     /// The other checks of the build still apply.
@@ -439,6 +502,30 @@ public sealed class ThnChecksTests
             Evaluator);
         Assert.Equal("entities.odd, entity_name: The value is 5, but the engine reads a text there.", Assert.Single(record).Message);
         Assert.Equal(new ThnLocation(Script), record[0].Cutscene);
+    }
+
+    /// <summary>
+    /// The one table of the templates: each kind of item names data lists of the rule data, the categories of a
+    /// COMPOUND keep their names, and the room fills in only the templates of a COMPOUND and of a DEFORMABLE. Only a
+    /// solar archetype, a ship, an equipment and an asteroid need a model file.
+    /// </summary>
+    [Fact]
+    public void EachKindOfTheTemplateTableNamesListsOfTheRuleData()
+    {
+        foreach (var kind in System.Enum.GetValues<ThnItemKind>())
+        {
+            Assert.NotEmpty(ThnTemplateRules.ListsOf(kind));
+            Assert.All(ThnTemplateRules.ListsOf(kind), id => Assert.True(ListRules.Retail.Lists.ContainsKey(id), id));
+        }
+        Assert.Equal(["asteroid", "equipment", "equipment cart", "prop", "room", "ship", "solar", "spaceship"],
+            ThnTemplateRules.Categories.Keys.Order(System.StringComparer.Ordinal));
+        Assert.Equal(["asteroid", "asteroid_mine"], ThnTemplateRules.Categories["Asteroid"].Lists);
+        Assert.Equal(["effect", "vis_effect"], ThnTemplateRules.Effect.Lists);
+        Assert.False(ThnTemplateRules.Sound.Closed);
+        Assert.Equal([ThnItemKind.Effect, ThnItemKind.Sound],
+            System.Enum.GetValues<ThnItemKind>().Where(k => !ThnTemplateRules.RoomFillsIn(k)));
+        Assert.Equal([ThnItemKind.Archetype, ThnItemKind.Ship, ThnItemKind.Equipment, ThnItemKind.Asteroid],
+            System.Enum.GetValues<ThnItemKind>().Where(ThnTemplateRules.NeedsModel));
     }
 
     /// <summary>The game data around a script: each listed item has its state, and each other item is missing.</summary>
