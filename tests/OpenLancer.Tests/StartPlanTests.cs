@@ -1267,4 +1267,67 @@ public sealed class StartPlanTests
         Assert.Same(MissionStartPoint.MissionStart, MissionStartPoint.MissionStart.Renamed("t_chosen", "t_new"));
         Assert.Throws<ArgumentException>(() => MissionStartPoint.At(" "));
     }
+
+    // The combat start of issue #48. The plan tells it, and the Play start page warns about the starter ship.
+
+    /// <summary>The plan of a start of the two-system story of the world tests, at the place of a choice.</summary>
+    private static StartPlan WorldPlan(string text, StartPlaceChoice choice = StartPlaceChoice.Suggested,
+        string? dock = null) =>
+        StartPlan.Make(Index(text, StartWorldTests.World()), Slot, MissionStartPoint.At("t_chosen"), choice, dock);
+
+    /// <summary>A start in space is a combat start when a trigger that waits at the start watches a fight on an object
+    /// that the setup makes in the start system. The setup makes the local ship of the second system. It leaves out the
+    /// guard of the first system, so a watcher of the guard does not make a combat start.</summary>
+    [Theory]
+    [InlineData("Cnd_Destroyed = ol_local", true)]
+    [InlineData("Cnd_HealthDec = ol_locals, 0.5", true)]
+    [InlineData("Cnd_HealthDec = ol_guard, 0.5", false)]
+    [InlineData("Cnd_Timer = 30", false)]
+    public void AWatcherOfAFightOnAnObjectOfTheStartSystemMakesACombatStart(string condition, bool combat)
+    {
+        var text = StartWorldTests.Script(jump: "Act_ActTrig = t_watch",
+            triggers: $"[Trigger]\nnickname = t_watch\n{condition}\n");
+
+        var plan = WorldPlan(text);
+
+        Assert.True(plan.CanStart, plan.Reason);
+        Assert.Equal(StartPlaceKind.Space, plan.Place.Kind);
+        Assert.Contains("t_watch", plan.ActiveSet);
+        Assert.Equal(combat, plan.Combat);
+    }
+
+    /// <summary>A start in space is a combat start when the setup makes a ship in the start system that the path makes
+    /// hostile to the player. A hostile ship of another system does not count, because the setup leaves it out. The
+    /// story without a hostile ship and without a watcher is a calm start.</summary>
+    [Theory]
+    [InlineData("", "", false)]
+    [InlineData("", "Act_SetVibe = ol_local, Player, REP_HOSTILE_THRESHOLD", true)]
+    [InlineData("", "Act_SetVibeLbl = ol_locals, Player, -0.9", true)]
+    [InlineData("Act_SetVibe = ol_guard, Player, REP_HOSTILE_THRESHOLD", "", false)]
+    public void AHostileShipOfTheStartSystemMakesACombatStart(string a, string jump, bool combat)
+    {
+        var plan = WorldPlan(StartWorldTests.Script(a: a, jump: jump));
+
+        Assert.True(plan.CanStart, plan.Reason);
+        Assert.Equal("ol_sys_b", plan.StartSystem);
+        Assert.Equal(combat, plan.Combat);
+    }
+
+    /// <summary>The player is docked at a base start, so it is never a combat start. A start at the Scene camera has no
+    /// start system before the play, so the page cannot tell. A mission start and a checkpoint start make no objects
+    /// before their triggers run. The approximate start at the kill of the plan script watches two ships of its world.</summary>
+    [Fact]
+    public void ABaseStartAMissionStartAndACheckpointStartAreNeverCombatStarts()
+    {
+        var hostile = StartWorldTests.Script(jump: "Act_SetVibe = ol_local, Player, REP_HOSTILE_THRESHOLD");
+
+        Assert.True(WorldPlan(hostile).Combat);
+        Assert.False(WorldPlan(hostile, StartPlaceChoice.Base, "ol_base_b").Combat);
+        Assert.False(WorldPlan(hostile, StartPlaceChoice.Camera).Combat);
+        Assert.True(Plan(Script, "t_kill").Combat);
+        Assert.False(Plan(Script, "t_kill", StartPlaceChoice.Base, "ol_base_a").Combat);
+        Assert.False(Plan(Script, null).Combat);
+        Assert.Equal(StartKind.Checkpoint, Plan(Script, "t_restore").Kind);
+        Assert.False(Plan(Script, "t_restore").Combat);
+    }
 }

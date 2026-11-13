@@ -236,7 +236,7 @@ public sealed partial class StartPlanRetailTests
         var watch = Stopwatch.StartNew();
         foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
         {
-            int plans = 0, leftOut = 0, fuses = 0, companions = 0, moved = 0, withoutSystem = 0;
+            int plans = 0, leftOut = 0, fuses = 0, companions = 0, moved = 0, withoutSystem = 0, combat = 0;
             foreach (var analysis in scripts)
             {
                 var index = analysis.Index;
@@ -255,6 +255,10 @@ public sealed partial class StartPlanRetailTests
                     companions += plan.Companions.Count;
                     moved += plan.Companions.Count(c => c.Moved);
                     var world = World(plan);
+                    // Only a start in space with the world of a known start system can be a combat start (issue #48).
+                    Assert.False(plan.Combat && (plan.StartSystem == null || plan.Place.Kind == StartPlaceKind.Base),
+                        $"{what}: a combat start without a start system or at a base.");
+                    combat += plan.Combat ? 1 : 0;
                     if (plan.StartSystem is not { } system)
                     {
                         withoutSystem++;
@@ -298,9 +302,40 @@ public sealed partial class StartPlanRetailTests
                 }
             }
             output.WriteLine($"{set}: {plans} approximate plans, {leftOut} left-out objects, {fuses} removed fuse lines, " +
-                             $"{companions} companions ({moved} moved), {withoutSystem} plans without a start system.");
+                             $"{companions} companions ({moved} moved), {withoutSystem} plans without a start system, " +
+                             $"{combat} combat starts.");
         }
         output.WriteLine($"Time: {watch.Elapsed.TotalSeconds:0} s.");
+    }
+
+    /// <summary>
+    /// The combat starts of issue #48 in both games. The review of #6 found that the starter ship dies fast at M12
+    /// decloak_R_wings and at M05 chase_player. Both start in space next to ships that the path makes hostile, and a
+    /// trigger that waits at the start watches a fight. So the plan tells a combat start. The mission start of M01a makes
+    /// no objects before its triggers run, so it is a calm start.
+    /// </summary>
+    [Fact]
+    public void TheCombatStartsOfTheReviewOfIssue6AreCombatStarts()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            foreach (var (slot, trigger) in new[] { ("M12", "decloak_R_wings"), ("M05", "chase_player") })
+            {
+                var analysis = Slot(scripts, slot);
+                var plan = Plan(analysis, trigger);
+                var what = $"{set} {slot} {trigger}";
+                Assert.True(plan.CanStart, $"{what}: {plan.Reason}");
+                Assert.Equal(StartPlaceKind.Space, plan.Place.Kind);
+                Assert.True(plan.Combat, what);
+                Assert.Contains(plan.ActiveSet, name =>
+                    analysis.Index.Trigger(name)?.Condition?.Name?.Group == "combat");
+            }
+
+            var m01a = Slot(scripts, "M01a");
+            var calm = StartPlan.Make(m01a.Index, m01a.Script.Slot, MissionStartPoint.MissionStart);
+            Assert.True(calm.CanStart, calm.Reason);
+            Assert.False(calm.Combat, $"{set} M01a mission start");
+        }
     }
 
     /// <summary>The NPC record of a ship of the script, or null.</summary>

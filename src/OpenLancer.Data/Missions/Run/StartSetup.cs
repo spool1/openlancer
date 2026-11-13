@@ -111,6 +111,8 @@ internal static class StartSetup
             StartSystem = built != null ? anchor!.System : null,
             LeftOut = built?.LeftOut ?? [],
             Companions = built?.Companions ?? [],
+            // The player is docked at a base start, so the fight waits for the launch.
+            Combat = built is { Combat: true } && plan.Place.Kind != StartPlaceKind.Base,
             Warnings = [.. plan.Warnings, .. worldWarnings],
         };
         return check ? Check(made, index) : made;

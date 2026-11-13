@@ -229,6 +229,15 @@ public sealed record StartPlan
     /// lines.</summary>
     public IReadOnlyList<StartCompanion> Companions { get; init; } = [];
 
+    /// <summary>
+    /// True for a combat start (issue #48): the play starts in space, and the world of the start system has a fight. A
+    /// trigger that waits at the start has a condition of the event group combat on an object that the setup makes. Or the
+    /// setup makes a ship that the path makes hostile to the player. Only an approximate start whose start system is
+    /// known has a setup of the world. A mission start and a checkpoint start make no objects before their triggers run,
+    /// and the player is docked at a base start. So these starts are never combat starts.
+    /// </summary>
+    public bool Combat { get; init; }
+
     /// <summary>The name of the start in the UI texts (section 8.1 of the M6c design): "Mission start", "Checkpoint
     /// {trigger}", "{trigger} (approximate)" or "Test script".</summary>
     public string StartName => NameOf(Kind, Start);

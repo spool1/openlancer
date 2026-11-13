@@ -162,6 +162,10 @@ internal static class StartWorld
 
     private static readonly string[] MoveKeys = ["Act_RelocateShip", "Act_RelocateForm"];
 
+    /// <summary>The event group of the conditions about a fight: a destroyed object, damage, hits, an attitude or a random
+    /// encounter.</summary>
+    private const string CombatGroup = "combat";
+
     /// <summary>The conditions of the triggers that run at each start or soon after it. The game sends the launch of
     /// the player at each start: when a start in space spawns the player, or at the launch from the base.</summary>
     private static readonly string[] StartConditions = ["Cnd_True", "Cnd_SpaceEnter", "Cnd_PlayerLaunch", "Cnd_Timer"];
@@ -174,7 +178,11 @@ internal static class StartWorld
 
     /// <summary>The world lines of the setup, the objects that it leaves out, the companions and the warnings.</summary>
     public sealed record Result(IReadOnlyList<(string Key, IReadOnlyList<string> Values)> Lines,
-        IReadOnlyList<LeftOutObject> LeftOut, IReadOnlyList<StartCompanion> Companions, IReadOnlyList<string> Warnings);
+        IReadOnlyList<LeftOutObject> LeftOut, IReadOnlyList<StartCompanion> Companions, IReadOnlyList<string> Warnings)
+    {
+        /// <summary>True when the world of the start system has a fight (see <see cref="StartPlan.Combat"/>).</summary>
+        public bool Combat { get; init; }
+    }
 
     /// <summary>The warning of a waiting trigger whose condition names only objects that the setup leaves out.</summary>
     public static string WaitingWarning(string trigger, string item, string system) =>
@@ -338,7 +346,23 @@ internal static class StartWorld
                 lines.AddRange(entry.After);
             }
             lines.AddRange(arrivalLines);
-            return new Result(lines, rows, placed, warnings);
+            return new Result(lines, rows, placed, warnings) { Combat = Combat() };
+        }
+
+        /// <summary>
+        /// True when the world of the start system has a fight (issue #48). A trigger that waits at the start has a
+        /// condition of the event group combat on an object that the setup makes. Or the setup makes a ship that the path
+        /// makes hostile to the player.
+        /// </summary>
+        private bool Combat()
+        {
+            var made = spawned.Where(p => !p.Key.Removed && !p.Value.Destroyed).Select(p => p.Value).Distinct().ToList();
+            var names = made.SelectMany(u => u.Members.Append(u.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return made.Any(u => u.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&
+                                 u.Members.Append(u.Name).Any(facts.Hostile.Contains)) ||
+                   replay.ActiveSet.Any(t => t.Condition is { Name.Group: CombatGroup } condition &&
+                                             Names(condition).Any(n =>
+                                                 names.Contains(n.Trim()) || Members(n).Any(names.Contains)));
         }
 
         /// <summary>The kept world lines, the jumps of the player and the arrivals of the jumpers, in the order of the
