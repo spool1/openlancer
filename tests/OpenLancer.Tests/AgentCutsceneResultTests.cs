@@ -8,6 +8,7 @@ using OpenLancer.Data.Thn;
 using OpenLancer.Studio.Agent;
 using OpenLancer.Studio.Commands;
 using Xunit;
+using static OpenLancer.Tests.AgentCalls;
 using static OpenLancer.Tests.ThnSessions;
 
 namespace OpenLancer.Tests;
@@ -117,6 +118,61 @@ public sealed class AgentCutsceneResultTests
             new ResultDelete($"{Ref}#event/2", DeleteReason.Cascade, "targets = Fx"),
             new ResultDelete($"{Ref}#entity/Fx", DeleteReason.Target, null),
         ], deleted.Deletes);
+    }
+
+    /// <summary>
+    /// In a call with a cutscene add and an INI add, the select is the last add of the call, as the editor selects the
+    /// last new item (decision D249). So the cutscene select replaces the select of the INI parts only when the cutscene
+    /// add comes later. Each step of <c>edit_batch</c> selects its own add.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TheSelectOfAMixedCallIsItsLastAdd(bool cutsceneFirst)
+    {
+        using var ws = ItemWorkspace.Create();
+        ws.WriteBase(ScriptPath, ThnSessions.Script);
+        var host = new TestAgentHost(ws.Session("act"));
+        var add = $$"""{ "tool": "cutscene_add_event", "arguments": { "cutscene": {{Json(Ref)}}, "type": "START_PSYS", "time": 1, "targets": ["Fx"] } }""";
+        const string copy = """{ "tool": "create_from_template", "arguments": { "kind": "equipment", "template": "gun1", "nickname": "gun2" } }""";
+        var gun = $"sec:{ItemWorkspace.WeaponsPath}#Gun/gun2";
+        var ev = $"{Ref}#event/6";
+
+        var result = Ok(host, "edit_batch", $$"""{ "steps": [ {{(cutsceneFirst ? add : copy)}}, {{(cutsceneFirst ? copy : add)}} ] }""");
+
+        Assert.Equal(cutsceneFirst ? gun : ev, (string?)result["select"]);
+        var steps = result["steps"]!.AsArray();
+        Assert.Equal(cutsceneFirst ? [ev, gun] : new[] { gun, ev }, steps.Select(s => (string?)s!["select"]));
+        Assert.Contains(ev, AgentEditToolTests.Texts(result["adds"]));
+        Assert.Contains(gun, AgentEditToolTests.Texts(result["adds"]));
+    }
+
+    /// <summary>
+    /// A change counts only when the element differs from W before the call. A move of an event and the move back give
+    /// no change of the event in the call, but each step gives the move of its event. The duration of the same call is
+    /// a change of the script, so the call has a net change.
+    /// </summary>
+    [Fact]
+    public void AnEventThatTheCallMovesBackIsNotAChangeOfTheCall()
+    {
+        using var ws = Workspace();
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        string Move(int delta) =>
+            $$"""{ "tool": "cutscene_move_events", "arguments": { "events": [ { "ref": {{Json($"{Ref}#event/3")}} } ], "time_delta": {{delta}} } }""";
+
+        var result = Ok(host, "edit_batch", $$"""
+            { "steps": [ {{Move(1)}}, {{Move(-1)}},
+                { "tool": "cutscene_set_duration", "arguments": { "cutscene": {{Json(Ref)}}, "seconds": 12 } } ] }
+            """);
+
+        Assert.Equal("applied", (string?)result["status"]);
+        Assert.Equal([Ref], AgentEditToolTests.Texts(result["changes"]));
+        var steps = result["steps"]!.AsArray();
+        Assert.Equal([$"{Ref}#event/3"], AgentEditToolTests.Texts(steps[0]!["changes"]));
+        Assert.Equal([$"{Ref}#event/3"], AgentEditToolTests.Texts(steps[1]!["changes"]));
+        Assert.Equal([Ref], AgentEditToolTests.Texts(steps[2]!["changes"]));
+        Assert.Equal(6f, ((ThnNumber)W(session).Events[3].Table.List[0]).Value);
     }
 
     /// <summary>A move of 0 and 0 changes nothing, so the call gives no change and no Undo step.</summary>
