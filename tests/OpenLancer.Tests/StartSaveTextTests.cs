@@ -134,6 +134,65 @@ public sealed class StartSaveTextTests
         Assert.NotEqual(FLHash.CreateID("ol_room"), ambient.Room.Hash);
     }
 
+    /// <summary>A ship with two mounted items, one of them without a hardpoint, and two goods in the hold.</summary>
+    internal static readonly StartSaveShip Ship = new("ol_ship",
+        [("ol_gun", "HpWeapon01"), ("ol_engine", null)], [("ol_missile", 3), ("ol_battery", 2)]);
+
+    [Fact]
+    public void AShipGivesItsShipEquipAndCargoLinesAfterThePlace()
+    {
+        var text = StartSaveText.OpenLancer(Plan("t_chosen"), InSpace, Time, Ship);
+        var player = text[..text.IndexOf("\r\n\r\n", StringComparison.Ordinal)].Split("\r\n");
+
+        Assert.Equal(["[Player]", "description", "tstamp", "system", "pos", "rotate", "ship_archetype", "equip", "equip",
+            "cargo", "cargo"], player.Select(l => l.Split(" = ")[0]));
+        Assert.Equal(["ship_archetype = ol_ship", "equip = ol_gun, HpWeapon01", "equip = ol_engine",
+            "cargo = ol_missile, 3", "cargo = ol_battery, 2"], player[6..]);
+    }
+
+    [Fact]
+    public void TheShipLinesParseToTheSameShipEquipAndCargo()
+    {
+        var player = Read(StartSaveText.OpenLancer(Plan("t_chosen"), StartSavePlace.AtBase("ol_sys_a", "ol_base_a"),
+            Time, Ship)).Player!;
+
+        Assert.Equal(FLHash.CreateID("ol_ship"), (uint)player.ShipArchetype);
+        Assert.Equal([(FLHash.CreateID("ol_gun"), "HpWeapon01"), (FLHash.CreateID("ol_engine"), null)],
+            player.Equip.Select(e => ((uint)e.Item, e.Hardpoint)));
+        Assert.Equal([(FLHash.CreateID("ol_missile"), 3), (FLHash.CreateID("ol_battery"), 2)],
+            player.Cargo.Select(c => ((uint)c.Item, c.Count)));
+        Assert.All(player.Cargo, c => Assert.False(c.IsMissionCargo));
+        Assert.Equal("ol_base_a", player.Base);
+    }
+
+    [Fact]
+    public void WithoutAShipTheTextHasNoShipLines()
+    {
+        var text = StartSaveText.OpenLancer(Plan("t_chosen"), InSpace, Time);
+
+        Assert.Equal(text, StartSaveText.OpenLancer(Plan("t_chosen"), InSpace, Time, null));
+        Assert.DoesNotContain("ship_archetype", text);
+        Assert.DoesNotContain("equip = ", text);
+        Assert.DoesNotContain("cargo = ", text);
+        Assert.Equal(0u, (uint)Read(text).Player!.ShipArchetype);
+    }
+
+    /// <summary>The addon rule of a ship package (decision D47): the amount 1 mounts the equipment at its hardpoint, a
+    /// larger amount puts it into the hold, and an amount below 1 gives nothing. The order of the addons stays.</summary>
+    [Fact]
+    public void TheAddonsOfAPackageGiveTheShipPartByTheirAmount()
+    {
+        var ship = StartSaveShip.FromAddons("ol_ship",
+        [
+            ("ol_gun", "HpWeapon01", 1), ("ol_mine", "HpMine01", 2), ("ol_engine", null, 1),
+            ("ol_shield", "HpShield01", 0), ("ol_missile", "internal", 5), ("ol_light", "HpLight01", -1),
+        ]);
+
+        Assert.Equal("ol_ship", ship.Ship);
+        Assert.Equal([("ol_gun", "HpWeapon01"), ("ol_engine", null)], ship.Equip);
+        Assert.Equal([("ol_mine", 2), ("ol_missile", 5)], ship.Cargo);
+    }
+
     [Fact]
     public void APlanThatCannotStartHasNoStartSave()
     {

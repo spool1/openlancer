@@ -21,6 +21,44 @@ public sealed record StartSavePlace(string System, string? Base, Vector3 Positio
         new(system, dock, Vector3.Zero, Quaternion.Identity);
 }
 
+/// <summary>The ship part of a save: the ship, the equipment that it mounts and the goods in its hold.</summary>
+/// <param name="Ship">The nickname of the <c>[Ship]</c>.</param>
+/// <param name="Equip">The equipment that the ship mounts, each with its hardpoint. The game mounts an item without a
+/// hardpoint at <c>internal</c>.</param>
+/// <param name="Cargo">The goods in the hold, each with its count.</param>
+public sealed record StartSaveShip(
+    string Ship,
+    IReadOnlyList<(string Item, string? Hardpoint)> Equip,
+    IReadOnlyList<(string Item, int Count)> Cargo)
+{
+    /// <summary>
+    /// The ship part that a ship package gives (decision D47). This is the one statement of the addon rule. The game
+    /// and the editor both use it:
+    /// <list type="bullet">
+    /// <item>An addon with the amount 1 mounts its equipment at its hardpoint.</item>
+    /// <item>An addon with a larger amount puts that amount of the equipment into the hold.</item>
+    /// <item>An addon with an amount below 1 gives nothing.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="ship">The nickname of the ship of the package.</param>
+    /// <param name="addons">The addons of the package in their order: the nickname of the equipment, the hardpoint and
+    /// the amount.</param>
+    public static StartSaveShip FromAddons(string ship,
+        IEnumerable<(string Equipment, string? Hardpoint, int Amount)> addons)
+    {
+        var equip = new List<(string, string?)>();
+        var cargo = new List<(string, int)>();
+        foreach (var (equipment, hardpoint, amount) in addons)
+        {
+            if (amount == 1)
+                equip.Add((equipment, hardpoint));
+            else if (amount > 1)
+                cargo.Add((equipment, amount));
+        }
+        return new StartSaveShip(ship, equip, cargo);
+    }
+}
+
 /// <summary>
 /// The start save of a play from a trigger (section 5.5 of the M6c design, decisions D750 and D753), as plain text. Each
 /// line comes from the one canonical line writer (<see cref="IniLines"/>). The OpenLancer form (F5) has a short
@@ -35,9 +73,11 @@ public static class StartSaveText
 
     /// <summary>The text of the OpenLancer form of a plan that can start.</summary>
     /// <param name="time">The time of the write: <c>tstamp</c>, so the load menu lists the file first.</param>
+    /// <param name="ship">The ship part of the save, or null for no ship lines. Without ship lines, the game uses the
+    /// ship of the play.</param>
     /// <exception cref="ArgumentException">The plan cannot start, or it has no story slot.</exception>
-    public static string OpenLancer(StartPlan plan, StartSavePlace place, DateTime time) =>
-        Text([PlayerSection(plan, place, time), .. MissionPart(plan)]);
+    public static string OpenLancer(StartPlan plan, StartSavePlace place, DateTime time, StartSaveShip? ship = null) =>
+        Text([PlayerSection(plan, place, time, ship), .. MissionPart(plan)]);
 
     /// <summary>The text of the description: "OpenLancer start: {slot}, {start}" (section 5.5 of the M6c
     /// design).</summary>
@@ -78,8 +118,11 @@ public static class StartSaveText
     }
 
     /// <summary>The short <c>[Player]</c> section of the OpenLancer form: the description, the time, the system, and the
-    /// base or the point with the heading as Euler angles in degrees.</summary>
-    private static (string, IReadOnlyList<string>) PlayerSection(StartPlan plan, StartSavePlace place, DateTime time)
+    /// base or the point with the heading as Euler angles in degrees. With a ship, the place lines are followed by
+    /// <c>ship_archetype</c>, one <c>equip</c> line for each mounted item and one <c>cargo</c> line for each good in
+    /// the hold, in the order of the save of the game.</summary>
+    private static (string, IReadOnlyList<string>) PlayerSection(StartPlan plan, StartSavePlace place, DateTime time,
+        StartSaveShip? ship)
     {
         var fileTime = time.ToFileTime();
         var lines = new List<string>
@@ -97,6 +140,13 @@ public static class StartSaveText
             var angles = place.Orientation.GetEulerDegrees();
             lines.Add(Line("pos", Number(place.Position.X), Number(place.Position.Y), Number(place.Position.Z)));
             lines.Add(Line("rotate", Number(angles.X), Number(angles.Y), Number(angles.Z)));
+        }
+        if (ship != null)
+        {
+            lines.Add(Line("ship_archetype", ship.Ship));
+            lines.AddRange(ship.Equip.Select(e =>
+                e.Hardpoint is { Length: > 0 } hardpoint ? Line("equip", e.Item, hardpoint) : Line("equip", e.Item)));
+            lines.AddRange(ship.Cargo.Select(c => Line("cargo", c.Item, Number(c.Count))));
         }
         return ("Player", lines);
     }
