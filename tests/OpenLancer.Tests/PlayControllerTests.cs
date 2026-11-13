@@ -2226,6 +2226,123 @@ public sealed class PlayControllerTests : IDisposable
         await StopAndRunToIdleAsync();
     }
 
+    /// <summary>
+    /// Restart the mission while the restart of a save runs. When the game answers the first restart, the second
+    /// restart has no new save. It also waits until the hidden Scene shows each edit, so its start check reads the new
+    /// shapes (issue #7).
+    /// </summary>
+    [Fact]
+    public async Task ARestartWithoutANewSaveWaitsForTheScene()
+    {
+        var mission = new FakeMissionStart();
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(2), Restarted(2)] }, mission);
+        editor.Commit(2);
+        play.Update(false, false);
+        editor.Finish(2);
+        Assert.Equal(PlayStatus.Reloading, play.Status);
+        play.RestartMission();
+        play.Update(false, false);
+        var behindAtPrepare = new List<bool>();
+        mission.OnPrepare = () => behindAtPrepare.Add(editor.SceneBehind);
+
+        // An edit after Restart the mission, which the hidden Scene did not apply.
+        editor.SceneBehind = true;
+        await ui.RunUntilAsync(() => Console.Any(m => m.StartsWith("The game started M99 again")), "the restart of save 2");
+
+        Assert.Empty(behindAtPrepare);
+        Assert.Equal(PlayStatus.Running, play.Status);
+        play.BeforePanels(editing: false);
+        Assert.Equal(1, editor.CatchUpCalls);
+        play.Update(false, false);
+
+        Assert.Equal([false], behindAtPrepare);
+        Assert.Equal(PlayStatus.Reloading, play.Status);
+        await RunUntilAsync(PlayStatus.Running);
+        Assert.Equal(["start", "restart 2", "restart 2"], stub.Input(0));
+        await StopAndRunToIdleAsync();
+    }
+
+    /// <summary>A validation that could not run lets the restart go on with a warning. The restart waits for the Scene
+    /// before the warning, so the Console gives the warning once, when the restart goes.</summary>
+    [Fact]
+    public async Task ARestartThatWaitsForTheSceneWarnsOnceThatTheValidationCouldNotRun()
+    {
+        const string warning = "The running game loads save 2 without a validation: the validation could not run.";
+        var mission = new FakeMissionStart();
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(2)] }, mission);
+
+        editor.Commit(2);
+        play.Update(false, false);
+        editor.SceneBehind = true;
+        editor.SceneStaysBehind = true;
+        editor.FailToRun(2);
+        for (var frame = 0; frame < 3; frame++)
+        {
+            play.BeforePanels(editing: false);
+            play.Update(false, false);
+        }
+
+        Assert.Equal(1, mission.Prepares);
+        Assert.DoesNotContain(warning, Console);
+
+        editor.SceneStaysBehind = false;
+        play.BeforePanels(editing: false);
+        play.Update(false, false);
+
+        Assert.Equal(2, mission.Prepares);
+        Assert.Single(Console, m => m == warning);
+        await RunUntilAsync(PlayStatus.Running);
+        Assert.Equal(["start", "restart 2"], stub.Input(0));
+        await StopAndRunToIdleAsync();
+    }
+
+    /// <summary>
+    /// Validation errors do not wait for the Scene, because no restart goes. The Console tells them at once, also while
+    /// the Scene cannot show each edit. A new mission play that waits for its save gets its refusal at once, and Play
+    /// does not make the Scene apply the edits.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ValidationErrorsDuringARestartDoNotWaitForTheScene(bool newStart)
+    {
+        var mission = new FakeMissionStart();
+        await PlayMissionToRunningAsync(Game, mission);
+        Task<PlayRequestResult>? result = null;
+        if (newStart)
+        {
+            editor.SaveResult = new SaveOutcome(true, 2, false);
+            result = play.RequestMission(new FakeMissionStart());
+        }
+        else
+        {
+            editor.Commit(2);
+        }
+
+        play.Update(false, false);
+        editor.SceneBehind = true;
+        editor.SceneStaysBehind = true;
+        editor.Finish(2, HullError);
+
+        Assert.Contains("The running game keeps save 1. The validation of save 2 found 1 error.", Console);
+        if (result != null)
+        {
+            Assert.True(result.IsCompleted);
+            Assert.Equal("ValidationErrors", (await result).Error!.Detail);
+            Assert.Contains("Play did not start M99 from Checkpoint t_restore: the validation of save 2 found 1 error.",
+                Console);
+        }
+
+        play.BeforePanels(editing: false);
+        play.Update(false, false);
+
+        Assert.Equal(0, editor.CatchUpCalls);
+        Assert.Equal(1, mission.Prepares);
+        Assert.Equal(PlayStatus.Running, play.Status);
+        await StopAndRunToIdleAsync();
+        Assert.Equal(["start", "stop"], stub.Input(0));
+    }
+
     /// <summary>A save while a restart runs: the game can show parts of it, and the Console says so. The trigger then
     /// sends the restart of that save. The watchdog of a restart names the restart.</summary>
     [Fact]
