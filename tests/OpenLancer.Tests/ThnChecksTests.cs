@@ -184,9 +184,9 @@ public sealed class ThnChecksTests
     [Theory]
     [InlineData("5", "The value is 5, but the engine reads a text there.")]
     [InlineData("\"OPEN {\"", "The value is not a path that the engine reads. A path text starts with OPEN or CLOSED and a comma.")]
-    [InlineData("\"OPEN, {\"", "The value is not a path that the engine reads. The text ends before the value is complete")]
+    [InlineData("\"OPEN, {\"", "The value is not a path that the engine reads. The path text ends before a table is complete.")]
     [InlineData("\"OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } x = { OPEN, {2+3,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}\"",
-        "The value is not a path that the engine reads. The text holds '}', which a value cannot hold.")]
+        "The value is not a path that the engine reads. The path text holds '}', which a path text cannot hold.")]
     [InlineData("\"1, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}\"",
         "The value is not a path that the engine reads. A path text starts with OPEN or CLOSED and a comma.")]
     [InlineData("\"OPEN, {0,0,0}, {1,1,1}\"",

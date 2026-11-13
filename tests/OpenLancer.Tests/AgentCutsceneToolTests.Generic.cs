@@ -24,7 +24,7 @@ namespace OpenLancer.Tests;
 public sealed partial class AgentCutsceneToolTests
 {
     /// <summary>A script with a key of each kind of the THN schema: a light, a motion path, a turn, a quaternion, the
-    /// bits of a motion, a curve, and a key that the schema does not know.</summary>
+    /// bits of a motion, a curve, and a key that the schema does not know. The last entity is a marker.</summary>
     private const string Kinds = """
         duration = 10
         entities = {
@@ -34,7 +34,8 @@ public sealed partial class AgentCutsceneToolTests
             { entity_name = "Lamp", type = LIGHT, lightprops = { type = L_POINT, on = Y } },
             { entity_name = "Path", type = MOTION_PATH, pathprops = { path_type = "CV_CROrientationSpline", path_data = "OPEN, {0,0,0}, {1,0,0,0}, {10,0,0}, {1,0,0,0}, " } },
             { entity_name = "Char", type = DEFORMABLE, userprops = { Actor = "Char", category = "Char" } },
-            { entity_name = "Fx", type = PSYS, psysprops = {} }
+            { entity_name = "Fx", type = PSYS, psysprops = {} },
+            { entity_name = "Mark", type = MARKER }
         }
         events = {
             { 0, SET_CAMERA, { "Monitor", "Cam" } },
@@ -328,7 +329,9 @@ public sealed partial class AgentCutsceneToolTests
     }
 
     /// <summary>Each error of the generic tools on cutscene items, with its code, its detail and its argument. Nothing
-    /// changes.</summary>
+    /// changes, and no evaluator run runs a path text as a script. The engine reads the path text of an entity of each
+    /// type, so a CAMERA and a MARKER refuse a new path text that is not only a path, also in a whole
+    /// <c>pathprops</c> record.</summary>
     [Theory]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#entity/Cam", "fields": { "a..b": 1 } }""", "invalid_argument", ItemRefs.BadReference, "fields.a..b")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1", "fields": { "duration": 1 } }""", "invalid_argument", ItemRefs.BadReference, "fields.duration")]
@@ -351,6 +354,9 @@ public sealed partial class AgentCutsceneToolTests
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#entity/Path", "fields": { "pathprops.path_data": "OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_path = { OPEN, {2+3,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}" } }""", "invalid_value", MissionErrors.FieldValue, "fields.pathprops.path_data")]
     [InlineData("cutscene_add_entity", """{ "cutscene": "thn:DATA\\SCRIPTS\\x.thn", "type": "MOTION_PATH", "name": "my_path", "fields": { "pathprops.path_data": "OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_path = { OPEN, {2+3,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}" } }""", "invalid_value", MissionErrors.FieldValue, "fields.pathprops.path_data")]
     [InlineData("cutscene_add_entity", """{ "cutscene": "thn:DATA\\SCRIPTS\\x.thn", "type": "MARKER", "name": "my_mark", "fields": { "userprops.note": "print(1)" } }""", "invalid_value", MissionErrors.FieldValue, "fields.userprops.note")]
+    [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#entity/Cam", "fields": { "pathprops.path_data": "\"OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_hit = { 2+3 } ol_path = { OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}\"" } }""", "invalid_value", MissionErrors.FieldValue, "fields.pathprops.path_data")]
+    [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#entity/Mark", "fields": { "pathprops": "{ path_data = \"OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_hit = { 2+3 } ol_path = { OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}\" }" } }""", "invalid_value", MissionErrors.FieldValue, "fields.pathprops")]
+    [InlineData("cutscene_add_entity", """{ "cutscene": "thn:DATA\\SCRIPTS\\x.thn", "type": "MARKER", "name": "my_mark", "fields": { "pathprops.path_data": "\"OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_hit = { 2+3 } ol_path = { OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}\"" } }""", "invalid_value", MissionErrors.FieldValue, "fields.pathprops.path_data")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/2", "fields": { "props.animation": "Sc_wü" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.animation")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/3", "fields": { "props.custom": "{ \"ü\" }" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.custom")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/3", "fields": { "props.custom": "{ \"\\200\" }" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.custom")]
@@ -391,7 +397,8 @@ public sealed partial class AgentCutsceneToolTests
     public void EachCutsceneErrorOfTheGenericToolsHasItsCodeAndChangesNothing(string tool, string arguments, string code,
         string detail, string field)
     {
-        var (ws, session, host) = Open(Kinds);
+        var evaluator = new ThnScripts.CountingEvaluator();
+        var (ws, session, host) = Open(Kinds, thn: evaluator);
         using var _ = ws;
         var before = ScriptText(session);
 
@@ -402,6 +409,7 @@ public sealed partial class AgentCutsceneToolTests
             ((string?)result.Content["code"], (string?)result.Content["detail"], (string?)result.Content["field"]));
         Assert.Equal(before, ScriptText(session));
         Assert.False(session.CanUndo);
+        Assert.Equal(0, evaluator.RunsThatSet("ol_hit"));
     }
 
     /// <summary>The errors give the reasons of the editor and name the tool for the change.</summary>

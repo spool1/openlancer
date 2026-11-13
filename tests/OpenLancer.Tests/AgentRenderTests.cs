@@ -275,6 +275,40 @@ public sealed class AgentRenderTests
         Assert.Contains("duration = 3", Encoding.ASCII.GetString(named));
     }
 
+    /// <summary>
+    /// The builds of the Cutscene tab and of an image do not give the engine a script whose entity has a path text that
+    /// is not only a path (section 8.7, item 2 of the MCP1 design). The engine reads the path text of an entity of each
+    /// type, so a MARKER stops the build too, from W and from a file of the edit view. The error names the script and
+    /// the entity. A file that the evaluator cannot read goes to the engine as it is, because it is not a text of the
+    /// writer.
+    /// </summary>
+    [Fact]
+    public void TheBuildDoesNotGiveTheEngineAPathTextThatIsNotOnlyAPath()
+    {
+        const string bad = "OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_hit = 1 ol_path = { OPEN, {0,0,0}, {1,0,0,0}";
+        const string marker = $$"""{ entity_name = "Mk", type = MARKER, pathprops = { path_data = "{{bad}}" } }""";
+        const string other = @"DATA\other.thn";
+        const string unread = @"DATA\unread.thn";
+        const string unreadScript = $"duration = 3\nentities = {{ {marker} }}\nevents = {{}}\ngap = {{ 1, nil, 3 }}\n";
+        using var ws = ThnSessions.Workspace(script: ThnSessions.Script.Replace("psysprops = {} }",
+            "psysprops = {} },\n" + marker));
+        ws.WriteBase(other, $"duration = 3\nentities = {{ {marker} }}\nevents = {{}}\n");
+        ws.WriteBase(unread, unreadScript);
+        var session = ws.Session("act");
+        var files = session.EditView.CreateFileSystem();
+
+        var working = Assert.Throws<InvalidOperationException>(() =>
+            CutsceneWorkspace.ScriptBytes(session, files, ThnSessions.ScriptPath, ThnSessions.ScriptPath));
+        var file = Assert.Throws<InvalidOperationException>(() => CutsceneWorkspace.ScriptBytes(session, files, other, null));
+
+        Assert.Equal($"The editor does not give the script {ThnSessions.ScriptPath} to the engine. The entity Mk has a " +
+                     "pathprops.path_data text that is not only a path. The engine would run it as a script. " +
+                     ThnMotionPath.NotPathPart("}"), working.Message);
+        Assert.StartsWith($"The editor does not give the script {other} to the engine. The entity Mk has", file.Message);
+        Assert.Equal(unreadScript,
+            Encoding.ASCII.GetString(CutsceneWorkspace.FileScriptBytes(files, unread)).ReplaceLineEndings("\n"));
+    }
+
     /// <summary>The list of the visible items clips at the planes of the render, so it never names an item that the
     /// image cannot show.</summary>
     [Fact]

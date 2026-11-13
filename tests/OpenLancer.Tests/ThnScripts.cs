@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using LibreLancer;
 using LibreLancer.Thorn;
@@ -22,6 +23,8 @@ internal static class ThnScripts
     /// <summary>The engine VM, with a count of its runs, so that a test can show that a text does not run.</summary>
     public sealed class CountingEvaluator : IThnEvaluator
     {
+        private readonly List<ThnTable> results = [];
+
         public int Runs { get; private set; }
 
         public IReadOnlyDictionary<string, ThnSymbolInfo> Symbols => Evaluator.Symbols;
@@ -29,8 +32,14 @@ internal static class ThnScripts
         public ThnTable Evaluate(ReadOnlySpan<byte> script, string name)
         {
             Runs++;
-            return Evaluator.Evaluate(script, name);
+            var globals = Evaluator.Evaluate(script, name);
+            results.Add(globals);
+            return globals;
         }
+
+        /// <summary>The runs that set a global. A test text sets a global that no value text sets, so a run that sets
+        /// it ran the text as a script.</summary>
+        public int RunsThatSet(string global) => results.Count(r => r[global] != null);
     }
 
     /// <summary>Evaluates Lua text with the engine VM.</summary>

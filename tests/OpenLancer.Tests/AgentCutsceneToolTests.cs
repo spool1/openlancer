@@ -73,11 +73,12 @@ public sealed partial class AgentCutsceneToolTests
         ThnWriter.Write(W(session).ToGlobals()) + "\n" +
         (session.Cutscene(NewPath) is { } created ? ThnWriter.Write(created.ToGlobals()) : "none");
 
+    /// <param name="thn">The cutscene evaluator of the session, or null for the engine evaluator.</param>
     private static (TestWorkspace Ws, EditSession Session, TestAgentHost Host) Open(string script = ThnSessions.Script,
-        Dictionary<string, string>? activeFiles = null)
+        Dictionary<string, string>? activeFiles = null, IThnEvaluator? thn = null)
     {
         var ws = Workspace(activeFiles, script);
-        var session = ws.Session("act");
+        var session = ws.Session("act", thn);
         return (ws, session, new TestAgentHost(session));
     }
 

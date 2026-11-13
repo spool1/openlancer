@@ -83,6 +83,56 @@ public sealed partial class CutsceneCommandsTests
         Assert.Equal(ThnElementKind.Entity, Assert.Single(plan.Changed).Kind);
     }
 
+    /// <summary>
+    /// The engine runs the path text of an entity of each type as Lua (ThnScript.cs:476-484). So a value that gives a
+    /// CAMERA or a MONITOR a new path text that is not only a path refuses with the detail FieldValue: for the key of
+    /// the text, for a whole <c>pathprops</c> record, and for the field of the Inspector. No evaluator run runs the
+    /// text, and a path text that is only a path applies.
+    /// </summary>
+    [Fact]
+    public void ANewPathTextOnAnEntityOfEachTypeMustBeOnlyAPath()
+    {
+        const string bad = "OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_hit = 1 ol_path = { OPEN, {0,0,0}, {1,0,0,0}";
+        using var ws = Workspace();
+        var evaluator = new CountingEvaluator();
+        var session = ws.Session("act", evaluator);
+        var message = "The engine reads pathprops.path_data of an entity of each type as a path. " +
+                      ThnMotionPath.NotPathPart("}");
+
+        AssertRefused(session, CutsceneCommands.SetValue(session, Entity(session, "Cam_A"), ThnMotionPath.Path, T(bad)),
+            message, MissionErrors.FieldValue);
+        AssertRefused(session, CutsceneCommands.SetValue(session, Entity(session, "Monitor"), new ThnPath("pathprops"),
+            Record(F("path_data", T(bad)))), message, MissionErrors.FieldValue);
+        AssertRefused(session, ThnFieldCommand.Set(Entity(session, "Monitor"), ThnMotionPath.Path).Make(session, T(bad)),
+            message, MissionErrors.FieldValue);
+        Assert.Equal(0, evaluator.RunsThatSet("ol_hit"));
+        Assert.False(session.CanUndo);
+
+        var path = CutsceneCommands.SetValue(session, Entity(session, "Monitor"), ThnMotionPath.Path,
+            T("OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}, "));
+        Assert.Equal(EditStatus.Applied, FakeCommandHost.Runner(session).Run(path).Status);
+    }
+
+    /// <summary>A stored path text that is not only a path, as a mod file can hold it, does not refuse an edit that
+    /// keeps it: the same text, or another key of the entity. The build checks such a text (see
+    /// <see cref="ThnMotionPath.ScriptProblem"/>).</summary>
+    [Fact]
+    public void AStoredPathTextDoesNotRefuseAnEditThatKeepsIt()
+    {
+        const string stored = "OPEN, {1+1,0,0}, {1,0,0,0}, {10,0,0}, {1,0,0,0}, ";
+        using var ws = Workspace(script: Script.Replace("{ entity_name = \"Monitor\", type = MONITOR }",
+            $"{{ entity_name = \"Monitor\", type = MONITOR, pathprops = {{ path_data = \"{stored}\" }} }}"));
+        var session = ws.Session("act");
+        var runner = FakeCommandHost.Runner(session);
+
+        var same = runner.Run(CutsceneCommands.SetValue(session, Entity(session, "Monitor"), ThnMotionPath.Path, T(stored)));
+        var other = runner.Run(CutsceneCommands.SetValue(session, Entity(session, "Monitor"), new ThnPath("spatialprops.pos"),
+            List(N(1), N(2), N(3))));
+
+        Assert.Equal((EditStatus.NoChange, EditStatus.Applied), (same.Status, other.Status));
+        Assert.Equal(T(stored), Value(session, Entity(session, "Monitor"), ThnMotionPath.Path.Text));
+    }
+
     /// <summary>A move and a change of the length give the W of the session command, on the 1 ms grid. Each event is
     /// one changed element, also when the request names it twice.</summary>
     [Fact]

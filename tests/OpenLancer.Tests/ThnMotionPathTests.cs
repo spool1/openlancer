@@ -72,17 +72,36 @@ public sealed class ThnMotionPathTests
         Assert.Throws<FormatException>(() => ThnMotionPath.Parse(text, Evaluator));
 
     /// <summary>
-    /// A path text that holds more than numbers, tables of numbers, OPEN and CLOSED does not run (section 8.7, item 2 of
+    /// A path text that holds more than OPEN, CLOSED, numbers and tables of numbers does not run (section 8.7, item 2 of
     /// the MCP1 design). The first text closes the table and assigns the path again with an operator: the evaluator
-    /// would give the point 5. The check of the items refuses each text before the evaluator runs it, with the reason.
+    /// would give the point 5. The check refuses each text before the evaluator runs it, with a reason about paths. A
+    /// text, a table in a table, a field, a comment and a second minus sign refuse too, also when the VM could read
+    /// them as values.
     /// </summary>
     [Theory]
     [InlineData("OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_path = { OPEN, {2+3,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}",
-        "The text holds '}', which a value cannot hold.")]
-    [InlineData("OPEN, {x,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}", "The path text names x. A path text can name only OPEN and CLOSED.")]
-    [InlineData("OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}, f()", "The path text names f.")]
-    [InlineData("OPEN, [[\n$if nil\n]], {1,1,1}", ThnValueText.Pragma)]
-    [InlineData("OPEN, {0,0,0", ThnValueText.Unfinished)]
+        "The path text holds '}', which a path text cannot hold. A path text holds OPEN or CLOSED, then tables of numbers")]
+    [InlineData("OPEN, {0,0,0}, {2+3,0,0}", "The path text holds '+' in a table. A table of a path text holds only numbers")]
+    [InlineData("OPEN, {x,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}", "The path text holds 'x' in a table.")]
+    [InlineData("OPEN, {OPEN,0,0}", "The path text holds 'OPEN' in a table.")]
+    [InlineData("OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}, f()", "The path text names f. A path text can name only OPEN and CLOSED.")]
+    [InlineData("OPEN, \"a\", {1,1,1}, {1,0,0,0}", ThnMotionPath.PathTexts)]
+    [InlineData("OPEN, [[\n$if nil\n]], {1,1,1}", ThnMotionPath.PathTexts)]
+    [InlineData("OPEN, \"a\\200\", {1,1,1}", ThnMotionPath.PathTexts)]
+    [InlineData("OPEN, \"a", ThnMotionPath.PathTexts)]
+    [InlineData("OPEN, {{1,2,3}}", "The path text holds '{' in a table.")]
+    [InlineData("OPEN, {x = 1}", "The path text holds 'x' in a table.")]
+    [InlineData("OPEN, {[1] = 1}", "The path text holds '[' in a table.")]
+    [InlineData("OPEN; {0,0,0}", "The path text holds ';', which a path text cannot hold.")]
+    [InlineData("OPEN,, {0,0,0}", "The path text holds ',', which a path text cannot hold.")]
+    [InlineData("OPEN, {0,0,0} -- x", ThnMotionPath.PathComment)]
+    [InlineData("OPEN, {0,0,0}\n$debug\n", "The path text holds '$', which a path text cannot hold.")]
+    [InlineData("OPEN, {- -1,0,0}", "The path text holds '-' before '-'. A minus sign can come only before a number.")]
+    [InlineData("OPEN, -OPEN", "The path text holds '-' before 'OPEN'.")]
+    [InlineData("OPEN, -", "The path text ends after a minus sign.")]
+    [InlineData("OPEN, {1..2,0,0}", "The path text holds '1..', which is not a number.")]
+    [InlineData("OPEN, {0,0,0", ThnMotionPath.PathUnfinished)]
+    [InlineData("OPEN, {0,0,0}, {1,0,0,0}, \u00fc", "The text \"OPEN, {0,0,0}, {1,0,0,0}, \u00fc\" has the character U+00FC.")]
     public void APathTextWithMoreThanValuesDoesNotRun(string text, string expected)
     {
         var evaluator = new CountingEvaluator();
@@ -91,8 +110,59 @@ public sealed class ThnMotionPathTests
 
         Assert.StartsWith(expected, error.Message);
         Assert.Equal(error.Message, ThnMotionPath.TextProblem(text));
+        // A path cannot name L_POINT, so the hint of a value text does not apply.
+        Assert.DoesNotContain("L_POINT", error.Message);
         Assert.Equal(0, evaluator.Runs);
-        Assert.Null(ThnMotionPath.TextProblem(Retail));
+    }
+
+    /// <summary>A path text holds OPEN or CLOSED, numbers with an optional minus sign and tables of numbers, with a
+    /// comma between two items and an optional comma at the end. Each such text passes the check, also a retail path
+    /// and a path of the writer with exponents.</summary>
+    [Theory]
+    [InlineData(Retail)]
+    [InlineData("CLOSED, {0,0,0}, {0,0,4}, {1,2,3}, ")]
+    [InlineData("OPEN, { - 1, 2e-5, .5, 1., 1E+3 }, {1,0,0,0}")]
+    [InlineData("OPEN,\r\n{1,2,3},\n\t{1,0,0,0},")]
+    [InlineData("OPEN, {}, {1,}")]
+    [InlineData("")]
+    public void APathTextOfNumbersPassesTheCheck(string text) => Assert.Null(ThnMotionPath.TextProblem(text));
+
+    [Fact]
+    public void APathOfTheWriterPassesTheCheck()
+    {
+        var keys = new ThnPathKeys(false, [new ThnPathKey(new Vector3(1e-10f, -3e38f, 0.1f), Quaternion.Identity),
+            new ThnPathKey(new Vector3(float.MaxValue, float.Epsilon, -0f), new Quaternion(0.5f, -0.5f, 0.5f, -0.5f))]);
+
+        var text = ThnMotionPath.Write(keys);
+
+        Assert.Null(ThnMotionPath.TextProblem(text));
+        Assert.Equal(keys.Keys, ThnMotionPath.Parse(text, Evaluator).Keys);
+    }
+
+    /// <summary>
+    /// The engine reads the path text of an entity of each type and runs it as Lua (ThnScript.cs:476-484). So the check
+    /// of a script for a build reads each entity, also an entity with a text key in <c>entities</c>, and names the
+    /// entity of the first path text with a problem. A script of paths passes.
+    /// </summary>
+    [Fact]
+    public void TheCheckOfAScriptNamesTheEntityOfABadPathText()
+    {
+        const string bad = "OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_hit = 1 ol_path = { OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}";
+        static ThnTable Globals(string entities) => Evaluate($"duration = 1\nentities = {{ {entities} }}\nevents = {{}}\n");
+        var good = $$"""{ entity_name = "P", type = MOTION_PATH, pathprops = { path_data = "{{Retail}}" } }""";
+
+        var marker = ThnMotionPath.ScriptProblem(Globals(
+            $$"""{{good}}, { entity_name = "Mk", type = MARKER, pathprops = { path_data = "{{bad}}" } }"""));
+        var keyed = ThnMotionPath.ScriptProblem(Globals(
+            $$"""{{good}}; cam = { entity_name = "Cam", type = CAMERA, pathprops = { path_data = "{{bad}}" } }"""));
+        var unnamed = ThnMotionPath.ScriptProblem(Globals($$"""{ type = MARKER, pathprops = { path_data = "{{bad}}" } }"""));
+
+        Assert.Equal("The entity Mk has a pathprops.path_data text that is not only a path. The engine would run it as a " +
+                     $"script. {ThnMotionPath.NotPathPart("}")}", marker);
+        Assert.StartsWith("The entity Cam has a pathprops.path_data text", keyed);
+        Assert.StartsWith("An entity without a name has a pathprops.path_data text", unnamed);
+        Assert.Null(ThnMotionPath.ScriptProblem(Globals($$"""{{good}}, { entity_name = "N", type = MARKER, pathprops = { path_data = 1 } }""")));
+        Assert.Null(ThnMotionPath.ScriptProblem(Evaluate("duration = 1\n")));
     }
 
     /// <summary>A MOTION_PATH entity of the engine with a path text.</summary>

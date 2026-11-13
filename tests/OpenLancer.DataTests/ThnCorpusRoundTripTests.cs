@@ -28,6 +28,7 @@ public sealed class ThnCorpusRoundTripTests(ITestOutputHelper output)
             .Order(StringComparer.OrdinalIgnoreCase).ToList();
 
         var problems = new List<string>();
+        var buildProblems = new List<string>();
         var counts = new Counts();
         foreach (var file in files)
         {
@@ -36,6 +37,9 @@ public sealed class ThnCorpusRoundTripTests(ITestOutputHelper output)
             counts.Add(globals);
             if (ThnWriter.RoundTripProblem(globals, ThornEvaluator.Instance, name) is { } problem)
                 problems.Add($"{name}: {problem}");
+            // The builds of the editor check the path texts of each script (section 8.7, item 2 of the MCP1 design).
+            if (ThnMotionPath.ScriptProblem(globals) is { } paths)
+                buildProblems.Add($"{name}: {paths}");
         }
 
         output.WriteLine($"{files.Count - problems.Count} of {files.Count} scripts give the same tables, with key order, " +
@@ -45,6 +49,8 @@ public sealed class ThnCorpusRoundTripTests(ITestOutputHelper output)
         Assert.True(problems.Count == 0,
             $"{problems.Count} of {files.Count} scripts differ:{Environment.NewLine}{string.Join(Environment.NewLine, problems.Take(20))}");
         Assert.Equal(RetailScripts, files.Count);
+        // So each retail script still builds in the Cutscene tab and in an image of the agent.
+        Assert.True(buildProblems.Count == 0, string.Join(Environment.NewLine, buildProblems.Take(20)));
         // The counts of the design (section 3). They show that the tree holds every value of the VM, and that a type
         // that the file stores as a number stays a number.
         Assert.Equal((1_119_470, 41_250, 50_785), (counts.Numbers, counts.Entities, counts.Events));
