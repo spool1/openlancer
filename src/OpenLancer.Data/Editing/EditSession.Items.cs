@@ -24,6 +24,10 @@ public sealed partial class EditSession
     /// </summary>
     public SectionRef? Find(ItemFileKind kind, string nickname) => Items.Find(kind, nickname);
 
+    /// <summary>True when one or more sections of the files of a kind have the nickname. The engine has the item also
+    /// when more than one section has the nickname: it uses one of them.</summary>
+    public bool Has(ItemFileKind kind, string nickname) => Items.Named(kind, nickname).Count > 0;
+
     /// <summary>The sections of the files of a kind that are not child sections, in load order.</summary>
     public IReadOnlyList<SectionRef> List(ItemFileKind kind) => Items.List(kind);
 

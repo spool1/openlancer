@@ -226,6 +226,9 @@ public sealed class ItemIndexTests
         var session = ws.Session("act");
 
         Assert.Null(session.Find(ItemFileKind.Equipment, "gun1"));
+        // The engine has the item, so the edit view has it too.
+        Assert.True(session.Has(ItemFileKind.Equipment, "GUN1"));
+        Assert.False(session.Has(ItemFileKind.Equipment, "gun9"));
         var problem = Assert.Single(session.Check(ItemWorkspace.Gun("gun1")));
         Assert.Equal(DiagnosticSeverity.Warning, problem.Severity);
         Assert.Contains("2 sections of the equipment files have this nickname", problem.Message);

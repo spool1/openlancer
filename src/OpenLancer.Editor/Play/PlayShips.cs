@@ -1,5 +1,7 @@
 using System;
+using System.Linq;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Missions.Run;
 using OpenLancer.Runtime.Play;
 
 namespace OpenLancer.Editor.Play;
@@ -7,7 +9,7 @@ namespace OpenLancer.Editor.Play;
 /// <summary>
 /// The ship packages that Play can give the player (decision D15): the <c>[Good]</c> sections of W with
 /// <c>category = ship</c>. The Goods table of the Database and the Play menu read them here, so they show the same
-/// packages (section 11.2 of the M4 design).
+/// packages (section 11.2 of the M4 design). It also makes the ship part of a start save from a package.
 /// </summary>
 internal static class PlayShips
 {
@@ -22,6 +24,38 @@ internal static class PlayShips
         IsPackage(section, view)
             ? section
             : null;
+
+    /// <summary>
+    /// The ship part of a start save for a ship package of W: the <c>[Ship]</c> of the package, and the lines that its
+    /// <c>addon</c> lines give by the addon rule (<see cref="StartSaveShip.FromAddons"/>). The builder reads the addon
+    /// lines as the engine reads them when it loads the package. A line needs the equipment and the hardpoint, and the
+    /// amount is 1 without a third value. An addon whose equipment W does not have gives no line, because the engine
+    /// drops it too. So the ship part gives the same ship as the package.
+    /// </summary>
+    /// <param name="package">The nickname of the package.</param>
+    /// <param name="problem">Null, or the reason when W has no such package or no ship of the package.</param>
+    /// <returns>The ship part, or null when W has no such package or no ship of the package.</returns>
+    public static StartSaveShip? ShipPart(EditSession edits, string package, out string? problem)
+    {
+        if (Find(edits, package) is not { } section)
+        {
+            problem = $"The edit view has no ship package '{package}'. Play cannot give the player this ship.";
+            return null;
+        }
+
+        if (edits.Related(section, ItemRelation.Ship) is not [{ Id.Key: { } ship }])
+        {
+            problem = $"The edit view has no ship of the ship package '{package}'. Play cannot give the player this ship.";
+            return null;
+        }
+
+        problem = null;
+        var addons = edits.Get(section)!.Lines("addon")
+            .Where(l => l.Values.Count >= 2 && edits.Has(ItemFileKind.Equipment, l.Values[0].ToString()))
+            .Select(l => (l.Values[0].ToString(), (string?)l.Values[1].ToString(),
+                l.Values.Count > 2 ? l.Values[2].ToInt32() : 1));
+        return StartSaveShip.FromAddons(ship, addons);
+    }
 
     /// <summary>
     /// The name of the ship that a play gives, for the Play menu and the Console: the name of the <c>[Ship]</c> section,
