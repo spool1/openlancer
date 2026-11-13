@@ -111,12 +111,12 @@ public static class ThnMotionPath
     }
 
     /// <summary>
-    /// Why the evaluator and the engine must not run a path text, or null when they can (section 8.7, item 2 of the MCP1
-    /// design). The text is the items of a table, with a comma between two items and an optional comma at the end. An
-    /// item is the name OPEN or CLOSED, a number, or a table of numbers. A number can have a minus sign before it. The
-    /// VM would also run a statement, a call or an operator, so the check refuses each other part. It reads the tokens
-    /// of the Lua 3.2 lexer (see <see cref="ThnLuaTokens"/>), and it refuses each text and comment, so no pragma line
-    /// can hide in them. A text without a problem can still be a text that the engine does not read as a path (see
+    /// Why the evaluator and the engine must not run a path text, or null when they can (section 8.7, item 2 of the
+    /// MCP1 design). The text is the items of a table, with a comma between two items and an optional comma at the end.
+    /// An item is the name OPEN or CLOSED, a number, or a table of numbers. A number can have a minus sign before it.
+    /// The VM would also run a statement, a call or an operator, so the check refuses each other part. It reads the
+    /// tokens of the Lua 3.2 lexer (see <see cref="ThnLuaTokens"/>), and it refuses each text and comment, so no pragma
+    /// line can hide in them. A text without a problem can still be a text that the engine does not read as a path (see
     /// <see cref="Problem"/>).
     /// </summary>
     internal static string? TextProblem(string text)
@@ -157,16 +157,19 @@ public static class ThnMotionPath
             if (value is ThnTable entity && Path.ValueIn(ThnElementKind.Entity, entity) is ThnText text &&
                 TextProblem(text.Value) is { } problem)
             {
-                var name = ThnScriptModel.NameOf(entity) is { } entityName ? $"The entity {entityName}" : "An entity without a name";
-                return $"{name} has a {Path} text that is not only a path. The engine would run it as a script. {problem}";
+                var name = ThnScriptModel.NameOf(entity) is { } entityName
+                    ? $"The entity {entityName}"
+                    : "An entity without a name";
+                return $"{name} has a {Path} text that is not only a path. The engine would run it as a script. " +
+                       problem;
             }
         }
         return null;
     }
 
     /// <summary>The rule of a path text, for the refusals of <see cref="TextProblem"/>.</summary>
-    private const string PathRule =
-        "A path text holds OPEN or CLOSED, then tables of numbers, for example OPEN, {0,0,0}, {1,0,0,0}, {10,0,0}, {1,0,0,0}.";
+    private const string PathRule = "A path text holds OPEN or CLOSED, then tables of numbers, for example " +
+                                    "OPEN, {0,0,0}, {1,0,0,0}, {10,0,0}, {1,0,0,0}.";
 
     /// <summary>The refusal of a comment in a path text.</summary>
     internal const string PathComment = "The path text holds a comment (--). " + PathRule;

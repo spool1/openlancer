@@ -826,8 +826,9 @@ internal sealed partial class CutsceneWorkspace(EditorWindow window) : IDisposab
     /// </summary>
     /// <param name="path">The install path of a cutscene of W.</param>
     /// <exception cref="ArgumentException">The context does not fit the cutscene. The message tells why.</exception>
-    /// <exception cref="InvalidOperationException">No game data is loaded, the session cannot read a script of the plan,
-    /// or a script of the plan has a path text that is not only a path (see <see cref="ScriptBytes"/>).</exception>
+    /// <exception cref="InvalidOperationException">No game data is loaded, the session cannot read a script of the
+    /// plan, or a script of the plan has a path text that is not only a path (see
+    /// <see cref="ScriptBytes"/>).</exception>
     internal CutsceneShotPlan ShotPlan(string path)
     {
         var current = window.Session ?? throw new InvalidOperationException("No profile is open.");

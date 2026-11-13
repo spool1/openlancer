@@ -5,10 +5,10 @@ namespace OpenLancer.Data.Thn;
 
 /// <summary>
 /// The check of the Lua value text of a cutscene field before the Thorn VM reads it (section 8.7, item 2 of the MCP1
-/// design). Such a text holds one value, not a script: a number, a text, a name or a table of them. The VM would also run
-/// a statement, a call or an operator, for example a text that doubles a string until the memory runs out. So the check
-/// reads the tokens of the Lua 3.2 lexer of the native compiler (see <see cref="ThnLuaTokens"/>) and refuses each other
-/// part. <see cref="ThnMotionPath.TextProblem"/> checks a path text with the same tokens.
+/// design). Such a text holds one value, not a script: a number, a text, a name or a table of them. The VM would also
+/// run a statement, a call or an operator, for example a text that doubles a string until the memory runs out. So the
+/// check reads the tokens of the Lua 3.2 lexer of the native compiler (see <see cref="ThnLuaTokens"/>) and refuses each
+/// other part. <see cref="ThnMotionPath.TextProblem"/> checks a path text with the same tokens.
 /// </summary>
 /// <remarks>The check also refuses each text that the lexer refuses or that it cannot read to its end, for example a
 /// string without its end. So the compiler gets only a text whose tokens the check read, and only values.</remarks>
