@@ -80,8 +80,8 @@ internal static class PublishTools
 {
     /// <summary>
     /// The publish checklist of the active mod (<c>PublishChecklist.Of</c>). The session part loads the mod and the
-    /// linked games. The tail reads the history and the fingerprints of the files of the mod on a worker, as the Export
-    /// dialog does.
+    /// linked games. The tail reads the history and the fingerprints of the files of the mod on a thread of its own
+    /// (<see cref="OwnThread"/>), because the reads block.
     /// </summary>
     public static ToolStep Checklist(ToolCall call)
     {
@@ -90,7 +90,7 @@ internal static class PublishTools
         var games = call.Host.Games(mod.Manifest);
         var history = ModExport.DefaultFolder(session.Profile.FilePath, mod.Id);
         var note = session.IsDirty ? AgentTexts.Error("checklist_unsaved") : null;
-        return ToolStep.Then(cancel => Task.Run(() =>
+        return ToolStep.Then(cancel => OwnThread.Run(() =>
         {
             ChecklistInput input;
             IReadOnlyList<string> problems;

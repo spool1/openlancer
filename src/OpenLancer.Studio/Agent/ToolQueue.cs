@@ -273,6 +273,9 @@ public sealed class ToolQueue : IDisposable
 
     /// <summary>Runs the tail of a call on a worker, with the time limit of the tail of its tool (section 8.4 of the MCP1
     /// design). An export has a longer limit than a check or an image.</summary>
+    /// <remarks>The start of the tail is short work on the thread pool, because the tail is async. A tail that blocks
+    /// runs its blocking part on a thread of its own (<see cref="OwnThread"/>), so it does not hold a pool
+    /// thread.</remarks>
     private void StartTail(Call pending, Func<CancellationToken, IProgress<ToolProgress>, Task<ToolResult>> tail)
     {
         var limit = AgentTools.Find(pending.Tool)!.TailLimit(host.Limits);

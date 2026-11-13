@@ -71,7 +71,7 @@ public sealed class AgentExports
         }
     }
 
-    /// <summary>One export: its work on a worker, and the stop before its write.</summary>
+    /// <summary>One export: its work on a thread of its own, and the stop before its write.</summary>
     internal sealed class ExportRun(AgentExports owner)
     {
         private readonly CancellationTokenSource beforeWrite = new();
@@ -93,11 +93,12 @@ public sealed class AgentExports
             }
         }
 
-        /// <summary>Starts the work on a worker. The work gets a token that tells it to stop before its write, and calls
-        /// <see cref="Write"/> before the write. The run ends with the work.</summary>
+        /// <summary>Starts the work on a thread of its own (<see cref="OwnThread"/>), because the prepare and the write
+        /// block. The work gets a token that tells it to stop before its write, and calls <see cref="Write"/> before the
+        /// write. The run ends with the work.</summary>
         public Task<T> Start<T>(Func<CancellationToken, T> work)
         {
-            var task = System.Threading.Tasks.Task.Run(() =>
+            var task = OwnThread.Run(() =>
             {
                 try
                 {

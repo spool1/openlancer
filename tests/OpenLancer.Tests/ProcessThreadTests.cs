@@ -6,8 +6,11 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenLancer.Editor.Editing;
+using OpenLancer.Editor.Mods;
 using OpenLancer.Editor.Play;
 using OpenLancer.Studio;
+using OpenLancer.Studio.Agent;
 using Xunit;
 
 namespace OpenLancer.Tests;
@@ -18,10 +21,26 @@ namespace OpenLancer.Tests;
 /// test reads their IL, also the IL of their lambdas. It fails at each call that can put their work on the thread pool.
 /// </summary>
 /// <remarks>The process tests show that no action of a program comes to the UI queue from a thread of the pool. The
-/// reader of the error output queues no action, so only this test covers it.</remarks>
+/// reader of the error output queues no action, so only this test covers it. The other blocking work that a frame, an
+/// agent call or a test waits for also starts through <see cref="OwnThread"/> (issue 71).</remarks>
 public sealed class ProcessThreadTests
 {
     private static readonly Type[] ProcessTypes = [typeof(PlayProcess), typeof(GameProcess)];
+
+    /// <summary>The members that start blocking work that a frame, an agent call or a test waits for: a check, a
+    /// validation process, an export, the worker of Play in the game and a blocking agent tail.</summary>
+    private static readonly (Type Type, string Member)[] BlockingWork =
+    [
+        (typeof(ModChecks), nameof(ModChecks.Update)),
+        (typeof(ToolProcess), nameof(ToolProcess.Start)),
+        (typeof(Editor.Export.ExportRun), nameof(Editor.Export.ExportRun.Prepare)),
+        (typeof(Editor.Export.ExportRun), nameof(Editor.Export.ExportRun.Write)),
+        (typeof(GamePlay), "Build"),
+        (typeof(GamePlay), "Exited"),
+        (typeof(GamePlay), "RunAction"),
+        (typeof(PublishTools), nameof(PublishTools.Checklist)),
+        (typeof(AgentExports.ExportRun), nameof(AgentExports.ExportRun.Start)),
+    ];
 
     [Fact]
     public void TheProcessTypesPutNoWorkOnTheThreadPool()
@@ -46,6 +65,26 @@ public sealed class ProcessThreadTests
             .ToHashSet();
 
         Assert.All(ProcessTypes, type => Assert.Contains(type, owners));
+    }
+
+    /// <summary>Each member that starts blocking work starts it through <see cref="OwnThread"/>, also in a lambda. It
+    /// puts no work on the thread pool and adds no continuation there. On the pool, the work would hold a pool thread
+    /// while it blocks, and on a busy computer the work would wait for a free pool thread first.</summary>
+    [Fact]
+    public void EachMemberWithBlockingWorkStartsItThroughOwnThread()
+    {
+        foreach (var (type, member) in BlockingWork)
+        {
+            var calls = type.Assembly.GetTypes()
+                .Where(t => IlWalker.OwnerOf(t) == type)
+                .SelectMany(IlWalker.Calls)
+                .Where(c => c.Caller.Name == member || c.Caller.Name.StartsWith($"<{member}>", StringComparison.Ordinal))
+                .ToList();
+            var pool = calls.Select(c => c.Callee).Where(IsPoolWork).Select(Name).Distinct();
+
+            Assert.True(!pool.Any(), $"{type.Name}.{member} puts work on the thread pool: {string.Join(", ", pool)}");
+            Assert.Contains(calls, c => c.Callee.DeclaringType == typeof(OwnThread));
+        }
     }
 
     /// <summary>The rule finds each form of pool work of <see cref="PoolWorkSample"/>, also in a lambda. It does not
@@ -81,6 +120,12 @@ public sealed class ProcessThreadTests
             "gets the events of the process on the thread pool",
         _ => null,
     };
+
+    /// <summary>True for a call that puts work or a continuation on the thread pool.</summary>
+    private static bool IsPoolWork(MemberInfo callee) => callee.DeclaringType is { } type &&
+        (type == typeof(ThreadPool) || type == typeof(TaskFactory) ||
+         type.IsGenericType && type.GetGenericTypeDefinition() == typeof(TaskFactory<>) ||
+         typeof(Task).IsAssignableFrom(type) && callee.Name is nameof(Task.Run) or nameof(Task.ContinueWith));
 
     private static bool IsTask(Type type) =>
         typeof(Task).IsAssignableFrom(type) || type == typeof(ValueTask) ||
