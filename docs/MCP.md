@@ -515,7 +515,7 @@ The cutscene tools change the cutscene scripts of the active mod with the comman
 
 A new cutscene goes into the folder `DATA\MODS\<mod id>\CUTSCENES` of the active mod, and a save writes it as a whole file. A name can have letters, digits, `_` and `-`, and at most 64 characters, as in the name field of **New cutscene**. A name that Windows uses for a device, for example `nul` or `com1`, is not allowed, in any letter case. Another name gives `refused` with the detail `NameInvalid`, and the message gives the rule. A name of a cutscene that exists gives `name_taken`, also in other letter case.
 
-Each argument takes one kind of `thn:` reference. `cutscene` takes a script, `entity` takes an entity, and `events` takes events. Another reference gives `invalid_argument`. All events of one call must be in one cutscene. One call names at most 200 events. `targets` of `cutscene_add_event` takes entity names, not references. A reference in `targets` gives `not_found`, because no entity has that name.
+Each argument takes one kind of `thn:` reference. `cutscene` takes a script, `entity` takes an entity, and `events` takes events. Another reference gives `invalid_argument`. All events of one call must be in one cutscene. One call names at most 200 events. `targets` of `cutscene_add_event` takes entity names, not references. A reference in `targets` gives `not_found`, because no entity has that name. The message then tells that `targets` takes names.
 
 A cutscene that the editor cannot change gives `refused` with the reason. An example is a cutscene whose THN patch in the active mod has an error.
 
@@ -602,7 +602,7 @@ A THN file is ASCII. So a text with a character outside ASCII, or with the chara
 Some keys have their own rules, as in the Inspector:
 
 - `time` and `props.duration` move the event, as the time and length fields do. They round to the 1 ms grid, and a time below 0 gives `invalid_value`. A SET_CAMERA event has no length, so `props.duration` gives `invalid_value` there.
-- `targets` takes one entity name for each target of the event, for example `["Monitor", "Camera_01"]`. Each entity must fit the role of its target. A target of the wrong type gives `refused`, and the message names the types that fit. A name that no entity of the script has gives `not_found`.
+- `targets` takes one entity name for each target of the event, for example `["Monitor", "Camera_01"]`. Another number of names gives `invalid_argument` with the detail `TargetCount`, as in `cutscene_add_event`. Each entity must fit the role of its target. A target of the wrong type gives `refused`, and the message names the types that fit. A name that no entity of the script has gives `not_found`.
 - `entity_name` and `type` give `refused`. Use `rename_item` for the name. To change the type, delete the element and add another one.
 - The `flags` of an entity give `refused`. Use `cutscene_set_flags`.
 

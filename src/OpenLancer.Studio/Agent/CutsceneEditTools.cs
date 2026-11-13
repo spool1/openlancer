@@ -110,8 +110,23 @@ internal static class CutsceneEditTools
         {
             throw new EditException(e.Error with { Message = $"{e.Error.Message} {AgentTexts.Error("cutscene_event_types")}" });
         }
+        catch (EditException e) when (TargetRefHint(e.Error, call.Args.Texts("targets")!) is { } hinted)
+        {
+            throw new EditException(hinted);
+        }
         AddFields(scope, call, plan);
     });
+
+    /// <summary>
+    /// The error of a target that no entity has, with a hint when a target is a <c>thn:</c> reference. A result gives
+    /// the reference of a new entity, and the server instructions tell the agent to pass references on. But
+    /// <c>targets</c> takes entity names, as the event in the file holds them. Gives null for another error.
+    /// </summary>
+    internal static EditError? TargetRefHint(EditError error, IReadOnlyList<string> targets) =>
+        error.Detail == MissionErrors.ItemNotFound &&
+        targets.Any(t => t.TrimStart().StartsWith("thn:", StringComparison.OrdinalIgnoreCase))
+            ? error with { Message = $"{error.Message} {AgentTexts.Error("cutscene_target_ref")}" }
+            : null;
 
     /// <summary>Sets the argument <c>fields</c> on the element that a plan added, with the rules of
     /// <c>set_fields</c>. An error names the field, for example <c>fields.spatialprops.pos</c>.</summary>

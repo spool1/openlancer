@@ -327,7 +327,7 @@ public sealed partial class AgentCutsceneToolTests
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1", "fields": { "time": "x" } }""", "invalid_value", MissionErrors.FieldValue, "fields.time")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1", "fields": { "time": -1 } }""", "invalid_value", MissionErrors.FieldValue, "fields.time")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/0", "fields": { "props.duration": 1 } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.duration")]
-    [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/0", "fields": { "targets": ["Monitor"] } }""", "invalid_value", MissionErrors.FieldValue, "fields.targets")]
+    [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/0", "fields": { "targets": ["Monitor"] } }""", "invalid_argument", MissionErrors.TargetCount, "fields.targets")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/0", "fields": { "targets": ["Monitor", "Lamp"] } }""", "refused", MissionErrors.TargetType, "fields.targets")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/0", "fields": { "targets": ["Monitor", "Nobody"] } }""", "not_found", MissionErrors.ItemNotFound, "fields.targets")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/1", "fields": { "time": 2 }, "expect_type": "START_SOUND" }""", "stale_revision", MissionErrors.RowChanged, "ref")]
@@ -385,6 +385,10 @@ public sealed partial class AgentCutsceneToolTests
             $$"""{ "ref": {{Json(Script + "#event/0")}}, "fields": { "targets": ["Monitor", "Lamp"] } }""");
         var vector = Error(host, "set_fields", $$"""{ "ref": {{Json(KindsCam)}}, "fields": { "spatialprops.pos": "x" } }""");
         var offset = Error(host, "duplicate_items", $$"""{ "refs": [{{Json(KindsSpatial)}}], "time_offset": 0 }""");
+        var targetRef = Error(host, "set_fields",
+            $$"""{ "ref": {{Json(Script + "#event/0")}}, "fields": { "targets": ["Monitor", {{Json(KindsCam)}}] } }""");
+        var addRef = Error(host, "cutscene_add_event",
+            $$"""{ "cutscene": {{Json(Script)}}, "type": "START_PSYS", "time": 1, "targets": [{{Json(Script + "#entity/Fx")}}] }""");
 
         Assert.Contains("cutscene_set_duration", script.Message);
         Assert.Contains("Use set_fields", text.Message);
@@ -393,6 +397,12 @@ public sealed partial class AgentCutsceneToolTests
         Assert.Equal("SET_CAMERA needs a CAMERA as target 2. The entity Lamp is a LIGHT.", target.Message);
         Assert.Equal("The value of spatialprops.pos must be three numbers [x, y, z].", vector.Message);
         Assert.Equal(CutsceneCommands.SameKeyCopy, offset.Message);
+        // A reference in targets is not a name, so the message tells that targets takes names.
+        Assert.Equal(("not_found", MissionErrors.ItemNotFound), (targetRef.Code, targetRef.Detail));
+        Assert.EndsWith(AgentTexts.Error("cutscene_target_ref"), targetRef.Message);
+        Assert.Equal(("not_found", MissionErrors.ItemNotFound), (addRef.Code, addRef.Detail));
+        Assert.StartsWith($"No entity of this script has the name {Script}#entity/Fx.", addRef.Message);
+        Assert.EndsWith(AgentTexts.Error("cutscene_target_ref"), addRef.Message);
     }
 
     /// <summary>The hidden group Cutscenes gives not_available for a cutscene item in each generic tool (decision

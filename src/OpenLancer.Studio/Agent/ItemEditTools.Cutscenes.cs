@@ -213,16 +213,25 @@ internal static partial class ItemEditTools
         var current = stored is ThnTable list ? list.List.Select(t => (t as ThnText)?.Value).ToList() : [];
         if (value is not JsonArray names || names.Any(n => n?.GetValueKind() != JsonValueKind.String))
             throw FieldError(EditErrorKind.InvalidValue, MissionErrors.FieldValue, AgentTexts.Error("cutscene_field_targets"));
+        // The number of targets is the shape of the argument, as in cutscene_add_event.
         if (names.Count != current.Count)
         {
-            throw FieldError(EditErrorKind.InvalidValue, MissionErrors.FieldValue,
+            throw FieldError(EditErrorKind.InvalidArgument, MissionErrors.TargetCount,
                 AgentTexts.Error("cutscene_field_target_count", ("count", current.Count)));
         }
         for (var i = 0; i < names.Count; i++)
         {
             var name = names[i]!.GetValue<string>();
-            if (!string.Equals(name, current[i], StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(name, current[i], StringComparison.OrdinalIgnoreCase))
+                continue;
+            try
+            {
                 Run(scope, CutsceneCommands.SetTarget(scope.Session, ev, i, name));
+            }
+            catch (EditException e) when (CutsceneEditTools.TargetRefHint(e.Error, [name]) is { } hinted)
+            {
+                throw new EditException(hinted);
+            }
         }
     }
 
