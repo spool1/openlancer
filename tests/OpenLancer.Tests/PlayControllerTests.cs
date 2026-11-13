@@ -1670,9 +1670,9 @@ public sealed class PlayControllerTests : IDisposable
 
         Assert.Empty(starts);
         Assert.Equal(PlayStatus.Idle, play.Status);
-        await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        Assert.Equal(EditErrorKind.Refused, (await result).Error!.Kind);
-        Assert.Equal("This mission script has no story slot.", (await result).Error.Message);
+        var error = (await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)).Error!;
+        Assert.Equal(EditErrorKind.Refused, error.Kind);
+        Assert.Equal("This mission script has no story slot.", error.Message);
         Assert.Equal("Play from here is not available: This mission script has no story slot.", Console[^1]);
     }
 
@@ -1895,9 +1895,9 @@ public sealed class PlayControllerTests : IDisposable
         play.Update(false, false);
         await RunUntilAsync(PlayStatus.Running);
 
-        await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        Assert.Equal("RestartFailed", (await result).Error!.Detail);
-        Assert.StartsWith("The game cannot start M99 again. The start save does not load.", (await result).Error.Message);
+        var error = (await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)).Error!;
+        Assert.Equal("RestartFailed", error.Detail);
+        Assert.StartsWith("The game cannot start M99 again. The start save does not load.", error.Message);
         Assert.Same(first, play.Mission);
         Assert.Equal([first], play.MissionStarts);
         editor.Commit(2);
@@ -1972,14 +1972,14 @@ public sealed class PlayControllerTests : IDisposable
         editor.Session = editor.Session! with { Unsaved = unsaved };
         play.Update(false, false);
 
-        await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        Assert.Equal(started, (await result).Started);
+        var outcome = await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(started, outcome.Started);
         Assert.Equal(started ? 1 : 0, editor.SaveCalls);
         Assert.Equal(started ? 1 : 0, starts.Count);
         if (!started)
         {
-            Assert.Equal(PlayRequests.NotSavedDetail, (await result).Error!.Detail);
-            Assert.Equal(PlayRequests.EditsWhileWaiting("proof"), (await result).Error.Message);
+            Assert.Equal(PlayRequests.NotSavedDetail, outcome.Error!.Detail);
+            Assert.Equal(PlayRequests.EditsWhileWaiting("proof"), outcome.Error.Message);
             return;
         }
 

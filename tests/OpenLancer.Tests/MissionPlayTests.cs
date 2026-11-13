@@ -198,9 +198,9 @@ public sealed class MissionPlayTests : IDisposable
 
         var second = Request(AgentRequest(null));
 
-        await second.WaitAsync(Wait, TestContext.Current.CancellationToken);
-        Assert.Equal(EditErrorKind.Busy, (await second).Error!.Kind);
-        Assert.Equal(PlayRequests.AgentWaitsReason, (await second).Error.Message);
+        var error = (await second.WaitAsync(Wait, TestContext.Current.CancellationToken)).Error!;
+        Assert.Equal(EditErrorKind.Busy, error.Kind);
+        Assert.Equal(PlayRequests.AgentWaitsReason, error.Message);
         Assert.False(first.IsCompleted);
         question.Cancel();
         await first.WaitAsync(Wait, TestContext.Current.CancellationToken);
