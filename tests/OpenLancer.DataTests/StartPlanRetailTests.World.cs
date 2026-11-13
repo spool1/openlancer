@@ -309,7 +309,7 @@ public sealed partial class StartPlanRetailTests
     }
 
     /// <summary>
-    /// The combat starts of issue #48 in both games. The review of #6 found that the starter ship dies fast at M12
+    /// The combat starts of issue #48 in both games. The review of #6 found that the default ship dies fast at M12
     /// decloak_R_wings and at M05 chase_player. Both start in space next to ships that the path makes hostile, and a
     /// trigger that waits at the start watches a fight. So the plan tells a combat start. The mission start of M01a makes
     /// no objects before its triggers run, so it is a calm start. The dialogue starts of M01a in space are calm starts

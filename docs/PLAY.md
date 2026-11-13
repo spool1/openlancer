@@ -77,7 +77,7 @@ To fly another ship:
 
 The Play menu shows the ship of the profile, for example "Ship: Starrunner". To go back to the default ship, click Use the default ship in the Play menu. Each profile keeps its own ship.
 
-A mission play uses the Ship field of the Play start page. Its default is the ship of the profile. To fly another ship in one mission, pick a ship package in that field. The editor keeps the field for each script. The field does not change the ship of the profile. [MISSIONS.md](MISSIONS.md) tells about the Play start page.
+A mission play uses the Ship field of the Play start page. When you pick nothing, the field uses the ship of the profile. To fly another ship in one mission, pick a ship package in that field. The editor keeps the field for each script. The field does not change the ship of the profile. [MISSIONS.md](MISSIONS.md) tells about the Play start page.
 
 The equipment of the package goes on its hardpoints. An item with an amount above 1 goes into the hold. A good that the engine cannot mount, for example a battery, also goes into the hold.
 
@@ -92,7 +92,7 @@ A character of a play is an admin. These chat commands work:
 | `/pos` | Shows the position of the ship. |
 | `/warp x y z` | Moves the ship to the position. |
 | `/base <nickname>` | Docks the ship at the base. |
-| `/godmode` | Makes the ship take no damage. |
+| `/godmode` | Keeps the ship alive. The hull does not go below 9 percent. Type it again to stop. |
 
 The game window shows the debug view. Its Debug window shows the position of the player.
 
@@ -204,7 +204,7 @@ A mission play starts a story mission at a point of its script: the mission star
 
 Play saves the edits of the active mod first, as F5 does. Then the editor makes the start plan from the saved script. It writes the start save `start\start.fl` and the test layer `start\layer\` into the play folder. The game loads the start save, and the mission starts at the point of the start. The other steps are the same as for Play from camera.
 
-The start save also holds the ship and its loadout: the ship package of the Ship field of the Play start page, else the ship of the profile. The equipment goes on its hardpoints, and an item with an amount above 1 goes into the hold, as for the ship of the profile. Without a ship package, the start save has no ship, so the game gives the ship of a new character. When the edit view does not have the ship package or its ship, the play does not start, and the Console gives the reason.
+The start save also holds the ship and its loadout. They come from the ship package of the Ship field of the Play start page, else from the ship of the profile. The equipment goes on its hardpoints, and an item with an amount above 1 goes into the hold, as for the ship of the profile. Without a ship package, the start save has no ship, so the game gives the default ship. When the edit view does not have the ship package or its ship, the play does not start, and the Console gives the reason.
 
 The player starts at the start place of the Play start page. The suggestion is where the player is at that point of the mission in the game. That is a base or a point in space. "How the editor suggests the start place" in [MISSIONS.md](MISSIONS.md) tells the rules.
 

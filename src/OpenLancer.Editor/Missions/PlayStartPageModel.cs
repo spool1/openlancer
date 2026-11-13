@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Fields;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Run;
@@ -22,9 +23,10 @@ internal sealed record ShipRow(string? Package, string Text, string? Hint);
 /// <param name="Tooltip">The tooltip of the value.</param>
 /// <param name="Problem">The reason when the edit view cannot give the ship of the value, else null. Play then refuses
 /// with this reason.</param>
-/// <param name="Starter">True when the value gives the starter ship: no ship package, or a package whose ship is the
-/// ship of a new character.</param>
-internal sealed record ShipField(IReadOnlyList<ShipRow> Rows, string Text, string Tooltip, string? Problem, bool Starter);
+/// <param name="FromPackage">True when the value gives a ship package. Else the player gets the default ship: the ship
+/// and the loadout of a new character.</param>
+internal sealed record ShipField(IReadOnlyList<ShipRow> Rows, string Text, string Tooltip, string? Problem,
+    bool FromPackage);
 
 /// <summary>
 /// The Play start page of the Inspector (sections 5.3 and 8.3 of the M6c design): the plan of the play start of a
@@ -67,27 +69,33 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
                                              "packages have no guns, nanobots or shield batteries.";
 
     public const string ShipTip = "The ship and the loadout of the player in this mission play. The start save holds " +
-                                  "them. The default is the ship of the profile, which the Play menu shows. " +
-                                  PackageLoadoutNote;
+                                  "them. When you pick nothing, the field uses the ship of the profile, which the Play " +
+                                  "menu shows. " + PackageLoadoutNote;
 
-    /// <summary>The label of the default row of the field "Ship".</summary>
+    /// <summary>The label of the first row of the field "Ship". The field uses this row when the user picks
+    /// nothing.</summary>
     public const string ProfileShipLabel = "Ship of the profile";
 
-    /// <summary>The tooltip of the default row of the field "Ship".</summary>
-    public const string ProfileRowTip = "The ship of the profile, which the Play menu shows. Use for Play in Database > " +
-                                        "Goods sets it.";
+    /// <summary>The tooltip of the first row of the field "Ship".</summary>
+    public const string ProfileRowTip = "The ship of the profile, which the Play menu shows. To change it, right-click a " +
+                                        "ship package in Database > Goods, then click Use for Play.";
 
-    /// <summary>The tooltip of the default row without a ship package of the profile.</summary>
-    public const string NoProfilePackageTip = "The profile has no ship package, so the player gets the ship of a new " +
-                                              "character.";
+    /// <summary>The tooltip of the first row without a ship package of the profile.</summary>
+    public const string NoProfilePackageTip = "The profile has no ship package, so the player gets the default ship. It " +
+                                              "is the ship of a new character, with the loadout of a new character.";
 
     /// <summary>The advice after the reason of a value of the field "Ship" that Play cannot give.</summary>
     public const string PickAnotherShip = "Pick another ship in this field.";
 
-    /// <summary>The warning of a combat start with the starter ship (issue #48). A ship package is no help in a fight
-    /// without weapons, so the warning tells what a package gives.</summary>
-    public const string CombatWarning = "This start is in combat, and the player flies the starter ship. Enemy ships can " +
-                                        "destroy it fast. " + PackageLoadoutNote;
+    /// <summary>The first sentence of the warning of a combat start (issue #48).</summary>
+    public const string CombatLead = "This start is in combat.";
+
+    /// <summary>The danger of a combat start for the default ship.</summary>
+    public const string DefaultShipDanger = "Enemy ships can destroy the default ship fast.";
+
+    /// <summary>The step of a combat start that works with each ship. The chat command <c>/godmode</c> of a play keeps
+    /// the hull of the ship above zero (docs/PLAY.md, "In the game").</summary>
+    public const string GodmodeStep = "To keep the ship alive, type /godmode in the chat of the game.";
     public const string WaitTip = "These triggers are active when the play starts, as at this point of the mission.";
     public const string SetupTip = "The setup triggers of an approximate start. They are in a test layer of the play. The mod " +
                                    "does not change.";
@@ -113,12 +121,14 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
     }
 
     /// <summary>
-    /// The field "Ship" of a play start (issue #48). The first row is the ship of the profile, as the Play menu names it.
-    /// The other rows are the ship packages of the edit view, sorted by the names of their ships. A row whose name another
-    /// row also has shows its package nickname as a hint. The value is the package of the setting, else the ship of the
-    /// profile. A package that the edit view cannot resolve gives the reason of <see cref="PlayShips.ShipPart"/>. The
-    /// tooltip of such a value gives that reason and tells the user to pick another row. The texts of the Play menu
-    /// point to Database > Goods instead, so the field does not use them.
+    /// The field "Ship" of a play start (issue #48). The first row is the ship of the profile, by the name of its ship.
+    /// Without a ship package of the profile, the row names the default ship. The other rows are the ship packages of
+    /// the edit view, sorted by the names of their ships. A row whose name another row also has shows its package
+    /// nickname as a hint. The value is the package of the setting, else the ship of the profile. A package that the
+    /// edit view cannot resolve gives the reason of <see cref="PlayShips.ShipPart"/>. The tooltip of such a value gives
+    /// that reason and tells the user to pick another row. The texts of the Play menu point to Database > Goods
+    /// instead, so the field does not use them. A value that is not in the list shows "(not in the data)" when the edit
+    /// view has no good with its nickname, else "(cannot play)".
     /// </summary>
     /// <param name="view">The edit view, or null without an open profile.</param>
     /// <param name="profilePackage">The ship package of the Play menu, or null for the default ship.</param>
@@ -127,32 +137,45 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
         IReadOnlyList<(string Package, string Ship)> packages = view == null ? [] : PlayShips.Packages(view);
         var shared = packages.GroupBy(p => p.Ship, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1)
             .Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var rows = new List<ShipRow>
-            { new(null, $"{ProfileShipLabel}: {PlayShips.ShipText(view, profilePackage).Text}", null) };
+        var rows = new List<ShipRow> { new(null, $"{ProfileShipLabel}: {ProfileShipText(view, profilePackage)}", null) };
         rows.AddRange(packages.OrderBy(p => p.Ship, StringComparer.OrdinalIgnoreCase)
             .ThenBy(p => p.Package, StringComparer.OrdinalIgnoreCase)
             .Select(p => new ShipRow(p.Package, p.Ship, shared.Contains(p.Ship) ? p.Package : null)));
 
         string? problem = null;
         var package = setting.PackageOr(profilePackage);
-        var part = package == null || view == null ? null : PlayShips.ShipPart(view.Edits, package, out problem);
-        var starter = package == null ||
-                      part != null && string.Equals(part.Ship, view?.DefaultShip, StringComparison.OrdinalIgnoreCase);
+        if (package != null && view != null)
+            PlayShips.ShipPart(view.Edits, package, out problem);
+        var fromPackage = package != null;
         if (setting.ShipPackage is not { } field)
         {
             var tip = problem != null ? ProblemTip(problem)
                 : $"{ProfileRowTip} {(profilePackage == null ? NoProfilePackageTip : PackageTip(profilePackage))}";
-            return new ShipField(rows, rows[0].Text, tip, problem, starter);
+            return new ShipField(rows, rows[0].Text, tip, problem, fromPackage);
         }
 
         if (rows.FirstOrDefault(r => string.Equals(r.Package, field, StringComparison.OrdinalIgnoreCase)) is { } row)
         {
             return new ShipField(rows, row.Hint == null ? row.Text : $"{row.Text} ({row.Hint})", PackageTip(field),
-                problem, starter);
+                problem, fromPackage);
         }
 
-        return new ShipField(rows, $"{field} (not in the data)",
-            ProblemTip(problem ?? $"The edit view has no ship package {field}."), problem, starter);
+        // The list leaves out a package without a ship and a nickname that two goods share. The data has such a value,
+        // but Play cannot give its ship.
+        var label = view != null && view.Edits.Has(ItemFileKind.Goods, field) ? "cannot play" : "not in the data";
+        return new ShipField(rows, $"{field} ({label})",
+            ProblemTip(problem ?? $"The edit view has no ship package {field}."), problem, fromPackage);
+    }
+
+    /// <summary>The ship of the first row: the name of the ship of the package of the profile, or the default
+    /// ship.</summary>
+    private static string ProfileShipText(ShipView? view, string? profilePackage)
+    {
+        if (profilePackage != null)
+            return PlayShips.ShipText(view, profilePackage).Text;
+        return (view == null ? null : PlayShips.ShipName(view, null)) is { } name
+            ? $"{name} (the default ship)"
+            : "the default ship";
     }
 
     /// <summary>The tooltip of a value of the field "Ship" that Play cannot give: the reason and the advice.</summary>
@@ -161,13 +184,18 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
     /// <summary>The tooltip of a row of the field "Ship".</summary>
     public static string ShipRowTip(ShipRow row) => row.Package == null ? ProfileRowTip : PackageTip(row.Package);
 
-    /// <summary>The tooltip of a ship package of the field "Ship".</summary>
-    private static string PackageTip(string package) => $"The ship package {package}.";
+    /// <summary>The tooltip of a ship package of the field "Ship": its nickname and what it gives.</summary>
+    private static string PackageTip(string package) => $"The ship package {package}. {PackageLoadoutNote}";
 
-    /// <summary>The warning of a combat start whose field "Ship" gives the starter ship, or null (issue #48). Only the
-    /// Play start page shows it.</summary>
+    /// <summary>The warning of a combat start (issue #48) for the default ship or for a ship package. The default ship is
+    /// weak, and a retail ship package has no guns. The warning gives a step that works with each ship.</summary>
+    public static string CombatWarning(bool fromPackage) =>
+        $"{CombatLead} {(fromPackage ? PackageLoadoutNote : DefaultShipDanger)} {GodmodeStep}";
+
+    /// <summary>The warning of a combat start for the ship of the field "Ship", or null (issue #48). A value that Play
+    /// cannot give shows its problem instead. Only the Play start page shows the warning.</summary>
     public string? CombatWarningOf(ShipField ship) =>
-        Plan is { CanStart: true, Combat: true } && ship is { Starter: true, Problem: null } ? CombatWarning : null;
+        Plan is { CanStart: true, Combat: true } && ship.Problem == null ? CombatWarning(ship.FromPackage) : null;
 
     /// <summary>The choices of the field "Start": the mission start, each checkpoint, and the trigger of the play start
     /// when it is another trigger.</summary>

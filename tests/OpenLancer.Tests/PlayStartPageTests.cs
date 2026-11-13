@@ -122,8 +122,9 @@ public sealed class PlayStartPageTests
         ["s3"] = "Patriot",
     };
 
-    /// <summary>An edit view with the starter ship s1 and three ship packages. The ships s2 and s3 have the same name. The
-    /// package lost_package names a hull good that the view does not have.</summary>
+    /// <summary>An edit view with the default ship s1 and three ship packages. The ships s2 and s3 have the same name. The
+    /// package lost_package names a hull good that the view does not have. Two goods share the nickname
+    /// twin_package.</summary>
     private static ShipView ShipWorkspace(TestWorkspace ws)
     {
         ws.WriteBase(ItemWorkspace.ShipsPath, """
@@ -163,13 +164,23 @@ public sealed class PlayStartPageTests
             nickname = lost_package
             category = ship
             hull = no_such_hull
+            [Good]
+            nickname = twin_package
+            category = ship
+            hull = s2_hull
+            [Good]
+            nickname = twin_package
+            category = ship
+            hull = s3_hull
             """);
         return new ShipView(ws.Session("act"), s => ShipNames.GetValueOrDefault(s.Id.Key ?? "") ?? "", "s1");
     }
 
     /// <summary>The field "Ship" is a picker. Its first row is the ship of the profile with the name that the Play menu
-    /// gives. The other rows are the ship packages of the edit view by the plain names of their ships. A name that two
-    /// packages share shows the package nickname as a hint. A package without a ship gives no row.</summary>
+    /// gives. Without a ship package of the profile, the row names the default ship. The other rows are the ship
+    /// packages of the edit view by the plain names of their ships. A name that two packages share shows the package
+    /// nickname as a hint. A package without a ship, and a nickname that two goods share, give no row. The tooltip of a
+    /// package row tells what a package gives.</summary>
     [Fact]
     public void TheShipFieldListsTheShipOfTheProfileThenEachShipPackage()
     {
@@ -181,19 +192,22 @@ public sealed class PlayStartPageTests
 
         Assert.Equal(
         [
-            new ShipRow(null, "Ship of the profile: Starflier (default)", null),
+            new ShipRow(null, "Ship of the profile: Starflier (the default ship)", null),
             new ShipRow("s2_package", "Patriot", "s2_package"),
             new ShipRow("s3_package", "Patriot", "s3_package"),
             new ShipRow("s1_package", "Starflier", null),
         ], field.Rows);
-        Assert.Equal("Ship of the profile: Starflier (default)", field.Text);
+        Assert.Equal("Ship of the profile: Starflier (the default ship)", field.Text);
         Assert.Null(field.Problem);
-        Assert.True(field.Starter);
+        Assert.False(field.FromPackage);
         Assert.Equal("Ship of the profile: Patriot", profile.Text);
         Assert.Equal(profile.Rows[0].Text, profile.Text);
-        Assert.False(profile.Starter);
+        Assert.True(profile.FromPackage);
         Assert.Equal(PlayStartPageModel.ProfileRowTip, PlayStartPageModel.ShipRowTip(field.Rows[0]));
-        Assert.Equal("The ship package s1_package.", PlayStartPageModel.ShipRowTip(field.Rows[3]));
+        Assert.Equal($"The ship package s1_package. {PlayStartPageModel.PackageLoadoutNote}",
+            PlayStartPageModel.ShipRowTip(field.Rows[3]));
+        Assert.Equal("Ship of the profile: the default ship",
+            PlayStartPageModel.ShipFieldOf(null, PlayStartSetting.Default, null).Text);
     }
 
     /// <summary>The value "Ship of the profile" has the tooltip of the field, not the tooltip of the Play menu. It names
@@ -209,13 +223,14 @@ public sealed class PlayStartPageTests
         var profile = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default, "s2_package");
 
         Assert.Equal($"{PlayStartPageModel.ProfileRowTip} {PlayStartPageModel.NoProfilePackageTip}", field.Tooltip);
-        Assert.Equal($"{PlayStartPageModel.ProfileRowTip} The ship package s2_package.", profile.Tooltip);
+        Assert.Equal($"{PlayStartPageModel.ProfileRowTip} The ship package s2_package. " +
+                     PlayStartPageModel.PackageLoadoutNote, profile.Tooltip);
         Assert.NotEqual(PlayShips.ShipText(view, null).Tooltip, field.Tooltip);
         Assert.NotEqual(PlayShips.ShipText(view, "s2_package").Tooltip, profile.Tooltip);
     }
 
-    /// <summary>A pick gives the ship of its package, also over the ship of the profile. A package whose ship is the ship
-    /// of a new character gives the starter ship.</summary>
+    /// <summary>A pick gives the ship of its package, also over the ship of the profile. A package whose ship is the
+    /// default ship also gives a package: the default ship with the equipment of the package.</summary>
     [Fact]
     public void APickGivesTheShipOfItsPackage()
     {
@@ -227,20 +242,23 @@ public sealed class PlayStartPageTests
         var starflier = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default with { Ship = "s1_package" },
             "s2_package");
 
-        Assert.Equal(("Patriot (s2_package)", "The ship package S2_PACKAGE.", false),
-            (patriot.Text, patriot.Tooltip, patriot.Starter));
+        Assert.Equal(("Patriot (s2_package)", $"The ship package S2_PACKAGE. {PlayStartPageModel.PackageLoadoutNote}",
+            true), (patriot.Text, patriot.Tooltip, patriot.FromPackage));
         Assert.Null(patriot.Problem);
-        Assert.Equal(("Starflier", true), (starflier.Text, starflier.Starter));
+        Assert.Equal(("Starflier", true), (starflier.Text, starflier.FromPackage));
     }
 
-    /// <summary>A package that the edit view does not have, or whose ship it does not have, shows "(not in the data)"
-    /// with the reason of the builder. Play refuses with the same reason, so the page shows it under the field. The
-    /// tooltip of the value gives the reason and tells the user to pick another ship in the field, also for the ship of
-    /// the profile. It does not give the Play menu text, which says that Play stops with an error.</summary>
+    /// <summary>A package that the edit view does not have shows "(not in the data)" with the reason of the builder. A
+    /// package whose ship the edit view does not have, and a nickname that two goods share, show "(cannot play)",
+    /// because the data has them. Play refuses with the same reason, so the page shows it under the field. The tooltip
+    /// of the value gives the reason and tells the user to pick another ship in the field, also for the ship of the
+    /// profile. It does not give the Play menu text, which says that Play stops with an error.</summary>
     [Theory]
-    [InlineData("no_such_package", "The edit view has no ship package 'no_such_package'.")]
-    [InlineData("lost_package", "The edit view has no ship of the ship package 'lost_package'.")]
-    public void APackageThatTheEditViewCannotResolveShowsTheReason(string package, string reason)
+    [InlineData("no_such_package", "not in the data", "The edit view has no ship package 'no_such_package'.")]
+    [InlineData("lost_package", "cannot play", "The edit view has no ship of the ship package 'lost_package'.")]
+    [InlineData("twin_package", "cannot play",
+        "More than one section of the goods files has the nickname 'twin_package'.")]
+    public void APackageThatTheEditViewCannotResolveShowsTheReason(string package, string label, string reason)
     {
         using var ws = ItemWorkspace.Create();
         var view = ShipWorkspace(ws);
@@ -248,18 +266,20 @@ public sealed class PlayStartPageTests
         var field = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default with { Ship = package }, null);
         var profile = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default, package);
 
-        Assert.Equal($"{package} (not in the data)", field.Text);
+        Assert.Equal($"{package} ({label})", field.Text);
         Assert.Equal($"{reason} Play cannot give the player this ship.", field.Problem);
         Assert.Equal($"{field.Problem} {PlayStartPageModel.PickAnotherShip}", field.Tooltip);
-        Assert.False(field.Starter);
+        Assert.DoesNotContain(field.Rows, r => r.Package == package);
         Assert.Equal(field.Problem, profile.Problem);
         Assert.Equal(field.Tooltip, profile.Tooltip);
     }
 
-    /// <summary>The page warns about a combat start with the starter ship. Another ship, a calm start, a base start and a
-    /// ship that the edit view cannot resolve give no warning.</summary>
+    /// <summary>The page warns about a combat start with each ship. The default ship is weak, and a retail ship package
+    /// has no guns, nanobots or shield batteries. Both warnings give the chat command that keeps the ship alive. A calm
+    /// start and a base start give no warning. A ship that the edit view cannot resolve shows its problem
+    /// instead.</summary>
     [Fact]
-    public void TheCombatWarningShowsForACombatStartWithTheStarterShip()
+    public void TheCombatWarningShowsForACombatStartWithEachShip()
     {
         using var ws = ItemWorkspace.Create();
         var view = ShipWorkspace(ws);
@@ -268,15 +288,21 @@ public sealed class PlayStartPageTests
         var calm = MissionTestData.Index(StartWorldTests.Script(), StartWorldTests.World());
         var combat = new PlayStartSetting("t_chosen", "suggested");
 
+        var defaultShip = PlayStartPageModel.CombatWarning(false);
+        var package = PlayStartPageModel.CombatWarning(true);
+
         Assert.True(Page(hostile, combat).Plan.Combat);
+        Assert.Equal($"{PlayStartPageModel.CombatLead} {PlayStartPageModel.DefaultShipDanger} " +
+                     PlayStartPageModel.GodmodeStep, defaultShip);
         // A retail ship package has no weapons, so the warning tells what a package gives. It does not send the user
         // to a "stronger ship".
-        Assert.EndsWith(PlayStartPageModel.PackageLoadoutNote, PlayStartPageModel.CombatWarning);
-        Assert.DoesNotContain("stronger", PlayStartPageModel.CombatWarning);
-        Assert.Equal(PlayStartPageModel.CombatWarning, Warning(hostile, combat));
-        Assert.Equal(PlayStartPageModel.CombatWarning, Warning(hostile, combat with { Ship = "s1_package" }));
-        Assert.Null(Warning(hostile, combat with { Ship = "s2_package" }));
-        Assert.Null(Warning(hostile, combat, "s2_package"));
+        Assert.Equal($"{PlayStartPageModel.CombatLead} {PlayStartPageModel.PackageLoadoutNote} " +
+                     PlayStartPageModel.GodmodeStep, package);
+        Assert.DoesNotContain("stronger", defaultShip + package);
+        Assert.Equal(defaultShip, Warning(hostile, combat));
+        Assert.Equal(package, Warning(hostile, combat with { Ship = "s1_package" }));
+        Assert.Equal(package, Warning(hostile, combat with { Ship = "s2_package" }));
+        Assert.Equal(package, Warning(hostile, combat, "s2_package"));
         Assert.Null(Warning(hostile, combat with { Ship = "lost_package" }));
         Assert.Null(Warning(hostile, combat.WithPlace(StartPlaceChoice.Base, "ol_base_b")));
         Assert.Null(Warning(calm, combat));
@@ -305,7 +331,9 @@ public sealed class PlayStartPageTests
             ("start", PlayStartPageModel.StartTip), ("slot", PlayStartPageModel.SlotTip),
             ("stage", PlayStartPageModel.StageTip), ("accept", PlayStartPageModel.AcceptTip),
             ("place", PlayStartPageModel.PlaceTip), ("source", PlayStartPageModel.SourceTip),
-            ("ship", PlayStartPageModel.ShipTip), ("combat", PlayStartPageModel.CombatWarning),
+            ("ship", PlayStartPageModel.ShipTip), ("combat", PlayStartPageModel.CombatWarning(false)),
+            ("combat package", PlayStartPageModel.CombatWarning(true)),
+            ("package row", PlayStartPageModel.ShipRowTip(new ShipRow("s1_package", "Starflier", null))),
             ("profile ship", PlayStartPageModel.ProfileRowTip),
             ("no profile package", PlayStartPageModel.NoProfilePackageTip),
             ("pick another ship", PlayStartPageModel.PickAnotherShip),
@@ -355,6 +383,9 @@ public sealed class PlayStartPageTests
         };
 
         Assert.Empty(texts.SelectMany(t => SteLint.Problems(t.Text).Select(p => $"{t.Name}: {p}")));
+        // The steps of the ship texts are instructions.
+        Assert.Empty(SteLint.Problems(PlayStartPageModel.GodmodeStep, SteLint.InstructionWords));
+        Assert.Empty(SteLint.Problems(PlayStartPageModel.ProfileRowTip, SteLint.InstructionWords));
     }
 
     /// <summary>The Console texts of a mission play have the words of section 8.4 of the M6c design.</summary>

@@ -205,7 +205,7 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 | Mission accepted | Yes when the start comes after the player accepts the mission. |
 | Start place | Where the player starts: the suggestion, a base that you pick, or the Scene camera. The suggestion is where the player is at this trigger in the game (see below). A base or a system that the game data does not have shows its reason under the field. The Scene camera without an open system, and a suggested Scene camera in a system that the Scene does not show, also show their reason. |
 | Source of the place | The line of the script that gives the suggested place, for example "'Set player start' of key_save_x". The text names the line by the name that the graph shows, in quotes, and the trigger by its nickname. When another line gives the system or the point, the text names that line too. Click "Select {trigger}" to select the trigger of the line in the graph. The row shows only for the suggested place. |
-| Ship | The ship and the loadout of the player in this mission play. The first item is the ship of the profile, which the Play menu shows. It is the default. The other items are the ship packages of the data, by the names of their ships. When two packages have the same ship name, their items also show the package nicknames. Pick a package to fly another ship in this mission only. A ship package gives only the equipment of the package. The retail ship packages have no guns, nanobots or shield batteries. A package that the data does not have, or whose ship the data does not have, shows "(not in the data)". Its reason then shows under the field and in the tooltip of the field, and the Play button is off. |
+| Ship | The ship and the loadout of the player in this mission play. The first item is the ship of the profile, which the Play menu shows. When you pick nothing, the field uses this item. The other items are the ship packages of the data, by the names of their ships. Pick a package to fly another ship in this mission only. "The Ship field" below tells more. |
 | Triggers that wait at the start | The triggers that are active when the play starts. Click a row to select the trigger. |
 | Objects that the setup leaves out ({n}) | A closed list of an approximate start. At this trigger, these objects are in another system, or a trigger of the start makes them again, so the setup does not make them. The list also has the fuse lines that the setup removes. Click a row to select the trigger of its spawn line. |
 | Ships that start next to the player ({n}) | A closed list of an approximate start. These ships travel with the player at this trigger, and each row tells why. The setup puts them next to the player. Click a row to select the trigger of its spawn line. |
@@ -214,10 +214,24 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 
 A warning shows when no start trigger and no checkpoint leads to the trigger. The play then starts only this trigger. When the start cannot start, the page shows the reason, for example for a script without a story slot.
 
-A warning shows under the Ship field for a combat start with the starter ship. The starter ship is the ship of a new character, for example the Starflier in vanilla. Enemy ships can destroy it fast. The warning also tells what a ship package gives. The retail ship packages have no guns, nanobots or shield batteries, so in vanilla a package ship cannot fight back. A combat start is a start in space where the setup makes the world of the start system with a fight:
+#### The Ship field
+
+The first item names the ship of the profile. Without a ship package of the profile, the item names the default ship, for example "Ship of the profile: Starflier (the default ship)". The default ship is the ship of a new character, with the loadout of a new character. When two packages have the same ship name, their items also show the package nicknames.
+
+A ship package gives only the equipment of the package. The retail ship packages have no guns, nanobots or shield batteries. In vanilla, only the default ship has guns, nanobots and shield batteries. The tooltip of each package item tells this.
+
+The list leaves out a package without a ship, and a nickname that two goods share. Play cannot give the player such a ship. A value that the data does not have shows "(not in the data)". A value that the list leaves out shows "(cannot play)". The reason of such a value shows under the field and in the tooltip of the field, and the Play button is off.
+
+#### The combat warning
+
+A warning shows under the Ship field for a combat start. With the default ship, it tells that enemy ships can destroy the ship fast. With a ship package, it tells what a ship package gives. In vanilla, a package ship cannot fight back. Both warnings give a step that works with each ship: type `/godmode` in the chat of the game. [PLAY.md](PLAY.md) tells about the chat commands of a play.
+
+A combat start is a start in space where the setup makes the world of the start system with a fight:
 
 - The world has a ship that the path makes hostile to the player.
 - Or a trigger that waits at the start watches a fight on an object of that world. Examples are a ship that the player must destroy and a station that must not take damage. A ship that flies with the player does not count, and a ship that the path makes friendly does not count. So a trigger that waits for the death of the escort of the player does not make a combat start.
+
+The rule does not check the distance between such an object and the start point. So a start can be a combat start when the fight is far away. A formation that the path destroys only in part still counts with the ships that live.
 
 A base start is never a combat start, because the player is docked. A mission start and a checkpoint start make no objects before their triggers run, so they are never combat starts. At the Scene camera, the page does not know the start system before the play, so it gives no warning.
 
@@ -400,7 +414,7 @@ A trigger of the instance without an output for the link refuses the drag, with 
 
 A field of a linked instance that differs from the prefab is an override. Its label is bold with a violet bar. An override that is not saved also has the blue bar. A field that each instance sets, for example the ships of a spawn wave, never shows as an override.
 
-In the graph, a collapsed linked instance with overrides has a violet dot after its name. Hover the dot to read the number of overrides. When the name does not fit, the tooltip of the header also gives this number.
+In the graph, a collapsed linked instance with overrides has a violet dot after its name. Hover the dot to read the number of overrides. When the name or a chip does not fit, the tooltip of the header also gives this number.
 
 The menu of an override has:
 
