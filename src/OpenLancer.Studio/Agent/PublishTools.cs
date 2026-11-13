@@ -158,10 +158,15 @@ internal static class PublishTools
         return ToolStep.Then(async (cancel, progress) =>
         {
             var live = new LiveProgress(progress);
+            // A cancel stops the export at once, also before the tail waits for the work. The worker starts at once on
+            // its own thread, so its prepare can end before the wait starts.
+            using var stop = cancel.Register(run.Stop);
             var work = run.Start(beforeWrite => Work(run, request, location, replace, beforeWrite, live));
             try
             {
                 var outcome = await work.WaitAsync(cancel).ConfigureAwait(false);
+                // A cancel before the end of the work counts, also when the work ended before the wait started.
+                cancel.ThrowIfCancellationRequested();
                 return outcome.Result(workspace, publishProblems);
             }
             catch (OperationCanceledException)
