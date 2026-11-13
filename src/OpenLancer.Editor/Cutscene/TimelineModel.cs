@@ -32,7 +32,9 @@ internal enum TimelineGroupKind
 /// <summary>One event of the open script, as the Timeline shows it.</summary>
 /// <param name="Index">The index of the event in the events of W.</param>
 /// <param name="Time">The start, in seconds.</param>
-/// <param name="Length"><c>props.duration</c>, or 0 for an event without a length.</param>
+/// <param name="Length"><c>props.duration</c>, or 0 for an event without a length. An event of a type without a length
+/// (see <see cref="ThnSchema.HasLength"/>) has 0 too, also when it stores <c>props.duration</c>. So the Timeline draws it as
+/// a diamond without edge handles, because a length change of such an event refuses.</param>
 /// <param name="Type">The type as a THN name, for example <c>SET_CAMERA</c>, or the value of the file when the engine
 /// does not know it.</param>
 /// <param name="Kind">The type as the engine reads it, or null.</param>
@@ -511,7 +513,7 @@ internal sealed class TimelineModel
             ? targetList.List.Select(v => v is ThnText text ? text.Value : ThnWriter.Value(v)).ToList()
             : [];
         var props = list.Length > 3 ? list[3] as ThnTable : null;
-        var length = TimelineClip.LengthOf(element.Table);
+        var length = ThnSchema.HasLength(type) ? TimelineClip.LengthOf(element.Table) : 0;
         string? ignored = play switch
         {
             ScriptPlay.Set => SetScriptReason,

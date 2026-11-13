@@ -306,6 +306,32 @@ public sealed class TimelineDragTests
         Assert.Equal(TimelineDragKind.Move, TimelineDrag.KindAt(Ev(session, Cut), 0, 0.1));
     }
 
+    /// <summary>
+    /// A SET_CAMERA event has no length, so the Timeline draws it as a diamond, also when hand-written or mod data stores
+    /// a length for it. A press at the end of that length moves the event, and the move applies. The edge handles of a
+    /// bar would change the length, which the move of events refuses for such an event.
+    /// </summary>
+    [Fact]
+    public void ACutWithAStoredLengthIsADiamondThatMoves()
+    {
+        using var ws = Workspace(script: Script.Replace("{ 0, SET_CAMERA, { \"Monitor\", \"Cam_A\" } }",
+            "{ 1, SET_CAMERA, { \"Monitor\", \"Cam_A\" }, { duration = 2 } }", StringComparison.Ordinal));
+        var session = ws.Session("act");
+        var cut = Ev(session, Cut);
+
+        Assert.Equal((false, 0f), (cut.IsBar, cut.Length));
+        Assert.Equal(TimelineDragKind.Move, TimelineDrag.KindAt(cut, 3, 0.05));
+        using (var drag = TimelineDrag.Begin(Commands(session), [cut], TimelineDragKind.Move, 1, []))
+        {
+            Assert.Null(drag.Drag(1.5, snap: false, tolerance: 0));
+            drag.End();
+        }
+
+        Assert.Equal(1.5f, Time(session, cut.Ref));
+        Assert.Equal(2f, Length(session, cut.Ref));
+        Assert.Equal("Move event", session.UndoLabel);
+    }
+
     /// <summary>A box select takes the bars that overlap the time range and the diamonds in it. The two bars of Fx
     /// overlap, so each is on its own sub-row, and a box over both lines takes both (decision D131).</summary>
     [Fact]
