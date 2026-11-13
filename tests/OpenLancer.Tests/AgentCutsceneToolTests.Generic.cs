@@ -628,6 +628,36 @@ public sealed partial class AgentCutsceneToolTests
             .Select(v => ((ThnNumber)v!).Value));
     }
 
+    /// <summary>
+    /// The session keeps a script in the letter case of its file, as it keeps an INI file. So a first read in other
+    /// letter case and with other separators does not decide the spelling: the results, the edited paths, the agent
+    /// marks and list_cutscenes give the path of the file, and the save writes the patch at that path.
+    /// </summary>
+    [Fact]
+    public void AScriptReadFirstInOtherLetterCaseKeepsThePathOfItsFile()
+    {
+        var (ws, session, host) = Open();
+        using var _ = ws;
+
+        var view = Ok(host, "get_cutscene", """{ "ref": "thn:data/scripts/X.THN" }""");
+        var set = Ok(host, "set_fields", """{ "ref": "thn:data/scripts/X.THN#event/1", "fields": { "props.duration": 4 } }""");
+        var flags = Ok(host, "cutscene_set_flags", """{ "entity": "thn:DATA/Scripts/x.thn#entity/fx", "flags": ["HIDDEN"] }""");
+
+        Assert.Equal(Script, (string?)view["ref"]);
+        Assert.Equal(Script + "#entity/Cam_A", (string?)view["entities"]![0]!["ref"]);
+        Assert.Equal([ScriptPath], AgentEditToolTests.Texts(set["files"]));
+        Assert.Equal([Script + "#event/1"], AgentEditToolTests.Texts(set["changes"]));
+        Assert.Equal([Script + "#entity/Fx"], AgentEditToolTests.Texts(flags["changes"]));
+        Assert.Equal([ScriptPath], session.EditedPaths);
+        Assert.Equal([ScriptPath], session.AgentCutscenes);
+        Assert.Equal([Script], Ok(host, "list_cutscenes", """{ "text": "x.thn" }""")["rows"]!.AsArray()
+            .Select(r => (string?)r!["ref"]));
+        AssertSaved(session.Save());
+        Assert.True(File.Exists(Path.Combine(ws.ModFolder("act"), PatchFile)));
+        Assert.Equal([PatchFile], Directory.GetFiles(ws.ModFolder("act"), "*.thn", SearchOption.AllDirectories)
+            .Select(f => Path.GetRelativePath(ws.ModFolder("act"), f)));
+    }
+
     /// <summary>A save of an edit of a lower cutscene writes only a THN patch into the folder of the active mod (section
     /// 8.2, item 1 of the MCP1 design). The base script does not change.</summary>
     [Fact]

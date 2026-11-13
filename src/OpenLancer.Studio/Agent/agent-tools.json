@@ -1676,7 +1676,7 @@
         "The section part of sec: and line: is <type>/<key>, or <type> for a section without a key.",
         "When two sections have the same identity, ~<n> follows, from 0. The form leaves out ~0.",
         "A child section puts its parent first, with > between them.",
-        "An install path uses \\ between its parts. A request can also use /. The tools match a path without letter case.",
+        "An install path uses \\ between its parts. A request can also use /. The tools match a path without letter case. A result gives the path in the letter case of the file.",
         "A result gives the most specific form, for example obj: before sec:."
       ]
     }

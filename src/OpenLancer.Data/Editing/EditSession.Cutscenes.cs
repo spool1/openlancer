@@ -253,6 +253,9 @@ public sealed partial class EditSession
             return true;
         if (cutsceneProblems.ContainsKey(normal))
             return false;
+        // The session keeps the path in the letter case of the files, as for an INI file. So the first request does not
+        // decide the letter case of the results, of the edited paths and of the recovery file.
+        normal = LetterCaseOfFiles(normal);
         // The fingerprint first: a change after it shows at the save.
         inputs.Remember(normal, lower);
         byte[]? bytes;
