@@ -472,7 +472,7 @@ public sealed partial class AgentCutsceneToolTests
 
         Assert.Equal("needs_confirmation", asked.Code);
         Assert.Contains($"It also removes {Script}#event/1, {Script}#event/2.", asked.Message);
-        Assert.Equal("Agent: Delete entity and 2 events", session.UndoLabel);
+        Assert.Equal("Agent: Delete Fx and 2 events", session.UndoLabel);
         Assert.Equal([$"{Script}#event/1 cascade targets = Fx", $"{Script}#event/2 cascade targets = Fx", $"{Script}#entity/Fx target "],
             deleted["deletes"]!.AsArray().Select(d => $"{d!["ref"]} {d["why"]} {d["cause"]}"));
         Assert.DoesNotContain(W(session).Entities, e => ThnScriptModel.NameOf(e.Table) == "Fx");
@@ -495,7 +495,7 @@ public sealed partial class AgentCutsceneToolTests
         var preview = Ok(host, "delete_items", """{ "preview": true, """ + arguments[2..]);
         var deleted = Ok(host, "delete_items", """{ "confirm": true, """ + arguments[2..]);
 
-        var question = $"The edit 'Delete entity and 2 events' changes more than its targets. It also removes " +
+        var question = $"The edit 'Delete Cam_A and 2 events' changes more than its targets. It also removes " +
                        $"{Script}#event/0, {Script}#event/5.";
         Assert.StartsWith(question + " ", asked.Message);
         Assert.Contains(preview["warnings"]!.AsArray(), w => (string?)w!["message"] == question);
@@ -515,7 +515,8 @@ public sealed partial class AgentCutsceneToolTests
         var asked = Error(host, "delete_items", arguments);
         var deleted = Ok(host, "delete_items", """{ "confirm": true, """ + arguments[2..]);
 
-        Assert.StartsWith("The 2 edits 'Delete entity and 2 events' change more than their targets. They also remove " +
+        Assert.StartsWith("The 2 edits 'Delete Cam_A and 2 events', 'Delete Fx and 2 events' change more than their " +
+                          "targets. They also remove " +
                           $"{Script}#event/0, {Script}#event/5, {Script}#event/1 and 1 more. Use preview: true", asked.Message);
         Assert.Equal([$"{Script}#event/0", $"{Script}#event/5", $"{Script}#event/1", $"{Script}#event/2"],
             deleted["deletes"]!.AsArray().Where(d => (string?)d!["why"] == "cascade").Select(d => (string?)d!["ref"]));

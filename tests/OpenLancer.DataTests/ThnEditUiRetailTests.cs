@@ -163,7 +163,7 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         Assert.True(deleteCigarette.NeedsConfirmation);
         Assert.Equal([.. cigaretteEvents, cigarette], deleteCigarette.Deleted);
         Run(deleteCigarette);
-        Done("Delete entity and 5 events");
+        Done("Delete prop_cigarette_2 and 5 events");
         expected.Delete(cigarette);
         foreach (var ev in cigaretteEvents)
             expected.Delete(ev);

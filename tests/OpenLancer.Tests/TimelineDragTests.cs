@@ -520,9 +520,9 @@ public sealed class TimelineDragTests
         var events = TimelineEdits.EventsNaming(ScriptPath, W(session), "CHAR_TRENT");
         Assert.Equal([Event(session, Motion), Event(session, Attach)], events);
 
-        session.Execute(TimelineEdits.DeleteWithEvents(trent, events));
+        session.Execute(TimelineEdits.DeleteWithEvents(trent, "Char_trent", events));
 
-        Assert.Equal("Delete entity and 2 events", session.UndoLabel);
+        Assert.Equal("Delete Char_trent and 2 events", session.UndoLabel);
         Assert.Equal(5, W(session).Entities.Count);
         Assert.Equal(4, W(session).Events.Count);
         session.Undo();

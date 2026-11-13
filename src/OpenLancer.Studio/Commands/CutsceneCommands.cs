@@ -347,12 +347,12 @@ public static class CutsceneCommands
         IReadOnlyList<ThnRef> events = name != null && ReferenceEquals(working!.EntityNamed(name), element)
             ? TimelineEdits.EventsNaming(path, working, name)
             : [];
-        var label = TimelineEdits.DeleteEntityLabel(events.Count);
+        var label = TimelineEdits.DeleteEntityLabel(name, events.Count);
         if (entity.Kind != ThnElementKind.Entity)
             return CutscenePlan.Refused(label, path, "The element of the delete must be an entity.");
         if (session.CutsceneReadOnlyReason(path) is { } reason)
             return CutscenePlan.Refused(label, path, reason);
-        return CutscenePlan.Of(label, path, () => TimelineEdits.DeleteWithEvents(entity, events),
+        return CutscenePlan.Of(label, path, () => TimelineEdits.DeleteWithEvents(entity, name, events),
             deleted: [.. events, entity], needsConfirmation: events.Count > 0);
     }
 

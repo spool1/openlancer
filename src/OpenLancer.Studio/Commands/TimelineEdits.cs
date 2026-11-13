@@ -102,13 +102,24 @@ internal static class TimelineEdits
             .Select(e => new ThnRef(path, ThnElementKind.Event, e.Id)).ToList();
 
     /// <summary>The command that deletes events and an entity in one entry: the events first, then the entity.</summary>
-    public static EditCommand DeleteWithEvents(ThnRef entity, IReadOnlyList<ThnRef> events) =>
-        EditCommand.Group(DeleteEntityLabel(events.Count),
+    /// <param name="name">The name of the entity, for the label, or null when it has no name.</param>
+    public static EditCommand DeleteWithEvents(ThnRef entity, string? name, IReadOnlyList<ThnRef> events) =>
+        EditCommand.Group(DeleteEntityLabel(name, events.Count),
             [.. events.Select(ThnEdits.Delete), ThnEdits.Delete(entity)]);
 
-    /// <summary>The label of the entry of a delete of an entity with the events that name it.</summary>
-    public static string DeleteEntityLabel(int events) =>
-        events == 0 ? "Delete entity" : $"Delete entity and {events} events";
+    /// <summary>The label of the entry of a delete of an entity with the events that name it, for example "Delete
+    /// Cam_01 and 2 events". It names the entity, as the label of an add or a rename does.</summary>
+    /// <param name="name">The name of the entity, or null when it has no name.</param>
+    public static string DeleteEntityLabel(string? name, int events)
+    {
+        var entity = string.IsNullOrEmpty(name) ? "entity" : name;
+        return events switch
+        {
+            0 => $"Delete {entity}",
+            1 => $"Delete {entity} and 1 event",
+            _ => $"Delete {entity} and {events} events",
+        };
+    }
 
     /// <summary>
     /// The events that the Add event menu of a row offers, in the order of the menu (section 7.3): the types whose first

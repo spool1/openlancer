@@ -258,16 +258,18 @@ public sealed partial class CutsceneCommandsTests
     public void DeleteEntityTakesTheEventsThatNameItAndAsksFirst()
     {
         var plan = AssertSameW(s => CutsceneCommands.DeleteEntity(s, Entity(s, "Char_trent")),
-            s => TimelineEdits.DeleteWithEvents(Entity(s, "Char_trent"), [Event(s, Motion), Event(s, Attach)]));
+            s => TimelineEdits.DeleteWithEvents(Entity(s, "Char_trent"), "Char_trent", [Event(s, Motion), Event(s, Attach)]));
         Assert.True(plan.NeedsConfirmation);
-        Assert.Equal("Delete entity and 2 events", plan.Label);
+        Assert.Equal("Delete Char_trent and 2 events", plan.Label);
         Assert.Equal([ThnElementKind.Event, ThnElementKind.Event, ThnElementKind.Entity], plan.Deleted.Select(d => d.Kind));
 
         using var ws = Workspace(script: Script.Replace("{ entity_name = \"Fx\"",
             "{ entity_name = \"MONITOR\", type = MARKER },\n    { entity_name = \"Fx\""));
         var session = ws.Session("act");
         var alone = CutsceneCommands.DeleteEntity(session, Entity(session, "Voice_other"));
-        Assert.Equal(("Delete entity", false), (alone.Label, alone.NeedsConfirmation));
+        Assert.Equal(("Delete Voice_other", false), (alone.Label, alone.NeedsConfirmation));
+        Assert.Equal("Delete Fx and 1 event", TimelineEdits.DeleteEntityLabel("Fx", 1));
+        Assert.Equal("Delete entity", TimelineEdits.DeleteEntityLabel(null, 0));
         // The MARKER named MONITOR comes after the MONITOR named Monitor, so the events find the marker.
         var hidden = CutsceneCommands.DeleteEntity(session, Entity(session, "Monitor"));
         Assert.Equal((true, false), (hidden.CanRun, hidden.NeedsConfirmation));
