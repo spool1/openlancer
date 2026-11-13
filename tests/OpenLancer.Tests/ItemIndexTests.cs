@@ -199,6 +199,51 @@ public sealed class ItemIndexTests
         Assert.Equal(1, Assert.Single(session.MarketLines("s1_package")).Line);
     }
 
+    /// <summary>The engine keeps the last hull good and the last <c>[Ship]</c> of a nickname. It reads the hull of a
+    /// package only among the hull goods, and a ship only among the <c>[Ship]</c> sections. The ship relation does the
+    /// same.</summary>
+    [Fact]
+    public void TheShipRelationUsesTheLastHullGoodAndTheLastShipOfANickname()
+    {
+        using var ws = ItemWorkspace.Create();
+        ws.WriteBase(ItemWorkspace.ShipsPath, """
+            [Ship]
+            nickname = s1
+            [Ship]
+            nickname = s2
+            mass = 1
+            [Ship]
+            nickname = s2
+            mass = 2
+            [Simple]
+            nickname = s3
+            """);
+        // weapon_good.ini loads after goods.ini. Its last good of the nickname s1_hull is no hull good.
+        ws.WriteBase(ItemWorkspace.WeaponGoodsPath, """
+            [Good]
+            nickname = s1_hull
+            category = shiphull
+            ship = s2
+            [Good]
+            nickname = s1_hull
+            category = equipment
+            [Good]
+            nickname = s3_hull
+            category = shiphull
+            ship = s3
+            """);
+        var session = ws.Session("act");
+        var lastShip = Assert.Single(session.List(ItemFileKind.Ships), s => s.Id.Key == "s2" && s.Id.Ordinal == 1);
+
+        Assert.Equal([lastShip], session.Related(ItemWorkspace.Good(ItemWorkspace.GoodsPath, "s1_package"),
+            ItemRelation.Ship));
+        // A hull good gives its own ship, also when another hull good has its nickname.
+        Assert.Equal([ItemWorkspace.Ship("s1")], session.Related(ItemWorkspace.Good(ItemWorkspace.GoodsPath, "s1_hull"),
+            ItemRelation.Ship));
+        // A [Simple] is not a ship.
+        Assert.Empty(session.Related(ItemWorkspace.Good(ItemWorkspace.WeaponGoodsPath, "s3_hull"), ItemRelation.Ship));
+    }
+
     [Fact]
     public void TheIndexShowsTheEditsAndTheirUndo()
     {

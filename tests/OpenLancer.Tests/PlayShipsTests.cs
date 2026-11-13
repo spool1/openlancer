@@ -80,6 +80,56 @@ public sealed class PlayShipsTests
         Assert.Equal([("gun1_ammo", 20)], ship.Cargo);
     }
 
+    /// <summary>
+    /// When sections share a nickname, the builder follows the engine. The engine keeps the last hull good and the last
+    /// <c>[Ship]</c> of a nickname, so the ship part has the ship of these. The engine stops when it loads two ship
+    /// packages of one nickname, so the builder gives the reason for a nickname that two goods share.
+    /// </summary>
+    [Fact]
+    public void ANicknameThatSectionsShareFollowsTheEngine()
+    {
+        using var ws = ItemWorkspace.Create();
+        ws.WriteBase(ItemWorkspace.ShipsPath, """
+            [Ship]
+            nickname = s1
+            [Ship]
+            nickname = s2
+            [Ship]
+            nickname = s2
+            """);
+        // weapon_good.ini loads after goods.ini, so its hull good is the last one.
+        ws.WriteBase(ItemWorkspace.WeaponGoodsPath, """
+            [Good]
+            nickname = gun1
+            equipment = gun1
+            category = equipment
+            [Good]
+            nickname = s1_hull
+            category = shiphull
+            ship = s2
+            """);
+        var session = ws.Session("act");
+
+        var ship = PlayShips.ShipPart(session, "s1_package", out var problem);
+
+        Assert.Null(problem);
+        Assert.NotNull(ship);
+        Assert.Equal("s2", ship.Ship);
+        Assert.Equal([("eng1", "internal"), ("gun1", "HpWeapon01")], ship.Equip);
+
+        session.Execute(EditCommand.AddSection(ItemWorkspace.WeaponGoodsPath, "Good",
+        [
+            ItemWorkspace.Line("nickname", new StringValue("s1_package")),
+            ItemWorkspace.Line("category", new StringValue("ship")),
+            ItemWorkspace.Line("hull", new StringValue("s1_hull")),
+        ]));
+
+        Assert.Null(PlayShips.ShipPart(session, "s1_package", out var shared));
+        Assert.Equal("More than one section of the goods files has the nickname 's1_package'. Play cannot give the " +
+                     "player this ship.", shared);
+        Assert.Empty(SteLint.Problems(shared!));
+    }
+
     /// <summary>No package with the nickname, a good that is no package, and a package without a ship give their
     /// reasons.</summary>
     [Fact]

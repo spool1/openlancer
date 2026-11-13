@@ -46,7 +46,8 @@ public enum ItemRelation
     Munition,
 
     /// <summary>From a package or a hull good: the <c>[Ship]</c> that it sells. A package names its hull good with
-    /// <c>hull</c>, and the hull good names the ship with <c>ship</c>.</summary>
+    /// <c>hull</c>, and the hull good names the ship with <c>ship</c>. When more than one section has the nickname, the
+    /// engine keeps the last hull good and the last <c>[Ship]</c>, so the relation gives the ship of these.</summary>
     Ship,
 }
 
@@ -288,9 +289,19 @@ internal sealed class ItemIndex
     /// <summary>The ship of a package or a hull good (see <see cref="ItemRelation.Ship"/>), or null.</summary>
     private Item? ShipOf(Item good)
     {
-        var hull = Is(Category(good), "ship") ? One(ItemFileKind.Goods, First(good.Section, "hull")) : good;
-        return hull != null && Is(Category(hull), "shiphull") ? One(ItemFileKind.Ships, First(hull.Section, "ship")) : null;
+        // The engine finds the hull of a package among the hull goods only.
+        var hull = Is(Category(good), "ship") ? Last(ItemFileKind.Goods, First(good.Section, "hull"), IsHull) : good;
+        return hull != null && IsHull(hull)
+            ? Last(ItemFileKind.Ships, First(hull.Section, "ship"), s => Is(s.Section.Name, "Ship"))
+            : null;
+
+        static bool IsHull(Item item) => Is(Category(item), "shiphull");
     }
+
+    /// <summary>The last section of a kind with a nickname that a filter accepts, or null. When more than one section
+    /// has the nickname, the engine keeps the last one.</summary>
+    private Item? Last(ItemFileKind kind, string? nickname, Func<Item, bool> accepts) =>
+        nickname == null ? null : ItemsNamed(kind, nickname).LastOrDefault(accepts);
 
     private List<Item> RelatedItems(Item item, ItemRelation relation)
     {

@@ -30,16 +30,23 @@ internal static class PlayShips
     /// <c>addon</c> lines give by the addon rule (<see cref="StartSaveShip.FromAddons"/>). The builder reads the addon
     /// lines as the engine reads them when it loads the package. A line needs the equipment and the hardpoint, and the
     /// amount is 1 without a third value. An addon whose equipment W does not have gives no line, because the engine
-    /// drops it too. So the ship part gives the same ship as the package.
+    /// drops it too. So the ship part gives the same ship as the package. When sections share the nickname of the hull
+    /// good or of the ship, the builder uses the last one, as the engine does (see <see cref="ItemRelation.Ship"/>).
     /// </summary>
     /// <param name="package">The nickname of the package.</param>
-    /// <param name="problem">Null, or the reason when W has no such package or no ship of the package.</param>
-    /// <returns>The ship part, or null when W has no such package or no ship of the package.</returns>
+    /// <param name="problem">Null, or the reason when W has no such package, more than one good with the nickname, or
+    /// no ship of the package.</param>
+    /// <returns>The ship part, or null when <paramref name="problem"/> gives a reason.</returns>
     public static StartSaveShip? ShipPart(EditSession edits, string package, out string? problem)
     {
         if (Find(edits, package) is not { } section)
         {
-            problem = $"The edit view has no ship package '{package}'. Play cannot give the player this ship.";
+            // Find gives null also when more than one good has the nickname. The engine stops when it loads two ship
+            // packages of one nickname, so there is no package to choose.
+            problem = edits.Find(ItemFileKind.Goods, package) == null && edits.Has(ItemFileKind.Goods, package)
+                ? $"More than one section of the goods files has the nickname '{package}'. Play cannot give the player " +
+                  "this ship."
+                : $"The edit view has no ship package '{package}'. Play cannot give the player this ship.";
             return null;
         }
 
