@@ -593,7 +593,7 @@ The value forms of the THN keys:
 | Motion path | `closed`, and one row for each key: a `point`, and an `orientation` (w, x, y and z) when the path has them. | `"pathprops.path_data": { "closed": false, "keys": [ { "point": [0, 0, 0], "orientation": [1, 0, 0, 0] } ] }` |
 | Curve | `clsid`, and one row for each point: `time`, `value`, `in` and `out`. | `"props.param_curve": { "clsid": "FreeFormPCurve", "points": [ { "time": 0, "value": 0, "in": 0, "out": 0 } ] }` |
 | Turn | `degrees`, and an optional `axis`: an axis name or three numbers. | `"props.spatialprops.axisrot": { "degrees": 90, "axis": "Y_AXIS" }` |
-| Other key | Lua text in a JSON text, as the engine reads it. A key that the THN schema does not know has this form too. | `"props.custom": "{ 1, 2 }"` |
+| Other key | Lua text in a JSON text, as the engine reads it. A key that the THN schema does not know has this form too. The text holds one value: a number, a text, a THN name, or a table of them. An operator, a call, a second value and another name give `invalid_value`, and the editor does not run the text. | `"props.custom": "{ 1, 2 }"` |
 
 Only `null` removes the key. A key of a record goes with its own path. A record as a value gives `invalid_argument`. A value of the wrong form gives `invalid_value`, and the message gives the form. A stored value that does not fit its form shows as Lua text, and the same text keeps the value.
 

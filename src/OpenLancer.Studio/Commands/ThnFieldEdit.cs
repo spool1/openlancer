@@ -132,12 +132,15 @@ internal static class ThnFieldEdit
 
     /// <summary>The value of a Lua value text, as the engine reads it, for example <c>{ 1, 2 }</c> or
     /// <c>"text"</c>. A THN file is ASCII, so a character outside ASCII refuses. The evaluator would read it as
-    /// <c>?</c>. An escape that gives such a character, or U+0000, refuses too (see <see cref="EscapeProblem"/>).</summary>
+    /// <c>?</c>. An escape that gives such a character, or U+0000, refuses too (see <see cref="EscapeProblem"/>). A text
+    /// that is not one value, for example a statement, a call or an operator, refuses before the evaluator runs it (see
+    /// <see cref="ThnValueText"/>).</summary>
     public static ThnFieldParse ParseValue(string text, IThnEvaluator evaluator)
     {
         if (text.Trim().Length == 0)
             return ThnFieldParse.Fail("The field needs a value. Use Remove in the menu of the label to remove the key.");
-        if ((ThnWriter.TextProblem(text) ?? EscapeProblem(text)) is { } problem)
+        if ((ThnWriter.TextProblem(text) ?? EscapeProblem(text) ?? ThnValueText.Problem(text, evaluator.Symbols)) is
+            { } problem)
             return ThnFieldParse.Fail(problem);
         try
         {
@@ -207,7 +210,7 @@ internal static class ThnFieldEdit
 
     /// <summary>The index of the last <c>]</c> of a long string whose text starts at <paramref name="start"/>, or -1.
     /// A long string of Lua 3.2 can hold other long strings.</summary>
-    private static int LongStringEnd(string text, int start)
+    internal static int LongStringEnd(string text, int start)
     {
         var depth = 0;
         for (var i = start; i + 1 < text.Length; i++)

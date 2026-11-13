@@ -573,7 +573,7 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
         using var host = OpenToEdit(workspace);
         var session = host.Session!;
         var (script, view) = Cutscenes(host, "bases")
-            .Select(s => (Ref: s, View: Ok(host, "get_cutscene", new JsonObject { ["ref"] = s })))
+            .Select(s => (Ref: s, View: WholeCutscene(host, s)))
             .First(s => s.View["read_only_reason"] == null && s.View["events"]!.AsArray().Count > 0 &&
                         s.View["entities"]!.AsArray().Any(e => (string?)e!["type"] == "CAMERA"));
         var before = ScriptText(session, script);
@@ -637,12 +637,34 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
     /// script.</summary>
     private const int SampleStep = 5;
 
+    /// <summary>The view of get_cutscene with the entities and the events of all pages.</summary>
+    private static JsonObject WholeCutscene(AgentHost host, string script)
+    {
+        var view = Ok(host, "get_cutscene", new JsonObject { ["ref"] = script, ["limit"] = 200 });
+        var cursor = (string?)view["next_cursor"];
+        while (cursor != null)
+        {
+            var page = Ok(host, "get_cutscene", new JsonObject { ["ref"] = script, ["limit"] = 200, ["cursor"] = cursor });
+            foreach (var list in new[] { "entities", "events" })
+            {
+                foreach (var element in page[list]!.AsArray())
+                    view[list]!.AsArray().Add(element!.DeepClone());
+            }
+            cursor = (string?)page["next_cursor"];
+        }
+        Assert.Equal(((int)view["entity_count"]!, (int)view["event_count"]!),
+            (view["entities"]!.AsArray().Count, view["events"]!.AsArray().Count));
+        return view;
+    }
+
     /// <summary>
     /// On a sample of the retail base scripts, each field of each element that get_cutscene gives goes back into a
     /// preview of set_fields, and the preview gives no_change. So an agent can read a retail cutscene, change one value
     /// and write the fields back. Some retail scripts have two entities with one name. The earlier entity gives no
     /// fields, because its reference names the later entity. The sample is each fifth script in the order of
-    /// list_cutscenes. The test writes counts only.
+    /// list_cutscenes. The Lua text of each element of the sample is one value for the check of a value text (see
+    /// <see cref="OpenLancer.Studio.Commands.ThnValueText"/>), so an agent can send a stored value back as Lua text. The
+    /// test writes counts only.
     /// </summary>
     [Fact]
     public void EachFieldOfARetailBaseScriptGoesBackIntoSetFields()
@@ -651,16 +673,24 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
         using var host = OpenToEdit(workspace);
         var session = host.Session!;
         var scripts = Cutscenes(host, "bases").Where((_, i) => i % SampleStep == 0).ToList();
-        var (elements, fields, readOnly, hidden) = (0, 0, 0, 0);
+        var (elements, fields, readOnly, hidden, tables) = (0, 0, 0, 0, 0);
         var changed = new List<string>();
 
         foreach (var script in scripts)
         {
-            var view = Ok(host, "get_cutscene", new JsonObject { ["ref"] = script });
+            var view = WholeCutscene(host, script);
             if (view["read_only_reason"] != null)
             {
                 readOnly++;
                 continue;
+            }
+            foreach (var table in session.Cutscene(script["thn:".Length..])!.Entities
+                         .Concat(session.Cutscene(script["thn:".Length..])!.Events).Select(e => e.Table))
+            {
+                var text = OpenLancer.Data.Thn.ThnWriter.Value(table);
+                Assert.True(OpenLancer.Studio.Commands.ThnValueText.Problem(text, session.ThnSymbols) == null,
+                    $"{script}: {OpenLancer.Studio.Commands.ThnValueText.Problem(text, session.ThnSymbols)}");
+                tables++;
             }
             foreach (var element in view["entities"]!.AsArray().Concat(view["events"]!.AsArray()))
             {
@@ -689,6 +719,7 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
         Assert.True(changed.Count == 0, $"{changed.Count} elements changed, the first is {changed.FirstOrDefault()}");
         Assert.Equal((0, false, false), (session.Revision, session.IsDirty, session.CanUndo));
         output.WriteLine($"{scripts.Count} base scripts ({readOnly} read-only), {elements} elements, {fields} fields: " +
-                         $"each preview gave no_change. {hidden} entities that a later entity hides gave no fields.");
+                         $"each preview gave no_change. {hidden} entities that a later entity hides gave no fields. " +
+                         $"The Lua text of each of {tables} elements is one value.");
     }
 }

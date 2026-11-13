@@ -74,6 +74,49 @@ public sealed class ThnFieldEditTests
         Assert.Equal(ThnWriter.TextProblem("{ \"ü\" }"), outside.Error);
     }
 
+    /// <summary>A Lua text that is one value goes to the evaluator: numbers in each form of the writer, texts, THN names,
+    /// and tables with keys, bracket keys, comments and both separators.</summary>
+    [Theory]
+    [InlineData("-4.371139E-08")]
+    [InlineData(".5")]
+    [InlineData("{ pos = { 0, -1, 2.5 }, [\"a.b\"] = 3, }")]
+    [InlineData("{ 1, 2; x = L_POINT }")]
+    [InlineData("[[a [[long]] text]]")]
+    [InlineData("'a\\'b'")]
+    [InlineData("-- a note\n{ N, \"x\" } -- the end")]
+    public void ALuaTextThatIsOneValueGivesTheValue(string text)
+    {
+        var parse = Parse(ThnKeyKind.Value, text);
+
+        Assert.Null(parse.Error);
+        Assert.NotNull(parse.Value);
+    }
+
+    /// <summary>A Lua text that is not one value refuses before the evaluator runs it (section 8.7, item 2 of the MCP1
+    /// design). The evaluator would run a statement, a call and an operator, so a short text could allocate gigabytes.
+    /// A name that is not a THN name refuses too, because it reads a global of the VM.</summary>
+    [Theory]
+    [InlineData("1 w = 2", ThnValueText.MoreThanOne)]
+    [InlineData("1 print(\"x\")", ThnValueText.MoreThanOne)]
+    [InlineData("{ 1 } { 2 }", ThnValueText.MoreThanOne)]
+    [InlineData("clock()", "clock")]
+    [InlineData("{ s = s .. s }", "s")]
+    [InlineData("{ f() }", "f")]
+    [InlineData("function() end", "function")]
+    [InlineData("1 + 2", "'+'")]
+    [InlineData("(1)", "'('")]
+    [InlineData("{ [1] 2 }", "'2'")]
+    public void ALuaTextThatIsNotOneValueRefusesBeforeItRuns(string text, string expected)
+    {
+        var parse = Parse(ThnKeyKind.Value, text);
+
+        Assert.Null(parse.Value);
+        var message = expected.StartsWith('\'') ? ThnValueText.NotValue(expected.Trim('\''))
+            : expected == ThnValueText.MoreThanOne ? expected
+            : ThnValueText.NotName(expected);
+        Assert.Equal(message, parse.Error);
+    }
+
     /// <summary>A decimal escape in a Lua text that gives a character outside ASCII or U+0000 refuses. The evaluator
     /// would read the first as '?' and drop the second at the end of the text. The scan finds an escape after a
     /// '--' or a quote in another string.</summary>
