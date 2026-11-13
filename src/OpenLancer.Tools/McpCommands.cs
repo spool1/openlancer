@@ -109,8 +109,9 @@ internal static class McpCommands
         using (thread)
         {
             var host = thread.Host;
+            // A reason is a sentence with its own period, and the line ends the state with one period.
             var state = readOnly ? "read-only"
-                : host.NoEditReason is { } reason ? $"no edits: {reason}"
+                : host.NoEditReason is { } reason ? $"no edits: {reason.TrimEnd().TrimEnd('.')}"
                 : noSave ? "edits, no save"
                 : "edits";
             error.WriteLine($"oltool mcp serve: profile {host.Session!.Profile.Name}, mod {mod}, {state}. The server reads " +

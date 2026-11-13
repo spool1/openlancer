@@ -347,7 +347,10 @@ public sealed class OltoolMcpTests
                 Assert.True(refused.IsError);
                 Assert.Equal("read_only", refused.StructuredContent!.Value.GetProperty("code").GetString());
             }
-            Assert.Contains("no edits: Another editor has mod 'act' open", await second.Errors);
+            var errors = await second.Errors;
+            Assert.Contains("no edits: Another editor has mod 'act' open", errors);
+            Assert.Contains(". The server reads the MCP messages on stdin.", errors);
+            Assert.DoesNotContain(".. The server reads", errors);
         }
 
         var system = ws.ReadModPatch(SceneWorkspace.Li01Path);
