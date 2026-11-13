@@ -8,6 +8,7 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Export;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Publishing;
+using OpenLancer.Studio;
 using OpenLancer.Studio.Agent;
 using Xunit;
 using static OpenLancer.Tests.AgentCalls;
@@ -326,7 +327,7 @@ public sealed class AgentPublishToolTests
         clock.Advance(TimeSpan.FromMinutes(9));
         var result = await call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         release.Set();
-        host.Exports.Wait();
+        await WaitForTheExport(host);
 
         Assert.False(afterCheckLimit);
         Assert.Equal(("limit", "TailTime"), ((string?)result.Content["code"], (string?)result.Content["detail"]));
@@ -372,10 +373,10 @@ public sealed class AgentPublishToolTests
         Assert.Contains("price = 1", File.ReadAllText(patch));
     }
 
-    /// <summary>Waits for the end of the export on another thread. The cancel of the test runs on the thread of the
+    /// <summary>Waits for the end of the export on a thread of its own. The cancel of the test runs on the thread of the
     /// export, so the test can continue on that thread. A wait there would wait for itself.</summary>
     private static Task WaitForTheExport(TestAgentHost host) =>
-        Task.Run(host.Exports.Wait).WaitAsync(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
+        OwnThread.Run(host.Exports.Wait).WaitAsync(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
 
     /// <summary>A progress that cancels the call at a step of the export, on the thread of the export.</summary>
     private sealed class CancelAt(string message, CancellationTokenSource cancel) : IProgress<ToolProgress>
