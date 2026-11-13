@@ -569,22 +569,25 @@ internal sealed partial class GraphView
 
     /// <summary>The violet dot after the title of a collapsed linked instance with overrides (section 8.6 of the M6b
     /// design), with the tooltip "This instance has {n} overrides." The title leaves <see cref="OverridesDotWidth"/> for
-    /// it.</summary>
-    private void OverridesDot(int overrides, ImDrawListPtr drawList, ref float x, Vector2 origin)
+    /// it. Returns true when the mouse is on the dot, so the tooltip of the header does not replace the tooltip of the
+    /// dot.</summary>
+    private bool OverridesDot(int overrides, ImDrawListPtr drawList, ref float x, Vector2 origin)
     {
         if (overrides <= 0)
         {
-            return;
+            return false;
         }
 
         var center = new Vector2(x + OverridesDotRadius, origin.Y + MissionGraph.HeaderHeight / 2);
         drawList.AddCircleFilled(center, OverridesDotRadius, EditorTheme.ToAbgr(EditorTheme.Override));
-        if (ImGui.IsMouseHoveringRect(center - new Vector2(OverridesDotRadius + 3), center + new Vector2(OverridesDotRadius + 3)))
+        x += OverridesDotWidth;
+        if (!ImGui.IsMouseHoveringRect(center - new Vector2(OverridesDotRadius + 3), center + new Vector2(OverridesDotRadius + 3)))
         {
-            pendingTooltip = MissionPageModel.OverridesDotTip(overrides);
+            return false;
         }
 
-        x += OverridesDotWidth;
+        pendingTooltip = MissionPageModel.OverridesDotTip(overrides);
+        return true;
     }
 
     /// <summary>The batch of Ctrl+D: a copy of each selected trigger and of each selected prefab instance, in one undo

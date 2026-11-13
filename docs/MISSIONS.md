@@ -400,6 +400,8 @@ A trigger of the instance without an output for the link refuses the drag, with 
 
 A field of a linked instance that differs from the prefab is an override. Its label is bold with a violet bar. An override that is not saved also has the blue bar. A field that each instance sets, for example the ships of a spawn wave, never shows as an override.
 
+In the graph, a collapsed linked instance with overrides has a violet dot after its name. Hover the dot to read the number of overrides. When the name does not fit, the tooltip of the header also gives this number.
+
 The menu of an override has:
 
 - **Revert**: use the value of the prefab.

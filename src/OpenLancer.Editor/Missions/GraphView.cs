@@ -839,9 +839,9 @@ internal sealed partial class GraphView : IDisposable
         var titleWidth = TextFit.AddText(drawList, font, TextSize, new Vector2(x, y), EditorTheme.ToAbgr(EditorTheme.TextBright),
             node.Title, right - x - (overrides > 0 ? OverridesDotWidth : 0));
         x += titleWidth + 6;
-        OverridesDot(overrides, drawList, ref x, origin);
+        // A hover on the dot or on a chip shows the tooltip of that part. The tooltip of the header does not replace it.
+        var partHovered = OverridesDot(overrides, drawList, ref x, origin);
         var shown = 0;
-        var chipHovered = false;
         if (full)
         {
             foreach (var chip in node.HeaderChips)
@@ -858,7 +858,7 @@ internal sealed partial class GraphView : IDisposable
                 if (ImGui.IsMouseHoveringRect(min, max))
                 {
                     pendingTooltip = MissionPageModel.TriggerChipTip(chip);
-                    chipHovered = true;
+                    partHovered = true;
                 }
 
                 x += chipWidth + ChipGap;
@@ -868,20 +868,28 @@ internal sealed partial class GraphView : IDisposable
 
         // The marks and the buttons can take the room of the title and the chips. A hover on the rest of the header shows
         // what they hide.
-        if (!chipHovered && ImGui.IsMouseHoveringRect(titleMin, new Vector2(right, origin.Y + MissionGraph.HeaderHeight)) &&
-            HeaderTip(node.Title, titleWidth < font.CalcTextSizeA(TextSize, float.MaxValue, 0, node.Title).X,
+        if (!partHovered && ImGui.IsMouseHoveringRect(titleMin, new Vector2(right, origin.Y + MissionGraph.HeaderHeight)) &&
+            HeaderTip(node.Title, titleWidth < font.CalcTextSizeA(TextSize, float.MaxValue, 0, node.Title).X, overrides,
                 full ? node.HeaderChips.Skip(shown) : []) is { } tip)
         {
             pendingTooltip = tip;
         }
     }
 
-    /// <summary>The tooltip of a header whose title "..." cuts or whose chips do not fit: the full title, then each
-    /// hidden chip with its tooltip. Null when the header shows all of it.</summary>
-    internal static string? HeaderTip(string title, bool titleCut, IEnumerable<string> hiddenChips)
+    /// <summary>The tooltip of a header whose title "..." cuts or whose chips do not fit: the full title, the number of
+    /// overrides, then each hidden chip with its tooltip. Null when the header shows all of it.</summary>
+    /// <param name="overrides">The number of overrides of a collapsed linked instance, else 0. A number of 0 adds no
+    /// line.</param>
+    internal static string? HeaderTip(string title, bool titleCut, int overrides, IEnumerable<string> hiddenChips)
     {
         var chips = hiddenChips.Select(c => $"{c}: {MissionPageModel.TriggerChipTip(c)}").ToList();
-        return titleCut || chips.Count > 0 ? string.Join("\n", [title, .. chips]) : null;
+        if (!titleCut && chips.Count == 0)
+        {
+            return null;
+        }
+
+        string[] count = overrides > 0 ? [MissionPageModel.OverridesDotTip(overrides)] : [];
+        return string.Join("\n", [title, .. count, .. chips]);
     }
 
     /// <summary>The help text of the info icon of a node: the event of a trigger, or the text of its frame.</summary>

@@ -459,10 +459,25 @@ public sealed class PlayFromHereStatesTests
     [Fact]
     public void AHeaderTooltipShowsTheCutTitleAndTheHiddenChips()
     {
-        Assert.Null(GraphView.HeaderTip("t_short", false, []));
-        Assert.Equal("t_a_long_name", GraphView.HeaderTip("t_a_long_name", true, []));
+        Assert.Null(GraphView.HeaderTip("t_short", false, 0, []));
+        Assert.Equal("t_a_long_name", GraphView.HeaderTip("t_a_long_name", true, 0, []));
         Assert.Equal($"t_name\nRepeats: {MissionPageModel.TriggerChipTip("Repeats")}\nol_sys_a: " +
-                     MissionPageModel.TriggerChipTip("ol_sys_a"), GraphView.HeaderTip("t_name", false, ["Repeats", "ol_sys_a"]));
+                     MissionPageModel.TriggerChipTip("ol_sys_a"), GraphView.HeaderTip("t_name", false, 0, ["Repeats", "ol_sys_a"]));
+    }
+
+    /// <summary>The violet dot of a collapsed linked instance with overrides follows the title. When "..." cuts the
+    /// title, the header tooltip also gives the number of overrides, after the full title (issue #10). A header that
+    /// shows all of it has no tooltip, because the dot has its own tooltip.</summary>
+    [Fact]
+    public void TheHeaderTooltipOfACutTitleGivesTheNumberOfOverrides()
+    {
+        Assert.Equal("Spawn wave ol_wave_a\nThis instance has 3 overrides.",
+            GraphView.HeaderTip("Spawn wave ol_wave_a", true, 3, []));
+        Assert.Equal("Spawn wave ol_wave_a\nThis instance has 1 override.",
+            GraphView.HeaderTip("Spawn wave ol_wave_a", true, 1, []));
+        Assert.Equal($"t_name\nThis instance has 2 overrides.\nRepeats: {MissionPageModel.TriggerChipTip("Repeats")}",
+            GraphView.HeaderTip("t_name", false, 2, ["Repeats"]));
+        Assert.Null(GraphView.HeaderTip("Spawn wave ol_wave_a", false, 3, []));
     }
 
     /// <summary>The look table of the button: no fill, a light fill under the mouse, and a solid fill with the dark glyph
