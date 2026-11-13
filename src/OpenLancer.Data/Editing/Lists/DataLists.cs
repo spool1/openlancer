@@ -93,6 +93,10 @@ public sealed class DataLists
     /// <summary>A list that has no scope, or null when it is not available or the rule data has no such list.</summary>
     public ListView? List(string id) => View([id], null);
 
+    /// <summary>The view of lists without a scope in order, as for a rule with more than one list: the first list with a
+    /// name gives the entry. Null when none of the lists is available.</summary>
+    public ListView? List(IReadOnlyList<string> ids) => View(ids, null);
+
     /// <summary>A scoped list of the sections of one file, for example the objects of a system file.</summary>
     public ListView? List(string id, string scopeFile) => View([id], VfsPath.Normalize(scopeFile));
 

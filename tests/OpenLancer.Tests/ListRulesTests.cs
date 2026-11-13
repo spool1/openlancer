@@ -67,8 +67,10 @@ public sealed class ListRulesTests
         [("bodyparts", "lefthand")] = typeof(Bodypart),
         [("bodyparts", "righthand")] = typeof(Bodypart),
         [("bodyparts", "accessory")] = typeof(Accessory),
-        // The asteroid archetypes of the Assets panel (milestone M23, AsteroidArchIni.cs).
+        // The asteroid archetypes of the Assets panel (milestone M23, AsteroidArchIni.cs), and the mines of the cutscene
+        // templates (section 12.1 of the M8b design).
         [("asteroids", "asteroid")] = typeof(Asteroid),
+        [("asteroids", "asteroidmine")] = typeof(Asteroid),
     };
 
     /// <summary>The keys that a hand parser reads, for the files without a section class (VoicesIni.cs:32-44,

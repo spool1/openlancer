@@ -360,6 +360,37 @@ public sealed class DataListsTests
         Assert.NotNull(both.Find("ship1"));
     }
 
+    /// <summary>
+    /// The lists of the cutscene templates (section 12.1 of the M8b design). The petalDB lists read each
+    /// <c>[Data] PetalDB</c> file, in any letter case of the name, and the first file with a name gives the entry, as
+    /// the engine reads them (PetalDbIni.cs). The mines are a list of their own, and the view of the asteroids and the
+    /// mines finds both, as the one collection of the engine does. The asteroid list of the Assets panel keeps only the
+    /// asteroids. The engine reads these files, so the lists are closed.
+    /// </summary>
+    [Fact]
+    public void ThePetalDbListsReadEachFileAndTheMinesHaveTheirOwnList()
+    {
+        using var ws = ListWorkspace.Create();
+        ws.WriteBase(@"EXE\freelancer.ini", ListWorkspace.FreelancerIni +
+                                            "\nPetalDB = petaldb.ini\npetaldb = more_petals.ini\nasteroids = solar\\asteroidarch.ini\n");
+        ws.WriteBase(@"DATA\petaldb.ini", "[ObjectTable]\nroom = bar1, rooms\\bar1.cmp\nprop = cup, props\\cup.3db\nprop = jug, props\\jug.3db\n");
+        ws.WriteBase(@"DATA\more_petals.ini", "[ObjectTable]\nprop = mug, props\\mug.3db\nprop = CUP, props\\other_cup.3db\ncart = cart1, carts\\cart1.cmp\n");
+        ws.WriteBase(@"DATA\SOLAR\asteroidarch.ini", "[Asteroid]\nnickname = rock1\n[AsteroidMine]\nnickname = mine1\n");
+        var lists = ws.Session("act").Lists;
+
+        Assert.Equal(["cup", "jug", "mug"], lists.List("petal_prop")!.Entries.Select(e => e.Value));
+        Assert.EndsWith("petaldb.ini", lists.List("petal_prop")!.Find("Cup")!.Section!.Path, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(["bar1"], lists.List("petal_room")!.Entries.Select(e => e.Value));
+        Assert.Equal(["cart1"], lists.List("petal_cart")!.Entries.Select(e => e.Value));
+        Assert.True(lists.List("petal_prop")!.Closed);
+        Assert.Equal(["rock1"], lists.List("asteroid")!.Entries.Select(e => e.Value));
+        Assert.Equal(["mine1"], lists.List("asteroid_mine")!.Entries.Select(e => e.Value));
+        var both = lists.List(["asteroid", "asteroid_mine"])!;
+        Assert.Equal(("asteroid+asteroid_mine", true), (both.Id, both.Closed));
+        Assert.NotNull(both.Find("MINE1"));
+        Assert.NotNull(both.Find("rock1"));
+    }
+
     [Fact]
     public void AScopedListHoldsTheSectionsOfOneFile()
     {
