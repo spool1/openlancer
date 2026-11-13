@@ -210,7 +210,7 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 | Objects that the setup leaves out ({n}) | A closed list of an approximate start. At this trigger, these objects are in another system, or a trigger of the start makes them again, so the setup does not make them. The list also has the fuse lines that the setup removes. Click a row to select the trigger of its spawn line. |
 | Ships that start next to the player ({n}) | A closed list of an approximate start. These ships travel with the player at this trigger, and each row tells why. The setup puts them next to the player. Click a row to select the trigger of its spawn line. |
 | Advanced > Setup lines | The setup triggers of an approximate start, as read-only raw INI with colors. They are in the test layer of the play, not in the mod. |
-| Play from the play start | Plays the mission from this start in OpenLancer, as F5 in the Mission tab does. The button is off while the start or its start place cannot start, and its tooltip gives the reason. |
+| Play from the play start | Plays the mission from this start in OpenLancer, as F5 in the Mission tab does. The button is off while the start, its start place or its ship cannot start, and its tooltip gives the reason. |
 
 A warning shows when no start trigger and no checkpoint leads to the trigger. The play then starts only this trigger. When the start cannot start, the page shows the reason, for example for a script without a story slot.
 
