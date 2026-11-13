@@ -1,6 +1,6 @@
 using System;
-using System.Threading.Tasks;
 using LibreLancer;
+using OpenLancer.Studio;
 
 namespace OpenLancer.Editor;
 
@@ -23,6 +23,8 @@ internal delegate Action DataLoad();
 /// reload reads the saved files when it starts.</para>
 /// <para>A close of the editor window waits for the running load, as Unity ends a running import before it quits (see
 /// <see cref="Close"/>).</para>
+/// <para>A load reads many files for seconds, so it runs on a thread of its own (<see cref="OwnThread"/>), not on a
+/// thread of the thread pool.</para>
 /// </remarks>
 internal sealed class DataLoads(IUIThread ui)
 {
@@ -111,7 +113,7 @@ internal sealed class DataLoads(IUIThread ui)
         return true;
     }
 
-    private void Run(DataLoad load) => Task.Run(() =>
+    private void Run(DataLoad load) => OwnThread.Run(() =>
     {
         Action? end = null;
         try

@@ -63,15 +63,15 @@ public sealed class DataLoadsTests
         var loads = new DataLoads(ui);
         var resources = new Resources();
         var events = new List<string>();
-        using var running = new ManualResetEventSlim();
+        var running = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var release = new ManualResetEventSlim();
         loads.Load(() =>
         {
-            running.Set();
+            running.SetResult();
             resources.Use(release);
             return () => events.Add("loaded");
         });
-        Assert.True(running.Wait(Timeout, TestContext.Current.CancellationToken));
+        await running.Task.WaitAsync(Timeout, TestContext.Current.CancellationToken);
 
         var starts = 0;
         DataLoad StartReload()
@@ -205,15 +205,15 @@ public sealed class DataLoadsTests
         var loads = new DataLoads(ui);
         var resources = new Resources();
         var events = new List<string>();
-        using var running = new ManualResetEventSlim();
+        var running = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var release = new ManualResetEventSlim();
         loads.Load(() =>
         {
-            running.Set();
+            running.SetResult();
             resources.Use(release);
             return () => events.Add("loaded");
         });
-        Assert.True(running.Wait(Timeout, TestContext.Current.CancellationToken));
+        await running.Task.WaitAsync(Timeout, TestContext.Current.CancellationToken);
         DataLoad StartReload()
         {
             events.Add("reload started");

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenLancer.Editor;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Mods;
 using OpenLancer.Editor.Play;
@@ -27,10 +28,11 @@ public sealed class ProcessThreadTests
 {
     private static readonly Type[] ProcessTypes = [typeof(PlayProcess), typeof(GameProcess)];
 
-    /// <summary>The members that start blocking work that a frame, an agent call or a test waits for: a check, a
-    /// validation process, an export, the worker of Play in the game and a blocking agent tail.</summary>
+    /// <summary>The members that start blocking work that a frame, an agent call or a test waits for: a data load, a
+    /// check, a validation process, an export, the worker of Play in the game and a blocking agent tail.</summary>
     private static readonly (Type Type, string Member)[] BlockingWork =
     [
+        (typeof(DataLoads), "Run"),
         (typeof(ModChecks), nameof(ModChecks.Update)),
         (typeof(ToolProcess), nameof(ToolProcess.Start)),
         (typeof(Editor.Export.ExportRun), nameof(Editor.Export.ExportRun.Prepare)),
