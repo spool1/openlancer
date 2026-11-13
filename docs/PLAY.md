@@ -224,6 +224,8 @@ During a mission play, a save whose validation passes starts the mission again a
 
 The editor validates the save, as after each save. Then it makes the start plan again from the new script, and it reads the Ship field again. The game loads the data of the save and starts the mission again. The process stays, so this takes about the time of a reload.
 
+When the start place can be a point in space, the start check of the restart reads the Scene. So the restart first waits until the Scene shows each edit, also while another tab shows. A new model of an edit can wait for the load of the game data. Then the Console tells why the restart waits. A base that you pick on the Play start page does not wait for the Scene.
+
 The Console says, for example, "Save 4 changed the files of the mission play. The game starts M02 again from Checkpoint t_restore." The start of the play changes only when the game started the mission again.
 
 When the editor cannot make the start again, for example because a new edit breaks the path of an approximate start, the editor sends nothing. The running game keeps its save and its mission. The Console says "The game cannot start M02 again." with the reason.
