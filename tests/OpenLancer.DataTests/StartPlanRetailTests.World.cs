@@ -312,7 +312,9 @@ public sealed partial class StartPlanRetailTests
     /// The combat starts of issue #48 in both games. The review of #6 found that the starter ship dies fast at M12
     /// decloak_R_wings and at M05 chase_player. Both start in space next to ships that the path makes hostile, and a
     /// trigger that waits at the start watches a fight. So the plan tells a combat start. The mission start of M01a makes
-    /// no objects before its triggers run, so it is a calm start.
+    /// no objects before its triggers run, so it is a calm start. The dialogue starts of M01a in space are calm starts
+    /// too. The setup makes the escort of the player, and a trigger that waits at the start watches its death. But the
+    /// escort flies with the player, and the path makes no ship hostile.
     /// </summary>
     [Fact]
     public void TheCombatStartsOfTheReviewOfIssue6AreCombatStarts()
@@ -335,6 +337,18 @@ public sealed partial class StartPlanRetailTests
             var calm = StartPlan.Make(m01a.Index, m01a.Script.Slot, MissionStartPoint.MissionStart);
             Assert.True(calm.CanStart, calm.Reason);
             Assert.False(calm.Combat, $"{set} M01a mission start");
+            foreach (var trigger in new[] { "tm_dlg_0100_0120", "com_0120" })
+            {
+                var dialogue = Plan(m01a, trigger);
+                var what = $"{set} M01a {trigger}";
+                Assert.True(dialogue.CanStart, $"{what}: {dialogue.Reason}");
+                Assert.Equal(StartKind.Approximate, dialogue.Kind);
+                Assert.Equal(StartPlaceKind.Space, dialogue.Place.Kind);
+                Assert.Contains(dialogue.Companions, c => MissionIndex.Is(c.Object, "escort"));
+                Assert.Contains(dialogue.ActiveSet, name =>
+                    m01a.Index.Trigger(name)?.Condition?.Name?.Group == "combat");
+                Assert.False(dialogue.Combat, what);
+            }
         }
     }
 

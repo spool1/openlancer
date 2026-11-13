@@ -346,23 +346,27 @@ internal static class StartWorld
                 lines.AddRange(entry.After);
             }
             lines.AddRange(arrivalLines);
-            return new Result(lines, rows, placed, warnings) { Combat = Combat() };
+            return new Result(lines, rows, placed, warnings) { Combat = Combat(companions.Select(c => c.Unit)) };
         }
 
         /// <summary>
-        /// True when the world of the start system has a fight (issue #48). A trigger that waits at the start has a
-        /// condition of the event group combat on an object that the setup makes. Or the setup makes a ship that the path
-        /// makes hostile to the player.
+        /// True when the world of the start system has a fight (issue #48). The setup makes a ship that the path makes
+        /// hostile to the player. Or a trigger that waits at the start has a condition of the event group combat on an
+        /// object that the setup makes. That object must not be a companion or friendly. A watcher of a ship that flies
+        /// with the player, for example "the escort dies", does not tell a fight.
         /// </summary>
-        private bool Combat()
+        private bool Combat(IEnumerable<Unit> companions)
         {
             var made = spawned.Where(p => !p.Key.Removed && !p.Value.Destroyed).Select(p => p.Value).Distinct().ToList();
-            var names = made.SelectMany(u => u.Members.Append(u.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            return made.Any(u => u.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&
-                                 u.Members.Append(u.Name).Any(facts.Hostile.Contains)) ||
-                   replay.ActiveSet.Any(t => t.Condition is { Name.Group: CombatGroup } condition &&
-                                             Names(condition).Any(n =>
-                                                 names.Contains(n.Trim()) || Members(n).Any(names.Contains)));
+            if (made.Any(u => u.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&
+                              u.Members.Append(u.Name).Any(facts.Hostile.Contains)))
+                return true;
+            var mates = companions.ToHashSet();
+            // By the members: the attitude lines name ships, and a name of a formation or a label stands for its ships.
+            var watched = made.Where(u => !mates.Contains(u)).SelectMany(u => u.Members)
+                .Where(m => !facts.Friendly.Contains(m)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return replay.ActiveSet.Any(t => t.Condition is { Name.Group: CombatGroup } condition &&
+                                             Names(condition).Any(n => Members(n).Overlaps(watched)));
         }
 
         /// <summary>The kept world lines, the jumps of the player and the arrivals of the jumpers, in the order of the

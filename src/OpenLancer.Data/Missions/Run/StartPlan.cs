@@ -230,11 +230,12 @@ public sealed record StartPlan
     public IReadOnlyList<StartCompanion> Companions { get; init; } = [];
 
     /// <summary>
-    /// True for a combat start (issue #48): the play starts in space, and the world of the start system has a fight. A
-    /// trigger that waits at the start has a condition of the event group combat on an object that the setup makes. Or the
-    /// setup makes a ship that the path makes hostile to the player. Only an approximate start whose start system is
-    /// known has a setup of the world. A mission start and a checkpoint start make no objects before their triggers run,
-    /// and the player is docked at a base start. So these starts are never combat starts.
+    /// True for a combat start (issue #48): the play starts in space, and the world of the start system has a fight. The
+    /// setup makes a ship that the path makes hostile to the player. Or a trigger that waits at the start has a condition
+    /// of the event group combat on an object that the setup makes. That object must not be a companion or friendly to
+    /// the player. Only an approximate start whose start system is known has a setup of the world. A mission start and
+    /// a checkpoint start make no objects before their triggers run, and the player is docked at a base start. So these
+    /// starts are never combat starts.
     /// </summary>
     public bool Combat { get; init; }
 

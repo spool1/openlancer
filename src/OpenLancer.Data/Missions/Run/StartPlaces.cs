@@ -54,10 +54,12 @@ internal static class StartPlaces
     /// it.</param>
     /// <param name="Hostile">The objects that the path makes hostile to the player, by the nicknames of the
     /// ships.</param>
+    /// <param name="Friendly">The objects whose last attitude line of the path toward the player is not hostile, by the
+    /// nicknames of the ships.</param>
     /// <param name="JumpHere">The jump-here triggers of the walk, the newest first, with the point of the player that
     /// each one gives.</param>
     public sealed record WorldFacts(IReadOnlyList<string?> Systems, IReadOnlySet<string> Hostile,
-        IReadOnlyList<(MissionTrigger Trigger, Vector3 Point)> JumpHere);
+        IReadOnlySet<string> Friendly, IReadOnlyList<(MissionTrigger Trigger, Vector3 Point)> JumpHere);
 
     /// <summary>The facts of the walk for the setup of the world of a replay.</summary>
     public static WorldFacts World(MissionIndex index, StartReplay replay) => new Walk(index, replay).World();
@@ -356,7 +358,8 @@ internal static class StartPlaces
             var jumps = Facts().Where(f => f is { Jump: true, Point: not null }).Select(f => (f.Trigger, f.Point!.Value))
                 .Distinct().ToList();
             var hostile = Attitudes.Where(p => p.Value).Select(p => p.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            return new WorldFacts(systems, hostile, jumps);
+            var friendly = Attitudes.Where(p => !p.Value).Select(p => p.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return new WorldFacts(systems, hostile, friendly, jumps);
         }
 
         /// <summary>The system of the player when a trigger runs: the system that its condition shows, else its system

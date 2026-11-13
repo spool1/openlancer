@@ -1277,15 +1277,26 @@ public sealed class StartPlanTests
 
     /// <summary>A start in space is a combat start when a trigger that waits at the start watches a fight on an object
     /// that the setup makes in the start system. The setup makes the local ship of the second system. It leaves out the
-    /// guard of the first system, so a watcher of the guard does not make a combat start.</summary>
+    /// guard of the first system, so a watcher of the guard does not make a combat start. A watcher of a companion does
+    /// not tell a fight either, for example "the escort dies". The wing jumps with the player. The local ship with the
+    /// Follow orders flies with the player. A watcher of a ship that the path makes friendly does not tell a fight. The
+    /// friends label holds the guard and the wing, so a watcher of that label does not make a combat start. A watcher of
+    /// a solar of the start system tells a fight.</summary>
     [Theory]
-    [InlineData("Cnd_Destroyed = ol_local", true)]
-    [InlineData("Cnd_HealthDec = ol_locals, 0.5", true)]
-    [InlineData("Cnd_HealthDec = ol_guard, 0.5", false)]
-    [InlineData("Cnd_Timer = 30", false)]
-    public void AWatcherOfAFightOnAnObjectOfTheStartSystemMakesACombatStart(string condition, bool combat)
+    [InlineData("Cnd_Destroyed = ol_local", "", true)]
+    [InlineData("Cnd_HealthDec = ol_locals, 0.5", "", true)]
+    [InlineData("Cnd_HealthDec = ol_guard, 0.5", "", false)]
+    [InlineData("Cnd_Timer = 30", "", false)]
+    [InlineData("Cnd_Destroyed = ol_wing", "", false)]
+    [InlineData("Cnd_HealthDec = ol_friends, 0.5", "", false)]
+    [InlineData("Cnd_Destroyed = ol_local", "Act_GiveObjList = ol_local, ol_follow", false)]
+    [InlineData("Cnd_Destroyed = ol_locals", "Act_SetVibe = ol_local, Player, REP_FRIEND_THRESHOLD", false)]
+    [InlineData("Cnd_Destroyed = ol_local", "Act_SetVibe = ol_local, Player, 0.5", false)]
+    [InlineData("Cnd_Destroyed = ol_depot", "Act_SpawnSolar = ol_depot", true)]
+    public void AWatcherOfAFightOnAnObjectOfTheStartSystemMakesACombatStart(string condition, string jump, bool combat)
     {
-        var text = StartWorldTests.Script(jump: "Act_ActTrig = t_watch",
+        var text = StartWorldTests.Script(jump: $"{jump}\nAct_ActTrig = t_watch",
+            records: "[MsnSolar]\nnickname = ol_depot\nposition = 12000, 0, 12000\n",
             triggers: $"[Trigger]\nnickname = t_watch\n{condition}\n");
 
         var plan = WorldPlan(text);

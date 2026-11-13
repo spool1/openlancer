@@ -216,8 +216,8 @@ A warning shows when no start trigger and no checkpoint leads to the trigger. Th
 
 A warning shows under the Ship field for a combat start with the starter ship. The starter ship is the ship of a new character, for example the Starflier in vanilla. Enemy ships can destroy it fast. Pick a stronger ship in the Ship field. A combat start is a start in space where the setup makes the world of the start system with a fight:
 
-- A trigger that waits at the start watches a fight on an object of that world. Examples are a ship that the player must destroy and a ship that must not take damage.
-- Or the world has a ship that the path makes hostile to the player.
+- The world has a ship that the path makes hostile to the player.
+- Or a trigger that waits at the start watches a fight on an object of that world. Examples are a ship that the player must destroy and a station that must not take damage. A ship that flies with the player does not count, and a ship that the path makes friendly does not count. So a trigger that waits for the death of the escort of the player does not make a combat start.
 
 A base start is never a combat start, because the player is docked. A mission start and a checkpoint start make no objects before their triggers run, so they are never combat starts. At the Scene camera, the page does not know the start system before the play, so it gives no warning.
 
