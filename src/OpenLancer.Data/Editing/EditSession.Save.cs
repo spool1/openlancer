@@ -197,9 +197,10 @@ public sealed partial class EditSession
     /// <item>Each FLHash collision of a hash list that the active mod adds a name to.</item>
     /// <item>The errors of the component checks (layer 3, milestone M3): a zone of the active mod whose nickname another
     /// zone of any system has, also by FLHash. Retail drops one of the two zones.</item>
-    /// <item>The errors of the checks of each cutscene that the active mod changes, that the lower cutscene does not
-    /// have, and each whole cutscene file of the active mod that does not evaluate (decision D137 of the M8b design,
-    /// see <see cref="CutsceneErrors"/>). The game crashes when it plays such a cutscene.</item>
+    /// <item>The problems of the checks of each cutscene that the active mod changes, that the lower cutscene does not
+    /// have, and each whole cutscene file of the active mod that does not evaluate (decision D137 and section 12.1 of
+    /// the M8b design, see <see cref="CutsceneErrors"/>). The game crashes when it plays a cutscene with an error. A
+    /// template that names no item of the data lists is a problem too.</item>
     /// </list>
     /// <para>Each list error tells what the game does with the data, for example "The game stops loading with this
     /// value."</para>

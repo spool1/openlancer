@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using LibreLancer.Data;
 using LibreLancer.Data.Ini;
@@ -45,6 +46,9 @@ public sealed class DataLists
     private readonly Dictionary<string, (ModOverlay View, FileTable? Table)> wholeFiles = new(VfsPath.Comparer);
     private readonly Dictionary<string, RemovedPart> removedParts = new(VfsPath.Comparer);
     private int checksRevision = int.MinValue;
+
+    // The section that gives each entry of a sections list, as the lists read its file (see SectionOf).
+    private readonly ConditionalWeakTable<ListEntry, Section> entrySections = new();
 
     /// <summary>The last <see cref="ReferencePart.Id"/>.</summary>
     private long partIds;
@@ -519,14 +523,17 @@ public sealed class DataLists
         var entries = order.Select(n =>
         {
             var (entry, count, anyChanged) = byName[n];
-            return definition.Unique && count > 1
-                ? entry with
-                {
-                    Usable = false,
-                    Problem = $"{count} sections have the name '{entry.Value}', so the game finds none of them.",
-                    UnusableByActiveMod = anyChanged,
-                }
-                : entry;
+            if (!definition.Unique || count <= 1)
+                return entry;
+            var unusable = entry with
+            {
+                Usable = false,
+                Problem = $"{count} sections have the name '{entry.Value}', so the game finds none of them.",
+                UnusableByActiveMod = anyChanged,
+            };
+            if (entrySections.TryGetValue(entry, out var section))
+                entrySections.AddOrUpdate(unusable, section);
+            return unusable;
         }).ToList();
         var collisions = definition.Hash ? Collisions(order) : [];
         var closed = source.Scoped || source.Role == null || Files.Engine(source.Role);
@@ -635,14 +642,24 @@ public sealed class DataLists
         var keyName = SectionKeys.For(section.Name).KeyEntry ?? SectionKeys.DefaultKey;
         var (origin, mod, inW, unsaved) = session.EntryOrigin(table, index, keyName);
         var missing = definition.Requires.Where(k => !section.Any(e => Is(e.Name, k) && e.Count > 0)).ToList();
-        return new ListEntry(name, inW ? new SectionRef(table.Path, id) : null, origin, mod, Detail(section, definition))
+        var entry = new ListEntry(name, inW ? new SectionRef(table.Path, id) : null, origin, mod, Detail(section, definition))
         {
             Usable = missing.Count == 0,
             Problem = missing.Count == 0 ? null : $"The [{section.Name}] '{name}' has no '{missing[0]}' line.",
             Unsaved = unsaved,
             UnusableByActiveMod = missing.Count > 0 && ChangedByActiveMod(table, index),
         };
+        entrySections.AddOrUpdate(entry, section);
+        return entry;
     }
+
+    /// <summary>
+    /// The section that gives an entry of a list, as the lists read its file: W, or the edit view of a whole file of the
+    /// active mod (see <see cref="TableOf"/>). <see cref="ListEntry.Section"/> names a section of W, and W has the lower
+    /// data of such a whole file. Null for an entry of a files list or of an enum, and for an entry of another session.
+    /// Do not change the section.
+    /// </summary>
+    internal Section? SectionOf(ListEntry entry) => entrySections.TryGetValue(entry, out var section) ? section : null;
 
     /// <summary>The detail text of an entry: the first line of each detail key, as "key = values".</summary>
     private static string Detail(Section section, ListDefinition definition)

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using ImGuiNET;
 using LibreLancer.Thn;
+using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
@@ -69,6 +70,14 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
     public void Dispose() => animations.Dispose();
 
     private static IReadOnlyDictionary<string, ThnSymbolInfo> Symbols => CutsceneWorkspace.Symbols;
+
+    /// <summary>The text of a problem in the Problems section: the message without the start that says that the game
+    /// crashes, because the tooltip gives the whole message. A name problem does not crash the game, so it keeps its
+    /// whole message.</summary>
+    internal static string ProblemText(Diagnostic problem) =>
+        problem.Message.StartsWith(EditSession.CutsceneCrash, StringComparison.Ordinal)
+            ? problem.Message[EditSession.CutsceneCrash.Length..].TrimStart()
+            : problem.Message;
 
     public void Draw(object item)
     {
@@ -137,17 +146,18 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
             grid.EndSection();
         }
 
-        // The errors that crash the game when it plays the cutscene (decision D137 of the M8b design). They block the
-        // save and Play, so the page shows them above the other sections.
+        // The errors that crash the game when it plays the cutscene, and the templates that name no item of the game
+        // data (decision D137 and section 12.1 of the M8b design). They block the save and Play, so the page shows them
+        // above the other sections.
         var errors = edits.CutsceneErrors(path);
         if (errors.Count > 0 &&
             grid.BeginSection("Thn.Problems", EditorIcons.ExclamationTriangle, $"Problems ({errors.Count})"))
         {
             foreach (var error in errors.Take(100))
             {
-                var text = error.Message[EditSession.CutsceneCrash.Length..].TrimStart();
-                if (grid.Link("Error", text, $"{error.Message}\n\nThe save and Play stop until you correct this. Click to " +
-                                             "select the element.") && error.Cutscene is { } place)
+                if (grid.Link("Error", ProblemText(error), $"{error.Message}\n\nThe save and Play stop until you correct " +
+                                                          "this. Click to select the element.") &&
+                    error.Cutscene is { } place)
                 {
                     workspace.Show(place);
                 }

@@ -7,6 +7,7 @@ using LibreLancer.Data.IO;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Mods;
+using OpenLancer.Data.Overlay;
 using OpenLancer.Data.Thn;
 
 namespace OpenLancer.Data.Editing;
@@ -18,13 +19,14 @@ public sealed partial class EditSession
     /// <summary>Why a cutscene path that the session tried to open has no document.</summary>
     private readonly Dictionary<string, string> cutsceneProblems = new(VfsPath.Comparer);
 
-    /// <summary>The errors of <see cref="CutsceneErrors"/>, for the W and the B that gave them, with the errors of B. B
-    /// changes only with a save, so an edit checks only W again.</summary>
-    private readonly Dictionary<string, (ThnScriptModel Working, ThnScriptModel? Base, IReadOnlyList<Diagnostic> Lower,
-        IReadOnlyList<Diagnostic> Errors)> cutsceneErrors = new(VfsPath.Comparer);
+    /// <summary>The errors of <see cref="CutsceneErrors"/> of each cutscene, with what gave them.</summary>
+    private readonly Dictionary<string, CutsceneCheckState> cutsceneErrors = new(VfsPath.Comparer);
 
     /// <summary>The files of the lower layer, made at the first use.</summary>
     private FileSystem? lowerFiles;
+
+    /// <summary>The INI lines of the edit view that name cutscenes, for the edit view that gave them.</summary>
+    private (ModOverlay View, ThnReferences References)? editViewReferences;
 
     /// <summary>The install paths of the cutscene scripts that the session opened, in normal form. A new cutscene that
     /// does not exist now, before New cutscene or after an undo of it, is not in the list.</summary>
@@ -124,38 +126,114 @@ public sealed partial class EditSession
               (ActiveMod.Files.ContainsKey(normal) || ActiveMod.Patches.ContainsKey(normal));
 
     /// <summary>The start of the message of an error of a cutscene in the save gate (decision D137 of the M8b
-    /// design).</summary>
+    /// design). A name problem does not crash the game, so its message does not start with it.</summary>
     public const string CutsceneCrash = "The game crashes when it plays this cutscene.";
 
     /// <summary>
-    /// The errors of the checks of a cutscene (<see cref="ThnChecks.Errors"/>) that W has and B does not have (decision
-    /// D137 of the M8b design). Such a value makes the engine throw when it reads the script or builds the scene, and no
-    /// code of the game catches it, so the game crashes. The save gate and Play refuse them. Each error keeps the place
-    /// of the check, and its message starts with <see cref="CutsceneCrash"/>. B does not give the errors, so each error
-    /// has the origin of the active mod. The checks run without game data, so they do not check templates and costumes.
-    /// Empty when the session has no W of the cutscene.
+    /// The problems of the checks of a cutscene (<see cref="ThnChecks.Check"/>) that W has and B does not have, with
+    /// the game data of W (decision D137 and section 12.1 of the M8b design, decisions D96 and D120 of the M21 design).
+    /// The save gate and Play refuse them.
     /// </summary>
+    /// <remarks>
+    /// <para>An error makes the engine throw when it reads the script or builds the scene, and no code of the game
+    /// catches it, so the game crashes. Its message starts with <see cref="CutsceneCrash"/>. A name problem is a template
+    /// that names no item, where the scene shows less, for example an entity without a model. Its message tells what the
+    /// scene does. Both kinds block the save, because a value of the active mod outside a closed list is an error.</para>
+    /// <para>The game data comes from the data lists of W (see <see cref="SessionThnData"/>), so an unsaved INI edit
+    /// counts, for example a new costume. B and W get the same game data. So a retail value that is not in the lists
+    /// gives the same problem in B, and stays out of the result. Each problem keeps the place of the check. B does not
+    /// give the problems, so each problem has the origin of the active mod.</para>
+    /// <para>The errors of W and B compare by their messages (<see cref="Diagnostic.NewIn"/>). The retail data has a
+    /// name problem, so the name problems compare by their elements (see <see cref="NewNameProblems"/>).</para>
+    /// <para>The result is cached. The cache checks W or B again when it changes, and both when the game data gives
+    /// another answer. The Problems section of the Cutscene page reads the result in each frame.</para>
+    /// <para>Empty when the session has no W of the cutscene.</para>
+    /// </remarks>
     public IReadOnlyList<Diagnostic> CutsceneErrors(string path)
     {
         if (CutsceneDocument(path) is not { } document)
             return [];
-        var cached = cutsceneErrors.TryGetValue(document.Path, out var known) && ReferenceEquals(known.Base, document.Base);
-        if (cached && ReferenceEquals(known.Working, document.Working))
-            return known.Errors;
-        var lower = cached ? known.Lower
-            : document.Base == null ? [] : ThnChecks.Errors(document.Path, document.Base.ToGlobals(), thn);
-        // The lower layer does not give these errors, so the active mod causes them: its patch, its whole file or its edits.
+        var known = cutsceneErrors.GetValueOrDefault(document.Path);
+        // The game data is the same when nothing changed since the last call, or when the lists still give each answer
+        // that the checks read.
+        var data = known != null && (known.Revision == CacheRevision || known.Data.Unchanged()) ? known.Data : null;
+        if (data != null)
+        {
+            known!.Revision = CacheRevision;
+            if (ReferenceEquals(known.Working, document.Working) && ReferenceEquals(known.Base, document.Base))
+                return known.Errors;
+        }
+        var lower = data != null && ReferenceEquals(known!.Base, document.Base) ? known.Lower : null;
+        data ??= new SessionThnData(this, document.Path);
+        lower ??= document.Base == null
+            ? new ThnCheckResult([], [])
+            : ThnChecks.Check(document.Path, document.Base.ToGlobals(), thn, data);
+        var working = ThnChecks.Check(document.Path, document.Working.ToGlobals(), thn, data);
+        // The lower layer does not give these problems, so the active mod causes them: its patch, its whole file or its
+        // edits.
         var origin = ActiveMod is { } active ? MessageOrigin.Mod(active.Id, ModEvidence.ActiveMod) : null;
-        var errors = Diagnostic.NewIn(lower, ThnChecks.Errors(document.Path, document.Working.ToGlobals(), thn))
-            .Select(e => e with
-            {
-                Severity = DiagnosticSeverity.Error,
-                Message = $"{CutsceneCrash} {e.Message}",
-                Origin = e.Origin ?? origin,
-            })
+        var crashes = Diagnostic.NewIn(lower.Errors, working.Errors)
+            .Select(e => e with { Message = $"{CutsceneCrash} {e.Message}" });
+        var errors = crashes.Concat(NewNameProblems(document.Working, lower.NameProblems, working.NameProblems))
+            .Select(e => e with { Severity = DiagnosticSeverity.Error, Origin = e.Origin ?? origin })
             .ToList();
-        cutsceneErrors[document.Path] = (document.Working, document.Base, lower, errors);
+        cutsceneErrors[document.Path] = new CutsceneCheckState(document.Working, document.Base, data, lower, errors)
+        {
+            Revision = CacheRevision,
+        };
         return errors;
+    }
+
+    /// <summary>
+    /// The name problems of W that B does not have. A message names its entity, and the retail data has a name problem:
+    /// the PSYS "ring_2" of <c>Intro_waterplanet.thn</c> names the effect "ring", which no effect file has. A compare of
+    /// the messages would make such a problem new after a rename of its entity. So a problem of an element of W that
+    /// comes from B is new only when its element in B has no problem with the same subject: the path of the value and
+    /// the text (<see cref="Diagnostic.Subject"/>). A problem of an element without an origin, for example in a whole
+    /// file of the active mod, compares by its message.
+    /// </summary>
+    private static IEnumerable<Diagnostic> NewNameProblems(ThnScriptModel working, IReadOnlyList<Diagnostic> lower,
+        IReadOnlyList<Diagnostic> current)
+    {
+        var left = lower.ToList();
+        foreach (var problem in current)
+        {
+            var (kind, origin) = problem.Cutscene is { Kind: { } k, Index: >= 0 and var index } &&
+                                 index < working.Elements(k).Count
+                ? (k, working.Elements(k)[index].Origin)
+                : (default(ThnElementKind?), -1);
+            var match = origin >= 0
+                ? left.FindIndex(p => p.Cutscene is { } at && at.Kind == kind && at.Index == origin && p.Subject == problem.Subject)
+                : left.FindIndex(p => p.Message == problem.Message);
+            if (match >= 0)
+                left.RemoveAt(match);
+            else
+                yield return problem;
+        }
+    }
+
+    /// <summary>The errors of a cutscene, with the W, the B and the game data that gave them, and the problems of
+    /// B.</summary>
+    private sealed record CutsceneCheckState(ThnScriptModel Working, ThnScriptModel? Base, SessionThnData Data,
+        ThnCheckResult Lower, IReadOnlyList<Diagnostic> Errors)
+    {
+        /// <summary>The <see cref="CacheRevision"/> of the last call that found the game data the same.</summary>
+        public int Revision { get; set; }
+    }
+
+    /// <summary>The INI lines of the edit view that name cutscenes. The scan reads each INI file of the edit view, so it
+    /// runs once for each edit view, when a check first needs it. The edit view changes only with a save.</summary>
+    internal ThnReferences EditViewReferences
+    {
+        get
+        {
+            if (editViewReferences is not { } known || !ReferenceEquals(known.View, EditView))
+            {
+                known = (EditView, ThnReferences.Scan(EditView.CreateFileSystem()));
+                editViewReferences = known;
+            }
+            return known.References;
+        }
     }
 
     /// <summary>
