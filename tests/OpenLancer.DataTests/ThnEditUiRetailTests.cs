@@ -42,6 +42,8 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         var hashBefore = SHA256.HashData(File.ReadAllBytes(baseFile));
         using var ws = new RetailWorkspace(baseFolder, "m8proof");
         var session = ws.Open();
+        // The Cutscene tab names the elements with the path that the session stores, the letter case of the file.
+        var stored = session.CutscenePath(S002xe)!;
         var commands = FakeCommandHost.Runner(session);
         var symbols = ThornEvaluator.Instance.Symbols;
         var lower = session.LowerCutscene(S002xe)!;
@@ -49,9 +51,9 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         var labels = new List<string>();
 
         ThnScriptModel W() => session.Cutscene(S002xe)!;
-        TimelineModel Model() => TimelineModel.Build(S002xe, W(), symbols, ScriptPlay.Normal);
-        ThnRef Entity(string name) => new(S002xe, ThnElementKind.Entity, W().EntityNamed(name)!.Id);
-        ThnRef Event(float time, string type, params string[] targets) => new(S002xe, ThnElementKind.Event, W().Events.Single(e =>
+        TimelineModel Model() => TimelineModel.Build(stored, W(), symbols, ScriptPlay.Normal);
+        ThnRef Entity(string name) => new(stored, ThnElementKind.Entity, W().EntityNamed(name)!.Id);
+        ThnRef Event(float time, string type, params string[] targets) => new(stored, ThnElementKind.Event, W().Events.Single(e =>
             e.Table.List[0] == new ThnNumber(time) && ThnSchema.TypeOf(ThnElementKind.Event, e.Table, symbols) == type &&
             ((ThnTable)e.Table.List[2]).List.Select(t => ((ThnText)t).Value).SequenceEqual(targets)).Id);
         ThnValue? Value(ThnRef element, string path) =>
@@ -75,7 +77,7 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         Drag(TimelineDragKind.End, mix, Model().Event(mix.Id)!.End, Model().Event(mix.Id)!.End - 1);
         Done("Change the length of event");
         expected.Change(mix);
-        using (var duration = TimelineDrag.BeginDuration(commands, S002xe, W().Duration, W().Duration, []))
+        using (var duration = TimelineDrag.BeginDuration(commands, stored, W().Duration, W().Duration, []))
         {
             Assert.Null(duration.Drag(95, false, 0));
             duration.End();
@@ -141,7 +143,7 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         Run(Add("Char_Extra_01", "START_SPATIAL_PROP_ANIM", 1));
         Done("Add START_SPATIAL_PROP_ANIM");
         expected.News += 2;
-        var anim = new ThnRef(S002xe, ThnElementKind.Event, W().Events[^1].Id);
+        var anim = new ThnRef(stored, ThnElementKind.Event, W().Events[^1].Id);
         Assert.Equal(anim, ThnGizmoTarget.Subject(W(), anim, symbols, out _));
         Gizmo(anim, GizmoTool.Move, Matrix4x4.CreateTranslation(0, 1, 0));
         Done("Move the target pose of Char_Extra_01");
@@ -158,7 +160,7 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         Done("Delete event");
         expected.Delete(distortion);
         var cigarette = Entity("prop_cigarette_2");
-        var cigaretteEvents = TimelineEdits.EventsNaming(S002xe, W(), "prop_cigarette_2");
+        var cigaretteEvents = TimelineEdits.EventsNaming(stored, W(), "prop_cigarette_2");
         var deleteCigarette = CutsceneCommands.DeleteEntity(session, cigarette);
         Assert.True(deleteCigarette.NeedsConfirmation);
         Assert.Equal([.. cigaretteEvents, cigarette], deleteCigarette.Deleted);
@@ -221,7 +223,7 @@ public sealed class ThnEditUiRetailTests(ITestOutputHelper output)
         var uses = CutsceneRename.Uses(ThnReferences.Scan(session.EditView.CreateFileSystem()), S002xe, "Char_Extra_03",
             _ => null, symbols);
         Assert.Empty(uses);
-        var naming = TimelineEdits.EventsNaming(S002xe, W(), "Char_Extra_03");
+        var naming = TimelineEdits.EventsNaming(stored, W(), "Char_Extra_03");
         var rename = CutsceneCommands.RenameEntity(session, extra, "Char_Extra_03_renamed", uses);
         Assert.False(rename.NeedsConfirmation);
         Run(rename);

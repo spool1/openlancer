@@ -661,6 +661,8 @@ public sealed partial class AgentCutsceneToolTests
         Assert.Equal([Script + "#entity/Fx"], AgentEditToolTests.Texts(flags["changes"]));
         Assert.Equal([ScriptPath], session.EditedPaths);
         Assert.Equal([ScriptPath], session.AgentCutscenes);
+        Assert.Equal(ScriptPath, session.CutscenePath("data/scripts/X.THN"));
+        Assert.Null(session.CutscenePath("data/scripts/none.thn"));
         Assert.Equal([Script], Ok(host, "list_cutscenes", """{ "text": "x.thn" }""")["rows"]!.AsArray()
             .Select(r => (string?)r!["ref"]));
         AssertSaved(session.Save());

@@ -267,6 +267,9 @@ internal sealed partial class CutsceneWorkspace(EditorWindow window) : IDisposab
             Problem = session.Edits.CutsceneReadOnlyReason(Path) ?? $"The edit view has no cutscene {Path}.";
             return false;
         }
+        // A line of a mission or a room can name the script in other letter case. The elements of the tab compare their
+        // path with the elements that a command gives, so the tab uses the path that the session stores.
+        Path = session.Edits.CutscenePath(Path) ?? Path;
 
         session.Edits.Changed += Changed;
         UseSound(data);

@@ -100,6 +100,13 @@ public sealed partial class EditSession
         TryCutscene(path, out var document) && document.State.Exists ? document : null;
 
     /// <summary>
+    /// The install path of a cutscene in the form that the session stores: the letter case of its file, with <c>\</c>
+    /// between the parts. A <see cref="ThnRef"/> compares its path with letter case, so a view that names the elements
+    /// of a script uses this form, as the results of the commands do. Null when the session cannot open the cutscene.
+    /// </summary>
+    public string? CutscenePath(string path) => CutsceneDocument(path)?.Path;
+
+    /// <summary>
     /// The install path of a new cutscene of the active mod: <c>DATA\MODS\&lt;mod id&gt;\CUTSCENES\&lt;name&gt;.thn</c>
     /// (decision D67). Null without an active mod. <see cref="ThnEdits.NewCutsceneRefusal"/> checks the name.
     /// </summary>
