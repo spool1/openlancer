@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json.Nodes;
-using LibreLancer;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions.Editing;
@@ -61,7 +60,7 @@ public sealed partial class AgentCutsceneToolTests
     {
         "cutscene_create" => CutsceneCommands.Create(session, "my_intro"),
         "cutscene_add_entity" => CutsceneCommands.AddEntity(session, ScriptPath, "CAMERA", "my_cam_2", null,
-            new Vector3(30, 10, 0), MathHelper.MatrixFromEulerDegrees(new Vector3(0, 90, 0))),
+            new Vector3(30, 10, 0), ThnPose.Rotation(new Vector3(0, 90, 0))),
         "cutscene_add_event" => CutsceneCommands.AddEvent(session, ScriptPath, "START_PSYS", 1.5, ["fx"], 2),
         "cutscene_set_duration" => CutsceneCommands.SetDuration(session, ScriptPath, 4),
         "cutscene_set_flags" => CutsceneCommands.SetFlags(session, Entity(session, "Fx"),
@@ -533,6 +532,46 @@ public sealed partial class AgentCutsceneToolTests
         Assert.EndsWith("SET_CAMERA needs a CAMERA there.", (string?)problem["message"]);
         Assert.Equal((string?)problem["message"], (string?)Assert.Single(removed["fixed_problems"]!.AsArray())!["message"]);
         Assert.Empty(removed["new_problems"]!.AsArray());
+    }
+
+    /// <summary>A move below the 1 ms grid rounds to the old times, so the call changes nothing. The result warns that
+    /// the move rounds to the grid. A move that changes an event gives no such warning.</summary>
+    [Fact]
+    public void AMoveBelowTheGridGivesNoChangeAndTellsWhy()
+    {
+        var (ws, session, host) = Open();
+        using var _ = ws;
+        string Move(double delta) => $$"""{ "events": [ { "ref": {{Json(Script + "#event/1")}} } ], "time_delta": {{delta.ToString(System.Globalization.CultureInfo.InvariantCulture)}} }""";
+
+        var rounded = Ok(host, "cutscene_move_events", Move(0.0004));
+        var moved = Ok(host, "cutscene_move_events", Move(0.5));
+
+        Assert.Equal("no_change", (string?)rounded["status"]);
+        Assert.Equal([AgentTexts.Error("cutscene_move_rounds")],
+            rounded["warnings"]!.AsArray().Select(w => (string?)w!["message"]));
+        Assert.Equal("applied", (string?)moved["status"]);
+        Assert.True(moved["warnings"] is null or JsonArray { Count: 0 });
+        Assert.Equal(1, session.Revision);
+    }
+
+    /// <summary>A rotation in Euler degrees gives a matrix with float errors, for example -4.371139E-08 for the cosine
+    /// of 90 degrees. The tools write 0, 1 and -1 for such values, so the file holds no noise. get_cutscene still gives
+    /// the degrees.</summary>
+    [Fact]
+    public void ARotationInDegreesWritesNoFloatNoise()
+    {
+        var (ws, session, host) = Open();
+        using var _ = ws;
+
+        Ok(host, "cutscene_add_entity",
+            $$"""{ "cutscene": {{Json(Script)}}, "type": "CAMERA", "name": "my_cam_2", "orientation": [0, 90, 0] }""");
+        Ok(host, "set_fields", $$"""{ "ref": {{Json(Script + "#entity/Cam_A")}}, "fields": { "spatialprops.orient": [0, 90, 0] } }""");
+
+        const string turned = "{ { 0, 0, -1 }, { 0, 1, 0 }, { 1, 0, 0 } }";
+        Assert.Equal(turned, ThnWriter.Value(Value(session, Entity(session, "my_cam_2"), "spatialprops.orient")!));
+        Assert.Equal(turned, ThnWriter.Value(Value(session, Entity(session, "Cam_A"), "spatialprops.orient")!));
+        var cam = Ok(host, "get_item", $$"""{ "ref": {{Json(Script + "#entity/my_cam_2")}} }""");
+        Assert.Contains("[0,90,0]", cam.ToJsonString());
     }
 
     /// <summary>

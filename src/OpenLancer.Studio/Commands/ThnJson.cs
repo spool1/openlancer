@@ -7,7 +7,6 @@ using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using LibreLancer;
 using OpenLancer.Data.Thn;
 
 namespace OpenLancer.Studio.Commands;
@@ -131,7 +130,7 @@ internal static class ThnJson
                     : bad;
             case ThnKeyKind.Orient:
                 return NumbersOf(json, 3) is [var x, var y, var z]
-                    ? Finite(() => ThnPose.Orient(MathHelper.MatrixFromEulerDegrees(new Vector3(x, y, z))))
+                    ? Finite(() => ThnPose.Orient(ThnPose.Rotation(new Vector3(x, y, z))))
                     : bad;
             case ThnKeyKind.Symbol:
                 var name = Text(json) ??

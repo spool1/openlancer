@@ -1421,6 +1421,7 @@
     "cutscene_field_record": "{path} holds a record. Set each key in it with its own path, for example {path}.<key>.",
     "cutscene_field_targets": "The value of targets must be a list of entity names, for example [\"Monitor\", \"Camera_01\"].",
     "cutscene_field_target_count": "The event has {count} targets. Give {count} entity names in targets.",
+    "cutscene_move_rounds": "The move rounds to the 1 ms grid, so the events keep their times and lengths.",
     "cutscene_target_ref": "targets takes the names of entities, for example Camera_01, not references.",
     "cutscene_field_number": "The value of {path} must be a number of seconds.",
     "cutscene_name_empty": "The name of an entity cannot be empty. Give a new name.",

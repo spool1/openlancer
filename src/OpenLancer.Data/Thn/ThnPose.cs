@@ -1,4 +1,6 @@
+using System;
 using System.Numerics;
+using LibreLancer;
 
 namespace OpenLancer.Data.Thn;
 
@@ -62,6 +64,29 @@ public static class ThnPose
 
     /// <summary>The matrix of three rows of a rotation.</summary>
     public static ThnTable Orient(Quaternion rotation) => Orient(Matrix4x4.CreateFromQuaternion(Quaternion.Normalize(rotation)));
+
+    /// <summary>
+    /// The rotation matrix of Euler angles in degrees, as the Inspector shows a rotation
+    /// (<see cref="MathHelper.MatrixFromEulerDegrees(Vector3)"/>). The float math gives a small error, for example
+    /// -4.371139E-08 for the cosine of 90 degrees. So each value within <see cref="SnapDistance"/> of 0, 1 or -1 becomes
+    /// that value, and a save writes 0 where the angles give 0.
+    /// </summary>
+    public static Matrix4x4 Rotation(Vector3 degrees)
+    {
+        var m = MathHelper.MatrixFromEulerDegrees(degrees);
+        return new Matrix4x4(Snap(m.M11), Snap(m.M12), Snap(m.M13), 0, Snap(m.M21), Snap(m.M22), Snap(m.M23), 0,
+            Snap(m.M31), Snap(m.M32), Snap(m.M33), 0, 0, 0, 0, 1);
+    }
+
+    /// <summary>The distance below which a value of <see cref="Rotation"/> becomes 0, 1 or -1. The float error of a sine
+    /// or a cosine is far smaller, and a real value of a rotation is far from these values at this distance.</summary>
+    private const float SnapDistance = 1e-6f;
+
+    private static float Snap(float value) =>
+        MathF.Abs(value) < SnapDistance ? 0
+        : MathF.Abs(value - 1) < SnapDistance ? 1
+        : MathF.Abs(value + 1) < SnapDistance ? -1
+        : value;
 
     /// <summary>The three rows of the rotation part of a matrix.</summary>
     public static ThnTable Orient(Matrix4x4 m) => ThnTable.FromList(Vector(new Vector3(m.M11, m.M12, m.M13)),

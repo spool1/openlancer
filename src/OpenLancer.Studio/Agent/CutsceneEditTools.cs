@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json.Nodes;
-using LibreLancer;
+using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
@@ -65,7 +65,7 @@ internal static class CutsceneEditTools
         var path = Script(call, "cutscene");
         var position = call.Args.Point("position");
         var degrees = call.Args.Point("orientation");
-        var rotation = degrees is { } angles ? MathHelper.MatrixFromEulerDegrees(angles) : (Matrix4x4?)null;
+        var rotation = degrees is { } angles ? ThnPose.Rotation(angles) : (Matrix4x4?)null;
         var type = call.Args.Text("type")!;
         var plan = CutsceneCommands.AddEntity(session, path, type, call.Args.Text("name")!.Trim(),
             call.Args.Text("template"), position, rotation);
@@ -178,8 +178,21 @@ internal static class CutsceneEditTools
                          CutsceneCommands.MoveEvents(scope.Session, moved, time, 0).CanRun
             ? "length_delta"
             : "time_delta";
+        var before = Tables(scope.Session, moved);
         Run(scope, plan, valueField, "events");
+        // A change below the grid rounds to the old values. The call then changes nothing, and the result tells why.
+        if ((time != 0 || length != 0) && before.SequenceEqual(Tables(scope.Session, moved)))
+        {
+            scope.Report(new EditResult(EditStatus.Applied)
+            {
+                Warnings = [new Problem(DiagnosticSeverity.Warning, AgentTexts.Error("cutscene_move_rounds"))],
+            });
+        }
     });
+
+    /// <summary>The tables of elements in W, or null for an element that W does not have.</summary>
+    private static List<ThnTable?> Tables(EditSession session, IEnumerable<ThnRef> elements) =>
+        elements.Select(e => session.Cutscene(e.Path)?.Element(e.Kind, e.Id)?.Table).ToList();
 
     /// <summary>
     /// The install path of the cutscene script that an argument names. The argument takes only a <c>thn:</c>

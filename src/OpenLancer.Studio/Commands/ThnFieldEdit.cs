@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Text;
-using LibreLancer;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions.Editing;
@@ -105,7 +104,7 @@ internal static class ThnFieldEdit
                     : NotNumbers(text, 4);
             case ThnKeyKind.Orient:
                 return ParseNumbers(text, 3) is { } degrees
-                    ? Numbers(degrees, n => ThnPose.Orient(MathHelper.MatrixFromEulerDegrees(new Vector3(n[0], n[1], n[2]))))
+                    ? Numbers(degrees, n => ThnPose.Orient(ThnPose.Rotation(new Vector3(n[0], n[1], n[2]))))
                     : NotNumbers(text, 3);
             default:
                 return ParseValue(text, evaluator);

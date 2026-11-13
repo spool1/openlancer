@@ -543,7 +543,7 @@ The new event gets the usual values of its type, as **Add event** gives them. Th
 
 #### Times, durations and flags
 
-`cutscene_move_events` rounds each new time and length to the 1 ms grid, as the Timeline does. When the lower cutscene has the event and the event has no length there, a length of 0 removes the key `props.duration`. Else the event keeps the length 0. A SET_CAMERA event has no length, as the Inspector shows. So a `length_delta` other than 0 on a SET_CAMERA event gives `invalid_value`, and the message names the event. A time below 0 and a negative length give `invalid_value` too.
+`cutscene_move_events` rounds each new time and length to the 1 ms grid, as the Timeline does. A move that rounds to the old values gives `no_change` with a warning that tells it. When the lower cutscene has the event and the event has no length there, a length of 0 removes the key `props.duration`. Else the event keeps the length 0. A SET_CAMERA event has no length, as the Inspector shows. So a `length_delta` other than 0 on a SET_CAMERA event gives `invalid_value`, and the message names the event. A time below 0 and a negative length give `invalid_value` too.
 
 `cutscene_set_duration` writes the value as you give it, as the duration field does. A negative duration gives `invalid_value`. A flag that the entity type does not have gives `invalid_value` too. A flags value that the engine cannot read gives `refused` with the reason.
 
@@ -587,7 +587,7 @@ The value forms of the THN keys:
 | Yes or no | `true` or `false`. A stored number stays a number, 0 or 1. | `"lightprops.on": false` |
 | Vector | Three numbers. | `"spatialprops.pos": [0, 10, -50]` |
 | Quaternion | Four numbers: w, x, y and z. | `"props.spatialprops.q_orient": [1, 0, 0, 0]` |
-| Rotation | Three angles in degrees, as the Inspector shows them. The file holds a matrix. | `"spatialprops.orient": [0, 90, 0]` |
+| Rotation | Three angles in degrees, as the Inspector shows them. The file holds a matrix. A value of the matrix within 0.000001 of 0, 1 or -1 becomes that value. | `"spatialprops.orient": [0, 90, 0]` |
 | Name | A THN name of the group of the key, or the number of such a name. Another number gives `invalid_value`. A stored number stays a number. | `"lightprops.type": "L_DIRECT"` |
 | Bits | A list of the names of the bits that are on, or a whole number. The other named bits of the key go off, so `[]` turns off all named bits. A bit without a name keeps its state. | `"props.event_flags": ["Loop"]` |
 | Motion path | `closed`, and one row for each key: a `point`, and an `orientation` (w, x, y and z) when the path has them. | `"pathprops.path_data": { "closed": false, "keys": [ { "point": [0, 0, 0], "orientation": [1, 0, 0, 0] } ] }` |
