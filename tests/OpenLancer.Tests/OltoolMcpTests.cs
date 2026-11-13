@@ -161,16 +161,18 @@ public sealed class OltoolMcpTests
 
         /// <summary>Ends the server without the end of its standard input, as a client that ends it at once does. Then
         /// it waits until the lock of the mod is free.</summary>
-        /// <remarks>On a busy computer, Windows can release the handle of the lock a moment after the exit of the
-        /// process. A session that opens before that is read-only.</remarks>
+        /// <remarks>A stress run of three unit runs at the same time saw the lock still held after the exit of the
+        /// server. The cause is not known. A session that opens while the lock is held is read-only. So the helper waits
+        /// up to 10 s, and a failure gives the reason of the lock.</remarks>
         public async Task KillAsync(string modFolder)
         {
             process.Kill(entireProcessTree: true);
             await process.ExitAsync(TimeSpan.FromSeconds(30), "oltool mcp serve did not end after the kill.");
             var end = DateTime.UtcNow + TimeSpan.FromSeconds(10);
-            while (ModLock.HeldBy(modFolder, "act") != null)
+            while (ModLock.HeldBy(modFolder, "act") is { } held)
             {
-                Assert.True(DateTime.UtcNow < end, "The lock of mod 'act' stayed 10 s after the exit of the server.");
+                Assert.True(DateTime.UtcNow < end,
+                    $"The lock of mod 'act' stayed 10 s after the exit of the server: {held}");
                 await Task.Delay(50, Token);
             }
         }
