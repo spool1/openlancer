@@ -270,6 +270,8 @@ public sealed partial class AgentCutsceneToolTests
         var kind = Error(host, "cutscene_set_flags", $$"""{ "entity": {{Json(Script)}}, "flags": [] }""");
         var stale = Error(host, "cutscene_move_events",
             $$"""{ "events": [ { "ref": {{Json(Script + "#event/1")}}, "expect_type": "START_SOUND" } ] }""");
+        var staleTime = Error(host, "cutscene_move_events",
+            $$"""{ "events": [ { "ref": {{Json(Script + "#event/0")}}, "expect_time": 0.0004 } ], "time_delta": 1 }""");
         var longName = Error(host, "cutscene_create", $$"""{ "name": "{{LongName}}" }""");
         var cutLength = Error(host, "cutscene_move_events",
             $$"""{ "events": [ { "ref": {{Json(Script + "#event/0")}} } ], "length_delta": 1 }""");
@@ -289,8 +291,10 @@ public sealed partial class AgentCutsceneToolTests
         Assert.Equal(("invalid_argument", CutsceneEditTools.OneCutscene), (two.Code, two.Detail));
         Assert.Equal(AgentTexts.Error("cutscene_events_one_cutscene"), two.Message);
         Assert.Equal(AgentTexts.Error("cutscene_entity_ref", ("ref", Script)), kind.Message);
-        Assert.Equal($"Event 1 of {ScriptPath} is not a START_SOUND event at 5 s now. The cutscene changed after you read " +
-                     "it. Read the cutscene again, then try again.", stale.Message);
+        Assert.Equal($"Event 1 of {ScriptPath} is a START_PSYS event at 5 s, not a START_SOUND event at 5 s. The cutscene " +
+                     "changed after you read it. Read the cutscene again, then try again.", stale.Message);
+        Assert.StartsWith($"Event 0 of {ScriptPath} is a SET_CAMERA event at 0 s, not a SET_CAMERA event at 0.0004 s.",
+            staleTime.Message);
     }
 
     /// <summary>A cutscene that takes no edits refuses with its reason. A flags value that the engine cannot read refuses

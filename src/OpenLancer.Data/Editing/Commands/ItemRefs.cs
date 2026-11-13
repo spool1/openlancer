@@ -388,9 +388,12 @@ public static class ItemRefs
         if (expectType != null && !string.Equals(type, expectType.Trim(), StringComparison.OrdinalIgnoreCase) ||
             expectTime is { } expected && (time == null || Math.Abs(time.Value - expected) > 1e-4f))
         {
+            // The text gives the event as it is now and as the guards expect it, so the agent sees the change.
+            static string Typed(string? name) => name == null ? "an event without a type" : $"a {name} event";
             throw new EditException(new EditError(EditErrorKind.StaleRevision, "RowChanged",
-                $"Event {index} of {path} is not a {expectType ?? type} event at {Seconds(expectTime ?? time)} s " +
-                "now. The cutscene changed after you read it. Read the cutscene again, then try again.")
+                $"Event {index} of {path} is {Typed(type)} at {Seconds(time)} s, not " +
+                $"{Typed(expectType?.Trim() ?? type)} at {Seconds(expectTime ?? time)} s. The cutscene changed after you " +
+                "read it. Read the cutscene again, then try again.")
             {
                 Target = text,
             });
@@ -439,7 +442,8 @@ public static class ItemRefs
             .Take(3).Select(c => c.Name).ToList();
     }
 
-    private static string Seconds(float? time) => time?.ToString("0.###", CultureInfo.InvariantCulture) ?? "?";
+    /// <summary>A time in seconds without rounding to the 1 ms grid, so a guard below the grid shows as it is.</summary>
+    private static string Seconds(float? time) => time?.ToString("0.#######", CultureInfo.InvariantCulture) ?? "?";
 
     /// <summary>True when the <c>obj:</c> or <c>zone:</c> form of a key resolves to this section, or when W does not
     /// have the section any more, for example after a delete. Another system can have an object with the same nickname,
