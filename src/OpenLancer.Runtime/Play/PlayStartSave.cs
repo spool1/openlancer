@@ -8,14 +8,20 @@ namespace OpenLancer.Runtime.Play;
 
 /// <summary>
 /// The start save of a mission play (section 5.5 of the M6c design): a plain-text save that the editor writes. The
-/// OpenLancer game reads four parts of it: <c>[StoryInfo]</c>, <c>[MissionState]</c>, <c>[TriggerSave]</c> and the
-/// place lines of <c>[Player]</c>. It keeps its multiplayer new character and the ship package of the play.
+/// OpenLancer game reads these parts of it: <c>[StoryInfo]</c>, <c>[MissionState]</c>, <c>[TriggerSave]</c>, the
+/// place lines of <c>[Player]</c>, and the ship lines of <c>[Player]</c> when it has them. The other lines of the play
+/// save come from its multiplayer new character. With <c>ship_archetype</c>, the play takes the ship, the
+/// <c>equip</c> lines and the <c>cargo</c> lines of the start save, and the ship package of the play has no effect.
+/// Without <c>ship_archetype</c>, the play uses the ship package of the play, or the ship of the new character.
 /// </summary>
 /// <param name="Save">The save of the file. Its schema reads only the keys that it knows.</param>
 /// <param name="Place">The place of the file: docked at a base, or in space at a point with the heading of
 /// <c>rotate</c>. After the spawn, <see cref="PlaySpawn.Orient"/> turns the ship to this heading.</param>
 public sealed record PlayStartSave(SaveGame Save, PlayStart Place)
 {
+    /// <summary>True when the <c>[Player]</c> section of the file has a <c>ship_archetype</c> line.</summary>
+    public bool HasShip => Save.Player!.ShipArchetype.Hash != 0;
+
     /// <summary>Reads a start save.</summary>
     /// <exception cref="InvalidDataException">The file is not a start save. The message gives the reason.</exception>
     /// <exception cref="IOException">The file cannot be read.</exception>

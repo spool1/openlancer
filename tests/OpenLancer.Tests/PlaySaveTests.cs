@@ -5,14 +5,16 @@ using LibreLancer.Data.GameData.Items;
 using LibreLancer.Data.GameData.Market;
 using LibreLancer.Data.Schema.Goods;
 using LibreLancer.Data.Schema.Save;
+using OpenLancer.Data.Missions.Run;
 using OpenLancer.Runtime.Play;
 using Xunit;
 
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The rules of the equipment and the cargo of a play save (decisions D47 and D56), on synthetic data. The server
-/// mounts an <c>equip</c> line at its hardpoint and puts a <c>cargo</c> line into the hold.
+/// The rules of the equipment and the cargo of a play save (decisions D47 and D56), on synthetic data: from a ship
+/// package, and from a start save with a ship. The server mounts an <c>equip</c> line at its hardpoint and puts a
+/// <c>cargo</c> line into the hold.
 /// </summary>
 public sealed class PlaySaveTests
 {
@@ -91,6 +93,68 @@ public sealed class PlaySaveTests
         Assert.Equal(FLHash.CreateID("test_ship"), (uint)player.ShipArchetype);
         Assert.DoesNotContain(player.Equip, e => e.Item == new HashValue("old_gun"));
         Assert.DoesNotContain(player.Cargo, c => c.Item == new HashValue("old_battery"));
+    }
+
+    /// <summary>A package and the start save of the editor give the lines of one rule: the save from a package has the
+    /// lines of <see cref="StartSaveShip.FromAddons"/> for its addons.</summary>
+    [Fact]
+    public void APackageGivesTheLinesOfTheAddonRuleOfTheStartSave()
+    {
+        PackageAddon[] addons =
+        [
+            new(Item("test_gun"), "HpWeapon01", 1), new(Item("test_mine"), "HpMine01", 2),
+            new(Item("test_engine"), null, 1), new(Item("test_shield"), "HpShield01", 0),
+        ];
+        var rule = StartSaveShip.FromAddons("test_ship", addons.Select(a => (a.Equipment.Nickname, a.Hardpoint, a.Amount)));
+
+        var player = Equip(addons);
+
+        Assert.Equal(FLHash.CreateID(rule.Ship), (uint)player.ShipArchetype);
+        Assert.Equal(rule.Equip.Select(e => (FLHash.CreateID(e.Item), e.Hardpoint)),
+            player.Equip.Select(e => ((uint)e.Item, e.Hardpoint)));
+        Assert.Equal(rule.Cargo.Select(c => (FLHash.CreateID(c.Item), c.Count)), Cargo(player));
+    }
+
+    [Fact]
+    public void TheShipOfAStartSaveReplacesTheShipTheEquipmentAndTheCargoOfTheSave()
+    {
+        var player = OldSave();
+        var start = StartSave(new PlayerEquipment { Item = new HashValue("test_gun"), Hardpoint = "HpWeapon01" },
+            new PlayerCargo { Item = new HashValue("test_missile"), Count = 4 });
+
+        PlaySave.TakeShip(player, start, [Item("test_gun"), Item("test_missile")]);
+
+        Assert.Equal(FLHash.CreateID("test_ship"), (uint)player.ShipArchetype);
+        var line = Assert.Single(player.Equip);
+        Assert.Equal((FLHash.CreateID("test_gun"), "HpWeapon01"), ((uint)line.Item, line.Hardpoint));
+        Assert.Equal([(FLHash.CreateID("test_missile"), 4)], Cargo(player));
+    }
+
+    /// <summary>The combinable rule (decision D56) also holds for an <c>equip</c> line of a start save. A combinable good
+    /// with a stack in the hold adds one to the hold.</summary>
+    [Fact]
+    public void ACombinableGoodOfAStartSaveGoesIntoTheHold()
+    {
+        var player = OldSave();
+        var start = StartSave(new PlayerEquipment { Item = new HashValue("test_battery"), Hardpoint = "" },
+            new PlayerCargo { Item = new HashValue("test_battery"), Count = 2 });
+        start.Equip.Add(new PlayerEquipment { Item = new HashValue("test_gun"), Hardpoint = "HpWeapon01" });
+
+        PlaySave.TakeShip(player, start, [Item("test_gun"), Battery()]);
+
+        var line = Assert.Single(player.Equip);
+        Assert.Equal(FLHash.CreateID("test_gun"), (uint)line.Item);
+        Assert.Equal([(FLHash.CreateID("test_battery"), 2), (FLHash.CreateID("test_battery"), 1)], Cargo(player));
+    }
+
+    /// <summary>The <c>[Player]</c> section of a start save with the ship <c>test_ship</c>, one equip line and one cargo
+    /// line.</summary>
+    private static SavePlayer StartSave(PlayerEquipment equip, PlayerCargo cargo)
+    {
+        var start = new SavePlayer { ShipArchetype = new HashValue("test_ship") };
+        start.Equip.Add(equip);
+        start.Cargo.Add(cargo);
+        return start;
     }
 
     /// <summary>A save with an old ship, an old gun and old cargo, after <see cref="PlaySave.Equip"/> with a package of

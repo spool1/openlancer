@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using LibreLancer.Data;
 using LibreLancer.Data.GameData.Items;
@@ -6,6 +7,7 @@ using LibreLancer.Data.GameData.Market;
 using LibreLancer.Data.Schema.NewCharDB;
 using LibreLancer.Data.Schema.Save;
 using LibreLancer.Server;
+using OpenLancer.Data.Missions.Run;
 
 namespace OpenLancer.Runtime.Play;
 
@@ -14,6 +16,8 @@ namespace OpenLancer.Runtime.Play;
 /// with the start point of the editor. When the user selected a ship package, the save has the ship of that package
 /// (decision D15). Without a start save, the save has no <c>[StoryInfo]</c>, so the game starts in free roam. A mission
 /// play copies the story, mission and trigger parts of its start save into the save (section 5.6 of the M6c design).
+/// When the start save has a ship, the save takes the ship and its lines from the start save, and the ship package has
+/// no effect (see <see cref="PlayStartSave"/>).
 /// </summary>
 public static class PlaySave
 {
@@ -29,7 +33,7 @@ public static class PlaySave
 
     /// <summary>Tells if the data can start the play. <see cref="Create"/> runs this check first.</summary>
     /// <param name="package">The nickname of the ship package, or null for the package of a new multiplayer
-    /// character.</param>
+    /// character. A start save with a ship does not use it, so the check does not read it then.</param>
     /// <returns>Null when the data can start the play. Else the reason: an unknown system, base or package,
     /// new-character data that cannot make a character, or a start save that the game cannot read or start.</returns>
     public static string? Check(GameItemDb items, PlayStart start, string? package)
@@ -38,8 +42,9 @@ public static class PlaySave
         {
             if (PlayStartSave.TryRead(fromSave.Save, out var problem) is not { } saved)
                 return problem;
-            return StartProblem(items, saved.Place) ?? MissionProblem(items, saved.Save) ?? PackageProblem(items, package) ??
-                   NewCharacterProblem(items, package == null);
+            return StartProblem(items, saved.Place) ?? MissionProblem(items, saved.Save) ??
+                   (saved.HasShip ? StartShipProblem(items, saved.Save.Player!) : PackageProblem(items, package)) ??
+                   NewCharacterProblem(items, !saved.HasShip && package == null);
         }
 
         return StartProblem(items, start) ?? PackageProblem(items, package) ?? NewCharacterProblem(items, package == null);
@@ -64,6 +69,12 @@ public static class PlaySave
     /// the equipment and the cargo of that package. The money stays the money of the new character. See
     /// <see cref="Equip"/> for the rules of the equipment and the cargo.
     /// </summary>
+    /// <remarks>
+    /// The save of a mission play (section 5.6 of the M6c design) is the new character at the place of the start save,
+    /// with the <c>[StoryInfo]</c>, <c>[MissionState]</c> and <c>[TriggerSave]</c> parts of the start save. The server
+    /// then loads the mission of the story. Without a saved trigger, it starts the start triggers. When the start save
+    /// has a ship, the save gets the ship lines of the start save (see <see cref="TakeShip"/>), not the package.
+    /// </remarks>
     /// <exception cref="ArgumentException">The data cannot start the play. The message is the reason of
     /// <see cref="Check"/>.</exception>
     public static SaveGame Create(GameServer server, PlayStart start, string? package)
@@ -71,11 +82,10 @@ public static class PlaySave
         var items = server.GameData.Items;
         if (Check(items, start, package) is { } problem)
             throw new ArgumentException(problem);
-        if (start is PlayStart.FromSave fromSave)
-            return FromStartSave(server, PlayStartSave.Read(fromSave.Save), package);
+        var saved = start is PlayStart.FromSave fromSave ? PlayStartSave.Read(fromSave.Save) : null;
         var save = server.NewCharacter(CharacterName, Faction);
         var player = save.Player!;
-        switch (start)
+        switch (saved?.Place ?? start)
         {
             case PlayStart.InSpace space:
                 // The new character starts at its home base. Without a base, the server spawns the ship in space.
@@ -89,21 +99,16 @@ public static class PlaySave
                 player.System = dock.System;
                 break;
         }
-        Equip(player, package == null ? null : items.GetShipPackage(FLHash.CreateID(package))!, items.Equipment);
-        return save;
-    }
-
-    /// <summary>
-    /// The save of a mission play (section 5.6 of the M6c design): the new character at the place of the start save,
-    /// with the <c>[StoryInfo]</c>, <c>[MissionState]</c> and <c>[TriggerSave]</c> parts of the start save. The server
-    /// then loads the mission of the story. Without a saved trigger, it starts the start triggers.
-    /// </summary>
-    private static SaveGame FromStartSave(GameServer server, PlayStartSave start, string? package)
-    {
-        var save = Create(server, start.Place, package);
-        save.StoryInfo = start.Save.StoryInfo;
-        save.MissionState = start.Save.MissionState;
-        save.TriggerSave = [.. start.Save.TriggerSave];
+        if (saved is { HasShip: true })
+            TakeShip(player, saved.Save.Player!, items.Equipment);
+        else
+            Equip(player, package == null ? null : items.GetShipPackage(FLHash.CreateID(package))!, items.Equipment);
+        if (saved != null)
+        {
+            save.StoryInfo = saved.Save.StoryInfo;
+            save.MissionState = saved.Save.MissionState;
+            save.TriggerSave = [.. saved.Save.TriggerSave];
+        }
         return save;
     }
 
@@ -135,16 +140,11 @@ public static class PlaySave
     /// </summary>
     /// <remarks>
     /// With a package, the save gets the ship of the package, and the addons of the package replace the equipment and
-    /// the cargo of the save:
-    /// <list type="bullet">
-    /// <item>An addon with the amount 1 becomes an <c>equip</c> line at its hardpoint.</item>
-    /// <item>An addon with a larger amount becomes a <c>cargo</c> line with that amount.</item>
-    /// <item>An addon with an amount below 1 gives no line.</item>
-    /// </list>
-    /// Then each <c>equip</c> line of a combinable good becomes a <c>cargo</c> line with the amount 1, with or without
-    /// a package. The line can come from an addon, from the loadout of the new-character package, or from the autosave
-    /// of a reload when the new data makes a mounted good combinable. The server cannot mount such a good: it throws on
-    /// its thread, and the game ends.
+    /// the cargo of the save. <see cref="StartSaveShip.FromAddons"/> tells the line of each addon. Then each
+    /// <c>equip</c> line of a combinable good becomes a <c>cargo</c> line with the amount 1, with or without a package.
+    /// The line can come from an addon, from the loadout of the new-character package, from a start save, or from the
+    /// autosave of a reload when the new data makes a mounted good combinable. The server cannot mount such a good: it
+    /// throws on its thread, and the game ends.
     /// </remarks>
     /// <param name="package">The ship package, or null to keep the ship and the lines of the save.</param>
     /// <param name="equipment">The equipment of the game data, which tells the good of each line.</param>
@@ -152,17 +152,14 @@ public static class PlaySave
     {
         if (package != null)
         {
-            player.ShipArchetype = new HashValue(package.Ship.Nickname);
+            var ship = StartSaveShip.FromAddons(package.Ship.Nickname,
+                package.Addons.Select(a => (a.Equipment.Nickname, a.Hardpoint, a.Amount)));
+            player.ShipArchetype = new HashValue(ship.Ship);
             player.Equip.Clear();
+            player.Equip.AddRange(ship.Equip.Select(e =>
+                new PlayerEquipment { Item = new HashValue(e.Item), Hardpoint = e.Hardpoint }));
             player.Cargo.Clear();
-            foreach (var addon in package.Addons.Where(a => a.Amount > 0))
-            {
-                var item = new HashValue(addon.Equipment.Nickname);
-                if (addon.Amount == 1)
-                    player.Equip.Add(new PlayerEquipment { Item = item, Hardpoint = addon.Hardpoint });
-                else
-                    player.Cargo.Add(new PlayerCargo { Item = item, Count = addon.Amount });
-            }
+            player.Cargo.AddRange(ship.Cargo.Select(c => new PlayerCargo { Item = new HashValue(c.Item), Count = c.Count }));
         }
 
         // The rule of the server for a good that it adds to a stack in the hold.
@@ -170,6 +167,43 @@ public static class PlaySave
         player.Cargo.AddRange(player.Equip.Where(Combinable).Select(l => new PlayerCargo { Item = l.Item, Count = 1 }));
         player.Equip.RemoveAll(Combinable);
     }
+
+    /// <summary>
+    /// Gives the save the ship, the <c>equip</c> lines and the <c>cargo</c> lines of a start save with a ship. They
+    /// replace the ship and the lines of the save. Then the combinable rule of <see cref="Equip"/> runs.
+    /// </summary>
+    /// <param name="start">The <c>[Player]</c> section of the start save.</param>
+    /// <param name="equipment">The equipment of the game data, which tells the good of each line.</param>
+    internal static void TakeShip(SavePlayer player, SavePlayer start, GameItemCollection<Equipment> equipment)
+    {
+        player.ShipArchetype = start.ShipArchetype;
+        player.Equip.Clear();
+        player.Equip.AddRange(start.Equip);
+        player.Cargo.Clear();
+        player.Cargo.AddRange(start.Cargo);
+        Equip(player, null, equipment);
+    }
+
+    /// <summary>The reason when the game data does not have the ship of a start save, or the equipment of one of its
+    /// <c>equip</c> or <c>cargo</c> lines, or null.</summary>
+    /// <param name="start">The <c>[Player]</c> section of a start save with a ship.</param>
+    internal static string? StartShipProblem(GameItemDb items, SavePlayer start)
+    {
+        if (items.Ships.Get(start.ShipArchetype) == null)
+            return $"The start save names the ship '{Name(start.ShipArchetype)}', which is not in the game data. The game " +
+                   "cannot give the player a ship.";
+        foreach (var item in start.Equip.Select(e => e.Item).Concat(start.Cargo.Select(c => c.Item)))
+        {
+            if (items.Equipment.Get(item) == null)
+                return $"The start save names the equipment '{Name(item)}', which is not in the game data. The game " +
+                       "cannot give it to the player.";
+        }
+
+        return null;
+    }
+
+    /// <summary>The nickname of a value of a save, or its game id when the save gives only the id.</summary>
+    private static string Name(HashValue value) => value.String ?? value.Hash.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>The reason when the items do not have the system. The check of a reload uses it too.</summary>
     internal static string? SystemProblem(GameItemDb items, string system) =>
@@ -195,7 +229,8 @@ public static class PlaySave
     /// Finds what <c>GameServer.NewCharacter</c> reads and does not find. The server would throw, or make a character
     /// without a ship.
     /// </summary>
-    /// <param name="usesItsShip">True when the save keeps the ship of the new-character package.</param>
+    /// <param name="usesItsShip">True when the save keeps the ship of the new-character package: no ship package and no
+    /// start save with a ship.</param>
     private static string? NewCharacterProblem(GameItemDb items, bool usesItsShip)
     {
         var data = items.Ini.NewCharDB;

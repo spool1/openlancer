@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Numerics;
+using LibreLancer.Data;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Run;
 using OpenLancer.Runtime.Play;
@@ -9,8 +11,8 @@ using static OpenLancer.Tests.MissionTestData;
 
 namespace OpenLancer.Tests;
 
-/// <summary>The read of a start save in the play process (section 5.6 of the M6c design): the place and the mission
-/// part.</summary>
+/// <summary>The read of a start save in the play process (section 5.6 of the M6c design): the place, the ship part and
+/// the mission part.</summary>
 public sealed class PlayStartSaveTests : IDisposable
 {
     private readonly string folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "openlancer-tests",
@@ -20,12 +22,36 @@ public sealed class PlayStartSaveTests : IDisposable
 
     public void Dispose() => Directory.Delete(folder, true);
 
-    private string Write(StartSavePlace place, string trigger = "t_chosen")
+    private string Write(StartSavePlace place, string trigger = "t_chosen", StartSaveShip? ship = null)
     {
         var plan = StartPlan.Make(Index(StartPlanTests.Script), StartPlanTests.Slot, MissionStartPoint.At(trigger));
         var file = System.IO.Path.Combine(folder, "start.fl");
-        File.WriteAllText(file, StartSaveText.OpenLancer(plan, place, DateTime.Now));
+        File.WriteAllText(file, StartSaveText.OpenLancer(plan, place, DateTime.Now, ship));
         return file;
+    }
+
+    /// <summary>The ship part that the editor writes reads back with the same ship, equipment and cargo.</summary>
+    [Fact]
+    public void TheShipPartOfTheTextReadsBackWithTheSameShipEquipmentAndCargo()
+    {
+        var ship = StartSaveTextTests.Ship;
+
+        var start = PlayStartSave.Read(Write(StartSavePlace.AtBase("ol_sys_a", "ol_base_a"), ship: ship));
+
+        Assert.True(start.HasShip);
+        var player = start.Save.Player!;
+        Assert.Equal(FLHash.CreateID(ship.Ship), (uint)player.ShipArchetype);
+        Assert.Equal(ship.Equip.Select(e => (FLHash.CreateID(e.Item), e.Hardpoint)),
+            player.Equip.Select(e => ((uint)e.Item, e.Hardpoint)));
+        Assert.Equal(ship.Cargo.Select(c => (FLHash.CreateID(c.Item), c.Count)),
+            player.Cargo.Select(c => ((uint)c.Item, c.Count)));
+        Assert.Equal(new PlayStart.AtBase("ol_base_a"), start.Place);
+    }
+
+    [Fact]
+    public void AStartSaveWithoutShipLinesHasNoShip()
+    {
+        Assert.False(PlayStartSave.Read(Write(StartSavePlace.AtBase("ol_sys_a", "ol_base_a"))).HasShip);
     }
 
     [Fact]
