@@ -5,6 +5,7 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Export;
 using OpenLancer.Data.Publishing;
 using OpenLancer.Editor.Ui;
+using OpenLancer.Studio;
 
 namespace OpenLancer.Editor.Export;
 
@@ -16,9 +17,10 @@ internal sealed record ExportWritten(ExportResult Result, RecordResult? Record, 
 
 /// <summary>
 /// The tasks of one export of the Export dialog (milestone M11c): the prepare with the same-version guard, and the write
-/// with the record in the publish history. Both run on a worker thread. <see cref="Update"/> takes their results on the
-/// UI thread in each frame, also while the dialog is closed. So a close of the dialog cannot leave an export that never
-/// ends, and a write that ends after the close still goes into the history.
+/// with the record in the publish history. Both block while they read and write many files, so each one runs on a
+/// thread of its own (<see cref="OwnThread"/>). <see cref="Update"/> takes their results on the UI thread in each frame,
+/// also while the dialog is closed. So a close of the dialog cannot leave an export that never ends, and a write that
+/// ends after the close still goes into the history.
 /// </summary>
 /// <remarks>Each member runs on the UI thread. The prepare and the write have no cancel. A close of the dialog drops the
 /// result of a prepare, but the packages of a write that started go on to the disk.</remarks>
@@ -47,7 +49,7 @@ internal sealed class ExportRun
     /// <summary>True when the dialog closed after the start of this run.</summary>
     public bool Closed { get; private set; }
 
-    /// <summary>Starts the prepare of a new run on a worker thread.</summary>
+    /// <summary>Starts the prepare of a new run on a thread of its own.</summary>
     /// <exception cref="InvalidOperationException">A run is not complete.</exception>
     public void Prepare(Func<GuardedExport> prepare)
     {
@@ -57,10 +59,10 @@ internal sealed class ExportRun
         }
 
         Closed = false;
-        preparing = Task.Run(prepare);
+        preparing = OwnThread.Run(prepare);
     }
 
-    /// <summary>Starts the write of a prepared export on a worker thread.</summary>
+    /// <summary>Starts the write of a prepared export on a thread of its own.</summary>
     /// <param name="replace">True after the answer "Replace version" of the guard.</param>
     /// <exception cref="InvalidOperationException">A run is not complete.</exception>
     public void Write(GuardedExport export, bool replace)
@@ -72,7 +74,7 @@ internal sealed class ExportRun
 
         writes = export;
         this.replace = replace;
-        writing = Task.Run(export.Write);
+        writing = OwnThread.Run(export.Write);
     }
 
     /// <summary>Tells the run that the dialog closed. A prepare that ends after this gives no event. A write still
