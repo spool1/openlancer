@@ -112,6 +112,162 @@ public sealed class PlayStartPageTests
         Assert.False(Model(new PlayStartSetting("t_none", "suggested")).ShowsSource);
     }
 
+    // The field "Ship" and the combat warning of issue #48.
+
+    /// <summary>The names of the ships of <see cref="ShipWorkspace"/>. Two ships have the same name.</summary>
+    private static readonly Dictionary<string, string> ShipNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["s1"] = "Starflier",
+        ["s2"] = "Patriot",
+        ["s3"] = "Patriot",
+    };
+
+    /// <summary>An edit view with the starter ship s1 and three ship packages. The ships s2 and s3 have the same name. The
+    /// package lost_package names a hull good that the view does not have.</summary>
+    private static ShipView ShipWorkspace(TestWorkspace ws)
+    {
+        ws.WriteBase(ItemWorkspace.ShipsPath, """
+            [Ship]
+            nickname = s1
+            [Ship]
+            nickname = s2
+            [Ship]
+            nickname = s3
+            """);
+        ws.WriteBase(ItemWorkspace.GoodsPath, """
+            [Good]
+            nickname = s1_hull
+            category = shiphull
+            ship = s1
+            [Good]
+            nickname = s2_hull
+            category = shiphull
+            ship = s2
+            [Good]
+            nickname = s3_hull
+            category = shiphull
+            ship = s3
+            [Good]
+            nickname = s3_package
+            category = ship
+            hull = s3_hull
+            [Good]
+            nickname = s1_package
+            category = ship
+            hull = s1_hull
+            [Good]
+            nickname = s2_package
+            category = ship
+            hull = s2_hull
+            [Good]
+            nickname = lost_package
+            category = ship
+            hull = no_such_hull
+            """);
+        return new ShipView(ws.Session("act"), s => ShipNames.GetValueOrDefault(s.Id.Key ?? "") ?? "", "s1");
+    }
+
+    /// <summary>The field "Ship" is a picker. Its first row is the ship of the profile with the name that the Play menu
+    /// gives. The other rows are the ship packages of the edit view by the plain names of their ships. A name that two
+    /// packages share shows the package nickname as a hint. A package without a ship gives no row.</summary>
+    [Fact]
+    public void TheShipFieldListsTheShipOfTheProfileThenEachShipPackage()
+    {
+        using var ws = ItemWorkspace.Create();
+        var view = ShipWorkspace(ws);
+
+        var field = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default, null);
+        var profile = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default, "s2_package");
+
+        Assert.Equal(
+        [
+            new ShipRow(null, "Ship of the profile: Starflier (default)", null),
+            new ShipRow("s2_package", "Patriot", "s2_package"),
+            new ShipRow("s3_package", "Patriot", "s3_package"),
+            new ShipRow("s1_package", "Starflier", null),
+        ], field.Rows);
+        Assert.Equal("Ship of the profile: Starflier (default)", field.Text);
+        Assert.Null(field.Problem);
+        Assert.True(field.Starter);
+        Assert.Equal("Ship of the profile: Patriot", profile.Text);
+        Assert.Equal(profile.Rows[0].Text, profile.Text);
+        Assert.False(profile.Starter);
+        Assert.Equal(PlayStartPageModel.ProfileRowTip, PlayStartPageModel.ShipRowTip(field.Rows[0]));
+        Assert.Equal("The ship package s1_package.", PlayStartPageModel.ShipRowTip(field.Rows[3]));
+    }
+
+    /// <summary>A pick gives the ship of its package, also over the ship of the profile. A package whose ship is the ship
+    /// of a new character gives the starter ship.</summary>
+    [Fact]
+    public void APickGivesTheShipOfItsPackage()
+    {
+        using var ws = ItemWorkspace.Create();
+        var view = ShipWorkspace(ws);
+
+        var patriot = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default with { Ship = "S2_PACKAGE" },
+            "s1_package");
+        var starflier = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default with { Ship = "s1_package" },
+            "s2_package");
+
+        Assert.Equal(("Patriot (s2_package)", "The ship package S2_PACKAGE.", false),
+            (patriot.Text, patriot.Tooltip, patriot.Starter));
+        Assert.Null(patriot.Problem);
+        Assert.Equal(("Starflier", true), (starflier.Text, starflier.Starter));
+    }
+
+    /// <summary>A package that the edit view does not have, or whose ship it does not have, shows "(not in the data)"
+    /// with the reason of the builder. Play refuses with the same reason, so the page shows it under the field.</summary>
+    [Theory]
+    [InlineData("no_such_package", "The edit view has no ship package 'no_such_package'.")]
+    [InlineData("lost_package", "The edit view has no ship of the ship package 'lost_package'.")]
+    public void APackageThatTheEditViewCannotResolveShowsTheReason(string package, string reason)
+    {
+        using var ws = ItemWorkspace.Create();
+        var view = ShipWorkspace(ws);
+
+        var field = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default with { Ship = package }, null);
+        var profile = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default, package);
+
+        Assert.Equal($"{package} (not in the data)", field.Text);
+        Assert.Equal($"{reason} Play cannot give the player this ship.", field.Problem);
+        Assert.Equal(field.Problem, field.Tooltip);
+        Assert.False(field.Starter);
+        Assert.Equal(field.Problem, profile.Problem);
+    }
+
+    /// <summary>The page warns about a combat start with the starter ship. Another ship, a calm start, a base start and a
+    /// ship that the edit view cannot resolve give no warning.</summary>
+    [Fact]
+    public void TheCombatWarningShowsForACombatStartWithTheStarterShip()
+    {
+        using var ws = ItemWorkspace.Create();
+        var view = ShipWorkspace(ws);
+        var hostile = MissionTestData.Index(
+            StartWorldTests.Script(jump: "Act_SetVibe = ol_local, Player, REP_HOSTILE_THRESHOLD"), StartWorldTests.World());
+        var calm = MissionTestData.Index(StartWorldTests.Script(), StartWorldTests.World());
+        var combat = new PlayStartSetting("t_chosen", "suggested");
+
+        Assert.True(Page(hostile, combat).Plan.Combat);
+        Assert.Equal(PlayStartPageModel.CombatWarning, Warning(hostile, combat));
+        Assert.Equal(PlayStartPageModel.CombatWarning, Warning(hostile, combat with { Ship = "s1_package" }));
+        Assert.Null(Warning(hostile, combat with { Ship = "s2_package" }));
+        Assert.Null(Warning(hostile, combat, "s2_package"));
+        Assert.Null(Warning(hostile, combat with { Ship = "lost_package" }));
+        Assert.Null(Warning(hostile, combat.WithPlace(StartPlaceChoice.Base, "ol_base_b")));
+        Assert.Null(Warning(calm, combat));
+        return;
+
+        static PlayStartPageModel Page(MissionIndex index, PlayStartSetting setting)
+        {
+            var (place, dock) = setting.PlaceChoice;
+            return new PlayStartPageModel(MissionTestData.Path, setting,
+                StartPlan.Make(index, StartPlanTests.Slot, setting.Start, place, dock));
+        }
+
+        string? Warning(MissionIndex index, PlayStartSetting setting, string? profile = null) =>
+            Page(index, setting).CombatWarningOf(PlayStartPageModel.ShipFieldOf(view, setting, profile));
+    }
+
     /// <summary>The UI texts of Play from a trigger pass the STE lint (section 12.2 of the M6c design).</summary>
     [Fact]
     public void TheTextsPassTheSteLint()
@@ -124,7 +280,8 @@ public sealed class PlayStartPageTests
             ("start", PlayStartPageModel.StartTip), ("slot", PlayStartPageModel.SlotTip),
             ("stage", PlayStartPageModel.StageTip), ("accept", PlayStartPageModel.AcceptTip),
             ("place", PlayStartPageModel.PlaceTip), ("source", PlayStartPageModel.SourceTip),
-            ("ship", PlayStartPageModel.ShipTip),
+            ("ship", PlayStartPageModel.ShipTip), ("combat", PlayStartPageModel.CombatWarning),
+            ("profile ship", PlayStartPageModel.ProfileRowTip),
             ("wait", PlayStartPageModel.WaitTip), ("setup", PlayStartPageModel.SetupTip),
             ("chip", MissionView.PlayStartTip), ("rules", MissionView.RulesBanner),
             ("rules help", MissionView.RulesHelp.WhatItIs), ("dry run during play", MissionView.DryRunPlayTip),
@@ -154,7 +311,8 @@ public sealed class PlayStartPageTests
             ("arrived", StartPlaces.ArrivedWarning("t_wave", "Li02")),
             ("restart refused", MissionPlayTexts.RestartRefused(new NamedStart(), "The path is refused.", "save 2")),
             ("restart failed", MissionPlayTexts.RestartFailedInGame(new NamedStart(), "The start save does not load.")),
-            ("ship", PlayShips.ShipText(null, null).Tooltip), ("ship missing", PlayShips.ShipText(null, "ol_package").Tooltip),
+            ("ship", PlayShips.ShipText((ShipView?)null, null).Tooltip),
+            ("ship missing", PlayShips.ShipText((ShipView?)null, "ol_package").Tooltip),
             ("left out", PlayStartPageModel.LeftOutTip), ("companions", PlayStartPageModel.CompanionsTip),
             ("row", PlayStartPageModel.RowTip), ("left out title", PlayStartPageModel.LeftOutLabel(3)),
             ("companions title", PlayStartPageModel.CompanionsLabel(2)),

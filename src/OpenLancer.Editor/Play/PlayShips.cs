@@ -1,10 +1,23 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Missions.Run;
 using OpenLancer.Runtime.Play;
 
 namespace OpenLancer.Editor.Play;
+
+/// <summary>What the ship texts of Play read: the edit view, the names of its sections and the ship of a new
+/// character. The tests give it without a window.</summary>
+/// <param name="Name">The name of a section of the edit view, or an empty text when it has no name.</param>
+/// <param name="DefaultShip">The nickname of the ship of a new character (see <see cref="PlaySave.DefaultShip"/>), or
+/// null when the game data did not load or has no such ship.</param>
+internal sealed record ShipView(EditSession Edits, Func<SectionRef, string> Name, string? DefaultShip)
+{
+    /// <summary>The view of an open profile.</summary>
+    public static ShipView Of(EditorSession session) => new(session.Edits, session.SectionName,
+        session.GameData is { } data ? PlaySave.DefaultShip(data.Items) : null);
+}
 
 /// <summary>
 /// The ship packages that Play can give the player (decision D15): the <c>[Good]</c> sections of W with
@@ -71,14 +84,17 @@ internal static class PlayShips
     /// character.
     /// </summary>
     /// <param name="package">The nickname of the package, or null for the default package.</param>
-    public static string? ShipName(EditorSession session, string? package)
+    public static string? ShipName(EditorSession session, string? package) => ShipName(ShipView.Of(session), package);
+
+    /// <inheritdoc cref="ShipName(EditorSession, string?)"/>
+    public static string? ShipName(ShipView view, string? package)
     {
-        var edits = session.Edits;
+        var edits = view.Edits;
         string? nickname;
         SectionRef? ship;
         if (package == null)
         {
-            nickname = session.GameData is { } data ? PlaySave.DefaultShip(data.Items) : null;
+            nickname = view.DefaultShip;
             ship = nickname == null ? null : edits.Find(ItemFileKind.Ships, nickname);
         }
         else
@@ -92,8 +108,34 @@ internal static class PlayShips
             nickname = ship?.Id.Key ?? package;
         }
 
-        return ship != null && session.SectionName(ship) is { Length: > 0 } name ? name : nickname;
+        return ship != null ? NameOf(view, ship) : nickname;
     }
+
+    /// <summary>
+    /// The ship packages of W that give a ship, with the name of the ship, in the order of W. The field "Ship" of the
+    /// Play start page lists them. A package without a ship of W, and a nickname that two goods share, give no row,
+    /// because Play cannot give such a ship (see <see cref="ShipPart"/>).
+    /// </summary>
+    public static IReadOnlyList<(string Package, string Ship)> Packages(ShipView view)
+    {
+        var edits = view.Edits;
+        var result = new List<(string, string)>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var section in edits.List(ItemFileKind.Goods))
+        {
+            if (section.Id.Key is { } package && seen.Add(package) && Find(edits, package) is { } found &&
+                edits.Related(found, ItemRelation.Ship) is [var ship])
+            {
+                result.Add((package, NameOf(view, ship)));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>The name of a <c>[Ship]</c> section, or its nickname when it has no name.</summary>
+    private static string NameOf(ShipView view, SectionRef ship) =>
+        view.Name(ship) is { Length: > 0 } name ? name : ship.Id.Key ?? "";
 
     /// <summary>
     /// The ship of Play in words, with its tooltip, for the Play menu and the Play start page: "{ship} (default)" without
@@ -101,9 +143,13 @@ internal static class PlayShips
     /// package.
     /// </summary>
     /// <param name="package">The nickname of the package, or null for the default package.</param>
-    public static (string Text, string Tooltip) ShipText(EditorSession? session, string? package)
+    public static (string Text, string Tooltip) ShipText(EditorSession? session, string? package) =>
+        ShipText(session == null ? null : ShipView.Of(session), package);
+
+    /// <inheritdoc cref="ShipText(EditorSession?, string?)"/>
+    public static (string Text, string Tooltip) ShipText(ShipView? view, string? package)
     {
-        var name = session == null ? null : ShipName(session, package);
+        var name = view == null ? null : ShipName(view, package);
         if (package == null)
         {
             return ($"{name ?? "the ship of a new character"} (default)",

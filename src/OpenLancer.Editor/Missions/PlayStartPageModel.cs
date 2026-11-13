@@ -1,11 +1,30 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using OpenLancer.Data.Editing.Fields;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Run;
+using OpenLancer.Editor.Play;
 
 namespace OpenLancer.Editor.Missions;
+
+/// <summary>One row of the field "Ship" of the Play start page (issue #48).</summary>
+/// <param name="Package">The ship package of the row, or null for the ship of the profile.</param>
+/// <param name="Text">The text of the row: the plain name of the ship of the package.</param>
+/// <param name="Hint">The nickname of the package as a dim hint when two rows have the same name, else null.</param>
+internal sealed record ShipRow(string? Package, string Text, string? Hint);
+
+/// <summary>The field "Ship" of the Play start page (issue #48), without ImGui.</summary>
+/// <param name="Rows">The rows of the picker: the ship of the profile, then each ship package of the edit view by the
+/// name of its ship.</param>
+/// <param name="Text">The text of the value of the field.</param>
+/// <param name="Tooltip">The tooltip of the value.</param>
+/// <param name="Problem">The reason when the edit view cannot give the ship of the value, else null. Play then refuses
+/// with this reason.</param>
+/// <param name="Starter">True when the value gives the starter ship: no ship package, or a package whose ship is the
+/// ship of a new character.</param>
+internal sealed record ShipField(IReadOnlyList<ShipRow> Rows, string Text, string Tooltip, string? Problem, bool Starter);
 
 /// <summary>
 /// The Play start page of the Inspector (sections 5.3 and 8.3 of the M6c design): the plan of the play start of a
@@ -42,7 +61,19 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
                                    "or hole of the jump. When no line of the path gives a place, it is the Scene camera.";
     public const string SourceTip = "The line of the script that tells where the player is at this trigger. When that line " +
                                     "gives no system or no point, the text names the line that gives the system or the point.";
-    public const string ShipTip = "The ship package of the Play menu.";
+    public const string ShipTip = "The ship and the loadout of the player in this mission play. The start save holds " +
+                                  "them. The default is the ship of the profile, which the Play menu shows.";
+
+    /// <summary>The label of the default row of the field "Ship".</summary>
+    public const string ProfileShipLabel = "Ship of the profile";
+
+    /// <summary>The tooltip of the default row of the field "Ship".</summary>
+    public const string ProfileRowTip = "The ship of the profile, which the Play menu shows. Use for Play in Database > " +
+                                        "Goods sets it.";
+
+    /// <summary>The warning of a combat start with the starter ship (issue #48).</summary>
+    public const string CombatWarning = "This start is in combat, and the ship of the play is the starter ship. Enemy " +
+                                        "ships can destroy it fast. Pick a stronger ship in the Ship field.";
     public const string WaitTip = "These triggers are active when the play starts, as at this point of the mission.";
     public const string SetupTip = "The setup triggers of an approximate start. They are in a test layer of the play. The mod " +
                                    "does not change.";
@@ -66,6 +97,56 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
         return new PlayStartPageModel(analysis.Script.Path, setting,
             StartPlan.Make(analysis.Index, analysis.Script.Slot, setting.Start, place, dock));
     }
+
+    /// <summary>
+    /// The field "Ship" of a play start (issue #48). The first row is the ship of the profile, as the Play menu names it.
+    /// The other rows are the ship packages of the edit view, sorted by the names of their ships. A row whose name another
+    /// row also has shows its package nickname as a hint. The value is the package of the setting, else the ship of the
+    /// profile. A package that the edit view cannot resolve gives the reason of <see cref="PlayShips.ShipPart"/>.
+    /// </summary>
+    /// <param name="view">The edit view, or null without an open profile.</param>
+    /// <param name="profilePackage">The ship package of the Play menu, or null for the default ship.</param>
+    public static ShipField ShipFieldOf(ShipView? view, PlayStartSetting setting, string? profilePackage)
+    {
+        var profile = PlayShips.ShipText(view, profilePackage);
+        IReadOnlyList<(string Package, string Ship)> packages = view == null ? [] : PlayShips.Packages(view);
+        var shared = packages.GroupBy(p => p.Ship, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1)
+            .Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var rows = new List<ShipRow> { new(null, $"{ProfileShipLabel}: {profile.Text}", null) };
+        rows.AddRange(packages.OrderBy(p => p.Ship, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(p => p.Package, StringComparer.OrdinalIgnoreCase)
+            .Select(p => new ShipRow(p.Package, p.Ship, shared.Contains(p.Ship) ? p.Package : null)));
+
+        string? problem = null;
+        var package = setting.PackageOr(profilePackage);
+        var part = package == null || view == null ? null : PlayShips.ShipPart(view.Edits, package, out problem);
+        var starter = package == null ||
+                      part != null && string.Equals(part.Ship, view?.DefaultShip, StringComparison.OrdinalIgnoreCase);
+        if (setting.ShipPackage is not { } field)
+        {
+            return new ShipField(rows, rows[0].Text, profile.Tooltip, problem, starter);
+        }
+
+        if (rows.FirstOrDefault(r => string.Equals(r.Package, field, StringComparison.OrdinalIgnoreCase)) is { } row)
+        {
+            return new ShipField(rows, row.Hint == null ? row.Text : $"{row.Text} ({row.Hint})", PackageTip(field),
+                problem, starter);
+        }
+
+        return new ShipField(rows, $"{field} (not in the data)", problem ?? $"The edit view has no ship package {field}.",
+            problem, starter);
+    }
+
+    /// <summary>The tooltip of a row of the field "Ship".</summary>
+    public static string ShipRowTip(ShipRow row) => row.Package == null ? ProfileRowTip : PackageTip(row.Package);
+
+    /// <summary>The tooltip of a ship package of the field "Ship".</summary>
+    private static string PackageTip(string package) => $"The ship package {package}.";
+
+    /// <summary>The warning of a combat start whose field "Ship" gives the starter ship, or null (issue #48). Only the
+    /// Play start page shows it.</summary>
+    public string? CombatWarningOf(ShipField ship) =>
+        Plan is { CanStart: true, Combat: true } && ship is { Starter: true, Problem: null } ? CombatWarning : null;
 
     /// <summary>The choices of the field "Start": the mission start, each checkpoint, and the trigger of the play start
     /// when it is another trigger.</summary>

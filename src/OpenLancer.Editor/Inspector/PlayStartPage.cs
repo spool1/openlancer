@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using ImGuiNET;
+using LibreLancer;
 using LibreLancer.ImUI;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Run;
@@ -16,8 +17,8 @@ namespace OpenLancer.Editor.Inspector;
 /// <summary>
 /// The Play start page of the Inspector (section 8.3 of the M6c design): the start, the story slot, the story stage, the
 /// accept, the start place, the ship, the triggers that wait at the start, the warnings, and the setup triggers as
-/// read-only raw INI in the closed section "Advanced". A change of the start or of the place changes the play start in
-/// the editor settings. It is not data of the mod, so it has no Undo entry.
+/// read-only raw INI in the closed section "Advanced". A change of the start, of the place or of the ship changes the
+/// play start in the editor settings. It is not data of the mod, so it has no Undo entry.
 /// </summary>
 internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : IDisposable
 {
@@ -27,6 +28,10 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
     private readonly RawIniEditor setupIni = new(MissionWorkspace.Vocabulary);
     private bool pickBase;
     private (MissionAnalysis Analysis, PlayStartSetting Setting, PlayStartPageModel Model)? cache;
+
+    // The field "Ship" reads the edit view, the game data and the ship of the Play menu, which change without a new plan.
+    private (EditorSession? Session, int Version, GameDataManager? Data, PlayStartSetting Setting, string? Profile,
+        ShipField Field)? shipCache;
 
     public void Draw(MissionRef item)
     {
@@ -82,6 +87,7 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
         var plays = window.Missions.Plays;
         // The check of the start place reads the game data and the Scene, which change without a new plan.
         var placeProblem = plan.CanStart ? window.StartPlaceProblem(plan.Place) : null;
+        var ship = ShipField(model.Setting);
         if (grid.BeginSection("PlayStart.Start", EditorIcons.Play, "Play start", true, PlayStartPageModel.Help))
         {
             grid.Help(PlayStartPageModel.StartTip);
@@ -128,9 +134,12 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
                     grid.Row(PlayStartPageModel.SourceLabel, () => PlaceSource(analysis, model));
                 }
 
-                var (ship, shipTip) = PlayShips.ShipText(window.Session, ShipPackage());
-                grid.Help($"{PlayStartPageModel.ShipTip} {shipTip}");
-                grid.Text("Ship", ship);
+                grid.Help(PlayStartPageModel.ShipTip);
+                grid.Row("Ship", () => ShipCombo(script, model, ship));
+                if ((ship.Problem ?? model.CombatWarningOf(ship)) is { } shipWarning)
+                {
+                    Warning(shipWarning);
+                }
             }
 
             grid.EndSection();
@@ -177,7 +186,7 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
         }
 
         // Play from the start: the same request as F5 in the Mission tab.
-        var block = !plan.CanStart ? StartPlan.RefusalPrefix + plan.Reason : placeProblem;
+        var block = !plan.CanStart ? StartPlan.RefusalPrefix + plan.Reason : placeProblem ?? ship.Problem;
         grid.FullRow(() =>
         {
             ImGui.BeginDisabled(block != null);
@@ -306,6 +315,51 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
         {
             plays.SetPlayStart(script, model.Setting.WithPlace(StartPlaceChoice.Base, picked));
         }
+    }
+
+    /// <summary>The picker of the field "Ship" (issue #48, UI rule 2): the ship of the profile, then each ship package of
+    /// the edit view by the plain name of its ship. A name that two packages share shows the package nickname as a dim
+    /// hint, as the Play menu shows a nickname.</summary>
+    private void ShipCombo(string script, PlayStartPageModel model, ShipField ship)
+    {
+        ImGui.SetNextItemWidth(-1);
+        if (!ImGui.BeginCombo("##ship", ship.Text))
+        {
+            ImGui.SetItemTooltip(ship.Tooltip);
+            return;
+        }
+
+        EditorTheme.PushMenuColors();
+        var current = model.Setting.ShipPackage;
+        for (var i = 0; i < ship.Rows.Count; i++)
+        {
+            var row = ship.Rows[i];
+            if (ImGui.MenuItem($"{row.Text}##ship-{i}", row.Hint ?? "",
+                    string.Equals(row.Package, current, StringComparison.OrdinalIgnoreCase)))
+            {
+                window.Missions.Plays.SetPlayStart(script, model.Setting with { Ship = row.Package });
+            }
+
+            ImGui.SetItemTooltip(PlayStartPageModel.ShipRowTip(row));
+        }
+
+        EditorTheme.PopMenuColors();
+        ImGui.EndCombo();
+    }
+
+    /// <summary>The field "Ship" of a setting, from the cache while its inputs stay the same.</summary>
+    private ShipField ShipField(PlayStartSetting setting)
+    {
+        var session = window.Session;
+        var (version, data, profile) = (session?.Version ?? 0, session?.GameData, ShipPackage());
+        if (shipCache is not var (s, v, d, set, p, field) || !ReferenceEquals(s, session) || v != version ||
+            !ReferenceEquals(d, data) || set != setting || p != profile)
+        {
+            field = PlayStartPageModel.ShipFieldOf(session == null ? null : ShipView.Of(session), setting, profile);
+            shipCache = (session, version, data, setting, profile, field);
+        }
+
+        return field;
     }
 
     /// <summary>Where the suggested place comes from, and a link that selects the trigger of its line (UI rule 6).</summary>
