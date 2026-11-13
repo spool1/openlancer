@@ -1078,6 +1078,8 @@ internal sealed partial class CutsceneWorkspace(EditorWindow window) : IDisposab
         }
         catch (ThnEvaluationException)
         {
+            // The engine runs the script file of a mod as Lua, as the game does. No agent text gets into such a file,
+            // because an agent saves a script only through ThnWriter.
             return bytes;
         }
 

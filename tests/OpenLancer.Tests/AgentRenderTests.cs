@@ -309,6 +309,32 @@ public sealed class AgentRenderTests
             Encoding.ASCII.GetString(CutsceneWorkspace.FileScriptBytes(files, unread)).ReplaceLineEndings("\n"));
     }
 
+    /// <summary>The engine reads the path text also from a <c>pathprops</c> table with list items, before or after the
+    /// key (ThnScript.cs:476-484). So such a table of a CAMERA stops the build too, from W and from a file of the edit
+    /// view.</summary>
+    [Theory]
+    [InlineData("{ 1; path_data = \"@\" }")]
+    [InlineData("{ path_data = \"@\"; 0 }")]
+    public void TheBuildReadsThePathTextAlsoFromATableWithListItems(string pathprops)
+    {
+        const string bad = "OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_hit = 1 ol_path = { OPEN, {0,0,0}, {1,0,0,0}";
+        const string other = @"DATA\other.thn";
+        var camera = $"{{ entity_name = \"Ls\", type = CAMERA, pathprops = {pathprops.Replace("@", bad, StringComparison.Ordinal)} }}";
+        using var ws = ThnSessions.Workspace(script: ThnSessions.Script.Replace("psysprops = {} }",
+            "psysprops = {} },\n" + camera));
+        ws.WriteBase(other, $"duration = 3\nentities = {{ {camera} }}\nevents = {{}}\n");
+        var session = ws.Session("act");
+        var files = session.EditView.CreateFileSystem();
+
+        var working = Assert.Throws<InvalidOperationException>(() =>
+            CutsceneWorkspace.ScriptBytes(session, files, ThnSessions.ScriptPath, ThnSessions.ScriptPath));
+        var file = Assert.Throws<InvalidOperationException>(() => CutsceneWorkspace.ScriptBytes(session, files, other, null));
+
+        Assert.StartsWith($"The editor does not give the script {ThnSessions.ScriptPath} to the engine. The entity Ls has",
+            working.Message);
+        Assert.StartsWith($"The editor does not give the script {other} to the engine. The entity Ls has", file.Message);
+    }
+
     /// <summary>The list of the visible items clips at the planes of the render, so it never names an item that the
     /// image cannot show.</summary>
     [Fact]

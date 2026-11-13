@@ -37,8 +37,15 @@ public static class ThnMotionPath
     public const string OpenName = "OPEN";
     public const string ClosedName = "CLOSED";
 
-    /// <summary>The path of the text in a MOTION_PATH entity.</summary>
-    public static readonly ThnPath Path = new("pathprops.path_data");
+    /// <summary>The key of the record of a path in an entity.</summary>
+    private const string PropsKey = "pathprops";
+
+    /// <summary>The key of the path text in the record of a path.</summary>
+    private const string DataKey = "path_data";
+
+    /// <summary>The path of the text in a MOTION_PATH entity. A path goes only into a table without list items, so a
+    /// check reads the text with <see cref="DataOf"/>.</summary>
+    public static readonly ThnPath Path = new($"{PropsKey}{ThnPath.Separator}{DataKey}");
 
     private const string Global = "ol_path";
 
@@ -141,6 +148,15 @@ public static class ThnMotionPath
     }
 
     /// <summary>
+    /// The value of <c>pathprops.path_data</c> of an entity as the engine reads it, or null when the entity has no such
+    /// value. The engine reads the key from the record part of the <c>pathprops</c> table, whatever its list part holds
+    /// (ThnScript.cs:476-484). So a table such as <c>{ 1; path_data = "..." }</c> gives the entity a path text too. Each
+    /// check of the path text of an entity reads the text here, because <see cref="Path"/> does not go into such a
+    /// table.
+    /// </summary>
+    public static ThnValue? DataOf(ThnTable entity) => entity[PropsKey] is ThnTable props ? props[DataKey] : null;
+
+    /// <summary>
     /// Why a build must not give a script to the engine, or null (section 8.7, item 2 of the MCP1 design). The engine
     /// reads <c>pathprops.path_data</c> of an entity of each type and runs it as Lua (ThnScript.cs:476-484,
     /// MotionPath.cs:54-55). So each path text of the script must be free of a <see cref="TextProblem"/>. The engine
@@ -154,8 +170,7 @@ public static class ThnMotionPath
             return null;
         foreach (var value in entities.List.Concat(entities.Record.Select(f => f.Value)))
         {
-            if (value is ThnTable entity && Path.ValueIn(ThnElementKind.Entity, entity) is ThnText text &&
-                TextProblem(text.Value) is { } problem)
+            if (value is ThnTable entity && DataOf(entity) is ThnText text && TextProblem(text.Value) is { } problem)
             {
                 var name = ThnScriptModel.NameOf(entity) is { } entityName
                     ? $"The entity {entityName}"

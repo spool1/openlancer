@@ -661,9 +661,10 @@ public static class CutsceneCommands
 
     /// <summary>
     /// Why a value at a path of an entity gives the entity a path text that the engine must not run, or null. The
-    /// engine reads <see cref="ThnMotionPath.Path"/> of an entity of each type, so the check reads the entity after the
-    /// edit, whatever the path of the edit is. A path that the session command refuses gives null, because the plan
-    /// then refuses with the reason of the command.
+    /// engine reads <see cref="ThnMotionPath.Path"/> of an entity of each type, also from a <c>pathprops</c> table with
+    /// list items. So the check reads the entity after the edit as the engine does (see
+    /// <see cref="ThnMotionPath.DataOf"/>), whatever the path of the edit is. A path that the session command refuses
+    /// gives null, because the plan then refuses with the reason of the command.
     /// </summary>
     private static string? NewPathProblem(EditSession session, ThnRef target, ThnPath path, ThnValue value)
     {
@@ -678,8 +679,7 @@ public static class CutsceneCommands
         {
             return null;
         }
-        return ThnMotionPath.Path.ValueIn(ThnElementKind.Entity, after) is ThnText text &&
-               !text.Equals(ThnMotionPath.Path.ValueIn(ThnElementKind.Entity, table)) &&
+        return ThnMotionPath.DataOf(after) is ThnText text && !text.Equals(ThnMotionPath.DataOf(table)) &&
                ThnMotionPath.TextProblem(text.Value) is { } problem
             ? $"The engine reads {ThnMotionPath.Path} of an entity of each type as a path. {problem}"
             : null;

@@ -282,7 +282,7 @@ public static class ThnChecks
             }
             // The path animation reads the path of the second target (StartPathAnimationEvent.cs:35-37,
             // ThnSceneObject.cs:218). An entity gets a path only from pathprops.path_data (ThnScript.cs:476-484).
-            if (type == "START_PATH_ANIMATION" && Get(entity.Table["pathprops"], "path_data") == null)
+            if (type == "START_PATH_ANIMATION" && ThnMotionPath.DataOf(entity.Table) == null)
             {
                 Add(ev, "targets", $"The second target is {entity.Label}, which has no pathprops.path_data. " +
                                    "START_PATH_ANIMATION needs a path there.");

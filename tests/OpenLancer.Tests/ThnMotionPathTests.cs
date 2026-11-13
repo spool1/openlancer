@@ -161,8 +161,39 @@ public sealed class ThnMotionPathTests
                      $"script. {ThnMotionPath.NotPathPart("}")}", marker);
         Assert.StartsWith("The entity Cam has a pathprops.path_data text", keyed);
         Assert.StartsWith("An entity without a name has a pathprops.path_data text", unnamed);
+        // The engine reads path_data from a pathprops table with list items too, before or after the key.
+        Assert.StartsWith("The entity L1 has a pathprops.path_data text", ThnMotionPath.ScriptProblem(Globals(
+            $$"""{{good}}, { entity_name = "L1", type = MARKER, pathprops = { 1; path_data = "{{bad}}" } }""")));
+        Assert.StartsWith("The entity L2 has a pathprops.path_data text", ThnMotionPath.ScriptProblem(Globals(
+            $$"""{{good}}, { entity_name = "L2", type = CAMERA, pathprops = { path_data = "{{bad}}"; 0 } }""")));
         Assert.Null(ThnMotionPath.ScriptProblem(Globals($$"""{{good}}, { entity_name = "N", type = MARKER, pathprops = { path_data = 1 } }""")));
         Assert.Null(ThnMotionPath.ScriptProblem(Evaluate("duration = 1\n")));
+    }
+
+    /// <summary>
+    /// The editor reads the path text of an entity as the engine reads it: from the record part of the
+    /// <c>pathprops</c> table, also when the table has list items. A path of <see cref="ThnPath"/> does not go into a
+    /// table with list items. So each check reads the text with <see cref="ThnMotionPath.DataOf"/>.
+    /// </summary>
+    [Theory]
+    [InlineData("pathprops = { path_data = \"@\" }", true)]
+    [InlineData("pathprops = { 1; path_data = \"@\" }", true)]
+    [InlineData("pathprops = { path_data = \"@\"; 0 }", true)]
+    [InlineData("pathprops = { 1, 2 }", false)]
+    [InlineData("pathprops = {}", false)]
+    [InlineData("", false)]
+    public void ThePathTextOfAnEntityIsTheTextThatTheEngineReads(string pathprops, bool hasPath)
+    {
+        pathprops = pathprops.Replace("@", Retail, StringComparison.Ordinal);
+        var script = $"duration = 1\nentities = {{ {{ entity_name = \"Mk\", type = MARKER, {pathprops} }} }}\nevents = {{}}\n";
+
+        var entity = Assert.IsType<ThnTable>(Assert.IsType<ThnTable>(Evaluate(script)["entities"]).List[0]);
+        var engine = new ThnScript(Encoding.ASCII.GetBytes(script), _ => null!, "path.thn").Entities["Mk"];
+
+        Assert.Equal(hasPath, engine.Path != null);
+        Assert.Equal(hasPath ? new ThnText(Retail) : null, ThnMotionPath.DataOf(entity));
+        if (hasPath && pathprops.Contains(';', StringComparison.Ordinal))
+            Assert.Null(ThnMotionPath.Path.ValueIn(ThnElementKind.Entity, entity));
     }
 
     /// <summary>A MOTION_PATH entity of the engine with a path text.</summary>

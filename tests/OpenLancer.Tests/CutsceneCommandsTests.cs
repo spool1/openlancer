@@ -105,6 +105,11 @@ public sealed partial class CutsceneCommandsTests
             Record(F("path_data", T(bad)))), message, MissionErrors.FieldValue);
         AssertRefused(session, ThnFieldCommand.Set(Entity(session, "Monitor"), ThnMotionPath.Path).Make(session, T(bad)),
             message, MissionErrors.FieldValue);
+        // The engine reads the text also from a pathprops table with list items.
+        AssertRefused(session, CutsceneCommands.SetValue(session, Entity(session, "Monitor"), new ThnPath("pathprops"),
+            new ThnTable([N(1)], [F("path_data", T(bad))])), message, MissionErrors.FieldValue);
+        AssertRefused(session, CutsceneCommands.SetValue(session, Entity(session, "Cam_A"), new ThnPath("pathprops"),
+            new ThnTable([N(0)], [F("path_data", T(bad))])), message, MissionErrors.FieldValue);
         Assert.Equal(0, evaluator.RunsThatSet("ol_hit"));
         Assert.False(session.CanUndo);
 
@@ -131,6 +136,32 @@ public sealed partial class CutsceneCommandsTests
 
         Assert.Equal((EditStatus.NoChange, EditStatus.Applied), (same.Status, other.Status));
         Assert.Equal(T(stored), Value(session, Entity(session, "Monitor"), ThnMotionPath.Path.Text));
+    }
+
+    /// <summary>The check reads a stored path text in a <c>pathprops</c> table with list items as the engine reads it.
+    /// So an edit that keeps the text applies, also an edit of the list items. An edit that gives the table another
+    /// text with a problem refuses.</summary>
+    [Fact]
+    public void AStoredPathTextInATableWithListItemsIsAStoredText()
+    {
+        const string stored = "OPEN, {1+1,0,0}, {1,0,0,0}, {10,0,0}, {1,0,0,0}, ";
+        using var ws = Workspace(script: Script.Replace("{ entity_name = \"Monitor\", type = MONITOR }",
+            $"{{ entity_name = \"Monitor\", type = MONITOR, pathprops = {{ 1; path_data = \"{stored}\" }} }}"));
+        var session = ws.Session("act");
+        var runner = FakeCommandHost.Runner(session);
+        var props = new ThnPath("pathprops");
+
+        var list = runner.Run(CutsceneCommands.SetValue(session, Entity(session, "Monitor"), props,
+            new ThnTable([N(2)], [F("path_data", T(stored))])));
+        var other = runner.Run(CutsceneCommands.SetValue(session, Entity(session, "Monitor"), new ThnPath("spatialprops.pos"),
+            List(N(1), N(2), N(3))));
+
+        Assert.Equal((EditStatus.Applied, EditStatus.Applied), (list.Status, other.Status));
+        Assert.Equal(T(stored), ThnMotionPath.DataOf(Table(session, Entity(session, "Monitor"))));
+        AssertRefused(session, CutsceneCommands.SetValue(session, Entity(session, "Monitor"), props,
+                new ThnTable([N(2)], [F("path_data", T(stored + "{2+2,0,0}, "))])),
+            "The engine reads pathprops.path_data of an entity of each type as a path. " + ThnMotionPath.NotPathNumber("+"),
+            MissionErrors.FieldValue);
     }
 
     /// <summary>A move and a change of the length give the W of the session command, on the 1 ms grid. Each event is
