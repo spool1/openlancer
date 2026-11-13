@@ -122,7 +122,7 @@ public sealed class PlaySaveTests
         var start = StartSave(new PlayerEquipment { Item = new HashValue("test_gun"), Hardpoint = "HpWeapon01" },
             new PlayerCargo { Item = new HashValue("test_missile"), Count = 4 });
 
-        PlaySave.TakeShip(player, start, [Item("test_gun"), Item("test_missile")]);
+        PlaySave.GiveShip(player, Saved(start), null, [Item("test_gun"), Item("test_missile")]);
 
         Assert.Equal(FLHash.CreateID("test_ship"), (uint)player.ShipArchetype);
         var line = Assert.Single(player.Equip);
@@ -140,12 +140,88 @@ public sealed class PlaySaveTests
             new PlayerCargo { Item = new HashValue("test_battery"), Count = 2 });
         start.Equip.Add(new PlayerEquipment { Item = new HashValue("test_gun"), Hardpoint = "HpWeapon01" });
 
-        PlaySave.TakeShip(player, start, [Item("test_gun"), Battery()]);
+        PlaySave.GiveShip(player, Saved(start), null, [Item("test_gun"), Battery()]);
 
         var line = Assert.Single(player.Equip);
         Assert.Equal(FLHash.CreateID("test_gun"), (uint)line.Item);
         Assert.Equal([(FLHash.CreateID("test_battery"), 2), (FLHash.CreateID("test_battery"), 1)], Cargo(player));
     }
+
+    /// <summary>The ship of a start save wins over the ship package of the play: the package has no effect.</summary>
+    [Fact]
+    public void TheShipOfAStartSaveWinsOverThePackage()
+    {
+        var player = OldSave();
+        var start = StartSave(new PlayerEquipment { Item = new HashValue("test_gun"), Hardpoint = "HpWeapon01" },
+            new PlayerCargo { Item = new HashValue("test_missile"), Count = 4 });
+        var (package, equipment) = Package("other_ship", new PackageAddon(Item("other_gun"), "HpWeapon02", 1));
+        equipment.Add(Item("test_gun"));
+        equipment.Add(Item("test_missile"));
+
+        PlaySave.GiveShip(player, Saved(start), package, equipment);
+
+        Assert.Equal(FLHash.CreateID("test_ship"), (uint)player.ShipArchetype);
+        var line = Assert.Single(player.Equip);
+        Assert.Equal((FLHash.CreateID("test_gun"), "HpWeapon01"), ((uint)line.Item, line.Hardpoint));
+        Assert.Equal([(FLHash.CreateID("test_missile"), 4)], Cargo(player));
+    }
+
+    /// <summary>A start save without <c>ship_archetype</c> has only the place. The package then gives the ship, and
+    /// without a package the save keeps the ship of the new character.</summary>
+    [Fact]
+    public void AStartSaveWithoutAShipKeepsThePackageOrTheShipOfTheNewCharacter()
+    {
+        var withPackage = OldSave();
+        var (package, equipment) = Package("other_ship", new PackageAddon(Item("other_gun"), "HpWeapon02", 1));
+
+        PlaySave.GiveShip(withPackage, Saved(new SavePlayer()), package, equipment);
+
+        Assert.Equal(FLHash.CreateID("other_ship"), (uint)withPackage.ShipArchetype);
+        var line = Assert.Single(withPackage.Equip);
+        Assert.Equal((FLHash.CreateID("other_gun"), "HpWeapon02"), ((uint)line.Item, line.Hardpoint));
+        Assert.Empty(withPackage.Cargo);
+
+        var withoutPackage = OldSave();
+        PlaySave.GiveShip(withoutPackage, Saved(new SavePlayer()), null, [Item("old_gun"), Item("old_battery")]);
+
+        Assert.Equal(FLHash.CreateID("old_ship"), (uint)withoutPackage.ShipArchetype);
+        Assert.Equal(FLHash.CreateID("old_gun"), (uint)Assert.Single(withoutPackage.Equip).Item);
+        Assert.Equal([(FLHash.CreateID("old_battery"), 3)], Cargo(withoutPackage));
+    }
+
+    /// <summary>The check of a start save ship names the ship, or the item of an <c>equip</c> or a <c>cargo</c> line, that
+    /// the game data does not have.</summary>
+    [Fact]
+    public void TheCheckOfAStartSaveShipNamesTheShipOrTheItemThatTheGameDataDoesNotHave()
+    {
+        GameItemCollection<Ship> ships = [new Ship { Nickname = "test_ship", CRC = FLHash.CreateID("test_ship") }];
+        GameItemCollection<Equipment> equipment = [Item("test_gun"), Item("test_missile")];
+        var start = StartSave(new PlayerEquipment { Item = new HashValue("test_gun"), Hardpoint = "HpWeapon01" },
+            new PlayerCargo { Item = new HashValue("test_missile"), Count = 4 });
+
+        Assert.Null(PlaySave.StartShipProblem(ships, equipment, start));
+
+        start.ShipArchetype = new HashValue("no_ship");
+        Assert.Equal("The start save names the ship 'no_ship', which is not in the game data. The game cannot give the " +
+                     "player a ship.", PlaySave.StartShipProblem(ships, equipment, start));
+
+        start.ShipArchetype = new HashValue("test_ship");
+        start.Equip.Add(new PlayerEquipment { Item = new HashValue("no_gun"), Hardpoint = "HpWeapon02" });
+        Assert.Equal(Unknown("no_gun"), PlaySave.StartShipProblem(ships, equipment, start));
+
+        start.Equip.RemoveAt(1);
+        start.Cargo.Add(new PlayerCargo { Item = new HashValue("no_missile"), Count = 2 });
+        Assert.Equal(Unknown("no_missile"), PlaySave.StartShipProblem(ships, equipment, start));
+        Assert.Empty(SteLint.Problems(Unknown("no_missile")));
+
+        static string Unknown(string item) =>
+            $"The start save names the equipment '{item}', which is not in the game data. The game cannot give it to the " +
+            "player.";
+    }
+
+    /// <summary>A start save with the <c>[Player]</c> section of the start save, docked at a base.</summary>
+    private static PlayStartSave Saved(SavePlayer start) =>
+        new(new SaveGame { Player = start }, new PlayStart.AtBase("test_base"));
 
     /// <summary>The <c>[Player]</c> section of a start save with the ship <c>test_ship</c>, one equip line and one cargo
     /// line.</summary>
@@ -162,15 +238,22 @@ public sealed class PlaySaveTests
     private static SavePlayer Equip(params PackageAddon[] addons)
     {
         var player = OldSave();
-        var ship = new Ship { Nickname = "test_ship", CRC = FLHash.CreateID("test_ship") };
-        var package = new ShipPackage("test_package", ship);
+        var (package, equipment) = Package("test_ship", addons);
+
+        PlaySave.Equip(player, package, equipment);
+        return player;
+    }
+
+    /// <summary>A ship package of a ship with addons, and the equipment of the addons.</summary>
+    private static (ShipPackage Package, GameItemCollection<Equipment> Equipment) Package(string ship,
+        params PackageAddon[] addons)
+    {
+        var package = new ShipPackage("test_package", new Ship { Nickname = ship, CRC = FLHash.CreateID(ship) });
         package.Addons.AddRange(addons);
         var equipment = new GameItemCollection<Equipment>();
         foreach (var addon in addons)
             equipment.Add(addon.Equipment);
-
-        PlaySave.Equip(player, package, equipment);
-        return player;
+        return (package, equipment);
     }
 
     /// <summary>A save with the ship <c>old_ship</c>, the gun <c>old_gun</c> and 3 of <c>old_battery</c>.</summary>
