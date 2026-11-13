@@ -555,7 +555,17 @@ When the event at the index has another type or time, the call gives `stale_revi
 
 The result gives each new and changed item as it is after the call. So an event reference in `adds` or `changes` has the index after the call. A deleted event has its index before the call, because the script does not have the event after the call. A new script is one add, and `select` names the last new item. Each step of `edit_batch` gives its references as they are after that step.
 
-The result also gives the errors of the cutscene checks that the call adds and removes, in `new_problems` and `fixed_problems`. The game crashes when it plays a cutscene with such an error, so the save stops. Each such problem gives the reference of its element. It gives the reference of the script when the problem is about the whole script. It also does so when another entity has the same name, or another event has the same time, type and targets. The active mod causes these errors, so their origin is the active mod. `check` with the scope `all` and the error `save_blocked` name the same references.
+The result also gives the problems of the cutscene checks that the call adds and removes, in `new_problems` and `fixed_problems`. The save stops for each such problem. The game crashes when it plays a cutscene with an error, and the message of an error starts with "The game crashes when it plays this cutscene."
+
+A template that names no item of the data lists is a problem too. An example is a costume or an effect that the game data does not have. The message of a template that does not crash the game tells what the scene does without the item. The check reads the data lists with the unsaved edits. `list_values` gives the names of these lists:
+
+| Template | Lists |
+|---|---|
+| DEFORMABLE | `costume` |
+| COMPOUND | By the category: `solar_archetype`, `ship`, `petal_room`, `petal_cart`, `petal_prop`, `equipment`, or `asteroid` and `asteroid_mine` |
+| PSYS | `effect` and `vis_effect` |
+
+Each such problem gives the reference of its element. It gives the reference of the script when the problem is about the whole script. It also does so when another entity has the same name, or another event has the same time, type and targets. The active mod causes these problems, so their origin is the active mod. `check` with the scope `all` and the error `save_blocked` name the same references.
 
 `get_cutscene` gives the entities and the events of a script, each with its fields. They come in pages, as the rows of a list tool do: first the entities, then the events. `entity_count` and `event_count` give the numbers of the whole script, and `next_cursor` gives the next page. A large retail script has more than a thousand elements. Use a smaller `limit` when a page is larger than the size limit of a result, or read one element with `get_item`.
 

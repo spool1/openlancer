@@ -642,8 +642,10 @@ A whole file of a later mod replaces the script and discards the patches before 
 - An event has fewer targets than its type reads: two for SET_CAMERA, ATTACH_ENTITY and START_PATH_ANIMATION, and one for most other types. The second target of SET_CAMERA names an entity of the script that is not a CAMERA. The second target of START_PATH_ANIMATION names an entity of the script without `pathprops.path_data`.
 - The scene cannot build an entity:
   - a LIGHT without `lightprops`, or a SCENE without an `ambient` color.
-  - a COMPOUND with a template, but without a known `userprops.category`, or with a solar, a ship, a room or a cart that does not exist.
+  - a COMPOUND with a template, but without a known `userprops.category`, or with a solar, a ship, a room or a cart that does not exist. A solar, a ship, an equipment or an asteroid without a model file also stops the engine. Such an item has no `DA_archetype` line, or the file of the line does not exist.
   - a DEFORMABLE without `userprops.Actor`, with a costume that does not exist.
+
+The check also reports a template that names no item as an error, where the engine does not stop. Such templates are the prop, the equipment or the asteroid of a COMPOUND, and the effect of a PSYS. The engine reads the template of a PSYS as it is, also a template that starts with `$`. The check compares these problems by the value and the text, without the entity. So a mod that renames an entity with such a problem of the lower data gets no new problem.
 
 The scene does not make a REFERENCE entity, or an entity that a later entity with the same name hides. So the checks of the scene skip these entities, and a target with the name of such an entity names an object of another script of the scene. `flags` gives REFERENCE also as a name of another group, because the engine casts the name to its number: `flags = CAMERA` is 3, which is REFERENCE and LIT_DYNAMIC. A room fills in the `$terrain_*` templates with the terrain of its base, so the check reads the template of each base that plays the script. The game makes no COMPOUND of a script that only `[Trigger] Act_CallThorn` lines name, because it plays such a script in space with the objects of the mission. So the checks of a COMPOUND skip such a script.
 
@@ -1034,6 +1036,15 @@ The editor reads some files only for the lists, for example `solararch.ini` and 
 
 The Assets panel uses two more lists. The `asteroid` list holds the `[Asteroid]` sections of the files of `[Data] asteroids`. The `model` list holds the `.cmp`, `.3db` and `.sph` files below `DATA`. A list field also takes a tile of the Assets panel (see "The Assets panel").
 
+The save gate checks the templates of the cutscenes with more lists (see "The save gate"):
+
+| List | Entries |
+|---|---|
+| `asteroid_mine` | The `[AsteroidMine]` sections of the files of `[Data] asteroids`. The engine puts the asteroids and the mines in one collection. So a template of the category `asteroid` names an entry of `asteroid` or of `asteroid_mine`. |
+| `petal_room`, `petal_prop`, `petal_cart` | The first values of the `room`, `prop` and `cart` lines of the `[ObjectTable]` sections of each `[Data] PetalDB` file. The engine reads each such file. When two files give one name, the engine uses the first file. |
+
+The templates of a cutscene also use the lists `solar_archetype`, `ship`, `equipment`, `costume`, `effect` and `vis_effect`, and `sound`.
+
 ### The raw INI block
 
 Each Inspector page that edits sections ends with "Loaded values (read-only)" and then "Raw INI". The raw block shows `[Type]` and one `name = values` line for each line of the section. Edit the lines, then click outside the block. The edit changes only the names whose lines you changed. One raw edit is one entry of the edit history, and one Undo puts back all its lines. The order of different names stays the file order. A new name goes at the end of the section.
@@ -1073,7 +1084,16 @@ Each save runs the save gate first, also a save with nothing to write, and also 
 - An error of the format checks of the export or of the content checks of the retail game, when the active mod adds it. See "Format checks" and "Content checks of the retail game". These checks run only for a tier-1 mod that names a retail target. They compare the data with the active mod with the data of the mods that load before it. They do not merge on the files of each target game. Play in the game and the export do that. For example, a good with the price 0 blocks the save, because the retail game can crash when a player buys or sells it.
 - An error of the mission checks in a mission script that the active mod changes. Examples are a trigger without a condition (rule M01) and two triggers whose names have one game id (rule M27). A line of any script that names a name that the active mod removes or renames is an error too. A mission problem that the base game or a lower mod also has is a warning, so it does not block the save.
 - A mission patch that does not merge on the game of a retail target of `mod.json` (rule T01). The check runs for each target with a linked game. It merges the lower mods of the profile on that game first, as Play in the game does. For example, the patch changes a trigger that the game of the target does not have. A section of the target that differs from the `ol.base` of the patch gives a warning (rule T02), because the changes of the target in the section go away. A target without a linked game gives one info line in the Console.
-- An error of the checks of a cutscene that the active mod changes, when the lower cutscene does not have the error. For example, a LIGHT has no `spatialprops.pos`. A whole cutscene file of the active mod that the engine cannot read is an error too. The game crashes when it plays such a cutscene, so the message starts with "The game crashes when it plays this cutscene." These checks run without the game data, so they do not check templates and costumes.
+- An error of the checks of a cutscene that the active mod changes, when the lower cutscene does not have the error. For example, a LIGHT has no `spatialprops.pos`. A whole cutscene file of the active mod that the engine cannot read is an error too. The game crashes when it plays such a cutscene, so the message starts with "The game crashes when it plays this cutscene."
+- A template of a cutscene that the active mod changes, when the template names no entry of its data list (see "Data lists and pickers"). The check reads the lists with the unsaved edits, so an unsaved INI edit counts, for example a new costume. A template that the lower cutscene has with the same problem does not block the save, also after a rename of its entity. These templates crash the game, so their messages start with "The game crashes when it plays this cutscene.":
+  - the costume of a DEFORMABLE without `userprops.Actor`. A costume of the active mod whose `body` names no body part is not in the game data either, because the game drops it.
+  - the solar archetype, the ship, the room or the cart of a COMPOUND. A solar archetype, a ship, an equipment or an asteroid without a `DA_archetype` line also crashes the game. It also crashes the game when the file of the line does not exist.
+
+  These templates do not crash the game. The message tells what the scene does without the item:
+  - the prop, the equipment or the asteroid of a COMPOUND: the scene shows the entity without a model.
+  - the effect of a PSYS: the scene does not show the entity.
+
+  The check skips a template that the room fills in, for example `$terrain_dyna_01`. It also skips the templates `PlayerShip` and `PlayerShipEngines`, the costume of a DEFORMABLE with `userprops.Actor`, and the template of a SOUND. A SOUND can also name a voice line. The game makes no COMPOUND of a script that only `[Trigger] Act_CallThorn` lines name, so the check skips the COMPOUNDs of such a script.
 
 A field-check error or a missing required key that the base game has too does not block the save. This is true when the key has the value of the base data, no lower mod changes the section, and the same check of the base version of the section gives the same error. For example, the active mod changes the loadout of a retail object, and the position of the object in the base data has a value that is not a number. The save continues with a warning that ends with "The base game has the same problem, so the save continues." Each other error blocks the save, also when it is a value of the base data: an error of a key that the active mod writes again, an error that a key of the active mod causes, an error of a key that a lower mod changes, and each error that reads another section.
 
