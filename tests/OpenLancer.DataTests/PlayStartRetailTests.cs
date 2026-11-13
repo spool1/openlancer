@@ -331,6 +331,40 @@ public sealed class PlayStartRetailTests(ITestOutputHelper output) : IDisposable
         Assert.True(equip > packages.Count, $"The packages give only {equip} equip lines.");
     }
 
+    /// <summary>
+    /// (9) The retail ship packages mount no gun, mine dropper or countermeasure dropper, and they hold no nanobots or
+    /// shield batteries. The Ship field and the combat warning of the Play start page say so
+    /// (<see cref="OpenLancer.Editor.Missions.PlayStartPageModel.PackageLoadoutNote"/>).
+    /// </summary>
+    [Fact]
+    public void NoRetailShipPackageGivesWeaponsNanobotsOrBatteries()
+    {
+        var baseFolder = GameDataPaths.RequireBase();
+        using var workspace = new RetailWorkspace(baseFolder, "play-ship-loadout");
+        var edits = workspace.Open();
+        string[] fighting = ["Gun", "MineDropper", "CounterMeasureDropper", "RepairKit", "ShieldBattery"];
+        var packages = Packages(edits);
+        var kinds = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var package in packages)
+        {
+            var ship = PlayShips.ShipPart(edits, package, out var problem);
+            Assert.True(ship != null, $"{package}: {problem}");
+            var items = ship.Equip.Select(e => e.Item).Concat(ship.Cargo.Select(c => c.Item)).ToList();
+            Assert.NotEmpty(items);
+            foreach (var item in items)
+            {
+                var kind = edits.Find(ItemFileKind.Equipment, item)?.Id.Type ?? "";
+                Assert.False(fighting.Contains(kind, StringComparer.OrdinalIgnoreCase), $"{package}: {item} is a {kind}.");
+                kinds.Add(kind);
+            }
+        }
+
+        output.WriteLine($"{packages.Count} ship packages give these kinds of equipment: {string.Join(", ", kinds)}.");
+        Assert.Equal(31, packages.Count);
+        Assert.Contains("ShieldGenerator", kinds);
+    }
+
     /// <summary>(9) No retail package puts a good into the hold. So a temp mod gives <c>le_package</c> 5 nanobots, and
     /// a battery with the amount 1, which the combinable rule puts into the hold. The save from the start save still
     /// has the same ship, equipment and cargo as the save from the package.</summary>

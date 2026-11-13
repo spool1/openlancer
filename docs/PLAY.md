@@ -81,6 +81,8 @@ A mission play uses the Ship field of the Play start page. Its default is the sh
 
 The equipment of the package goes on its hardpoints. An item with an amount above 1 goes into the hold. A good that the engine cannot mount, for example a battery, also goes into the hold.
 
+A ship package gives only the equipment of the package. The retail ship packages have no guns, nanobots or shield batteries. So a retail package gives a ship that cannot fight back. In vanilla, the default ship gets two guns, three nanobots and three shield batteries from the loadout of a new character.
+
 ## In the game
 
 A character of a play is an admin. These chat commands work:

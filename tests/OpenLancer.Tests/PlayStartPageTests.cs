@@ -196,6 +196,24 @@ public sealed class PlayStartPageTests
         Assert.Equal("The ship package s1_package.", PlayStartPageModel.ShipRowTip(field.Rows[3]));
     }
 
+    /// <summary>The value "Ship of the profile" has the tooltip of the field, not the tooltip of the Play menu. It names
+    /// the ship package of the profile, or tells that the profile has none. The Play menu text points only to Database >
+    /// Goods.</summary>
+    [Fact]
+    public void TheShipOfTheProfileHasTheTooltipOfTheField()
+    {
+        using var ws = ItemWorkspace.Create();
+        var view = ShipWorkspace(ws);
+
+        var field = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default, null);
+        var profile = PlayStartPageModel.ShipFieldOf(view, PlayStartSetting.Default, "s2_package");
+
+        Assert.Equal($"{PlayStartPageModel.ProfileRowTip} {PlayStartPageModel.NoProfilePackageTip}", field.Tooltip);
+        Assert.Equal($"{PlayStartPageModel.ProfileRowTip} The ship package s2_package.", profile.Tooltip);
+        Assert.NotEqual(PlayShips.ShipText(view, null).Tooltip, field.Tooltip);
+        Assert.NotEqual(PlayShips.ShipText(view, "s2_package").Tooltip, profile.Tooltip);
+    }
+
     /// <summary>A pick gives the ship of its package, also over the ship of the profile. A package whose ship is the ship
     /// of a new character gives the starter ship.</summary>
     [Fact]
@@ -216,7 +234,9 @@ public sealed class PlayStartPageTests
     }
 
     /// <summary>A package that the edit view does not have, or whose ship it does not have, shows "(not in the data)"
-    /// with the reason of the builder. Play refuses with the same reason, so the page shows it under the field.</summary>
+    /// with the reason of the builder. Play refuses with the same reason, so the page shows it under the field. The
+    /// tooltip of the value gives the reason and tells the user to pick another ship in the field, also for the ship of
+    /// the profile. It does not give the Play menu text, which says that Play stops with an error.</summary>
     [Theory]
     [InlineData("no_such_package", "The edit view has no ship package 'no_such_package'.")]
     [InlineData("lost_package", "The edit view has no ship of the ship package 'lost_package'.")]
@@ -230,9 +250,10 @@ public sealed class PlayStartPageTests
 
         Assert.Equal($"{package} (not in the data)", field.Text);
         Assert.Equal($"{reason} Play cannot give the player this ship.", field.Problem);
-        Assert.Equal(field.Problem, field.Tooltip);
+        Assert.Equal($"{field.Problem} {PlayStartPageModel.PickAnotherShip}", field.Tooltip);
         Assert.False(field.Starter);
         Assert.Equal(field.Problem, profile.Problem);
+        Assert.Equal(field.Tooltip, profile.Tooltip);
     }
 
     /// <summary>The page warns about a combat start with the starter ship. Another ship, a calm start, a base start and a
@@ -248,6 +269,10 @@ public sealed class PlayStartPageTests
         var combat = new PlayStartSetting("t_chosen", "suggested");
 
         Assert.True(Page(hostile, combat).Plan.Combat);
+        // A retail ship package has no weapons, so the warning tells what a package gives. It does not send the user
+        // to a "stronger ship".
+        Assert.EndsWith(PlayStartPageModel.PackageLoadoutNote, PlayStartPageModel.CombatWarning);
+        Assert.DoesNotContain("stronger", PlayStartPageModel.CombatWarning);
         Assert.Equal(PlayStartPageModel.CombatWarning, Warning(hostile, combat));
         Assert.Equal(PlayStartPageModel.CombatWarning, Warning(hostile, combat with { Ship = "s1_package" }));
         Assert.Null(Warning(hostile, combat with { Ship = "s2_package" }));
@@ -282,6 +307,9 @@ public sealed class PlayStartPageTests
             ("place", PlayStartPageModel.PlaceTip), ("source", PlayStartPageModel.SourceTip),
             ("ship", PlayStartPageModel.ShipTip), ("combat", PlayStartPageModel.CombatWarning),
             ("profile ship", PlayStartPageModel.ProfileRowTip),
+            ("no profile package", PlayStartPageModel.NoProfilePackageTip),
+            ("pick another ship", PlayStartPageModel.PickAnotherShip),
+            ("package loadout", PlayStartPageModel.PackageLoadoutNote),
             ("wait", PlayStartPageModel.WaitTip), ("setup", PlayStartPageModel.SetupTip),
             ("chip", MissionView.PlayStartTip), ("rules", MissionView.RulesBanner),
             ("rules help", MissionView.RulesHelp.WhatItIs), ("dry run during play", MissionView.DryRunPlayTip),
