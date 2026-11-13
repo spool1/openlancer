@@ -826,8 +826,8 @@ internal sealed partial class CutsceneWorkspace(EditorWindow window) : IDisposab
     /// </summary>
     /// <param name="path">The install path of a cutscene of W.</param>
     /// <exception cref="ArgumentException">The context does not fit the cutscene. The message tells why.</exception>
-    /// <exception cref="InvalidOperationException">No game data is loaded, or the session cannot read a script of the
-    /// plan.</exception>
+    /// <exception cref="InvalidOperationException">No game data is loaded, the session cannot read a script of the plan,
+    /// or a script of the plan has a path text that is not only a path (see <see cref="ScriptBytes"/>).</exception>
     internal CutsceneShotPlan ShotPlan(string path)
     {
         var current = window.Session ?? throw new InvalidOperationException("No profile is open.");
@@ -1034,20 +1034,63 @@ internal sealed partial class CutsceneWorkspace(EditorWindow window) : IDisposab
 
     /// <summary>
     /// The bytes of a script for a build: the text that the writer makes from W for a cutscene and for each other open
-    /// cutscene of the session, else the bytes of the edit view.
+    /// cutscene of the session, else the bytes of the edit view (see <see cref="FileScriptBytes"/>). The Cutscene tab
+    /// and the images of the agent read each script of a build here.
     /// </summary>
+    /// <remarks>The engine runs the path text of an entity of each type as Lua. The edits refuse a path text that is
+    /// not only a path, and this check stops a build that gets one in another way (section 8.7, item 2 of the MCP1
+    /// design). A script with such a text does not go to the engine.</remarks>
     /// <param name="files">The file system of the game data.</param>
     /// <param name="cutscene">The cutscene of the build, or null.</param>
+    /// <exception cref="InvalidOperationException">The session cannot read the cutscene, or an entity of the script has
+    /// a path text that is not only a path. The message names the entity.</exception>
     internal static byte[] ScriptBytes(EditSession edits, FileSystem files, string path, string? cutscene)
     {
         if (VfsPath.Comparer.Equals(path, cutscene) || edits.OpenCutscenes.Contains(path, VfsPath.Comparer))
         {
             var working = edits.Cutscene(path) ?? throw new InvalidOperationException(
                 edits.CutsceneReadOnlyReason(path) ?? $"No cutscene {path}.");
-            return Encoding.ASCII.GetBytes(ThnWriter.Write(working.ToGlobals()));
+            var globals = working.ToGlobals();
+            RequirePaths(globals, path);
+            return Encoding.ASCII.GetBytes(ThnWriter.Write(globals));
         }
 
-        return files.ReadAllBytes(path);
+        return FileScriptBytes(files, path);
+    }
+
+    /// <summary>
+    /// The bytes of a script file of the edit view for a build, after the check of its path texts (see
+    /// <see cref="ScriptBytes"/>). The evaluator reads the file first. A file that the evaluator cannot read is not a
+    /// text of the writer, so an edit of the editor did not give it its path texts. Such a file goes to the engine as
+    /// it is, because the engine runs the whole file as Lua, and a check of its path texts cannot change that.
+    /// </summary>
+    /// <param name="files">The file system of the game data.</param>
+    /// <exception cref="InvalidOperationException">An entity of the script has a path text that is not only a path. The
+    /// message names the entity.</exception>
+    internal static byte[] FileScriptBytes(FileSystem files, string path)
+    {
+        var bytes = files.ReadAllBytes(path);
+        ThnTable globals;
+        try
+        {
+            globals = ThornEvaluator.Instance.Evaluate(bytes, path);
+        }
+        catch (ThnEvaluationException)
+        {
+            return bytes;
+        }
+
+        RequirePaths(globals, path);
+        return bytes;
+    }
+
+    /// <summary>Stops a build when an entity of a script has a path text that is not only a path.</summary>
+    private static void RequirePaths(ThnTable globals, string path)
+    {
+        if (ThnMotionPath.ScriptProblem(globals) is { } problem)
+        {
+            throw new InvalidOperationException($"The editor does not give the script {path} to the engine. {problem}");
+        }
     }
 
     /// <summary>

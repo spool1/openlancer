@@ -111,15 +111,139 @@ public static class ThnMotionPath
     }
 
     /// <summary>
-    /// Why the evaluator must not read a path text, or null when it can (section 8.7, item 2 of the MCP1 design). The
-    /// text must be the items of a table: numbers, tables of numbers and the names OPEN and CLOSED. The evaluator would
-    /// also run a statement, a call or an operator (see <see cref="ThnValueText"/>). A text without a problem can still
-    /// be a text that the engine does not read as a path (see <see cref="Problem"/>).
+    /// Why the evaluator and the engine must not run a path text, or null when they can (section 8.7, item 2 of the MCP1
+    /// design). The text is the items of a table, with a comma between two items and an optional comma at the end. An
+    /// item is the name OPEN or CLOSED, a number, or a table of numbers. A number can have a minus sign before it. The
+    /// VM would also run a statement, a call or an operator, so the check refuses each other part. It reads the tokens
+    /// of the Lua 3.2 lexer (see <see cref="ThnLuaTokens"/>), and it refuses each text and comment, so no pragma line
+    /// can hide in them. A text without a problem can still be a text that the engine does not read as a path (see
+    /// <see cref="Problem"/>).
     /// </summary>
-    internal static string? TextProblem(string text) =>
-        ThnValueText.ItemsProblem(text, name => name is OpenName or ClosedName
-            ? null
-            : $"The path text names {name}. A path text can name only {OpenName} and {ClosedName}.");
+    internal static string? TextProblem(string text)
+    {
+        if (ThnWriter.TextProblem(text) is { } characters)
+            return characters;
+        // Two minus signs start a comment, and a path text holds no text in which they can be.
+        if (text.Contains("--", StringComparison.Ordinal))
+            return PathComment;
+        var tokens = new ThnLuaTokens(text);
+        tokens.Next();
+        while (tokens.Kind != ThnTokenKind.End)
+        {
+            if (PathItem(tokens) is { } problem)
+                return problem;
+            if (tokens.Is(','))
+                tokens.Next();
+            else if (tokens.Kind != ThnTokenKind.End)
+                return PathPart(tokens, inTable: false);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Why a build must not give a script to the engine, or null (section 8.7, item 2 of the MCP1 design). The engine
+    /// reads <c>pathprops.path_data</c> of an entity of each type and runs it as Lua (ThnScript.cs:476-484,
+    /// MotionPath.cs:54-55). So each path text of the script must be free of a <see cref="TextProblem"/>. The engine
+    /// reads each value of <c>entities</c>, also a value with a text key (ThnScript.cs:124-127), so the check does too.
+    /// </summary>
+    /// <param name="globals">The globals of the script.</param>
+    /// <returns>The reason, which names the entity.</returns>
+    public static string? ScriptProblem(ThnTable globals)
+    {
+        if (globals["entities"] is not ThnTable entities)
+            return null;
+        foreach (var value in entities.List.Concat(entities.Record.Select(f => f.Value)))
+        {
+            if (value is ThnTable entity && Path.ValueIn(ThnElementKind.Entity, entity) is ThnText text &&
+                TextProblem(text.Value) is { } problem)
+            {
+                var name = ThnScriptModel.NameOf(entity) is { } entityName ? $"The entity {entityName}" : "An entity without a name";
+                return $"{name} has a {Path} text that is not only a path. The engine would run it as a script. {problem}";
+            }
+        }
+        return null;
+    }
+
+    /// <summary>The rule of a path text, for the refusals of <see cref="TextProblem"/>.</summary>
+    private const string PathRule =
+        "A path text holds OPEN or CLOSED, then tables of numbers, for example OPEN, {0,0,0}, {1,0,0,0}, {10,0,0}, {1,0,0,0}.";
+
+    /// <summary>The refusal of a comment in a path text.</summary>
+    internal const string PathComment = "The path text holds a comment (--). " + PathRule;
+
+    /// <summary>The refusal of a text in quotes or in <c>[[ ]]</c> in a path text.</summary>
+    internal const string PathTexts = "The path text holds a text in quotes or in [[ ]]. " + PathRule;
+
+    /// <summary>The refusal of a path text that ends in a table.</summary>
+    internal const string PathUnfinished =
+        "The path text ends before a table is complete. Add the } at the end of the table.";
+
+    /// <summary>The refusal of a part that a path text cannot hold, for example an operator.</summary>
+    internal static string NotPathPart(string part) =>
+        $"The path text holds '{part}', which a path text cannot hold. {PathRule}";
+
+    /// <summary>The refusal of a name other than OPEN and CLOSED.</summary>
+    internal static string NotPathName(string name) =>
+        $"The path text names {name}. A path text can name only {OpenName} and {ClosedName}.";
+
+    /// <summary>The refusal of a part of a table of a path text that is not a number.</summary>
+    internal static string NotPathNumber(string part) =>
+        $"The path text holds '{part}' in a table. A table of a path text holds only numbers, for example {{1,0,0,0}}.";
+
+    /// <summary>An item of a path text: OPEN, CLOSED, a number, or a table of numbers.</summary>
+    private static string? PathItem(ThnLuaTokens tokens)
+    {
+        if (tokens.Kind == ThnTokenKind.Name)
+        {
+            if (tokens.Token is not (OpenName or ClosedName))
+                return NotPathName(tokens.Token);
+            tokens.Next();
+            return null;
+        }
+        if (!tokens.Is('{'))
+            return PathNumber(tokens, inTable: false);
+        tokens.Next();
+        while (!tokens.Is('}'))
+        {
+            if (PathNumber(tokens, inTable: true) is { } problem)
+                return problem;
+            if (tokens.Is(','))
+                tokens.Next();
+            else if (!tokens.Is('}'))
+                return PathPart(tokens, inTable: true);
+        }
+        tokens.Next();
+        return null;
+    }
+
+    /// <summary>A number with an optional minus sign before it.</summary>
+    private static string? PathNumber(ThnLuaTokens tokens, bool inTable)
+    {
+        if (tokens.Is('-'))
+        {
+            tokens.Next();
+            if (tokens.Kind is ThnTokenKind.Name or ThnTokenKind.Mark)
+                return $"The path text holds '-' before '{tokens.Token}'. A minus sign can come only before a number.";
+        }
+        if (tokens.Kind != ThnTokenKind.Number)
+            return PathPart(tokens, inTable);
+        tokens.Next();
+        return null;
+    }
+
+    /// <summary>The refusal of the token where an item, a number or a mark of a path text must be. The text ends
+    /// outside a table only after a minus sign.</summary>
+    private static string PathPart(ThnLuaTokens tokens, bool inTable) => tokens.Kind switch
+    {
+        ThnTokenKind.End => inTable ? PathUnfinished : "The path text ends after a minus sign. Add a number after it.",
+        ThnTokenKind.Text or ThnTokenKind.Open => PathTexts,
+        // A bad escape is in a text. The other bad token is a number that the lexer refuses.
+        ThnTokenKind.Bad when tokens.Token[0] is '"' or '\'' => PathTexts,
+        ThnTokenKind.Bad => $"The path text holds '{tokens.Token}', which is not a number. {PathRule}",
+        _ when inTable => NotPathNumber(tokens.Token),
+        ThnTokenKind.Name => NotPathName(tokens.Token),
+        _ => NotPathPart(tokens.Token),
+    };
 
     /// <summary>The items of a path text: the text runs as a Lua table, with the names OPEN and CLOSED. A text with a
     /// <see cref="TextProblem"/> does not run.</summary>

@@ -33,12 +33,19 @@ public static class CutsceneCommands
     /// Plans a value at a path of an entity or an event. Each missing record on the path is made. See
     /// <see cref="ThnEdits.Set"/>.
     /// </summary>
+    /// <remarks>The engine runs the path text of an entity of each type as Lua (see
+    /// <see cref="ThnMotionPath.ScriptProblem"/>). So a value that gives an entity a new path text with a
+    /// <see cref="ThnMotionPath.TextProblem"/> refuses with the detail <see cref="MissionErrors.FieldValue"/>, for
+    /// each entity type and each path of the edit, for example a whole <c>pathprops</c> record. A path text that the
+    /// edit does not change keeps its value.</remarks>
     public static CutscenePlan SetValue(EditSession session, ThnRef target, ThnPath path, ThnValue value)
     {
         var label = $"Set {path}";
         var script = ScriptPath(session, target.Path);
         if (session.CutsceneReadOnlyReason(target) is { } reason)
             return CutscenePlan.Refused(label, script, reason);
+        if (NewPathProblem(session, target, path, value) is { } problem)
+            return CutscenePlan.Refused(label, script, problem, MissionErrors.FieldValue);
         return CutscenePlan.Of(label, script, () => ThnEdits.Set(target, path, value), changed: [target]);
     }
 
@@ -651,6 +658,32 @@ public static class CutsceneCommands
     /// name when W has no such entity.</summary>
     private static string EntityName(ThnScriptModel working, string name) =>
         working.EntityNamed(name) is { } entity ? ThnScriptModel.NameOf(entity.Table) ?? name : name;
+
+    /// <summary>
+    /// Why a value at a path of an entity gives the entity a path text that the engine must not run, or null. The
+    /// engine reads <see cref="ThnMotionPath.Path"/> of an entity of each type, so the check reads the entity after the
+    /// edit, whatever the path of the edit is. A path that the session command refuses gives null, because the plan
+    /// then refuses with the reason of the command.
+    /// </summary>
+    private static string? NewPathProblem(EditSession session, ThnRef target, ThnPath path, ThnValue value)
+    {
+        if (target.Kind != ThnElementKind.Entity || Table(session, target) is not { } table)
+            return null;
+        ThnTable after;
+        try
+        {
+            after = ThnElementPaths.Set(ThnElementKind.Entity, table, path, value);
+        }
+        catch (Exception e) when (e is ArgumentException or ThnPathException)
+        {
+            return null;
+        }
+        return ThnMotionPath.Path.ValueIn(ThnElementKind.Entity, after) is ThnText text &&
+               !text.Equals(ThnMotionPath.Path.ValueIn(ThnElementKind.Entity, table)) &&
+               ThnMotionPath.TextProblem(text.Value) is { } problem
+            ? $"The engine reads {ThnMotionPath.Path} of an entity of each type as a path. {problem}"
+            : null;
+    }
 
     /// <summary>The table of an element in W, or null.</summary>
     private static ThnTable? Table(EditSession session, ThnRef element) =>

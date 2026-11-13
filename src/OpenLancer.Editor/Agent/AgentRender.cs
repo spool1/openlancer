@@ -297,9 +297,11 @@ internal sealed class AgentRender : IDisposable
             this.height = height;
             var items = plan.Data.Items;
             var viewport = new Rectangle(0, 0, width, height);
+            // The plan checked the path texts of its scripts. Another script gets the same check.
             clock = new CutsceneClock(() => CutscenePlayer.Build(plan.Plan,
-                path => new ThnScript(plan.Scripts.TryGetValue(path, out var bytes) ? bytes : items.VFS.ReadAllBytes(path),
-                    items.ThornReadCallback, path),
+                path => new ThnScript(plan.Scripts.TryGetValue(path, out var bytes)
+                    ? bytes
+                    : CutsceneWorkspace.FileScriptBytes(items.VFS, path), items.ThornReadCallback, path),
                 plan.Data, session.Resources, window, viewport));
             target = LastStep(time);
             clock.Seek(target);
