@@ -76,6 +76,8 @@ public sealed class AgentExports
     {
         private readonly CancellationTokenSource beforeWrite = new();
         private int writes;
+        private bool ended;
+        private bool cancelled;
 
         /// <summary>The work, or null before <see cref="Start{T}"/>.</summary>
         public Task? Task { get; private set; }
@@ -96,8 +98,11 @@ public sealed class AgentExports
         /// <summary>Starts the work on a thread of its own (<see cref="OwnThread"/>), because the prepare and the write
         /// block. The work gets a token that tells it to stop before its write, and calls <see cref="Write"/> before the
         /// write. The run ends with the work.</summary>
-        public Task<T> Start<T>(Func<CancellationToken, T> work)
+        /// <param name="cancel">The cancel of the call. A cancel before the end of the work stops the run at once, also
+        /// before a wait for the work starts. <see cref="WaitAsync{T}"/> then gives the cancel.</param>
+        public Task<T> Start<T>(Func<CancellationToken, T> work, CancellationToken cancel)
         {
+            var registration = cancel.Register(Cancelled);
             var task = OwnThread.Run(() =>
             {
                 try
@@ -106,6 +111,9 @@ public sealed class AgentExports
                 }
                 finally
                 {
+                    lock (owner.gate)
+                        ended = true;
+                    registration.Dispose();
                     owner.Ended(this);
                 }
             });
@@ -113,16 +121,32 @@ public sealed class AgentExports
             return task;
         }
 
-        /// <summary>Waits for the work that <see cref="Start{T}"/> gives. While the work runs, a cancel ends the wait
-        /// with <see cref="OperationCanceledException"/>. The work can end before the wait starts. So after the end of
-        /// the work, a cancel still counts when the work did not start its write. After a write, the wait gives the
-        /// result of the work.</summary>
+        /// <summary>Waits for the work that <see cref="Start{T}"/> gives. A cancel before the end of the work gives
+        /// <see cref="OperationCanceledException"/>. The worker starts at once, so the work can end before the wait
+        /// starts. A cancel before that end still counts. A cancel after the end of the work does not count, and the
+        /// wait gives the result of the work.</summary>
         public async Task<T> WaitAsync<T>(Task<T> work, CancellationToken cancel)
         {
             var result = await work.WaitAsync(cancel).ConfigureAwait(false);
-            if (!Writes)
-                cancel.ThrowIfCancellationRequested();
+            lock (owner.gate)
+            {
+                if (cancelled)
+                    throw new OperationCanceledException(cancel);
+            }
             return result;
+        }
+
+        /// <summary>The cancel of the call: before the end of the work, it counts and stops the run.</summary>
+        private void Cancelled()
+        {
+            lock (owner.gate)
+            {
+                if (ended)
+                    return;
+                cancelled = true;
+                if (writes == 0)
+                    beforeWrite.Cancel();
+            }
         }
 
         /// <summary>Marks the start of the write, or gives false when a stop came first. After it, a stop has no

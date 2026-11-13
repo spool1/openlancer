@@ -304,29 +304,56 @@ public sealed class AgentPublishToolTests
         Assert.False(host.Exports.Running);
     }
 
-    /// <summary>The work of an export can end before the tail waits for it. A cancel then still counts when the work did
-    /// not start its write, so the tail gives the cancel and not the result.</summary>
+    /// <summary>A cancel before the write stops the run at once, also when no wait for the work runs yet. The work then
+    /// writes nothing, and a wait after the end of the work still gives the cancel.</summary>
     [Fact]
-    public async Task ACancelAfterTheEndOfAWorkWithoutAWriteStillCounts()
+    public async Task ACancelBeforeTheWriteStopsTheRunBeforeTheWaitStarts()
     {
+        using var cancel = new CancellationTokenSource();
         var run = new AgentExports().Begin()!;
-        var work = run.Start(_ => "stopped");
-        await work.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var work = run.Start(_ =>
+        {
+            cancel.Cancel();
+            return run.Write();
+        }, cancel.Token);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run.WaitAsync(work, new CancellationToken(true)));
+        Assert.False(await work.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run.WaitAsync(work, cancel.Token));
         Assert.False(run.Writes);
     }
 
-    /// <summary>A cancel after the end of the work does not hide the result when the work wrote its packages. The tail
-    /// then gives the real result of the export, not the failure that tells that the write goes on.</summary>
+    /// <summary>The worker starts at once, so on a busy computer the work can end before the tail waits for it. A cancel
+    /// during the write still counts then, and the tail gives the failure that tells that the write goes on. The
+    /// result does not depend on the time of the wait.</summary>
     [Fact]
-    public async Task ACancelAfterTheEndOfAWriteGivesTheResultOfTheExport()
+    public async Task ACancelDuringTheWriteCountsAlsoWhenTheWorkEndsBeforeTheWait()
     {
+        using var cancel = new CancellationTokenSource();
         var run = new AgentExports().Begin()!;
-        var work = run.Start(_ => run.Write() ? "written" : "stopped");
-        await work.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var work = run.Start(_ =>
+        {
+            var wrote = run.Write();
+            cancel.Cancel();
+            return wrote;
+        }, cancel.Token);
 
-        Assert.Equal("written", await run.WaitAsync(work, new CancellationToken(true)));
+        Assert.True(await work.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run.WaitAsync(work, cancel.Token));
+        Assert.True(run.Writes);
+    }
+
+    /// <summary>A cancel after the end of the work does not count. So it does not hide the result of an export that
+    /// wrote its packages behind the failure that tells that the write goes on.</summary>
+    [Fact]
+    public async Task ACancelAfterTheEndOfTheWorkGivesTheResultOfTheWork()
+    {
+        using var cancel = new CancellationTokenSource();
+        var run = new AgentExports().Begin()!;
+        var work = run.Start(_ => run.Write(), cancel.Token);
+        await work.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        cancel.Cancel();
+
+        Assert.True(await run.WaitAsync(work, cancel.Token));
         Assert.True(run.Writes);
     }
 

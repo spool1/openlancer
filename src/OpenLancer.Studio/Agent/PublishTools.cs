@@ -158,10 +158,8 @@ internal static class PublishTools
         return ToolStep.Then(async (cancel, progress) =>
         {
             var live = new LiveProgress(progress);
-            // A cancel stops the export at once, also before the tail waits for the work. The worker starts at once on
-            // its own thread, so its prepare can end before the wait starts.
-            using var stop = cancel.Register(run.Stop);
-            var work = run.Start(beforeWrite => Work(run, request, location, replace, beforeWrite, live));
+            // A cancel before the end of the work stops the run at once, also before the tail waits for the work.
+            var work = run.Start(beforeWrite => Work(run, request, location, replace, beforeWrite, live), cancel);
             try
             {
                 var outcome = await run.WaitAsync(work, cancel).ConfigureAwait(false);
@@ -169,7 +167,7 @@ internal static class PublishTools
             }
             catch (OperationCanceledException)
             {
-                run.Stop();
+                // The cancel stopped the run before its write, or the write goes on to its end.
                 if (!run.Writes)
                     throw;
                 return ToolResult.Failure(EditErrorKind.Limit, "TailTime", AgentTexts.Error("export_write_goes_on"));
