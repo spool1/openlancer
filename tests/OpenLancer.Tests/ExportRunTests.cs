@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using OpenLancer.Data.Export;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Publishing;
@@ -28,13 +29,13 @@ public sealed class ExportRunTests
         }, Location(game, mod), DateTime.UtcNow);
 
     /// <summary>Calls <see cref="ExportRun.Update"/> as the frames of the editor do, until the run ends.</summary>
-    private static void Finish(ExportRun run)
+    private static async Task FinishAsync(ExportRun run)
     {
         var end = DateTime.UtcNow + TimeSpan.FromSeconds(60);
         while (run.Running)
         {
             Assert.True(DateTime.UtcNow < end, "The export did not end in 60 s.");
-            Thread.Sleep(10);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
             run.Update();
         }
     }
@@ -42,7 +43,7 @@ public sealed class ExportRunTests
     /// <summary>A close during the prepare drops its result: no guard question and no write. The run then ends, so the
     /// editor can export again.</summary>
     [Fact]
-    public void ACloseDuringThePrepareDropsItsResult()
+    public async Task ACloseDuringThePrepareDropsItsResult()
     {
         using var game = new ExportGame();
         var mod = game.GoodsMod(Patch);
@@ -58,7 +59,7 @@ public sealed class ExportRunTests
         });
         run.Close();
         gate.Set();
-        Finish(run);
+        await FinishAsync(run);
 
         Assert.True(run.Closed);
         Assert.Empty(prepared);
@@ -69,7 +70,7 @@ public sealed class ExportRunTests
     /// <summary>A write that ends after a close of the dialog still records the export in the history, and the result
     /// tells that the dialog closed, so that Export and play does not start the game.</summary>
     [Fact]
-    public void AWriteAfterACloseStillRecordsTheExport()
+    public async Task AWriteAfterACloseStillRecordsTheExport()
     {
         using var game = new ExportGame();
         var mod = game.GoodsMod(Patch);
@@ -80,12 +81,12 @@ public sealed class ExportRunTests
         run.Written += result => written = result;
 
         run.Prepare(() => Prepare(game, mod));
-        Finish(run);
+        await FinishAsync(run);
         Assert.NotNull(prepared);
         run.Write(prepared, replace: false);
         Assert.True(run.Running);
         run.Close();
-        Finish(run);
+        await FinishAsync(run);
 
         Assert.NotNull(written);
         Assert.True(written.Closed);
@@ -97,7 +98,7 @@ public sealed class ExportRunTests
 
     /// <summary>A run takes one export at a time. A prepare that throws gives its reason, and the run ends.</summary>
     [Fact]
-    public void AFailedPrepareGivesItsReason()
+    public async Task AFailedPrepareGivesItsReason()
     {
         var run = new ExportRun();
         var failures = new List<string>();
@@ -111,7 +112,7 @@ public sealed class ExportRunTests
         });
         Assert.Throws<InvalidOperationException>(() => run.Prepare(() => null!));
         gate.Set();
-        Finish(run);
+        await FinishAsync(run);
 
         Assert.Equal(["The disk is full."], failures);
         Assert.False(run.Running);

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using OpenLancer.Data;
 using OpenLancer.Data.Export;
 using OpenLancer.Data.Games;
@@ -47,7 +48,7 @@ internal sealed class FakeGameProcess : IGameProcess
 /// Play in the game with a fake editor, fake programs and a fake clock, on a fake game (milestone M11). The play copy of
 /// the game is real, in the temporary folder of the test. No test starts a game program or FLServer.
 /// </summary>
-internal sealed class GamePlayRig : IDisposable
+internal sealed class GamePlayRig : IAsyncDisposable
 {
     public const string GoodsPatch = "[Good]\nnickname = lf_hull\nprice = 5600\n";
 
@@ -89,15 +90,15 @@ internal sealed class GamePlayRig : IDisposable
     }
 
     /// <summary>Opens a profile with a goods patch and plays until the game starts.</summary>
-    public void StartGame()
+    public async Task StartGameAsync()
     {
         Open(Game.Export.GoodsMod(GoodsPatch));
         Plays.Play(Target);
-        Run(() => Starts.Count == 1, "the start of the game");
+        await RunAsync(() => Starts.Count == 1, "the start of the game");
     }
 
     /// <summary>Runs the queued actions and the frames of the editor until the condition is true.</summary>
-    public void Run(Func<bool> done, string what)
+    public async Task RunAsync(Func<bool> done, string what)
     {
         var end = DateTime.UtcNow + TimeSpan.FromSeconds(60);
         while (true)
@@ -107,13 +108,13 @@ internal sealed class GamePlayRig : IDisposable
             if (done())
                 return;
             Assert.True(DateTime.UtcNow < end, $"Not in 60 s: {what}. The Console: {string.Join(" | ", Console)}");
-            Thread.Sleep(10);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
         }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        Run(() => !Plays.Checking, "the end of the checks");
+        await RunAsync(() => !Plays.Checking, "the end of the checks");
         Plays.Dispose();
         Game.Dispose();
     }
@@ -182,16 +183,16 @@ internal sealed class FakeGameHost : IGamePlayHost
 }
 
 /// <summary>Play in the game (section 8.6 of the M11 design).</summary>
-public sealed class GamePlayTests : IDisposable
+public sealed class GamePlayTests : IAsyncDisposable
 {
     private readonly GamePlayRig rig = new();
 
-    public void Dispose() => rig.Dispose();
+    public ValueTask DisposeAsync() => rig.DisposeAsync();
 
     [Fact]
-    public void TheGameStartsInItsProgramFolder()
+    public async Task TheGameStartsInItsProgramFolder()
     {
-        rig.StartGame();
+        await rig.StartGameAsync();
 
         var (info, exit, process) = rig.Starts[0];
         Assert.Equal(rig.Game.CopyPath(ProgramPath), info.FileName);
@@ -210,7 +211,7 @@ public sealed class GamePlayTests : IDisposable
         Assert.Throws<PlayCopyException>(() => PlayCopy.Open(rig.Game.CopyFolder));
 
         exit(0);
-        rig.Run(() => !rig.Plays.Checking, "the check after the exit");
+        await rig.RunAsync(() => !rig.Plays.Checking, "the check after the exit");
 
         Assert.True(process.Disposed);
         Assert.Null(rig.Plays.GameStatus);
@@ -221,9 +222,9 @@ public sealed class GamePlayTests : IDisposable
     }
 
     [Fact]
-    public void StopClosesThenForceStops()
+    public async Task StopClosesThenForceStops()
     {
-        rig.StartGame();
+        await rig.StartGameAsync();
         var process = rig.Starts[0].Process;
 
         rig.Plays.StopGame();
@@ -244,9 +245,9 @@ public sealed class GamePlayTests : IDisposable
     }
 
     [Fact]
-    public void AGameWithoutAWindowGetsForceStopAtOnce()
+    public async Task AGameWithoutAWindowGetsForceStopAtOnce()
     {
-        rig.StartGame();
+        await rig.StartGameAsync();
         rig.Starts[0].Process.HasWindow = false;
 
         rig.Plays.StopGame();
@@ -256,9 +257,9 @@ public sealed class GamePlayTests : IDisposable
     }
 
     [Fact]
-    public void ASaveWhileTheGameRunsGivesTheNote()
+    public async Task ASaveWhileTheGameRunsGivesTheNote()
     {
-        rig.StartGame();
+        await rig.StartGameAsync();
 
         rig.Host.Commit(1);
         rig.Plays.Update(false, false);
@@ -298,12 +299,12 @@ public sealed class GamePlayTests : IDisposable
     }
 
     [Fact]
-    public void ACheckErrorStopsPlay()
+    public async Task ACheckErrorStopsPlay()
     {
         rig.Open(rig.Game.Export.GoodsMod($"[Good]\nnickname = g2\nname = {new string('a', 1100)}\n"));
 
         rig.Plays.Play(rig.Target);
-        rig.Run(() => rig.Console.Any(c => c.StartsWith("Play did not start.")), "the refusal");
+        await rig.RunAsync(() => rig.Console.Any(c => c.StartsWith("Play did not start.")), "the refusal");
 
         Assert.Contains(rig.Host.Log.Entries, e => e.Severity == ConsoleSeverity.Error &&
                                                    e.Message.EndsWith("The game writes past the end of its buffer."));
@@ -331,7 +332,7 @@ public sealed class GamePlayTests : IDisposable
     }
 
     [Fact]
-    public void ARequestWaitsForTheEndOfAFieldEdit()
+    public async Task ARequestWaitsForTheEndOfAFieldEdit()
     {
         rig.Open(rig.Game.Export.GoodsMod(GamePlayRig.GoodsPatch));
 
@@ -340,27 +341,27 @@ public sealed class GamePlayTests : IDisposable
         rig.Plays.Update(editing: false, dialogOpen: true);
 
         Assert.Equal(0, rig.Host.SaveCalls);
-        rig.Run(() => rig.Starts.Count == 1, "the start of the game");
+        await rig.RunAsync(() => rig.Starts.Count == 1, "the start of the game");
         Assert.Equal(1, rig.Host.SaveCalls);
     }
 
     [Fact]
-    public void TheLinkCheckRunsAfterTheExit()
+    public async Task TheLinkCheckRunsAfterTheExit()
     {
-        rig.StartGame();
+        await rig.StartGameAsync();
         // A program writes into a linked file of the play copy in place, so the game file changes too.
         var model = rig.Game.Game.PathOf(SoundPath);
         using (var stream = new FileStream(model, FileMode.Append, FileAccess.Write))
             stream.Write(" and more"u8);
 
         rig.Starts[0].Exit(0);
-        rig.Run(() => !rig.Plays.Checking, "the check after the exit");
+        await rig.RunAsync(() => !rig.Plays.Checking, "the check after the exit");
 
         Assert.Contains(PlayCopyTexts.LinkedFileChanged(rig.Game.CopyPath(SoundPath), model), rig.Console);
     }
 
     [Fact]
-    public void ExportAndPlayInstallsTheExport()
+    public async Task ExportAndPlayInstallsTheExport()
     {
         var mod = rig.Game.Export.Mod("m", new()
         {
@@ -371,7 +372,7 @@ public sealed class GamePlayTests : IDisposable
         Assert.True(result.Succeeded, string.Join(" | ", result.Problems));
 
         rig.Plays.PlayExport(rig.Host.Games[0], result.Builds[ExportTarget.Vanilla], Played(mod, result.Content));
-        rig.Run(() => rig.Starts.Count == 1, "the start of the game");
+        await rig.RunAsync(() => rig.Starts.Count == 1, "the start of the game");
 
         Assert.Equal("Playing the export of m in Freelancer 1.0 (play copy)", rig.Plays.GameStatus);
         Assert.True(File.Exists(rig.Game.CopyPath(@"EXE\ol_m.dll")));
@@ -383,17 +384,17 @@ public sealed class GamePlayTests : IDisposable
     /// <summary>A game that runs a minute records a test play in the history of each mod of the profile (decision D569
     /// of the M11c design), with the target of the game and the content at the install.</summary>
     [Fact]
-    public void AGameThatRanAMinuteRecordsATestPlayForEachInstalledMod()
+    public async Task AGameThatRanAMinuteRecordsATestPlayForEachInstalledMod()
     {
         var first = rig.Game.Export.GoodsMod(GamePlayRig.GoodsPatch, "first");
         var second = rig.Game.Export.Mod("second", []);
         rig.Open(first, second);
         rig.Plays.Play(rig.Target);
-        rig.Run(() => rig.Starts.Count == 1, "the start of the game");
+        await rig.RunAsync(() => rig.Starts.Count == 1, "the start of the game");
 
         rig.Now += GamePlay.TestPlayTime;
         rig.Starts[0].Exit(0);
-        rig.Run(() => rig.Console.Count(c => c.StartsWith("Recorded a test play")) == 2, "the records of the plays");
+        await rig.RunAsync(() => rig.Console.Count(c => c.StartsWith("Recorded a test play")) == 2, "the records of the plays");
 
         foreach (var mod in new[] { first, second })
         {
@@ -412,11 +413,11 @@ public sealed class GamePlayTests : IDisposable
     /// changes during the merge then gives the test play the old content, so the play does not count for the new
     /// content, which the game can miss.</summary>
     [Fact]
-    public void ATestPlayHasTheContentOfTheStartOfTheInstall()
+    public async Task ATestPlayHasTheContentOfTheStartOfTheInstall()
     {
         string? patch = null;
         var writer = new ChangingWriter(() => File.AppendAllText(patch!, "\n; A change during the merge.\n"));
-        using var local = new GamePlayRig(strings: writer);
+        await using var local = new GamePlayRig(strings: writer);
         var mod = local.Game.Export.Mod("m", new()
         {
             ["strings.json"] = """{ "strings": { "name": "Name" } }""",
@@ -427,10 +428,10 @@ public sealed class GamePlayTests : IDisposable
         local.Open(mod);
 
         local.Plays.Play(local.Target);
-        local.Run(() => local.Starts.Count == 1, "the start of the game");
+        await local.RunAsync(() => local.Starts.Count == 1, "the start of the game");
         local.Now += GamePlay.TestPlayTime;
         local.Starts[0].Exit(0);
-        local.Run(() => local.Console.Any(c => c.StartsWith("Recorded a test play")), "the record of the play");
+        await local.RunAsync(() => local.Console.Any(c => c.StartsWith("Recorded a test play")), "the record of the play");
 
         Assert.True(writer.Changed);
         var history = PublishHistory.Load(PublishHistory.FolderOf(local.Game.Game.Folder, mod.Id), mod.Id).History;
@@ -474,9 +475,9 @@ public sealed class GamePlayTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void ForceStopOrACrashCodeRecordsNoPlay(bool forceStop)
+    public async Task ForceStopOrACrashCodeRecordsNoPlay(bool forceStop)
     {
-        rig.StartGame();
+        await rig.StartGameAsync();
         rig.Now += GamePlay.TestPlayTime;
         if (forceStop)
         {
@@ -487,39 +488,39 @@ public sealed class GamePlayTests : IDisposable
 
         rig.Starts[0].Exit(forceStop ? 1 : unchecked((int)0xC0000005));
 
-        AssertNoPlay("m");
+        await AssertNoPlayAsync("m");
     }
 
     [Fact]
-    public void AShortRunRecordsNoPlay()
+    public async Task AShortRunRecordsNoPlay()
     {
-        rig.StartGame();
+        await rig.StartGameAsync();
         rig.Now += GamePlay.TestPlayTime - TimeSpan.FromSeconds(1);
 
         rig.Starts[0].Exit(0);
 
-        AssertNoPlay("m");
+        await AssertNoPlayAsync("m");
     }
 
     /// <summary>A test server run records nothing. The game that joins it is a game run, with the mods of the
     /// install of the server.</summary>
     [Fact]
-    public void TheTestServerRecordsNoPlay()
+    public async Task TheTestServerRecordsNoPlay()
     {
         var mod = rig.Game.Export.GoodsMod(GamePlayRig.GoodsPatch);
         rig.Open(mod);
         rig.Plays.HostServer(rig.Target);
-        rig.Run(() => rig.Starts.Count == 1, "the start of the server");
+        await rig.RunAsync(() => rig.Starts.Count == 1, "the start of the server");
         rig.Now += GamePlay.TestPlayTime;
         rig.Starts[0].Exit(0);
-        AssertNoPlay(mod.Id);
+        await AssertNoPlayAsync(mod.Id);
 
         rig.Plays.HostServer(rig.Target);
-        rig.Run(() => rig.Starts.Count == 2, "the start of the server");
+        await rig.RunAsync(() => rig.Starts.Count == 2, "the start of the server");
         rig.Plays.JoinServer();
         rig.Now += GamePlay.TestPlayTime;
         rig.Starts[2].Exit(0);
-        rig.Run(() => rig.Console.Any(c => c.StartsWith("Recorded a test play")), "the record of the play");
+        await rig.RunAsync(() => rig.Console.Any(c => c.StartsWith("Recorded a test play")), "the record of the play");
 
         Assert.Single(History(mod).Plays);
         rig.Starts[1].Exit(0);
@@ -527,18 +528,18 @@ public sealed class GamePlayTests : IDisposable
 
     /// <summary>"Play this mod alone" of the Mods window (decision D577) records a play alone.</summary>
     [Fact]
-    public void PlayOfOneModRecordsAPlayAlone()
+    public async Task PlayOfOneModRecordsAPlayAlone()
     {
         var mod = rig.Game.Export.GoodsMod(GamePlayRig.GoodsPatch);
         var prepared = ModExport.Prepare(rig.Game.Export.Request(mod) with { Forms = 0, ChecklistOnly = true });
 
         rig.Plays.PlayExport(rig.Host.Games[0], prepared.Builds[ExportTarget.Vanilla], Played(mod, prepared.Content),
             alone: true);
-        rig.Run(() => rig.Starts.Count == 1, "the start of the game");
+        await rig.RunAsync(() => rig.Starts.Count == 1, "the start of the game");
         Assert.Equal("Playing Mod m alone in Freelancer 1.0 (play copy)", rig.Plays.GameStatus);
         rig.Now += GamePlay.TestPlayTime;
         rig.Starts[0].Exit(0);
-        rig.Run(() => rig.Console.Any(c => c.StartsWith("Recorded a test play")), "the record of the play");
+        await rig.RunAsync(() => rig.Console.Any(c => c.StartsWith("Recorded a test play")), "the record of the play");
 
         var play = Assert.Single(History(mod).Plays);
         Assert.True(play.Alone);
@@ -555,13 +556,13 @@ public sealed class GamePlayTests : IDisposable
 
     /// <summary>Runs the frames until the check after the exit ends, then a few more frames for a record that would
     /// write. The history of the mod has no play.</summary>
-    private void AssertNoPlay(string modId)
+    private async Task AssertNoPlayAsync(string modId)
     {
-        rig.Run(() => !rig.Plays.Checking, "the check after the exit");
+        await rig.RunAsync(() => !rig.Plays.Checking, "the check after the exit");
         for (var i = 0; i < 20; i++)
         {
             rig.Host.Ui.RunQueued();
-            Thread.Sleep(10);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
         Assert.DoesNotContain(rig.Console, c => c.StartsWith("Recorded a test play"));
@@ -569,9 +570,9 @@ public sealed class GamePlayTests : IDisposable
     }
 
     [Fact]
-    public void TheGameLinkActionsWaitForTheGameAndChangeOnlyThePlayCopy()
+    public async Task TheGameLinkActionsWaitForTheGameAndChangeOnlyThePlayCopy()
     {
-        rig.StartGame();
+        await rig.StartGameAsync();
         var root = rig.Game.Root;
         var before = Stamps(root);
 
@@ -579,65 +580,65 @@ public sealed class GamePlayTests : IDisposable
         rig.Plays.UninstallCopy(root);
         Assert.Contains(rig.Plays.CopyBlock(root), rig.Console);
         rig.Starts[0].Exit(0);
-        rig.Run(() => !rig.Plays.Checking, "the check after the exit");
+        await rig.RunAsync(() => !rig.Plays.Checking, "the check after the exit");
         Assert.Null(rig.Plays.CopyBlock(root));
 
         rig.Plays.RefreshCopy(root);
-        rig.Run(() => rig.Plays.CopyInfo(root) is { Record: not null }, "the play copy row");
+        await rig.RunAsync(() => rig.Plays.CopyInfo(root) is { Record: not null }, "the play copy row");
         Assert.Equal(rig.Game.CopyFolder, rig.Plays.CopyInfo(root)!.Folder);
         rig.Plays.CheckCopy(root);
-        rig.Run(() => rig.Console.Any(c => c.EndsWith("has no difference: " +
+        await rig.RunAsync(() => rig.Console.Any(c => c.EndsWith("has no difference: " +
                                                       $"{rig.Plays.CopyInfo(root)!.Record!.LinkCount} links, " +
                                                       $"{rig.Plays.CopyInfo(root)!.Record!.CopyCount} real files.")),
             "the check of the play copy");
         rig.Plays.UninstallCopy(root);
-        rig.Run(() => rig.Console.Any(c => c.StartsWith("OpenLancer removed the mods from the play copy")),
+        await rig.RunAsync(() => rig.Console.Any(c => c.StartsWith("OpenLancer removed the mods from the play copy")),
             "the uninstall");
         Assert.DoesNotContain("price = 5600", File.ReadAllText(rig.Game.CopyPath(ExportGame.GoodsPath)));
         rig.Plays.RemoveCopy(root);
-        rig.Run(() => rig.Console.Any(c => c.StartsWith("OpenLancer removed the play copy")), "the remove");
+        await rig.RunAsync(() => rig.Console.Any(c => c.StartsWith("OpenLancer removed the play copy")), "the remove");
 
         Assert.False(Directory.Exists(rig.Game.CopyFolder));
         Assert.Null(rig.Host.Settings.Games[0].PlayCopy);
         Assert.Equal(before, Stamps(root));
-        rig.Run(() => rig.Plays.CopyInfo(root) is { Record: null }, "the row without a play copy");
+        await rig.RunAsync(() => rig.Plays.CopyInfo(root) is { Record: null }, "the row without a play copy");
     }
 
     [Fact]
-    public void AFailedRemoveKeepsTheFolderOfThePlayCopy()
+    public async Task AFailedRemoveKeepsTheFolderOfThePlayCopy()
     {
         var other = Path.Combine(rig.Game.Game.Folder, "other play");
         rig.Game.Track(other);
         rig.Host.Settings.Games[0] = rig.Host.Settings.Games[0] with { PlayCopy = other };
-        rig.StartGame();
+        await rig.StartGameAsync();
         rig.Starts[0].Exit(0);
-        rig.Run(() => !rig.Plays.Checking, "the check after the exit");
+        await rig.RunAsync(() => !rig.Plays.Checking, "the check after the exit");
         var root = rig.Game.Root;
 
         // An open handle without delete sharing stops the delete of one name.
         using (new FileStream(Path.Combine(other, ProgramPath), FileMode.Open, FileAccess.Read, FileShare.None))
         {
             rig.Plays.RemoveCopy(root);
-            rig.Run(() => rig.Console.Any(c => c.StartsWith("OpenLancer could not complete the remove")), "the error");
+            await rig.RunAsync(() => rig.Console.Any(c => c.StartsWith("OpenLancer could not complete the remove")), "the error");
         }
 
         Assert.Equal(other, rig.Host.Settings.Games[0].PlayCopy);
         Assert.Equal(other, rig.Plays.CopyFolder(root));
         rig.Plays.RemoveCopy(root);
-        rig.Run(() => rig.Console.Any(c => c.StartsWith("OpenLancer removed the play copy")), "the remove");
+        await rig.RunAsync(() => rig.Console.Any(c => c.StartsWith("OpenLancer removed the play copy")), "the remove");
         Assert.False(Directory.Exists(other));
         Assert.Null(rig.Host.Settings.Games[0].PlayCopy);
     }
 
     [Fact]
-    public void AFolderThatFailsAsksForAnotherFolder()
+    public async Task AFolderThatFailsAsksForAnotherFolder()
     {
         rig.Open(rig.Game.Export.GoodsMod(GamePlayRig.GoodsPatch));
         // The default folder is in the workspace, so the play copy cannot go there.
         rig.Host.Protected.Add(rig.Game.Game.Folder);
 
         rig.Plays.Play(rig.Target);
-        rig.Run(() => rig.Host.Asked != null, "the question");
+        await rig.RunAsync(() => rig.Host.Asked != null, "the question");
 
         Assert.StartsWith("OpenLancer cannot make the play copy next to the game.", rig.Host.Asked!.Value.Message);
         Assert.Equal(["Select folder...", "Cancel"], rig.Host.Asked.Value.Choices.Select(c => c.Label));
@@ -647,7 +648,7 @@ public sealed class GamePlayTests : IDisposable
         rig.Host.Protected.Clear();
         rig.Host.Asked.Value.Choices[0].Action();
         rig.Host.Chooser!(other);
-        rig.Run(() => rig.Starts.Count == 1, "the start in the other folder");
+        await rig.RunAsync(() => rig.Starts.Count == 1, "the start in the other folder");
 
         Assert.Equal(Path.Combine(other, ProgramPath), rig.Starts[0].Info.FileName);
         Assert.Equal(other, rig.Host.Settings.Games[0].PlayCopy);

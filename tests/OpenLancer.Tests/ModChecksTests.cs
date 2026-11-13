@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Export;
 using OpenLancer.Data.Publishing;
@@ -69,7 +70,7 @@ public sealed class ModChecksTests
     /// <summary>The checks run one at a time. A second request of a waiting mod adds no check, and a cancel drops the
     /// result of the running check and the checks that wait.</summary>
     [Fact]
-    public void ChecksRunOneAtATimeAndCancelDropsTheResults()
+    public async Task ChecksRunOneAtATimeAndCancelDropsTheResults()
     {
         var started = new List<string>();
         using var gate = new SemaphoreSlim(0);
@@ -92,10 +93,10 @@ public sealed class ModChecksTests
         Assert.Equal(Folder("a"), checks.Running);
         Assert.Equal(1, checks.Waiting);
         gate.Release();
-        Run(checks, () => results.Count == 1);
+        await RunAsync(checks, () => results.Count == 1);
         Assert.Equal(["a"], results);
         Assert.NotNull(checks.ResultOf(Folder("a")));
-        Run(checks, () =>
+        await RunAsync(checks, () =>
         {
             lock (started)
                 return started.Count == 2;
@@ -110,7 +111,7 @@ public sealed class ModChecksTests
         Assert.Equal(0, checks.Waiting);
         checks.Request(Request("d"));
         gate.Release(2);
-        Run(checks, () => results.Count == 2);
+        await RunAsync(checks, () => results.Count == 2);
 
         Assert.Equal(["a", "d"], results);
         Assert.Null(checks.ResultOf(Folder("b")));
@@ -121,7 +122,7 @@ public sealed class ModChecksTests
     /// <summary>A cancel drops the result of a running check, but its worker still writes the publish history. So a
     /// rename of the mod waits until the worker ends (review of M11c Build 2).</summary>
     [Fact]
-    public void ACancelledCheckStillMakesTheModBusy()
+    public async Task ACancelledCheckStillMakesTheModBusy()
     {
         using var gate = new SemaphoreSlim(0);
         var checks = new ModChecks(request =>
@@ -141,7 +142,7 @@ public sealed class ModChecksTests
         Assert.True(checks.IsBusyWith(Folder("a")));
         Assert.False(checks.IsBusyWith(Folder("b")));
         gate.Release();
-        Run(checks, () => !checks.IsBusyWith(Folder("a")));
+        await RunAsync(checks, () => !checks.IsBusyWith(Folder("a")));
         Assert.Null(checks.ResultOf(Folder("a")));
     }
 
@@ -170,14 +171,14 @@ public sealed class ModChecksTests
     private static ExportTarget ModTargetsOf(string id) => ExportTarget.Find(id)!;
 
     /// <summary>Runs the frames of the window until the condition is true.</summary>
-    private static void Run(ModChecks checks, Func<bool> done)
+    private static async Task RunAsync(ModChecks checks, Func<bool> done)
     {
         var end = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         while (!done())
         {
             Assert.True(DateTime.UtcNow < end, "The checks did not end in 30 s.");
             checks.Update();
-            Thread.Sleep(5);
+            await Task.Delay(5, TestContext.Current.CancellationToken);
         }
     }
 }

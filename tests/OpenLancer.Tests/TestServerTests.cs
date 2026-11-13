@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using OpenLancer.Editor.Play;
 using Xunit;
 using static OpenLancer.Tests.PlayGame;
@@ -8,25 +9,25 @@ namespace OpenLancer.Tests;
 
 /// <summary>The local test server of a play copy (section 8.7 of the M11 design), with fake programs and a fake
 /// clock. No test starts FLServer.</summary>
-public sealed class TestServerTests : IDisposable
+public sealed class TestServerTests : IAsyncDisposable
 {
     private readonly GamePlayRig rig = new();
 
-    public void Dispose() => rig.Dispose();
+    public ValueTask DisposeAsync() => rig.DisposeAsync();
 
     /// <summary>Opens a profile with a goods patch and hosts the test server until FLServer starts.</summary>
-    private FakeGameProcess Host()
+    private async Task<FakeGameProcess> HostAsync()
     {
         rig.Open(rig.Game.Export.GoodsMod(GamePlayRig.GoodsPatch));
         rig.Plays.HostServer(rig.Target);
-        rig.Run(() => rig.Starts.Count == 1, "the start of the server");
+        await rig.RunAsync(() => rig.Starts.Count == 1, "the start of the server");
         return rig.Starts[0].Process;
     }
 
     [Fact]
-    public void TheServerStartsWithSlashC()
+    public async Task TheServerStartsWithSlashC()
     {
-        Host();
+        await HostAsync();
 
         var info = rig.Starts[0].Info;
         Assert.Equal(rig.Game.CopyPath(@"EXE\FLServer.exe"), info.FileName);
@@ -40,9 +41,9 @@ public sealed class TestServerTests : IDisposable
     }
 
     [Fact]
-    public void NoServerProgramGivesTheText()
+    public async Task NoServerProgramGivesTheText()
     {
-        using var hd = new GamePlayRig(hd: true);
+        await using var hd = new GamePlayRig(hd: true);
         hd.Game.Game.Delete(@"EXE\FLServer.exe");
         Assert.False(hd.Target.HasServer);
         hd.Open(hd.Game.Export.GoodsMod(GamePlayRig.GoodsPatch));
@@ -55,13 +56,13 @@ public sealed class TestServerTests : IDisposable
     }
 
     [Fact]
-    public void JoinNeedsARunningServer()
+    public async Task JoinNeedsARunningServer()
     {
         rig.Plays.JoinServer();
         Assert.Contains("Play did not start. Host a test server first.", rig.Console);
         Assert.Empty(rig.Starts);
 
-        Host();
+        await HostAsync();
         rig.Plays.JoinServer();
 
         Assert.Equal(2, rig.Starts.Count);
@@ -71,19 +72,19 @@ public sealed class TestServerTests : IDisposable
         Assert.Equal("The game of the play copy runs.", rig.Plays.JoinBlock);
         // The game exits first. The play copy keeps its lock for the server.
         rig.Starts[1].Exit(0);
-        rig.Run(() => !rig.Plays.Checking, "the check after the exit of the game");
+        await rig.RunAsync(() => !rig.Plays.Checking, "the check after the exit of the game");
         Assert.True(rig.Plays.ServerRuns);
         Assert.Throws<OpenLancer.Data.PlayCopies.PlayCopyException>(() =>
             OpenLancer.Data.PlayCopies.PlayCopy.Open(rig.Game.CopyFolder));
         rig.Starts[0].Exit(0);
-        rig.Run(() => !rig.Plays.Checking, "the check after the exit of the server");
+        await rig.RunAsync(() => !rig.Plays.Checking, "the check after the exit of the server");
         Assert.Contains("The test server closed.", rig.Console);
     }
 
     [Fact]
-    public void StopWaitsBeforeItEndsTheServer()
+    public async Task StopWaitsBeforeItEndsTheServer()
     {
-        var server = Host();
+        var server = await HostAsync();
 
         rig.Plays.StopServer();
 
@@ -102,9 +103,9 @@ public sealed class TestServerTests : IDisposable
     }
 
     [Fact]
-    public void ForceStopEndsTheServerAtOnce()
+    public async Task ForceStopEndsTheServerAtOnce()
     {
-        var server = Host();
+        var server = await HostAsync();
 
         rig.Plays.StopServer();
         rig.Plays.StopServer();
@@ -115,10 +116,10 @@ public sealed class TestServerTests : IDisposable
     }
 
     [Fact]
-    public void TheCloseOfTheEditorAsksAndWaitsForTheServer()
+    public async Task TheCloseOfTheEditorAsksAndWaitsForTheServer()
     {
         Assert.True(rig.Plays.CloseRequested(() => throw new InvalidOperationException("No server runs.")));
-        var server = Host();
+        var server = await HostAsync();
         var closed = 0;
 
         Assert.False(rig.Plays.CloseRequested(() => closed++));
@@ -133,9 +134,9 @@ public sealed class TestServerTests : IDisposable
     }
 
     [Fact]
-    public void PlayInTheGameWaitsForTheServer()
+    public async Task PlayInTheGameWaitsForTheServer()
     {
-        Host();
+        await HostAsync();
 
         rig.Plays.Play(rig.Target);
 
