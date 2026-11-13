@@ -2097,6 +2097,135 @@ public sealed class PlayControllerTests : IDisposable
         await StopAndRunToIdleAsync();
     }
 
+    /// <summary>
+    /// The restart after a save waits until a hidden Scene shows each edit, as a request that waits does (issue #7).
+    /// Play sends no restart and does not make the start again until Play lets the Scene apply the edits before the
+    /// panels draw. So the start check of the restart reads the new shapes.
+    /// </summary>
+    [Fact]
+    public async Task ARestartAfterASaveLetsAHiddenSceneShowTheEditsBeforeItsStartCheck()
+    {
+        var mission = new FakeMissionStart();
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(2)] }, mission);
+        var behindAtPrepare = new List<bool>();
+        mission.OnPrepare = () => behindAtPrepare.Add(editor.SceneBehind);
+
+        editor.Commit(2);
+        play.Update(false, false);
+        // The save changed the shapes of the start check, and the hidden Scene did not apply them.
+        editor.SceneBehind = true;
+        editor.Finish(2);
+        play.Update(false, false);
+
+        Assert.Equal(1, mission.Prepares);
+        Assert.Equal(PlayStatus.Running, play.Status);
+        Assert.Equal(["start"], stub.Input(0));
+        // The next frame: no Scene draws, so only Play makes the Scene apply the edits.
+        play.BeforePanels(editing: false);
+        Assert.Equal(1, editor.CatchUpCalls);
+        play.Update(false, false);
+
+        Assert.Equal([false], behindAtPrepare);
+        Assert.Equal(PlayStatus.Reloading, play.Status);
+        Assert.DoesNotContain(PlayController.SceneWaitText, Console);
+        await RunUntilAsync(PlayStatus.Running);
+        Assert.Equal(["start", "restart 2"], stub.Input(0));
+        await StopAndRunToIdleAsync();
+    }
+
+    /// <summary>
+    /// When the Scene cannot show each edit, the restart after a save waits, and the Console tells why once for each
+    /// restart. Play does not make the Scene apply the edits while a field edit or a drag is open.
+    /// </summary>
+    [Fact]
+    public async Task ARestartTellsOnceWhyItWaitsWhenTheSceneCannotShowEachEdit()
+    {
+        var mission = new FakeMissionStart();
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(2), Restarted(3)] }, mission);
+
+        for (var save = 2; save <= 3; save++)
+        {
+            editor.Commit(save);
+            play.Update(false, false);
+            editor.SceneBehind = true;
+            editor.SceneStaysBehind = true;
+            editor.Finish(save);
+            var calls = editor.CatchUpCalls;
+            play.BeforePanels(editing: true);
+            Assert.Equal(calls, editor.CatchUpCalls);
+            for (var frame = 0; frame < 3; frame++)
+            {
+                play.BeforePanels(editing: false);
+                play.Update(false, false);
+            }
+
+            Assert.Equal(calls + 3, editor.CatchUpCalls);
+            Assert.Equal(save - 1, mission.Prepares);
+            Assert.Equal(save - 1, Console.Count(m => m == PlayController.SceneWaitText));
+
+            editor.SceneStaysBehind = false;
+            play.BeforePanels(editing: false);
+            play.Update(false, false);
+
+            Assert.Equal(save, mission.Prepares);
+            await RunUntilAsync(PlayStatus.Running);
+        }
+
+        Assert.Equal(["start", "restart 2", "restart 3"], stub.Input(0));
+        await StopAndRunToIdleAsync();
+    }
+
+    /// <summary>A new start that waits for the validation of its save waits for the Scene when its own start check reads
+    /// the Scene. This is also true when the start of the running play does not read the Scene.</summary>
+    [Fact]
+    public async Task ANewStartThatWaitsForItsSaveWaitsForTheSceneOfItsOwnStartCheck()
+    {
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(2)] }, new FakeMissionStart { ReadsScene = false });
+        editor.SaveResult = new SaveOutcome(true, 2, false);
+        var second = new FakeMissionStart();
+        var behindAtPrepare = new List<bool>();
+        second.OnPrepare = () => behindAtPrepare.Add(editor.SceneBehind);
+
+        var result = play.RequestMission(second);
+        play.Update(false, false);
+        editor.SceneBehind = true;
+        editor.Finish(2);
+        play.Update(false, false);
+
+        Assert.Equal(0, second.Prepares);
+        play.BeforePanels(editing: false);
+        play.Update(false, false);
+
+        Assert.Equal([false], behindAtPrepare);
+        await RunUntilAsync(PlayStatus.Running);
+        Assert.Same(second, play.Mission);
+        Assert.True((await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)).Started);
+        Assert.Equal(["start", "restart 2"], stub.Input(0));
+        await StopAndRunToIdleAsync();
+    }
+
+    /// <summary>The restart of a mission at a base that the user picked does not read the Scene, so it does not wait
+    /// for it.</summary>
+    [Fact]
+    public async Task ARestartOfAMissionAtAPickedBaseDoesNotWaitForTheScene()
+    {
+        var mission = new FakeMissionStart { ReadsScene = false };
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(2)] }, mission);
+
+        editor.Commit(2);
+        play.Update(false, false);
+        editor.SceneBehind = true;
+        editor.Finish(2);
+        play.BeforePanels(editing: false);
+        play.Update(false, false);
+
+        Assert.Equal(0, editor.CatchUpCalls);
+        Assert.Equal(2, mission.Prepares);
+        await RunUntilAsync(PlayStatus.Running);
+        Assert.Equal(["start", "restart 2"], stub.Input(0));
+        await StopAndRunToIdleAsync();
+    }
+
     /// <summary>A save while a restart runs: the game can show parts of it, and the Console says so. The trigger then
     /// sends the restart of that save. The watchdog of a restart names the restart.</summary>
     [Fact]

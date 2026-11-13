@@ -50,7 +50,8 @@ internal enum PlayStatus
 /// <para>A request waits for the end of the frame and for the end of an open field edit, drag or dialog, so that the
 /// save has the edit of the field (section 9.1). A request whose start check reads the Scene also waits until the Scene
 /// shows each edit (section 9.5): a start at the camera, and a mission play whose start place can be in the Scene.
-/// Before the panels draw, Play lets the Scene apply the edits, also while the Scene does not show.</para>
+/// The restart of such a mission play waits in the same way, also the restart after a save (issue #7). Before the
+/// panels draw, Play lets the Scene apply the edits, also while the Scene does not show.</para>
 /// <para>The gate (section 9.3): the validation of the gate save decides. The gate save is the save whose files the game
 /// reads. Errors stop the game at once (D16). The start command waits for the waiting event of the game: until then,
 /// the game reads the mod files, and a save in that time makes the newest save the gate save (the read window, D51).
@@ -323,29 +324,32 @@ internal sealed class PlayController : IDisposable
     }
 
     /// <summary>
-    /// Lets the Scene apply each edit for a request whose start check reads the Scene (section 9.5). The Scene applies
-    /// the edits only while it draws, so without this step such a request waits without end while the Scene does not
-    /// show, for example while the Mission tab hides its Scene part. When the Scene still cannot show each edit, because a
-    /// new model waits for the load of the game data, the Console tells once why Play waits. Call it once each frame,
-    /// before the panels draw.
+    /// Lets the Scene apply each edit for a request or a restart whose start check reads the Scene (section 9.5). The
+    /// Scene applies the edits only while it draws. Without this step, such a request or restart waits without end while
+    /// the Scene does not show. An example is the Mission tab when it hides its Scene part. The Scene can stay behind,
+    /// because a new model waits for the load of the game data. Then the Console tells once why Play waits. Call it once
+    /// each frame, before the panels draw.
     /// </summary>
-    /// <param name="editing">True while a field edit or a drag is open. The request waits for its end first.</param>
+    /// <param name="editing">True while a field edit or a drag is open. Play then does not make the Scene apply the
+    /// edits. So a request or a restart that waits for the Scene waits for the end of the edit first.</param>
     public void BeforePanels(bool editing)
     {
-        if (editing || pending is not { } request || !ReadsScene(request) || !editor.SceneBehind)
+        // A request that waits comes first. A restart of the running mission play that waits for the Scene comes next.
+        var wait = pending is { } request && ReadsScene(request) ? request.SceneWait : game?.SceneWait;
+        if (editing || wait == null || !editor.SceneBehind)
         {
             return;
         }
 
         editor.CatchUpScene();
-        if (editor.SceneBehind && !request.SceneWaitTold)
+        if (editor.SceneBehind && !wait.Told)
         {
-            request.SceneWaitTold = true;
+            wait.Told = true;
             Log(ConsoleSeverity.Info, SceneWaitText);
         }
     }
 
-    /// <summary>The note of a request that waits until the Scene shows each edit.</summary>
+    /// <summary>The note of a request or a restart that waits until the Scene shows each edit.</summary>
     internal const string SceneWaitText = "Play waits until the Scene shows each edit, because the start check of Play " +
                                           "reads the Scene. The Scene shows new models when the load of the game data " +
                                           "ends.";
@@ -752,9 +756,14 @@ internal sealed class PlayController : IDisposable
     /// then looks only at the last save, so the older saves drop. A save that is not complete gets no validation
     /// (D59). The save that completes it starts the validation. A mission play starts again from its start in place of
     /// a reload (section 5.8 of the M6c design). A new mission play that waits for a restart gets it also without a new
-    /// save.</remarks>
+    /// save. A restart whose start check reads the Scene waits until the Scene shows each edit, as a request that waits
+    /// does (section 9.5, issue #7). <see cref="BeforePanels"/> lets the Scene apply the edits, and a later check sends
+    /// the restart.</remarks>
     private void CheckReload(GameRun run)
     {
+        // Each check decides again whether a restart waits for the Scene. A wait that goes on keeps its note.
+        var sceneWait = run.SceneWait;
+        run.SceneWait = null;
         if (!run.Spawned || run.Ending || run.Error != null || run.Reload != null || editor.Session is not { } session)
         {
             return;
@@ -770,7 +779,11 @@ internal sealed class PlayController : IDisposable
         if (!newSave)
         {
             // The files of the game did not change, so the new start needs no validation.
-            SendRestart(run, save, null);
+            if (!WaitsForScene(run, sceneWait))
+            {
+                SendRestart(run, save, null);
+            }
+
             return;
         }
 
@@ -782,12 +795,7 @@ internal sealed class PlayController : IDisposable
             return;
         }
 
-        if (result.Problems is not { } problems)
-        {
-            Log(ConsoleSeverity.Warning, $"The running game loads {EditController.SaveText(save)} without a " +
-                                         "validation: the validation could not run.");
-        }
-        else if (problems.Count(p => p.Severity == DiagnosticSeverity.Error) is var errors and > 0)
+        if (result.Problems?.Count(p => p.Severity == DiagnosticSeverity.Error) is int errors and > 0)
         {
             if (run.ErrorsTold != save)
             {
@@ -811,6 +819,18 @@ internal sealed class PlayController : IDisposable
             return;
         }
 
+        // The restart waits before the warning, so the Console gives the warning once, when the restart goes.
+        if (run.Mission != null && WaitsForScene(run, sceneWait))
+        {
+            return;
+        }
+
+        if (result.Problems == null)
+        {
+            Log(ConsoleSeverity.Warning, $"The running game loads {EditController.SaveText(save)} without a " +
+                                         "validation: the validation could not run.");
+        }
+
         var savedAt = lastSave.Save == save ? lastSave.At : (TimeSpan?)null;
         if (run.Mission != null)
         {
@@ -822,6 +842,30 @@ internal sealed class PlayController : IDisposable
     }
 
     /// <summary>
+    /// Holds the restart while its start check reads the Scene and the Scene does not show each edit (section 9.5). A
+    /// request that waits does the same. <see cref="BeforePanels"/> then lets the Scene apply the edits. A later check
+    /// sends the restart, so its start check reads the new shapes (issue #7). A start at a base that the user picked
+    /// does not read the Scene, so its restart does not wait.
+    /// </summary>
+    /// <param name="sceneWait">The wait of the last check, or null. A wait that goes on keeps it, so the Console tells
+    /// once for each restart why the restart waits.</param>
+    /// <returns>True when the restart waits.</returns>
+    private bool WaitsForScene(GameRun run, SceneWait? sceneWait)
+    {
+        if (!StartOfRestart(run).ReadsScene || !editor.SceneBehind)
+        {
+            return false;
+        }
+
+        run.SceneWait = sceneWait ?? new SceneWait();
+        return true;
+    }
+
+    /// <summary>The start of the next restart: the start of a new mission play that waits, else the start of the
+    /// running play.</summary>
+    private static IMissionStart StartOfRestart(GameRun run) => run.Wanted?.Mission ?? run.Mission!;
+
+    /// <summary>
     /// Starts the mission play again (section 5.8 of the M6c design): from the start of a new mission play that waits,
     /// else from the start of the running play, not from the play start of the settings. The editor makes the plan again
     /// from the new model and writes the start save and the test layer, then the game gets restart. The start of the
@@ -830,12 +874,13 @@ internal sealed class PlayController : IDisposable
     /// </summary>
     /// <remarks>A new start that cannot start gives its refusal, and the save that its request made goes to the game
     /// with the start of the running play. When the start of the running play cannot start, the game keeps its mission
-    /// and its data, and the trigger of the reload does not send this save again.</remarks>
+    /// and its data, and the trigger of the reload does not send this save again. <see cref="CheckReload"/> calls it
+    /// only when the Scene shows each edit that the start check reads.</remarks>
     private void SendRestart(GameRun run, int save, TimeSpan? savedAt)
     {
+        var mission = StartOfRestart(run);
         var wanted = run.Wanted;
         run.Wanted = null;
-        var mission = wanted?.Mission ?? run.Mission!;
         if (mission.Prepare() is not { } start)
         {
             var reason = mission.Refusal ?? NoStart;
@@ -1319,13 +1364,21 @@ internal sealed class PlayController : IDisposable
         /// <summary>Who asks for the play.</summary>
         public EditOrigin Origin { get; init; }
 
-        /// <summary>True after the Console told why the request waits for the Scene.</summary>
-        public bool SceneWaitTold { get; set; }
+        /// <summary>The wait of the request until the Scene shows each edit, when its start check reads the
+        /// Scene.</summary>
+        public SceneWait SceneWait { get; } = new();
 
         /// <summary>The result of the request. Its continuations run on the thread pool, not in the frame of the
         /// editor.</summary>
         public TaskCompletionSource<PlayRequestResult> Result { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    /// <summary>A request or a restart that waits until the Scene shows each edit (section 9.5).</summary>
+    private sealed class SceneWait
+    {
+        /// <summary>True after the Console told why Play waits.</summary>
+        public bool Told { get; set; }
     }
 
     /// <param name="Code">The exit code, or null when the editor ended the game.</param>
@@ -1419,5 +1472,9 @@ internal sealed class PlayController : IDisposable
         /// <summary>The request of the new start of the restart that the game did not end yet, or null. It gets its
         /// result when the game answers.</summary>
         public PlayRequest? RestartRequest { get; set; }
+
+        /// <summary>The wait of a restart until the Scene shows each edit, or null when no restart waits for the Scene
+        /// (see <see cref="PlayController.WaitsForScene"/>).</summary>
+        public SceneWait? SceneWait { get; set; }
     }
 }
