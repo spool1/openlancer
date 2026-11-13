@@ -159,11 +159,20 @@ public sealed class OltoolMcpTests
             }
         }
 
-        /// <summary>Ends the server without the end of its standard input, as a client that ends it at once does.</summary>
-        public async Task KillAsync()
+        /// <summary>Ends the server without the end of its standard input, as a client that ends it at once does. Then
+        /// it waits until the lock of the mod is free.</summary>
+        /// <remarks>On a busy computer, Windows can release the handle of the lock a moment after the exit of the
+        /// process. A session that opens before that is read-only.</remarks>
+        public async Task KillAsync(string modFolder)
         {
             process.Kill(entireProcessTree: true);
             await process.ExitAsync(TimeSpan.FromSeconds(30), "oltool mcp serve did not end after the kill.");
+            var end = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            while (ModLock.HeldBy(modFolder, "act") != null)
+            {
+                Assert.True(DateTime.UtcNow < end, "The lock of mod 'act' stayed 10 s after the exit of the server.");
+                await Task.Delay(50, Token);
+            }
         }
 
         public async ValueTask DisposeAsync()
@@ -277,7 +286,7 @@ public sealed class OltoolMcpTests
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
             while (!File.Exists(recovery) && DateTime.UtcNow < deadline)
                 await Task.Delay(100, Token);
-            await server.KillAsync();
+            await server.KillAsync(ws.ModFolder("act"));
         }
         var session = ws.Session("act");
 
@@ -773,7 +782,7 @@ public sealed class OltoolMcpTests
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
             while (!File.Exists(recovery) && DateTime.UtcNow < deadline)
                 await Task.Delay(100, Token);
-            await server.KillAsync();
+            await server.KillAsync(ws.ModFolder("act"));
         }
         var session = ws.Session("act");
 
