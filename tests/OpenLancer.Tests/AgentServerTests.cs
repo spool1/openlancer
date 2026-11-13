@@ -46,12 +46,18 @@ public sealed class AgentServerTests
     /// <summary>A running server on a free port, its session thread, and an HTTP client.</summary>
     private sealed class Running : IAsyncDisposable
     {
-        public Running(AgentLimits? limits = null)
+        private Running(SessionThread thread, AgentServer server)
         {
-            Thread = SessionThread.Start(() => new TestAgentHost(null, AgentHostKind.Editor));
-            var start = AgentServer.StartAsync(FreePort(), Thread.Queue, limits ?? new AgentLimits()).GetAwaiter().GetResult();
+            Thread = thread;
+            Server = server;
+        }
+
+        public static async Task<Running> StartAsync(AgentLimits? limits = null)
+        {
+            var thread = SessionThread.Start(() => new TestAgentHost(null, AgentHostKind.Editor));
+            var start = await AgentServer.StartAsync(FreePort(), thread.Queue, limits ?? new AgentLimits());
             Assert.Null(start.Problem);
-            Server = start.Server!;
+            return new Running(thread, start.Server!);
         }
 
         public SessionThread Thread { get; }
@@ -99,7 +105,7 @@ public sealed class AgentServerTests
             Environment.SetEnvironmentVariable("ASPNETCORE_HTTP_PORTS", "0");
             Environment.SetEnvironmentVariable("Kestrel__Endpoints__X__Url", "http://0.0.0.0:0");
             Environment.SetEnvironmentVariable("URLS", "http://0.0.0.0:0");
-            await using var running = new Running();
+            await using var running = await Running.StartAsync();
 
             Assert.Equal([$"http://127.0.0.1:{running.Server.Port}"], running.Server.Addresses);
             Assert.Equal(64, running.Server.Token.Length);
@@ -114,7 +120,7 @@ public sealed class AgentServerTests
     [Fact]
     public async Task EachRequestNeedsTheTokenAndPassesTheChecks()
     {
-        await using var running = new Running(new AgentLimits { RequestMegabytes = 1 });
+        await using var running = await Running.StartAsync(new AgentLimits { RequestMegabytes = 1 });
 
         HttpRequestMessage With(string header, string value)
         {
@@ -171,7 +177,7 @@ public sealed class AgentServerTests
     [InlineData("2025-11-25")]
     public async Task AClientWithTheTokenCallsTheToolsOverHttp(string? protocol)
     {
-        await using var running = new Running();
+        await using var running = await Running.StartAsync();
         var transport = new HttpClientTransport(new HttpClientTransportOptions
         {
             Endpoint = new Uri(running.Url()),
@@ -236,7 +242,7 @@ public sealed class AgentServerTests
     [Fact]
     public async Task ASecondServerOnAPortInUseDoesNotStartAndTakesNoOtherPort()
     {
-        await using var first = new Running();
+        await using var first = await Running.StartAsync();
         using var thread = SessionThread.Start(() => new TestAgentHost(null, AgentHostKind.Editor));
 
         var second = await AgentServer.StartAsync(first.Server.Port, thread.Queue, new AgentLimits());
@@ -277,7 +283,7 @@ public sealed class AgentControllerTests : IDisposable
     }
 
     [Fact]
-    public void StartWritesTheDiscoveryFileAndStopDeletesIt()
+    public async Task StartWritesTheDiscoveryFileAndStopDeletesIt()
     {
         var editor = new FakeAgentEditor();
         editor.Settings.Port = FreePort();
@@ -285,7 +291,7 @@ public sealed class AgentControllerTests : IDisposable
         using var controller = new AgentController(editor, ui, () => default, Discovery, folder);
 
         controller.Start();
-        ui.RunUntil(() => controller.State == AgentServerState.On, "the start of the server");
+        await ui.RunUntilAsync(() => controller.State == AgentServerState.On, "the start of the server");
         var info = AgentDiscovery.Read(Discovery)!;
         var headers = AgentDiscovery.Headers(Agent, $"http://127.0.0.1:{editor.Settings.Port}/mcp");
         controller.Stop();
@@ -303,7 +309,7 @@ public sealed class AgentControllerTests : IDisposable
     }
 
     [Fact]
-    public void APortInUseStopsTheStartAndTellsTheUser()
+    public async Task APortInUseStopsTheStartAndTellsTheUser()
     {
         var editor = new FakeAgentEditor();
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -315,7 +321,7 @@ public sealed class AgentControllerTests : IDisposable
             using var controller = new AgentController(editor, ui, () => default, Discovery, folder);
 
             controller.Start();
-            ui.RunUntil(() => controller.State != AgentServerState.Starting, "the end of the start");
+            await ui.RunUntilAsync(() => controller.State != AgentServerState.Starting, "the end of the start");
 
             Assert.Equal(AgentServerState.PortInUse, controller.State);
             Assert.Equal($"Agent server: port {editor.Settings.Port} is in use", controller.StatusText);
@@ -403,7 +409,7 @@ public sealed class AgentControllerTests : IDisposable
         var ui = new QueuedUIThread();
         using var controller = new AgentController(editor, ui, () => default, Discovery, folder);
         controller.Start();
-        ui.RunUntil(() => controller.State == AgentServerState.On, "the start of the server");
+        await ui.RunUntilAsync(() => controller.State == AgentServerState.On, "the start of the server");
         using var http = new HttpClient();
         var request = new HttpRequestMessage(HttpMethod.Post,
             $"http://127.0.0.1:{editor.Settings.Port}{AgentServer.Endpoint}")
@@ -423,7 +429,7 @@ public sealed class AgentControllerTests : IDisposable
         {
             ui.RunQueued();
             controller.Frame();
-            Thread.Sleep(5);
+            await Task.Delay(5, TestContext.Current.CancellationToken);
         }
         using var response = await call;
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);

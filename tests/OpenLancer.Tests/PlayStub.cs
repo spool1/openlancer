@@ -4,7 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace OpenLancer.Tests;
@@ -110,39 +110,45 @@ internal sealed class PlayStub
     public IReadOnlyList<string> Input(int start) => Read(start).Where(l => !l.StartsWith("pid ")).ToList();
 
     /// <summary>Waits until a start of the stub read the count of input lines.</summary>
-    public void WaitForInput(int start, int count)
+    public async Task WaitForInputAsync(int start, int count)
     {
         var end = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         while (Input(start).Count < count)
         {
             Assert.True(DateTime.UtcNow < end, $"The stub did not read {count} input lines in 30 s. It read " +
                                                $"[{string.Join(", ", Input(start))}], and it runs: {Runs(start)}.");
-            Thread.Sleep(20);
+            await Task.Delay(20, TestContext.Current.CancellationToken);
         }
     }
 
     /// <summary>The process id of a start of the stub. It waits until the stub wrote it.</summary>
-    public int ProcessId(int start)
+    public async Task<int> ProcessIdAsync(int start)
     {
         var end = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         while (true)
         {
-            if (Read(start).FirstOrDefault(l => l.StartsWith("pid ")) is { } line)
+            if (WrittenId(start) is { } id)
             {
-                return int.Parse(line["pid ".Length..]);
+                return id;
             }
 
             Assert.True(DateTime.UtcNow < end, "The stub did not start in 30 s.");
-            Thread.Sleep(20);
+            await Task.Delay(20, TestContext.Current.CancellationToken);
         }
     }
 
-    /// <summary>True while the process of a start of the stub runs.</summary>
+    /// <summary>True while the process of a start of the stub runs. A stub that did not write its process id yet does
+    /// not run for this check.</summary>
     public bool Runs(int start)
     {
+        if (WrittenId(start) is not { } id)
+        {
+            return false;
+        }
+
         try
         {
-            using var process = Process.GetProcessById(ProcessId(start));
+            using var process = Process.GetProcessById(id);
             return IsStub(process, start);
         }
         catch (Exception e) when (e is ArgumentException or InvalidOperationException or Win32Exception)
@@ -161,9 +167,14 @@ internal sealed class PlayStub
                 continue;
             }
 
+            if (WrittenId(start) is not { } id)
+            {
+                continue;
+            }
+
             try
             {
-                using var process = Process.GetProcessById(ProcessId(start));
+                using var process = Process.GetProcessById(id);
                 if (IsStub(process, start))
                 {
                     process.Kill();
@@ -183,6 +194,10 @@ internal sealed class PlayStub
     /// </summary>
     private bool IsStub(Process process, int start) =>
         !process.HasExited && process.StartTime.ToUniversalTime() <= File.GetCreationTimeUtc(records[start]);
+
+    /// <summary>The process id that a start of the stub wrote, or null.</summary>
+    private int? WrittenId(int start) =>
+        Read(start).FirstOrDefault(l => l.StartsWith("pid ")) is { } line ? int.Parse(line["pid ".Length..]) : null;
 
     private string[] Read(int start)
     {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Runtime.Validation;
 using Xunit;
@@ -49,7 +50,7 @@ public sealed class BaseRunRunnerTests
     /// <summary>A new run stops the run before it, and the result of the old run is dropped, for example the run of a
     /// profile that closed. The slow stub writes a file when it is not stopped.</summary>
     [Fact]
-    public void ANewRunDropsTheResultOfTheOldRun()
+    public async Task ANewRunDropsTheResultOfTheOldRun()
     {
         using var ws = new TestWorkspace();
         var ended = Path.Combine(ws.Root, "slow-ended.txt");
@@ -61,7 +62,7 @@ public sealed class BaseRunRunnerTests
         Assert.True(runner.Running);
         runner.Start("fast", ui, r => results.Add(("fast", r)));
         // Each process queues its result when it ends: the first when the second start stopped it.
-        ui.Run(2);
+        await ui.RunAsync(2);
 
         var (folder, result) = Assert.Single(results);
         Assert.Equal("fast", folder);
@@ -72,7 +73,7 @@ public sealed class BaseRunRunnerTests
 
     /// <summary>A stop drops the result of the run, for example when the profile closes.</summary>
     [Fact]
-    public void AStopDropsTheResult()
+    public async Task AStopDropsTheResult()
     {
         var ui = new QueuedUIThread();
         var results = new List<BaseRunResult>();
@@ -80,7 +81,7 @@ public sealed class BaseRunRunnerTests
 
         runner.Start("fast", ui, results.Add);
         runner.Stop();
-        ui.RunUntilQuiet(TimeSpan.FromSeconds(1));
+        await ui.RunUntilQuietAsync(TimeSpan.FromSeconds(1));
 
         Assert.Empty(results);
         Assert.False(runner.Running);

@@ -49,17 +49,17 @@ public sealed class PlayRequestsTests : IDisposable
     /// <summary>A request of an agent without unsaved edits starts at once, without a question. Nobody allowed a save,
     /// so Play refuses edits that come before its save.</summary>
     [Fact]
-    public void AnAgentRequestWithoutUnsavedEditsStartsAtOnce()
+    public async Task AnAgentRequestWithoutUnsavedEditsStartsAtOnce()
     {
         var host = new FakeAgentHost();
         var rules = new List<PlaySaveRule>();
 
-        var result = PlayRequests.WithAgentRule(host, EditOrigin.Agent, () => PlayStatus.Idle, Start(rules));
+        var result = PlayRequests.WithAgentRule(host, EditOrigin.Agent, () => PlayStatus.Idle, Start(rules),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal([PlaySaveRule.NoEdits], rules);
         Assert.Null(host.Asked);
-        Assert.True(result.Wait(Wait));
-        Assert.True(result.Result.Started);
+        Assert.True((await result.WaitAsync(Wait, TestContext.Current.CancellationToken)).Started);
     }
 
     /// <summary>With unsaved edits, the editor asks the user. Cancel gives the agent refused with the reason of the user
@@ -68,12 +68,13 @@ public sealed class PlayRequestsTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void CancelOfTheQuestionGivesRefusedWithTheReason(bool button)
+    public async Task CancelOfTheQuestionGivesRefusedWithTheReason(bool button)
     {
         var host = new FakeAgentHost { UnsavedMod = "ol_mod" };
         var rules = new List<PlaySaveRule>();
 
-        var result = PlayRequests.WithAgentRule(host, EditOrigin.Agent, () => PlayStatus.Idle, Start(rules));
+        var result = PlayRequests.WithAgentRule(host, EditOrigin.Agent, () => PlayStatus.Idle, Start(rules),
+            TestContext.Current.CancellationToken);
 
         var (title, message, choices, cancel) = host.Asked!.Value;
         Assert.Equal("Agent Play", title);
@@ -86,27 +87,28 @@ public sealed class PlayRequestsTests : IDisposable
         else
             cancel();
 
-        Assert.True(result.Wait(Wait));
+        var error = (await result.WaitAsync(Wait, TestContext.Current.CancellationToken)).Error!;
         Assert.Empty(rules);
-        Assert.Equal(EditErrorKind.Refused, result.Result.Error!.Kind);
-        Assert.Equal("The user did not save. Play did not start.", result.Result.Error.Message);
+        Assert.Equal(EditErrorKind.Refused, error.Kind);
+        Assert.Equal("The user did not save. Play did not start.", error.Message);
     }
 
     /// <summary>"Save and continue" starts the play. Play then saves first, as F5 does (see
     /// <c>PlayControllerTests</c>).</summary>
     [Fact]
-    public void SaveAndContinueStartsThePlay()
+    public async Task SaveAndContinueStartsThePlay()
     {
         var host = new FakeAgentHost { UnsavedMod = "ol_mod" };
         var rules = new List<PlaySaveRule>();
 
-        var result = PlayRequests.WithAgentRule(host, EditOrigin.Agent, () => PlayStatus.Idle, Start(rules));
+        var result = PlayRequests.WithAgentRule(host, EditOrigin.Agent, () => PlayStatus.Idle, Start(rules),
+            TestContext.Current.CancellationToken);
         Assert.Empty(rules);
         host.Asked!.Value.Choices[0].Action();
 
-        Assert.True(result.Wait(Wait));
+        var started = await result.WaitAsync(Wait, TestContext.Current.CancellationToken);
         Assert.Equal([PlaySaveRule.Save], rules);
-        Assert.True(result.Result.Started);
+        Assert.True(started.Started);
     }
 
     /// <summary>The setting "Auto-save and continue when an MCP agent starts Play" skips the question. A request of the
@@ -114,16 +116,17 @@ public sealed class PlayRequestsTests : IDisposable
     [Theory]
     [InlineData(EditOrigin.Agent, true)]
     [InlineData(EditOrigin.User, false)]
-    public void TheSettingAndARequestOfTheUserSkipTheQuestion(EditOrigin origin, bool autoSave)
+    public async Task TheSettingAndARequestOfTheUserSkipTheQuestion(EditOrigin origin, bool autoSave)
     {
         var host = new FakeAgentHost { UnsavedMod = "ol_mod", AutoSaveAgentPlay = autoSave };
         var rules = new List<PlaySaveRule>();
 
-        var result = PlayRequests.WithAgentRule(host, origin, () => PlayStatus.Idle, Start(rules));
+        var result = PlayRequests.WithAgentRule(host, origin, () => PlayStatus.Idle, Start(rules),
+            TestContext.Current.CancellationToken);
 
         Assert.Null(host.Asked);
         Assert.Equal([PlaySaveRule.Save], rules);
-        Assert.True(result.Wait(Wait));
+        await result.WaitAsync(Wait, TestContext.Current.CancellationToken);
     }
 
     /// <summary>The setting is off by default, and the settings file keeps it.</summary>

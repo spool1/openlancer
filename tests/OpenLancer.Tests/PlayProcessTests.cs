@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipes;
 using System.Numerics;
+using System.Threading.Tasks;
 using OpenLancer.Editor;
 using OpenLancer.Editor.Play;
 using OpenLancer.Runtime.Play;
@@ -33,19 +34,19 @@ public sealed class PlayProcessTests : IDisposable
     /// sleeps 120 s, so only the job can end it within the 30 s of the wait.
     /// </summary>
     [Fact]
-    public void DisposeClosesTheJobAndEndsAGameThatIgnoresItsInput()
+    public async Task DisposeClosesTheJobAndEndsAGameThatIgnoresItsInput()
     {
         int? code = null;
         var process = PlayProcess.Start(stub.Command(new StubPlan([], Sleep: 120)), ui, _ => { }, _ => { },
             (c, _) => code = c);
-        stub.ProcessId(0);
+        await stub.ProcessIdAsync(0);
         process.CloseInput();
         Assert.False(process.WaitForExit(TimeSpan.FromSeconds(1)));
         Assert.True(stub.Runs(0));
 
         process.Dispose();
 
-        ui.RunUntil(() => code != null, "the exit of the stub after the job closed");
+        await ui.RunUntilAsync(() => code != null, "the exit of the stub after the job closed");
         Assert.False(stub.Runs(0));
     }
 
@@ -56,12 +57,12 @@ public sealed class PlayProcessTests : IDisposable
     /// <see cref="SendToAGameThatEndedReturnsFalseAlsoWhenItsInputTakesTheWrite"/>).
     /// </summary>
     [Fact]
-    public void SendToAGameThatEndedReturnsFalse()
+    public async Task SendToAGameThatEndedReturnsFalse()
     {
         int? code = null;
         using var process = PlayProcess.Start(stub.Command(new StubPlan([], Exit: 0)), ui, _ => { }, _ => { },
             (c, _) => code = c);
-        ui.RunUntil(() => code != null, "the exit of the stub");
+        await ui.RunUntilAsync(() => code != null, "the exit of the stub");
 
         Assert.False(process.Send(new PlayCommand(PlayCommandKind.Start)));
         Assert.False(process.Send(new PlayCommand(PlayCommandKind.Stop)));
@@ -77,7 +78,7 @@ public sealed class PlayProcessTests : IDisposable
     /// Send must still give false, because the game ended.
     /// </summary>
     [Fact]
-    public void SendToAGameThatEndedReturnsFalseAlsoWhenItsInputTakesTheWrite()
+    public async Task SendToAGameThatEndedReturnsFalseAlsoWhenItsInputTakesTheWrite()
     {
         using var pipe = new AnonymousPipeServerStream(PipeDirection.Out);
         using var readEnd = new AnonymousPipeClientStream(PipeDirection.In, pipe.ClientSafePipeHandle);
@@ -85,7 +86,7 @@ public sealed class PlayProcessTests : IDisposable
         int? code = null;
         using var process = PlayProcess.Start(stub.Command(new StubPlan([], Exit: 0)), input, ui, _ => { }, _ => { },
             (c, _) => code = c);
-        ui.RunUntil(() => code != null, "the exit of the stub");
+        await ui.RunUntilAsync(() => code != null, "the exit of the stub");
 
         // The input still takes a write after the exit.
         input.WriteLine("probe");
@@ -97,7 +98,7 @@ public sealed class PlayProcessTests : IDisposable
     }
 
     [Fact]
-    public void SendWritesOneLineForEachCommand()
+    public async Task SendWritesOneLineForEachCommand()
     {
         int? code = null;
         using var process = PlayProcess.Start(stub.Command(new StubPlan([])), ui, _ => { }, _ => { },
@@ -107,7 +108,7 @@ public sealed class PlayProcessTests : IDisposable
         Assert.True(process.Send(new PlayCommand(PlayCommandKind.Start)));
         Assert.True(process.Send(new PlayCommand(PlayCommandKind.Stop)));
 
-        ui.RunUntil(() => code != null, "the exit of the stub at stop");
+        await ui.RunUntilAsync(() => code != null, "the exit of the stub at stop");
         Assert.Equal(["reload 4", "start", "stop"], stub.Input(0));
     }
 
@@ -116,7 +117,7 @@ public sealed class PlayProcessTests : IDisposable
     /// the UI thread. The other lines are dropped. The exit comes last, with the first lines of the error output.
     /// </summary>
     [Fact]
-    public void EventsAndEngineWarningsAndErrorsComeOnTheUIThreadBeforeTheExit()
+    public async Task EventsAndEngineWarningsAndErrorsComeOnTheUIThreadBeforeTheExit()
     {
         var waiting = new PlayEvent.Waiting(2300);
         var spawned = new PlayEvent.Spawned("Br01", null, new Vector3(1, 2, 3), "ge_fighter", "Starflier", 450);
@@ -136,7 +137,6 @@ public sealed class PlayProcessTests : IDisposable
             "!err second",
             "!err third",
         ];
-        var testThread = Environment.CurrentManagedThreadId;
         var got = new List<object>();
         var threads = new List<int>();
         (int Code, string Errors)? exit = null;
@@ -157,10 +157,12 @@ public sealed class PlayProcessTests : IDisposable
                 exit = (code, errors);
             });
 
-        // Two events, two log lines and the exit. The stub ended, and nothing ran yet.
-        ui.WaitForQueued(5);
+        // Two events, two log lines and the exit. The stub ended, and nothing ran yet. All actions are in the queue, so
+        // the run does not wait and stays on the thread of the test.
+        await ui.WaitForQueuedAsync(5);
         Assert.Empty(got);
-        ui.RunUntil(() => exit != null, "the exit of the stub");
+        var testThread = Environment.CurrentManagedThreadId;
+        await ui.RunUntilAsync(() => exit != null, "the exit of the stub");
 
         Assert.Equal([waiting, "[Warning: 12:00:00] Ini: a warning", "[Error: 12:00:00] Ship: an error", spawned], got);
         Assert.All(threads, id => Assert.Equal(testThread, id));
@@ -175,7 +177,7 @@ public sealed class PlayProcessTests : IDisposable
     /// error output queues no action, so <see cref="ProcessThreadTests"/> covers it.
     /// </summary>
     [Fact]
-    public void TheOutputAndTheExitDoNotWaitForAThreadOfThePool()
+    public async Task TheOutputAndTheExitDoNotWaitForAThreadOfThePool()
     {
         string[] lines = [PlayProtocol.Write(new PlayEvent.Waiting(2300)), "[Warning: 12:00:00] Ini: a warning", "!err an error"];
         var events = 0;
@@ -183,7 +185,7 @@ public sealed class PlayProcessTests : IDisposable
         (int Code, string Errors)? exit = null;
         using var process = PlayProcess.Start(stub.Command(new StubPlan(lines, Exit: 4)), ui, _ => events++,
             _ => logLines++, (code, errors) => exit = (code, errors));
-        ui.RunUntil(() => exit != null, "the exit of the stub");
+        await ui.RunUntilAsync(() => exit != null, "the exit of the stub");
 
         Assert.Equal((1, 1, (4, "an error")), (events, logLines, exit));
         Assert.Equal(0, ui.QueuedFromThreadPool);

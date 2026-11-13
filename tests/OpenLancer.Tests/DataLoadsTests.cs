@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using OpenLancer.Editor;
 using OpenLancer.Editor.Editing;
 using Xunit;
@@ -56,7 +57,7 @@ public sealed class DataLoadsTests
     /// the first load, because both fill the same resources. A second save during the load gives no second reload.
     /// </summary>
     [Fact]
-    public void ASaveDuringTheFirstLoadReloadsAfterTheLoadEnds()
+    public async Task ASaveDuringTheFirstLoadReloadsAfterTheLoadEnds()
     {
         var ui = new QueuedUIThread();
         var loads = new DataLoads(ui);
@@ -89,7 +90,7 @@ public sealed class DataLoadsTests
         var waiting = (loads.IsLoading, loads.IsReloading, loads.ReloadWaits, starts);
 
         release.Set();
-        ui.RunUntil(() => events.Contains("reload 1 loaded"), "the reload after the first load");
+        await ui.RunUntilAsync(() => events.Contains("reload 1 loaded"), "the reload after the first load");
 
         // The race comes first: a reload that starts at once uses the resources with the first load.
         Assert.Equal(1, resources.Most);
@@ -102,7 +103,7 @@ public sealed class DataLoadsTests
 
     /// <summary>A save during a reload gives one more reload after it, which reads the files of the last save.</summary>
     [Fact]
-    public void ASaveDuringAReloadReloadsAgainAfterIt()
+    public async Task ASaveDuringAReloadReloadsAgainAfterIt()
     {
         var ui = new QueuedUIThread();
         var loads = new DataLoads(ui);
@@ -110,7 +111,7 @@ public sealed class DataLoadsTests
         var events = new List<string>();
         using var release = new ManualResetEventSlim();
         loads.Load(() => () => events.Add("loaded"));
-        ui.RunUntil(() => !loads.IsBusy, "the first load");
+        await ui.RunUntilAsync(() => !loads.IsBusy, "the first load");
 
         Assert.True(loads.Reload(() =>
         {
@@ -133,7 +134,7 @@ public sealed class DataLoadsTests
         Assert.True(loads.IsReloading);
 
         release.Set();
-        ui.RunUntil(() => events.Contains("reload 2 loaded"), "the second reload");
+        await ui.RunUntilAsync(() => events.Contains("reload 2 loaded"), "the second reload");
 
         Assert.Equal(1, resources.Most);
         Assert.Equal(["loaded", "reload 1 started", "reload 1 loaded", "reload 2 started", "reload 2 loaded"], events);
@@ -145,7 +146,7 @@ public sealed class DataLoadsTests
     /// profile can close. The reload that waits for it then starts.
     /// </summary>
     [Fact]
-    public void ALoadThatThrowsStillEnds()
+    public async Task ALoadThatThrowsStillEnds()
     {
         var ui = new QueuedUIThread();
         var loads = new DataLoads(ui);
@@ -159,7 +160,7 @@ public sealed class DataLoadsTests
         Assert.False(loads.Reload(() => () => () => events.Add("reloaded")));
 
         release.Set();
-        ui.RunUntil(() => events.Contains("reloaded"), "the reload after the load that threw");
+        await ui.RunUntilAsync(() => events.Contains("reloaded"), "the reload after the load that threw");
 
         Assert.False(loads.IsBusy);
     }
@@ -169,7 +170,7 @@ public sealed class DataLoadsTests
     /// without a running load gives no line, because its reload starts at once.
     /// </summary>
     [Fact]
-    public void TheConsoleTellsOneTimeThatAReloadWaits()
+    public async Task TheConsoleTellsOneTimeThatAReloadWaits()
     {
         var ui = new QueuedUIThread();
         var loads = new DataLoads(ui);
@@ -185,11 +186,11 @@ public sealed class DataLoadsTests
             EditController.RequestReload(loads, Start));
         Assert.Null(EditController.RequestReload(loads, Start));
         release.Set();
-        ui.RunUntil(() => !loads.IsBusy, "the reload after the first load");
+        await ui.RunUntilAsync(() => !loads.IsBusy, "the reload after the first load");
 
         Assert.Null(EditController.RequestReload(loads, Start));
         Assert.True(loads.IsReloading);
-        ui.RunUntil(() => !loads.IsBusy, "the reload of the last save");
+        await ui.RunUntilAsync(() => !loads.IsBusy, "the reload of the last save");
     }
 
     /// <summary>
@@ -198,7 +199,7 @@ public sealed class DataLoadsTests
     /// save before the close does not start, and no load starts after the close. A second close changes nothing.
     /// </summary>
     [Fact]
-    public void ACloseDuringALoadWaitsForItsEndAndStartsNoReload()
+    public async Task ACloseDuringALoadWaitsForItsEndAndStartsNoReload()
     {
         var ui = new QueuedUIThread();
         var loads = new DataLoads(ui);
@@ -228,7 +229,7 @@ public sealed class DataLoadsTests
         Assert.False(loads.ReloadWaits);
 
         release.Set();
-        ui.RunUntil(() => events.Count == 2, "the close after the load");
+        await ui.RunUntilAsync(() => events.Count == 2, "the close after the load");
         ui.RunQueued();
 
         Assert.Equal((true, true, true, false), closing);
@@ -242,12 +243,12 @@ public sealed class DataLoadsTests
 
     /// <summary>A close without a running load runs at once. Then no load starts.</summary>
     [Fact]
-    public void ACloseWithoutALoadRunsAtOnce()
+    public async Task ACloseWithoutALoadRunsAtOnce()
     {
         var ui = new QueuedUIThread();
         var loads = new DataLoads(ui);
         loads.Load(() => () => { });
-        ui.RunUntil(() => !loads.IsBusy, "the first load");
+        await ui.RunUntilAsync(() => !loads.IsBusy, "the first load");
         var closed = 0;
 
         Assert.True(loads.Close(() => closed++));

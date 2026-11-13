@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Threading;
 using System.Threading.Tasks;
 using LibreLancer.Data.GameData.World;
 using LibreLancer.World;
@@ -78,7 +77,7 @@ public sealed class PlayControllerTests : IDisposable
 
     /// <summary>(1) No edits and a passed validation of the current save: the game gets start at its waiting event.</summary>
     [Fact]
-    public void WithoutEditsAndWithAPassedValidationTheGameGetsStartAtOnce()
+    public async Task WithoutEditsAndWithAPassedValidationTheGameGetsStartAtOnce()
     {
         editor.Commit(1);
         editor.Finish(1);
@@ -89,12 +88,12 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Equal(1, Assert.Single(starts).Save);
         Assert.Equal(PlayStatus.Starting, play.Status);
         Assert.Equal("Play: starting...", play.StatusText);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Contains("Playing in New London (Br01) with Starflier ge_fighter. From Play to flight: 0.0 s.", Console);
         Assert.Equal("Playing: New London (Br01), save 1", play.StatusText);
         play.Stop();
         Assert.Equal("Play: stopping...", play.StatusText);
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.Null(play.StatusText);
         Assert.Equal(["start", "stop"], stub.Input(0));
         Assert.Equal(0, editor.ValidateNowCalls);
@@ -103,26 +102,26 @@ public sealed class PlayControllerTests : IDisposable
 
     /// <summary>A new session without a validation: Play validates the saved files, and starts when that passes.</summary>
     [Fact]
-    public void WithoutAValidationPlayValidatesTheSavedFiles()
+    public async Task WithoutAValidationPlayValidatesTheSavedFiles()
     {
         RequestPlay();
 
         Assert.Equal(1, editor.ValidateNowCalls);
         Assert.Equal(0, Assert.Single(starts).Save);
-        ui.Run(1);
+        await ui.RunAsync(1);
         Assert.Equal(PlayStatus.Validating, play.Status);
         Assert.Equal("Play: validating the saved files...", play.StatusText);
         editor.Finish(0);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         // A game without a save of the session names no save.
         Assert.Equal("Playing: New London (Br01)", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "stop"], stub.Input(0));
     }
 
     /// <summary>(2) Unsaved edits: the save runs, and start waits for the passed validation of that save.</summary>
     [Fact]
-    public void UnsavedEditsAreSavedAndStartWaitsForThePassedValidationOfTheSave()
+    public async Task UnsavedEditsAreSavedAndStartWaitsForThePassedValidationOfTheSave()
     {
         editor.Commit(1);
         editor.Finish(1);
@@ -132,42 +131,42 @@ public sealed class PlayControllerTests : IDisposable
 
         Assert.Equal(2, Assert.Single(starts).Save);
         Assert.Contains("Play: saved mod 'proof' (save 2). Waiting for its validation.", Console);
-        ui.Run(1);
+        await ui.RunAsync(1);
         play.Update(false, false);
         Assert.Equal(PlayStatus.Validating, play.Status);
         Assert.Equal("Play: validating save 2...", play.StatusText);
         // A start would give a spawn now.
-        ui.RunUntilQuiet(TimeSpan.FromMilliseconds(500));
+        await ui.RunUntilQuietAsync(TimeSpan.FromMilliseconds(500));
         Assert.Equal(PlayStatus.Validating, play.Status);
 
         editor.Finish(2);
 
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "stop"], stub.Input(0));
         Assert.Equal(0, editor.ValidateNowCalls);
     }
 
     /// <summary>(3) Validation errors: stop, the Console line, then status Idle at the exit.</summary>
     [Fact]
-    public void ValidationErrorsStopTheGame()
+    public async Task ValidationErrorsStopTheGame()
     {
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         editor.Finish(2, HullError, Diagnostic.Warning("Engine", "a warning"));
 
         Assert.Contains("Play stopped: the validation of save 2 found 1 error. The Console lists them.", Console);
         Assert.Equal(PlayStatus.Stopping, play.Status);
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.Equal(["stop"], stub.Input(0));
         Assert.DoesNotContain(Console, m => m.StartsWith("Playing") || m == "The game closed.");
     }
 
     /// <summary>Errors that come while the game loads stop it at once. The gate does not wait for waiting.</summary>
     [Fact]
-    public void ValidationErrorsBeforeWaitingStopTheGameAtOnce()
+    public async Task ValidationErrorsBeforeWaitingStopTheGameAtOnce()
     {
         plan = new StubPlan([], [Spawned]);
         editor.SaveResult = new SaveOutcome(true, 2, false);
@@ -176,25 +175,25 @@ public sealed class PlayControllerTests : IDisposable
         editor.Finish(2, HullError, HullError);
 
         Assert.Contains("Play stopped: the validation of save 2 found 2 errors. The Console lists them.", Console);
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.Equal(["stop"], stub.Input(0));
     }
 
     /// <summary>(4) The validation could not run: start, and a warning (D43).</summary>
     [Fact]
-    public void AValidationThatCouldNotRunStartsWithAWarning()
+    public async Task AValidationThatCouldNotRunStartsWithAWarning()
     {
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         editor.FailToRun(2);
 
         Assert.Contains(editor.Log.Entries, e => e.Severity == ConsoleSeverity.Warning &&
                                                  e.Message == "Play goes on without a validation: the validation of " +
                                                  "save 2 could not run.");
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "stop"], stub.Input(0));
     }
 
@@ -226,7 +225,7 @@ public sealed class PlayControllerTests : IDisposable
         "Play uses the saved files of mod 'proof'. The editor takes no edits for it now: The mod 'proof' is part of " +
         "the OpenLancer repo, so its files are tracked files. Allow its edits for this session first.")]
     [InlineData(null, null, "No mod is active, so Play uses the saved files of all mods of the profile.")]
-    public void WithoutEditsToSavePlaySavesNothingAndStarts(string? mod, string? reason, string line)
+    public async Task WithoutEditsToSavePlaySavesNothingAndStarts(string? mod, string? reason, string line)
     {
         editor.Session = editor.Session! with { ActiveMod = mod, NoEditReason = reason };
         editor.Commit(1);
@@ -237,8 +236,8 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Equal(0, editor.SaveCalls);
         Assert.Equal(mod, Assert.Single(starts).ActiveMod);
         Assert.Contains(line, Console);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>Play writes next to the profile file, so a profile file in its base folder starts no game and saves
@@ -258,11 +257,11 @@ public sealed class PlayControllerTests : IDisposable
 
     /// <summary>(7) A request while a field or a dialog is open runs at the first update without one.</summary>
     [Fact]
-    public void ARequestWaitsWhileAFieldOrADialogIsOpen()
+    public async Task ARequestWaitsWhileAFieldOrADialogIsOpen()
     {
         editor.Commit(1);
         editor.Finish(1);
-        play.Request(Space, null);
+        _ = play.Request(Space, null);
 
         play.Update(editing: true, dialogOpen: false);
         play.Update(editing: false, dialogOpen: true);
@@ -276,8 +275,8 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Single(starts);
         play.Update(editing: false, dialogOpen: false);
         Assert.Single(starts);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>
@@ -285,13 +284,13 @@ public sealed class PlayControllerTests : IDisposable
     /// that does not save, give no line of the check. The game gets the start that the check moved.
     /// </summary>
     [Fact]
-    public void TheStartCheckOfPlayFromCameraRunsOnlyForAGameThatStarts()
+    public async Task TheStartCheckOfPlayFromCameraRunsOnlyForAGameThatStarts()
     {
         editor.Commit(1);
         editor.Finish(1);
         editor.Shapes.Add(DeathZone());
 
-        play.Request(Space, null);
+        _ = play.Request(Space, null);
         play.Stop();
         play.Update(false, false);
         editor.SaveResult = new SaveOutcome(false, 0, false);
@@ -307,8 +306,8 @@ public sealed class PlayControllerTests : IDisposable
         Near(MovedStart, start.Position);
         Assert.Equal(Space with { Position = start.Position }, start);
         Assert.Equal(1, Console.Count(m => m == MovedLine));
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>
@@ -317,11 +316,11 @@ public sealed class PlayControllerTests : IDisposable
     /// the Scene shows the zone one frame later.
     /// </summary>
     [Fact]
-    public void ACameraStartWaitsUntilTheSceneShowsTheEditOfTheFieldThatTheClickEnded()
+    public async Task ACameraStartWaitsUntilTheSceneShowsTheEditOfTheFieldThatTheClickEnded()
     {
         editor.Commit(1);
         editor.Finish(1);
-        play.Request(Space, null);
+        _ = play.Request(Space, null);
         editor.SceneBehind = true;
 
         play.Update(false, false);
@@ -336,13 +335,13 @@ public sealed class PlayControllerTests : IDisposable
 
         Near(MovedStart, Assert.IsType<PlayStart.InSpace>(Assert.Single(starts).Start).Position);
         Assert.Contains(MovedLine, Console);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>A start at a base has no start check, so it does not wait for the Scene.</summary>
     [Fact]
-    public void AStartAtABaseDoesNotWaitForTheScene()
+    public async Task AStartAtABaseDoesNotWaitForTheScene()
     {
         editor.Commit(1);
         editor.Finish(1);
@@ -351,8 +350,8 @@ public sealed class PlayControllerTests : IDisposable
         RequestPlay(new PlayStart.AtBase("Br01_01_Base"));
 
         Assert.Single(starts);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>
@@ -394,8 +393,8 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Contains("Agent Play: the start point is inside Zone_Br01_death. The ship starts 200 units behind the " +
                         "start point.", Console);
         Assert.DoesNotContain(Console, m => m.StartsWith("Play from camera", StringComparison.Ordinal));
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
 
         var elsewhere = play.Request(new PlayStart.InSpace("li01", Vector3.Zero, Quaternion.Identity), null,
             PlaySaveRule.NoEdits, EditOrigin.Agent);
@@ -413,41 +412,41 @@ public sealed class PlayControllerTests : IDisposable
 
     /// <summary>(8) A second request while the game runs: stop, the exit, then a new game with the new start.</summary>
     [Fact]
-    public void ASecondPlayStopsTheGameAndStartsANewOneAfterItsExit()
+    public async Task ASecondPlayStopsTheGameAndStartsANewOneAfterItsExit()
     {
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         var atBase = new PlayStart.AtBase("Br01_01_Base");
 
-        play.Request(atBase, "le_package");
+        _ = play.Request(atBase, "le_package");
         play.Update(false, false);
 
         Assert.Equal(PlayStatus.Stopping, play.Status);
         Assert.Single(starts);
-        ui.RunUntil(() =>
+        await ui.RunUntilAsync(() =>
         {
             play.Update(false, false);
             return starts.Count == 2;
         }, "the start of the second game");
         Assert.Equal(["start", "stop"], stub.Input(0));
         Assert.Equal((atBase, "le_package"), (starts[1].Start, starts[1].Package));
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "stop"], stub.Input(1));
     }
 
     /// <summary>A second request for a game that does not close: after 5 s the editor ends it and starts the new one.</summary>
     [Fact]
-    public void ASecondPlayEndsAGameThatDoesNotCloseIn5S()
+    public async Task ASecondPlayEndsAGameThatDoesNotCloseIn5S()
     {
         plan = Game with { IgnoreStop = true };
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        RunUntil(PlayStatus.Running);
-        play.Request(Space, null);
+        await RunUntilAsync(PlayStatus.Running);
+        _ = play.Request(Space, null);
         play.Update(false, false);
 
         now += TimeSpan.FromSeconds(4.9);
@@ -456,35 +455,35 @@ public sealed class PlayControllerTests : IDisposable
         now += TimeSpan.FromSeconds(0.1);
         play.Update(false, false);
 
-        ui.RunUntil(() =>
+        await ui.RunUntilAsync(() =>
         {
             play.Update(false, false);
             return starts.Count == 2;
         }, "the start of the second game");
         Assert.False(stub.Runs(0));
         Assert.Contains("The game did not close in 5 s, so the editor ended it to play again.", Console);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         play.Stop();
         now += PlayController.ExitLimit;
         play.Stop();
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
     }
 
     /// <summary>(9) Stop, and no exit for 5 s on the fake clock: Stop is Force stop, and it kills the game.</summary>
     [Fact]
-    public void StopIsForceStopAfter5SAndKillsTheGame()
+    public async Task StopIsForceStopAfter5SAndKillsTheGame()
     {
         plan = Game with { IgnoreStop = true };
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
 
         play.Stop();
         Assert.Equal(PlayStatus.Stopping, play.Status);
         Assert.False(play.ForceStop);
         // The stub read stop, and it runs on.
-        stub.WaitForInput(0, 2);
+        await stub.WaitForInputAsync(0, 2);
         now += TimeSpan.FromSeconds(4.9);
         play.Update(false, false);
         Assert.False(play.ForceStop);
@@ -495,7 +494,7 @@ public sealed class PlayControllerTests : IDisposable
 
         play.Stop();
 
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.False(stub.Runs(0));
         Assert.Equal(["start", "stop"], stub.Input(0));
         Assert.Equal("The game did not respond, so the editor ended it.", Console[^1]);
@@ -503,12 +502,12 @@ public sealed class PlayControllerTests : IDisposable
 
     /// <summary>(10) The window close closes the input of the game, and the game ends.</summary>
     [Fact]
-    public void TheWindowCloseClosesTheInputAndTheGameEnds()
+    public async Task TheWindowCloseClosesTheInputAndTheGameEnds()
     {
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         var clock = Stopwatch.StartNew();
 
         play.SessionEnding(windowClose: true);
@@ -521,13 +520,13 @@ public sealed class PlayControllerTests : IDisposable
 
     /// <summary>A game that ignores the end of its input gets 2 s at the window close. Then the job ends it.</summary>
     [Fact]
-    public void TheWindowCloseEndsAGameThatIgnoresItsInputAfter2S()
+    public async Task TheWindowCloseEndsAGameThatIgnoresItsInputAfter2S()
     {
         plan = new StubPlan([], Sleep: 120);
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        stub.ProcessId(0);
+        await stub.ProcessIdAsync(0);
         var clock = Stopwatch.StartNew();
 
         play.SessionEnding(windowClose: true);
@@ -537,7 +536,7 @@ public sealed class PlayControllerTests : IDisposable
         var end = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (stub.Runs(0) && DateTime.UtcNow < end)
         {
-            Thread.Sleep(20);
+            await Task.Delay(20, TestContext.Current.CancellationToken);
         }
 
         Assert.False(stub.Runs(0));
@@ -546,18 +545,18 @@ public sealed class PlayControllerTests : IDisposable
 
     /// <summary>A profile close or another end of the session sends stop. The exit follows.</summary>
     [Fact]
-    public void AProfileCloseStopsTheGame()
+    public async Task AProfileCloseStopsTheGame()
     {
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        RunUntil(PlayStatus.Running);
-        play.Request(Space, null);
+        await RunUntilAsync(PlayStatus.Running);
+        _ = play.Request(Space, null);
 
         play.SessionEnding(windowClose: false);
 
         Assert.Equal(PlayStatus.Stopping, play.Status);
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         play.Update(false, false);
         Assert.Single(starts);
         Assert.Equal(["start", "stop"], stub.Input(0));
@@ -565,7 +564,7 @@ public sealed class PlayControllerTests : IDisposable
 
     /// <summary>(11) An error event and exit code 3: status Idle, and the message in the Console.</summary>
     [Fact]
-    public void AnErrorEventAndExitCode3GiveTheMessage()
+    public async Task AnErrorEventAndExitCode3GiveTheMessage()
     {
         plan = new StubPlan([Error("Unknown ship package 'no_such_package'.", crash: false)], Exit: PlayExitCodes.Data);
         editor.Commit(1);
@@ -573,14 +572,14 @@ public sealed class PlayControllerTests : IDisposable
 
         RequestPlay();
 
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.Equal("Play stopped: Unknown ship package 'no_such_package'.", Console[^1]);
         Assert.Equal(ConsoleSeverity.Error, editor.Log.Entries[^1].Severity);
     }
 
     /// <summary>A crash without a validation that runs: the code, the cause and the path of the game log.</summary>
     [Fact]
-    public void ACrashGivesTheCodeTheCauseAndTheGameLog()
+    public async Task ACrashGivesTheCodeTheCauseAndTheGameLog()
     {
         plan = new StubPlan(["!err Process terminated. Assertion failed.", "!err    at A.B()"], Exit: 9);
         editor.Commit(1);
@@ -588,7 +587,7 @@ public sealed class PlayControllerTests : IDisposable
 
         RequestPlay();
 
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.Equal("The game stopped with exit code 9: Process terminated. Assertion failed. at A.B(). The log is " +
                      $"{OpenLancer.Editor.ProgramPaths.PlayLog}.", Console[^1]);
     }
@@ -598,14 +597,14 @@ public sealed class PlayControllerTests : IDisposable
     /// validation finds errors. The Console gives them as the cause (D55), not the crash. Here the exit comes first.
     /// </summary>
     [Fact]
-    public void ACrashDuringTheValidationWaitsForItAndReportsItsErrors()
+    public async Task ACrashDuringTheValidationWaitsForItAndReportsItsErrors()
     {
         plan = new StubPlan([Error("The engine load stops.", crash: true)], Exit: 1);
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
 
         // The error event and the exit.
-        ui.Run(2);
+        await ui.RunAsync(2);
         play.Update(false, false);
         Assert.Equal(PlayStatus.Validating, play.Status);
         // The game ended, and its report waits for the validation of its save.
@@ -625,31 +624,31 @@ public sealed class PlayControllerTests : IDisposable
     /// game ended, so the stop of the gate goes to a game that ended. That write must not throw (R6).
     /// </summary>
     [Fact]
-    public void ACrashDuringTheValidationNeedsNoWriteToTheEndedGame()
+    public async Task ACrashDuringTheValidationNeedsNoWriteToTheEndedGame()
     {
         plan = new StubPlan([Error("The engine load stops.", crash: true)], Exit: 1);
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.WaitForQueued(2);
+        await ui.WaitForQueuedAsync(2);
         Assert.False(stub.Runs(0));
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         editor.Finish(2, HullError);
 
         Assert.Equal("Play stopped: the validation of save 2 found 1 error. The game closed during its load because " +
                      "of them.", Console[^1]);
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.DoesNotContain(Console, m => m.StartsWith("The game stopped"));
     }
 
     /// <summary>(12) Without errors, the Console reports the crash with the message of the error event.</summary>
     [Fact]
-    public void ACrashDuringAValidationWithoutErrorsIsReportedAsACrash()
+    public async Task ACrashDuringAValidationWithoutErrorsIsReportedAsACrash()
     {
         plan = new StubPlan([Error("Tried to mount combinable item", crash: true)], Exit: 1);
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(2);
+        await ui.RunAsync(2);
 
         editor.Finish(2, Diagnostic.Warning("Engine", "a warning"));
 
@@ -663,22 +662,22 @@ public sealed class PlayControllerTests : IDisposable
     /// the validation of the new save, not of the old one (the read window, D51).
     /// </summary>
     [Fact]
-    public void ASaveBeforeWaitingMakesTheGateWaitForTheNewSave()
+    public async Task ASaveBeforeWaitingMakesTheGateWaitForTheNewSave()
     {
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
         Assert.Equal(1, Assert.Single(starts).Save);
-        ui.WaitForQueued(1);
+        await ui.WaitForQueuedAsync(1);
 
         editor.Commit(2);
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         Assert.Equal(PlayStatus.Validating, play.Status);
         Assert.Contains("Save 2 came while the game read the mod files. Play waits for its validation.", Console);
         editor.Finish(2, HullError);
         Assert.Contains("Play stopped: the validation of save 2 found 1 error. The Console lists them.", Console);
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.Equal(["stop"], stub.Input(0));
     }
 
@@ -687,12 +686,12 @@ public sealed class PlayControllerTests : IDisposable
     /// starts with a warning. The reload of the new save follows when its validation passes.
     /// </summary>
     [Fact]
-    public void ASaveAfterWaitingDoesNotChangeTheStart()
+    public async Task ASaveAfterWaitingDoesNotChangeTheStart()
     {
         plan = Game with { ReloadLines = [Reloaded(3)] };
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(1);
+        await ui.RunAsync(1);
         Assert.Equal(PlayStatus.Validating, play.Status);
 
         editor.Commit(3);
@@ -700,13 +699,13 @@ public sealed class PlayControllerTests : IDisposable
 
         Assert.Contains("Play goes on without a validation of save 2: a later save stopped it. The game shows the " +
                         "files of save 2.", Console);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal("Playing: New London (Br01), save 2", play.StatusText);
         editor.Finish(3);
         Assert.Equal("Play: reloading save 3...", play.StatusText);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal("Playing: New London (Br01), save 3", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 3", "stop"], stub.Input(0));
     }
 
@@ -716,32 +715,32 @@ public sealed class PlayControllerTests : IDisposable
     /// once, with one warning.
     /// </summary>
     [Fact]
-    public void AValidationThatCannotStartGivesOneWarningAndOneStart()
+    public async Task AValidationThatCannotStartGivesOneWarningAndOneStart()
     {
         editor.Commit(1);
         RequestPlay();
-        ui.WaitForQueued(1);
+        await ui.WaitForQueuedAsync(1);
         editor.StopValidation();
         editor.ValidationCannotStart = true;
 
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         Assert.Equal(1, editor.ValidateNowCalls);
         Assert.Single(Console, m => m == "Play goes on without a validation: the validation of save 1 could not run.");
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "stop"], stub.Input(0));
     }
 
     /// <summary>(14) No waiting for 60 s on the fake clock: the game does not respond, and Stop kills it at once.</summary>
     [Fact]
-    public void WithoutWaitingFor60STheGameDoesNotRespondAndStopKillsItAtOnce()
+    public async Task WithoutWaitingFor60STheGameDoesNotRespondAndStopKillsItAtOnce()
     {
         plan = new StubPlan([]);
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        stub.ProcessId(0);
+        await stub.ProcessIdAsync(0);
 
         now += TimeSpan.FromSeconds(59.9);
         play.Update(false, false);
@@ -756,7 +755,7 @@ public sealed class PlayControllerTests : IDisposable
 
         play.Stop();
 
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.False(stub.Runs(0));
         Assert.Empty(stub.Input(0));
     }
@@ -764,13 +763,13 @@ public sealed class PlayControllerTests : IDisposable
     /// <summary>A game that does not exit 5 s after its error event, for example a crash window that waits: the editor
     /// ends it.</summary>
     [Fact]
-    public void AGameThatDoesNotExit5SAfterItsErrorIsEnded()
+    public async Task AGameThatDoesNotExit5SAfterItsErrorIsEnded()
     {
         plan = new StubPlan([Error("Crashed.", crash: true)], IgnoreStop: true);
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         now += TimeSpan.FromSeconds(4.9);
         play.Update(false, false);
@@ -778,7 +777,7 @@ public sealed class PlayControllerTests : IDisposable
         now += TimeSpan.FromSeconds(0.1);
         play.Update(false, false);
 
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.False(stub.Runs(0));
         Assert.Equal("The game did not exit 5 s after its error, so the editor ended it.", Console[^2]);
         // The kill sets the exit code, so the line gives none. The cause is the message of the error event.
@@ -788,23 +787,23 @@ public sealed class PlayControllerTests : IDisposable
     /// <summary>The game can start the play before it reads stop. A spawn after stop then gives no Playing line (section
     /// 9.8).</summary>
     [Fact]
-    public void ASpawnAfterStopIsIgnored()
+    public async Task ASpawnAfterStopIsIgnored()
     {
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(1);
+        await ui.RunAsync(1);
         editor.Finish(2);
 
         play.Stop();
 
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.Equal(["start", "stop"], stub.Input(0));
         Assert.DoesNotContain(Console, m => m.StartsWith("Playing"));
     }
 
     /// <summary>The warnings and errors of the engine log of the game go to the Console, by decision D57.</summary>
     [Fact]
-    public void TheEngineLinesOfTheGameGoToTheConsoleOnce()
+    public async Task TheEngineLinesOfTheGameGoToTheConsoleOnce()
     {
         plan = Game with { Lines = ["[Warning: 12:00:00] Ini: known", "[Error: 12:00:00] Ship: new", Waiting] };
         editor.Log.AddEngineLine("[Warning: 11:00:00] Ini: known", LibreLancer.LogSeverity.Warning);
@@ -813,14 +812,14 @@ public sealed class PlayControllerTests : IDisposable
 
         RequestPlay();
 
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Single(editor.Log.Entries, e => e.Source == PlayController.Source && e.Message == "Ship: new");
         Assert.DoesNotContain(editor.Log.Entries, e => e.Source == PlayController.Source && e.Message == "Ini: known");
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
     }
 
     [Fact]
-    public void AtABaseTheConsoleNamesTheBaseAndTheLaterModsShowAsAWarning()
+    public async Task AtABaseTheConsoleNamesTheBaseAndTheLaterModsShowAsAWarning()
     {
         plan = Game with
         {
@@ -832,13 +831,13 @@ public sealed class PlayControllerTests : IDisposable
 
         RequestPlay(new PlayStart.AtBase("Br01_01_Base"));
 
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Contains(editor.Log.Entries, e => e.Severity == ConsoleSeverity.Warning &&
                                                  e.Message == "Play does not include the later mods: late1, late2.");
         Assert.Contains("Playing at Planet New London (Br01_01_Base) in New London (Br01) with le. From Play to " +
                         "flight: 0.0 s.", Console);
         Assert.Equal("Playing: Planet New London (Br01_01_Base), save 1", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>
@@ -846,11 +845,11 @@ public sealed class PlayControllerTests : IDisposable
     /// No later save exists, so Play validates the gate save again and does not wait for the stopped validation.
     /// </summary>
     [Fact]
-    public void AValidationThatASaveStoppedWithoutALaterSaveRunsAgain()
+    public async Task AValidationThatASaveStoppedWithoutALaterSaveRunsAgain()
     {
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(1);
+        await ui.RunAsync(1);
         Assert.Equal(PlayStatus.Validating, play.Status);
 
         editor.StopValidation();
@@ -859,8 +858,8 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Equal(1, editor.ValidateNowCalls);
         Assert.Equal(PlayStatus.Validating, play.Status);
         editor.Finish(2);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "stop"], stub.Input(0));
     }
 
@@ -869,7 +868,7 @@ public sealed class PlayControllerTests : IDisposable
     /// no validation, and Play stops the game (D59).
     /// </summary>
     [Fact]
-    public void ASaveThatIsNotCompleteInTheReadWindowStopsTheGame()
+    public async Task ASaveThatIsNotCompleteInTheReadWindowStopsTheGame()
     {
         const string stopped = "Play stopped: save 2 is not complete, and the game can hold parts of it. Correct the " +
                                "problem of the file, save again, then press Play.";
@@ -883,7 +882,7 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Equal(0, editor.ValidateNowCalls);
         Assert.Equal(ConsoleSeverity.Error, editor.Log.Entries[^1].Severity);
         Assert.Equal(stopped, Console[^1]);
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.Equal(["stop"], stub.Input(0));
         Assert.Equal(stopped, Console[^1]);
     }
@@ -893,11 +892,11 @@ public sealed class PlayControllerTests : IDisposable
     /// gate save, so Play goes on with the warning of D58 and does not validate the save that is not complete.
     /// </summary>
     [Fact]
-    public void ASaveThatIsNotCompleteAfterWaitingGetsNoValidation()
+    public async Task ASaveThatIsNotCompleteAfterWaitingGetsNoValidation()
     {
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         editor.SaveIncomplete(3);
         play.Update(false, false);
@@ -905,22 +904,22 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Equal(0, editor.ValidateNowCalls);
         Assert.Contains("Play goes on without a validation of save 2: a later save stopped it. The game shows the " +
                         "files of save 2.", Console);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "stop"], stub.Input(0));
     }
 
     /// <summary>An error event without a crash and exit code 3 give the message at once, also while the validation of
     /// the save runs. Its result cannot be the cause of a data error such as an unknown package.</summary>
     [Fact]
-    public void ADataErrorDuringTheValidationGivesItsMessageAtOnce()
+    public async Task ADataErrorDuringTheValidationGivesItsMessageAtOnce()
     {
         plan = new StubPlan([Error("Unknown ship package 'no_such_package'.", crash: false)], Exit: PlayExitCodes.Data);
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
 
         // The error event and the exit.
-        ui.Run(2);
+        await ui.RunAsync(2);
 
         Assert.True(editor.Validation!.Running);
         Assert.Equal(PlayStatus.Idle, play.Status);
@@ -930,21 +929,21 @@ public sealed class PlayControllerTests : IDisposable
     /// <summary>A waiting event after the 60 s watchdog: the game responds again, so Stop sends stop and does not kill
     /// it.</summary>
     [Fact]
-    public void AWaitingEventAfterTheLoadLimitEndsNotResponding()
+    public async Task AWaitingEventAfterTheLoadLimitEndsNotResponding()
     {
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        ui.WaitForQueued(1);
+        await ui.WaitForQueuedAsync(1);
         now += PlayController.LoadLimit;
         play.Update(false, false);
         Assert.Equal(PlayStatus.NotResponding, play.Status);
 
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         Assert.False(play.ForceStop);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "stop"], stub.Input(0));
         Assert.Equal("The game closed.", Console[^1]);
     }
@@ -952,7 +951,7 @@ public sealed class PlayControllerTests : IDisposable
     /// <summary>A crash without an error event and without error output: the cause is the last error line of the
     /// engine log (section 9.10).</summary>
     [Fact]
-    public void ACrashWithoutAnEventOrErrorOutputGivesTheLastEngineError()
+    public async Task ACrashWithoutAnEventOrErrorOutputGivesTheLastEngineError()
     {
         plan = new StubPlan(["[Error: 12:00:00] Ship: first", "[Error: 12:00:01] Ship: last",
             "[Warning: 12:00:02] Ini: later"], Exit: 9);
@@ -961,7 +960,7 @@ public sealed class PlayControllerTests : IDisposable
 
         RequestPlay();
 
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.Equal("The game stopped with exit code 9: Ship: last. The log is " +
                      $"{OpenLancer.Editor.ProgramPaths.PlayLog}.", Console[^1]);
     }
@@ -971,7 +970,7 @@ public sealed class PlayControllerTests : IDisposable
     /// the validation of the new save, and its errors are the cause (D51, D55).
     /// </summary>
     [Fact]
-    public void ACrashInTheReadWindowWaitsForTheValidationOfTheNewSave()
+    public async Task ACrashInTheReadWindowWaitsForTheValidationOfTheNewSave()
     {
         plan = new StubPlan([Error("The engine load stops.", crash: true)], Exit: 1);
         editor.Commit(1);
@@ -979,10 +978,10 @@ public sealed class PlayControllerTests : IDisposable
         RequestPlay();
         Assert.Equal(1, Assert.Single(starts).Save);
         // The error event and the exit.
-        ui.WaitForQueued(2);
+        await ui.WaitForQueuedAsync(2);
 
         editor.Commit(2);
-        ui.Run(2);
+        await ui.RunAsync(2);
         play.Update(false, false);
 
         Assert.Equal(PlayStatus.Validating, play.Status);
@@ -996,12 +995,12 @@ public sealed class PlayControllerTests : IDisposable
     /// <summary>Stop while a crash report waits for the validation: the Console reports the crash now, and the status
     /// is Idle.</summary>
     [Fact]
-    public void StopReportsACrashThatWaitsForTheValidation()
+    public async Task StopReportsACrashThatWaitsForTheValidation()
     {
         plan = new StubPlan([Error("The engine load stops.", crash: true)], Exit: 1);
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(2);
+        await ui.RunAsync(2);
         Assert.Equal(PlayStatus.Validating, play.Status);
 
         play.Stop();
@@ -1017,12 +1016,12 @@ public sealed class PlayControllerTests : IDisposable
     /// before the lines of the new game.
     /// </summary>
     [Fact]
-    public void ACrashThatWaitsUntilTheNextPlayNamesThePreviousLog()
+    public async Task ACrashThatWaitsUntilTheNextPlayNamesThePreviousLog()
     {
         plan = new StubPlan([Error("The engine load stops.", crash: true)], Exit: 1);
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(2);
+        await ui.RunAsync(2);
         play.Update(false, false);
         Assert.Equal(PlayStatus.Validating, play.Status);
         Assert.DoesNotContain(Console, m => m.StartsWith("The game stopped"));
@@ -1038,19 +1037,19 @@ public sealed class PlayControllerTests : IDisposable
                      $"{OpenLancer.Editor.ProgramPaths.PreviousPlayLog}.", Console[lines]);
         Assert.Single(Console, m => m.StartsWith("The game stopped"));
         editor.Finish(2);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>A new play that does not start while a crash report waits: no new game moves the game log, so the line
     /// names the game log. It comes after the reason.</summary>
     [Fact]
-    public void ACrashThatWaitsForARefusedPlayNamesTheGameLog()
+    public async Task ACrashThatWaitsForARefusedPlayNamesTheGameLog()
     {
         plan = new StubPlan([Error("The engine load stops.", crash: true)], Exit: 1);
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(2);
+        await ui.RunAsync(2);
         play.Update(false, false);
         Assert.Equal(PlayStatus.Validating, play.Status);
 
@@ -1067,12 +1066,12 @@ public sealed class PlayControllerTests : IDisposable
     /// <summary>A new play whose start throws while a crash report waits: the exception leaves Update, and the Console
     /// still has the report. No new game moved the game log, so the line names the game log.</summary>
     [Fact]
-    public void ACrashThatWaitsForAPlayWhoseStartThrowsIsReported()
+    public async Task ACrashThatWaitsForAPlayWhoseStartThrowsIsReported()
     {
         plan = new StubPlan([Error("The engine load stops.", crash: true)], Exit: 1);
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(2);
+        await ui.RunAsync(2);
         play.Update(false, false);
         Assert.Equal(PlayStatus.Validating, play.Status);
 
@@ -1093,17 +1092,17 @@ public sealed class PlayControllerTests : IDisposable
     /// applies as for an exit: the report waits for the validation, and its errors are the cause.
     /// </summary>
     [Fact]
-    public void AGameThatTheErrorWatchdogEndedDuringTheValidationWaitsForIt()
+    public async Task AGameThatTheErrorWatchdogEndedDuringTheValidationWaitsForIt()
     {
         plan = new StubPlan([Error("The engine load stops.", crash: true)], IgnoreStop: true);
         editor.SaveResult = new SaveOutcome(true, 2, false);
         RequestPlay();
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         now += PlayController.ExitLimit;
         play.Update(false, false);
         // The exit after the kill.
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         Assert.False(stub.Runs(0));
         Assert.Equal(PlayStatus.Validating, play.Status);
@@ -1120,9 +1119,9 @@ public sealed class PlayControllerTests : IDisposable
     /// the spawn, so the reload continues at the base, and the status names the base.
     /// </summary>
     [Fact]
-    public void APassedValidationAfterTheSpawnReloadsTheGame()
+    public async Task APassedValidationAfterTheSpawnReloadsTheGame()
     {
-        PlayToRunning(Game with { ReloadLines = [Reloaded(2, dock: "Br01_01_Base")] });
+        await PlayToRunningAsync(Game with { ReloadLines = [Reloaded(2, dock: "Br01_01_Base")] });
         Assert.True(play.CanReload);
 
         editor.Commit(2);
@@ -1134,11 +1133,11 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Equal(PlayStatus.Reloading, play.Status);
         Assert.Equal("Play: reloading save 2...", play.StatusText);
         Assert.False(play.CanReload);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal(["start", "reload 2"], stub.Input(0));
         Assert.Equal("The running game shows save 2 (reload 0.6 s, 3.0 s from the save).", Console[^1]);
         Assert.Equal("Playing: Planet New London (Br01_01_Base), save 2", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 2", "stop"], stub.Input(0));
     }
 
@@ -1146,7 +1145,7 @@ public sealed class PlayControllerTests : IDisposable
     /// that the base game gives one time stays a base-game line after the reload (decision D514 of the console filter
     /// design).</summary>
     [Fact]
-    public void AReloadStartsTheCountsOfTheEngineLinesAgain()
+    public async Task AReloadStartsTheCountsOfTheEngineLinesAgain()
     {
         const string line = @"[Warning: 12:00:00] Ini: Unknown entry typo at section Object: data\other.ini, line 5";
         using var mods = ListWorkspace.Create(activeFiles: new()
@@ -1155,25 +1154,25 @@ public sealed class PlayControllerTests : IDisposable
         });
         editor.Log.Origins = new EngineLineOrigins(mods.Session("act"));
         editor.Log.BaseRunEnded(new Dictionary<string, int> { [EngineLine.Parse(line)!.Key] = 1 });
-        PlayToRunning(Game with { Lines = [line, Waiting], ReloadLines = [line + StubPlan.NextLine + Reloaded(2)] });
+        await PlayToRunningAsync(Game with { Lines = [line, Waiting], ReloadLines = [line + StubPlan.NextLine + Reloaded(2)] });
 
         editor.Commit(2);
         play.Update(false, false);
         editor.Finish(2);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
 
         Assert.Equal(["start", "reload 2"], stub.Input(0));
         var entry = Assert.Single(editor.Log.Entries, e => e.Source == PlayController.Source && e.Message.StartsWith("Ini: "));
         Assert.Equal(MessageOrigin.BaseGame, entry.Origin);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>(15) Validation errors after the spawn: no reload, and the Console tells once which save the game
     /// keeps.</summary>
     [Fact]
-    public void ValidationErrorsAfterTheSpawnKeepTheSaveOfTheGame()
+    public async Task ValidationErrorsAfterTheSpawnKeepTheSaveOfTheGame()
     {
-        PlayToRunning(Game with { ReloadLines = [Reloaded(2)] });
+        await PlayToRunningAsync(Game with { ReloadLines = [Reloaded(2)] });
 
         editor.Commit(2);
         editor.Finish(2, HullError);
@@ -1183,7 +1182,7 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Equal(PlayStatus.Running, play.Status);
         Assert.Single(Console, m => m == "The running game keeps save 1. The validation of save 2 found 1 error.");
         Assert.Equal("Playing: New London (Br01), save 1", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "stop"], stub.Input(0));
     }
 
@@ -1192,13 +1191,13 @@ public sealed class PlayControllerTests : IDisposable
     /// game read the mod files while those saves came, so it can show parts of the last one (D51).
     /// </summary>
     [Fact]
-    public void SavesDuringAReloadWaitAndOnlyTheLastSaveReloads()
+    public async Task SavesDuringAReloadWaitAndOnlyTheLastSaveReloads()
     {
-        PlayToRunning(Game with { ReloadLines = [Reloaded(2), Reloaded(4)] });
+        await PlayToRunningAsync(Game with { ReloadLines = [Reloaded(2), Reloaded(4)] });
         editor.Commit(2);
         editor.Finish(2);
         // The reloaded event of the stub waits in the queue of the UI thread.
-        ui.WaitForQueued(1);
+        await ui.WaitForQueuedAsync(1);
 
         editor.Commit(3);
         editor.Finish(3);
@@ -1207,28 +1206,28 @@ public sealed class PlayControllerTests : IDisposable
         play.Update(false, false);
 
         Assert.Equal("Play: reloading save 2...", play.StatusText);
-        ui.Run(1);
+        await ui.RunAsync(1);
         Assert.Contains("The running game shows save 2 (reload 0.6 s, 0.0 s from the save).", Console);
         Assert.Contains("Save 4 came during the reload, so the game can show parts of it.", Console);
         Assert.Equal("Play: reloading save 4...", play.StatusText);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal("Playing: New London (Br01), save 4", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 2", "reload 4", "stop"], stub.Input(0));
     }
 
     /// <summary>(16) A validation that passes before the spawn sends no reload. The reload follows at the spawn
     /// (D52).</summary>
     [Fact]
-    public void APassedValidationBeforeTheSpawnReloadsAtTheSpawn()
+    public async Task APassedValidationBeforeTheSpawnReloadsAtTheSpawn()
     {
         plan = Game with { ReloadLines = [Reloaded(2)] };
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
         // The waiting event: the game gets start, and its spawned event waits in the queue.
-        ui.Run(1);
-        ui.WaitForQueued(1);
+        await ui.RunAsync(1);
+        await ui.WaitForQueuedAsync(1);
 
         editor.Commit(2);
         editor.Finish(2);
@@ -1238,11 +1237,11 @@ public sealed class PlayControllerTests : IDisposable
         Assert.False(play.CanReload);
         play.Reload();
         Assert.Equal(PlayStatus.Starting, play.Status);
-        ui.Run(1);
+        await ui.RunAsync(1);
         Assert.Equal("Play: reloading save 2...", play.StatusText);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.DoesNotContain(Console, m => m.Contains("Press F5", StringComparison.Ordinal));
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 2", "stop"], stub.Input(0));
     }
 
@@ -1251,23 +1250,23 @@ public sealed class PlayControllerTests : IDisposable
     /// validation of the new save passed at the gate, so the reload of that save follows the spawn at once (D51).
     /// </summary>
     [Fact]
-    public void ASaveBeforeWaitingReloadsTheLastSaveAfterTheSpawn()
+    public async Task ASaveBeforeWaitingReloadsTheLastSaveAfterTheSpawn()
     {
         plan = Game with { ReloadLines = [Reloaded(2)] };
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        ui.WaitForQueued(1);
+        await ui.WaitForQueuedAsync(1);
         editor.Commit(2);
-        ui.Run(1);
+        await ui.RunAsync(1);
         editor.Finish(2);
 
-        ui.RunUntil(() => play.Status != PlayStatus.Starting, "the spawn");
+        await ui.RunUntilAsync(() => play.Status != PlayStatus.Starting, "the spawn");
 
         Assert.Equal("Play: reloading save 2...", play.StatusText);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal("Playing: New London (Br01), save 2", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 2", "stop"], stub.Input(0));
     }
 
@@ -1278,15 +1277,15 @@ public sealed class PlayControllerTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void ASaveDuringAReloadMakesTheGameSaveUnknown(bool passes)
+    public async Task ASaveDuringAReloadMakesTheGameSaveUnknown(bool passes)
     {
-        PlayToRunning(Game with { ReloadLines = [Reloaded(2), Reloaded(3)] });
+        await PlayToRunningAsync(Game with { ReloadLines = [Reloaded(2), Reloaded(3)] });
         editor.Commit(2);
         editor.Finish(2);
-        ui.WaitForQueued(1);
+        await ui.WaitForQueuedAsync(1);
         editor.Commit(3);
 
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         Assert.Equal(PlayStatus.Running, play.Status);
         Assert.Equal("Playing: New London (Br01), parts of save 3", play.StatusText);
@@ -1295,7 +1294,7 @@ public sealed class PlayControllerTests : IDisposable
         {
             editor.Finish(3);
             Assert.Equal("Play: reloading save 3...", play.StatusText);
-            RunUntil(PlayStatus.Running);
+            await RunUntilAsync(PlayStatus.Running);
             Assert.Equal("Playing: New London (Br01), save 3", play.StatusText);
         }
         else
@@ -1306,7 +1305,7 @@ public sealed class PlayControllerTests : IDisposable
                 Console[^1]);
         }
 
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         string[] input = passes ? ["start", "reload 2", "reload 3", "stop"] : ["start", "reload 2", "stop"];
         Assert.Equal(input, stub.Input(0));
     }
@@ -1316,18 +1315,18 @@ public sealed class PlayControllerTests : IDisposable
     /// it again, and a later save reloads.
     /// </summary>
     [Fact]
-    public void AFailedReloadIsNotSentAgainButReloadGameSendsIt()
+    public async Task AFailedReloadIsNotSentAgainButReloadGameSendsIt()
     {
         const string failure = "The new data cannot load the autosave of the player. The ship 'm4proof_fighter' is " +
                                "not in the game data.";
-        PlayToRunning(Game with
+        await PlayToRunningAsync(Game with
         {
             ReloadLines = [PlayProtocol.Write(new PlayEvent.ReloadFailed(2, failure)), Reloaded(2, 700), Reloaded(3)],
         });
         editor.Commit(2);
         editor.Finish(2);
 
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal("The reload of save 2 failed, so the running game keeps save 1: The new data cannot load the " +
                      "autosave of the player. The ship 'm4proof_fighter' is not in the game data.", Console[^1]);
         Assert.Equal(ConsoleSeverity.Error, editor.Log.Entries[^1].Severity);
@@ -1338,38 +1337,38 @@ public sealed class PlayControllerTests : IDisposable
         play.Reload();
 
         Assert.Equal("Play: reloading save 2...", play.StatusText);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal("The running game shows save 2 (reload 0.7 s).", Console[^1]);
         editor.Commit(3);
         editor.Finish(3);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal("Playing: New London (Br01), save 3", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 2", "reload 2", "reload 3", "stop"], stub.Input(0));
     }
 
     /// <summary>Reload game sends the last save also when its validation found errors. It is for a change outside the
     /// editor (D45).</summary>
     [Fact]
-    public void ReloadGameSendsTheLastSaveAlsoWithValidationErrors()
+    public async Task ReloadGameSendsTheLastSaveAlsoWithValidationErrors()
     {
-        PlayToRunning(Game with { ReloadLines = [Reloaded(2)] });
+        await PlayToRunningAsync(Game with { ReloadLines = [Reloaded(2)] });
         editor.Commit(2);
         editor.Finish(2, HullError);
 
         play.Reload();
 
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal("Playing: New London (Br01), save 2", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 2", "stop"], stub.Input(0));
     }
 
     /// <summary>A validation that could not run lets the reload go on with a warning, as the start does (D43).</summary>
     [Fact]
-    public void AReloadAfterAValidationThatCouldNotRunGoesOnWithAWarning()
+    public async Task AReloadAfterAValidationThatCouldNotRunGoesOnWithAWarning()
     {
-        PlayToRunning(Game with { ReloadLines = [Reloaded(2)] });
+        await PlayToRunningAsync(Game with { ReloadLines = [Reloaded(2)] });
         editor.Commit(2);
 
         editor.FailToRun(2);
@@ -1378,8 +1377,8 @@ public sealed class PlayControllerTests : IDisposable
                                                  e.Message == "The running game loads save 2 without a validation: " +
                                                  "the validation could not run.");
         Assert.Equal("Play: reloading save 2...", play.StatusText);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 2", "stop"], stub.Input(0));
     }
 
@@ -1389,9 +1388,9 @@ public sealed class PlayControllerTests : IDisposable
     /// starts the validation.
     /// </summary>
     [Fact]
-    public void AStoppedValidationRunsAgainAndASaveThatIsNotCompleteWaits()
+    public async Task AStoppedValidationRunsAgainAndASaveThatIsNotCompleteWaits()
     {
-        PlayToRunning(Game with { ReloadLines = [Reloaded(2), Reloaded(3)] });
+        await PlayToRunningAsync(Game with { ReloadLines = [Reloaded(2), Reloaded(3)] });
         editor.Commit(2);
         editor.StopValidation();
 
@@ -1399,7 +1398,7 @@ public sealed class PlayControllerTests : IDisposable
 
         Assert.Equal(1, editor.ValidateNowCalls);
         editor.Finish(2);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         editor.SaveIncomplete(3);
         play.Update(false, false);
         Assert.Equal(1, editor.ValidateNowCalls);
@@ -1407,8 +1406,8 @@ public sealed class PlayControllerTests : IDisposable
         // The next save completes save 3.
         editor.Commit(3);
         editor.Finish(3);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 2", "reload 3", "stop"], stub.Input(0));
     }
 
@@ -1416,17 +1415,17 @@ public sealed class PlayControllerTests : IDisposable
     /// once (section 9.10). The limit counts from the reload command, not from the process start, and the Console warns
     /// once.</summary>
     [Fact]
-    public void WithoutTheEndOfAReloadFor30STheGameDoesNotRespond()
+    public async Task WithoutTheEndOfAReloadFor30STheGameDoesNotRespond()
     {
         const string warning = "Play: the game does not respond. It did not end the reload of save 2 in 30 s. Stop " +
                                "ends it.";
-        PlayToRunning(Game);
+        await PlayToRunningAsync(Game);
         // The player flew for 5 minutes before the save.
         now += TimeSpan.FromMinutes(5);
         play.Update(false, false);
         editor.Commit(2);
         editor.Finish(2);
-        stub.WaitForInput(0, 2);
+        await stub.WaitForInputAsync(0, 2);
 
         now += TimeSpan.FromSeconds(29.9);
         play.Update(false, false);
@@ -1442,7 +1441,7 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Equal(warning, Console[^1]);
         Assert.Single(Console, m => m == warning);
         play.Stop();
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.False(stub.Runs(0));
     }
 
@@ -1451,23 +1450,23 @@ public sealed class PlayControllerTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ALateEndOfAReloadEndsNotResponding(bool failed)
+    public async Task ALateEndOfAReloadEndsNotResponding(bool failed)
     {
-        PlayToRunning(Game with { ReloadLines = [failed ? ReloadFailed(2) : Reloaded(2)] });
+        await PlayToRunningAsync(Game with { ReloadLines = [failed ? ReloadFailed(2) : Reloaded(2)] });
         editor.Commit(2);
         editor.Finish(2);
         // The event of the stub waits in the queue of the UI thread.
-        ui.WaitForQueued(1);
+        await ui.WaitForQueuedAsync(1);
         now += PlayController.ReloadLimit;
         play.Update(false, false);
         Assert.Equal(PlayStatus.NotResponding, play.Status);
 
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         Assert.Equal(PlayStatus.Running, play.Status);
         Assert.False(play.ForceStop);
         Assert.Equal($"Playing: New London (Br01), save {(failed ? 1 : 2)}", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 2", "stop"], stub.Input(0));
         Assert.Equal("The game closed.", Console[^1]);
     }
@@ -1477,25 +1476,25 @@ public sealed class PlayControllerTests : IDisposable
     /// reload. So the newer save, whose validation passed, reloads at once (D74).
     /// </summary>
     [Fact]
-    public void ASaveDuringAFailedReloadReloadsAfterIt()
+    public async Task ASaveDuringAFailedReloadReloadsAfterIt()
     {
-        PlayToRunning(Game with { ReloadLines = [ReloadFailed(2), Reloaded(3)] });
+        await PlayToRunningAsync(Game with { ReloadLines = [ReloadFailed(2), Reloaded(3)] });
         editor.Commit(2);
         editor.Finish(2);
-        ui.WaitForQueued(1);
+        await ui.WaitForQueuedAsync(1);
         editor.Commit(3);
         editor.Finish(3);
         play.Update(false, false);
         Assert.Equal("Play: reloading save 2...", play.StatusText);
 
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         Assert.Equal("The reload of save 2 failed, so the running game keeps save 1: The new data cannot load the " +
                      "autosave of the player.", Console[^1]);
         Assert.Equal("Play: reloading save 3...", play.StatusText);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal("Playing: New London (Br01), save 3", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 2", "reload 3", "stop"], stub.Input(0));
     }
 
@@ -1504,43 +1503,43 @@ public sealed class PlayControllerTests : IDisposable
     /// show parts of the gate save, so the status and the errors line name the gate save, not the save of the start.
     /// </summary>
     [Fact]
-    public void ErrorsAfterASaveInTheReadWindowOfTheStartNameTheGateSave()
+    public async Task ErrorsAfterASaveInTheReadWindowOfTheStartNameTheGateSave()
     {
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
         // The waiting event waits in the queue, and save 2 comes while the game reads the mod files.
-        ui.WaitForQueued(1);
+        await ui.WaitForQueuedAsync(1);
         editor.Commit(2);
-        ui.Run(1);
+        await ui.RunAsync(1);
         editor.Finish(2);
         // The spawned event waits in the queue, and save 3 has an error.
-        ui.WaitForQueued(1);
+        await ui.WaitForQueuedAsync(1);
         editor.Commit(3);
         editor.Finish(3, HullError);
 
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         Assert.Equal(PlayStatus.Running, play.Status);
         Assert.Equal("Playing: New London (Br01), parts of save 2", play.StatusText);
         Assert.Equal("The running game can show parts of save 2. The validation of save 3 found 1 error.", Console[^1]);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "stop"], stub.Input(0));
     }
 
     /// <summary>An error event after the spawn: the game closes. So a passed validation sends no reload, and Reload game
     /// is not available.</summary>
     [Fact]
-    public void AnErrorEventAfterTheSpawnStopsTheReloads()
+    public async Task AnErrorEventAfterTheSpawnStopsTheReloads()
     {
         plan = new StubPlan([Waiting], [Spawned, Error("Crashed.", crash: true)], IgnoreStop: true,
             ReloadLines: [Reloaded(2)]);
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         // The error event.
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         Assert.False(play.CanReload);
         Assert.Equal("The game sent an error event, and it closes.", play.ReloadBlock);
@@ -1553,7 +1552,7 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Equal("Playing: New London (Br01), save 1", play.StatusText);
         now += PlayController.ExitLimit;
         play.Update(false, false);
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.Equal(["start"], stub.Input(0));
     }
 
@@ -1562,18 +1561,18 @@ public sealed class PlayControllerTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void AnEndOfAReloadAfterStopIsIgnored(bool failed)
+    public async Task AnEndOfAReloadAfterStopIsIgnored(bool failed)
     {
-        PlayToRunning(Game with { ReloadLines = [failed ? ReloadFailed(2) : Reloaded(2)] });
+        await PlayToRunningAsync(Game with { ReloadLines = [failed ? ReloadFailed(2) : Reloaded(2)] });
         editor.Commit(2);
         editor.Finish(2);
-        ui.WaitForQueued(1);
+        await ui.WaitForQueuedAsync(1);
         play.Stop();
 
-        ui.Run(1);
+        await ui.RunAsync(1);
 
         Assert.Equal(PlayStatus.Stopping, play.Status);
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.DoesNotContain(Console, m => m.StartsWith("The running game", StringComparison.Ordinal) ||
                                             m.StartsWith("The reload of save 2", StringComparison.Ordinal));
         Assert.Equal(["start", "reload 2", "stop"], stub.Input(0));
@@ -1582,22 +1581,22 @@ public sealed class PlayControllerTests : IDisposable
 
     /// <summary>A save whose validation passes after stop sends no reload, because the game closes (section 9.8).</summary>
     [Fact]
-    public void APassedValidationAfterStopSendsNoReload()
+    public async Task APassedValidationAfterStopSendsNoReload()
     {
-        PlayToRunning(Game with { IgnoreStop = true, ReloadLines = [Reloaded(2)] });
+        await PlayToRunningAsync(Game with { IgnoreStop = true, ReloadLines = [Reloaded(2)] });
         play.Stop();
-        stub.WaitForInput(0, 2);
+        await stub.WaitForInputAsync(0, 2);
 
         editor.Commit(2);
         editor.Finish(2);
         play.Update(false, false);
 
         // The stub reads its input after stop. So a reload command would reach it, and the stub would answer it.
-        ui.RunUntilQuiet(TimeSpan.FromMilliseconds(500));
+        await ui.RunUntilQuietAsync(TimeSpan.FromMilliseconds(500));
         Assert.Equal(["start", "stop"], stub.Input(0));
         now += PlayController.ExitLimit;
         play.Stop();
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
     }
 
     /// <summary>
@@ -1605,9 +1604,9 @@ public sealed class PlayControllerTests : IDisposable
     /// The save that completes it keeps its number, and the reload trigger then sends it (review of step 8).
     /// </summary>
     [Fact]
-    public void ReloadGameWaitsForTheSaveThatCompletesASaveThatIsNotComplete()
+    public async Task ReloadGameWaitsForTheSaveThatCompletesASaveThatIsNotComplete()
     {
-        PlayToRunning(Game with { ReloadLines = [Reloaded(2)] });
+        await PlayToRunningAsync(Game with { ReloadLines = [Reloaded(2)] });
         editor.SaveIncomplete(2);
         play.Update(false, false);
 
@@ -1622,9 +1621,9 @@ public sealed class PlayControllerTests : IDisposable
         editor.Finish(2);
 
         Assert.Equal("Play: reloading save 2...", play.StatusText);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal("Playing: New London (Br01), save 2", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(["start", "reload 2", "stop"], stub.Input(0));
     }
 
@@ -1635,7 +1634,7 @@ public sealed class PlayControllerTests : IDisposable
     /// <summary>A mission play saves the active mod first, then makes its start from the model of the saved script, and
     /// the game starts from the start save. The Console gives the start note and the note of an approximate start.</summary>
     [Fact]
-    public void AMissionPlaySavesFirstThenPreparesItsStartAndStartsFromTheStartSave()
+    public async Task AMissionPlaySavesFirstThenPreparesItsStartAndStartsFromTheStartSave()
     {
         editor.Commit(1);
         editor.Finish(1);
@@ -1652,17 +1651,17 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Same(mission, play.Mission);
         Assert.Equal(["OpenLancer plays M99 from t_wave (approximate).", MissionPlayTexts.Approximate],
             Console.SkipWhile(l => !l.StartsWith("OpenLancer plays")).Take(2));
-        Assert.True(result.Wait(TimeSpan.FromSeconds(5)));
-        Assert.True(result.Result.Started);
+        await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.True((await result).Started);
         editor.Finish(2);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
         Assert.Null(play.Mission);
     }
 
     /// <summary>A start that cannot start starts no game. The request gives the reason of the start.</summary>
     [Fact]
-    public void AStartThatCannotStartStartsNoGameAndGivesItsReason()
+    public async Task AStartThatCannotStartStartsNoGameAndGivesItsReason()
     {
         var mission = new FakeMissionStart { RefuseWith = "This mission script has no story slot." };
 
@@ -1671,9 +1670,9 @@ public sealed class PlayControllerTests : IDisposable
 
         Assert.Empty(starts);
         Assert.Equal(PlayStatus.Idle, play.Status);
-        Assert.True(result.Wait(TimeSpan.FromSeconds(5)));
-        Assert.Equal(EditErrorKind.Refused, result.Result.Error!.Kind);
-        Assert.Equal("This mission script has no story slot.", result.Result.Error.Message);
+        await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(EditErrorKind.Refused, (await result).Error!.Kind);
+        Assert.Equal("This mission script has no story slot.", (await result).Error.Message);
         Assert.Equal("Play from here is not available: This mission script has no story slot.", Console[^1]);
     }
 
@@ -1683,7 +1682,7 @@ public sealed class PlayControllerTests : IDisposable
     [InlineData((int)SaveFailure.Blocked, EditErrorKind.SaveBlocked)]
     [InlineData((int)SaveFailure.ChangedOnDisk, EditErrorKind.ChangedOnDisk)]
     [InlineData((int)SaveFailure.None, EditErrorKind.Refused)]
-    public void AFailedSaveGivesItsErrorToTheRequest(int failure, EditErrorKind kind)
+    public async Task AFailedSaveGivesItsErrorToTheRequest(int failure, EditErrorKind kind)
     {
         editor.SaveResult = SaveOutcome.NotSaved with { Failure = (SaveFailure)failure };
         var mission = new FakeMissionStart();
@@ -1693,17 +1692,17 @@ public sealed class PlayControllerTests : IDisposable
 
         Assert.Empty(starts);
         Assert.Equal(0, mission.Prepares);
-        Assert.True(result.Wait(TimeSpan.FromSeconds(5)));
-        Assert.Equal(kind, result.Result.Error!.Kind);
+        await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(kind, (await result).Error!.Kind);
     }
 
     /// <summary>A save during a mission play sends restart, not reload (section 5.8 of the M6c design). The start of the
     /// running play makes its plan again, and the Console gives the restart note.</summary>
     [Fact]
-    public void ASaveDuringAMissionPlaySendsRestartNotReload()
+    public async Task ASaveDuringAMissionPlaySendsRestartNotReload()
     {
         var mission = new FakeMissionStart();
-        PlayMissionToRunning(Game with { RestartLines = [Restarted(2)] }, mission);
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(2)] }, mission);
         Assert.Contains(StartNote, Console);
 
         editor.Commit(2);
@@ -1716,11 +1715,11 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Equal(2, mission.Prepares);
         Assert.Contains("Save 2 changed the files of the mission play. The game starts M99 again from Checkpoint t_restore.",
             Console);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal(["start", "restart 2"], stub.Input(0));
         Assert.Equal("The game started M99 again from Checkpoint t_restore with save 2 (restart 0.6 s).", Console[^1]);
         Assert.Equal("Playing: New London (Br01), save 2", play.StatusText);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal(1, stub.Starts);
         // The live view starts a new play at the start and at the restart, and stops its clock at the exit.
         Assert.Equal(["started", "started", "ended"], editor.LiveCalls);
@@ -1729,15 +1728,15 @@ public sealed class PlayControllerTests : IDisposable
     /// <summary>restart-failed keeps the game: the player goes on with the data of the game, and the Console tells it as
     /// a warning. The trigger of the restart does not send the save again.</summary>
     [Fact]
-    public void ARestartFailedKeepsTheGameAndTellsTheConsole()
+    public async Task ARestartFailedKeepsTheGameAndTellsTheConsole()
     {
         var mission = new FakeMissionStart();
-        PlayMissionToRunning(Game with { RestartLines = [RestartFailed(2)] }, mission);
+        await PlayMissionToRunningAsync(Game with { RestartLines = [RestartFailed(2)] }, mission);
 
         editor.Commit(2);
         play.Update(false, false);
         editor.Finish(2);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
 
         var warning = Assert.Single(editor.Log.Entries, e => e.Message.StartsWith("The game cannot start"));
         Assert.Equal(ConsoleSeverity.Warning, warning.Severity);
@@ -1748,16 +1747,16 @@ public sealed class PlayControllerTests : IDisposable
         play.Update(false, false);
         play.Update(false, false);
         Assert.Equal(["start", "restart 2"], stub.Input(0));
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>A start that cannot start before a restart keeps the game and its mission. The Console tells why, and the
     /// save is not sent again.</summary>
     [Fact]
-    public void AStartThatCannotStartBeforeARestartKeepsTheGame()
+    public async Task AStartThatCannotStartBeforeARestartKeepsTheGame()
     {
         var mission = new FakeMissionStart();
-        PlayMissionToRunning(Game, mission);
+        await PlayMissionToRunningAsync(Game, mission);
         mission.RefuseWith = "The path to trigger 't_wave' passes trigger 't_x', which has no condition.";
 
         editor.Commit(2);
@@ -1773,16 +1772,16 @@ public sealed class PlayControllerTests : IDisposable
                      "condition. The running game keeps save 1 and its mission.", Console[^1]);
         play.Update(false, false);
         Assert.Equal(2, mission.Prepares);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>F5 during a mission play writes a new start and sends restart. The process stays, the new start becomes
     /// the start of the play, and a later save restarts from it, not from the first start.</summary>
     [Fact]
-    public void F5DuringAMissionPlayStartsTheGameAgainAtTheNewStart()
+    public async Task F5DuringAMissionPlayStartsTheGameAgainAtTheNewStart()
     {
         var first = new FakeMissionStart();
-        PlayMissionToRunning(Game with { RestartLines = [Restarted(1), Restarted(2)] }, first);
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(1), Restarted(2)] }, first);
         var second = new FakeMissionStart { StartName = "t_wave (approximate)", Approximate = true };
 
         var result = play.RequestMission(second, null);
@@ -1794,35 +1793,35 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Same(second, play.LoadingMission);
         Assert.Equal([first, second], play.MissionStarts);
         Assert.Contains("OpenLancer plays M99 from t_wave (approximate).", Console);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Same(second, play.Mission);
-        Assert.True(result.Wait(TimeSpan.FromSeconds(5)));
-        Assert.True(result.Result.Started);
+        await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.True((await result).Started);
         Assert.Equal(["start", "restart 1"], stub.Input(0));
 
         editor.Commit(2);
         play.Update(false, false);
         editor.Finish(2);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
 
         Assert.Equal(1, first.Prepares);
         Assert.Equal(2, second.Prepares);
         Assert.Equal(["start", "restart 1", "restart 2"], stub.Input(0));
         Assert.Equal(1, stub.Starts);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>A play from the camera during a mission play closes the game first, as a second Play does (section 9.9
     /// of the M4 design).</summary>
     [Fact]
-    public void APlayFromTheCameraDuringAMissionPlayClosesTheGameFirst()
+    public async Task APlayFromTheCameraDuringAMissionPlayClosesTheGameFirst()
     {
-        PlayMissionToRunning(Game, new FakeMissionStart());
+        await PlayMissionToRunningAsync(Game, new FakeMissionStart());
 
         RequestPlay();
 
         Assert.Contains("Play closes the running game first.", Console);
-        ui.RunUntil(() =>
+        await ui.RunUntilAsync(() =>
         {
             play.Update(false, false);
             return starts.Count == 2;
@@ -1830,28 +1829,28 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Equal(["start", "stop"], stub.Input(0));
         Assert.IsType<PlayStart.InSpace>(starts[1].Start);
         Assert.Null(play.Mission);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>The mission events of the game reach the editor (section 6.3 of the M6c design).</summary>
     [Fact]
-    public void MissionEventsReachTheEditor()
+    public async Task MissionEventsReachTheEditor()
     {
         var changes = new PlayEvent.MissionChanges("Mission_99", true, 0,
             [new MissionChange(120, "t_restore", MissionChangeKind.Ran), new MissionChange(120, "t_kill", MissionChangeKind.Started)]);
-        PlayMissionToRunning(Game with { StartLines = [Spawned, PlayProtocol.Write(changes)] }, new FakeMissionStart());
+        await PlayMissionToRunningAsync(Game with { StartLines = [Spawned, PlayProtocol.Write(changes)] }, new FakeMissionStart());
 
-        ui.RunUntil(() => editor.MissionEvents.Count == 1, "the mission event");
+        await ui.RunUntilAsync(() => editor.MissionEvents.Count == 1, "the mission event");
 
         Assert.Equal(changes.Changes, editor.MissionEvents[0].Changes);
         Assert.Equal("Mission_99", editor.MissionEvents[0].Mission);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>Stop drops a request that waits, and a newer request replaces it. Each gives its refusal.</summary>
     [Fact]
-    public void StopAndANewerRequestEndARequestThatWaits()
+    public async Task StopAndANewerRequestEndARequestThatWaits()
     {
         var replaced = play.RequestMission(new FakeMissionStart(), null);
         var stopped = play.RequestMission(new FakeMissionStart(), null);
@@ -1860,24 +1859,24 @@ public sealed class PlayControllerTests : IDisposable
         play.Update(false, false);
 
         Assert.Empty(starts);
-        Assert.True(Task.WaitAll([replaced, stopped], TimeSpan.FromSeconds(5)));
-        Assert.Equal("Replaced", replaced.Result.Error!.Detail);
-        Assert.Equal("Dropped", stopped.Result.Error!.Detail);
+        await Task.WhenAll(replaced, stopped).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal("Replaced", (await replaced).Error!.Detail);
+        Assert.Equal("Dropped", (await stopped).Error!.Detail);
     }
 
     /// <summary>Shift+F5, the Stop button and the agent tool play_stop all call one stop request: it stops the game of
     /// Play in OpenLancer while one runs, not the game of the play copy (section 7.2 of the M6c design).</summary>
     [Fact]
-    public void TheStopRequestStopsTheOpenLancerGameFirst()
+    public async Task TheStopRequestStopsTheOpenLancerGameFirst()
     {
         var games = new PlayRequestsTests.FakeGames { GameRuns = true };
-        PlayToRunning(Game);
+        await PlayToRunningAsync(Game);
 
         Assert.Equal(PlayStopped.OpenLancer, PlayRequests.Stop(play, games));
 
         Assert.Equal(PlayStatus.Stopping, play.Status);
         Assert.Equal(0, games.Stops);
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
         Assert.Equal(PlayStopped.Game, PlayRequests.Stop(play, games));
         Assert.Equal(1, games.Stops);
     }
@@ -1886,71 +1885,71 @@ public sealed class PlayControllerTests : IDisposable
     /// origins of the engine lines name it. The request of the new start gets refused with the reason of the game
     /// (review fix of M6c-2).</summary>
     [Fact]
-    public void ARestartFailedOfANewStartKeepsTheStartOfTheGame()
+    public async Task ARestartFailedOfANewStartKeepsTheStartOfTheGame()
     {
         var first = new FakeMissionStart();
-        PlayMissionToRunning(Game with { RestartLines = [RestartFailed(1), Restarted(2)] }, first);
+        await PlayMissionToRunningAsync(Game with { RestartLines = [RestartFailed(1), Restarted(2)] }, first);
         var second = new FakeMissionStart { StartName = "t_wave (approximate)" };
 
         var result = play.RequestMission(second, null);
         play.Update(false, false);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
 
-        Assert.True(result.Wait(TimeSpan.FromSeconds(5)));
-        Assert.Equal("RestartFailed", result.Result.Error!.Detail);
-        Assert.StartsWith("The game cannot start M99 again. The start save does not load.", result.Result.Error.Message);
+        await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal("RestartFailed", (await result).Error!.Detail);
+        Assert.StartsWith("The game cannot start M99 again. The start save does not load.", (await result).Error.Message);
         Assert.Same(first, play.Mission);
         Assert.Equal([first], play.MissionStarts);
         editor.Commit(2);
         play.Update(false, false);
         editor.Finish(2);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal(2, first.Prepares);
         Assert.Equal(1, second.Prepares);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>A new start that cannot start after the save of its request: the request gets its refusal, and the save
     /// goes to the game with the start of the running play, so the game does not keep the old files (review fix of
     /// M6c-2).</summary>
     [Fact]
-    public void ARefusedNewStartStillRestartsTheRunningStartWithItsSave()
+    public async Task ARefusedNewStartStillRestartsTheRunningStartWithItsSave()
     {
         var running = new FakeMissionStart();
-        PlayMissionToRunning(Game with { RestartLines = [Restarted(2)] }, running);
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(2)] }, running);
         editor.SaveResult = new SaveOutcome(true, 2, false);
 
         var result = play.RequestMission(new FakeMissionStart { RefuseWith = "The path is refused." }, null);
         play.Update(false, false);
         editor.Finish(2);
 
-        Assert.True(result.Wait(TimeSpan.FromSeconds(5)));
-        Assert.Equal("StartRefused", result.Result.Error!.Detail);
+        await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal("StartRefused", (await result).Error!.Detail);
         Assert.Contains("Play from here is not available: The path is refused.", Console);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Equal(["start", "restart 2"], stub.Input(0));
         Assert.Equal(2, running.Prepares);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>Restart the mission does not save: the game starts again with the saved files (section 5.8 of the M6c
     /// design, review fix).</summary>
     [Fact]
-    public void RestartTheMissionDoesNotSave()
+    public async Task RestartTheMissionDoesNotSave()
     {
         var mission = new FakeMissionStart();
-        PlayMissionToRunning(Game with { RestartLines = [Restarted(1)] }, mission);
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(1)] }, mission);
         Assert.Null(play.RestartBlock);
         var saves = editor.SaveCalls;
         editor.SaveResult = new SaveOutcome(true, 2, false);
 
         play.RestartMission();
         play.Update(false, false);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
 
         Assert.Equal(saves, editor.SaveCalls);
         Assert.Equal(["start", "restart 1"], stub.Input(0));
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
         Assert.Equal("Available while a mission play runs.", play.RestartBlock);
     }
 
@@ -1963,7 +1962,7 @@ public sealed class PlayControllerTests : IDisposable
     [InlineData((int)PlaySaveRule.NoEdits, true, false)]
     [InlineData((int)PlaySaveRule.NoEdits, false, true)]
     [InlineData((int)PlaySaveRule.Save, true, true)]
-    public void AnAgentRequestDoesNotSaveEditsThatCameAfterIt(int rule, bool unsaved, bool started)
+    public async Task AnAgentRequestDoesNotSaveEditsThatCameAfterIt(int rule, bool unsaved, bool started)
     {
         editor.Commit(1);
         editor.Finish(1);
@@ -1973,19 +1972,19 @@ public sealed class PlayControllerTests : IDisposable
         editor.Session = editor.Session! with { Unsaved = unsaved };
         play.Update(false, false);
 
-        Assert.True(result.Wait(TimeSpan.FromSeconds(5)));
-        Assert.Equal(started, result.Result.Started);
+        await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(started, (await result).Started);
         Assert.Equal(started ? 1 : 0, editor.SaveCalls);
         Assert.Equal(started ? 1 : 0, starts.Count);
         if (!started)
         {
-            Assert.Equal(PlayRequests.NotSavedDetail, result.Result.Error!.Detail);
-            Assert.Equal(PlayRequests.EditsWhileWaiting("proof"), result.Result.Error.Message);
+            Assert.Equal(PlayRequests.NotSavedDetail, (await result).Error!.Detail);
+            Assert.Equal(PlayRequests.EditsWhileWaiting("proof"), (await result).Error.Message);
             return;
         }
 
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>
@@ -1995,14 +1994,14 @@ public sealed class PlayControllerTests : IDisposable
     /// part (review fix of M6c-2).
     /// </summary>
     [Fact]
-    public void AMissionPlayLetsAHiddenSceneShowTheEditsAndStartsInTheNextFrame()
+    public async Task AMissionPlayLetsAHiddenSceneShowTheEditsAndStartsInTheNextFrame()
     {
         editor.Commit(1);
         editor.Finish(1);
         editor.SceneBehind = true;
         var mission = new FakeMissionStart();
 
-        play.RequestMission(mission, null);
+        _ = play.RequestMission(mission, null);
         play.Update(false, false);
 
         Assert.Equal(0, mission.Prepares);
@@ -2013,20 +2012,20 @@ public sealed class PlayControllerTests : IDisposable
         play.Update(false, false);
         Assert.Equal(1, mission.Prepares);
         Assert.DoesNotContain(PlayController.SceneWaitText, Console);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>F5 during a mission play also lets a hidden Scene apply the edits, and then the game starts again at the
     /// new start.</summary>
     [Fact]
-    public void F5DuringAMissionPlayLetsAHiddenSceneShowTheEdits()
+    public async Task F5DuringAMissionPlayLetsAHiddenSceneShowTheEdits()
     {
-        PlayMissionToRunning(Game with { RestartLines = [Restarted(1)] }, new FakeMissionStart());
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(1)] }, new FakeMissionStart());
         var second = new FakeMissionStart();
         editor.SceneBehind = true;
 
-        play.RequestMission(second, null);
+        _ = play.RequestMission(second, null);
         play.Update(false, false);
         Assert.Equal(0, second.Prepares);
 
@@ -2034,30 +2033,30 @@ public sealed class PlayControllerTests : IDisposable
         play.Update(false, false);
 
         Assert.Equal(1, second.Prepares);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
         Assert.Same(second, play.Mission);
         Assert.Equal(["start", "restart 1"], stub.Input(0));
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>A mission play at a base that the user picked does not read the Scene, so it does not wait for
     /// it.</summary>
     [Fact]
-    public void AMissionPlayAtAPickedBaseDoesNotWaitForTheScene()
+    public async Task AMissionPlayAtAPickedBaseDoesNotWaitForTheScene()
     {
         editor.Commit(1);
         editor.Finish(1);
         editor.SceneBehind = true;
         var mission = new FakeMissionStart { ReadsScene = false };
 
-        play.RequestMission(mission, null);
+        _ = play.RequestMission(mission, null);
         play.BeforePanels(editing: false);
         play.Update(false, false);
 
         Assert.Equal(0, editor.CatchUpCalls);
         Assert.Equal(1, mission.Prepares);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>
@@ -2066,14 +2065,14 @@ public sealed class PlayControllerTests : IDisposable
     /// play starts when the Scene shows each edit.
     /// </summary>
     [Fact]
-    public void PlayTellsOnceWhyItWaitsWhenTheSceneCannotShowEachEdit()
+    public async Task PlayTellsOnceWhyItWaitsWhenTheSceneCannotShowEachEdit()
     {
         editor.Commit(1);
         editor.Finish(1);
         editor.SceneBehind = true;
         editor.SceneStaysBehind = true;
 
-        play.Request(Space, null);
+        _ = play.Request(Space, null);
         play.BeforePanels(editing: true);
         Assert.Equal(0, editor.CatchUpCalls);
         for (var frame = 0; frame < 3; frame++)
@@ -2091,34 +2090,34 @@ public sealed class PlayControllerTests : IDisposable
         play.Update(false, false);
 
         Assert.Single(starts);
-        RunUntil(PlayStatus.Running);
-        StopAndRunToIdle();
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
     }
 
     /// <summary>A save while a restart runs: the game can show parts of it, and the Console says so. The trigger then
     /// sends the restart of that save. The watchdog of a restart names the restart.</summary>
     [Fact]
-    public void ASaveDuringARestartRestartsAgainAndTheWatchdogNamesTheRestart()
+    public async Task ASaveDuringARestartRestartsAgainAndTheWatchdogNamesTheRestart()
     {
         var mission = new FakeMissionStart();
-        PlayMissionToRunning(Game with { RestartLines = [Restarted(2), Restarted(3)] }, mission);
+        await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(2), Restarted(3)] }, mission);
         editor.Commit(2);
         play.Update(false, false);
         editor.Finish(2);
         Assert.Equal(PlayStatus.Reloading, play.Status);
         editor.Commit(3);
         play.Update(false, false);
-        ui.RunUntil(() => stub.Input(0).Count >= 2 && Console.Any(l => l.StartsWith("Save 3 came during the restart")),
+        await ui.RunUntilAsync(() => stub.Input(0).Count >= 2 && Console.Any(l => l.StartsWith("Save 3 came during the restart")),
             "the note of the save during the restart");
         editor.Finish(3);
-        ui.RunUntil(() => stub.Input(0).Count >= 3 && play.Status == PlayStatus.Running, "the second restart");
+        await ui.RunUntilAsync(() => stub.Input(0).Count >= 3 && play.Status == PlayStatus.Running, "the second restart");
 
         Assert.Equal(["start", "restart 2", "restart 3"], stub.Input(0));
         Assert.Contains("Save 3 came during the restart, so the game can show parts of it.", Console);
-        StopAndRunToIdle();
+        await StopAndRunToIdleAsync();
 
         var waits = new FakeMissionStart();
-        PlayMissionToRunning(Game, waits);
+        await PlayMissionToRunningAsync(Game, waits);
         editor.Commit(4);
         play.Update(false, false);
         editor.Finish(4);
@@ -2129,7 +2128,7 @@ public sealed class PlayControllerTests : IDisposable
                      "ends it.", Console[^1]);
         play.Stop();
         play.Stop();
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
     }
 
     /// <summary>A new start that waits gives its refusal when the game exits, and when the validation of its save finds
@@ -2137,9 +2136,9 @@ public sealed class PlayControllerTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void ANewStartThatWaitsGivesItsRefusal(bool exits)
+    public async Task ANewStartThatWaitsGivesItsRefusal(bool exits)
     {
-        PlayMissionToRunning(Game, new FakeMissionStart());
+        await PlayMissionToRunningAsync(Game, new FakeMissionStart());
         editor.Commit(2);
         var result = play.RequestMission(new FakeMissionStart { StartName = "t_wave (approximate)" }, null);
         play.Update(false, false);
@@ -2147,22 +2146,22 @@ public sealed class PlayControllerTests : IDisposable
 
         if (exits)
         {
-            using (var process = Process.GetProcessById(stub.ProcessId(0)))
+            using (var process = Process.GetProcessById(await stub.ProcessIdAsync(0)))
                 process.Kill();
-            RunUntil(PlayStatus.Idle);
+            await RunUntilAsync(PlayStatus.Idle);
         }
         else
         {
             editor.Finish(2, HullError);
         }
 
-        Assert.True(result.Wait(TimeSpan.FromSeconds(5)));
-        Assert.Equal(exits ? "GameClosed" : "ValidationErrors", result.Result.Error!.Detail);
+        await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(exits ? "GameClosed" : "ValidationErrors", (await result).Error!.Detail);
         if (!exits)
         {
             Assert.Contains("Play did not start M99 from t_wave (approximate): the validation of save 2 found 1 error.",
                 Console);
-            StopAndRunToIdle();
+            await StopAndRunToIdleAsync();
         }
     }
 
@@ -2173,14 +2172,14 @@ public sealed class PlayControllerTests : IDisposable
         PlayProtocol.Write(new PlayEvent.RestartFailed(save, "The start save does not load."));
 
     /// <summary>Starts a mission play for save 1, whose validation passed, and runs it until the spawn.</summary>
-    private void PlayMissionToRunning(StubPlan game, FakeMissionStart mission)
+    private async Task PlayMissionToRunningAsync(StubPlan game, FakeMissionStart mission)
     {
         plan = game;
         editor.Commit(1);
         editor.Finish(1);
-        play.RequestMission(mission, null);
+        _ = play.RequestMission(mission, null);
         play.Update(false, false);
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
     }
 
     /// <summary>A mission start of the tests. Each prepare gives the same start save, or refuses with a reason.</summary>
@@ -2231,13 +2230,13 @@ public sealed class PlayControllerTests : IDisposable
         PlayProtocol.Write(new PlayEvent.ReloadFailed(save, "The new data cannot load the autosave of the player."));
 
     /// <summary>Starts a game for save 1, whose validation passed, and runs it until the spawn.</summary>
-    private void PlayToRunning(StubPlan game)
+    private async Task PlayToRunningAsync(StubPlan game)
     {
         plan = game;
         editor.Commit(1);
         editor.Finish(1);
         RequestPlay();
-        RunUntil(PlayStatus.Running);
+        await RunUntilAsync(PlayStatus.Running);
     }
 
     /// <summary>A death zone with a radius of 1,000 whose center is 900 units ahead of the camera of
@@ -2262,13 +2261,13 @@ public sealed class PlayControllerTests : IDisposable
         play.Update(false, false);
     }
 
-    private void RunUntil(PlayStatus status) => ui.RunUntil(() => play.Status == status, $"status {status}");
+    private Task RunUntilAsync(PlayStatus status) => ui.RunUntilAsync(() => play.Status == status, $"status {status}");
 
-    private void StopAndRunToIdle()
+    private async Task StopAndRunToIdleAsync()
     {
         play.Stop();
         Assert.Equal(PlayStatus.Stopping, play.Status);
-        RunUntil(PlayStatus.Idle);
+        await RunUntilAsync(PlayStatus.Idle);
     }
 
     /// <summary>

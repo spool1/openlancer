@@ -1,15 +1,21 @@
 using System;
-using System.Collections.Concurrent;
 using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
 using LibreLancer;
 using Xunit;
 
 namespace OpenLancer.Tests;
 
 /// <summary>A UI thread that keeps the queued actions until the test runs them, as a frame of the editor does.</summary>
+/// <remarks>The waits are async. A test that waits for an action does not hold a thread of the thread pool, so the work
+/// of the editor that queues the action can get one (issue 71).</remarks>
 internal sealed class QueuedUIThread : IUIThread
 {
-    private readonly BlockingCollection<Action> queue = [];
+    /// <summary>The time that a wait for an action can take.</summary>
+    private static readonly TimeSpan Limit = TimeSpan.FromSeconds(30);
+
+    private readonly Channel<Action> queue = Channel.CreateUnbounded<Action>();
     private int queuedFromThreadPool;
 
     /// <summary>The count of actions that a thread of the thread pool queued. The process tests use it. They show that
@@ -23,16 +29,16 @@ internal sealed class QueuedUIThread : IUIThread
             Interlocked.Increment(ref queuedFromThreadPool);
         }
 
-        queue.Add(work);
+        queue.Writer.TryWrite(work);
     }
 
     /// <summary>Runs the next actions, and waits for each one.</summary>
-    public void Run(int count)
+    public async Task RunAsync(int count)
     {
         for (var i = 0; i < count; i++)
         {
-            Assert.True(queue.TryTake(out var work, TimeSpan.FromSeconds(30)), "No action was queued.");
-            work();
+            Assert.True(await NextAsync(Limit), "No action was queued.");
+            Take();
         }
     }
 
@@ -40,44 +46,67 @@ internal sealed class QueuedUIThread : IUIThread
     /// editor runs its queue in the same way.</summary>
     public void RunQueued()
     {
-        while (queue.TryTake(out var work))
+        while (queue.Reader.TryRead(out var work))
         {
             work();
         }
     }
 
     /// <summary>Runs the queued actions in order, and waits for more, until the condition is true.</summary>
-    public void RunUntil(Func<bool> done, string what)
+    public async Task RunUntilAsync(Func<bool> done, string what)
     {
-        var end = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        var end = DateTime.UtcNow + Limit;
         while (!done())
         {
             var left = end - DateTime.UtcNow;
             Assert.True(left > TimeSpan.Zero, $"Not in 30 s: {what}");
-            if (queue.TryTake(out var work, left))
+            if (await NextAsync(left))
             {
-                work();
+                Take();
             }
         }
     }
 
     /// <summary>Runs the queued actions in order until no action comes for the time.</summary>
-    public void RunUntilQuiet(TimeSpan quiet)
+    public async Task RunUntilQuietAsync(TimeSpan quiet)
     {
-        while (queue.TryTake(out var work, quiet))
+        while (await NextAsync(quiet))
         {
-            work();
+            Take();
         }
     }
 
     /// <summary>Waits until the queue has the count of actions, and runs none of them.</summary>
-    public void WaitForQueued(int count)
+    public async Task WaitForQueuedAsync(int count)
     {
-        var end = DateTime.UtcNow + TimeSpan.FromSeconds(30);
-        while (queue.Count < count)
+        var end = DateTime.UtcNow + Limit;
+        while (queue.Reader.Count < count)
         {
             Assert.True(DateTime.UtcNow < end, $"{count} actions were not queued in 30 s.");
-            Thread.Sleep(10);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
+    }
+
+    /// <summary>Runs the next queued action.</summary>
+    private void Take()
+    {
+        Assert.True(queue.Reader.TryRead(out var work));
+        work();
+    }
+
+    /// <summary>Waits until an action is in the queue, for at most the time. False when no action came.</summary>
+    private async Task<bool> NextAsync(TimeSpan wait)
+    {
+        var test = TestContext.Current.CancellationToken;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(test);
+        timeout.CancelAfter(wait);
+        try
+        {
+            return await queue.Reader.WaitToReadAsync(timeout.Token);
+        }
+        catch (OperationCanceledException) when (!test.IsCancellationRequested)
+        {
+            return false;
         }
     }
 }

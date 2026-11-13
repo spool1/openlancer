@@ -266,7 +266,7 @@ public sealed class ClosePromptTests
     /// A second close changes nothing. The window ends one time, when the load ends.
     /// </summary>
     [Fact]
-    public void ACloseDuringALoadBlocksTheWindowUntilTheLoadEnds()
+    public async Task ACloseDuringALoadBlocksTheWindowUntilTheLoadEnds()
     {
         using var ws = Workspace();
         using var load = new RunningLoad();
@@ -284,7 +284,7 @@ public sealed class ClosePromptTests
         Assert.False(prompt.Request());
         Assert.Equal(["end edits", "wait"], host.Calls);
 
-        load.End();
+        await load.EndAsync();
 
         Assert.Equal(["end edits", "wait", "exit"], host.Calls);
         Assert.False(prompt.Waits);
@@ -296,7 +296,7 @@ public sealed class ClosePromptTests
     /// recovery file stays deleted.
     /// </summary>
     [Fact]
-    public void DontSaveDuringALoadDeletesTheRecoveryFileAndWaits()
+    public async Task DontSaveDuringALoadDeletesTheRecoveryFileAndWaits()
     {
         using var ws = Workspace();
         var session = ws.Session("act");
@@ -314,13 +314,13 @@ public sealed class ClosePromptTests
         Assert.Equal(["end edits", "ask", "discard", "wait"], host.Calls);
         Assert.Null(host.Dialog);
         Assert.False(File.Exists(recovery));
-        load.End();
+        await load.EndAsync();
         Assert.Equal(["end edits", "ask", "discard", "wait", "exit"], host.Calls);
     }
 
     /// <summary>Save in the dialog during a load saves the files, and the window ends when the load ends.</summary>
     [Fact]
-    public void SaveDuringALoadClosesTheWindowWhenTheLoadEnds()
+    public async Task SaveDuringALoadClosesTheWindowWhenTheLoadEnds()
     {
         using var ws = Workspace();
         var session = ws.Session("act");
@@ -333,7 +333,7 @@ public sealed class ClosePromptTests
 
         Assert.Equal(["end edits", "ask", "save", "wait"], host.Calls);
         Assert.False(session.IsDirty);
-        load.End();
+        await load.EndAsync();
         Assert.Equal(["end edits", "ask", "save", "wait", "exit"], host.Calls);
     }
 
@@ -355,13 +355,13 @@ public sealed class ClosePromptTests
 
     /// <summary>Without a running load, the window closes at once, also with a session.</summary>
     [Fact]
-    public void WithoutARunningLoadTheWindowClosesAtOnce()
+    public async Task WithoutARunningLoadTheWindowClosesAtOnce()
     {
         using var ws = Workspace();
         var ui = new QueuedUIThread();
         var loads = new DataLoads(ui);
         loads.Load(() => () => { });
-        ui.RunUntil(() => !loads.IsBusy, "the first load");
+        await ui.RunUntilAsync(() => !loads.IsBusy, "the first load");
         var host = new Host(ws.Session("act")) { Loads = loads };
 
         Assert.True(new ClosePrompt(host).Request());
@@ -392,10 +392,10 @@ public sealed class ClosePromptTests
         public DataLoads Loads { get; }
 
         /// <summary>Ends the load, and runs its end on the UI thread, as the next frame of the editor does.</summary>
-        public void End()
+        public async Task EndAsync()
         {
             release.TrySetResult();
-            ui.RunUntil(() => !Loads.IsBusy, "the end of the load");
+            await ui.RunUntilAsync(() => !Loads.IsBusy, "the end of the load");
         }
 
         /// <summary>Ends a load that the test did not end.</summary>

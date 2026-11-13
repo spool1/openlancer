@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using OpenLancer.Data;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Editing;
@@ -96,7 +97,7 @@ public sealed class ValidationTests
     /// to the editor (review finding F16). The first stub program writes a file when it is not stopped.
     /// </summary>
     [Fact]
-    public void ANewValidationStopsTheRunningOneAndDropsItsResult()
+    public async Task ANewValidationStopsTheRunningOneAndDropsItsResult()
     {
         using var ws = new TestWorkspace();
         var ended = Path.Combine(ws.Root, "slow-ended.txt");
@@ -109,7 +110,7 @@ public sealed class ValidationTests
         runner.Start("fast", "act", 2, ui, results.Add);
         Assert.Equal(new ValidationState(2, true, null), runner.State);
         // Each process queues its result when it ends: the first when the second start stopped it.
-        ui.Run(2);
+        await ui.RunAsync(2);
 
         var result = Assert.Single(results);
         Assert.Equal(2, result.Save);
@@ -124,7 +125,7 @@ public sealed class ValidationTests
     /// Console has the result first. A reset forgets the state.
     /// </summary>
     [Fact]
-    public void AStoppedValidationKeepsItsSaveWithoutAResult()
+    public async Task AStoppedValidationKeepsItsSaveWithoutAResult()
     {
         using var ws = new TestWorkspace();
         var ui = new QueuedUIThread();
@@ -139,7 +140,7 @@ public sealed class ValidationTests
 
         Assert.Equal(new ValidationState(1, false, null), runner.State);
         // The stopped process queues its result when it ends, and the runner drops it.
-        ui.Run(1);
+        await ui.RunAsync(1);
         Assert.Empty(calls);
         Assert.Equal(new ValidationState(1, false, null), runner.State);
 
@@ -148,7 +149,7 @@ public sealed class ValidationTests
             calls.Add($"done {result.Save}");
             Assert.Equal(new ValidationState(2, false, result), runner.State);
         });
-        ui.Run(1);
+        await ui.RunAsync(1);
         Assert.Equal(["done 2", "validated 2 False"], calls);
         Assert.NotNull(runner.State!.Result);
 
@@ -175,7 +176,7 @@ public sealed class ValidationTests
 
     /// <summary>A reset during a validation drops its result, for example when the profile closes.</summary>
     [Fact]
-    public void AResetDropsTheResultOfTheRunningValidation()
+    public async Task AResetDropsTheResultOfTheRunningValidation()
     {
         var ui = new QueuedUIThread();
         var calls = new List<string>();
@@ -184,7 +185,7 @@ public sealed class ValidationTests
 
         runner.Start("p", "act", 4, ui, result => calls.Add($"done {result.Save}"));
         runner.Reset();
-        ui.RunUntilQuiet(TimeSpan.FromSeconds(1));
+        await ui.RunUntilQuietAsync(TimeSpan.FromSeconds(1));
 
         Assert.Empty(calls);
         Assert.Null(runner.State);

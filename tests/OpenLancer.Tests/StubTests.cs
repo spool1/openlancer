@@ -35,13 +35,13 @@ public sealed class StubTests : IDisposable
         process.StandardInput.WriteLine("start");
         process.StandardInput.WriteLine("stop");
         process.StandardInput.Flush();
-        stub.WaitForInput(0, 2);
+        await stub.WaitForInputAsync(0, 2);
         await process.WaitForExitAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(0, process.ExitCode);
         Assert.Equal(["a line", "started"], (await output).Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
         Assert.Equal("an error", (await errors).Trim());
         Assert.Equal(["start", "stop"], stub.Input(0));
-        Assert.Equal(process.Id, stub.ProcessId(0));
+        Assert.Equal(process.Id, await stub.ProcessIdAsync(0));
     }
 }

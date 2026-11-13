@@ -61,7 +61,7 @@ public sealed class MissionPlayTests : IDisposable
     /// <summary>F5 plays the play start. A request of the user does what F5 does: no question, and the play start does
     /// not change.</summary>
     [Fact]
-    public void F5RequestsAPlayOfThePlayStart()
+    public async Task F5RequestsAPlayOfThePlayStart()
     {
         editor.UnsavedMod = "act";
         plays.SetPlayStart(ScriptPath, new PlayStartSetting("t_kill", "base:ol_base_a"));
@@ -75,8 +75,8 @@ public sealed class MissionPlayTests : IDisposable
         Assert.Equal(EditOrigin.User, start.Request.Origin);
         Assert.True(start.Request.FromPlayStart);
         Assert.Equal([PlaySaveRule.Save], editor.Saves);
-        Assert.True(result.Wait(Wait));
-        Assert.True(result.Result.Started);
+        await result.WaitAsync(Wait, TestContext.Current.CancellationToken);
+        Assert.True((await result).Started);
     }
 
     /// <summary>"Play from here" sets the play start and plays. The place choice of the play start stays.</summary>
@@ -148,22 +148,22 @@ public sealed class MissionPlayTests : IDisposable
     /// <summary>The agent play rule: with unsaved edits, the editor asks. Cancel gives refused with the reason, and no
     /// play starts. "Save and continue" asks Play for the play, and Play saves first.</summary>
     [Fact]
-    public void AnAgentRequestWithUnsavedEditsAsksTheUserFirst()
+    public async Task AnAgentRequestWithUnsavedEditsAsksTheUserFirst()
     {
         editor.UnsavedMod = "act";
 
         var cancelled = Request(AgentRequest("t_kill"));
         editor.Asked!.Value.Choices.Single(c => c.Label == "Cancel").Action();
 
-        Assert.True(cancelled.Wait(Wait));
-        Assert.Equal("The user did not save. Play did not start.", cancelled.Result.Error!.Message);
+        await cancelled.WaitAsync(Wait, TestContext.Current.CancellationToken);
+        Assert.Equal("The user did not save. Play did not start.", (await cancelled).Error!.Message);
         Assert.Empty(editor.Requests);
 
         var saved = Request(AgentRequest("t_kill"));
         editor.Asked!.Value.Choices.Single(c => c.Label == "Save and continue").Action();
 
-        Assert.True(saved.Wait(Wait));
-        Assert.True(saved.Result.Started);
+        await saved.WaitAsync(Wait, TestContext.Current.CancellationToken);
+        Assert.True((await saved).Started);
         Assert.Single(editor.Requests);
         Assert.Equal([PlaySaveRule.Save], editor.Saves);
     }
@@ -190,7 +190,7 @@ public sealed class MissionPlayTests : IDisposable
     /// <summary>A second agent request while the question of the first is open gives busy, so the first question stays
     /// and its agent gets its answer. After the answer, a new request asks again.</summary>
     [Fact]
-    public void ASecondAgentRequestWhileTheQuestionIsOpenGivesBusy()
+    public async Task ASecondAgentRequestWhileTheQuestionIsOpenGivesBusy()
     {
         editor.UnsavedMod = "act";
         var first = Request(AgentRequest("t_kill"));
@@ -198,14 +198,14 @@ public sealed class MissionPlayTests : IDisposable
 
         var second = Request(AgentRequest(null));
 
-        Assert.True(second.Wait(Wait));
-        Assert.Equal(EditErrorKind.Busy, second.Result.Error!.Kind);
-        Assert.Equal(PlayRequests.AgentWaitsReason, second.Result.Error.Message);
+        await second.WaitAsync(Wait, TestContext.Current.CancellationToken);
+        Assert.Equal(EditErrorKind.Busy, (await second).Error!.Kind);
+        Assert.Equal(PlayRequests.AgentWaitsReason, (await second).Error.Message);
         Assert.False(first.IsCompleted);
         question.Cancel();
-        Assert.True(first.Wait(Wait));
+        await first.WaitAsync(Wait, TestContext.Current.CancellationToken);
 
-        Request(AgentRequest(null));
+        _ = Request(AgentRequest(null));
         Assert.NotSame(question.Choices, editor.Asked!.Value.Choices);
     }
 
@@ -256,7 +256,7 @@ public sealed class MissionPlayTests : IDisposable
     /// <summary>The user can start another play while the question is open. "Save and continue" then checks the rule
     /// again, and the agent gets refused, so the request does not close the play of the user.</summary>
     [Fact]
-    public void SaveAndContinueChecksTheRuleOfAnotherPlayAgain()
+    public async Task SaveAndContinueChecksTheRuleOfAnotherPlayAgain()
     {
         editor.UnsavedMod = "act";
         var result = Request(AgentRequest("t_kill"));
@@ -264,8 +264,8 @@ public sealed class MissionPlayTests : IDisposable
 
         editor.Asked!.Value.Choices.Single(c => c.Label == "Save and continue").Action();
 
-        Assert.True(result.Wait(Wait));
-        Assert.Equal(MissionPlay.OtherPlayDetail, result.Result.Error!.Detail);
+        await result.WaitAsync(Wait, TestContext.Current.CancellationToken);
+        Assert.Equal(MissionPlay.OtherPlayDetail, (await result).Error!.Detail);
         Assert.Empty(editor.Requests);
     }
 
@@ -273,7 +273,7 @@ public sealed class MissionPlayTests : IDisposable
     [Theory]
     [InlineData("act", true)]
     [InlineData(null, false)]
-    public void AnAgentRequestStartsAtOnceWithTheSettingOrWithoutUnsavedEdits(string? unsaved, bool autoSave)
+    public async Task AnAgentRequestStartsAtOnceWithTheSettingOrWithoutUnsavedEdits(string? unsaved, bool autoSave)
     {
         editor.UnsavedMod = unsaved;
         editor.AutoSaveAgentPlay = autoSave;
@@ -284,45 +284,45 @@ public sealed class MissionPlayTests : IDisposable
         Assert.Single(editor.Requests);
         // Without the setting, nobody allowed a save, so Play refuses edits that come before its save.
         Assert.Equal([autoSave ? PlaySaveRule.Save : PlaySaveRule.NoEdits], editor.Saves);
-        Assert.True(result.Wait(Wait));
-        Assert.True(result.Result.Started);
+        await result.WaitAsync(Wait, TestContext.Current.CancellationToken);
+        Assert.True((await result).Started);
     }
 
     /// <summary>A request of an agent gives refused while another play runs: a play from the camera, or the game of a
     /// play copy. While a mission play runs, the game starts again at the new start, so the request goes on.</summary>
     [Fact]
-    public void AnAgentRequestWhileAnotherPlayRunsIsRefused()
+    public async Task AnAgentRequestWhileAnotherPlayRunsIsRefused()
     {
         editor.GameRuns = true;
-        Assert.Equal(MissionPlay.OtherPlayDetail, Request(AgentRequest(null)).Result.Error!.Detail);
+        Assert.Equal(MissionPlay.OtherPlayDetail, (await Request(AgentRequest(null))).Error!.Detail);
 
         editor.GameRuns = false;
         editor.PlayStatus = PlayStatus.Running;
-        Assert.Equal(MissionPlay.OtherPlayDetail, Request(AgentRequest(null)).Result.Error!.Detail);
+        Assert.Equal(MissionPlay.OtherPlayDetail, (await Request(AgentRequest(null))).Error!.Detail);
 
         editor.RunningMission = new MissionPlayStart(plays, new MissionPlayRequest(ScriptPath, MissionStartPoint.MissionStart));
-        Assert.Null(Request(AgentRequest(null)).Result.Error);
+        Assert.Null((await Request(AgentRequest(null))).Error);
         Assert.Single(editor.Requests);
     }
 
     /// <summary>A plan that cannot start refuses the request of an agent with the reason of the plan, before the
     /// question. A trigger that the script does not have gives not_found.</summary>
     [Fact]
-    public void AnAgentRequestWithAPlanThatCannotStartIsRefusedBeforeTheQuestion()
+    public async Task AnAgentRequestWithAPlanThatCannotStartIsRefusedBeforeTheQuestion()
     {
         editor.UnsavedMod = "act";
         editor.Slot = null;
 
-        var noSlot = Request(AgentRequest("t_kill")).Result;
+        var noSlot = await Request(AgentRequest("t_kill"));
 
         Assert.Equal(EditErrorKind.Refused, noSlot.Error!.Kind);
         Assert.Equal(StartPlan.NoSlotReason, noSlot.Error.Message);
         Assert.Equal(StartRefusal.NoSlot, noSlot.Plan!.Refusal);
         editor.Slot = StartPlanTests.Slot;
-        Assert.Equal(EditErrorKind.NotFound, Request(AgentRequest("t_gone")).Result.Error!.Kind);
-        Assert.Equal(StartPlan.NoTriggerReason("t_gone"), Request(AgentRequest("t_gone")).Result.Error!.Message);
+        Assert.Equal(EditErrorKind.NotFound, (await Request(AgentRequest("t_gone"))).Error!.Kind);
+        Assert.Equal(StartPlan.NoTriggerReason("t_gone"), (await Request(AgentRequest("t_gone"))).Error!.Message);
         editor.Missing = "The session has no such mission script.";
-        var noScript = Request(AgentRequest(null)).Result.Error!;
+        var noScript = (await Request(AgentRequest(null))).Error!;
         Assert.Equal((EditErrorKind.NotFound, MissionErrors.ScriptNotFound), (noScript.Kind, noScript.Detail));
         Assert.Null(editor.Asked);
         Assert.Empty(editor.Requests);

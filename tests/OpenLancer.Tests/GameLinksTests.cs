@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using OpenLancer.Data.Games;
 using OpenLancer.Data.Mods;
 using OpenLancer.Editor;
@@ -77,11 +78,11 @@ public sealed class GameLinksTests : IDisposable
 
     private IReadOnlyList<string> Console => host.Log.Entries.Select(e => e.Message).ToList();
 
-    private GameReport LinkNow(string folder)
+    private async Task<GameReport> LinkNowAsync(string folder)
     {
         GameReport? result = null;
         links.Link(folder, r => result = r);
-        host.Ui.RunUntil(() => result != null, "the link");
+        await host.Ui.RunUntilAsync(() => result != null, "the link");
         return result!;
     }
 
@@ -97,14 +98,14 @@ public sealed class GameLinksTests : IDisposable
     }
 
     [Fact]
-    public void LinkAddsTheGameOnce()
+    public async Task LinkAddsTheGameOnce()
     {
-        var report = LinkNow(game.Root);
-        LinkNow(game.Root + Path.DirectorySeparatorChar);
-        LinkNow(game.PathOf("DATA"));
+        var report = await LinkNowAsync(game.Root);
+        await LinkNowAsync(game.Root + Path.DirectorySeparatorChar);
+        await LinkNowAsync(game.PathOf("DATA"));
         if (OperatingSystem.IsWindows())
         {
-            LinkNow(game.Root.ToUpperInvariant());
+            await LinkNowAsync(game.Root.ToUpperInvariant());
         }
 
         Assert.Equal("Freelancer 1.0", report.Name);
@@ -116,18 +117,18 @@ public sealed class GameLinksTests : IDisposable
     }
 
     [Fact]
-    public void AFolderWithoutAGameGetsNoLink()
+    public async Task AFolderWithoutAGameGetsNoLink()
     {
-        var report = LinkNow(game.Folder + Path.DirectorySeparatorChar + "none");
+        var report = await LinkNowAsync(game.Folder + Path.DirectorySeparatorChar + "none");
 
         Assert.False(report.IsGame);
         Assert.Empty(links.Games);
     }
 
     [Fact]
-    public void RelinkWithTheSameBuildRewritesEachProfileOfTheOldRoot()
+    public async Task RelinkWithTheSameBuildRewritesEachProfileOfTheOldRoot()
     {
-        LinkNow(game.Root);
+        await LinkNowAsync(game.Root);
         host.Settings.Games[0] = host.Settings.Games[0] with { PlayCopy = Path.Combine(game.Folder, "play") };
         var first = Profile("first", game.Root);
         var second = Profile("second", game.Root);
@@ -137,7 +138,7 @@ public sealed class GameLinksTests : IDisposable
         Directory.Move(game.Root, moved);
 
         links.Relink(game.Root, moved);
-        host.Ui.RunUntil(() => links.Games[0].Path == moved, "the relink");
+        await host.Ui.RunUntilAsync(() => links.Games[0].Path == moved, "the relink");
 
         Assert.Equal(moved, ModProfile.BaseFolderOf(first));
         Assert.Equal(moved, ModProfile.BaseFolderOf(second));
@@ -150,14 +151,14 @@ public sealed class GameLinksTests : IDisposable
     }
 
     [Fact]
-    public void RelinkToASourceBuildIsRefused()
+    public async Task RelinkToASourceBuildIsRefused()
     {
-        LinkNow(game.Root);
+        await LinkNowAsync(game.Root);
         var profile = Profile("p", game.Root);
         using var source = new SourceBuildGame();
 
         links.Relink(game.Root, source.Root);
-        host.Ui.RunUntil(() => links.ErrorOf(game.Root) != null, "the error");
+        await host.Ui.RunUntilAsync(() => links.ErrorOf(game.Root) != null, "the error");
 
         Assert.Equal(GameTexts.SourceBuildNoBase, links.ErrorOf(game.Root));
         Assert.Equal(game.Root, ModProfile.BaseFolderOf(profile));
@@ -165,11 +166,11 @@ public sealed class GameLinksTests : IDisposable
     }
 
     [Fact]
-    public void ASourceBuildLinksAsAPlayTarget()
+    public async Task ASourceBuildLinksAsAPlayTarget()
     {
         using var source = new SourceBuildGame();
 
-        var report = LinkNow(source.Root);
+        var report = await LinkNowAsync(source.Root);
 
         Assert.Equal(GameKind.SourceBuild, report.Kind);
         Assert.False(report.CanBeBase);
@@ -197,15 +198,15 @@ public sealed class GameLinksTests : IDisposable
     }
 
     [Fact]
-    public void RelinkWithAnotherBuildAsksFirst()
+    public async Task RelinkWithAnotherBuildAsksFirst()
     {
-        LinkNow(game.Root);
+        await LinkNowAsync(game.Root);
         var profile = Profile("p", game.Root);
         using var other = new FakeGame();
         other.CodeFiles("1.1");
 
         links.Relink(game.Root, other.Root);
-        host.Ui.RunUntil(() => host.Asked != null, "the question");
+        await host.Ui.RunUntilAsync(() => host.Asked != null, "the question");
 
         Assert.Equal(game.Root, ModProfile.BaseFolderOf(profile));
         Assert.Contains("Unknown Freelancer version", host.Asked!.Value.Message);
@@ -219,13 +220,13 @@ public sealed class GameLinksTests : IDisposable
     }
 
     [Fact]
-    public void RelinkToAFolderWithoutAGameChangesNothing()
+    public async Task RelinkToAFolderWithoutAGameChangesNothing()
     {
-        LinkNow(game.Root);
+        await LinkNowAsync(game.Root);
         var profile = Profile("p", game.Root);
 
         links.Relink(game.Root, game.Folder + Path.DirectorySeparatorChar + "none");
-        host.Ui.RunUntil(() => links.ErrorOf(game.Root) != null, "the error");
+        await host.Ui.RunUntilAsync(() => links.ErrorOf(game.Root) != null, "the error");
 
         Assert.Equal(GameTexts.FolderMissing, links.ErrorOf(game.Root));
         Assert.Equal(game.Root, ModProfile.BaseFolderOf(profile));
@@ -233,9 +234,9 @@ public sealed class GameLinksTests : IDisposable
     }
 
     [Fact]
-    public void RelinkSkipsAProfileInAGameFolderInTheRepoOrWithAComment()
+    public async Task RelinkSkipsAProfileInAGameFolderInTheRepoOrWithAComment()
     {
-        LinkNow(game.Root);
+        await LinkNowAsync(game.Root);
         using var moved = new FakeGame();
         var inGame = Profile("in-game", game.Root, moved.PathOf("profiles"));
         var repo = Path.Combine(game.Folder, "repo");
@@ -249,7 +250,7 @@ public sealed class GameLinksTests : IDisposable
         var plain = Profile("plain", game.Root);
 
         links.Relink(game.Root, moved.Root);
-        host.Ui.RunUntil(() => links.Games[0].Path == moved.Root, "the relink");
+        await host.Ui.RunUntilAsync(() => links.Games[0].Path == moved.Root, "the relink");
 
         Assert.Equal(game.Root, ModProfile.BaseFolderOf(inGame));
         Assert.Equal(game.Root, ModProfile.BaseFolderOf(inRepo));
@@ -262,17 +263,17 @@ public sealed class GameLinksTests : IDisposable
     }
 
     [Fact]
-    public void TheUsedByListFindsProfilesOfAMissingGame()
+    public async Task TheUsedByListFindsProfilesOfAMissingGame()
     {
-        LinkNow(game.Root);
+        await LinkNowAsync(game.Root);
         var profile = Profile("p", game.Root);
         Profile("other", game.Folder);
         Directory.Delete(game.Root, true);
 
         links.RefreshUsedBy();
-        host.Ui.RunUntil(() => links.UsedBy(game.Root).Count > 0, "the used-by list");
+        await host.Ui.RunUntilAsync(() => links.UsedBy(game.Root).Count > 0, "the used-by list");
         links.Check(game.Root);
-        host.Ui.RunUntil(() => !links.IsChecking(game.Root), "the check");
+        await host.Ui.RunUntilAsync(() => !links.IsChecking(game.Root), "the check");
 
         Assert.Equal([profile], links.UsedBy(game.Root));
         Assert.True(links.ReportOf(game.Root)!.FolderMissing);
@@ -280,9 +281,9 @@ public sealed class GameLinksTests : IDisposable
     }
 
     [Fact]
-    public void RemoveDeletesNoFile()
+    public async Task RemoveDeletesNoFile()
     {
-        LinkNow(game.Root);
+        await LinkNowAsync(game.Root);
         Profile("p", game.Root);
         var before = FakeGame.Snapshot(game.Folder);
 
@@ -293,31 +294,31 @@ public sealed class GameLinksTests : IDisposable
     }
 
     [Fact]
-    public void OpeningAProfileOnAnUnlinkedGameLinksIt()
+    public async Task OpeningAProfileOnAnUnlinkedGameLinksIt()
     {
         var path = Profile("p", game.Root);
 
         links.ProfileOpened(ModProfile.Load(path));
-        host.Ui.RunUntil(() => links.Games.Count == 1, "the link");
+        await host.Ui.RunUntilAsync(() => links.Games.Count == 1, "the link");
 
         Assert.Equal(game.Root, links.Games[0].Path);
         Assert.Contains(Console, c => c == $"The profile p uses the game folder {game.Root}, so OpenLancer linked it.");
     }
 
     [Fact]
-    public void NotOnANonGameBase()
+    public async Task NotOnANonGameBase()
     {
         var path = Profile("p", game.PathOf("DATA"));
 
         links.ProfileOpened(ModProfile.Load(path));
-        host.Ui.RunUntil(() => links.ReportOf(game.PathOf("DATA")) != null, "the check");
+        await host.Ui.RunUntilAsync(() => links.ReportOf(game.PathOf("DATA")) != null, "the check");
 
         Assert.Empty(links.Games);
         Assert.Equal(GameTexts.NotAGameFolder, links.ReportOf(game.PathOf("DATA"))!.Error);
     }
 
     [Fact]
-    public void NotInTheBench()
+    public async Task NotInTheBench()
     {
         var bench = new GameLinks(host, enabled: false, builds);
         var path = Profile("p", game.Root);
@@ -325,19 +326,19 @@ public sealed class GameLinksTests : IDisposable
 
         bench.ProfileOpened(ModProfile.Load(path));
         bench.CheckAll();
-        host.Ui.RunUntilQuiet(TimeSpan.FromMilliseconds(300));
+        await host.Ui.RunUntilQuietAsync(TimeSpan.FromMilliseconds(300));
 
         Assert.Null(bench.ReportOf(game.Root));
         Assert.False(bench.IsChecking(game.Root));
     }
 
     [Fact]
-    public void AChangedBuildBetweenStartsWritesAConsoleLine()
+    public async Task AChangedBuildBetweenStartsWritesAConsoleLine()
     {
         host.Settings.Games.Add(new LinkedGame(game.Root, DateTime.UtcNow, "Freelancer 1.1", "vanilla-1.1"));
 
         links.CheckAll();
-        host.Ui.RunUntil(() => links.ReportOf(game.Root) != null, "the check");
+        await host.Ui.RunUntilAsync(() => links.ReportOf(game.Root) != null, "the check");
 
         Assert.Contains($"The game in {game.Root} changed. It was Freelancer 1.1. Now it is Freelancer 1.0.", Console);
         Assert.Equal(new LinkedGame(game.Root, host.Settings.Games[0].LinkedUtc, "Freelancer 1.0", "vanilla-1.0"),
