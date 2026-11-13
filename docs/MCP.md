@@ -681,6 +681,7 @@ These cases are special to `mission_play`:
 - While a mission play runs, the game starts again at the new start, as F5 does. While another play runs, the tool gives `refused`, and the agent calls `play_stop` first.
 - When the plan of the start cannot start, the tool gives `refused` with the reason of the plan. A trigger or a script that does not exist gives `not_found`, and `field` is `start` or `script`. The editor does this check again after you answer the question.
 - The play never changes the play start of the script in your settings. F5 still plays your play start.
+- The player gets the ship of the Ship field of the play start of the script, else the ship of the profile, as with F5. "The Play start page" in [MISSIONS.md](MISSIONS.md) tells about the field. When the edit view does not have that ship package or its ship, the tool gives `refused` with the reason.
 - When you clear the group Missions or the group Play, the tool gives `not_available`.
 
 The result gives the state of Play, the start, the kind and the name of the start, and the warnings of the plan. Play makes the plan from the saved script. When the saved script does not have the trigger of the start, the game plays the mission start, and `start` is `mission_start`.
