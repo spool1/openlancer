@@ -141,8 +141,8 @@ public sealed class StartPlacesTests
     [Fact]
     public void TheBarVisitAndTheAcceptStartDockedAtTheBase()
     {
-        Docked(Place(Story, "p_bar"), "ol_base_a", "On enter room of p_bar.");
-        Docked(Place(Story, "p_accept"), "ol_base_a", "On enter room of p_bar.");
+        Docked(Place(Story, "p_bar"), "ol_base_a", "'On enter room' of p_bar.");
+        Docked(Place(Story, "p_accept"), "ol_base_a", "'On enter room' of p_bar.");
     }
 
     /// <summary>The bug of 2026-10-27: after the launch, the start is in space and not at the bar of the base.</summary>
@@ -151,11 +151,11 @@ public sealed class StartPlacesTests
     {
         // The launch names no system, so the system hint of the step gives it. The step spawns the first ship.
         Space(Place(Story, "p_init"), "ol_sys_a", new Vector3(500, 0, 600 + StartPlaces.Offset),
-            "On enter space of p_launch. The system comes from the system hint of p_init. The point is 1,000 units from " +
+            "'On enter space' of p_launch. The system comes from the system hint of p_init. The point is 1,000 units from " +
             "the spawn of ol_king.");
         // A Cnd_DistVec line that waits for the player inside its sphere gives its point.
         Space(Place(Story, "p_lane"), "ol_sys_a", new Vector3(1000, 0, 2000 + StartPlaces.Offset),
-            "Near a point of p_near. The system comes from the system hint of p_near.");
+            "'Near a point' of p_near. The system comes from the system hint of p_near.");
     }
 
     /// <summary>Review fix: the system of the base of the launch comes before a system hint.</summary>
@@ -164,11 +164,11 @@ public sealed class StartPlacesTests
     {
         Space(Place(Story, "p_lane", World(("ol_base_a", "ol_sys_c"))), "ol_sys_c",
             new Vector3(1000, 0, 2000 + StartPlaces.Offset),
-            "Near a point of p_near. The system comes from the base of On enter room of p_bar.");
+            "'Near a point' of p_near. The system comes from the base of 'On enter room' of p_bar.");
         // The spawn of the step is in the system of its hint, so it gives no point in that system. The start is at the
         // base of the launch.
         Docked(Place(Story, "p_init", World(("ol_base_a", "ol_sys_c"))), "ol_base_a",
-            "On enter room of p_bar. No line of the path gives a point in ol_sys_c after On enter space of p_launch.");
+            "'On enter room' of p_bar. No line of the path gives a point in ol_sys_c after 'On enter space' of p_launch.");
     }
 
     /// <summary>The point fallback after the fact itself: the first point of the segment.</summary>
@@ -176,7 +176,7 @@ public sealed class StartPlacesTests
     public void ASpaceFactWithoutAPointTakesThePointOfAnOlderFactOfTheSegment()
     {
         Space(Place(Story, "p_jump"), "ol_sys_a", new Vector3(1000, 0, 2000 + StartPlaces.Offset),
-            "On leave trade lane of p_lane. The system comes from the system hint of p_lane. The point comes from Near a point " +
+            "'On leave trade lane' of p_lane. The system comes from the system hint of p_lane. The point comes from 'Near a point' " +
             "of p_near.");
     }
 
@@ -186,11 +186,11 @@ public sealed class StartPlacesTests
     [Fact]
     public void ATriggerThatWaitsAtTheBaseForTheLaunchStartsDocked()
     {
-        Docked(Place(Story, "p_launch"), "ol_base_a", "On enter room of p_bar.");
-        Docked(Place(Story, "p_exit"), "ol_base_a", "On leave base of p_exit.");
+        Docked(Place(Story, "p_launch"), "ol_base_a", "'On enter room' of p_bar.");
+        Docked(Place(Story, "p_exit"), "ol_base_a", "'On leave base' of p_exit.");
         // Review fix: a Cnd_SpaceEnter with a system waits at the base too.
         Docked(Place(Story.Replace("Cnd_SpaceEnter = no_params", "Cnd_SpaceEnter = ol_sys_a"), "p_launch"),
-            "ol_base_a", "On enter room of p_bar.");
+            "ol_base_a", "'On enter room' of p_bar.");
     }
 
     /// <summary>Review fix: a start in space never ends a launch, so a chosen Cnd_LaunchComplete starts docked at the base
@@ -201,7 +201,7 @@ public sealed class StartPlacesTests
         var plan = Plan(Story, "p_launched");
 
         Docked(plan.Place, "ol_base_a",
-            "On enter room of p_bar. Trigger p_launched waits for the end of a launch, so the play starts docked.");
+            "'On enter room' of p_bar. Trigger p_launched waits for the end of a launch, so the play starts docked.");
         Assert.DoesNotContain(StartPlaces.LaunchWatcherWarning("p_launched"), plan.Warnings);
     }
 
@@ -292,7 +292,7 @@ public sealed class StartPlacesTests
         Assert.Equal(StartPlaceKind.Camera, place.Kind);
         Assert.Equal("ol_sys_b", place.System);
         Assert.Equal("At the Scene camera in ol_sys_b", place.Text);
-        Assert.Equal("Ships enter a system of p_jump. No line of the path gives a point in ol_sys_b.", place.Source);
+        Assert.Equal("'Ships enter a system' of p_jump. No line of the path gives a point in ol_sys_b.", place.Source);
         Assert.Equal("p_jump", place.Trigger);
     }
 
@@ -304,7 +304,7 @@ public sealed class StartPlacesTests
         var place = Place(Story, "p_after", World([GateToA]));
 
         Space(place, "ol_sys_b", AtGateToA,
-            "Ships enter a system of p_jump. The point is 1,000 units from ol_gate_b_to_a, the jump gate or hole to ol_sys_a.");
+            "'Ships enter a system' of p_jump. The point is 1,000 units from ol_gate_b_to_a, the jump gate or hole to ol_sys_a.");
         Assert.Equal(GateToA.Rotation, place.Orientation);
         // No object of the system leads back, so the start is at the Scene camera in that system.
         Assert.Equal(StartPlaceKind.Camera, Place(Story, "p_after", World([GateToA with { JumpTo = "ol_sys_c" }])).Kind);
@@ -330,7 +330,7 @@ public sealed class StartPlacesTests
         var text = Story.Replace("Act_ActTrig = p_after", "Act_SpawnShip = ol_juni\nAct_ActTrig = p_after");
 
         Space(Place(text, "p_after"), "ol_sys_b", new Vector3(-500, 0, -600 + StartPlaces.Offset),
-            "Ships enter a system of p_jump. The point is 1,000 units from the spawn of ol_juni.");
+            "'Ships enter a system' of p_jump. The point is 1,000 units from the spawn of ol_juni.");
     }
 
     // Jump-here triggers.
@@ -352,7 +352,7 @@ public sealed class StartPlacesTests
             """;
 
         Space(Place(Debug("ol_sys_b"), "p_after"), "ol_sys_b", new Vector3(7000, 0, 7000),
-            "Ships enter a system of p_jump. The point comes from Move player of p_debug, which starts p_after.");
+            "'Ships enter a system' of p_jump. The point comes from 'Move player' of p_debug, which starts p_after.");
         Assert.Equal(StartPlaceKind.Camera, Place(Debug("ol_sys_a"), "p_after").Kind);
     }
 
@@ -409,10 +409,10 @@ public sealed class StartPlacesTests
         var debug = Plan(text, "p_debug");
         var restore = Plan(text, "p_restore");
 
-        Space(debug.Place, "ol_sys_a", new Vector3(7000, 0, 7000), "Move player of p_debug.");
+        Space(debug.Place, "ol_sys_a", new Vector3(7000, 0, 7000), "'Move player' of p_debug.");
         Assert.Contains(StartPlaces.OtherSystemWarning("p_debug", "ol_sys_b", "ol_sys_a"), debug.Warnings);
         Assert.Empty(SteLint.Problems(StartPlaces.OtherSystemWarning("p_debug", "ol_sys_b", "ol_sys_a")));
-        Space(restore.Place, "ol_sys_b", new Vector3(8000, 0, 8000), "Set player start of p_restore.");
+        Space(restore.Place, "ol_sys_b", new Vector3(8000, 0, 8000), "'Set player start' of p_restore.");
         Assert.DoesNotContain(restore.Warnings, w => w.Contains("enter space in"));
     }
 
@@ -431,7 +431,7 @@ public sealed class StartPlacesTests
             """;
 
         Space(Place(text, "p_debug"), "ol_sys_a", new Vector3(7000, 0, 7000),
-            "Move player of p_debug. The system comes from the system hint of p_lane.");
+            "'Move player' of p_debug. The system comes from the system hint of p_lane.");
     }
 
     // Checkpoints and place lines.
@@ -466,11 +466,11 @@ public sealed class StartPlacesTests
 
         Assert.Equal(StartKind.Checkpoint, checkpoint.Kind);
         Space(checkpoint.Place, "ol_sys_c", new Vector3(10, 20, 30),
-            "Set player start of p_stage1. The system comes from On enter space of p_stage2.");
+            "'Set player start' of p_stage1. The system comes from 'On enter space' of p_stage2.");
         Assert.Equal(new Quaternion(0, 1, 0, 0), checkpoint.Place.Orientation);
         // A step after the checkpoint keeps the pose of the first stage.
         Assert.Equal(("ol_sys_c", new Vector3(10, 20, 30)), (later.System, later.Position));
-        Assert.StartsWith("On enter space of p_stage2. The point comes from Set player start of p_stage1.",
+        Assert.StartsWith("'On enter space' of p_stage2. The point comes from 'Set player start' of p_stage1.",
             later.Source);
     }
 
@@ -498,7 +498,7 @@ public sealed class StartPlacesTests
         var plan = Plan(text, "p_restore");
 
         Assert.Equal(StartKind.Checkpoint, plan.Kind);
-        Space(plan.Place, "ol_sys_a", new Vector3(4000, 0, 4000), "Move player of p_step, which p_restore starts.");
+        Space(plan.Place, "ol_sys_a", new Vector3(4000, 0, 4000), "'Move player' of p_step, which p_restore starts.");
     }
 
     /// <summary>Act_RelocateShip of the player is a place line with a heading. The setup triggers do not copy it, so a
@@ -511,7 +511,7 @@ public sealed class StartPlacesTests
 
         var plan = Plan(text, "p_near");
 
-        Space(plan.Place, "ol_sys_a", new Vector3(300, 0, 400), "Move ship of p_init.");
+        Space(plan.Place, "ol_sys_a", new Vector3(300, 0, 400), "'Move ship' of p_init.");
         Assert.Equal(new Quaternion(0, 1, 0, 0), plan.Place.Orientation);
         var world = plan.Setup.Single(s => s.Nickname == "ol_play_world").Lines;
         Assert.Contains(world, l => l.Key == "Act_RelocateShip" && l.Values[0] == "ol_king");
@@ -524,7 +524,7 @@ public sealed class StartPlacesTests
     {
         var text = Story.Replace("Act_ActTrig = p_jump", "Act_ForceLand = ol_base_b\nAct_ActTrig = p_jump");
 
-        Docked(Place(text, "p_jump"), "ol_base_b", "Force land of p_lane.");
+        Docked(Place(text, "p_jump"), "ol_base_b", "'Force land' of p_lane.");
     }
 
     // Review fixes about names and docks that no line names.
@@ -569,7 +569,7 @@ public sealed class StartPlacesTests
         var text = Story.Replace("system = ol_sys_a\n", "");
 
         Docked(Place(text, "p_lane"), "ol_base_a",
-            "On enter room of p_bar. No line of the path names the system of Near a point of p_near.");
+            "'On enter room' of p_bar. No line of the path names the system of 'Near a point' of p_near.");
         var none = Place(Story, "p_start");
         Assert.Equal((StartPlaceKind.Camera, "No line of the path gives a place."), (none.Kind, none.Source));
         // Review fix: rule 7 gives the Scene camera in any system, also for a trigger with a system hint. The start trigger
@@ -587,7 +587,7 @@ public sealed class StartPlacesTests
         var text = Story.Replace("Act_SpawnShip = ol_king\n", "");
 
         Docked(Place(text, "p_init"), "ol_base_a",
-            "On enter room of p_bar. No line of the path gives a point in ol_sys_a after On enter space of p_launch.");
+            "'On enter room' of p_bar. No line of the path gives a point in ol_sys_a after 'On enter space' of p_launch.");
     }
 
     /// <summary>Review fix: within the same part of the walk, a spawn with its own point comes before a spawn at the
@@ -598,7 +598,7 @@ public sealed class StartPlacesTests
         var text = Story.Replace("Act_SpawnShip = ol_king\n", "Act_SpawnShip = ol_king\nAct_SpawnShip = ol_juni, no_ol, 100, 0, 200\n");
 
         Space(Place(text, "p_init"), "ol_sys_a", new Vector3(100, 0, 200 + StartPlaces.Offset),
-            "On enter space of p_launch. The system comes from the system hint of p_init. The point is 1,000 units from " +
+            "'On enter space' of p_launch. The system comes from the system hint of p_init. The point is 1,000 units from " +
             "the spawn of ol_juni.");
     }
 
@@ -629,7 +629,7 @@ public sealed class StartPlacesTests
         var text = Story.Replace("Cnd_TLExited = Player, ol_ring_1", "Cnd_DistShip = inside, Player, ol_buoy, 2000");
         var buoy = new WorldObject("ol_buoy", "ol_sys_c", new Vector3(-7000, 0, 5000), Quaternion.Identity, null);
 
-        Space(Place(text, "p_jump", World([buoy])), "ol_sys_c", new Vector3(-7000, 0, 7000), "Near a ship of p_lane.");
+        Space(Place(text, "p_jump", World([buoy])), "ol_sys_c", new Vector3(-7000, 0, 7000), "'Near a ship' of p_lane.");
         Assert.Equal(new Vector3(-7000, 0, 5000 + StartPlaces.Offset),
             Place(text.Replace("ol_buoy, 2000", "ol_buoy, 300"), "p_jump", World([buoy])).Position);
         // An object that the world does not know gives no point, so the older point of the segment gives it.
@@ -645,7 +645,7 @@ public sealed class StartPlacesTests
             .Replace("Act_SpawnShip = ol_king\n", "").Replace("nickname = p_init\nsystem = ol_sys_a\n", "nickname = p_init\n");
 
         Docked(Place(text, "p_init", World(("ol_base_a", "ol_sys_a"))), "ol_base_a",
-            "On leave base of p_bar. No line of the path gives a point in ol_sys_a after On enter space of p_launch.");
+            "'On leave base' of p_bar. No line of the path gives a point in ol_sys_a after 'On enter space' of p_launch.");
     }
 
     /// <summary>Rule 6: a spawn of the replay before the segment comes last. The system of a spawn is the system of its
@@ -657,7 +657,7 @@ public sealed class StartPlacesTests
             .Replace("Act_ActTrig = p_bar", "Act_SpawnShip = ol_king, no_ol, 3000, 0, 3000\nAct_ActTrig = p_bar");
 
         Space(Place(text, "p_init"), "ol_sys_a", new Vector3(3000, 0, 3000 + StartPlaces.Offset),
-            "On enter space of p_launch. The system comes from the system hint of p_init. The point is 1,000 units from " +
+            "'On enter space' of p_launch. The system comes from the system hint of p_init. The point is 1,000 units from " +
             "the spawn of ol_king.");
     }
 
@@ -716,7 +716,7 @@ public sealed class StartPlacesTests
 
         var place = StartPlan.Make(Index(text), StartPlanTests.Slot, MissionStartPoint.MissionStart).Place;
 
-        Space(place, "ol_sys_a", new Vector3(100, 0, 100), "Move player of p_start.");
+        Space(place, "ol_sys_a", new Vector3(100, 0, 100), "'Move player' of p_start.");
         Assert.Equal(StartPlaceKind.Camera,
             StartPlan.Make(Index(Story), StartPlanTests.Slot, MissionStartPoint.MissionStart).Place.Kind);
     }

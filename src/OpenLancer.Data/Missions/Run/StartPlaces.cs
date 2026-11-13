@@ -221,9 +221,10 @@ internal static class StartPlaces
             ? text
             : null;
 
-    /// <summary>The line in words: "{plain name} of {trigger}", for example "On enter space of t_launch". The plain name
-    /// is the name that the graph shows for the line (<see cref="MissionLine.Plain"/>).</summary>
-    private static string Of(MissionLine line, MissionTrigger trigger) => $"{line.Plain} of {trigger.Nickname}";
+    /// <summary>The line in words: "'{plain name}' of {trigger}", for example "'On enter space' of t_launch". The plain
+    /// name is the name that the graph shows for the line (<see cref="MissionLine.Plain"/>). The quotes keep it apart
+    /// from the sentence around it, for example "The point comes from 'Near a point' of p_near.".</summary>
+    private static string Of(MissionLine line, MissionTrigger trigger) => $"'{line.Plain}' of {trigger.Nickname}";
 
     /// <summary>The numbers of a line from a value index, or null when one of them is not a finite number.</summary>
     private static float[]? Numbers(MissionLine line, int from, int count)
@@ -276,7 +277,7 @@ internal static class StartPlaces
 
     /// <summary>A fact of the walk about where the player is.</summary>
     /// <param name="At">The index in the timeline of the trigger of the fact.</param>
-    /// <param name="Source">The line of the fact in words, for example "On enter space of t_launch".</param>
+    /// <param name="Source">The line of the fact in words, for example "'On enter space' of t_launch".</param>
     private sealed record Fact(FactKind Kind, MissionTrigger Trigger, int At, string Source)
     {
         public string? System { get; init; }

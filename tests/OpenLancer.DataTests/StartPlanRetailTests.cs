@@ -232,7 +232,7 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
             var place = Suggested(scripts, "M02", trigger);
             Assert.Equal(("Li03", debris), (place.System, place.Position));
             Assert.Equal(LineHeading(m02, "key_save_fly_to_debris"), place.Orientation);
-            Assert.Equal("Set player start of key_save_fly_to_debris.", place.Source);
+            Assert.Equal("'Set player start' of key_save_fly_to_debris.", place.Source);
         }
         // The debug trigger fly_to_debris moves the player to the same point.
         Assert.Equal(debris, LinePoint(m02, "fly_to_debris", "Act_MovePlayer"));
@@ -318,7 +318,7 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
 
         // The rows of the reviews of the fix. A Cnd_True step of a restore trigger gives the place of the checkpoint.
         SpaceAt(scripts, "M01a", "w_tutorialsave", "Li01", LinePoint(Slot(scripts, "M01a"), "w_tutorial", "Act_MovePlayer"));
-        Assert.Equal("Move player of w_tutorial, which w_tutorialsave starts.",
+        Assert.Equal("'Move player' of w_tutorial, which w_tutorialsave starts.",
             Suggested(scripts, "M01a", "w_tutorialsave").Source);
         // A Cnd_DistShip line near an object of the game data gives a point near that object. So the checkpoint at the
         // base of the Blood Dragons starts near that base, and not at a generator that the restore trigger makes hostile.
@@ -348,7 +348,7 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
         var item = Slot(scripts, slot).Index.World.ObjectOf(name)!;
         SpaceAt(scripts, slot, trigger, item.System,
             item.Position + new Vector3(0, 0, Math.Max(StartPlaces.Offset, Number(condition, 3))));
-        Assert.Equal($"Near a ship of {near}.", Suggested(scripts, slot, trigger).Source);
+        Assert.Equal($"'Near a ship' of {near}.", Suggested(scripts, slot, trigger).Source);
     }
 
     /// <summary>Checks a start at the jump gate or hole of a system that leads to the system before the jump.</summary>

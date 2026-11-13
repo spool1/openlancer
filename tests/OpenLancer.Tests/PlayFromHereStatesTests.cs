@@ -417,7 +417,7 @@ public sealed class PlayFromHereStatesTests
         var checkpoint = Lines("t_restore");
         Assert.Equal("Start: Checkpoint t_restore. The state of the triggers is exact.", checkpoint[1]);
         Assert.Equal("Start place: Suggested: In ol_sys_a at 10, 20, 30", checkpoint[2]);
-        Assert.Equal("Source of the place: Set player start of t_restore. The system comes from On enter space of " +
+        Assert.Equal("Source of the place: 'Set player start' of t_restore. The system comes from 'On enter space' of " +
                      "t_launch.", checkpoint[3]);
         var warning = $"{EditorIcons.ExclamationTriangle}  {StartPlan.CheckpointStateWarning("t_restore")}";
         // The tooltip draws the warning lines in the warning color, as the Play start page does.

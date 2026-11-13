@@ -106,7 +106,7 @@ public sealed class PlayStartPageTests
         Assert.True(suggested.ShowsSource);
         Assert.False(atBase.ShowsSource);
         Assert.False(atCamera.ShowsSource);
-        Assert.Equal("On enter space of t_launch. The point is 1,000 units from the spawn of ol_ship_a.",
+        Assert.Equal("'On enter space' of t_launch. The point is 1,000 units from the spawn of ol_ship_a.",
             suggested.Plan.Suggested.Source);
         Assert.Equal("t_launch", suggested.Plan.Suggested.Trigger);
         Assert.False(Model(new PlayStartSetting("t_none", "suggested")).ShowsSource);
