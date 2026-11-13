@@ -107,9 +107,11 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
         "Opens and frames the item of each agent edit. Follow mode stops when you move the camera of the Scene or the " +
         "mission graph, or select an item.";
 
-    /// <summary>The first removed item of each agent delete, by the label of its entry, so an undo of the delete selects
-    /// the item again (decision D249).</summary>
-    private readonly Dictionary<string, string> deleted = [];
+    /// <summary>The first removed item of each agent delete, by the id of its entry of the history (see
+    /// <see cref="EditSession.UndoEntryId"/>), so an undo of the delete selects the item again (decision D249). Two
+    /// cutscene deletes can have one label, for example "Agent: Delete event", so the label cannot name the
+    /// entry.</summary>
+    private readonly Dictionary<long, string> deleted = [];
 
     private EditSession? session;
 
@@ -163,10 +165,11 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
     {
         if (session == null)
             return;
-        if (result.UndoLabel is { } label &&
+        // The call committed just before, so its entry is the top entry of the history.
+        if (result.UndoLabel != null && session.UndoEntryId is { } entry &&
             (result.Deletes.FirstOrDefault(d => d.Why == DeleteReason.Target) ?? result.Deletes.FirstOrDefault()) is { } first)
         {
-            deleted[label] = first.Ref;
+            deleted[entry] = first.Ref;
         }
         // The Mission tab moves the selection with a rename of the agent. A row move of the agent moves it here, as a row
         // move of the user does (section 8.10 of the M6b design).
@@ -201,23 +204,28 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
     /// <summary>Follows an undo or a redo of the agent. With follow mode on, the undo of an agent delete selects its
     /// first item again, as the undo of a delete of the user does (decision D249). Other steps change no
     /// selection.</summary>
-    public void Stepped(string tool, string label)
+    /// <param name="tool"><c>undo</c> or <c>redo</c>. Call it right after the step.</param>
+    public void Stepped(string tool)
     {
-        if (On && tool == "undo" && deleted.TryGetValue(label, out var reference))
+        if (On && tool == "undo" && UndoneDelete() is { } reference)
             Show([reference], select: true);
     }
 
     /// <summary>
-    /// The first item of the agent delete with the label of an entry, when the edit view has the item again, else null.
-    /// The undo of the user selects it, as the undo of a delete of the user does (decision D249). This works also with
-    /// follow mode off, because the user asked for the undo. An item of a mission file gives null: the undo of a mission
-    /// edit of the user keeps the selection of the Mission tab, so the undo of an agent edit does too.
+    /// The first item of the agent delete that the last undo took back, when the edit view has the item again, else
+    /// null. The undo of the user selects it, as the undo of a delete of the user does (decision D249). This works also
+    /// with follow mode off, because the user asked for the undo. An item of a mission file gives null: the undo of a
+    /// mission edit of the user keeps the selection of the Mission tab, so the undo of an agent edit does too.
     /// </summary>
-    /// <param name="label">The label of the entry that the undo reversed.</param>
-    public SectionRef? DeletedItem(string label) =>
-        session != null && deleted.TryGetValue(label, out var reference) && MissionFileOf(reference) == null
-            ? SectionOf(reference)
-            : null;
+    /// <remarks>Call it right after the undo. The entry that the undo took back is then the top entry of the redo
+    /// stack (see <see cref="EditSession.RedoEntryId"/>).</remarks>
+    public SectionRef? DeletedItem() =>
+        UndoneDelete() is { } reference && MissionFileOf(reference) == null ? SectionOf(reference) : null;
+
+    /// <summary>The first item of the agent delete that the last undo took back, or null when that entry is not an
+    /// agent delete.</summary>
+    private string? UndoneDelete() =>
+        session?.RedoEntryId is { } entry && deleted.TryGetValue(entry, out var reference) ? reference : null;
 
     /// <summary>
     /// Shows the first item of an edit: in the Cutscene tab for a cutscene or an element of a cutscene, in the Mission

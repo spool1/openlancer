@@ -201,7 +201,7 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
     public override void Stepped(string tool, string label) => AfterChange(() =>
     {
         editor.Log.Add(ConsoleSeverity.Info, AgentController.Source, Sentence($"{(tool == "redo" ? "Redo" : "Undo")} {label}"));
-        editor.Follow.Stepped(tool, label);
+        editor.Follow.Stepped(tool);
     });
 
     /// <summary>The start of the Console entry of a fault in what the editor shows of an agent change.</summary>

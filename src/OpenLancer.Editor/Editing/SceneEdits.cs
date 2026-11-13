@@ -552,7 +552,7 @@ internal sealed class SceneEdits(EditorWindow window)
     {
         if (label == null)
             return;
-        var section = deleted.TryGetValue(label, out var own) ? own : window.AgentFollow.DeletedItem(label);
+        var section = deleted.TryGetValue(label, out var own) ? own : window.AgentFollow.DeletedItem();
         if (section != null && window.Session?.Edits.Get(section) != null)
             window.Scene.SelectWhenShown(section);
     }

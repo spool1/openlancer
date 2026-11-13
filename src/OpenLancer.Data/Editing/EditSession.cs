@@ -144,6 +144,17 @@ public sealed partial class EditSession : IDisposable
     /// redoes only an entry that it undid itself (decision D709 of the MCP1 design).</summary>
     public EditOrigin? RedoUndoneBy => history.RedoUndoneBy;
 
+    /// <summary>
+    /// The id of the entry that <see cref="Undo()"/> takes back, or null when there is nothing to undo. Each entry keeps
+    /// its id through undo and redo, and no other entry of the session gets it. So a caller can know an entry again
+    /// after an undo, also when two entries have one label.
+    /// </summary>
+    public long? UndoEntryId => history.UndoId;
+
+    /// <summary>The id of the entry that <see cref="Redo"/> puts back, or null when there is nothing to redo. After an
+    /// undo, it is the id of the entry that the undo took back (see <see cref="UndoEntryId"/>).</summary>
+    public long? RedoEntryId => history.RedoId;
+
     /// <summary>The agent entries since the last save, at the version of the history that it read.</summary>
     private (long Version, int Count, HashSet<SectionRef> Sections, HashSet<string> Cutscenes)? agentEdits;
 

@@ -219,6 +219,12 @@ internal sealed class EditHistory
     /// agent redoes only an entry that it undid itself (decision D709 of the MCP1 design).</summary>
     public EditOrigin? RedoUndoneBy => CanRedo ? redo[^1].UndoneBy : null;
 
+    /// <summary>The id of the top entry, or null when there is nothing to undo.</summary>
+    public long? UndoId => CanUndo ? undo[^1].Id : null;
+
+    /// <summary>The id of the top entry of the redo stack, or null when there is nothing to redo.</summary>
+    public long? RedoId => CanRedo ? redo[^1].Id : null;
+
     /// <summary>True when the top entry is not the entry of the last save.</summary>
     public bool IsDirty => TopId != savedId;
 

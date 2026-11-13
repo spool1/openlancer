@@ -146,8 +146,8 @@ public sealed class FollowModeTests
     }
 
     /// <summary>An undo of the user of an agent delete finds the first item of the delete, so the Scene selects it again
-    /// (decision D249). This works also with follow mode off, because the user asked for the undo. A label of an entry
-    /// of the user is not an agent delete.</summary>
+    /// (decision D249). This works also with follow mode off, because the user asked for the undo. Before the undo and
+    /// after the redo, no undone entry is an agent delete.</summary>
     [Fact]
     public void AnUndoOfTheUserFindsTheItemOfAnAgentDelete()
     {
@@ -156,13 +156,13 @@ public sealed class FollowModeTests
         editor.Follow.Set(false);
 
         Ok(host, "delete_items", """{ "refs": ["obj:Li01_dock"], "confirm": true }""");
-        var label = session.UndoLabel!;
-        Assert.Null(editor.Follow.DeletedItem(label));
+        Assert.Null(editor.Follow.DeletedItem());
         session.Undo();
 
-        Assert.Equal(Dock, editor.Follow.DeletedItem(label));
-        Assert.Null(editor.Follow.DeletedItem(label.Replace("Agent: ", "")));
+        Assert.Equal(Dock, editor.Follow.DeletedItem());
         Assert.Empty(editor.FollowView.Shown);
+        session.Redo();
+        Assert.Null(editor.Follow.DeletedItem());
     }
 
     /// <summary>A rename keeps the selection: a selected section gets its new reference.</summary>
@@ -481,11 +481,10 @@ public sealed class FollowModeTests
         editor.Follow.Set(false);
 
         Ok(host, "mission_edit", MissionEdit(RemoveEnd, confirm: true));
-        var label = m.Session.UndoLabel!;
         m.Session.Undo();
 
         Assert.NotNull(m.Session.Get(new SectionRef(MissionEdits.Script, new SectionIdentity("Trigger", "ol_end"))));
-        Assert.Null(editor.Follow.DeletedItem(label));
+        Assert.Null(editor.Follow.DeletedItem());
     }
 
     /// <summary>With follow mode off, an agent mission edit changes nothing of the view and the selection.</summary>
@@ -622,13 +621,12 @@ public sealed class FollowModeTests
         Assert.Equal(template, view.Selection);
         Ok(host, "mission_edit", MissionEdit($$"""{ "kind": "remove_section", "section": "{{build}}" }""", confirm: true));
         Assert.Equal(template, view.Selection);
-        var label = m.Session.UndoLabel!;
         Ok(host, "undo");
 
         Assert.Equal(template, view.Selection);
         Assert.Empty(view.MissionShown);
         Assert.Empty(view.Shown);
-        Assert.Null(editor.Follow.DeletedItem(label));
+        Assert.Null(editor.Follow.DeletedItem());
     }
 
     /// <summary>A trigger that the Mission tab cannot show, for example before the mission run reads its script, shows
@@ -785,6 +783,27 @@ public sealed class FollowModeTests
         var restored = ThnSessions.Event(session, 2);
         Assert.Equal((ThnSessions.ScriptPath, (object?)restored, true), view.CutsceneShown[^1]);
         Assert.Equal(restored, view.Selection);
+    }
+
+    /// <summary>Two agent deletes of events have one label, "Agent: Delete event". Follow mode keeps each delete by its
+    /// entry of the history, so each agent undo selects the event of its own delete again: first event 2, then event
+    /// 5.</summary>
+    [Fact]
+    public void TwoAgentDeletesWithOneLabelEachSelectTheirEventAtTheUndo()
+    {
+        var (ws, session, editor, host) = Cutscenes();
+        using var _ = ws;
+        var view = editor.FollowView;
+
+        Ok(host, "delete_items", $$"""{ "refs": [{{Json(Script + "#event/5")}}] }""");
+        Ok(host, "delete_items", $$"""{ "refs": [{{Json(Script + "#event/2")}}] }""");
+        Assert.Equal("Agent: Delete event", session.UndoLabel);
+
+        Ok(host, "undo");
+        Assert.Equal(ThnSessions.Event(session, 2), view.Selection);
+        Ok(host, "undo");
+        Assert.Equal(ThnSessions.Event(session, 5), view.Selection);
+        Assert.Equal((ThnSessions.ScriptPath, (object?)ThnSessions.Event(session, 5), true), view.CutsceneShown[^1]);
     }
 
     /// <summary>When the Cutscene tab cannot open the script, for example while the game data loads, a delete clears the
