@@ -12,6 +12,7 @@ using OpenLancer.Data.Strings;
 using OpenLancer.Data.Thn;
 using OpenLancer.Runtime.Strings;
 using OpenLancer.Runtime.Thn;
+using OpenLancer.Studio;
 
 namespace OpenLancer.Editor.Mods;
 
@@ -45,8 +46,9 @@ internal sealed record ModCheckResult(string Folder, DateTime Time, string Conte
 /// <summary>
 /// The checks of the Mods window (decision D572 of the M11c design). A check is <see cref="ModExport.Prepare"/> for each
 /// target of the mod, without a write and without compression. It records the result of each target in the publish
-/// history. The checks run on a worker thread, one at a time. A cancel drops the result of a running check and the
-/// checks that wait.
+/// history. The checks run one at a time on a thread of their own (<see cref="OwnThread"/>), because a check reads many
+/// files and waits for the lock of the history. A cancel drops the result of a running check and the checks that
+/// wait.
 /// </summary>
 /// <remarks>Each member except <see cref="Run"/> runs on the UI thread. Call <see cref="Update"/> once each
 /// frame.</remarks>
@@ -70,7 +72,7 @@ internal sealed class ModChecks(Func<ModCheckRequest, ModCheckResult> run)
     public bool IsChecking(string folder) =>
         Running is { } running && GameFolders.Same(running, folder) || waiting.Any(r => GameFolders.Same(r.Folder, folder));
 
-    /// <summary>True while a check of the mod waits or runs on a worker thread, also a check whose result a cancel
+    /// <summary>True while a check of the mod waits or runs on its thread, also a check whose result a cancel
     /// dropped. A check that runs writes the publish history of the mod, so a rename of the mod waits for it.</summary>
     public bool IsBusyWith(string folder) =>
         running is { } current && GameFolders.Same(current.Request.Folder, folder) ||
@@ -117,12 +119,12 @@ internal sealed class ModChecks(Func<ModCheckRequest, ModCheckResult> run)
         {
             var next = waiting[0];
             waiting.RemoveAt(0);
-            running = (next, Task.Run(() => run(next)));
+            running = (next, OwnThread.Run(() => run(next)));
         }
     }
 
     /// <summary>The check of a mod: the prepare of an export of each target, the texts of the Preview tab, and the
-    /// record of the result of each target in the publish history. It runs on a worker thread.</summary>
+    /// record of the result of each target in the publish history. It runs on the thread of the check.</summary>
     public static ModCheckResult Run(ModCheckRequest request) =>
         Run(request, DllStringResourceWriter.Instance, ThornEvaluator.Instance);
 
