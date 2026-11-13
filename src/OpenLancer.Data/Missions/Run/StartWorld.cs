@@ -297,7 +297,15 @@ internal static class StartWorld
         /// arrival.</summary>
         public bool IdleSinceArrival => CancelledBefore >= 0 && (Orders == null || Cancelled);
 
-        public bool Destroyed { get; set; }
+        /// <summary>The names that the kept destroy lines give for the object: its name, its members, or a label. A destroy
+        /// line can name one ship of a formation. The other ships of the formation then stay in the world.</summary>
+        public HashSet<string> Lost { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The members that no destroy line names.</summary>
+        public IEnumerable<string> LiveMembers => Members.Where(m => !Lost.Contains(m));
+
+        /// <summary>True when a destroy line names the object, or when the destroy lines name each of its members.</summary>
+        public bool Destroyed => Lost.Contains(Name) || Members.Count > 0 && Members.All(Lost.Contains);
     }
 
     private sealed class Builder(MissionIndex index, StartReplay replay, IReadOnlyList<bool> keep, StartAnchor anchor)
@@ -358,12 +366,13 @@ internal static class StartWorld
         private bool Combat(IEnumerable<Unit> companions)
         {
             var made = spawned.Where(p => !p.Key.Removed && !p.Value.Destroyed).Select(p => p.Value).Distinct().ToList();
+            // Only the members that live count. A formation that lost one ship can still fight with its other ships.
             if (made.Any(u => u.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&
-                              u.Members.Append(u.Name).Any(facts.Hostile.Contains)))
+                              u.LiveMembers.Append(u.Name).Any(facts.Hostile.Contains)))
                 return true;
             var mates = companions.ToHashSet();
             // By the members: the attitude lines name ships, and a name of a formation or a label stands for its ships.
-            var watched = made.Where(u => !mates.Contains(u)).SelectMany(u => u.Members)
+            var watched = made.Where(u => !mates.Contains(u)).SelectMany(u => u.LiveMembers)
                 .Where(m => !facts.Friendly.Contains(m)).ToHashSet(StringComparer.OrdinalIgnoreCase);
             return replay.ActiveSet.Any(t => t.Condition is { Name.Group: CombatGroup } condition &&
                                              Names(condition).Any(n => Members(n).Overlaps(watched)));
@@ -488,8 +497,9 @@ internal static class StartWorld
                 }
                 else if (entry.Is("Act_Destroy"))
                 {
-                    foreach (var unit in UnitsOf(name))
-                        unit.Destroyed = true;
+                    var named = Members(name).Append(name.Trim()).ToList();
+                    foreach (var unit in UnitsOf(name).ToList())
+                        unit.Lost.UnionWith(named);
                 }
             }
         }

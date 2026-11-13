@@ -253,6 +253,23 @@ public sealed class StartWorldTests
         Assert.Contains("Act_RelocateShip = ol_f1, 20000, 0, 20000", lines);
     }
 
+    /// <summary>A destroy line of one ship of a formation does not destroy the formation. The other ship lives, so the
+    /// formation of the first system is still left out, with each line that names it. A destroy of each ship destroys
+    /// the formation, so the setup does not make it.</summary>
+    [Fact]
+    public void AFormationThatLostOneShipStaysInItsSystem()
+    {
+        var partial = Plan(Script(a: "Act_Destroy = ol_f1, SILENT"));
+
+        Assert.Contains(partial.LeftOut, l => l is { Object: "ol_form_a", Kind: StartObjectKind.Formation });
+        Assert.DoesNotContain(WorldLines(partial), l => l.Contains("ol_form_a") || l.Contains("ol_f1"));
+
+        var both = Plan(Script(a: "Act_Destroy = ol_f1, SILENT\nAct_Destroy = ol_f2, SILENT"));
+
+        Assert.DoesNotContain(both.LeftOut, l => l.Object == "ol_form_a");
+        Assert.DoesNotContain(WorldLines(both), l => l.Contains("ol_form_a"));
+    }
+
     /// <summary>The jumper flag at the time of the jump counts. A line that turns the flag off after the jump does not
     /// bring the ship back. A line that turns it off before the jump keeps the ship in the first system.
     /// <c>Act_Jumper</c> of a label sets each member.</summary>

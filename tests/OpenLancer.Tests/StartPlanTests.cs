@@ -1324,6 +1324,67 @@ public sealed class StartPlanTests
         Assert.Equal(combat, plan.Combat);
     }
 
+    /// <summary>A formation and a solar of the start system for <see cref="OnlyAShipOrAFormationIsAHostileObject"/>.</summary>
+    private const string HostileRecords = """
+        [MsnShip]
+        nickname = ol_f3
+        position = 0, 0, 0
+
+        [MsnShip]
+        nickname = ol_f4
+        position = 0, 0, 0
+
+        [MsnFormation]
+        nickname = ol_form_b
+        position = 20000, 0, 20000
+        ship = ol_f3
+        ship = ol_f4
+
+        [MsnSolar]
+        nickname = ol_depot
+        position = 12000, 0, 12000
+        """;
+
+    /// <summary>The hostile part of the combat rule counts only a ship or a formation. A hostile solar without a watcher
+    /// does not make a combat start. A hostile formation makes a combat start. It stays a combat start after the path
+    /// destroys one of its ships, because the setup makes the formation and the other ship lives. When the path destroys
+    /// both ships, or the formation, the setup does not make the formation, and the start is calm.</summary>
+    [Theory]
+    [InlineData("Act_SpawnSolar = ol_depot\nAct_SetVibe = ol_depot, Player, REP_HOSTILE_THRESHOLD", true, false)]
+    [InlineData("Act_SpawnFormation = ol_form_b\nAct_SetVibe = ol_form_b, Player, REP_HOSTILE_THRESHOLD", true, true)]
+    [InlineData("Act_SpawnFormation = ol_form_b\nAct_SetVibe = ol_form_b, Player, REP_HOSTILE_THRESHOLD\n" +
+                "Act_Destroy = ol_f3, SILENT", true, true)]
+    [InlineData("Act_SpawnFormation = ol_form_b\nAct_SetVibe = ol_form_b, Player, REP_HOSTILE_THRESHOLD\n" +
+                "Act_Destroy = ol_f3, SILENT\nAct_Destroy = ol_f4, SILENT", false, false)]
+    [InlineData("Act_SpawnFormation = ol_form_b\nAct_SetVibe = ol_form_b, Player, REP_HOSTILE_THRESHOLD\n" +
+                "Act_Destroy = ol_form_b, SILENT", false, false)]
+    public void OnlyAShipOrAFormationIsAHostileObject(string jump, bool made, bool combat)
+    {
+        var plan = WorldPlan(StartWorldTests.Script(jump: jump, records: HostileRecords));
+
+        Assert.True(plan.CanStart, plan.Reason);
+        Assert.Equal("ol_sys_b", plan.StartSystem);
+        Assert.Equal(made, plan.Setup[1].Lines.Any(l => l.Key is "Act_SpawnSolar" or "Act_SpawnFormation"));
+        Assert.Equal(combat, plan.Combat);
+    }
+
+    /// <summary>A watcher of the formation tells a fight while one of its ships lives. After the path destroys both
+    /// ships, the watcher names no object of the world.</summary>
+    [Theory]
+    [InlineData("Act_Destroy = ol_f3, SILENT", true)]
+    [InlineData("Act_Destroy = ol_f3, SILENT\nAct_Destroy = ol_f4, SILENT", false)]
+    public void AWatcherOfAFormationThatLostOneShipMakesACombatStart(string destroy, bool combat)
+    {
+        var text = StartWorldTests.Script(jump: $"Act_SpawnFormation = ol_form_b\n{destroy}\nAct_ActTrig = t_watch",
+            records: HostileRecords, triggers: "[Trigger]\nnickname = t_watch\nCnd_Destroyed = ol_form_b\n");
+
+        var plan = WorldPlan(text);
+
+        Assert.True(plan.CanStart, plan.Reason);
+        Assert.Contains("t_watch", plan.ActiveSet);
+        Assert.Equal(combat, plan.Combat);
+    }
+
     /// <summary>The player is docked at a base start, so it is never a combat start. A start at the Scene camera has no
     /// start system before the play, so the page cannot tell. A mission start and a checkpoint start make no objects
     /// before their triggers run. The approximate start at the kill of the plan script watches two ships of its world.</summary>
