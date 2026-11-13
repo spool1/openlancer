@@ -17,6 +17,7 @@ using OpenLancer.Editor.Dialogs;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Play;
+using OpenLancer.Studio;
 using Xunit;
 using static OpenLancer.Tests.PlayGame;
 
@@ -470,6 +471,25 @@ public sealed class GamePlayTests : IAsyncDisposable
     public void TheRuleOfATestPlay(bool server, bool killed, int code, int seconds, bool counts)
     {
         Assert.Equal(counts, GamePlay.IsTestPlay(server, killed, code, TimeSpan.FromSeconds(seconds)));
+    }
+
+    /// <summary>The worker of Play and the check after an exit wait until each earlier check ended, because a check holds
+    /// the lock of the play copy. A failed check does not end the wait early, and it does not stop the next work.</summary>
+    [Fact]
+    public async Task TheWaitForEarlierChecksWaitsForEachCheckAlsoAFailedOne()
+    {
+        var failed = new TaskCompletionSource();
+        var running = new TaskCompletionSource();
+        var wait = OwnThread.Run(() => GamePlay.WaitFor([failed.Task, running.Task]));
+
+        failed.SetException(new IOException("The check failed."));
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+        var early = wait.IsCompleted;
+        running.SetResult();
+        await wait.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+        Assert.False(early);
+        Assert.True(wait.IsCompletedSuccessfully);
     }
 
     [Theory]

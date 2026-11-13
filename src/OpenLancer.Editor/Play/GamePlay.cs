@@ -1093,7 +1093,7 @@ internal sealed class GamePlay : IDisposable, IGameStop
 
     /// <summary>Waits on the thread of a worker until each earlier check ended, also a check that failed. The UI thread
     /// gives the reason of a failed check when it takes the check.</summary>
-    private static void WaitFor(Task[] before)
+    internal static void WaitFor(Task[] before)
     {
         try
         {
