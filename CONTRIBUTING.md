@@ -57,6 +57,8 @@ The test of the issue forms, `tools/test_issue_forms.py`, needs PyYAML (`python 
 
 The process tests of the unit tests start a small stub program, `tests/OpenLancer.TestStub`, in place of a game. The build of the unit tests puts the stub next to the tests.
 
+The unit tests run in parallel on threads of the .NET thread pool. A test that blocks holds its thread, and on a busy computer the work that the test waits for then cannot get a thread. So a test awaits a task, for example with `WaitAsync` and the cancel token of the test. It does not block on a task, and it does not sleep in a wait loop. Editor work that blocks, for example a check, a process read or an export, gets a thread of its own through `OwnThread`.
+
 The retail tests in the data tests need your own game data. CI has no game data, so the retail tests skip in CI. To run them:
 
 1. Extract the game data from your own retail disc of the game.
