@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using LibreLancer;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Runtime.Play;
+using OpenLancer.Studio;
 
 namespace OpenLancer.Editor.Play;
 

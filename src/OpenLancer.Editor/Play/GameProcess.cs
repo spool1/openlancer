@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using LibreLancer;
+using OpenLancer.Studio;
 
 namespace OpenLancer.Editor.Play;
 
