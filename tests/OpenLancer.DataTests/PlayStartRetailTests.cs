@@ -12,7 +12,11 @@ using LibreLancer.Data.Schema.Save;
 using LibreLancer.Data.Schema.Solar;
 using LibreLancer.Resources;
 using LibreLancer.Server;
+using OpenLancer.Data.Editing;
+using OpenLancer.Data.Missions;
+using OpenLancer.Data.Missions.Run;
 using OpenLancer.Data.Mods;
+using OpenLancer.Editor.Play;
 using OpenLancer.Data.Overlay;
 using OpenLancer.Data.Validation;
 using OpenLancer.Runtime.Play;
@@ -30,8 +34,11 @@ namespace OpenLancer.DataTests;
 /// The new character has its home at Planet Manhattan in Li01. The starts of the tests are in Br01 and at Planet New
 /// London in Br01. So a save that keeps the home system or the home base of the new character fails the tests.
 /// </remarks>
-public sealed class PlayStartRetailTests(ITestOutputHelper output)
+public sealed class PlayStartRetailTests(ITestOutputHelper output) : IDisposable
 {
+    /// <summary>The folder of the start saves of the tests.</summary>
+    private readonly string folder = Path.Combine(Path.GetTempPath(), "openlancer-tests", Guid.NewGuid().ToString("N"));
+
     /// <summary>The limit from the start of the server to the packet. The first load of a system is the slow part.</summary>
     private static readonly TimeSpan StartLimit = TimeSpan.FromSeconds(30);
 
@@ -46,7 +53,17 @@ public sealed class PlayStartRetailTests(ITestOutputHelper output)
     /// <summary>The new-character data, which <c>GameServer.NewCharacter</c> reads.</summary>
     private const string NewCharacterFile = @"DATA\CHARACTERS\newcharacter.ini";
 
+    /// <summary>A ship part of the retail data: the ship of <c>le_package</c>, an engine and two batteries.</summary>
+    private static readonly StartSaveShip KnownShip =
+        new("li_elite", [("ge_le_engine_01", "internal")], [("ge_s_battery_01", 2)]);
+
     static PlayStartRetailTests() => AppHandler.ConsoleInit(silent: true);
+
+    public void Dispose()
+    {
+        if (Directory.Exists(folder))
+            Directory.Delete(folder, true);
+    }
 
     /// <summary>(1) A start in space with the package of a new multiplayer character.</summary>
     [Fact]
@@ -271,6 +288,135 @@ public sealed class PlayStartRetailTests(ITestOutputHelper output)
         Assert.Equal("The new-character package 'ge_fighter' names the ship 'no_such_ship', which is not in the game " +
                      "data.", PlaySave.Check(items, InBr01, null));
         Assert.Null(PlaySave.Check(items, InBr01, "le_package"));
+        // A start save with a ship gives the save that ship, so it does not need the ship of the new character either.
+        Assert.Equal("The new-character package 'ge_fighter' names the ship 'no_such_ship', which is not in the game " +
+                     "data.", PlaySave.Check(items, StartSave(null), null));
+        Assert.Null(PlaySave.Check(items, StartSave(KnownShip), null));
+    }
+
+    /// <summary>
+    /// (9) The ship part of a start save (issue #48): for each ship package of the retail data, the save from the start
+    /// save lines of <see cref="PlayShips.ShipPart"/> has the same ship, equipment and cargo as the save from the
+    /// package. So the editor and the game use one addon rule, and the start save gives the ship of the package.
+    /// </summary>
+    [Fact]
+    public void TheShipPartOfEachRetailPackageGivesTheSameSaveAsThePackage()
+    {
+        var baseFolder = GameDataPaths.RequireBase();
+        var items = RetailGame.Instance.Data.Items;
+        using var workspace = new RetailWorkspace(baseFolder, "play-ship-part");
+        var edits = workspace.Open();
+        using var headless = new HeadlessServer(RetailGame.Instance.Data);
+        var withoutShip = StartSave(null);
+        var packages = Packages(edits);
+        var (equip, cargo) = (0, 0);
+
+        foreach (var package in packages)
+        {
+            var ship = PlayShips.ShipPart(edits, package, out var problem);
+            Assert.True(ship != null, $"{package}: {problem}");
+            Assert.NotNull(items.GetShipPackage(FLHash.CreateID(package)));
+            var start = StartSave(ship);
+            Assert.Null(PlaySave.Check(items, start, null));
+
+            var fromStartSave = PlaySave.Create(headless.Server, start, null).Player!;
+            var fromPackage = PlaySave.Create(headless.Server, withoutShip, package).Player!;
+
+            Assert.Equal(Lines(fromPackage), Lines(fromStartSave));
+            (equip, cargo) = (equip + fromPackage.Equip.Count, cargo + fromPackage.Cargo.Count);
+        }
+
+        output.WriteLine($"{packages.Count} ship packages, {equip} equip lines and {cargo} cargo lines.");
+        Assert.Equal(31, packages.Count);
+        Assert.True(equip > packages.Count, $"The packages give only {equip} equip lines.");
+    }
+
+    /// <summary>(9) No retail package puts a good into the hold. So a temp mod gives <c>le_package</c> 5 nanobots, and
+    /// a battery with the amount 1, which the combinable rule puts into the hold. The save from the start save still
+    /// has the same ship, equipment and cargo as the save from the package.</summary>
+    [Fact]
+    public void TheShipPartOfAPackageWithGoodsInTheHoldGivesTheSameSaveAsThePackage()
+    {
+        var baseFolder = GameDataPaths.RequireBase();
+        var addons = RetailGame.Instance.Data.Items.GetShipPackage(FLHash.CreateID("le_package"))!.Addons
+            .Select(a => $"addon = {a.Equipment.Nickname}, {a.Hardpoint}, {a.Amount}");
+        using var workspace = new RetailWorkspace(baseFolder, "play-ship-hold");
+        var overlay = Patched(workspace, @"DATA\EQUIPMENT\goods.ini",
+            $"[Good]\r\nnickname = le_package\r\n{string.Join("\r\n", addons)}\r\n" +
+            "addon = ge_s_repair_01, internal, 5\r\naddon = ge_s_battery_01, internal, 1\r\n");
+        var data = Load(overlay);
+        // The convex shapes go after the server, which uses them.
+        using var shapes = data.Resources.ConvexCollection;
+        using var headless = new HeadlessServer(data);
+        var ship = PlayShips.ShipPart(workspace.Open(), "le_package", out var problem);
+        Assert.True(ship != null, problem);
+
+        var fromStartSave = PlaySave.Create(headless.Server, StartSave(ship), null).Player!;
+        var fromPackage = PlaySave.Create(headless.Server, StartSave(null), "le_package").Player!;
+
+        output.WriteLine(Lines(fromStartSave));
+        Assert.Equal([("ge_s_repair_01", 5)], ship.Cargo);
+        Assert.Contains(("ge_s_battery_01", "internal"), ship.Equip);
+        Assert.Equal(Lines(fromPackage), Lines(fromStartSave));
+        Assert.Equal([(FLHash.CreateID("ge_s_repair_01"), 5), (FLHash.CreateID("ge_s_battery_01"), 1)],
+            fromStartSave.Cargo.Select(c => ((uint)c.Item, c.Count)));
+        Assert.DoesNotContain(fromStartSave.Equip, e => e.Item == new HashValue("ge_s_battery_01"));
+    }
+
+    /// <summary>(9) The ship of a start save wins over the ship package of the play. The check does not read the package
+    /// then, because the save does not use it.</summary>
+    [Fact]
+    public void ThePackageOfThePlayDoesNotChangeTheShipOfAStartSave()
+    {
+        var baseFolder = GameDataPaths.RequireBase();
+        var items = RetailGame.Instance.Data.Items;
+        using var workspace = new RetailWorkspace(baseFolder, "play-ship-wins");
+        var edits = workspace.Open();
+        using var headless = new HeadlessServer(RetailGame.Instance.Data);
+        var ship = PlayShips.ShipPart(edits, "le_package", out _)!;
+        var other = Packages(edits).First(p => PlayShips.ShipPart(edits, p, out _)!.Ship != ship.Ship);
+        var start = StartSave(ship);
+
+        var alone = PlaySave.Create(headless.Server, start, null).Player!;
+        var withPackage = PlaySave.Create(headless.Server, start, other).Player!;
+
+        output.WriteLine($"The start save has the ship {ship.Ship}. The other package is {other}.");
+        Assert.Equal(FLHash.CreateID("li_elite"), (uint)withPackage.ShipArchetype);
+        Assert.Equal(Lines(alone), Lines(withPackage));
+        Assert.Null(PlaySave.Check(items, start, other));
+        Assert.Null(PlaySave.Check(items, start, "no_such_package"));
+    }
+
+    /// <summary>(9) <see cref="PlaySave.Check"/> refuses a start save whose ship, equipment or cargo the game data does
+    /// not have, and <see cref="PlaySave.Create"/> throws with the same reason. The play then stops with the data exit
+    /// code.</summary>
+    [Fact]
+    public void CheckRefusesAStartSaveShipOrEquipmentThatTheGameDataDoesNotHave()
+    {
+        GameDataPaths.RequireBase();
+        var items = RetailGame.Instance.Data.Items;
+        using var headless = new HeadlessServer(RetailGame.Instance.Data);
+        (StartSaveShip Ship, string Reason)[] cases =
+        [
+            (KnownShip with { Ship = "ol_no_ship" },
+                "The start save names the ship 'ol_no_ship', which is not in the game data. The game cannot give the " +
+                "player a ship."),
+            (KnownShip with { Equip = [("ol_no_gun", "HpWeapon01")] },
+                "The start save names the equipment 'ol_no_gun', which is not in the game data. The game cannot give it " +
+                "to the player."),
+            (KnownShip with { Cargo = [("ol_no_goods", 3)] },
+                "The start save names the equipment 'ol_no_goods', which is not in the game data. The game cannot give " +
+                "it to the player."),
+        ];
+
+        foreach (var (ship, reason) in cases)
+        {
+            var start = StartSave(ship);
+            Assert.Equal(reason, PlaySave.Check(items, start, null));
+            var stop = Assert.Throws<ArgumentException>(() => PlaySave.Create(headless.Server, start, null));
+            Assert.Equal(reason, stop.Message);
+        }
+        Assert.Null(PlaySave.Check(items, StartSave(KnownShip), null));
     }
 
     /// <summary>(7) The save has no story, so the play starts in free roam.</summary>
@@ -324,6 +470,25 @@ public sealed class PlayStartRetailTests(ITestOutputHelper output)
         output.WriteLine($"{packet} after {clock.ElapsedMilliseconds} ms.");
         return save;
     }
+
+    /// <summary>A start save of the M02 mission start at Planet New London, with a ship part or without one.</summary>
+    private PlayStart.FromSave StartSave(StartSaveShip? ship)
+    {
+        var analysis = RetailMissions.Slot("M02");
+        var plan = StartPlan.Make(analysis.Index, analysis.Script.Slot, MissionStartPoint.MissionStart);
+        var file = Path.Combine(Directory.CreateDirectory(folder).FullName, $"{Guid.NewGuid():N}.fl");
+        File.WriteAllText(file, StartSaveText.OpenLancer(plan, StartSavePlace.AtBase("br01", NewLondon), DateTime.Now, ship));
+        return new PlayStart.FromSave(file, null);
+    }
+
+    /// <summary>The nicknames of the ship packages of the edit view, in load order.</summary>
+    private static List<string> Packages(EditSession edits) =>
+        edits.List(ItemFileKind.Goods).Where(g => PlayShips.IsPackage(g, edits.Get(g)!)).Select(g => g.Id.Key!).ToList();
+
+    /// <summary>The ship, the equip lines and the cargo lines of a save, as text.</summary>
+    private static string Lines(SavePlayer player) =>
+        $"ship {(uint)player.ShipArchetype}; equip {string.Join(", ", player.Equip.Select(e => $"{(uint)e.Item} {e.Hardpoint}"))}" +
+        $"; cargo {string.Join(", ", player.Cargo.Select(c => $"{(uint)c.Item} x{c.Count}"))}";
 
     /// <summary>The play view of the temp mod of <paramref name="workspace"/> with one patch file.</summary>
     /// <param name="path">The install path of the file that the patch changes.</param>
