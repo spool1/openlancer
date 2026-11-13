@@ -238,7 +238,7 @@
     },
     "duplicate_items": {
       "title": "Copy items",
-      "description": "Copies items of a system with their children, mission items and cutscene events. Each copy gets the next free nickname. The tool makes one Undo step. The result gives the references of the copies.",
+      "description": "Copies items of a system with their children, mission items and cutscene events. Each copy of an item of a system and each mission copy gets the next free nickname. The copies of cutscene events start at the end of the events. The tool makes one Undo step. The result gives the references of the copies.",
       "fields": {
         "refs": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. It also copies triggers and other mission items: trg: and sec: references. It also copies cutscene events: thn: references with #event/. studio_status gives the most items of one call.",
         "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position, a mission copy and a copy of a cutscene event do not move, and the result warns about them. Without it, each copy is at the place of its item.",

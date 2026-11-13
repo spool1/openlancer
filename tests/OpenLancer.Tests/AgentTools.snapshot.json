@@ -9334,7 +9334,7 @@
     {
       "name": "duplicate_items",
       "title": "Copy items",
-      "description": "Copies items of a system with their children, mission items and cutscene events. Each copy gets the next free nickname. The tool makes one Undo step. The result gives the references of the copies.",
+      "description": "Copies items of a system with their children, mission items and cutscene events. Each copy of an item of a system and each mission copy gets the next free nickname. The copies of cutscene events start at the end of the events. The tool makes one Undo step. The result gives the references of the copies.",
       "inputSchema": {
         "type": "object",
         "properties": {

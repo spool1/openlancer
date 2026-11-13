@@ -529,7 +529,7 @@ A cutscene that the editor cannot change gives `refused` with the reason. An exa
 - A SCENE gets the ambient color 0, 0, 0. No retail script has two SCENE entities, so a second SCENE gives `refused`.
 - A MOTION_PATH gets no path. Give the keys in `pathprops.path_data` with `fields`.
 
-`template` is the costume of a DEFORMABLE, the sound of a SOUND or the effect of a PSYS. `list_values` with the list `costume` gives the costumes. A COMPOUND takes the nickname of an item of its category in `userprops.category`, for example a solar archetype for `"Solar"` or a ship for `"Spaceship"`. So a COMPOUND with a template needs `userprops.category` too. The tool does not write a default category, because the category depends on the template. A template with a character outside ASCII, or with the character U+0000, gives `invalid_value`.
+`template` is the costume of a DEFORMABLE, the sound of a SOUND or the effect of a PSYS. `list_values` with the list `costume` gives the costumes. A COMPOUND takes as its template the nickname of an item of its category. For example, it takes a solar archetype when `userprops.category` is `"Solar"`, and a ship when it is `"Spaceship"`. So a COMPOUND with a template needs `userprops.category` too. The tool does not write a default category, because the category depends on the template. A template with a character outside ASCII, or with the character U+0000, gives `invalid_value`.
 
 The tool adds a DEFORMABLE without a template and without `userprops.Actor`, and a COMPOUND with a template and no category. The result gives the error in `new_problems`, and the save stops until you correct it. The checks of a call do not read the game data. So a template that the game data does not have is not an error of the call. The save validation of the editor and `check` with a target report it.
 
@@ -551,7 +551,7 @@ The new event gets the usual values of its type, as **Add event** gives them. Th
 
 An event reference is `thn:<install path>#event/<index>`. The index is the place of the event in the event list of the script, from 0. An add, a delete and a reorder of an event can change the index of the events after it. So each row of `events` can also give `expect_type` and `expect_time`: the type and the time that the agent read.
 
-When the event at the index has another type or time, the call gives `stale_revision` with the detail `RowChanged`, and nothing changes. The agent then reads the cutscene again with `get_cutscene`. With the guards, a replay of the audit log on a copy of the profile changes the same events.
+When the event at the index has another type or time, the call gives `stale_revision` with the detail `RowChanged`, and nothing changes. The message gives the type and the time of the event now. The agent then reads the cutscene again with `get_cutscene`. With the guards, a replay of the audit log on a copy of the profile changes the same events.
 
 The result gives each new and changed item as it is after the call. So an event reference in `adds` or `changes` has the index after the call. A deleted event has its index before the call, because the script does not have the event after the call. A new script is one add, and `select` names the last new item. Each step of `edit_batch` gives its references as they are after that step.
 
