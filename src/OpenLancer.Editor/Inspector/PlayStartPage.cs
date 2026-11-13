@@ -274,7 +274,7 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
             EditorTheme.PushMenuColors();
             if (ImGui.Selectable($"Suggested: {model.SuggestedText}", place == StartPlaceChoice.Suggested))
             {
-                plays.SetPlayStart(script, PlayStartSetting.Of(model.Setting.Start, StartPlaceChoice.Suggested, null));
+                plays.SetPlayStart(script, model.Setting.WithPlace(StartPlaceChoice.Suggested, null));
             }
 
             if (ImGui.Selectable("At base...", place == StartPlaceChoice.Base))
@@ -284,7 +284,7 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
 
             if (ImGui.Selectable("At the Scene camera", place == StartPlaceChoice.Camera))
             {
-                plays.SetPlayStart(script, PlayStartSetting.Of(model.Setting.Start, StartPlaceChoice.Camera, null));
+                plays.SetPlayStart(script, model.Setting.WithPlace(StartPlaceChoice.Camera, null));
             }
 
             EditorTheme.PopMenuColors();
@@ -304,7 +304,7 @@ internal sealed class PlayStartPage(EditorWindow window, PropertyGrid grid) : ID
             none: false, ObjectKinds.OfList("base"));
         if (picked is { Length: > 0 })
         {
-            plays.SetPlayStart(script, PlayStartSetting.Of(model.Setting.Start, StartPlaceChoice.Base, picked));
+            plays.SetPlayStart(script, model.Setting.WithPlace(StartPlaceChoice.Base, picked));
         }
     }
 

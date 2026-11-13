@@ -514,7 +514,7 @@ public sealed class MissionPlayTests : IDisposable
         Assert.Empty(read.PlayStarts[profile]);
         Assert.Equal((StartPlaceChoice.Suggested, (string?)null), new PlayStartSetting("", "unknown").PlaceChoice);
         Assert.Equal(new PlayStartSetting("", "camera"),
-            PlayStartSetting.Of(MissionStartPoint.MissionStart, StartPlaceChoice.Camera, null));
+            PlayStartSetting.Default.WithPlace(StartPlaceChoice.Camera, null));
     }
 
     /// <summary>The play start of a mission is an item of the Mission tab: the toolbar chip selects it, and the

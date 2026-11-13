@@ -36,14 +36,16 @@ internal sealed record LinkedGame(string Path, DateTime LinkedUtc, string LastNa
 /// <param name="Trigger">The nickname of the trigger of the start, or an empty text for the mission start.</param>
 /// <param name="Place">The start place: <c>suggested</c>, <c>camera</c>, or <c>base:</c> with the nickname of a base, as
 /// the agent tools write it.</param>
-internal sealed record PlayStartSetting(string Trigger, string Place)
+/// <param name="Ship">The ship package of the field "Ship" of the Play start page (issue #48), or null for the ship of
+/// the profile. A settings file of an earlier version has no such value, so it gives null.</param>
+internal sealed record PlayStartSetting(
+    string Trigger,
+    string Place,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Ship = null)
 {
-    /// <summary>The play start of a script without a setting: the mission start at the suggested place.</summary>
+    /// <summary>The play start of a script without a setting: the mission start at the suggested place with the ship of
+    /// the profile.</summary>
     public static readonly PlayStartSetting Default = new("", RunJson.SuggestedPlace);
-
-    /// <summary>The setting of a start and a place.</summary>
-    public static PlayStartSetting Of(MissionStartPoint start, StartPlaceChoice place, string? dock) =>
-        new(start.Trigger ?? "", RunJson.PlaceText(place, dock));
 
     /// <summary>The start of the setting.</summary>
     [JsonIgnore]
@@ -54,6 +56,25 @@ internal sealed record PlayStartSetting(string Trigger, string Place)
     [JsonIgnore]
     public (StartPlaceChoice Place, string? Base) PlaceChoice =>
         RunJson.ParsePlace(Place) ?? (StartPlaceChoice.Suggested, null);
+
+    /// <summary>The ship package of the field "Ship", or null for the ship of the profile. A blank text from a hand edit
+    /// of the settings file gives null.</summary>
+    [JsonIgnore]
+    public string? ShipPackage => string.IsNullOrWhiteSpace(Ship) ? null : Ship.Trim();
+
+    /// <summary>True for the default of each field: the mission start at the suggested place with the ship of the
+    /// profile. The settings keep no entry for it.</summary>
+    [JsonIgnore]
+    public bool IsDefault => Trigger.Trim().Length == 0 && Place == RunJson.SuggestedPlace && ShipPackage == null;
+
+    /// <summary>The same setting with another place. The start and the ship stay.</summary>
+    public PlayStartSetting WithPlace(StartPlaceChoice place, string? dock) =>
+        this with { Place = RunJson.PlaceText(place, dock) };
+
+    /// <summary>The ship package of a play of this start: the package of the field "Ship", else the ship package of the
+    /// profile. Null means the ship of a new character.</summary>
+    /// <param name="profilePackage">The ship package of the Play menu of the profile, or null.</param>
+    public string? PackageOr(string? profilePackage) => ShipPackage ?? profilePackage;
 }
 
 /// <summary>The choices of the Export dialog for one mod (milestone M11).</summary>
@@ -552,8 +573,9 @@ internal sealed class EditorSettings
             ? start
             : PlayStartSetting.Default;
 
-    /// <summary>Stores the play start of a mission script. The mission start with the suggested place removes the
-    /// entry.</summary>
+    /// <summary>Stores the play start of a mission script. The default (see <see cref="PlayStartSetting.IsDefault"/>)
+    /// removes the entry. A ship in the field "Ship" keeps the entry also for the mission start at the suggested
+    /// place.</summary>
     public void SetPlayStart(string profilePath, string script, PlayStartSetting start)
     {
         if (!PlayStarts.TryGetValue(profilePath, out var scripts))
@@ -561,7 +583,7 @@ internal sealed class EditorSettings
             PlayStarts[profilePath] = scripts = new Dictionary<string, PlayStartSetting>(StringComparer.OrdinalIgnoreCase);
         }
 
-        if (start.Trigger.Trim().Length == 0 && start.Place == RunJson.SuggestedPlace)
+        if (start.IsDefault)
         {
             scripts.Remove(script);
         }
