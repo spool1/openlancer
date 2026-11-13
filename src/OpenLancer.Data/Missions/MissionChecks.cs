@@ -114,8 +114,6 @@ public static class MissionChecks
             });
         }
 
-        private static string Plain(MissionLine line) => line.Name?.Plain ?? line.KeySpec?.Label ?? line.Key;
-
         /// <summary>The name of a section in a subject: the nickname, or the identity.</summary>
         private static string Id(MissionSection section) => section.Nickname ?? section.Ref.Id.ToString();
 
@@ -214,20 +212,20 @@ public static class MissionChecks
                     return;
                 case MissionKindScope.Script when reference.Kind == MissionValueKind.Trigger:
                     Add("M05", line.Section, line.Entry,
-                        $"{Plain(line)} names trigger '{name}'. This script has no such trigger. The game ignores this " +
+                        $"{line.Plain} names trigger '{name}'. This script has no such trigger. The game ignores this " +
                         "line. Pick a trigger of this script.", $"{owner}|{name}");
                     return;
                 case MissionKindScope.Script when reference.Kind == MissionValueKind.Object:
                     // A name of the label rule can also name an object of a system (review finding RV39).
                     Add("M06", line.Section, line.Entry,
-                        $"{Plain(line)} names '{name}'. This script has no ship, formation, solar, loot or label with this " +
+                        $"{line.Plain} names '{name}'. This script has no ship, formation, solar, loot or label with this " +
                         "name, and no system has an object with this name. The game ignores this line. Pick a name from " +
                         "the list.", $"{owner}|{reference.Kind}|{name}");
                     return;
                 case MissionKindScope.Script:
                     var kind = KindWord(reference.Kind);
                     Add("M06", line.Section, line.Entry,
-                        $"{Plain(line)} names {kind} '{name}'. This script has no such {kind}. The game ignores this line. " +
+                        $"{line.Plain} names {kind} '{name}'. This script has no such {kind}. The game ignores this line. " +
                         $"Pick {WithArticle(kind)} of this script.", $"{owner}|{reference.Kind}|{name}");
                     return;
                 case MissionKindScope.File:
@@ -250,7 +248,7 @@ public static class MissionChecks
                 default:
                     var world = KindWord(reference.Kind);
                     Add("M23", line.Section, line.Entry,
-                        $"{Plain(line)} names {world} '{name}'. The game data has no {world} with this name. The game " +
+                        $"{line.Plain} names {world} '{name}'. The game data has no {world} with this name. The game " +
                         $"ignores this line. Pick {WithArticle(world)} from the list.", $"{owner}|{reference.Kind}|{name}");
                     return;
             }
@@ -544,7 +542,7 @@ public static class MissionChecks
             {
                 foreach (var line in trigger.Rows.Where(r => r.Mark == EngineMark.CannotLoad))
                     Add("M11", trigger.Section, line.Entry,
-                        $"OpenLancer cannot load {Plain(line)}. The mission does not start in OpenLancer. Remove the line, " +
+                        $"OpenLancer cannot load {line.Plain}. The mission does not start in OpenLancer. Remove the line, " +
                         "or remove OpenLancer from the targets of the mod.", $"{trigger.Nickname}|{line.Key}");
             }
         }

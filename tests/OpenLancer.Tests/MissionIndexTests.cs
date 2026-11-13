@@ -300,4 +300,27 @@ public sealed class MissionIndexTests
         Assert.Null(TriggerRules.Nickname(index.Document.Sections[0].Section));
         Assert.Equal("t1", TriggerRules.Nickname(index.Document.Sections[1].Section));
     }
+
+    /// <summary>One rule names a line in the checks and in the source text of a start place (issue #10): the plain name
+    /// of a condition or an action, else the label of a section key, else the key.</summary>
+    [Fact]
+    public void ALineHasThePlainNameOfItsConditionActionOrKey()
+    {
+        var index = Index("""
+            [MsnLoot]
+            nickname = ol_loot
+            archetype = ol_crate
+
+            [Trigger]
+            nickname = t1
+            Cnd_SpaceEnter = ol_sys_a
+            act_moveplayer = 1, 2, 3, 0
+            Act_NoSuchAction = 1
+            """);
+
+        var trigger = Assert.Single(index.Triggers);
+        Assert.Equal("On enter space", trigger.Condition!.Plain);
+        Assert.Equal(["Move player", "Act_NoSuchAction"], trigger.Actions.Select(a => a.Plain));
+        Assert.Equal(["Nickname", "Archetype"], index.LinesOf(index.Document.Sections[0]).Select(l => l.Plain));
+    }
 }

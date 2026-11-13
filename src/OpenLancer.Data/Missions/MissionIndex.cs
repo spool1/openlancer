@@ -83,6 +83,11 @@ public sealed class MissionLine
     /// <summary>True when the schema knows the key.</summary>
     public bool Known => Name != null || KeySpec != null;
 
+    /// <summary>The plain name of the line, for example "On enter space" for Cnd_SpaceEnter. It is the plain name of the
+    /// condition, action or order, else the label of the section key, else the key. The checks and the source text of a
+    /// start place use this one rule to name a line.</summary>
+    public string Plain => Name?.Plain ?? KeySpec?.Label ?? Key.Trim();
+
     /// <summary>The specs of the values of the line.</summary>
     public IReadOnlyList<MissionValueSpec> Specs => Name?.Values ?? KeySpec?.ValueSpecsOf(Value(0)) ?? [];
 
