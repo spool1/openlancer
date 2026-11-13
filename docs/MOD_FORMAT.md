@@ -638,7 +638,7 @@ A whole file of a later mod replaces the script and discards the patches before 
 - An entity has no text `entity_name`, or a `type` that the engine cannot read.
 - An event has no number time, no type with an event class of the engine, or no table of text targets. Or the props of an event are not a table.
 - A key holds a value of another kind than the engine reads. An entity reads its keys with casts: `cameraprops.fovh = "20"` stops the engine, because the engine reads a number there. An event reads its props with conversions, which also take a text with a number or a THN name, for example `time_scale = "2"`.
-- An entity with `lightprops` has no light type or no `spatialprops.pos`. A `path_data` text is not a path that the engine reads, or it holds more than numbers, tables of numbers, `OPEN` and `CLOSED`.
+- An entity with `lightprops` has no light type or no `spatialprops.pos`. A `path_data` text is not a path that the engine reads, or it holds more than `OPEN`, `CLOSED`, numbers and tables of numbers. The engine reads `pathprops.path_data` of an entity of each type, so the check reads each entity.
 - An event has fewer targets than its type reads: two for SET_CAMERA, ATTACH_ENTITY and START_PATH_ANIMATION, and one for most other types. The second target of SET_CAMERA names an entity of the script that is not a CAMERA. The second target of START_PATH_ANIMATION names an entity of the script without `pathprops.path_data`.
 - The scene cannot build an entity:
   - a LIGHT without `lightprops`, or a SCENE without an `ambient` color.
