@@ -48,7 +48,8 @@ internal sealed class ThnPathKeysEditor(EditorWindow window, PropertyGrid grid)
         catch (FormatException e)
         {
             grid.SetNextNote(ErrorText.Of(e));
-            grid.ThnTextRow("path_data", field, null, value => ThnFieldParse.Of(new ThnText(value)), "Not set");
+            grid.ThnTextRow("path_data", field, null,
+                value => ThnFieldEdit.Parse(ThnKeyKind.PathData, value, ThornEvaluator.Instance), "Not set");
             grid.EndSection();
             return;
         }

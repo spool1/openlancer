@@ -92,8 +92,11 @@ internal static class ThnFieldEdit
             case ThnKeyKind.Number:
                 return ParseNumbers(text, 1) is { } one ? Numbers(one, n => new ThnNumber(n[0])) : NotNumbers(text, 1);
             case ThnKeyKind.Text:
-            case ThnKeyKind.PathData:
                 return ThnFieldParse.Of(new ThnText(text));
+            case ThnKeyKind.PathData:
+                return ThnMotionPath.TextProblem(text) is { } problem
+                    ? ThnFieldParse.Fail(problem)
+                    : ThnFieldParse.Of(new ThnText(text));
             case ThnKeyKind.Vector:
                 return ParseNumbers(text, 3) is { } vector
                     ? Numbers(vector, n => ThnTable.FromList([.. n.Select(v => (ThnValue)new ThnNumber(v))]))
@@ -131,16 +134,14 @@ internal static class ThnFieldEdit
     public static Vector3 Degrees(Matrix4x4 rotation) => TransformValues.EulerNear(rotation, Vector3.Zero);
 
     /// <summary>The value of a Lua value text, as the engine reads it, for example <c>{ 1, 2 }</c> or
-    /// <c>"text"</c>. A THN file is ASCII, so a character outside ASCII refuses. The evaluator would read it as
-    /// <c>?</c>. An escape that gives such a character, or U+0000, refuses too (see <see cref="EscapeProblem"/>). A text
-    /// that is not one value, for example a statement, a call or an operator, refuses before the evaluator runs it (see
-    /// <see cref="ThnValueText"/>).</summary>
+    /// <c>"text"</c>. A text that is not one value, for example a statement, a call or an operator, refuses before the
+    /// evaluator runs it (see <see cref="ThnValueText"/>). A THN file is ASCII, so a character outside ASCII refuses too.
+    /// The evaluator would read it as <c>?</c>. An escape that gives such a character, or U+0000, also refuses.</summary>
     public static ThnFieldParse ParseValue(string text, IThnEvaluator evaluator)
     {
         if (text.Trim().Length == 0)
             return ThnFieldParse.Fail("The field needs a value. Use Remove in the menu of the label to remove the key.");
-        if ((ThnWriter.TextProblem(text) ?? EscapeProblem(text) ?? ThnValueText.Problem(text, evaluator.Symbols)) is
-            { } problem)
+        if (ThnValueText.Problem(text, evaluator.Symbols) is { } problem)
             return ThnFieldParse.Fail(problem);
         try
         {
@@ -153,82 +154,6 @@ internal static class ThnFieldEdit
         {
             return ThnFieldParse.Fail(ErrorText.Of(e));
         }
-    }
-
-    /// <summary>
-    /// Why a decimal escape in a short string of an ASCII Lua text gives a character that a THN text cannot hold, or
-    /// null. An example is <c>"\200"</c>. The VM reads a character above U+007F as <c>?</c> (Undump.cs:69), and it
-    /// drops U+0000 at the end of a text. So such an escape would change the value without a message.
-    /// </summary>
-    /// <remarks>The scan follows the lexer of Lua 3.2. A comment runs from <c>--</c> to the end of the line, and a long
-    /// string in <c>[[ ]]</c> has no escapes. A text that the scan cannot read to its end, for example a string
-    /// without its end, gives null. The compiler then gives the error.</remarks>
-    private static string? EscapeProblem(string text)
-    {
-        for (var i = 0; i < text.Length; i++)
-        {
-            var c = text[i];
-            var next = i + 1 < text.Length ? text[i + 1] : '\0';
-            if (c == '-' && next == '-')
-            {
-                i = text.IndexOf('\n', i);
-                if (i < 0)
-                    return null;
-            }
-            else if (c == '[' && next == '[')
-            {
-                i = LongStringEnd(text, i + 2);
-                if (i < 0)
-                    return null;
-            }
-            else if (c is '"' or '\'')
-            {
-                for (i++; i < text.Length && text[i] != c; i++)
-                {
-                    if (text[i] == '\n' || text[i] == '\\' && i + 1 == text.Length)
-                        return null;
-                    if (text[i] != '\\' || !char.IsAsciiDigit(text[i + 1]))
-                    {
-                        // Other escapes give the character after the '\', or a control character.
-                        if (text[i] == '\\')
-                            i++;
-                        continue;
-                    }
-                    var start = ++i;
-                    var value = 0;
-                    for (; i < text.Length && i - start < 3 && char.IsAsciiDigit(text[i]); i++)
-                        value = value * 10 + (text[i] - '0');
-                    // A value above 255 does not compile.
-                    if (value is 0 or > 127 and <= byte.MaxValue)
-                        return $"The escape \\{text[start..i]} gives the character U+{value:X4}. {ThnWriter.TextRule}";
-                    i--;
-                }
-            }
-        }
-        return null;
-    }
-
-    /// <summary>The index of the last <c>]</c> of a long string whose text starts at <paramref name="start"/>, or -1.
-    /// A long string of Lua 3.2 can hold other long strings.</summary>
-    internal static int LongStringEnd(string text, int start)
-    {
-        var depth = 0;
-        for (var i = start; i + 1 < text.Length; i++)
-        {
-            if (text[i] == '[' && text[i + 1] == '[')
-            {
-                depth++;
-                i++;
-            }
-            else if (text[i] == ']' && text[i + 1] == ']')
-            {
-                if (depth == 0)
-                    return i + 1;
-                depth--;
-                i++;
-            }
-        }
-        return -1;
     }
 
     /// <summary>The text of a float: the shortest text that gives the same float.</summary>

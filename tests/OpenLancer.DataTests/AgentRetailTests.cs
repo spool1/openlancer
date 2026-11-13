@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using LibreLancer;
+using OpenLancer.Data.Thn;
 using OpenLancer.Studio.Agent;
 
 using Xunit;
@@ -339,7 +340,7 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
         while (cursor != null);
 
         var largest = (Bytes: 0, Call: "");
-        var pages = 0;
+        var (pages, paths) = (0, 0);
         foreach (var script in scripts)
         {
             cursor = null;
@@ -357,9 +358,20 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
                 pages++;
             }
             while (cursor != null);
+            // Each retail path text is a list of values, so the editor reads each retail path (section 8.7, item 2).
+            foreach (var entity in host.Session!.Cutscene(script["thn:".Length..])!.Entities)
+            {
+                if (ThnElementPaths.Get(ThnElementKind.Entity, entity.Table, ThnMotionPath.Path) is not ThnText path)
+                    continue;
+                Assert.True(ThnMotionPath.TextProblem(path.Value) == null,
+                    $"{script}: {ThnMotionPath.TextProblem(path.Value)}");
+                paths++;
+            }
         }
         Assert.True(scripts.Count > 1000, $"{scripts.Count} scripts");
-        output.WriteLine($"{scripts.Count} scripts, {pages} pages. The largest page: {largest.Bytes} bytes, {largest.Call}");
+        Assert.True(paths > 0);
+        output.WriteLine($"{scripts.Count} scripts, {pages} pages, {paths} path texts. The largest page: {largest.Bytes} " +
+                         $"bytes, {largest.Call}");
     }
 
     /// <summary>The time of one agent mission edit (section 13.4 of the MCP1 design and section 11.4 of the M6b
@@ -663,7 +675,7 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
     /// and write the fields back. Some retail scripts have two entities with one name. The earlier entity gives no
     /// fields, because its reference names the later entity. The sample is each fifth script in the order of
     /// list_cutscenes. The Lua text of each element of the sample is one value for the check of a value text (see
-    /// <see cref="OpenLancer.Studio.Commands.ThnValueText"/>), so an agent can send a stored value back as Lua text. The
+    /// <see cref="OpenLancer.Data.Thn.ThnValueText"/>), so an agent can send a stored value back as Lua text. The
     /// test writes counts only.
     /// </summary>
     [Fact]
@@ -688,8 +700,8 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
                          .Concat(session.Cutscene(script["thn:".Length..])!.Events).Select(e => e.Table))
             {
                 var text = OpenLancer.Data.Thn.ThnWriter.Value(table);
-                Assert.True(OpenLancer.Studio.Commands.ThnValueText.Problem(text, session.ThnSymbols) == null,
-                    $"{script}: {OpenLancer.Studio.Commands.ThnValueText.Problem(text, session.ThnSymbols)}");
+                Assert.True(OpenLancer.Data.Thn.ThnValueText.Problem(text, session.ThnSymbols) == null,
+                    $"{script}: {OpenLancer.Data.Thn.ThnValueText.Problem(text, session.ThnSymbols)}");
                 tables++;
             }
             foreach (var element in view["entities"]!.AsArray().Concat(view["events"]!.AsArray()))

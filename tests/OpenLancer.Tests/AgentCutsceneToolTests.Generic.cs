@@ -75,6 +75,7 @@ public sealed partial class AgentCutsceneToolTests
             """ "props.param_curve": { "clsid": "FreeFormPCurve", "points": [ { "time": 0, "value": 0, "in": 0, "out": 0 }, { "time": 1, "value": 0.5, "in": 0, "out": 0 } ] } """,
             "curve"
         },
+        { "path text", Script + "#entity/Path", """ "pathprops.path_data": "CLOSED, {0,0,0}, {1,0,0,0}, {20,0,0}, {1,0,0,0}, " """, "path-text" },
         { "axis", KindsSpatial, """ "props.spatialprops.axisrot": { "degrees": 45, "axis": "X_AXIS" } """, "axis" },
         { "value", Script + "#event/3", """ "props.custom": "{ 3, 4 }" """, "value" },
         { "time", Script + "#event/2", """ "time": 1.5 """, "time" },
@@ -111,6 +112,8 @@ public sealed partial class AgentCutsceneToolTests
                 new ThnPathKeys(true, [new ThnPathKey(System.Numerics.Vector3.Zero, System.Numerics.Quaternion.Identity),
                     new ThnPathKey(new System.Numerics.Vector3(20, 0, 0), System.Numerics.Quaternion.Identity)])))),
             "curve" => CutsceneCommands.SetCurvePoint(s, Event(s, 3), 1, new ThnCurvePoint(1, 0.5f, 0, 0)),
+            "path-text" => Text(Entity(s, "Path"), "pathprops.path_data", ThnKeyKind.PathData,
+                "CLOSED, {0,0,0}, {1,0,0,0}, {20,0,0}, {1,0,0,0}, "),
             "axis" => Text(Event(s, 1), "props.spatialprops.axisrot", ThnKeyKind.AxisRotation, "{ 45, X_AXIS }"),
             "value" => Text(Event(s, 3), "props.custom", ThnKeyKind.Value, "{ 3, 4 }"),
             "time" => ThnFieldCommand.Time(Event(s, 2), 2).Make(s, new ThnNumber(1.5f)),
@@ -234,13 +237,38 @@ public sealed partial class AgentCutsceneToolTests
         }
         """;
 
+    /// <summary>A script whose path text holds an operator, as a mod file can hold it.</summary>
+    private const string OperatorPath = """
+        duration = 10
+        entities = {
+            { entity_name = "Path", type = MOTION_PATH, pathprops = { path_data = "OPEN, {1+1,0,0}, {1,0,0,0}, {10,0,0}, {1,0,0,0}, " } }
+        }
+        events = {}
+        """;
+
+    /// <summary>A stored path text that holds more than values does not run. get_item gives it as its text, not as
+    /// keys, and the same text goes back into set_fields as no change.</summary>
+    [Fact]
+    public void AStoredPathTextWithAnOperatorShowsAsItsText()
+    {
+        var (ws, _, host) = Open(OperatorPath);
+        using var __ = ws;
+
+        var item = Ok(host, "get_item", $$"""{ "ref": {{Json(Script + "#entity/Path")}} }""");
+
+        Assert.Equal("OPEN, {1+1,0,0}, {1,0,0,0}, {10,0,0}, {1,0,0,0}, ",
+            (string?)item["cutscene_element"]!["fields"]!["pathprops.path_data"]);
+    }
+
     /// <summary>Each field that <c>get_cutscene</c> gives goes back into <c>set_fields</c> and changes nothing, also a
     /// rotation, whose degrees do not give the same floats back. An entity that a later entity with the same name
-    /// hides gives no fields, because its reference names the later entity.</summary>
+    /// hides gives no fields, because its reference names the later entity. A path text that does not run stays its
+    /// text.</summary>
     [Theory]
     [InlineData(Kinds)]
     [InlineData(ThnSessions.Script)]
     [InlineData(Twins)]
+    [InlineData(OperatorPath)]
     public void EachFieldOfGetCutsceneGoesBackIntoSetFieldsAndGivesNoChange(string script)
     {
         var (ws, session, host) = Open(script);
@@ -319,6 +347,9 @@ public sealed partial class AgentCutsceneToolTests
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/3", "fields": { "props.custom": "{ 1," } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.custom")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/3", "fields": { "props.custom": "1 w = 2" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.custom")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/3", "fields": { "props.custom": "clock()" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.custom")]
+    [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/3", "fields": { "props.custom": "\"a\\\n$if 1\n$end\n\" ol_value = 2 + 3" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.custom")]
+    [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#entity/Path", "fields": { "pathprops.path_data": "OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_path = { OPEN, {2+3,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}" } }""", "invalid_value", MissionErrors.FieldValue, "fields.pathprops.path_data")]
+    [InlineData("cutscene_add_entity", """{ "cutscene": "thn:DATA\\SCRIPTS\\x.thn", "type": "MOTION_PATH", "name": "my_path", "fields": { "pathprops.path_data": "OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_path = { OPEN, {2+3,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}" } }""", "invalid_value", MissionErrors.FieldValue, "fields.pathprops.path_data")]
     [InlineData("cutscene_add_entity", """{ "cutscene": "thn:DATA\\SCRIPTS\\x.thn", "type": "MARKER", "name": "my_mark", "fields": { "userprops.note": "print(1)" } }""", "invalid_value", MissionErrors.FieldValue, "fields.userprops.note")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/2", "fields": { "props.animation": "Sc_wü" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.animation")]
     [InlineData("set_fields", """{ "ref": "thn:DATA\\SCRIPTS\\x.thn#event/3", "fields": { "props.custom": "{ \"ü\" }" } }""", "invalid_value", MissionErrors.FieldValue, "fields.props.custom")]

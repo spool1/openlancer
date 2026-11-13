@@ -22,6 +22,9 @@ internal sealed record ThnJsonInput(ThnValue? Value, IReadOnlySet<string>? Bits,
     public static ThnJsonInput Of(ThnValue value) => new(value, null, null);
 
     public static ThnJsonInput Fail(string error) => new(null, null, error);
+
+    /// <summary>The value of the text of a field, or why the text gives no value.</summary>
+    public static ThnJsonInput From(ThnFieldParse parse) => parse.Value is { } value ? Of(value) : Fail(parse.Error!);
 }
 
 /// <summary>
@@ -142,7 +145,7 @@ internal static class ThnJson
                 return Bits(row!, path, json) ?? bad;
             case ThnKeyKind.PathData:
                 if (Text(json) is { } pathText)
-                    return ThnJsonInput.Of(new ThnText(pathText));
+                    return ThnJsonInput.From(ThnFieldEdit.Parse(kind, pathText, evaluator));
                 return json is JsonObject keys ? ReadPath(path, keys) : bad;
             case ThnKeyKind.Curve:
                 return json is JsonObject curve ? ReadCurve(path, curve, stored) : bad;
@@ -151,8 +154,7 @@ internal static class ThnJson
             default:
                 if (Text(json) is not { } lua)
                     return bad;
-                var parse = ThnFieldEdit.ParseValue(lua, evaluator);
-                return parse.Value is { } value ? ThnJsonInput.Of(value) : ThnJsonInput.Fail(parse.Error!);
+                return ThnJsonInput.From(ThnFieldEdit.ParseValue(lua, evaluator));
         }
     }
 

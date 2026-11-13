@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Text;
 using LibreLancer;
 using LibreLancer.Thorn;
@@ -16,6 +18,20 @@ internal static class ThnScripts
     static ThnScripts() => AppHandler.ConsoleInit(silent: true);
 
     public static ThornEvaluator Evaluator => ThornEvaluator.Instance;
+
+    /// <summary>The engine VM, with a count of its runs, so that a test can show that a text does not run.</summary>
+    public sealed class CountingEvaluator : IThnEvaluator
+    {
+        public int Runs { get; private set; }
+
+        public IReadOnlyDictionary<string, ThnSymbolInfo> Symbols => Evaluator.Symbols;
+
+        public ThnTable Evaluate(ReadOnlySpan<byte> script, string name)
+        {
+            Runs++;
+            return Evaluator.Evaluate(script, name);
+        }
+    }
 
     /// <summary>Evaluates Lua text with the engine VM.</summary>
     public static ThnTable Evaluate(string text) => Evaluator.Evaluate(Encoding.ASCII.GetBytes(text), "test.thn");

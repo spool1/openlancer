@@ -67,7 +67,7 @@ public sealed class ThnFieldEditTests
     {
         Assert.Equal(List(N(1), T("a"), S("CAMERA")), Parse(ThnKeyKind.Value, "{ 1, \"a\", CAMERA }").Value);
         Assert.Equal(new ThnBool(true), Parse(ThnKeyKind.Value, "Y").Value);
-        Assert.StartsWith("field: The script does not compile", Parse(ThnKeyKind.Value, "{ 1,").Error);
+        Assert.Equal(ThnValueText.Unfinished, Parse(ThnKeyKind.Value, "{ 1,").Error);
         Assert.StartsWith("The field needs a value.", Parse(ThnKeyKind.Value, "  ").Error);
         var outside = Parse(ThnKeyKind.Value, "{ \"ü\" }");
         Assert.Null(outside.Value);
@@ -84,6 +84,10 @@ public sealed class ThnFieldEditTests
     [InlineData("[[a [[long]] text]]")]
     [InlineData("'a\\'b'")]
     [InlineData("-- a note\n{ N, \"x\" } -- the end")]
+    [InlineData("{ 1., 1.e5, 2E-3, .5e+2 }")]
+    [InlineData("\"a\\\nb\"")]
+    [InlineData("[[a\n $b]]")]
+    [InlineData("{ 1 }\r\n\t")]
     public void ALuaTextThatIsOneValueGivesTheValue(string text)
     {
         var parse = Parse(ThnKeyKind.Value, text);
@@ -92,9 +96,14 @@ public sealed class ThnFieldEditTests
         Assert.NotNull(parse.Value);
     }
 
-    /// <summary>A Lua text that is not one value refuses before the evaluator runs it (section 8.7, item 2 of the MCP1
-    /// design). The evaluator would run a statement, a call and an operator, so a short text could allocate gigabytes.
-    /// A name that is not a THN name refuses too, because it reads a global of the VM.</summary>
+    /// <summary>
+    /// A Lua text that is not one value refuses before the evaluator runs it (section 8.7, item 2 of the MCP1 design).
+    /// The evaluator would run a statement, a call and an operator, so a short text could allocate gigabytes. A name
+    /// that is not a THN name refuses too, because it reads a global of the VM. The check reads the tokens as the Lua 3.2
+    /// lexer reads them. So a line that starts with $ refuses, because the lexer reads it as a pragma, also in a string:
+    /// $if nil skips the end of a string, and $if 1 with $end hides a line end. A text that the lexer refuses or that
+    /// ends too early refuses too, for example a string without its end, a bad number or a vertical tab.
+    /// </summary>
     [Theory]
     [InlineData("1 w = 2", ThnValueText.MoreThanOne)]
     [InlineData("1 print(\"x\")", ThnValueText.MoreThanOne)]
@@ -106,15 +115,48 @@ public sealed class ThnFieldEditTests
     [InlineData("1 + 2", "'+'")]
     [InlineData("(1)", "'('")]
     [InlineData("{ [1] 2 }", "'2'")]
+    [InlineData("\"a\\\n$if 1\n$end\n\" ol_value = 2 + 3", ThnValueText.Pragma)]
+    [InlineData("[[\n$if nil\n]] \"\n$end\n]] ol_value = 2 + 3", ThnValueText.Pragma)]
+    [InlineData("{ [[\n$if nil\n]], [[ [[\n$end\n]] } ol_value = 2 + 3 -- ]] }", ThnValueText.Pragma)]
+    [InlineData("-- a note\n$debug\n1", ThnValueText.Pragma)]
+    [InlineData("\"a\\\n$debug\n\"", ThnValueText.Pragma)]
+    [InlineData("{ 1,", ThnValueText.Unfinished)]
+    [InlineData("{ x = ", ThnValueText.Unfinished)]
+    [InlineData("-", ThnValueText.Unfinished)]
+    [InlineData("\"abc", ThnValueText.OpenString)]
+    [InlineData("{ \"a\", 'b\\", ThnValueText.OpenString)]
+    [InlineData("\"a\nb\"", ThnValueText.OpenString)]
+    [InlineData("{ [[a [[b]] }", ThnValueText.OpenString)]
+    [InlineData("1 \"x", ThnValueText.OpenString)]
+    [InlineData("1..2", "#1..")]
+    [InlineData("{ 1e }", "#1e")]
+    [InlineData("1E+", "#1E+")]
+    [InlineData("\v1", "'\v'")]
     public void ALuaTextThatIsNotOneValueRefusesBeforeItRuns(string text, string expected)
     {
-        var parse = Parse(ThnKeyKind.Value, text);
+        var evaluator = new CountingEvaluator();
+
+        var parse = ThnFieldEdit.Parse(ThnKeyKind.Value, text, evaluator);
 
         Assert.Null(parse.Value);
         var message = expected.StartsWith('\'') ? ThnValueText.NotValue(expected.Trim('\''))
-            : expected == ThnValueText.MoreThanOne ? expected
+            : expected.StartsWith('#') ? ThnValueText.NotNumber(expected[1..])
+            : expected.EndsWith('.') ? expected
             : ThnValueText.NotName(expected);
         Assert.Equal(message, parse.Error);
+        Assert.Equal(0, evaluator.Runs);
+    }
+
+    /// <summary>Tables in more than <see cref="ThnValueText.MaxDepth"/> levels refuse, also very deep ones. So the check
+    /// and the compiler do not recurse without a limit. A text at the limit is a value.</summary>
+    [Fact]
+    public void TablesInTooManyLevelsRefuse()
+    {
+        static string Nested(int levels) => new string('{', levels) + new string('}', levels);
+
+        Assert.Equal(ThnValueText.TooDeep, Parse(ThnKeyKind.Value, Nested(ThnValueText.MaxDepth + 1)).Error);
+        Assert.Equal(ThnValueText.TooDeep, Parse(ThnKeyKind.Value, Nested(1_000_000)).Error);
+        Assert.NotNull(Parse(ThnKeyKind.Value, Nested(ThnValueText.MaxDepth)).Value);
     }
 
     /// <summary>A decimal escape in a Lua text that gives a character outside ASCII or U+0000 refuses. The evaluator
@@ -133,6 +175,14 @@ public sealed class ThnFieldEditTests
 
         Assert.Null(parse.Value);
         Assert.Equal($"The escape {escape} gives the character U+{code}. {ThnWriter.TextRule}", parse.Error);
+    }
+
+    /// <summary>An escape above 255 does not compile, so the check refuses it with its own reason.</summary>
+    [Fact]
+    public void AnEscapeAbove255Refuses()
+    {
+        Assert.Equal("The escape \\999 is more than \\255, so it gives no character.",
+            Parse(ThnKeyKind.Value, "{ \"a\\999\" }").Error);
     }
 
     /// <summary>An escape inside ASCII keeps its value. A long string has no escapes, and a comment is not a part of

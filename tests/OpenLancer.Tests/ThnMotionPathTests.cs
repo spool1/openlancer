@@ -71,6 +71,30 @@ public sealed class ThnMotionPathTests
     public void ATextThatIsNotAPathIsAFormatException(string text) =>
         Assert.Throws<FormatException>(() => ThnMotionPath.Parse(text, Evaluator));
 
+    /// <summary>
+    /// A path text that holds more than numbers, tables of numbers, OPEN and CLOSED does not run (section 8.7, item 2 of
+    /// the MCP1 design). The first text closes the table and assigns the path again with an operator: the evaluator
+    /// would give the point 5. The check of the items refuses each text before the evaluator runs it, with the reason.
+    /// </summary>
+    [Theory]
+    [InlineData("OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0} } ol_path = { OPEN, {2+3,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}",
+        "The text holds '}', which a value cannot hold.")]
+    [InlineData("OPEN, {x,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}", "The path text names x. A path text can name only OPEN and CLOSED.")]
+    [InlineData("OPEN, {0,0,0}, {1,0,0,0}, {1,1,1}, {1,0,0,0}, f()", "The path text names f.")]
+    [InlineData("OPEN, [[\n$if nil\n]], {1,1,1}", ThnValueText.Pragma)]
+    [InlineData("OPEN, {0,0,0", ThnValueText.Unfinished)]
+    public void APathTextWithMoreThanValuesDoesNotRun(string text, string expected)
+    {
+        var evaluator = new CountingEvaluator();
+
+        var error = Assert.Throws<FormatException>(() => ThnMotionPath.Parse(text, evaluator));
+
+        Assert.StartsWith(expected, error.Message);
+        Assert.Equal(error.Message, ThnMotionPath.TextProblem(text));
+        Assert.Equal(0, evaluator.Runs);
+        Assert.Null(ThnMotionPath.TextProblem(Retail));
+    }
+
     /// <summary>A MOTION_PATH entity of the engine with a path text.</summary>
     private static ThnEntity Entity(string pathData)
     {
