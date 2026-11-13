@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -180,7 +181,9 @@ public sealed class GraphModelTests
         Assert.True(wait.Lines);
         Assert.Equal([GraphRowKind.BeforeNickname, GraphRowKind.IgnoredCondition, GraphRowKind.Condition,
             GraphRowKind.Action], wait.Rows.Select(r => r.Kind));
-        Assert.Equal("Start trigger: t_kill", wait.Rows[3].Text);
+        // Each row names its line by the plain name rule that the checks and the source text of a start place also use.
+        Assert.Equal(["Repeats: true", "At once", "After a delay: 5", "Start trigger: t_kill"], wait.Rows.Select(r => r.Text));
+        Assert.All(wait.Rows, r => Assert.StartsWith(r.Line.Plain, r.Text, StringComparison.Ordinal));
         var pin = wait.Rows[3].Pin!;
         Assert.Equal((GraphPinKind.Row, 4), (pin.Kind, pin.Slot));
         Assert.Contains(pin, wait.Pins);

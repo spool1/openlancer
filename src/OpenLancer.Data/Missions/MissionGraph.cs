@@ -855,11 +855,12 @@ public sealed class MissionGraph
             problems.Where(p => p.EntryIndex == line.Entry).ToList());
     }
 
-    /// <summary>The plain name and the values of a line. A name without values in the schema, for example Cnd_True,
-    /// shows its plain name only, because its value is only a placeholder.</summary>
+    /// <summary>The plain name (<see cref="MissionLine.Plain"/>) and the values of a line, for example "Repeats: true".
+    /// A name without values in the schema, for example Cnd_True, shows its plain name only, because its value is only a
+    /// placeholder.</summary>
     public static string LineText(MissionLine line)
     {
-        var plain = line.Name?.Plain ?? line.Key;
+        var plain = line.Plain;
         if (line.Name is { Values.Count: 0 })
             return plain;
         var values = Enumerable.Range(0, line.Count).Select(line.Value).OfType<string>().ToList();

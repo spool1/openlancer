@@ -44,7 +44,7 @@ The Mission tab shows the open mission as a graph. The Scene part is at its righ
 
 ### The graph
 
-- Each node is one trigger. Its header has the glyph of its event, its name, and the chips "Start" and "Repeats". When the name or a chip does not fit, hover the name to read all of the header. Its body shows the event and the actions as a summary. With "Show lines", it shows each line.
+- Each node is one trigger. Its header has the glyph of its event, its name, and the chips "Start" and "Repeats". When the name or a chip does not fit, hover the name to read all of the header. Its body shows the event and the actions as a summary. With "Show lines", it shows each line by its plain name and its values, for example "After a delay: 5" or "Repeats: true".
 - The pins at the left take a start, a stop, a load from a checkpoint and a watch. The pins at the right give them. The "+" pin in the header starts or stops another trigger. The green Play button of a node plays the mission from its trigger (see "Set the play start and play").
 - A frame groups triggers: an act, the frame "Not started by the mission", or a behavior prefab. Click the arrow of a frame to collapse it into one node.
 - The marks at the right of a header show errors, warnings, the muted base-game messages, "Never starts" and "Watched state". Hover a mark to read the reasons.

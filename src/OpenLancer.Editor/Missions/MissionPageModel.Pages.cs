@@ -476,20 +476,10 @@ internal sealed partial record MissionPageModel
     /// <summary>The line number of a line in its section, from 1.</summary>
     private static string LineNumber(MissionLine line) => (line.Entry + 1).ToString(CultureInfo.InvariantCulture);
 
-    /// <summary>The plain name and the values of a line. A key of a section has the label of the schema, for example
-    /// "Repeats".</summary>
-    private static string LineText(MissionLine line)
-    {
-        if (line.Kind() == MissionNameKind.Action)
-            return MissionGraph.ActionText(line);
-        if (line.Name == null && line.KeySpec is { } key)
-        {
-            var values = Enumerable.Range(0, line.Count).Select(line.Value).OfType<string>().ToList();
-            return values.Count == 0 ? key.Label : $"{key.Label}: {string.Join(", ", values)}";
-        }
-
-        return MissionGraph.LineText(line);
-    }
+    /// <summary>The plain name and the values of a line, as the graph shows it. A key of a section has the label of the
+    /// schema, for example "Repeats".</summary>
+    private static string LineText(MissionLine line) =>
+        line.Kind() == MissionNameKind.Action ? MissionGraph.ActionText(line) : MissionGraph.LineText(line);
 
     /// <summary>A field of a line of another trigger, with a link that selects the line.</summary>
     private static PageField RowField(string script, MissionLine line) =>
