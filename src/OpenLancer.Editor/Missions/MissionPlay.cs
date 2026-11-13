@@ -42,6 +42,10 @@ internal interface IMissionPlayEditor : IAgentPlayHost
     /// <summary>The ship package of the Play menu, or null for the default ship.</summary>
     string? PlayPackage { get; }
 
+    /// <summary>The ship part of a start save for a ship package of the edit view, or null with the reason (see
+    /// <see cref="PlayShips.ShipPart"/>).</summary>
+    StartSaveShip? ShipPart(string package, out string? problem);
+
     /// <summary>The Play status of OpenLancer.</summary>
     PlayStatus PlayStatus { get; }
 
@@ -55,7 +59,7 @@ internal interface IMissionPlayEditor : IAgentPlayHost
     bool GameRuns { get; }
 
     /// <summary>Asks Play for a mission play (<see cref="PlayController.RequestMission"/>).</summary>
-    Task<PlayRequestResult> RequestMission(IMissionStart start, string? package, PlaySaveRule save);
+    Task<PlayRequestResult> RequestMission(IMissionStart start, PlaySaveRule save);
 }
 
 /// <summary>
@@ -246,7 +250,7 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
         // the answer.
         return editor.AgentPlays.Run(editor, request.Origin, () => editor.PlayStatus,
             () => AgentRefusal(request, afterQuestion: true),
-            save => editor.RequestMission(new MissionPlayStart(this, request), editor.PlayPackage, save), cancel);
+            save => editor.RequestMission(new MissionPlayStart(this, request), save), cancel);
     }
 
     /// <summary>
@@ -293,4 +297,14 @@ internal sealed class MissionPlay(IMissionPlayEditor editor) : IMissionPlayHost
         editor.ModelOf(script, out problem);
 
     StartSavePlace? IMissionPlayHost.PlaceOf(StartPlace place, out string? problem) => editor.PlaceOf(place, out problem);
+
+    /// <summary>The ship part of the start save of a script: the field "Ship" of its play start, else the ship of the
+    /// profile. The game gets no ship package, so the start save gives the ship (issue #48).</summary>
+    StartSaveShip? IMissionPlayHost.ShipOf(string script, out string? problem)
+    {
+        problem = null;
+        return PlayStartOf(script).PackageOr(editor.PlayPackage) is { } package
+            ? editor.ShipPart(package, out problem)
+            : null;
+    }
 }

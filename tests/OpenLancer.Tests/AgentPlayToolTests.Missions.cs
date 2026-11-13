@@ -586,6 +586,13 @@ public sealed partial class AgentPlayToolTests
 
         public string? PlayPackage => null;
 
+        /// <summary>The fake has no edit view, so it gives no ship part. Its play starts use no ship package.</summary>
+        public StartSaveShip? ShipPart(string package, out string? problem)
+        {
+            problem = $"The edit view has no ship package '{package}'. Play cannot give the player this ship.";
+            return null;
+        }
+
         public IMissionStart? RunningMission { get; set; }
 
         public IReadOnlyList<IMissionStart> MissionStarts => RunningMission is { } running ? [running] : [];
@@ -620,7 +627,7 @@ public sealed partial class AgentPlayToolTests
 
         /// <summary>Keeps the request. Play gives the plan of the start that it prepared after its save, so a play that
         /// starts at once gives the plan of the start of the request.</summary>
-        public Task<PlayRequestResult> RequestMission(IMissionStart start, string? package, PlaySaveRule save)
+        public Task<PlayRequestResult> RequestMission(IMissionStart start, PlaySaveRule save)
         {
             var mission = (MissionPlayStart)start;
             MissionRequests.Add((mission, save));

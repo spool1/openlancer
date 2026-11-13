@@ -190,15 +190,14 @@ internal sealed class PlayController : IDisposable
     /// <summary>
     /// Asks for a mission play (section 5.6 of the M6c design). It runs at the next <see cref="Update"/>, as
     /// <see cref="Request"/> does. While a mission play runs and the player is in the game, the game starts again at the
-    /// new start (section 5.8). Else a running game closes first.
+    /// new start (section 5.8). Else a running game closes first. The game gets no ship package, because the start save
+    /// of the mission gives the ship (issue #48).
     /// </summary>
-    /// <param name="package">The ship package, or null for the package of a new multiplayer character (D15).</param>
     /// <param name="save">What the save of Play does (user decision of 2026-10-20 of the M6c design).</param>
     /// <returns>The result of the request, when the play started or did not start. A request that starts the running
     /// game again gives its result when the game answers.</returns>
-    public Task<PlayRequestResult> RequestMission(IMissionStart mission, string? package,
-        PlaySaveRule save = PlaySaveRule.Save) =>
-        Replace(new PlayRequest(null, package, clock()) { Mission = mission, Save = save });
+    public Task<PlayRequestResult> RequestMission(IMissionStart mission, PlaySaveRule save = PlaySaveRule.Save) =>
+        Replace(new PlayRequest(null, null, clock()) { Mission = mission, Save = save });
 
     /// <summary>Play > Restart the mission (section 5.8 of the M6c design): the running mission play starts again from
     /// its start, with the current save. Play does not save, so the game uses the saved files. It does nothing when
@@ -207,7 +206,7 @@ internal sealed class PlayController : IDisposable
     {
         if (RestartBlock == null)
         {
-            RequestMission(game!.Mission!, game.Args.Package, PlaySaveRule.None);
+            RequestMission(game!.Mission!, PlaySaveRule.None);
         }
     }
 
@@ -855,7 +854,7 @@ internal sealed class PlayController : IDisposable
 
         if (start != run.Args.Start)
         {
-            var again = wanted ?? new PlayRequest(null, run.Args.Package, clock()) { Mission = mission };
+            var again = wanted ?? new PlayRequest(null, null, clock()) { Mission = mission };
             if (pending == null)
             {
                 pending = again;
@@ -1306,6 +1305,8 @@ internal sealed class PlayController : IDisposable
     private static string Errors(int count) => count == 1 ? "1 error" : $"{count} errors";
 
     /// <param name="Start">The start, or null for a mission play, which prepares its start after the save.</param>
+    /// <param name="Package">The ship package, or null for the package of a new multiplayer character (D15). A mission
+    /// play has none, because its start save gives the ship (issue #48).</param>
     /// <param name="Time">The time of the request, for the time from Play to flight.</param>
     private sealed record PlayRequest(PlayStart? Start, string? Package, TimeSpan Time)
     {

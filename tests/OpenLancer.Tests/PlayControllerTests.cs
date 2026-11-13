@@ -1632,7 +1632,8 @@ public sealed class PlayControllerTests : IDisposable
     private const string StartNote = "OpenLancer plays M99 from Checkpoint t_restore.";
 
     /// <summary>A mission play saves the active mod first, then makes its start from the model of the saved script, and
-    /// the game starts from the start save. The Console gives the start note and the note of an approximate start.</summary>
+    /// the game starts from the start save without a ship package. The Console gives the start note and the note of an
+    /// approximate start.</summary>
     [Fact]
     public async Task AMissionPlaySavesFirstThenPreparesItsStartAndStartsFromTheStartSave()
     {
@@ -1643,11 +1644,13 @@ public sealed class PlayControllerTests : IDisposable
         var savesAtPrepare = -1;
         mission.OnPrepare = () => savesAtPrepare = editor.SaveCalls;
 
-        var result = play.RequestMission(mission, null);
+        var result = play.RequestMission(mission);
         play.Update(false, false);
 
         Assert.Equal(1, savesAtPrepare);
         Assert.Equal(mission.Start, Assert.Single(starts).Start);
+        // The start save gives the ship, so the game gets no ship package (issue #48).
+        Assert.Null(starts[0].Package);
         Assert.Same(mission, play.Mission);
         Assert.Equal(["OpenLancer plays M99 from t_wave (approximate).", MissionPlayTexts.Approximate],
             Console.SkipWhile(l => !l.StartsWith("OpenLancer plays")).Take(2));
@@ -1665,7 +1668,7 @@ public sealed class PlayControllerTests : IDisposable
     {
         var mission = new FakeMissionStart { RefuseWith = "This mission script has no story slot." };
 
-        var result = play.RequestMission(mission, null);
+        var result = play.RequestMission(mission);
         play.Update(false, false);
 
         Assert.Empty(starts);
@@ -1687,7 +1690,7 @@ public sealed class PlayControllerTests : IDisposable
         editor.SaveResult = SaveOutcome.NotSaved with { Failure = (SaveFailure)failure };
         var mission = new FakeMissionStart();
 
-        var result = play.RequestMission(mission, null);
+        var result = play.RequestMission(mission);
         play.Update(false, false);
 
         Assert.Empty(starts);
@@ -1784,7 +1787,7 @@ public sealed class PlayControllerTests : IDisposable
         await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(1), Restarted(2)] }, first);
         var second = new FakeMissionStart { StartName = "t_wave (approximate)", Approximate = true };
 
-        var result = play.RequestMission(second, null);
+        var result = play.RequestMission(second);
         play.Update(false, false);
 
         Assert.Equal(2, editor.SaveCalls);
@@ -1852,8 +1855,8 @@ public sealed class PlayControllerTests : IDisposable
     [Fact]
     public async Task StopAndANewerRequestEndARequestThatWaits()
     {
-        var replaced = play.RequestMission(new FakeMissionStart(), null);
-        var stopped = play.RequestMission(new FakeMissionStart(), null);
+        var replaced = play.RequestMission(new FakeMissionStart());
+        var stopped = play.RequestMission(new FakeMissionStart());
 
         play.Stop();
         play.Update(false, false);
@@ -1891,7 +1894,7 @@ public sealed class PlayControllerTests : IDisposable
         await PlayMissionToRunningAsync(Game with { RestartLines = [RestartFailed(1), Restarted(2)] }, first);
         var second = new FakeMissionStart { StartName = "t_wave (approximate)" };
 
-        var result = play.RequestMission(second, null);
+        var result = play.RequestMission(second);
         play.Update(false, false);
         await RunUntilAsync(PlayStatus.Running);
 
@@ -1919,7 +1922,7 @@ public sealed class PlayControllerTests : IDisposable
         await PlayMissionToRunningAsync(Game with { RestartLines = [Restarted(2)] }, running);
         editor.SaveResult = new SaveOutcome(true, 2, false);
 
-        var result = play.RequestMission(new FakeMissionStart { RefuseWith = "The path is refused." }, null);
+        var result = play.RequestMission(new FakeMissionStart { RefuseWith = "The path is refused." });
         play.Update(false, false);
         editor.Finish(2);
 
@@ -1966,7 +1969,7 @@ public sealed class PlayControllerTests : IDisposable
     {
         editor.Commit(1);
         editor.Finish(1);
-        var result = play.RequestMission(new FakeMissionStart(), null, (PlaySaveRule)rule);
+        var result = play.RequestMission(new FakeMissionStart(), (PlaySaveRule)rule);
         play.Update(editing: true, dialogOpen: false);
 
         editor.Session = editor.Session! with { Unsaved = unsaved };
@@ -2001,7 +2004,7 @@ public sealed class PlayControllerTests : IDisposable
         editor.SceneBehind = true;
         var mission = new FakeMissionStart();
 
-        _ = play.RequestMission(mission, null);
+        _ = play.RequestMission(mission);
         play.Update(false, false);
 
         Assert.Equal(0, mission.Prepares);
@@ -2025,7 +2028,7 @@ public sealed class PlayControllerTests : IDisposable
         var second = new FakeMissionStart();
         editor.SceneBehind = true;
 
-        _ = play.RequestMission(second, null);
+        _ = play.RequestMission(second);
         play.Update(false, false);
         Assert.Equal(0, second.Prepares);
 
@@ -2049,7 +2052,7 @@ public sealed class PlayControllerTests : IDisposable
         editor.SceneBehind = true;
         var mission = new FakeMissionStart { ReadsScene = false };
 
-        _ = play.RequestMission(mission, null);
+        _ = play.RequestMission(mission);
         play.BeforePanels(editing: false);
         play.Update(false, false);
 
@@ -2140,7 +2143,7 @@ public sealed class PlayControllerTests : IDisposable
     {
         await PlayMissionToRunningAsync(Game, new FakeMissionStart());
         editor.Commit(2);
-        var result = play.RequestMission(new FakeMissionStart { StartName = "t_wave (approximate)" }, null);
+        var result = play.RequestMission(new FakeMissionStart { StartName = "t_wave (approximate)" });
         play.Update(false, false);
         Assert.False(result.IsCompleted);
 
@@ -2177,7 +2180,7 @@ public sealed class PlayControllerTests : IDisposable
         plan = game;
         editor.Commit(1);
         editor.Finish(1);
-        _ = play.RequestMission(mission, null);
+        _ = play.RequestMission(mission);
         play.Update(false, false);
         await RunUntilAsync(PlayStatus.Running);
     }

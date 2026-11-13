@@ -59,6 +59,13 @@ internal interface IMissionPlayHost
     /// <summary>The play start of a script of the open profile, or the mission start.</summary>
     MissionStartPoint PlayStartOf(string script);
 
+    /// <summary>
+    /// The ship part of the start save of a script (issue #48): the ship and the loadout of the ship package of the field
+    /// "Ship" of its play start, else of the ship package of the profile. Null without a ship package: the play then gets
+    /// the ship of a new character. Null with the reason when the edit view cannot give the ship of the package.
+    /// </summary>
+    StartSaveShip? ShipOf(string script, out string? problem);
+
     /// <summary>Stores the play start of a script of the open profile (decision D762).</summary>
     void SetPlayStart(string script, MissionStartPoint start);
 }
@@ -66,10 +73,12 @@ internal interface IMissionPlayHost
 /// <summary>
 /// The start of one mission play (sections 5.6 and 5.8 of the M6c design). Play calls <see cref="Prepare"/> after its
 /// save and before each restart. It makes the start plan from the model of the saved script, and it writes the start save
-/// and the test layer into the play folder. The start follows a rename of its trigger, also its Undo and its Redo, so a
-/// restart after the rename finds the trigger. A start whose trigger is gone becomes the mission start, and the Console
-/// tells it (decision D762). Only a request of the user from the play start also makes the play start of the settings
-/// the mission start. So a request of an agent and a Play menu item keep the play start of the user.
+/// and the test layer into the play folder. The start save holds the ship and the loadout of the field "Ship" of the
+/// play start, and each restart reads the field again (issue #48). The start follows a rename of its trigger, also its
+/// Undo and its Redo, so a restart after the rename finds the trigger. A start whose trigger is gone becomes the mission
+/// start, and the Console tells it (decision D762). Only a request of the user from the play start also makes the play
+/// start of the settings the mission start. So a request of an agent and a Play menu item keep the play start of the
+/// user.
 /// </summary>
 internal sealed class MissionPlayStart(IMissionPlayHost host, MissionPlayRequest request) : IMissionStart
 {
@@ -159,12 +168,19 @@ internal sealed class MissionPlayStart(IMissionPlayHost host, MissionPlayRequest
             }
         }
 
+        // The ship of the field, else the ship of the profile. A restart reads the field again.
+        var ship = host.ShipOf(Request.Script, out var shipProblem);
+        if (shipProblem != null)
+        {
+            return Refuse(shipProblem);
+        }
+
         var save = PlayFolder.StartSavePath(profile);
         var layer = PlayFolder.TestLayerPath(profile);
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(save)!);
-            File.WriteAllText(save, StartSaveText.OpenLancer(plan, place, DateTime.Now), new UTF8Encoding(false));
+            File.WriteAllText(save, StartSaveText.OpenLancer(plan, place, DateTime.Now, ship), new UTF8Encoding(false));
             // An exact start writes a layer without a patch, so a restart never reads the setup of an earlier start.
             TestLayer.Write(layer, plan);
         }

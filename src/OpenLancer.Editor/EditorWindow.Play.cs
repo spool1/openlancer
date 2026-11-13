@@ -225,6 +225,17 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
 
     string? IMissionPlayEditor.PlayPackage => PlayPackage;
 
+    StartSaveShip? IMissionPlayEditor.ShipPart(string package, out string? problem)
+    {
+        if (Session is not { } session)
+        {
+            problem = "No profile is open.";
+            return null;
+        }
+
+        return PlayShips.ShipPart(session.Edits, package, out problem);
+    }
+
     PlayStatus IMissionPlayEditor.PlayStatus => Play.Status;
 
     IMissionStart? IMissionPlayEditor.RunningMission => Play.Mission;
@@ -233,8 +244,8 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
 
     bool IMissionPlayEditor.GameRuns => GamePlay.GameRuns;
 
-    Task<PlayRequestResult> IMissionPlayEditor.RequestMission(IMissionStart start, string? package, PlaySaveRule save) =>
-        Play.RequestMission(start, package, save);
+    Task<PlayRequestResult> IMissionPlayEditor.RequestMission(IMissionStart start, PlaySaveRule save) =>
+        Play.RequestMission(start, save);
 
     string? IAgentPlayHost.UnsavedMod => Session is { Edits: { IsDirty: true, ActiveMod: { } mod } } ? mod.Id : null;
 

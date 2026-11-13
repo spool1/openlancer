@@ -375,6 +375,60 @@ public sealed class MissionPlayTests : IDisposable
         Assert.DoesNotContain("ol_guard", text);
     }
 
+    /// <summary>The ship part of the package of the field "Ship" in the tests.</summary>
+    private static readonly StartSaveShip FieldShip = new("ol_field_ship", [("ol_gun", "HpWeapon01")], [("ol_ammo", 20)]);
+
+    /// <summary>The ship part of the package of the Play menu in the tests.</summary>
+    private static readonly StartSaveShip ProfileShip = new("ol_profile_ship", [("ol_engine", "internal")], []);
+
+    /// <summary>
+    /// The start save holds the ship and the loadout of the field "Ship" of the play start (issue #48). Without a ship in
+    /// the field, it holds the ship of the profile. Without both, it has no ship lines, so the game gives the ship of a
+    /// new character. Play prepares the start again for each restart, so a restart reads a changed field.
+    /// </summary>
+    [Fact]
+    public void TheStartSaveHoldsTheShipOfTheFieldElseTheShipOfTheProfile()
+    {
+        editor.Packages["ol_field_package"] = FieldShip;
+        editor.Packages["ol_profile_package"] = ProfileShip;
+        var start = new MissionPlayStart(plays, new MissionPlayRequest(ScriptPath, MissionStartPoint.At("t_restore")));
+        string StartSave() => File.ReadAllText(start.Prepare()!.Save);
+
+        Assert.DoesNotContain("ship_archetype", StartSave());
+        Assert.Empty(editor.ShipCalls);
+
+        editor.PlayPackage = "ol_profile_package";
+        var profile = StartSave();
+        plays.SetPlayStart(ScriptPath, plays.PlayStartOf(ScriptPath) with { Ship = "ol_field_package" });
+        var field = StartSave();
+
+        Assert.Contains("ship_archetype = ol_profile_ship", profile);
+        Assert.Contains("equip = ol_engine, internal", profile);
+        Assert.Contains("ship_archetype = ol_field_ship", field);
+        Assert.Contains("equip = ol_gun, HpWeapon01", field);
+        Assert.Contains("cargo = ol_ammo, 20", field);
+        Assert.DoesNotContain("ol_profile_ship", field);
+        Assert.Equal(["ol_profile_package", "ol_field_package"], editor.ShipCalls);
+        Assert.Empty(Console);
+    }
+
+    /// <summary>A ship package that the edit view cannot resolve stops the start with the reason of the builder. Play
+    /// gives the reason to the Console and to the result of F5, of a Play button and of the agent tool. The start writes
+    /// no start save.</summary>
+    [Fact]
+    public void AShipThatTheEditViewCannotResolveStopsTheStart()
+    {
+        plays.SetPlayStart(ScriptPath, new PlayStartSetting("t_restore", "suggested", "ol_lost_package"));
+        var start = new MissionPlayStart(plays, new MissionPlayRequest(ScriptPath, MissionStartPoint.At("t_restore")));
+
+        Assert.Null(start.Prepare());
+
+        Assert.Equal("The edit view has no ship package 'ol_lost_package'. Play cannot give the player this ship.",
+            start.Refusal);
+        Assert.Null(start.Plan);
+        Assert.False(File.Exists(PlayFolder.StartSavePath(editor.ProfilePath!)));
+    }
+
     private const string PlayStartNote = "The play start of M99 named trigger 't_gone'. The script does not have this " +
                                          "trigger now. The play start is the mission start again.";
 
@@ -558,7 +612,24 @@ public sealed class MissionPlayTests : IDisposable
 
         public StorySlot? Slot { get; set; } = StartPlanTests.Slot;
 
-        public string? PlayPackage => null;
+        /// <summary>The ship package of the Play menu, or null for the default ship.</summary>
+        public string? PlayPackage { get; set; }
+
+        /// <summary>The ship parts of the packages of the edit view of the fake.</summary>
+        public Dictionary<string, StartSaveShip> Packages { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The package of each call of <see cref="ShipPart"/>, in order.</summary>
+        public List<string> ShipCalls { get; } = [];
+
+        public StartSaveShip? ShipPart(string package, out string? problem)
+        {
+            ShipCalls.Add(package);
+            var ship = Packages.GetValueOrDefault(package);
+            problem = ship == null
+                ? $"The edit view has no ship package '{package}'. Play cannot give the player this ship."
+                : null;
+            return ship;
+        }
 
         public PlayStatus PlayStatus { get; set; } = PlayStatus.Idle;
 
@@ -609,7 +680,7 @@ public sealed class MissionPlayTests : IDisposable
         /// <summary>The result of the next requests, or null for a play that started at once.</summary>
         public TaskCompletionSource<PlayRequestResult>? Result { get; set; }
 
-        public Task<PlayRequestResult> RequestMission(IMissionStart start, string? package, PlaySaveRule save)
+        public Task<PlayRequestResult> RequestMission(IMissionStart start, PlaySaveRule save)
         {
             Requests.Add(start);
             Saves.Add(save);
