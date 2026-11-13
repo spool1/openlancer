@@ -68,7 +68,7 @@ public static class InstallPaths
     /// also with an extension, for example <c>nul.ini</c>. A write to such a path writes to the device. No file of the
     /// game data can have such a name.
     /// </summary>
-    private static bool IsDeviceName(string part)
+    internal static bool IsDeviceName(string part)
     {
         var stem = part.Split('.')[0].TrimEnd(' ').ToUpperInvariant();
         return stem is "CON" or "PRN" or "AUX" or "NUL" or "CONIN$" or "CONOUT$" ||

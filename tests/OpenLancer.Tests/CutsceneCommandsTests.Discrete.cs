@@ -69,8 +69,13 @@ public sealed partial class CutsceneCommandsTests
         AssertRefused(session, CutsceneCommands.Create(session, new string('a', ThnEdits.MaxNameLength + 1)),
             "Use a name of at most 64 characters.", MissionErrors.NameInvalid);
         Assert.True(CutsceneCommands.Create(session, new string('a', ThnEdits.MaxNameLength)).CanRun);
-        var folder = CutsceneCommands.Create(session, @"..\x");
-        Assert.Equal(MissionErrors.NameInvalid, Assert.Single(folder.Report(session).Errors).Detail);
+        // A name with a folder separator gives the name rule, not the folder rule.
+        AssertRefused(session, CutsceneCommands.Create(session, @"..\x"), ThnEdits.BadName, MissionErrors.NameInvalid);
+        AssertRefused(session, CutsceneCommands.Create(session, "a/b"), ThnEdits.BadName, MissionErrors.NameInvalid);
+        // Windows opens these names as devices, in any letter case, so the session cannot open such a path.
+        foreach (var device in new[] { "nul", "CON", "aux", "com1", "LPT9", "prn" })
+            AssertRefused(session, CutsceneCommands.Create(session, device), ThnEdits.DeviceName(device), MissionErrors.NameInvalid);
+        Assert.True(CutsceneCommands.Create(session, "null").CanRun);
         AssertRefused(viewer, CutsceneCommands.Create(viewer, "my_cut"), ThnEdits.NoActiveMod, MissionErrors.NotEditable);
         Assert.Equal("New cutscene my_cut", session.UndoLabel);
         session.Undo();

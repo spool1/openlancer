@@ -513,7 +513,7 @@ The cutscene tools change the cutscene scripts of the active mod with the comman
 | `cutscene_set_duration` | Sets the length of a script in seconds, as the duration field of the Inspector does. |
 | `cutscene_set_flags` | Sets the flags of one entity, as the flag boxes of the Inspector do. The flags are REFERENCE, LIT_DYNAMIC, LIT_AMBIENT and HIDDEN. A SOUND has SPATIAL in place of LIT_DYNAMIC. The flags that the list does not name go off. |
 
-A new cutscene goes into the folder `DATA\MODS\<mod id>\CUTSCENES` of the active mod, and a save writes it as a whole file. A name can have letters, digits, `_` and `-`, and at most 64 characters, as in the name field of **New cutscene**. Another name gives `refused` with the detail `NameInvalid`. A name of a cutscene that exists gives `name_taken`, also in other letter case.
+A new cutscene goes into the folder `DATA\MODS\<mod id>\CUTSCENES` of the active mod, and a save writes it as a whole file. A name can have letters, digits, `_` and `-`, and at most 64 characters, as in the name field of **New cutscene**. A name that Windows uses for a device, for example `nul` or `com1`, is not allowed, in any letter case. Another name gives `refused` with the detail `NameInvalid`, and the message gives the rule. A name of a cutscene that exists gives `name_taken`, also in other letter case.
 
 Each argument takes one kind of `thn:` reference. `cutscene` takes a script, `entity` takes an entity, and `events` takes events. Another reference gives `invalid_argument`. All events of one call must be in one cutscene. One call names at most 200 events. `targets` of `cutscene_add_event` takes entity names, not references. A reference in `targets` gives `not_found`, because no entity has that name.
 

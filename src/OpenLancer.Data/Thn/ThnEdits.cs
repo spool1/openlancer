@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions.Editing;
 
@@ -281,6 +282,10 @@ public static class ThnEdits
     /// <summary>The refusal of a name with more than <see cref="MaxNameLength"/> characters.</summary>
     public static readonly string LongName = $"Use a name of at most {MaxNameLength} characters.";
 
+    /// <summary>The refusal of a name that Windows opens as a device, for example <c>nul</c> (see
+    /// <see cref="InstallPaths.IsDeviceName"/>). A save cannot write a file with such a name.</summary>
+    public static string DeviceName(string name) => $"Windows uses the name {name} for a device. Type another name.";
+
     /// <summary>
     /// Why the user cannot make a new cutscene at an install path, or null (decision D134 of the M8b design): the
     /// session has no active mod or is read-only, the path is not <c>DATA\MODS\&lt;active mod id&gt;\CUTSCENES\&lt;name&gt;.thn</c>,
@@ -337,20 +342,37 @@ public static class ThnEdits
 
     /// <summary>Why the path is not a path of a new cutscene of a mod, or null: the path and the name rules of
     /// <see cref="NewCutsceneRefusal"/>. The restore of the recovery file uses them too.</summary>
+    /// <remarks>The name is the text after the folder. A name with a folder separator, for example a name that starts
+    /// with <c>../</c>, names another folder. So the name rule refuses it before the folder rule. A name that Windows
+    /// opens as a device refuses too, because the session refuses such a path (see
+    /// <see cref="InstallPaths.Problem"/>).</remarks>
     internal static string? NewCutscenePathProblem(Mods.Mod mod, string path)
     {
-        var normal = VfsPath.Normalize(path);
         var folder = EditSession.NewCutsceneFolder(mod.Id);
+        var prefix = folder + '\\';
+        const string extension = ".thn";
+        if (path.Length > prefix.Length + extension.Length && path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+            path.EndsWith(extension, StringComparison.OrdinalIgnoreCase) &&
+            !IsNameText(path[prefix.Length..^extension.Length]))
+            return BadName;
+        var normal = VfsPath.Normalize(path);
         if (normal == null || !VfsPath.Comparer.Equals(VfsPath.Parent(normal), folder) ||
-            !normal.EndsWith(".thn", StringComparison.OrdinalIgnoreCase))
+            !normal.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
             return $@"A new cutscene goes into the folder {folder} of the active mod.";
         var name = System.IO.Path.GetFileNameWithoutExtension(normal);
         if (name.Length == 0)
             return "Type a name for the cutscene.";
-        if (!name.All(c => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '_' or '-'))
+        if (!IsNameText(name))
             return BadName;
-        return name.Length > MaxNameLength ? LongName : null;
+        if (name.Length > MaxNameLength)
+            return LongName;
+        return InstallPaths.IsDeviceName(name) ? DeviceName(name) : null;
     }
+
+    /// <summary>True for a text of letters, digits, <c>_</c> and <c>-</c> only: the characters of the name of a new
+    /// cutscene.</summary>
+    private static bool IsNameText(string name) =>
+        name.All(c => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '_' or '-');
 
     private static void CheckKind(ThnRef target, ThnElementKind kind)
     {

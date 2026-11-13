@@ -206,6 +206,8 @@ public sealed partial class AgentCutsceneToolTests
     [InlineData("cutscene_create", """{ "name": "..\\x" }""", "refused", MissionErrors.NameInvalid, "name")]
     [InlineData("cutscene_create", """{ "name": "C:x" }""", "refused", MissionErrors.NameInvalid, "name")]
     [InlineData("cutscene_create", """{ "name": "a:b" }""", "refused", MissionErrors.NameInvalid, "name")]
+    [InlineData("cutscene_create", """{ "name": "nul" }""", "refused", MissionErrors.NameInvalid, "name")]
+    [InlineData("cutscene_create", """{ "name": "COM1", "duration": 5 }""", "refused", MissionErrors.NameInvalid, "name")]
     [InlineData("cutscene_create", $$"""{ "name": "{{LongName}}" }""", "refused", MissionErrors.NameInvalid, "name")]
     [InlineData("cutscene_create", """{ "name": "my_intro", "duration": -1 }""", "invalid_value", MissionErrors.FieldValue, "duration")]
     [InlineData("cutscene_set_duration", """{ "cutscene": "thn:DATA\\SCRIPTS\\x.thn", "seconds": -1 }""", "invalid_value", MissionErrors.FieldValue, "seconds")]
@@ -257,6 +259,8 @@ public sealed partial class AgentCutsceneToolTests
 
         var taken = Error(host, "cutscene_create", """{ "name": "MY_INTRO" }""");
         var name = Error(host, "cutscene_create", """{ "name": "a:b" }""");
+        var device = Error(host, "cutscene_create", """{ "name": "nul" }""");
+        var folder = Error(host, "cutscene_create", """{ "name": "../x" }""");
         var spatial = Error(host, "cutscene_set_flags", $$"""{ "entity": {{Json(Script + "#entity/Cam_A")}}, "flags": ["SPATIAL"] }""");
         var early = Error(host, "cutscene_move_events",
             $$"""{ "events": [ { "ref": {{Json(Script + "#event/0")}} } ], "time_delta": -1 }""");
@@ -273,6 +277,9 @@ public sealed partial class AgentCutsceneToolTests
         Assert.Equal(("name_taken", MissionErrors.PathInUse), (taken.Code, taken.Detail));
         Assert.Equal(ThnEdits.PathInUse, taken.Message);
         Assert.Equal(ThnEdits.BadName, name.Message);
+        Assert.Equal(("refused", MissionErrors.NameInvalid, "Windows uses the name nul for a device. Type another name."),
+            (device.Code, device.Detail, device.Message));
+        Assert.Equal(ThnEdits.BadName, folder.Message);
         Assert.Equal("Use a name of at most 64 characters.", longName.Message);
         Assert.Equal("Event 0 is a SET_CAMERA event. An event of this type has no length.", cutLength.Message);
         Assert.Equal("SPATIAL is not a flag of an entity that is not a SOUND. The flags are REFERENCE, LIT_DYNAMIC, " +
