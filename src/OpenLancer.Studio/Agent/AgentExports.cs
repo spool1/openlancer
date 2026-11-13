@@ -113,6 +113,18 @@ public sealed class AgentExports
             return task;
         }
 
+        /// <summary>Waits for the work that <see cref="Start{T}"/> gives. While the work runs, a cancel ends the wait
+        /// with <see cref="OperationCanceledException"/>. The work can end before the wait starts. So after the end of
+        /// the work, a cancel still counts when the work did not start its write. After a write, the wait gives the
+        /// result of the work.</summary>
+        public async Task<T> WaitAsync<T>(Task<T> work, CancellationToken cancel)
+        {
+            var result = await work.WaitAsync(cancel).ConfigureAwait(false);
+            if (!Writes)
+                cancel.ThrowIfCancellationRequested();
+            return result;
+        }
+
         /// <summary>Marks the start of the write, or gives false when a stop came first. After it, a stop has no
         /// effect.</summary>
         public bool Write()

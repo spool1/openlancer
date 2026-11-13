@@ -304,6 +304,32 @@ public sealed class AgentPublishToolTests
         Assert.False(host.Exports.Running);
     }
 
+    /// <summary>The work of an export can end before the tail waits for it. A cancel then still counts when the work did
+    /// not start its write, so the tail gives the cancel and not the result.</summary>
+    [Fact]
+    public async Task ACancelAfterTheEndOfAWorkWithoutAWriteStillCounts()
+    {
+        var run = new AgentExports().Begin()!;
+        var work = run.Start(_ => "stopped");
+        await work.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run.WaitAsync(work, new CancellationToken(true)));
+        Assert.False(run.Writes);
+    }
+
+    /// <summary>A cancel after the end of the work does not hide the result when the work wrote its packages. The tail
+    /// then gives the real result of the export, not the failure that tells that the write goes on.</summary>
+    [Fact]
+    public async Task ACancelAfterTheEndOfAWriteGivesTheResultOfTheExport()
+    {
+        var run = new AgentExports().Begin()!;
+        var work = run.Start(_ => run.Write() ? "written" : "stopped");
+        await work.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+        Assert.Equal("written", await run.WaitAsync(work, new CancellationToken(true)));
+        Assert.True(run.Writes);
+    }
+
     /// <summary>The tail of an export has its own time limit (section 8.4 of the MCP1 design). It is 10 minutes by
     /// default, not the limit of a check or an image. The queue applies it to the tail of the export.</summary>
     [Fact]

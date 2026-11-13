@@ -164,9 +164,7 @@ internal static class PublishTools
             var work = run.Start(beforeWrite => Work(run, request, location, replace, beforeWrite, live));
             try
             {
-                var outcome = await work.WaitAsync(cancel).ConfigureAwait(false);
-                // A cancel before the end of the work counts, also when the work ended before the wait started.
-                cancel.ThrowIfCancellationRequested();
+                var outcome = await run.WaitAsync(work, cancel).ConfigureAwait(false);
                 return outcome.Result(workspace, publishProblems);
             }
             catch (OperationCanceledException)
