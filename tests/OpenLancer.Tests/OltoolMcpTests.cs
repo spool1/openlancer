@@ -32,9 +32,9 @@ public sealed class OltoolMcpTests
     private static string Tool => Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "oltool.exe" : "oltool");
 
     [Fact]
-    public void TheToolListIsTheSnapshot()
+    public async Task TheToolListIsTheSnapshot()
     {
-        var (exit, output, errors) = Run("mcp", "tools", "--json");
+        var (exit, output, errors) = await RunAsync("mcp", "tools", "--json");
 
         Assert.True(exit == 0, errors);
         var snapshot = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "AgentTools.snapshot.json"));
@@ -45,9 +45,9 @@ public sealed class OltoolMcpTests
     }
 
     [Fact]
-    public void TheTextToolListNamesEachTool()
+    public async Task TheTextToolListNamesEachTool()
     {
-        var (exit, output, _) = Run("mcp", "tools");
+        var (exit, output, _) = await RunAsync("mcp", "tools");
 
         Assert.Equal(0, exit);
         Assert.All(AgentTools.All, t => Assert.Contains($"{t.Name}: {t.Title}", output));
@@ -72,26 +72,26 @@ public sealed class OltoolMcpTests
         };
         info.Environment["CLAUDE_CODE_MCP_SERVER_URL"] = url;
         using var process = Process.Start(info)!;
-        var output = process.StandardOutput.ReadToEndAsync(Token);
-        var errors = process.StandardError.ReadToEndAsync(Token);
+        var output = process.StandardOutput.ReadToEndOnOwnThread();
+        var errors = process.StandardError.ReadToEndOnOwnThread();
 
-        await process.WaitForExitAsync(Token).WaitAsync(TimeSpan.FromMinutes(1), Token);
+        await process.ExitAsync(TimeSpan.FromMinutes(1), "oltool mcp token did not end.");
         Assert.Equal(2, process.ExitCode);
         Assert.Empty(await output);
         Assert.Contains("Do not use localhost.", await errors);
     }
 
     [Fact]
-    public void ServeAndReplayCheckTheirArguments()
+    public async Task ServeAndReplayCheckTheirArguments()
     {
         using var ws = SceneWorkspace.Create();
 
-        var noMod = Run("mcp", "serve", ws.ProfilePath, "--read-only");
-        var unknown = Run("mcp", "serve", ws.ProfilePath, "--mod", "none");
-        var both = Run("mcp", "serve", ws.ProfilePath, "--mod", "act", "--restore-recovery", "--discard-recovery");
-        var readOnly = Run("mcp", "serve", ws.ProfilePath, "--mod", "act", "--read-only", "--discard-recovery");
-        var twice = Run("mcp", "serve", ws.ProfilePath, "--mod", "act", "--no-save", "--no-save");
-        var replay = Run("mcp", "replay", ws.ProfilePath, "--mod", "act");
+        var noMod = await RunAsync("mcp", "serve", ws.ProfilePath, "--read-only");
+        var unknown = await RunAsync("mcp", "serve", ws.ProfilePath, "--mod", "none");
+        var both = await RunAsync("mcp", "serve", ws.ProfilePath, "--mod", "act", "--restore-recovery", "--discard-recovery");
+        var readOnly = await RunAsync("mcp", "serve", ws.ProfilePath, "--mod", "act", "--read-only", "--discard-recovery");
+        var twice = await RunAsync("mcp", "serve", ws.ProfilePath, "--mod", "act", "--no-save", "--no-save");
+        var replay = await RunAsync("mcp", "replay", ws.ProfilePath, "--mod", "act");
 
         Assert.Equal(2, noMod.Exit);
         Assert.Contains("The server needs the active mod.", noMod.Errors);
@@ -117,7 +117,7 @@ public sealed class OltoolMcpTests
         {
             this.process = process;
             Client = client;
-            errors = process.StandardError.ReadToEndAsync(Token);
+            errors = process.StandardError.ReadToEndOnOwnThread();
         }
 
         public McpClient Client { get; }
@@ -160,10 +160,10 @@ public sealed class OltoolMcpTests
         }
 
         /// <summary>Ends the server without the end of its standard input, as a client that ends it at once does.</summary>
-        public void Kill()
+        public async Task KillAsync()
         {
             process.Kill(entireProcessTree: true);
-            process.WaitForExit(TimeSpan.FromSeconds(30));
+            await process.ExitAsync(TimeSpan.FromSeconds(30), "oltool mcp serve did not end after the kill.");
         }
 
         public async ValueTask DisposeAsync()
@@ -174,7 +174,7 @@ public sealed class OltoolMcpTests
                 {
                     await Client.DisposeAsync();
                     process.StandardInput.Close();
-                    Assert.True(process.WaitForExit(TimeSpan.FromSeconds(60)), "oltool mcp serve did not end at the end of stdin.");
+                    await process.ExitAsync(TimeSpan.FromSeconds(60), "oltool mcp serve did not end at the end of stdin.");
                 }
             }
             finally
@@ -243,7 +243,7 @@ public sealed class OltoolMcpTests
 
         /// <summary>Writes the calls as an audit log into the folder of a fresh copy of the profile, and runs
         /// <c>oltool mcp replay</c> of the log on the copy.</summary>
-        public (int Exit, string Output, string Errors) Replay(TestWorkspace copy)
+        public async Task<(int Exit, string Output, string Errors)> ReplayAsync(TestWorkspace copy)
         {
             var log = Path.Combine(copy.Root, "calls.jsonl");
             File.WriteAllLines(log, calls.Select(c => new JsonObject
@@ -252,7 +252,7 @@ public sealed class OltoolMcpTests
                 ["arguments"] = JsonNode.Parse(c.Arguments),
                 ["result"] = AuditLog.Outcome(c.Outcome),
             }.ToJsonString()));
-            return Run("mcp", "replay", copy.ProfilePath, "--mod", "act", log);
+            return await RunAsync("mcp", "replay", copy.ProfilePath, "--mod", "act", log);
         }
     }
 
@@ -277,7 +277,7 @@ public sealed class OltoolMcpTests
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
             while (!File.Exists(recovery) && DateTime.UtcNow < deadline)
                 await Task.Delay(100, Token);
-            server.Kill();
+            await server.KillAsync();
         }
         var session = ws.Session("act");
 
@@ -360,7 +360,7 @@ public sealed class OltoolMcpTests
         Assert.Contains("nickname = my_wreck_1_loadout", ws.ReadModPatch(BuilderWorkspace.Loadout("my_wreck_1_loadout").Path));
         Assert.False(File.Exists(RecoveryFile.PathOf(ws.ModFolder("act"))));
 
-        var replay = calls.Replay(copy);
+        var replay = await calls.ReplayAsync(copy);
 
         Assert.True(replay.Exit == 0, replay.Errors);
         Assert.Equal(TestWorkspace.Files(ws.ModFolder("act")), TestWorkspace.Files(copy.ModFolder("act")));
@@ -596,7 +596,7 @@ public sealed class OltoolMcpTests
         }
 
         // 11. The replay of the recorded calls on a fresh copy gives the same files of the mod.
-        var replay = calls.Replay(copy);
+        var replay = await calls.ReplayAsync(copy);
 
         Assert.True(replay.Exit == 0, replay.Errors);
         Assert.Equal(TestWorkspace.Files(ws.ModFolder("act")), TestWorkspace.Files(copy.ModFolder("act")));
@@ -747,7 +747,7 @@ public sealed class OltoolMcpTests
         }
 
         // 12. The replay of the recorded calls on a fresh copy gives the same files of the mod.
-        var replay = calls.Replay(copy);
+        var replay = await calls.ReplayAsync(copy);
 
         Assert.True(replay.Exit == 0, replay.Errors);
         Assert.Equal(TestWorkspace.Files(ws.ModFolder("act")), TestWorkspace.Files(copy.ModFolder("act")));
@@ -773,7 +773,7 @@ public sealed class OltoolMcpTests
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
             while (!File.Exists(recovery) && DateTime.UtcNow < deadline)
                 await Task.Delay(100, Token);
-            server.Kill();
+            await server.KillAsync();
         }
         var session = ws.Session("act");
 
@@ -802,7 +802,7 @@ public sealed class OltoolMcpTests
             RedirectStandardError = true,
             UseShellExecute = false,
         })!;
-        var errors = server.StandardError.ReadToEndAsync(Token);
+        var errors = server.StandardError.ReadToEndOnOwnThread();
         try
         {
             var client = await McpClient.CreateAsync(
@@ -840,7 +840,7 @@ public sealed class OltoolMcpTests
                 Assert.Equal("not_available", console.GetProperty("code").GetString());
             }
             server.StandardInput.Close();
-            Assert.True(server.WaitForExit(TimeSpan.FromSeconds(30)), "oltool mcp serve did not end at the end of stdin.");
+            await server.ExitAsync(TimeSpan.FromSeconds(30), "oltool mcp serve did not end at the end of stdin.");
             Assert.Equal(0, server.ExitCode);
             Assert.Contains("read-only", await errors);
         }
@@ -860,7 +860,7 @@ public sealed class OltoolMcpTests
             ["arguments"] = JsonSerializer.SerializeToNode(c.Arguments),
             ["result"] = AuditLog.Outcome(c.Outcome),
         }.ToJsonString()));
-        var replay = Run("mcp", "replay", ws.ProfilePath, "--mod", "act", log);
+        var replay = await RunAsync("mcp", "replay", ws.ProfilePath, "--mod", "act", log);
 
         Assert.True(replay.Exit == 0, replay.Errors);
         var lines = replay.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => JsonNode.Parse(l)!).ToList();
@@ -872,11 +872,11 @@ public sealed class OltoolMcpTests
             """{"tool": "studio_status", "arguments": {}}""",
             """{"tool": "get_item", "arguments": {"ref": "obj:Li01_01"}, "result": {"status": "error", "code": "not_found"}}""",
         ]);
-        var differs = Run("mcp", "replay", ws.ProfilePath, "--mod", "act", log);
+        var differs = await RunAsync("mcp", "replay", ws.ProfilePath, "--mod", "act", log);
         File.WriteAllLines(log, ["""{"tool": "get_item", "arguments": {"ref": "obj:none"}}"""]);
-        var unrecorded = Run("mcp", "replay", ws.ProfilePath, "--mod", "act", log);
+        var unrecorded = await RunAsync("mcp", "replay", ws.ProfilePath, "--mod", "act", log);
         File.WriteAllLines(log, ["not json"]);
-        var broken = Run("mcp", "replay", ws.ProfilePath, "--mod", "act", log);
+        var broken = await RunAsync("mcp", "replay", ws.ProfilePath, "--mod", "act", log);
 
         Assert.Equal(1, differs.Exit);
         Assert.Contains("Line 2: get_item gave ok, and the log has error not_found.", differs.Errors);

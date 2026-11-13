@@ -35,14 +35,14 @@ public sealed class AgentPublishToolTests
     /// <summary>The checklist parity test (review finding R12 of MCP1-2): the tool gives the steps and the recommended
     /// items of <c>oltool publish --json</c>.</summary>
     [Fact]
-    public void TheChecklistGivesTheStepsOfOltoolPublish()
+    public async Task TheChecklistGivesTheStepsOfOltoolPublish()
     {
         using var game = new ExportGame();
         var (profile, session) = Ready(game);
         using var _ = session;
 
         var tool = Ok(new TestAgentHost(session), "publish_checklist");
-        var (exit, output, errors) = Run("publish", profile, "--mod", "ol-test", "--json");
+        var (exit, output, errors) = await RunAsync("publish", profile, "--mod", "ol-test", "--json");
 
         Assert.True(exit == 1, errors);
         var json = JsonNode.Parse(output)!;

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using OpenLancer.Data.PlayCopies;
 using Xunit;
 using static OpenLancer.Tests.PlayGame;
@@ -18,65 +19,65 @@ public sealed class OltoolInstallTests : IDisposable
 
     public void Dispose() => game.Dispose();
 
-    private static (int Exit, string Output, string Errors) Run(params string[] arguments) =>
-        OltoolExportTests.Run(arguments);
+    private static Task<(int Exit, string Output, string Errors)> RunAsync(params string[] arguments) =>
+        OltoolExportTests.RunAsync(arguments);
 
     [Fact]
-    public void TheUsageNamesTheCommands()
+    public async Task TheUsageNamesTheCommands()
     {
-        var (exit, _, errors) = Run("install");
+        var (exit, _, errors) = await RunAsync("install");
 
         Assert.Equal(2, exit);
         Assert.Contains("install <profile.json> --game <folder> [--into <play copy>] [--full-copy]", errors);
         Assert.Contains("playcopy check <play copy>", errors);
-        Assert.Equal(2, Run("install", "p.json").Exit);
-        Assert.Equal(2, Run("playcopy", "check").Exit);
-        Assert.Equal(2, Run("uninstall").Exit);
+        Assert.Equal(2, (await RunAsync("install", "p.json")).Exit);
+        Assert.Equal(2, (await RunAsync("playcopy", "check")).Exit);
+        Assert.Equal(2, (await RunAsync("uninstall")).Exit);
     }
 
     [Fact]
-    public void TheExitCodesTellTheResult()
+    public async Task TheExitCodesTellTheResult()
     {
         var profile = game.Profile(game.Export.GoodsMod(GamePlayRig.GoodsPatch));
 
-        var installed = Run("install", profile, "--game", game.Root);
+        var installed = await RunAsync("install", profile, "--game", game.Root);
 
         Assert.True(installed.Exit == 0, installed.Errors);
         Assert.Contains(PlayCopyTexts.Make("Freelancer 1.0", game.CopyFolder), installed.Output);
         Assert.Contains($"Play copy: {game.CopyFolder}", installed.Output);
         Assert.Contains($"Program: {game.CopyPath(ProgramPath)}", installed.Output);
         Assert.Contains("price = 5600", File.ReadAllText(game.CopyPath(ExportGame.GoodsPath)));
-        var clean = Run("playcopy", "check", game.CopyFolder);
+        var clean = await RunAsync("playcopy", "check", game.CopyFolder);
         Assert.True(clean.Exit == 0, clean.Errors);
         Assert.Contains("0 differences", clean.Output);
 
         using (var stream = new FileStream(game.Game.PathOf(SoundPath), FileMode.Append, FileAccess.Write))
             stream.Write(" and more"u8);
-        var changed = Run("playcopy", "check", game.CopyFolder);
+        var changed = await RunAsync("playcopy", "check", game.CopyFolder);
         Assert.Equal(1, changed.Exit);
         Assert.Contains("changed after OpenLancer made the play copy", changed.Errors);
 
-        var uninstalled = Run("uninstall", game.CopyFolder);
+        var uninstalled = await RunAsync("uninstall", game.CopyFolder);
         Assert.True(uninstalled.Exit == 0, uninstalled.Errors);
         Assert.Equal(File.ReadAllBytes(game.Game.PathOf(ExportGame.GoodsPath)),
             File.ReadAllBytes(game.CopyPath(ExportGame.GoodsPath)));
 
-        var removed = Run("playcopy", "remove", game.CopyFolder);
+        var removed = await RunAsync("playcopy", "remove", game.CopyFolder);
         Assert.True(removed.Exit == 0, removed.Errors);
         Assert.False(Directory.Exists(game.CopyFolder));
-        var notACopy = Run("playcopy", "remove", game.Game.Folder);
+        var notACopy = await RunAsync("playcopy", "remove", game.Game.Folder);
         Assert.Equal(2, notACopy.Exit);
         Assert.Contains("is not an OpenLancer play copy", notACopy.Errors);
         Assert.True(Directory.Exists(game.Root));
-        Assert.Equal(2, Run("install", profile, "--game", Path.Combine(game.Game.Folder, "none")).Exit);
+        Assert.Equal(2, (await RunAsync("install", profile, "--game", Path.Combine(game.Game.Folder, "none"))).Exit);
     }
 
     [Fact]
-    public void ARefusedModGivesExitOne()
+    public async Task ARefusedModGivesExitOne()
     {
         var profile = game.Profile(game.Export.Mod("runtime", [], """, "tier": 2"""));
 
-        var (exit, _, errors) = Run("install", profile, "--game", game.Root);
+        var (exit, _, errors) = await RunAsync("install", profile, "--game", game.Root);
 
         Assert.Equal(1, exit);
         Assert.Contains("Mod 'runtime' is a tier-2 mod.", errors);
@@ -84,7 +85,7 @@ public sealed class OltoolInstallTests : IDisposable
     }
 
     [Fact]
-    public void APlayCopyInAModFolderOrTheProfileFolderIsRefused()
+    public async Task APlayCopyInAModFolderOrTheProfileFolderIsRefused()
     {
         var mod = game.Export.GoodsMod(GamePlayRig.GoodsPatch);
         var profile = game.Profile(mod);
@@ -97,7 +98,7 @@ public sealed class OltoolInstallTests : IDisposable
         {
             game.Track(folder);
 
-            var (exit, _, errors) = Run("install", profile, "--game", game.Root, "--into", folder, "--full-copy");
+            var (exit, _, errors) = await RunAsync("install", profile, "--game", game.Root, "--into", folder, "--full-copy");
 
             Assert.Equal(2, exit);
             Assert.Contains(PlayCopyTexts.OverlapsProtected(folder, other), errors);
@@ -106,13 +107,13 @@ public sealed class OltoolInstallTests : IDisposable
     }
 
     [Fact]
-    public void AFullCopyGoesIntoTheFolderOfInto()
+    public async Task AFullCopyGoesIntoTheFolderOfInto()
     {
         var profile = game.Profile(game.Export.GoodsMod(GamePlayRig.GoodsPatch));
         var folder = Path.Combine(game.Game.Folder, "full test copy");
         game.Track(folder);
 
-        var (exit, output, errors) = Run("install", profile, "--game", game.Root, "--into", folder, "--full-copy");
+        var (exit, output, errors) = await RunAsync("install", profile, "--game", game.Root, "--into", folder, "--full-copy");
 
         Assert.True(exit == 0, errors);
         Assert.Contains($"Play copy: {folder}", output);

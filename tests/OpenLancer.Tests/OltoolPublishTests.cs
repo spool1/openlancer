@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
+using System.Threading.Tasks;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Publishing;
 using Xunit;
@@ -22,12 +23,12 @@ public sealed class OltoolPublishTests
     }
 
     [Fact]
-    public void PrintsEachStep()
+    public async Task PrintsEachStep()
     {
         using var game = new ExportGame();
         var profile = Ready(game);
 
-        var (exit, output, errors) = Run("publish", profile, "--mod", "ol-test");
+        var (exit, output, errors) = await RunAsync("publish", profile, "--mod", "ol-test");
 
         Assert.True(exit == 1, errors);
         var lines = output.ReplaceLineEndings("\n").Split('\n');
@@ -43,12 +44,12 @@ public sealed class OltoolPublishTests
     }
 
     [Fact]
-    public void JsonHasEachStep()
+    public async Task JsonHasEachStep()
     {
         using var game = new ExportGame();
         var profile = Ready(game);
 
-        var (exit, output, errors) = Run("publish", profile, "--mod", "ol-test", "--json");
+        var (exit, output, errors) = await RunAsync("publish", profile, "--mod", "ol-test", "--json");
 
         Assert.True(exit == 1, errors);
         var json = JsonNode.Parse(output)!;
@@ -61,24 +62,24 @@ public sealed class OltoolPublishTests
         Assert.True(steps[0]!["complete"]!.GetValue<bool>());
         Assert.Single(steps[3]!["missing"]!.AsArray());
         Assert.Contains("Write a description.", json["recommended"]!.AsArray().Select(r => r!.GetValue<string>()));
-        Assert.Equal(2, Run("publish", profile, "--mod", "none").Exit);
-        Assert.Equal(2, Run("publish", profile).Exit);
+        Assert.Equal(2, (await RunAsync("publish", profile, "--mod", "none")).Exit);
+        Assert.Equal(2, (await RunAsync("publish", profile)).Exit);
     }
 
     [Fact]
-    public void ExitsZeroOnlyWhenAllStepsAreComplete()
+    public async Task ExitsZeroOnlyWhenAllStepsAreComplete()
     {
         using var game = new ExportGame();
         var profile = Ready(game);
         var mod = Path.Combine(game.ModsFolder, "ol-test");
         var root = Path.Combine(game.Game.Folder, "exports", "ol-test");
 
-        var export = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1");
-        var withoutPlay = Run("publish", profile, "--mod", "ol-test");
+        var export = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1");
+        var withoutPlay = await RunAsync("publish", profile, "--mod", "ol-test");
         var content = new ModFingerprint().Content(ModManifest.Load(mod), mod);
         PublishHistory.Update(new HistoryLocation(root, "ol-test", mod, []), "play",
             h => h.AddPlay(new HistoryPlay(DateTime.UtcNow, null, content, false, 0, true)));
-        var (exit, output, errors) = Run("publish", profile, "--mod", "ol-test");
+        var (exit, output, errors) = await RunAsync("publish", profile, "--mod", "ol-test");
 
         Assert.True(export.Exit == 0, export.Errors);
         Assert.Equal(1, withoutPlay.Exit);

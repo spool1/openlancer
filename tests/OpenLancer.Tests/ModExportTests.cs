@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using OpenLancer.Data;
 using OpenLancer.Data.Export;
 using OpenLancer.Data.Publishing;
@@ -497,7 +498,7 @@ public sealed class ModExportTests
 public sealed class OltoolExportTests
 {
     /// <summary>Runs the oltool of the test folder. The play copy tests use it too.</summary>
-    internal static (int Exit, string Output, string Errors) Run(params string[] arguments)
+    internal static async Task<(int Exit, string Output, string Errors)> RunAsync(params string[] arguments)
     {
         var tool = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "oltool.exe" : "oltool");
         Assert.True(File.Exists(tool), $"{tool} is not in the test folder.");
@@ -505,10 +506,10 @@ public sealed class OltoolExportTests
         foreach (var argument in arguments)
             info.ArgumentList.Add(argument);
         using var process = Process.Start(info)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var errors = process.StandardError.ReadToEndAsync();
-        Assert.True(process.WaitForExit(TimeSpan.FromMinutes(2)), "oltool did not end.");
-        return (process.ExitCode, output.Result, errors.Result);
+        var output = process.StandardOutput.ReadToEndOnOwnThread();
+        var errors = process.StandardError.ReadToEndOnOwnThread();
+        await process.ExitAsync(TimeSpan.FromMinutes(2), "oltool did not end.");
+        return (process.ExitCode, await output, await errors);
     }
 
     /// <summary>A fake Freelancer 1.0 (by the file version of Common.dll), a mod and a profile. Returns the profile
@@ -526,26 +527,26 @@ public sealed class OltoolExportTests
     }
 
     [Fact]
-    public void TheUsageNamesTheCommand()
+    public async Task TheUsageNamesTheCommand()
     {
-        var (exit, _, errors) = Run("export");
+        var (exit, _, errors) = await RunAsync("export");
 
         Assert.Equal(2, exit);
         Assert.Contains("export <profile.json> --mod <id> --target <hde-0.7.1|vanilla-1.1|openlancer> [--target ...]", errors);
-        Assert.Equal(2, Run("export", "x.json", "--mod", "m", "--target", "other").Exit);
-        Assert.Equal(2, Run("export", "x.json", "--mod", "m", "--target", "openlancer", "--target", "openlancer").Exit);
+        Assert.Equal(2, (await RunAsync("export", "x.json", "--mod", "m", "--target", "other")).Exit);
+        Assert.Equal(2, (await RunAsync("export", "x.json", "--mod", "m", "--target", "openlancer", "--target", "openlancer")).Exit);
     }
 
     [Fact]
-    public void TheExitCodesTellTheResult()
+    public async Task TheExitCodesTellTheResult()
     {
         using var game = new ExportGame();
         var profile = Profile(game);
         var output = Path.Combine(game.Game.Folder, "out");
 
-        var written = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin", "--out", output);
-        var noBase = Run("export", profile, "--mod", "ol-test", "--target", "hde-0.7.1", "--out", output);
-        var noMod = Run("export", profile, "--mod", "none", "--target", "vanilla-1.1");
+        var written = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin", "--out", output);
+        var noBase = await RunAsync("export", profile, "--mod", "ol-test", "--target", "hde-0.7.1", "--out", output);
+        var noMod = await RunAsync("export", profile, "--mod", "none", "--target", "vanilla-1.1");
 
         Assert.True(written.Exit == 0, written.Errors);
         Assert.True(File.Exists(Path.Combine(output, "ol-test-1.2.0-vanilla-1.1.zip")));
@@ -556,13 +557,13 @@ public sealed class OltoolExportTests
     }
 
     [Fact]
-    public void TheChecklistIsPrintedAndNothingIsWritten()
+    public async Task TheChecklistIsPrintedAndNothingIsWritten()
     {
         using var game = new ExportGame();
         var profile = Profile(game);
         var output = Path.Combine(game.Game.Folder, "out");
 
-        var (exit, text, errors) = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--checklist",
+        var (exit, text, errors) = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--checklist",
             "--out", output);
 
         Assert.True(exit == 0, errors);
@@ -571,13 +572,13 @@ public sealed class OltoolExportTests
     }
 
     [Fact]
-    public void TheProbeHasItsOwnName()
+    public async Task TheProbeHasItsOwnName()
     {
         using var game = new ExportGame();
         var profile = Profile(game);
         var output = Path.Combine(game.Game.Folder, "out");
 
-        var (exit, _, errors) = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "flmm",
+        var (exit, _, errors) = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "flmm",
             "--flmm-probe", "--out", output);
 
         Assert.True(exit == 0, errors);
@@ -585,13 +586,13 @@ public sealed class OltoolExportTests
     }
 
     [Fact]
-    public void WriteManifestWritesTheFileList()
+    public async Task WriteManifestWritesTheFileList()
     {
         using var game = new FakeGame();
         var file = Path.Combine(game.Folder, "list.tsv");
 
-        var (exit, output, errors) = Run("game", game.Root, "--write-manifest", file);
-        var inside = Run("game", game.Root, "--write-manifest", Path.Combine(game.Root, "list.tsv"));
+        var (exit, output, errors) = await RunAsync("game", game.Root, "--write-manifest", file);
+        var inside = await RunAsync("game", game.Root, "--write-manifest", Path.Combine(game.Root, "list.tsv"));
 
         Assert.True(exit == 0, errors);
         Assert.StartsWith("Wrote ", output);
@@ -601,13 +602,13 @@ public sealed class OltoolExportTests
     }
 
     [Fact]
-    public void OltoolTheDefaultFolderIsTheVersionFolder()
+    public async Task OltoolTheDefaultFolderIsTheVersionFolder()
     {
         using var game = new ExportGame();
         var profile = Profile(game);
         var root = Path.Combine(game.Game.Folder, "exports", "ol-test");
 
-        var (exit, output, errors) = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin");
+        var (exit, output, errors) = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin");
 
         Assert.True(exit == 0, errors);
         Assert.Contains($"Wrote {Path.Combine(root, "1.2.0", "ol-test-1.2.0-vanilla-1.1.zip")}", output);
@@ -618,16 +619,16 @@ public sealed class OltoolExportTests
     }
 
     [Fact]
-    public void OltoolTheSameVersionWithOtherGameFilesExitsOne()
+    public async Task OltoolTheSameVersionWithOtherGameFilesExitsOne()
     {
         using var game = new ExportGame();
         var profile = Profile(game);
         var package = Path.Combine(game.Game.Folder, "exports", "ol-test", "1.2.0", "ol-test-1.2.0-vanilla-1.1.zip");
-        Assert.Equal(0, Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin").Exit);
+        Assert.Equal(0, (await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin")).Exit);
         var before = File.ReadAllBytes(package);
         ChangePrice(game);
 
-        var (exit, _, errors) = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin");
+        var (exit, _, errors) = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin");
 
         Assert.Equal(1, exit);
         Assert.Contains("has other game files. Players cannot see which of the two packages they have.", errors);
@@ -635,15 +636,15 @@ public sealed class OltoolExportTests
     }
 
     [Fact]
-    public void OltoolSameVersionReplacesAVersionWithoutTheMark()
+    public async Task OltoolSameVersionReplacesAVersionWithoutTheMark()
     {
         using var game = new ExportGame();
         var profile = Profile(game);
         var root = Path.Combine(game.Game.Folder, "exports", "ol-test");
-        Assert.Equal(0, Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin").Exit);
+        Assert.Equal(0, (await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin")).Exit);
         ChangePrice(game);
 
-        var (exit, _, errors) = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin",
+        var (exit, _, errors) = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin",
             "--same-version");
 
         Assert.True(exit == 0, errors);
@@ -651,23 +652,23 @@ public sealed class OltoolExportTests
         Assert.Equal(2, history.Exports.Count);
         Assert.Equal(history.Exports[1].Time, history.Exports[0].ReplacedBy);
         // The FLMM package of the same content is no conflict, so it needs no replace.
-        Assert.Equal(0, Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "flmm").Exit);
+        Assert.Equal(0, (await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "flmm")).Exit);
     }
 
     [Fact]
-    public void OltoolSameVersionDoesNotReplaceAPublishedVersion()
+    public async Task OltoolSameVersionDoesNotReplaceAPublishedVersion()
     {
         using var game = new ExportGame();
         var profile = Profile(game);
         var root = Path.Combine(game.Game.Folder, "exports", "ol-test");
-        Assert.Equal(0, Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin").Exit);
+        Assert.Equal(0, (await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin")).Exit);
         PublishHistory.Update(new HistoryLocation(root, "ol-test", Path.Combine(game.ModsFolder, "ol-test"), []), "mark",
             h => h.Mark("1.2.0", DateTime.UtcNow, ""));
         ChangePrice(game);
 
-        var (exit, _, errors) = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin",
+        var (exit, _, errors) = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin",
             "--same-version");
-        var plain = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin");
+        var plain = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin");
 
         Assert.Equal(1, exit);
         Assert.Contains("Version 1.2.0 is on Nexus. Write a higher version into mod.json.", errors);
@@ -677,17 +678,17 @@ public sealed class OltoolExportTests
     }
 
     [Fact]
-    public void OltoolSameVersionReplacesAVersionOfTwoTargets()
+    public async Task OltoolSameVersionReplacesAVersionOfTwoTargets()
     {
         using var game = new ExportGame();
         var profile = Profile(game);
         var root = Path.Combine(game.Game.Folder, "exports", "ol-test");
-        Assert.Equal(0, Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin").Exit);
-        Assert.Equal(0, Run("export", profile, "--mod", "ol-test", "--target", "openlancer").Exit);
+        Assert.Equal(0, (await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin")).Exit);
+        Assert.Equal(0, (await RunAsync("export", profile, "--mod", "ol-test", "--target", "openlancer")).Exit);
         ChangePrice(game);
 
-        var one = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin", "--same-version");
-        var (exit, output, errors) = Run("export", profile, "--mod", "ol-test", "--target", "openlancer", "--target",
+        var one = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin", "--same-version");
+        var (exit, output, errors) = await RunAsync("export", profile, "--mod", "ol-test", "--target", "openlancer", "--target",
             "vanilla-1.1", "--format", "dropin", "--same-version");
 
         // A replace of one target would leave the old content in the package of the other target.
@@ -705,18 +706,18 @@ public sealed class OltoolExportTests
     [Theory]
     [InlineData("{ not json")]
     [InlineData("""{ "formatVersion": 2 }""")]
-    public void OltoolAHistoryThatDoesNotLoadStopsTheExport(string text)
+    public async Task OltoolAHistoryThatDoesNotLoadStopsTheExport(string text)
     {
         using var game = new ExportGame();
         var profile = Profile(game);
         var root = Path.Combine(game.Game.Folder, "exports", "ol-test");
         var package = Path.Combine(root, "1.2.0", "ol-test-1.2.0-vanilla-1.1.zip");
-        Assert.Equal(0, Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin").Exit);
+        Assert.Equal(0, (await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin")).Exit);
         var before = File.ReadAllBytes(package);
         File.WriteAllText(Path.Combine(root, PublishHistory.FileName), text);
         ChangePrice(game);
 
-        var (exit, _, errors) = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin");
+        var (exit, _, errors) = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin");
 
         // Without the history, the guard cannot protect the package, so the export writes nothing.
         Assert.Equal(2, exit);
@@ -727,16 +728,16 @@ public sealed class OltoolExportTests
     }
 
     [Fact]
-    public void OltoolTheProbeKeepsTheTextsOfTheVersionFolder()
+    public async Task OltoolTheProbeKeepsTheTextsOfTheVersionFolder()
     {
         using var game = new ExportGame();
         var profile = Profile(game);
         var folder = Path.Combine(game.Game.Folder, "exports", "ol-test", "1.2.0");
-        Assert.Equal(0, Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin").Exit);
+        Assert.Equal(0, (await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin")).Exit);
         var nexus = File.ReadAllText(Path.Combine(folder, ModExport.NexusPageFile));
         var checklist = File.ReadAllText(Path.Combine(folder, ModExport.ChecklistFile));
 
-        var (exit, _, errors) = Run("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "flmm",
+        var (exit, _, errors) = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "flmm",
             "--flmm-probe");
 
         Assert.True(exit == 0, errors);
@@ -747,14 +748,14 @@ public sealed class OltoolExportTests
     }
 
     [Fact]
-    public void OltoolAnUnsafeVersionExitsOne()
+    public async Task OltoolAnUnsafeVersionExitsOne()
     {
         using var game = new ExportGame();
         var profile = Profile(game);
         var manifest = Path.Combine(game.ModsFolder, "ol-test", "mod.json");
         File.WriteAllText(manifest, File.ReadAllText(manifest).Replace("\"1.2.0\"", "\"../x\""));
 
-        var (exit, _, errors) = Run("export", profile, "--mod", "ol-test", "--target", "openlancer");
+        var (exit, _, errors) = await RunAsync("export", profile, "--mod", "ol-test", "--target", "openlancer");
 
         Assert.Equal(1, exit);
         Assert.Contains(PublishMessages.VersionUnsafe("../x"), errors);
