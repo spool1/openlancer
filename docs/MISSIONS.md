@@ -205,7 +205,7 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 | Mission accepted | Yes when the start comes after the player accepts the mission. |
 | Start place | Where the player starts: the suggestion, a base that you pick, or the Scene camera. The suggestion is where the player is at this trigger in the game (see below). A base or a system that the game data does not have shows its reason under the field. The Scene camera without an open system, and a suggested Scene camera in a system that the Scene does not show, also show their reason. |
 | Source of the place | The line of the script that gives the suggested place, for example Act_SetInitialPlayerPos of key_save_x. When another line gives the system or the point, the text names that line too. Click "Select {trigger}" to select the trigger of the line in the graph. The row shows only for the suggested place. |
-| Ship | The ship package of the Play menu. |
+| Ship | The ship and the loadout of the player in this mission play. The first item is the ship of the profile, which the Play menu shows. It is the default. The other items are the ship packages of the data, by the names of their ships. When two packages have the same ship name, their items also show the package nicknames. Pick a package to fly another ship in this mission only. A package that the data does not have, or whose ship the data does not have, shows "(not in the data)". Its reason then shows under the field, and the Play button is off. |
 | Triggers that wait at the start | The triggers that are active when the play starts. Click a row to select the trigger. |
 | Objects that the setup leaves out ({n}) | A closed list of an approximate start. At this trigger, these objects are in another system, or a trigger of the start makes them again, so the setup does not make them. The list also has the fuse lines that the setup removes. Click a row to select the trigger of its spawn line. |
 | Ships that start next to the player ({n}) | A closed list of an approximate start. These ships travel with the player at this trigger, and each row tells why. The setup puts them next to the player. Click a row to select the trigger of its spawn line. |
@@ -213,6 +213,13 @@ In the Scene and Cutscene tabs, and in the Mission tab without an open mission, 
 | Play from the play start | Plays the mission from this start in OpenLancer, as F5 in the Mission tab does. The button is off while the start or its start place cannot start, and its tooltip gives the reason. |
 
 A warning shows when no start trigger and no checkpoint leads to the trigger. The play then starts only this trigger. When the start cannot start, the page shows the reason, for example for a script without a story slot.
+
+A warning shows under the Ship field for a combat start with the starter ship. The starter ship is the ship of a new character, for example the Starflier in vanilla. Enemy ships can destroy it fast. Pick a stronger ship in the Ship field. A combat start is a start in space where the setup makes the world of the start system with a fight:
+
+- A trigger that waits at the start watches a fight on an object of that world. Examples are a ship that the player must destroy and a ship that must not take damage.
+- Or the world has a ship that the path makes hostile to the player.
+
+A base start is never a combat start, because the player is docked. A mission start and a checkpoint start make no objects before their triggers run, so they are never combat starts. At the Scene camera, the page does not know the start system before the play, so it gives no warning.
 
 A checkpoint start, and a start whose path starts at a checkpoint, show the limit of this version as a warning. The warning starts with "This version restores only the triggers of checkpoint '{trigger}'." A saved game also keeps the objective, the dock and lane rules, the reputations and other state from before the save. This version does not restore that state. So after such a start, that state can differ from a saved game of the retail game.
 

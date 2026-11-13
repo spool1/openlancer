@@ -77,6 +77,8 @@ To fly another ship:
 
 The Play menu shows the ship of the profile, for example "Ship: Starrunner". To go back to the default ship, click Use the default ship in the Play menu. Each profile keeps its own ship.
 
+A mission play uses the Ship field of the Play start page. Its default is the ship of the profile. To fly another ship in one mission, pick a ship package in that field. The editor keeps the field for each script. The field does not change the ship of the profile. [MISSIONS.md](MISSIONS.md) tells about the Play start page.
+
 The equipment of the package goes on its hardpoints. An item with an amount above 1 goes into the hold. A good that the engine cannot mount, for example a battery, also goes into the hold.
 
 ## In the game
@@ -200,6 +202,8 @@ A mission play starts a story mission at a point of its script: the mission star
 
 Play saves the edits of the active mod first, as F5 does. Then the editor makes the start plan from the saved script. It writes the start save `start\start.fl` and the test layer `start\layer\` into the play folder. The game loads the start save, and the mission starts at the point of the start. The other steps are the same as for Play from camera.
 
+The start save also holds the ship and its loadout: the ship package of the Ship field of the Play start page, else the ship of the profile. The equipment goes on its hardpoints, and an item with an amount above 1 goes into the hold, as for the ship of the profile. Without a ship package, the start save has no ship, so the game gives the ship of a new character. When the edit view does not have the ship package or its ship, the play does not start, and the Console gives the reason.
+
 The player starts at the start place of the Play start page. The suggestion is where the player is at that point of the mission in the game. That is a base or a point in space. "How the editor suggests the start place" in [MISSIONS.md](MISSIONS.md) tells the rules.
 
 For an approximate start, the setup triggers make only the world of the start system. The ships that travel with the player start next to the player. The setup starts the triggers that wait at the start after it makes the world. So their lines find the ships of the world. "How the setup builds the world" in [MISSIONS.md](MISSIONS.md) tells the rules.
@@ -218,7 +222,7 @@ During a mission play, a save whose validation passes starts the mission again a
 
 1. Press Ctrl+S.
 
-The editor validates the save, as after each save. Then it makes the start plan again from the new script. The game loads the data of the save and starts the mission again. The process stays, so this takes about the time of a reload.
+The editor validates the save, as after each save. Then it makes the start plan again from the new script, and it reads the Ship field again. The game loads the data of the save and starts the mission again. The process stays, so this takes about the time of a reload.
 
 The Console says, for example, "Save 4 changed the files of the mission play. The game starts M02 again from Checkpoint t_restore." The start of the play changes only when the game started the mission again.
 
