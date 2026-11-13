@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Text.RegularExpressions;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Run;
 using OpenLancer.Runtime.Missions;
@@ -231,7 +232,7 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
             var place = Suggested(scripts, "M02", trigger);
             Assert.Equal(("Li03", debris), (place.System, place.Position));
             Assert.Equal(LineHeading(m02, "key_save_fly_to_debris"), place.Orientation);
-            Assert.Equal("Act_SetInitialPlayerPos of key_save_fly_to_debris.", place.Source);
+            Assert.Equal("Set player start of key_save_fly_to_debris.", place.Source);
         }
         // The debug trigger fly_to_debris moves the player to the same point.
         Assert.Equal(debris, LinePoint(m02, "fly_to_debris", "Act_MovePlayer"));
@@ -317,7 +318,7 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
 
         // The rows of the reviews of the fix. A Cnd_True step of a restore trigger gives the place of the checkpoint.
         SpaceAt(scripts, "M01a", "w_tutorialsave", "Li01", LinePoint(Slot(scripts, "M01a"), "w_tutorial", "Act_MovePlayer"));
-        Assert.Equal("Act_MovePlayer of w_tutorial, which w_tutorialsave starts.",
+        Assert.Equal("Move player of w_tutorial, which w_tutorialsave starts.",
             Suggested(scripts, "M01a", "w_tutorialsave").Source);
         // A Cnd_DistShip line near an object of the game data gives a point near that object. So the checkpoint at the
         // base of the Blood Dragons starts near that base, and not at a generator that the restore trigger makes hostile.
@@ -347,7 +348,7 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
         var item = Slot(scripts, slot).Index.World.ObjectOf(name)!;
         SpaceAt(scripts, slot, trigger, item.System,
             item.Position + new Vector3(0, 0, Math.Max(StartPlaces.Offset, Number(condition, 3))));
-        Assert.Equal($"Cnd_DistShip of {near}.", Suggested(scripts, slot, trigger).Source);
+        Assert.Equal($"Near a ship of {near}.", Suggested(scripts, slot, trigger).Source);
     }
 
     /// <summary>Checks a start at the jump gate or hole of a system that leads to the system before the jump.</summary>
@@ -386,7 +387,8 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
 
     /// <summary>The check of each story trigger of a data set (see
     /// <see cref="EachStoryTriggerOfTheBaseGameStartsWhereThePlayerIs"/>). Each suggestion names a system or a base that
-    /// the game data has.</summary>
+    /// the game data has. Its source text names each line by the plain name that the graph shows, never by a Cnd_ or Act_
+    /// key (review item R2-4 of the graph Play button).</summary>
     /// <param name="expected">The number of suspect rows of each reason in this data set.</param>
     /// <param name="cameras">The number of suggestions at the Scene camera in one system.</param>
     private void CheckEachStoryTrigger(IReadOnlyList<MissionAnalysis> scripts, string name,
@@ -396,6 +398,7 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
         var inOneSystem = 0;
         var reasons = Enum.GetValues<Reason>().ToDictionary(r => r, _ => 0);
         var wrong = new List<string>();
+        var keyNames = new List<string>();
         foreach (var analysis in scripts)
         {
             var index = analysis.Index;
@@ -410,6 +413,8 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
                 if (place is { Kind: StartPlaceKind.Camera, System: not null })
                     inOneSystem++;
                 var row = $"{slot} {trigger.Nickname}";
+                if (KeyName().IsMatch(place.Source))
+                    keyNames.Add($"{row}: {place.Source}");
                 if (place.System is { } system)
                     Assert.True(index.World.Has(MissionValueKind.System, system), $"{row}: {place.Text}");
                 if (place.Base is { } dock)
@@ -430,9 +435,14 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
                          $"suspect rows {string.Join(", ", reasons.Select(r => $"{r.Key} {r.Value}"))}, " +
                          $"{inOneSystem} at the Scene camera in one system");
         Assert.Empty(wrong);
+        Assert.Empty(keyNames);
         Assert.Equal(expected.OrderBy(r => r.Key), reasons.OrderBy(r => r.Key));
         Assert.Equal(cameras, inOneSystem);
     }
+
+    /// <summary>A key of a condition or an action, for example Cnd_SpaceEnter or act_moveplayer.</summary>
+    [GeneratedRegex(@"\b(Cnd|Act)_\w", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex KeyName();
 
     /// <summary>The rule of the survey of 2026-10-27. A trigger of the story path after the trigger of the place has a
     /// launch, an arrival or a space condition with the player. For a Scene camera, the check starts at the start of the

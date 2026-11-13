@@ -115,7 +115,7 @@ public enum StartPlaceKind
 /// <param name="Base">The base of a base start, else null.</param>
 /// <param name="Position">The point of a space start.</param>
 /// <param name="Orientation">The heading of a space start.</param>
-/// <param name="Source">Where the place comes from, in plain words, for example "Act_MovePlayer of t_wave.".</param>
+/// <param name="Source">Where the place comes from, in plain words, for example "Move player of t_wave.".</param>
 public sealed record StartPlace(StartPlaceKind Kind, string? System, string? Base, Vector3 Position,
     Quaternion Orientation, string Source)
 {

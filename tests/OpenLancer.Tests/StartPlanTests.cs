@@ -750,7 +750,7 @@ public sealed class StartPlanTests
         Assert.Equal(Quaternion.Identity, place.Orientation);
         // The line has no system. The story at the step that the restore trigger starts gives it.
         Assert.Equal("ol_sys_a", place.System);
-        Assert.Equal("Act_SetInitialPlayerPos of t_restore. The system comes from Cnd_SpaceEnter of t_launch.", place.Source);
+        Assert.Equal("Set player start of t_restore. The system comes from On enter space of t_launch.", place.Source);
     }
 
     [Fact]
@@ -892,7 +892,7 @@ public sealed class StartPlanTests
         Assert.Equal(StartPlaceKind.Space, place.Kind);
         Assert.Equal("ol_sys_a", place.System);
         Assert.Equal(new Vector3(100, 0, 200 + StartPlaces.Offset), place.Position);
-        Assert.Equal("Cnd_SpaceEnter of t_launch. The point is 1,000 units from the spawn of ol_ship_a.", place.Source);
+        Assert.Equal("On enter space of t_launch. The point is 1,000 units from the spawn of ol_ship_a.", place.Source);
     }
 
     /// <summary>A launch without a system is still a launch, so the start is not at the base of the offer. The base of the
@@ -910,10 +910,10 @@ public sealed class StartPlanTests
 
         Assert.Equal((StartPlaceKind.Space, "ol_sys_a"), (known.Kind, known.System));
         Assert.Equal(new Vector3(100, 0, 200 + StartPlaces.Offset), known.Position);
-        Assert.Equal("Cnd_SpaceEnter of t_launch. The system comes from the base of Cnd_BaseEnter of t_offer. The point " +
+        Assert.Equal("On enter space of t_launch. The system comes from the base of On enter base of t_offer. The point " +
                      "is 1,000 units from the spawn of ol_ship_a.", known.Source);
         Assert.Equal((StartPlaceKind.Base, "ol_base_a"), (unknown.Kind, unknown.Base));
-        Assert.Equal("Cnd_BaseEnter of t_offer. No line of the path names the system of Cnd_SpaceEnter of t_launch.",
+        Assert.Equal("On enter base of t_offer. No line of the path names the system of On enter space of t_launch.",
             unknown.Source);
     }
 
