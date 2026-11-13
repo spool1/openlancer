@@ -317,6 +317,51 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
         output.WriteLine($"The largest page of triggers: {largest.Bytes} bytes, {largest.Call}");
     }
 
+    /// <summary>Each page of <c>get_cutscene</c> with the default limit fits the size limit of a result (section 8.4 of
+    /// the MCP1 design), for each retail cutscene. So the agent can read each script in pages, also the largest story
+    /// scripts. The test applies the limit of the queue (<see cref="ToolResult.Limited"/>), as a client sees it.</summary>
+    [Fact]
+    public void EachPageOfEachRetailCutsceneFitsTheSizeLimit()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "mcp1cutscenes");
+        using var host = HeadlessHost.OpenReadOnly(workspace.ProfilePath, workspace.ModId);
+        var scripts = new List<string>();
+        string? cursor = null;
+        do
+        {
+            var arguments = new JsonObject { ["limit"] = 200 };
+            if (cursor != null)
+                arguments["cursor"] = cursor;
+            var page = Ok(host, "list_cutscenes", arguments);
+            scripts.AddRange(page["rows"]!.AsArray().Select(r => (string)r!["ref"]!));
+            cursor = (string?)page["next_cursor"];
+        }
+        while (cursor != null);
+
+        var largest = (Bytes: 0, Call: "");
+        var pages = 0;
+        foreach (var script in scripts)
+        {
+            cursor = null;
+            do
+            {
+                var arguments = new JsonObject { ["ref"] = script };
+                if (cursor != null)
+                    arguments["cursor"] = cursor;
+                var result = AgentTools.Run(host, "get_cutscene", arguments).Result!;
+                Assert.False(result.IsError, $"{script}: {result.Text}");
+                Assert.False(result.Limited(host.Limits).IsError, $"{script}, cursor {cursor}: {result.Bytes} bytes");
+                if (result.Bytes > largest.Bytes)
+                    largest = (result.Bytes, $"{script}, cursor {cursor}");
+                cursor = (string?)result.Content["next_cursor"];
+                pages++;
+            }
+            while (cursor != null);
+        }
+        Assert.True(scripts.Count > 1000, $"{scripts.Count} scripts");
+        output.WriteLine($"{scripts.Count} scripts, {pages} pages. The largest page: {largest.Bytes} bytes, {largest.Call}");
+    }
+
     /// <summary>The time of one agent mission edit (section 13.4 of the MCP1 design and section 11.4 of the M6b
     /// design).</summary>
     private const double MissionEditMilliseconds = 50;

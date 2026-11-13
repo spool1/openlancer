@@ -184,6 +184,42 @@ public sealed partial class AgentCutsceneToolTests
         Assert.Null(view["entities"]![0]!["fields"]!["entity_name"]);
     }
 
+    /// <summary><c>get_cutscene</c> gives the elements in pages, as a list tool gives its rows: the entities first, then
+    /// the events. Each page gives the numbers of the whole script and the errors of the script. A limit above the most
+    /// rows gives <c>limit</c>, and a cursor that this server did not give gives <c>invalid_argument</c>.</summary>
+    [Fact]
+    public void GetCutsceneGivesTheEntitiesAndTheEventsInPages()
+    {
+        var (ws, _, host) = Open();
+        using var __ = ws;
+        JsonObject Page(string? cursor) => Ok(host, "get_cutscene",
+            $$"""{ "ref": {{Json(Script)}}, "limit": 4{{(cursor == null ? "" : $", \"cursor\": {Json(cursor)}")}} }""");
+        static List<string?> Refs(JsonNode? list) => list!.AsArray().Select(e => (string?)e!["ref"]).ToList();
+
+        var first = Page(null);
+        var second = Page((string?)first["next_cursor"]);
+        var third = Page((string?)second["next_cursor"]);
+        var all = Ok(host, "get_cutscene", $$"""{ "ref": {{Json(Script)}} }""");
+
+        Assert.Equal([Script + "#entity/Cam_A", Script + "#entity/Monitor", Script + "#entity/Char_trent",
+            Script + "#entity/Voice_trent"], Refs(first["entities"]));
+        Assert.Empty(first["events"]!.AsArray());
+        Assert.Equal([Script + "#entity/Voice_other", Script + "#entity/Fx"], Refs(second["entities"]));
+        Assert.Equal([Script + "#event/0", Script + "#event/1"], Refs(second["events"]));
+        Assert.Empty(third["entities"]!.AsArray());
+        Assert.Equal(new[] { 2, 3, 4, 5 }.Select(i => (string?)$"{Script}#event/{i}"), Refs(third["events"]));
+        Assert.Null(third["next_cursor"]);
+        Assert.All(new[] { first, second, third, all }, page =>
+            Assert.Equal((6, 6), ((int)page["entity_count"]!, (int)page["event_count"]!)));
+        Assert.Equal(Refs(first["entities"]).Concat(Refs(second["entities"])), Refs(all["entities"]));
+        Assert.Equal(Refs(second["events"]).Concat(Refs(third["events"])), Refs(all["events"]));
+        Assert.Null(all["next_cursor"]);
+        var tooMany = Call(host, "get_cutscene", $$"""{ "ref": {{Json(Script)}}, "limit": 201 }""").Content;
+        Assert.Equal(("limit", "limit"), ((string?)tooMany["code"], (string?)tooMany["field"]));
+        Assert.Equal("invalid_argument",
+            Error(host, "get_cutscene", $$"""{ "ref": {{Json(Script)}}, "cursor": "13" }""").Code);
+    }
+
     /// <summary>A script with two lights of one name in other letter case. The engine uses the last light, so a
     /// reference of the name names the second light.</summary>
     private const string Twins = """

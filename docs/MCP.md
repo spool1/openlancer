@@ -118,7 +118,7 @@ These tools work in both hosts. They change nothing.
 | `list_missions`, `get_mission`, `get_trigger`, `describe_mission_name` | The mission scripts, one script, one trigger, and the plain name of a condition or an action. |
 | `mission_dry_run` | A dry run of one mission script, without a game world. The trigger rules of the game run step by step on the inputs that the agent gives. The result gives each step and the state after the last step. The section "The dry run" of `docs/MISSIONS.md` gives the rules. |
 | `mission_start_plan` | The plan of a play of one mission script from a start, as the Play start page shows it. A plan that cannot start gives the status `refused` and the reason. See "The start plan". |
-| `list_cutscenes`, `get_cutscene` | The cutscene scripts, and one script with its entities, its events and their fields. |
+| `list_cutscenes`, `get_cutscene` | The cutscene scripts, and one script with its entities, its events and their fields, in pages. |
 | `get_raw_ini` | The INI text of a section or a file, with the problems of each line. |
 | `check` | The problems of the checks of the editor, in pages. |
 
@@ -557,7 +557,9 @@ The result gives each new and changed item as it is after the call. So an event 
 
 The result also gives the errors of the cutscene checks that the call adds and removes, in `new_problems` and `fixed_problems`. The game crashes when it plays a cutscene with such an error, so the save stops.
 
-`get_cutscene` gives the entities and the events of a script, each with its fields. In the editor, the Console entry of a cutscene edit links to its element, and follow mode opens the script in the Cutscene tab. "What you see in the editor" tells more.
+`get_cutscene` gives the entities and the events of a script, each with its fields. They come in pages, as the rows of a list tool do: first the entities, then the events. `entity_count` and `event_count` give the numbers of the whole script, and `next_cursor` gives the next page. A large retail script has more than a thousand elements. Use a smaller `limit` when a page is larger than the size limit of a result, or read one element with `get_item`.
+
+In the editor, the Console entry of a cutscene edit links to its element, and follow mode opens the script in the Cutscene tab. "What you see in the editor" tells more.
 
 #### The generic tools on cutscene items
 

@@ -83,7 +83,7 @@ public static class AgentTools
         Query("list_cutscenes", ToolGroup.Cutscenes,
             new ToolInput(new TextParam("category", false, Names<CutsceneFolder>(), null), TextFilter, Cursor, Limit),
             typeof(Page<CutsceneRow>), CutsceneQueries.ListCutscenes),
-        Query("get_cutscene", ToolGroup.Cutscenes, new ToolInput(Text("ref", true)), typeof(CutsceneView),
+        Query("get_cutscene", ToolGroup.Cutscenes, new ToolInput(Text("ref", true), Cursor, Limit), typeof(CutsceneView),
             CutsceneQueries.GetCutscene),
         Query("get_raw_ini", ToolGroup.Studio, new ToolInput(Text("ref"), Text("file")), typeof(RawIniView),
             ItemQueries.GetRawIni),

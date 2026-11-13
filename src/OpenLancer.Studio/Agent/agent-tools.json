@@ -164,9 +164,11 @@
     },
     "get_cutscene": {
       "title": "Get a cutscene",
-      "description": "Gives one cutscene script: its duration, its entities, its events with their times and targets, and its errors. Each element gives its fields by THN path, in the forms that set_fields takes. This tool changes nothing. Get the cutscenes from list_cutscenes first.",
+      "description": "Gives one cutscene script: its duration, its errors, and one page of its entities and events with their times and targets. A page has the entities first, then the events. Each element gives its fields by THN path, in the forms that set_fields takes. This tool changes nothing. Get the cutscenes from list_cutscenes first.",
       "fields": {
-        "ref": "The reference of the cutscene, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_scene.thn."
+        "ref": "The reference of the cutscene, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_scene.thn.",
+        "cursor": "The next_cursor of the previous page. Without it, the page starts at the first entity.",
+        "limit": "The most entities and events of the page. studio_status gives the default and the largest value."
       }
     },
     "get_raw_ini": {
@@ -1924,9 +1926,11 @@
     "CutsceneRow.unsaved": "True when the session has an edit of the script that it did not save.",
     "CutsceneView.ref": "The thn: reference.",
     "CutsceneView.duration": "The duration in seconds.",
-    "CutsceneView.entities": "The entities of the script.",
-    "CutsceneView.events": "The events of the script, in the order of the event list.",
+    "CutsceneView.entities": "The entities of this page, in the order of the script.",
+    "CutsceneView.events": "The events of this page, in the order of the event list.",
     "CutsceneView.problems": "The errors of the script.",
+    "CutsceneView.entity_count": "The number of entities of the script.",
+    "CutsceneView.event_count": "The number of events of the script.",
     "CutsceneElementView.ref": "The thn: reference of the entity or of the event. An event reference has the index of the event.",
     "CutsceneElementView.element": "entity or event.",
     "CutsceneElementView.type": "The THN name of the type, for example CAMERA or START_SOUND, or none.",

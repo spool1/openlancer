@@ -5988,7 +5988,7 @@
     {
       "name": "get_cutscene",
       "title": "Get a cutscene",
-      "description": "Gives one cutscene script: its duration, its entities, its events with their times and targets, and its errors. Each element gives its fields by THN path, in the forms that set_fields takes. This tool changes nothing. Get the cutscenes from list_cutscenes first.",
+      "description": "Gives one cutscene script: its duration, its errors, and one page of its entities and events with their times and targets. A page has the entities first, then the events. Each element gives its fields by THN path, in the forms that set_fields takes. This tool changes nothing. Get the cutscenes from list_cutscenes first.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5997,6 +5997,17 @@
             "minLength": 1,
             "maxLength": 1024,
             "description": "The reference of the cutscene, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_scene.thn."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The next_cursor of the previous page. Without it, the page starts at the first entity."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The most entities and events of the page. studio_status gives the default and the largest value."
           }
         },
         "additionalProperties": false,
@@ -6107,14 +6118,14 @@
                 "element"
               ]
             },
-            "description": "The entities of the script."
+            "description": "The entities of this page, in the order of the script."
           },
           "events": {
             "type": "array",
             "items": {
               "$ref": "#/properties/entities/items"
             },
-            "description": "The events of the script, in the order of the event list."
+            "description": "The events of this page, in the order of the event list."
           },
           "problems": {
             "type": "array",
@@ -6178,6 +6189,21 @@
               ]
             },
             "description": "The errors of the script."
+          },
+          "entity_count": {
+            "type": "integer",
+            "description": "The number of entities of the script."
+          },
+          "event_count": {
+            "type": "integer",
+            "description": "The number of events of the script."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor of the next page, or none on the last page. Give it as the argument cursor."
           },
           "rev": {
             "type": "string",
@@ -6267,7 +6293,9 @@
               "duration",
               "entities",
               "events",
-              "problems"
+              "problems",
+              "entity_count",
+              "event_count"
             ],
             "description": "A result of the tool. The structured content of a call is a result or a tool error."
           },

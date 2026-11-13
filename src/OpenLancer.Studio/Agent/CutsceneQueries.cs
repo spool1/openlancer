@@ -69,10 +69,16 @@ internal sealed record CutsceneElementView(string Ref, ThnElementKind Element, s
     public string? ReadOnlyReason { get; init; }
 }
 
-/// <summary>A cutscene with its entities, its events and its problems (tool <c>get_cutscene</c>).</summary>
+/// <summary>A cutscene with its problems and one page of its entities and events (tool <c>get_cutscene</c>).</summary>
 /// <param name="ReadOnlyReason">Why the editor cannot change the cutscene, or null.</param>
+/// <param name="Entities">The entities of the page.</param>
+/// <param name="Events">The events of the page.</param>
+/// <param name="EntityCount">The number of entities of the script.</param>
+/// <param name="EventCount">The number of events of the script.</param>
+/// <param name="NextCursor">The cursor of the next page, or null on the last page.</param>
 internal sealed record CutsceneView(string Ref, float Duration, string? ReadOnlyReason,
-    IReadOnlyList<CutsceneElementView> Entities, IReadOnlyList<CutsceneElementView> Events, IReadOnlyList<Problem> Problems);
+    IReadOnlyList<CutsceneElementView> Entities, IReadOnlyList<CutsceneElementView> Events, IReadOnlyList<Problem> Problems,
+    int EntityCount, int EventCount, string? NextCursor);
 
 /// <summary>The cutscene query tools of section 7.1 of the MCP1 design.</summary>
 internal static class CutsceneQueries
@@ -97,16 +103,26 @@ internal static class CutsceneQueries
             Kind(session.CutsceneSource(path)), session.Cutscene(path)?.Duration, session.HasUnsavedCutsceneEdits(path))));
     }
 
+    /// <summary>
+    /// Gives a cutscene with its problems and one page of its elements: the entities first, then the events, in the
+    /// order of the script. A large retail script has more than a thousand elements, and their fields are larger than
+    /// the size limit of a result (section 8.4 of the MCP1 design). So the elements come in pages, as the rows of a list
+    /// tool do, and the views are made only for the page.
+    /// </summary>
     public static ToolStep GetCutscene(ToolCall call)
     {
         var session = call.Session;
         var reference = ItemRefs.Parse(call.Args.Text("ref")!);
         var path = ItemRefs.ResolveCutscene(session, reference);
         var model = session.Cutscene(path)!;
+        var elements = model.Entities.Select(e => new ThnRef(path, ThnElementKind.Entity, e.Id))
+            .Concat(model.Events.Select(e => new ThnRef(path, ThnElementKind.Event, e.Id))).ToList();
+        var page = call.Paged(elements, e => Element(session, e));
         return ToolResult.Of(new CutsceneView(Ref(path), model.Duration, session.CutsceneReadOnlyReason(path),
-            model.Entities.Select(e => Element(session, new ThnRef(path, ThnElementKind.Entity, e.Id))).ToList(),
-            model.Events.Select(e => Element(session, new ThnRef(path, ThnElementKind.Event, e.Id))).ToList(),
-            session.CutsceneErrors(path).Select(d => AgentRows.ProblemOf(session, d) with { Ref = Ref(path) }).ToList()));
+            page.Rows.Where(e => e.Element == ThnElementKind.Entity).ToList(),
+            page.Rows.Where(e => e.Element == ThnElementKind.Event).ToList(),
+            session.CutsceneErrors(path).Select(d => AgentRows.ProblemOf(session, d) with { Ref = Ref(path) }).ToList(),
+            model.Entities.Count, model.Events.Count, page.NextCursor));
     }
 
     /// <summary>The view of an entity or an event of W of a cutscene.</summary>
