@@ -1,8 +1,8 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using LibreLancer;
+using OpenLancer.Studio;
 
 namespace OpenLancer.Editor.Editing;
 
@@ -14,9 +14,14 @@ internal sealed record ToolOutput(int ExitCode, string Output, string Errors, st
 /// Runs one helper process at a time, for example <c>oltool</c>, and gives its output on the UI thread. A new start
 /// stops the running process, and the output of a stopped process is dropped.
 /// </summary>
-/// <remarks>The engine log and the material map are process-wide, so the editor runs a second data load in a process of
+/// <remarks>
+/// <para>The engine log and the material map are process-wide, so the editor runs a second data load in a process of
 /// its own: the validation of a save (<see cref="ValidationRunner"/>) and the base run of the Console
-/// (<see cref="Logs.BaseRunRunner"/>).</remarks>
+/// (<see cref="Logs.BaseRunRunner"/>).</para>
+/// <para>A thread of its own reads the output and waits for the exit, and a second thread of its own reads the error
+/// output (see <see cref="OwnThread"/>). An async read of a redirected output holds a thread of the thread pool until
+/// data comes, so a process that runs for seconds would hold two pool threads.</para>
+/// </remarks>
 internal sealed class ToolProcess : IDisposable
 {
     private Process? process;
@@ -50,15 +55,15 @@ internal sealed class ToolProcess : IDisposable
 
         process = started;
         var id = ++generation;
-        Task.Run(async () =>
+        OwnThread.Run(() =>
         {
             ToolOutput output;
             try
             {
-                var text = started.StandardOutput.ReadToEndAsync();
-                var errors = started.StandardError.ReadToEndAsync();
-                await started.WaitForExitAsync();
-                output = new ToolOutput(started.ExitCode, await text, await errors, null);
+                var errors = OwnThread.Run(started.StandardError.ReadToEnd);
+                var text = started.StandardOutput.ReadToEnd();
+                started.WaitForExit();
+                output = new ToolOutput(started.ExitCode, text, errors.GetAwaiter().GetResult(), null);
             }
             finally
             {
