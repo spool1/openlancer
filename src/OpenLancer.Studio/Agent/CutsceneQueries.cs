@@ -121,7 +121,7 @@ internal static class CutsceneQueries
         return ToolResult.Of(new CutsceneView(Ref(path), model.Duration, session.CutsceneReadOnlyReason(path),
             page.Rows.Where(e => e.Element == ThnElementKind.Entity).ToList(),
             page.Rows.Where(e => e.Element == ThnElementKind.Event).ToList(),
-            session.CutsceneErrors(path).Select(d => AgentRows.ProblemOf(session, d) with { Ref = Ref(path) }).ToList(),
+            session.CutsceneErrors(path).Select(d => AgentRows.ProblemOf(session, d)).ToList(),
             model.Entities.Count, model.Events.Count, page.NextCursor));
     }
 
@@ -219,6 +219,22 @@ internal static class CutsceneQueries
 
     /// <summary>The <c>thn:</c> reference of a cutscene script.</summary>
     internal static string Ref(string path) => ItemRefs.Format(new ItemReference(ItemRefKind.Cutscene, "") { Path = path });
+
+    /// <summary>
+    /// The item reference of a place in a cutscene, for example the place of a problem of the cutscene checks or of a
+    /// Console entry: the element that the place names in W now (see <see cref="ThnLocation.ElementIn"/>), or else the
+    /// script. An element with a twin gives the script too, because the reference of an entity names the last entity
+    /// with its name, and the place could name the twin (see <see cref="ThnLocation.Of"/>).
+    /// </summary>
+    internal static string RefOf(EditSession session, ThnLocation place)
+    {
+        var path = session.CutsceneDocument(place.Path)?.Path ?? VfsPath.Normalize(place.Path) ?? place.Path;
+        var script = session.Cutscene(path);
+        if (script == null || place.Kind is not { } kind || place.ElementIn(script) is not { } element)
+            return Ref(path);
+        var located = new ThnRef(path, kind, element.Id);
+        return ThnLocation.Of(script, located).Kind == null ? Ref(path) : ItemRefs.Of(script, located);
+    }
 
     private static IReadOnlyList<string> Targets(ThnValue value) => value switch
     {

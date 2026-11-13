@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
@@ -173,7 +174,7 @@ public sealed class AgentCutsceneResultTests
     }
 
     /// <summary>The commit checks give the cutscene errors that the call adds and removes, with the reference of the
-    /// script (section 12.6, item 4 of the MCP1 design).</summary>
+    /// element of the error and the origin of the active mod (section 12.6, item 4 of the MCP1 design).</summary>
     [Fact]
     public void TheResultGivesTheCutsceneErrorsThatTheCallAddsAndRemoves()
     {
@@ -188,7 +189,8 @@ public sealed class AgentCutsceneResultTests
                 new System.Collections.Generic.HashSet<string> { ThnFlags.Reference })));
 
         var problem = Assert.Single(added.NewProblems);
-        Assert.Equal(Ref, problem.Ref);
+        Assert.Equal($"{Ref}#event/0", problem.Ref);
+        Assert.Equal((OriginKind.Mod, "act"), (problem.Origin, problem.ModId));
         Assert.Contains("SET_CAMERA needs a CAMERA there.", problem.Message);
         Assert.StartsWith(EditSession.CutsceneCrash, problem.Message);
         Assert.Empty(added.FixedProblems);

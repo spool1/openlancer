@@ -873,7 +873,7 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
         // compare across adds and deletes of other elements (see ThnChecks.Errors).
         foreach (var (path, was) in cutscenesBefore)
         {
-            Problem Of(Diagnostic problem) => AgentRows.ProblemOf(session, problem) with { Ref = CutsceneQueries.Ref(path) };
+            Problem Of(Diagnostic problem) => AgentRows.ProblemOf(session, problem);
             var now = session.CutsceneErrors(path);
             var left = was.Select(Key).ToList();
             foreach (var problem in now.Where(p => !left.Remove(Key(p))))

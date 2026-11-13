@@ -124,20 +124,27 @@ internal static class SaveTools
     }
 
     /// <summary>The error <c>save_blocked</c> with the messages of the first errors. The target is the item of the first
-    /// error.</summary>
+    /// error. The message of a cutscene error says "this cutscene", so the text adds the reference of its place (see
+    /// <see cref="CutsceneQueries.RefOf"/>).</summary>
     /// <param name="detail"><c>Gate</c> for the errors of the save gate, <c>SaveFailed</c> for a save that wrote
     /// nothing for another reason.</param>
     private static EditException Blocked(EditSession session, string detail, IReadOnlyList<Diagnostic> problems)
     {
         var errors = problems.Where(p => p.Severity == DiagnosticSeverity.Error).ToList();
-        var shown = string.Join(" ", errors.Take(ShownErrors).Select(e => e.Message));
+        string? CutsceneRef(Diagnostic error) =>
+            error is { Target: null, Cutscene: { } place } ? CutsceneQueries.RefOf(session, place) : null;
+        var shown = string.Join(" ", errors.Take(ShownErrors).Select(e => CutsceneRef(e) is { } where
+            ? $"{e.Message} {AgentTexts.Error("save_blocked_cutscene", ("ref", where))}"
+            : e.Message));
         var key = detail != "Gate" ? "save_failed" : errors.Count == 1 ? "save_blocked_one" : "save_blocked";
         var message = AgentTexts.Error(key, ("count", errors.Count), ("errors", shown));
         if (errors.Count > ShownErrors)
             message += " " + AgentTexts.Error("save_blocked_more");
         return new EditException(new EditError(EditErrorKind.SaveBlocked, detail, message)
         {
-            Target = errors.FirstOrDefault()?.Target is { } target ? ItemRefs.Canonical(session, target) : null,
+            Target = errors.FirstOrDefault() is not { } first ? null
+                : first.Target is { } target ? ItemRefs.Canonical(session, target)
+                : CutsceneRef(first),
         });
     }
 

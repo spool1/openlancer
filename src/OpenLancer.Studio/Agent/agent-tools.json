@@ -1529,6 +1529,7 @@
     "save_blocked": "The save stopped. {count} errors block it. Correct them, then save again. {errors}",
     "save_blocked_one": "The save stopped. 1 error blocks it. Correct it, then save again. {errors}",
     "save_blocked_more": "Call check to read all errors.",
+    "save_blocked_cutscene": "The error is in {ref}.",
     "save_failed": "The save wrote nothing. {errors}",
     "changed_on_disk": "Files of the mod changed outside the editor: {files}. The editor asks the user to replace them or to keep them. The save wrote nothing.",
     "changed_on_disk_headless": "Files of the mod changed outside the server: {files}. The server does not replace them, so the save wrote nothing. Ask the user to open the mod in the editor.",

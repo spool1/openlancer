@@ -517,9 +517,40 @@ public sealed partial class AgentCutsceneToolTests
         var removed = Ok(host, "cutscene_set_flags", $$"""{ "entity": {{monitor}}, "flags": ["REFERENCE"] }""");
 
         var problem = Assert.Single(added["new_problems"]!.AsArray())!;
-        Assert.Equal(Script, (string?)problem["ref"]);
+        Assert.Equal(Script + "#event/0", (string?)problem["ref"]);
+        Assert.Equal(("mod", "act"), ((string?)problem["origin"], (string?)problem["mod_id"]));
         Assert.EndsWith("SET_CAMERA needs a CAMERA there.", (string?)problem["message"]);
         Assert.Equal((string?)problem["message"], (string?)Assert.Single(removed["fixed_problems"]!.AsArray())!["message"]);
         Assert.Empty(removed["new_problems"]!.AsArray());
+    }
+
+    /// <summary>
+    /// Two cutscenes with the same error: <c>check</c> with the scope <c>all</c> gives each error with the reference of
+    /// its entity and the origin of the active mod, so the agent can tell which script to correct. The error
+    /// <c>save_blocked</c> names the same references in its message, and its target is the first one.
+    /// </summary>
+    [Fact]
+    public void CheckAllAndSaveBlockedNameTheCutsceneOfEachError()
+    {
+        var (ws, _, host) = Open();
+        using var _ = ws;
+        const string other = @"thn:DATA\MODS\act\CUTSCENES\my_other.thn";
+        foreach (var name in new[] { "my_intro", "my_other" })
+        {
+            Ok(host, "cutscene_create", $$"""{ "name": {{Json(name)}} }""");
+            Ok(host, "cutscene_add_entity",
+                $$"""{ "cutscene": {{Json($@"thn:DATA\MODS\act\CUTSCENES\{name}.thn")}}, "type": "DEFORMABLE", "name": "nobody" }""");
+        }
+
+        var check = Ok(host, "check", """{ "scope": "all" }""");
+        var saved = Call(host, "save").Content;
+
+        var problems = check["problems"]!.AsArray();
+        Assert.Equal(["thn:" + NewPath + "#entity/nobody", other + "#entity/nobody"],
+            problems.Select(p => (string?)p!["ref"]));
+        Assert.All(problems, p => Assert.Equal(("mod", "act"), ((string?)p!["origin"], (string?)p["mod_id"])));
+        Assert.Equal(("save_blocked", "thn:" + NewPath + "#entity/nobody"), ((string?)saved["code"], (string?)saved["target"]));
+        Assert.Contains($"{(string?)problems[0]!["message"]} The error is in thn:{NewPath}#entity/nobody.", (string?)saved["message"]);
+        Assert.Contains($"The error is in {other}#entity/nobody.", (string?)saved["message"]);
     }
 }

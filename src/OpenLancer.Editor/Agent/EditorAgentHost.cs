@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
-using OpenLancer.Data.IO;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Editing;
@@ -277,19 +276,8 @@ internal sealed class EditorAgentHost(IAgentEditor editor, AgentExports? exports
             .Select(e => new AgentConsoleEntry(e.Sequence, e.Time.ToUniversalTime(), Severity(e.Severity), e.Source, e.Message,
                 session == null ? null
                 : e.Target is { } target ? ItemRefs.Canonical(session, target)
-                : e.Cutscene is { } place ? RefOf(session, place) : null, e.Origin.Kind))
+                : e.Cutscene is { } place ? CutsceneQueries.RefOf(session, place) : null, e.Origin.Kind))
             .ToList();
-    }
-
-    /// <summary>The item reference of the place of an entry in a cutscene: the element that the place names in W now
-    /// (see <see cref="ThnLocation.ElementIn"/>), or else the cutscene.</summary>
-    private static string RefOf(EditSession session, ThnLocation place)
-    {
-        var path = VfsPath.Normalize(place.Path) ?? place.Path;
-        var script = session.Cutscene(path);
-        return script != null && place.Kind is { } kind && place.ElementIn(script) is { } element
-            ? ItemRefs.Of(script, new ThnRef(path, kind, element.Id))
-            : CutsceneQueries.Ref(path);
     }
 
     /// <summary>

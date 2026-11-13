@@ -124,8 +124,9 @@ public sealed partial class EditSession
     /// The errors of the checks of a cutscene (<see cref="ThnChecks.Errors"/>) that W has and B does not have (decision
     /// D137 of the M8b design). Such a value makes the engine throw when it reads the script or builds the scene, and no
     /// code of the game catches it, so the game crashes. The save gate and Play refuse them. Each error keeps the place
-    /// of the check, and its message starts with <see cref="CutsceneCrash"/>. The checks run without game data, so they
-    /// do not check templates and costumes. Empty when the session has no W of the cutscene.
+    /// of the check, and its message starts with <see cref="CutsceneCrash"/>. B does not give the errors, so each error
+    /// has the origin of the active mod. The checks run without game data, so they do not check templates and costumes.
+    /// Empty when the session has no W of the cutscene.
     /// </summary>
     public IReadOnlyList<Diagnostic> CutsceneErrors(string path)
     {
@@ -136,8 +137,15 @@ public sealed partial class EditSession
             return known.Errors;
         var lower = cached ? known.Lower
             : document.Base == null ? [] : ThnChecks.Errors(document.Path, document.Base.ToGlobals(), thn);
+        // The lower layer does not give these errors, so the active mod causes them: its patch, its whole file or its edits.
+        var origin = ActiveMod is { } active ? MessageOrigin.Mod(active.Id, ModEvidence.ActiveMod) : null;
         var errors = Diagnostic.NewIn(lower, ThnChecks.Errors(document.Path, document.Working.ToGlobals(), thn))
-            .Select(e => e with { Severity = DiagnosticSeverity.Error, Message = $"{CutsceneCrash} {e.Message}" })
+            .Select(e => e with
+            {
+                Severity = DiagnosticSeverity.Error,
+                Message = $"{CutsceneCrash} {e.Message}",
+                Origin = e.Origin ?? origin,
+            })
             .ToList();
         cutsceneErrors[document.Path] = (document.Working, document.Base, lower, errors);
         return errors;
@@ -169,6 +177,7 @@ public sealed partial class EditSession
                 yield return Diagnostic.Error(path, $"{CutsceneCrash} {CutsceneProblem(path)}") with
                 {
                     Cutscene = new ThnLocation(path),
+                    Origin = MessageOrigin.Mod(active.Id, ModEvidence.ActiveMod),
                 };
             }
         }

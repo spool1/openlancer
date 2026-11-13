@@ -130,8 +130,7 @@ internal static class CheckQueries
     private static IReadOnlyList<Problem> Cutscene(EditSession session, string reference)
     {
         var path = ItemRefs.ResolveCutscene(session, ItemRefs.Parse(reference));
-        var cutscene = CutsceneQueries.Ref(path);
-        return session.CutsceneErrors(path).Select(d => AgentRows.ProblemOf(session, d) with { Ref = cutscene }).ToList();
+        return session.CutsceneErrors(path).Select(d => AgentRows.ProblemOf(session, d)).ToList();
     }
 }
 
