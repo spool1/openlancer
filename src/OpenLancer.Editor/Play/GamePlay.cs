@@ -18,6 +18,7 @@ using OpenLancer.Editor.Dialogs;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Ui;
+using OpenLancer.Studio;
 
 namespace OpenLancer.Editor.Play;
 
@@ -82,7 +83,9 @@ internal sealed record PlayCopyInfo(string Folder, PlayCopyRecord? Record, long 
 /// </summary>
 /// <remarks>
 /// <para>The merge, the make of the play copy and the install run on a worker thread. The play copy keeps its lock while
-/// the game or the test server runs. After each exit, the check of the linked files runs (decision D323).</para>
+/// the game or the test server runs. After each exit, the check of the linked files runs (decision D323). The worker,
+/// the checks and the actions of the Game link window block while they wait for a lock or for an earlier check, so each
+/// one gets a thread of its own (<see cref="OwnThread"/>).</para>
 /// <para>The game ends with the editor, through the job of its process (decision D313). Stop closes the main window of
 /// the game. After 5 seconds, Stop becomes Force stop, which ends the process. Stop test server closes the window of
 /// FLServer and offers Force stop at once. The editor ends FLServer itself after 60 seconds (decision D336).</para>
@@ -633,15 +636,11 @@ internal sealed class GamePlay : IDisposable, IGameStop
         }
 
         var profile = host.Session?.ProfilePath;
-        var before = checks.ToList();
-        request.Task = Task.Run(() =>
+        var before = checks.ToArray();
+        request.Task = OwnThread.Run(() =>
         {
             // A check after an exit holds the lock of the play copy until it ends.
-            foreach (var check in before)
-            {
-                check.ContinueWith(_ => { }).Wait();
-            }
-
+            WaitFor(before);
             return Prepare(request, profile, folder);
         });
     }
@@ -888,14 +887,10 @@ internal sealed class GamePlay : IDisposable, IGameStop
                 open = null;
             }
 
-            var before = checks.ToList();
-            checks.Add(Task.Run(() =>
+            var before = checks.ToArray();
+            checks.Add(OwnThread.Run(() =>
             {
-                foreach (var check in before)
-                {
-                    check.ContinueWith(_ => { }).Wait();
-                }
-
+                WaitFor(before);
                 try
                 {
                     return new CheckOutcome(copy.Check(), null);
@@ -1089,11 +1084,25 @@ internal sealed class GamePlay : IDisposable, IGameStop
         }
 
         var folder = CopyFolder(root);
-        action = (GameFolders.Normal(root), what, Task.Run(() =>
+        action = (GameFolders.Normal(root), what, OwnThread.Run(() =>
         {
             using var copy = PlayCopy.Open(folder);
             return work(copy);
         }), done);
+    }
+
+    /// <summary>Waits on the thread of a worker until each earlier check ended, also a check that failed. The UI thread
+    /// gives the reason of a failed check when it takes the check.</summary>
+    private static void WaitFor(Task[] before)
+    {
+        try
+        {
+            Task.WaitAll(before);
+        }
+        catch (AggregateException)
+        {
+            // Update takes each check in its order and gives its fault.
+        }
     }
 
     private void ActionDone(string root, string what, Task<string> task, Action? done)
