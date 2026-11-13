@@ -1442,6 +1442,7 @@
     "edit_no_change": "The data has these values already, so the edit changed nothing.",
     "text_shared": "{ref} shows the same text and keeps the old text. To change it too, call set_text on {ref} with the field {key}.",
     "limit_items": "One call can name at most {max} items in refs. Split the call.",
+    "limit_cutscene_fields": "The call sets {count} fields of cutscene items, and one call can set at most {max}. Split the call.",
     "repo_mod_editor": "Allow edits of this mod in the editor first.",
     "copy_not_moved": "The copy {ref} has no position, so the offset did not move it. To move it, give it a pos with set_fields.",
     "limit_edit_result": "The result of the edit has {size} KB of text, and one result can have at most {max} KB. The edit changed nothing. Split the edit into smaller calls. The inverse of a delete holds the lines that go. So to delete a large script or trigger, first remove its sections or lines in smaller calls. Or ask the user to raise the size of a result in Agent settings.",

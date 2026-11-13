@@ -94,7 +94,7 @@ When another program uses the port, the server does not start. The status bar th
 | Size of a request (MB) | 4 | The largest request. The change applies at the next start of the server. |
 | Largest side of an image (pixels) | 2048 | The most pixels on each side of an image. A larger panel capture becomes smaller. A `render_scene` or `render_cutscene` call with a larger `width` or `height` gives the error `limit`. |
 | Items of one edit | 200 | The most items that one call of `delete_items`, `duplicate_items` or `prop_group_save` names. Also the most moves of one `scene_transform` call, the most events of one `cutscene_move_events` call and the most rows of `expect_events`. |
-| Sections of one edit | 2000 | The most sections that one edit call changes, adds or removes. A larger edit changes nothing and gives the error `limit`. |
+| Sections of one edit | 2000 | The most sections that one edit call changes, adds or removes. Also the most keys of `fields` of cutscene items that one call sets, in all steps of `edit_batch`. A larger edit changes nothing and gives the error `limit`. |
 | Steps of one batch | 100 | The most steps of one `edit_batch` call, and the most commands of one `mission_edit` call. |
 | Legs of one route | 50 | The most legs of one `scene_place_patrol_route` call. Each leg is one zone. A retail route has at most 12 legs. |
 | Time of an export (min) | 10 | How long one `export_mod` call can take. A longer export gives the error `limit`. A write of the packages that started goes on to its end. |
@@ -208,7 +208,7 @@ When one step fails, the error `step_failed` gives its index and its error, and 
 
 #### Limits and pauses
 
-One call names at most 200 items or cutscene events and changes at most 2000 sections. One batch has at most 100 steps, one `mission_edit` call has at most 100 commands, and one route has at most 50 legs. **Agent > Agent settings > Advanced** changes these limits. One call also runs at most 1000 mission commands, and no setting changes this budget (see "The mission tools"). A call above a limit gives the error `limit` and changes nothing. The size limit of a result applies to an edit too. The edit checks the size of its result before it applies, so a larger edit also changes nothing.
+One call names at most 200 items or cutscene events, changes at most 2000 sections and sets at most 2000 fields of cutscene items. One batch has at most 100 steps, one `mission_edit` call has at most 100 commands, and one route has at most 50 legs. **Agent > Agent settings > Advanced** changes these limits. One call also runs at most 1000 mission commands, and no setting changes this budget (see "The mission tools"). A call above a limit gives the error `limit` and changes nothing. The size limit of a result applies to an edit too. The edit checks the size of its result before it applies, so a larger edit also changes nothing.
 
 While you pause the agent edits, each tool that changes data, writes files or starts a play gives the error `paused`. Examples are the edit tools, `undo`, `redo`, `save`, `export_mod`, `play` and `mission_play`. The read tools still work, also `publish_checklist` and `mission_play_trace`. `play_stop` also works. It stops each game of Play, also a game that you started. Pick **Agent > Pause agent edits** to pause the agent edits, and **Resume agent edits** to let the agent edit again.
 

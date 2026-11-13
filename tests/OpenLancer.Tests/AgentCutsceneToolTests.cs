@@ -365,6 +365,70 @@ public sealed partial class AgentCutsceneToolTests
         Assert.Equal(1, session.Revision);
     }
 
+    /// <summary>One call can guard at most 200 events in <c>expect_events</c> (section 13.1, item 10 of the MCP1
+    /// design). The rows do not have to be unique, so the limit counts the rows. The call above the limit changes
+    /// nothing.</summary>
+    [Theory]
+    [InlineData("delete_items")]
+    [InlineData("duplicate_items")]
+    public void MoreGuardsThanTheLimitGiveLimit(string tool)
+    {
+        var (ws, session, host) = Open();
+        using var _ = ws;
+        var before = State(session);
+        var row = $$"""{ "ref": {{Json(Script + "#event/1")}}, "expect_type": "START_PSYS" }""";
+        string Arguments(int rows) =>
+            $$"""{ "refs": [ {{Json(Script + "#event/1")}} ], "expect_events": [ {{string.Join(", ", Enumerable.Repeat(row, rows))}} ] }""";
+
+        var error = Call(host, tool, Arguments(201)).Content;
+        Assert.Equal(before, State(session));
+        var atLimit = Ok(host, tool, Arguments(200));
+
+        Assert.Equal(("limit", EditTools.EditItems, "expect_events"),
+            ((string?)error["code"], (string?)error["detail"], (string?)error["field"]));
+        Assert.Equal(AgentTexts.Error("limit_guards", ("max", 200)), (string?)error["message"]);
+        Assert.Equal("applied", (string?)atLimit["status"]);
+    }
+
+    /// <summary>
+    /// Each key of <c>fields</c> of a cutscene item is one plan. So one call sets at most as many keys as the section
+    /// limit (section 8.4 of the MCP1 design), in all its requests and in all steps of <c>edit_batch</c>. A call at the
+    /// limit applies. A call above the limit gives <c>limit</c> with the field <c>fields</c>, and nothing changes. In
+    /// <c>edit_batch</c>, the limit is a limit of the call, so the code stays <c>limit</c>.
+    /// </summary>
+    [Fact]
+    public void MoreCutsceneFieldsThanTheSectionLimitGiveLimit()
+    {
+        var (ws, session, host) = Open();
+        using var _ = ws;
+        host.TestLimits = new AgentLimits { EditSections = 3 };
+        var before = State(session);
+        var cam = Json(Script + "#entity/Cam_A");
+        const string four = """{ "cameraprops.fovh": 20, "cameraprops.hvaspect": 2, "cameraprops.nearplane": 2, "cameraprops.farplane": 50 }""";
+
+        var set = Call(host, "set_fields", $$"""{ "ref": {{cam}}, "fields": {{four}} }""").Content;
+        var add = Call(host, "cutscene_add_entity",
+            $$"""{ "cutscene": {{Json(Script)}}, "type": "CAMERA", "name": "my_cam", "fields": {{four}} }""").Content;
+        var batch = Call(host, "edit_batch", $$"""
+            { "steps": [
+                { "tool": "set_fields", "arguments": { "ref": {{cam}}, "fields": { "cameraprops.fovh": 20, "cameraprops.hvaspect": 2 } } },
+                { "tool": "set_fields", "arguments": { "ref": {{cam}}, "fields": { "cameraprops.nearplane": 2, "cameraprops.farplane": 50 } } }
+            ] }
+            """).Content;
+        Assert.Equal(before, State(session));
+        var atLimit = Ok(host, "set_fields",
+            $$"""{ "ref": {{cam}}, "fields": { "cameraprops.fovh": 20, "cameraprops.hvaspect": 2, "cameraprops.nearplane": 2 } }""");
+
+        Assert.Equal(("limit", EditTools.CutsceneFields, "fields"),
+            ((string?)set["code"], (string?)set["detail"], (string?)set["field"]));
+        Assert.Equal(AgentTexts.Error("limit_cutscene_fields", ("count", 4), ("max", 3)), (string?)set["message"]);
+        Assert.Equal(("limit", "fields"), ((string?)add["code"], (string?)add["field"]));
+        Assert.Equal(("limit", EditTools.CutsceneFields, "steps[1].arguments.fields", 1),
+            ((string?)batch["code"], (string?)batch["detail"], (string?)batch["field"], (int?)batch["index"]));
+        Assert.Equal("applied", (string?)atLimit["status"]);
+        Assert.Equal(1, session.Revision);
+    }
+
     /// <summary>A new cutscene goes only into DATA\MODS\&lt;mod id&gt;\CUTSCENES of the active mod, and the save writes
     /// it there as a whole file (section 8.2, item 4 of the MCP1 design).</summary>
     [Fact]

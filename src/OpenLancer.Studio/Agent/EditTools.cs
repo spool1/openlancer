@@ -63,10 +63,18 @@ internal sealed class EditScope
     /// inverses that the call gives, with the group that joins the inverses of a step (see <see cref="CountOf"/>).</summary>
     private int missionCommands, inverseCommands;
 
+    /// <summary>The keys of the <c>fields</c> arguments of cutscene items that the call set until now (see
+    /// <see cref="CountCutsceneFields"/>).</summary>
+    private int cutsceneFields;
+
+    /// <summary>The most sections that one call changes (<see cref="AgentLimits.EditSections"/>).</summary>
+    private readonly int sectionLimit;
+
     internal EditScope(EditSession session, EditBatch batch, AgentLimits limits)
     {
         Session = session;
         Batch = batch;
+        sectionLimit = limits.EditSections;
         checks = new EditChecks(session, batch, limits.EditSections);
         batch.AddCommitCheck(checks);
         cutscenes = new CutsceneResults(session);
@@ -179,6 +187,28 @@ internal sealed class EditScope
         missionRuns.Add((result.Inverse, result.Rows));
         stepConfirmations.AddRange(result.Asked.Select(a => a.Message).Distinct());
         return result;
+    }
+
+    /// <summary>
+    /// Counts the keys of a <c>fields</c> argument of a cutscene item before their plans run. Each key is one plan, as
+    /// one field of the Inspector is one edit, and the cost of a plan grows with the size of its element. So the keys of
+    /// all cutscene requests of the call, also of all steps of <c>edit_batch</c>, count against the section limit of a
+    /// call (section 8.4 of the MCP1 design). A larger change is not one gesture, and the editor stays responsive.
+    /// </summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.Limit"/> with the detail
+    /// <see cref="EditTools.CutsceneFields"/> and the field <c>fields</c>. No plan of the keys ran. The caller cancels
+    /// the batch, so nothing changes.</exception>
+    public void CountCutsceneFields(int count)
+    {
+        if (cutsceneFields + count > sectionLimit)
+        {
+            throw new EditException(new EditError(EditErrorKind.Limit, EditTools.CutsceneFields,
+                AgentTexts.Error("limit_cutscene_fields", ("count", cutsceneFields + count), ("max", sectionLimit)))
+            {
+                Field = "fields",
+            });
+        }
+        cutsceneFields += count;
     }
 
     /// <summary>The mission commands of a command: the command itself, and each command of a command group at each
@@ -298,6 +328,11 @@ internal static class EditTools
     /// <summary>The detail code of a call that names more items than the item limit of the host (see
     /// <see cref="RequireItemLimit"/>).</summary>
     public const string EditItems = "EditItems";
+
+    /// <summary>The detail code of a call that sets more fields of cutscene items than the section limit of the host
+    /// (see <see cref="EditScope.CountCutsceneFields"/>). The limit is for the whole call, also in
+    /// <c>edit_batch</c>.</summary>
+    public const string CutsceneFields = "CutsceneFields";
 
     /// <summary>The most references that the text of a confirmation names for each kind of change.</summary>
     private const int ShownRefs = 3;

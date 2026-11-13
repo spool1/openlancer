@@ -69,9 +69,11 @@ internal static class BatchTool
                 {
                     step = tool.Run(new ToolCall(call.Host, tool.Name, tool.Input.Read(tool.Name, arguments)) { Scope = scope });
                 }
-                catch (EditException e) when (e.Error.Detail is MissionEditTools.MissionBudget or MissionEditTools.InverseBudget)
+                catch (EditException e) when (e.Error.Detail is MissionEditTools.MissionBudget or MissionEditTools.InverseBudget
+                                                  or EditTools.CutsceneFields)
                 {
-                    // The budget of the mission commands is a limit of the call, not of the step.
+                    // The budget of the mission commands and the limit of the cutscene fields are limits of the call, not
+                    // of the step.
                     throw new EditException(e.Error with
                     {
                         Index = i,

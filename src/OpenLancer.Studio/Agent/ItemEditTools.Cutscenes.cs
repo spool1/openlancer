@@ -127,10 +127,13 @@ internal static partial class ItemEditTools
     /// </summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> for a path that is not a path of
     /// the element, or a record. <see cref="EditErrorKind.Refused"/> for the name, the type and the flags of an entity,
-    /// which have their own tools. <see cref="EditErrorKind.InvalidValue"/> for a value of the wrong form.</exception>
+    /// which have their own tools. <see cref="EditErrorKind.InvalidValue"/> for a value of the wrong form.
+    /// <see cref="EditErrorKind.Limit"/> when the keys of the call are more than the section limit (see
+    /// <see cref="EditScope.CountCutsceneFields"/>).</exception>
     internal static void SetCutsceneFields(EditScope scope, ThnRef element, JsonObject fields)
     {
         var session = scope.Session;
+        scope.CountCutsceneFields(fields.Count);
         if (fields.Count > 1)
         {
             var working = session.Cutscene(element.Path)!;
