@@ -620,7 +620,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
 
         // The animation of a START_MOTION event on a character gets the clip picker. A COMPOUND plays the scripts of its
         // model, so its row keeps the text field.
-        if (kind == ThnElementKind.Event && path.Text == ThnAnimationPicker.AnimationPath &&
+        if (kind == ThnElementKind.Event && path.Text == ThnTemplateRules.AnimationPath &&
             workspace.Timeline?.Event(target.Id) is { } info &&
             ThnAnimationPicker.Applies(info.Kind, path.Text, workspace.Working, info.Targets))
         {

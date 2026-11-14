@@ -66,7 +66,7 @@ public sealed class AnimationCatalogRetailTests(ITestOutputHelper output)
         var view = FileSystem.FromPath(GameDataPaths.RequireBase());
         var clips = AnimationClips.Read(RetailGame.Instance.Data);
         var evaluator = ThornEvaluator.Instance;
-        var path = new ThnPath(ThnAnimationPicker.AnimationPath);
+        var path = new ThnPath(ThnTemplateRules.AnimationPath);
         var (characters, others) = (0, 0);
         var missing = new List<string>();
         var otherFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

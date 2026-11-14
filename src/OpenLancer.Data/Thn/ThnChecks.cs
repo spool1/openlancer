@@ -39,6 +39,10 @@ public enum ThnItemKind
 
     /// <summary>A sound (ThnScriptInstance.cs:282-288).</summary>
     Sound,
+
+    /// <summary>A clip of the animation files, which a START_MOTION event on a character plays (StartMotionEvent.cs:34,
+    /// AnimationComponent.cs:192-203). The engine finds it by the name as it is, without letter case.</summary>
+    Animation,
 }
 
 /// <summary>What the game data has for the template of an entity. The states go from the worst to the best.</summary>
@@ -56,8 +60,8 @@ public enum ThnItemState
 }
 
 /// <summary>The game data around one script: the items that the engine reads when it builds the entities of a scene
-/// (ThnScriptInstance.cs:106-281), and how the game plays the script. OpenLancer.Runtime implements it with the data of
-/// a view.</summary>
+/// (ThnScriptInstance.cs:106-281), the clips of the animation files, and how the game plays the script.
+/// OpenLancer.Runtime implements it with the data of a view.</summary>
 public interface IThnGameData
 {
     /// <summary>
@@ -84,15 +88,17 @@ public interface IThnGameData
 
 /// <summary>The problems of one walk of a script (see <see cref="ThnChecks.Check"/>).</summary>
 /// <param name="Errors">The values that stop the engine.</param>
-/// <param name="NameProblems">The templates that name no item, where the engine does not stop.</param>
+/// <param name="NameProblems">The templates that name no item and the clips that the game does not have, where the
+/// engine does not stop.</param>
 public sealed record ThnCheckResult(IReadOnlyList<Diagnostic> Errors, IReadOnlyList<Diagnostic> NameProblems);
 
 /// <summary>
 /// The error checks of a cutscene script (section 9 of the M8 design). An error is a value that makes the engine throw
 /// while it reads the script (ThnScript.cs:122-487, ThnEvent.cs:43-90 and the event classes), while it builds the
 /// scene (ThnScriptInstance.cs:63-293), or when an event reads its targets. The cutscene then does not play. A name
-/// problem is a template that names no item of the game data, where the engine does not stop but the scene shows less,
-/// for example an entity without a model (section 12.1 of the M8b design).
+/// problem is a template that names no item of the game data, or a clip of a character that the game does not have,
+/// where the engine does not stop but the scene shows less, for example an entity without a model (section 12.1 of the
+/// M8b design).
 /// </summary>
 /// <remarks>
 /// <para>The engine reads the keys of an entity of each type, and the props of an event by the type of the event.
@@ -153,9 +159,10 @@ public static class ThnChecks
         Check(path, globals, evaluator, data).Errors;
 
     /// <summary>
-    /// The name problems of a script: each template that names no item of the game data, where the engine does not
-    /// stop. A message names the element as in <see cref="Errors"/>, and it tells what the scene does without the item.
-    /// Without game data, the result is empty.
+    /// The name problems of a script: each template that names no item of the game data, and each clip of a character
+    /// that the game does not have, where the engine does not stop. A message names the element as in
+    /// <see cref="Errors"/>, and it tells what the scene does without the item. Without game data, the result is
+    /// empty.
     /// </summary>
     public static IReadOnlyList<Diagnostic> NameProblems(string path, ThnTable globals, IThnEvaluator evaluator,
         IThnGameData? data) =>
@@ -178,12 +185,16 @@ public static class ThnChecks
         private readonly List<Diagnostic> errors = [];
         private readonly List<Diagnostic> names = [];
 
+        // The tables of the entities, in the order of the engine, for the rule of the clips.
+        private IReadOnlyList<ThnTable> entityTables = [];
+
         public ThnCheckResult Run(ThnTable globals)
         {
             // ThnScript.cs:124-125, :141.
             if (globals[ThnScriptModel.DurationGlobal] is not ThnNumber)
                 Global(ThnScriptModel.DurationGlobal, globals, "a number");
             var entities = Elements(globals, ThnElementKind.Entity, ThnScriptModel.EntitiesGlobal);
+            entityTables = entities.Select(e => e.Table).ToList();
             var events = Elements(globals, ThnElementKind.Event, ThnScriptModel.EventsGlobal);
 
             var broken = new HashSet<Element>(ReferenceEqualityComparer.Instance);
@@ -265,9 +276,10 @@ public static class ThnChecks
                 Add(ev, "targets", Slot(list, 2, "a table"));
             else if (targets.List.FirstOrDefault(t => t is not ThnText) is { } target)
                 Add(ev, "targets", $"A target is {Shown(target)}, but the engine reads a text for each target.");
+            var props = list.Length > ThnElementPaths.PropsSlot ? list[ThnElementPaths.PropsSlot] as ThnTable : null;
             if (list.Length > ThnElementPaths.PropsSlot)
             {
-                if (list[ThnElementPaths.PropsSlot] is not ThnTable props)
+                if (props == null)
                     Add(ev, "props", Slot(list, ThnElementPaths.PropsSlot, "a table"));
                 else if (type != null)
                 {
@@ -283,6 +295,8 @@ public static class ThnChecks
                 Add(ev, "targets", $"The event has {targets.List.Length} targets, but the engine reads {count} for {type}.");
                 return;
             }
+            if (type == "START_MOTION")
+                Motion(ev, targets, props);
             // A target that names no entity that this script makes can be an object of another script of the scene, for
             // example of the set script of a room.
             if (type is not ("SET_CAMERA" or "START_PATH_ANIMATION") || targets.List[1] is not ThnText second ||
@@ -301,6 +315,23 @@ public static class ThnChecks
                 Add(ev, "targets", $"The second target is {entity.Label}, which has no pathprops.path_data. " +
                                    "START_PATH_ANIMATION needs a path there.");
             }
+        }
+
+        /// <summary>
+        /// A START_MOTION event on a character plays a clip of the animation files (StartMotionEvent.cs:34,
+        /// AnimationComponent.cs:192-203). The engine finds the clip by the name as it is, and a character without the
+        /// clip does not move. The check applies only where the rule of the clip list applies
+        /// (<see cref="ThnTemplateRules.PlaysClips"/>), so a COMPOUND, which plays the scripts of its own model, gets no
+        /// check. An empty clip names no clip, as in the clip field.
+        /// </summary>
+        private void Motion(Element ev, ThnTable targets, ThnTable? props)
+        {
+            if (data == null || props?["animation"] is not ThnText { Value.Length: > 0 } clip ||
+                targets.List[0] is not ThnText first ||
+                !ThnTemplateRules.PlaysClips(entityTables, [first.Value], symbols) ||
+                data.Item(ThnItemKind.Animation, clip.Value) != ThnItemState.Missing)
+                return;
+            Add(ev, ThnTemplateRules.AnimationPath, ThnTemplateRules.UnknownClip(clip.Value), name: true);
         }
 
         /// <summary>Checks one key of a row in its root: the record of an entity or the props of an event.</summary>
@@ -581,7 +612,7 @@ public static class ThnChecks
         : $"The value is missing. The engine reads {expected} there.";
 
     /// <summary>A value as Lua text for a message, cut to <see cref="ShownLength"/> characters.</summary>
-    private static string Shown(ThnValue value)
+    internal static string Shown(ThnValue value)
     {
         var text = ThnWriter.Value(value);
         return text.Length <= ShownLength ? text : text[..(ShownLength - 3)] + "...";

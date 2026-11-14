@@ -10,6 +10,7 @@ using LibreLancer.Render.Cameras;
 using LibreLancer.Thn;
 using LibreLancer.Utf.Anm;
 using LibreLancer.World;
+using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Assets;
 using OpenLancer.Runtime.Thn;
 
@@ -338,7 +339,7 @@ internal sealed class ThnAnimationPreview(EditorWindow window) : IDisposable
         var scripts = data.GetCharacterAnimations().Scripts;
         if (!scripts.TryGetValue(clip, out var script))
         {
-            problem = ThnAnimationPicker.UnknownClip;
+            problem = ThnTemplateRules.UnknownClip(clip);
             return;
         }
 

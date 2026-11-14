@@ -22,15 +22,11 @@ namespace OpenLancer.Editor.Inspector;
 /// preview. The <b>Preview</b> button plays the cutscene preview from the time of the event.
 /// </summary>
 /// <remarks>A COMPOUND plays the scripts of its own model, not the clips of the <c>.anm</c> files (GameObject.cs:602-605),
-/// so the row of another target keeps its text field (risk R5 of the M8b design).</remarks>
+/// so the row of another target keeps its text field (risk R5 of the M8b design). The save gate checks the clip with
+/// the same rule (<see cref="ThnTemplateRules.PlaysClips"/>) and the same text
+/// (<see cref="ThnTemplateRules.UnknownClip"/>).</remarks>
 internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid) : IDisposable
 {
-    /// <summary>The path of the animation of a START_MOTION event.</summary>
-    public const string AnimationPath = "props.animation";
-
-    /// <summary>The warning of a clip name that the game does not have.</summary>
-    public const string UnknownClip = "The game has no animation with this name. The character does not move.";
-
     /// <summary>The tooltip of the field when the user can pick a clip.</summary>
     public const string ClickToPick = "Click to pick a clip.";
 
@@ -44,7 +40,6 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
     /// reason.</summary>
     public const string NoPreview = "The cutscene has no preview.";
 
-    private const string Character = "DEFORMABLE";
     private const string NotSet = "Not set";
 
     private const string Note =
@@ -81,18 +76,14 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
     }
 
     /// <summary>True when the row of a value gets the picker: the animation of a START_MOTION event whose first target
-    /// is a DEFORMABLE entity of the script.</summary>
+    /// is a DEFORMABLE entity of the script. The save gate uses the same rule (see
+    /// <see cref="ThnTemplateRules.PlaysClips"/>).</summary>
     /// <param name="script">The open script, or null.</param>
     /// <param name="targets">The targets of the event.</param>
     public static bool Applies(EventTypes? eventType, string path, ThnScriptModel? script,
         IReadOnlyList<string> targets) =>
-        eventType == EventTypes.StartMotion && path == AnimationPath && TargetType(script, targets) == Character;
-
-    /// <summary>The type of the entity of the first target of an event, for example "DEFORMABLE". Null when the event has
-    /// no target, or when the target names no entity of the script. For a name that two entities have, the last entity
-    /// counts, as in the engine.</summary>
-    internal static string? TargetType(ThnScriptModel? script, IReadOnlyList<string> targets) =>
-        targets.Count > 0 ? TypeOf(script, targets[0]) : null;
+        eventType == EventTypes.StartMotion && path == ThnTemplateRules.AnimationPath && script != null &&
+        ThnTemplateRules.PlaysClips(script.Entities.Select(e => e.Table), targets, CutsceneWorkspace.Symbols);
 
     /// <summary>The names of the characters (DEFORMABLE entities) of a script, each name once, in the order of the
     /// script. For a name that two entities have, the last entity counts, as in the engine.</summary>
@@ -113,22 +104,22 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
             }
         }
 
-        return names.Where(name => TypeOf(last[name]) == Character).ToList();
+        return names.Where(name => TypeOf(last[name]) == ThnTemplateRules.CharacterType).ToList();
     }
 
     /// <summary>The <c>template_name</c> of the entity with a name, or null.</summary>
     internal static string? Template(ThnScriptModel? script, string name) =>
         script?.EntityNamed(name)?.Table["template_name"] is ThnText { Value: var template } ? template : null;
 
-    /// <summary>The tooltip of the field. It has the clip and its skeletons, or the warning of an unknown clip. Then it
-    /// has the click hint, or the reason of the read-only state.</summary>
+    /// <summary>The tooltip of the field. It has the clip and its skeletons, or the problem of an unknown clip, as the
+    /// save gate gives it. Then it has the click hint, or the reason of the read-only state.</summary>
     /// <param name="current">The value of the field.</param>
     /// <param name="readOnly">Why the row cannot change the value, or null.</param>
     internal static string FieldTooltip(AnimationClips clips, AnimationClip? clip, string current, string? readOnly)
     {
         var action = readOnly ?? ClickToPick;
         return clip != null ? $"{clip.Name}\n{clips.SkeletonText(clip)}\n\n{action}"
-            : current.Length > 0 ? $"{UnknownClip}\n\n{action}"
+            : current.Length > 0 ? $"{ThnTemplateRules.UnknownClip(current)}\n\n{action}"
             : action;
     }
 
@@ -196,7 +187,7 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
             if (current.Length > 0 && clip == null)
             {
                 ImGui.PushStyleColor(ImGuiCol.Text, EditorTheme.Warning);
-                ImGui.TextWrapped(UnknownClip);
+                ImGui.TextWrapped(ThnTemplateRules.UnknownClip(current));
                 ImGui.PopStyleColor();
             }
         });
@@ -213,10 +204,6 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
 
     /// <summary>Frees the clip preview.</summary>
     public void Dispose() => preview.Dispose();
-
-    /// <summary>The type of the entity that the engine uses for a name, or null when no entity has the name.</summary>
-    private static string? TypeOf(ThnScriptModel? script, string name) =>
-        script?.EntityNamed(name) is { } entity ? TypeOf(entity) : null;
 
     private static string? TypeOf(ThnElement entity) =>
         ThnSchema.TypeOf(ThnElementKind.Entity, entity.Table, CutsceneWorkspace.Symbols);
@@ -281,7 +268,7 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
         if (clips.Find(row.Value) is not { } clip)
         {
             ImGui.PushStyleColor(ImGuiCol.Text, EditorTheme.Warning);
-            ImGui.TextWrapped($"{row.Value}: {UnknownClip}");
+            ImGui.TextWrapped(ThnTemplateRules.UnknownClip(row.Value));
             ImGui.PopStyleColor();
             return;
         }

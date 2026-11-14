@@ -319,6 +319,48 @@ public sealed class ThnChecksTests
     }
 
     /// <summary>
+    /// A START_MOTION event on a character plays a clip of the animation files, so a clip that the game does not have is
+    /// a name problem: the character does not move. The engine finds a clip by its name as it is. The rule of the clip
+    /// picker decides where the check applies: a COMPOUND plays the scripts of its model, a target can name an object
+    /// of another script, and for a name of two entities the last entity counts. An empty clip names no clip.
+    /// </summary>
+    [Fact]
+    public void AnUnknownClipOfACharacterIsANameProblem()
+    {
+        const string entities = """
+            { entity_name = "Man", type = DEFORMABLE, userprops = { Actor = "Man" } },
+            { entity_name = "Door", type = COMPOUND },
+            { entity_name = "Twin", type = DEFORMABLE, userprops = { Actor = "Twin" } },
+            { entity_name = "TWIN", type = COMPOUND }
+            """;
+        const string events = """
+            { 1, START_MOTION, { "Man" }, { animation = "Sc_Walk" } },
+            { 2, START_MOTION, { "man" }, { animation = "Sc_Typo" } },
+            { 3, START_MOTION, { "Door" }, { animation = "Sc_loop" } },
+            { 4, START_MOTION, { "Twin" }, { animation = "Sc_Typo" } },
+            { 5, START_MOTION, { "Nobody" }, { animation = "Sc_Typo" } },
+            { 6, START_MOTION, { "Man" }, { animation = "" } },
+            { 7, START_MOTION, { "Man" }, { animation = " Sc_Walk" } }
+            """;
+        var globals = Globals(entities, events);
+        var data = new FakeData((ThnItemKind.Animation, "Sc_Walk", ThnItemState.Ready));
+
+        var result = ThnChecks.Check(Script, globals, Evaluator, data);
+
+        Assert.Empty(result.Errors);
+        Assert.Equal([
+            "event { 2, START_MOTION, { \"man\" } }, props.animation: The game has no animation \"Sc_Typo\". The character does not move.",
+            "event { 7, START_MOTION, { \"Man\" } }, props.animation: The game has no animation \" Sc_Walk\". The character does not move.",
+        ], result.NameProblems.Select(p => p.Message));
+        var problem = result.NameProblems[0];
+        Assert.Equal((ThnElementKind.Event, 1, ThnTemplateRules.AnimationPath),
+            (problem.Cutscene!.Kind, problem.Cutscene.Index, problem.Cutscene.Value));
+        Assert.Equal($"props.animation: {ThnTemplateRules.UnknownClip("Sc_Typo")}", problem.Subject);
+        Assert.Empty(ThnChecks.NameProblems(Script, globals, Evaluator, new FakeData { Loaded = false }));
+        Assert.Empty(ThnChecks.NameProblems(Script, globals, Evaluator, null));
+    }
+
+    /// <summary>
     /// The game makes no COMPOUND of a script that it plays only in space: the space scene uses the objects of the
     /// mission in their place (Cutscene.cs:101-113, ThnScriptInstance.cs:113). So no check of a COMPOUND applies there.
     /// The other checks of the build still apply.
@@ -506,8 +548,9 @@ public sealed class ThnChecksTests
 
     /// <summary>
     /// The one table of the templates: each kind of item names data lists of the rule data, the categories of a
-    /// COMPOUND keep their names, and the room fills in only the templates of a COMPOUND and of a DEFORMABLE. Only a
-    /// solar archetype, a ship, an equipment and an asteroid need a model file.
+    /// COMPOUND keep their names, and the room fills in only the templates of a COMPOUND and of a DEFORMABLE, not a clip.
+    /// Only a solar archetype, a ship, an equipment and an asteroid need a model file. A clip comes from the list
+    /// animation.
     /// </summary>
     [Fact]
     public void EachKindOfTheTemplateTableNamesListsOfTheRuleData()
@@ -522,8 +565,9 @@ public sealed class ThnChecksTests
         Assert.Equal(["asteroid", "asteroid_mine"], ThnTemplateRules.Categories["Asteroid"].Lists);
         Assert.Equal(["effect", "vis_effect"], ThnTemplateRules.Effect.Lists);
         Assert.False(ThnTemplateRules.Sound.Closed);
-        Assert.Equal([ThnItemKind.Effect, ThnItemKind.Sound],
+        Assert.Equal([ThnItemKind.Effect, ThnItemKind.Sound, ThnItemKind.Animation],
             System.Enum.GetValues<ThnItemKind>().Where(k => !ThnTemplateRules.RoomFillsIn(k)));
+        Assert.Equal(["animation"], ThnTemplateRules.ListsOf(ThnItemKind.Animation));
         Assert.Equal([ThnItemKind.Archetype, ThnItemKind.Ship, ThnItemKind.Equipment, ThnItemKind.Asteroid],
             System.Enum.GetValues<ThnItemKind>().Where(ThnTemplateRules.NeedsModel));
     }

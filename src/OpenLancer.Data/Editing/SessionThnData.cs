@@ -21,8 +21,11 @@ namespace OpenLancer.Data.Editing;
 /// when the file of the line does not exist in the edit view (<see cref="ThnTemplateRules.NeedsModel"/>). An equipment
 /// of a section type that gets no model has no model, and the engine makes no item of some section types
 /// (<see cref="ThnTemplateRules.EquipmentModel"/>). <see cref="Reason"/> tells why for each such entry.</para>
+/// <para>A clip of a character comes from the list <c>animation</c>, so the session reads the animation files only for
+/// a script with a START_MOTION event on a character.</para>
 /// <para>Each such answer also tells if the active mod causes it: the active mod removes the name, makes the entry
-/// unusable, or adds or changes the section of the item. <see cref="Lower"/> gives no state for such an answer.</para>
+/// unusable, or adds or changes the section of the item. A clip that W does not have and the lower layer has is a clip
+/// that the active mod removes. <see cref="Lower"/> gives no state for such an answer.</para>
 /// <para>The checks of a script depend on the game data only through the answers of this class. So the class keeps
 /// each answer, and <see cref="Unchanged"/> tells if the lists give the same answers now. An unsaved INI edit that
 /// changes an answer then checks the cutscene again, and an edit of another file does not.</para>
@@ -78,8 +81,10 @@ internal sealed class SessionThnData : IThnGameData
         var ids = ThnTemplateRules.ListsOf(kind);
         if (lists.List(ids) is not { } list)
             return default;
-        if (list.Find(template) is not { } entry)
-            return new Answer(ThnItemState.Missing, ids.Any(id => lists.RemovedOf(id, null, template) != null), null);
+        if (Find(list, kind, template) is not { } entry)
+            return new Answer(ThnItemState.Missing, kind == ThnItemKind.Animation
+                ? lists.LowerLayerHasClip(template)
+                : ids.Any(id => lists.RemovedOf(id, null, template) != null), null);
         if (lists.Unusable(entry) is { } unusable)
             return new Answer(ThnItemState.Missing, unusable.ByActiveMod, unusable.Reason);
         if (!ThnTemplateRules.NeedsModel(kind) || lists.SectionOf(entry) is not { } section)
@@ -87,6 +92,14 @@ internal sealed class SessionThnData : IThnGameData
         var (state, reason) = Model(kind, section);
         return new Answer(state, state != ThnItemState.Ready && lists.ChangedByActiveMod(entry), reason);
     }
+
+    /// <summary>The entry of a name of a list. The engine finds a clip by the name as it is, so a clip name with spaces
+    /// around it names no clip.</summary>
+    private static ListEntry? Find(ListView list, ThnItemKind kind, string name) =>
+        list.Find(name) is { } entry &&
+        (kind != ThnItemKind.Animation || entry.Value.Equals(name, StringComparison.OrdinalIgnoreCase))
+            ? entry
+            : null;
 
     /// <summary>The model of the section of an item, as the engine gives it: the file of the last <c>DA_archetype</c>
     /// line with a value, when the file exists in the edit view (GameItemDb.cs:122-138, :2088-2105). An equipment also

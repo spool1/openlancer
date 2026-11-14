@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenLancer.Data.Thn;
 
@@ -23,8 +24,8 @@ public sealed record ThnTemplateRule(ThnItemKind Kind, string What, bool Missing
 /// <summary>
 /// The one table of the entity templates of a cutscene (section 12.1 of the M8b design): the COMPOUND categories, the
 /// costume of a DEFORMABLE, the effect of a PSYS and the sound of a SOUND, with their game data and their data lists.
-/// The error checks (<see cref="ThnChecks"/>), the game data of the save gate and of the validation, and the Inspector
-/// read it.
+/// It also has the rule of the clip of a START_MOTION event. The error checks (<see cref="ThnChecks"/>), the game data
+/// of the save gate and of the validation, and the Inspector read it.
 /// </summary>
 public static class ThnTemplateRules
 {
@@ -35,6 +36,16 @@ public static class ThnTemplateRules
     /// <summary>The template of a PSYS that takes the engine effect of the player ship of the scene
     /// (ThnScriptInstance.cs:98-104). The engine reads this template before the effects.</summary>
     public const string PlayerShipEngines = "PlayerShipEngines";
+
+    /// <summary>The entity type of a character.</summary>
+    public const string CharacterType = "DEFORMABLE";
+
+    /// <summary>The path of the clip of a START_MOTION event.</summary>
+    public const string AnimationPath = "props.animation";
+
+    /// <summary>What the scene does when a character gets a clip that the game does not have: the engine finds no
+    /// script with the name and starts no motion (AnimationComponent.cs:192-203).</summary>
+    public const string ClipConsequence = "The character does not move.";
 
     private const string NoModel = "The scene shows the entity without a model.";
 
@@ -84,13 +95,16 @@ public static class ThnTemplateRules
         ThnItemKind.Costume => ["costume"],
         ThnItemKind.Effect => ["effect", "vis_effect"],
         ThnItemKind.Sound => ["sound"],
+        ThnItemKind.Animation => ["animation"],
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
     /// <summary>True when the room fills in a template of the kind that starts with <c>$</c>, for example
     /// <c>$terrain_dyna_01</c>. The engine fills in the template of a COMPOUND and of a DEFORMABLE, but it reads the
-    /// template of a PSYS and of a SOUND as it is (ThnScriptInstance.cs:106-109, :192-196, :282-288).</summary>
-    public static bool RoomFillsIn(ThnItemKind kind) => kind is not (ThnItemKind.Effect or ThnItemKind.Sound);
+    /// template of a PSYS and of a SOUND, and a clip, as it is (ThnScriptInstance.cs:106-109, :192-196,
+    /// :282-288).</summary>
+    public static bool RoomFillsIn(ThnItemKind kind) => kind is not (ThnItemKind.Effect or ThnItemKind.Sound or
+        ThnItemKind.Animation);
 
     /// <summary>True for an item whose model file the engine loads when it builds the entity: a solar archetype, a ship,
     /// an equipment or an asteroid. The engine stops when the item has no <c>DA_archetype</c> line, or when the file of
@@ -98,6 +112,36 @@ public static class ThnTemplateRules
     /// needs a section type that gets a model (see <see cref="EquipmentModel"/>).</summary>
     public static bool NeedsModel(ThnItemKind kind) =>
         kind is ThnItemKind.Archetype or ThnItemKind.Ship or ThnItemKind.Equipment or ThnItemKind.Asteroid;
+
+    /// <summary>
+    /// The type of the entity of the first target of an event, for example "DEFORMABLE". Null when the event has no
+    /// target, or when the target names no entity of the script. For a name that two entities have, the last entity
+    /// counts, as in the engine (ThnScript.cs:107, :130-137).
+    /// </summary>
+    /// <param name="entities">The entities of the script, in the order of the engine.</param>
+    /// <param name="targets">The targets of the event.</param>
+    public static string? TargetType(IEnumerable<ThnTable> entities, IReadOnlyList<string> targets,
+        IReadOnlyDictionary<string, ThnSymbolInfo> symbols) =>
+        targets.Count > 0 && entities.LastOrDefault(e =>
+            ThnScriptModel.NameOf(e)?.Equals(targets[0], StringComparison.OrdinalIgnoreCase) == true) is { } entity
+            ? ThnSchema.TypeOf(ThnElementKind.Entity, entity, symbols)
+            : null;
+
+    /// <summary>
+    /// True when the clip of a START_MOTION event names a clip of the animation files (the list <c>animation</c>): the
+    /// first target names a character (see <see cref="TargetType"/>). A character plays the clips of the animation
+    /// files (ThnScriptInstance.cs:266-270). A COMPOUND plays the scripts of its own model (GameObject.cs:602-605), and a
+    /// target that names no entity of the script names an object of another script. So the Inspector gives the clip
+    /// picker, and the save gate checks the clip, only when this rule is true.
+    /// </summary>
+    public static bool PlaysClips(IEnumerable<ThnTable> entities, IReadOnlyList<string> targets,
+        IReadOnlyDictionary<string, ThnSymbolInfo> symbols) =>
+        TargetType(entities, targets, symbols) == CharacterType;
+
+    /// <summary>The problem of a clip that the game does not have, with its consequence. The clip field of the
+    /// Inspector, the save gate and the agent tools give this text.</summary>
+    public static string UnknownClip(string clip) =>
+        $"The game has no animation {ThnChecks.Shown(new ThnText(clip))}. {ClipConsequence}";
 
     /// <summary>
     /// What the engine makes of an equipment section for a COMPOUND (GameItemDb.cs:1008-1303). Only some section types

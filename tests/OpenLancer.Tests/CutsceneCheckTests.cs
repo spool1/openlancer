@@ -263,6 +263,62 @@ public sealed class CutsceneCheckTests
     }
 
     /// <summary>
+    /// The validation checks the clip of a START_MOTION event on a character with the clips of the animation files that
+    /// the <c>[Animations]</c> lines of the loaded data name. It skips a file that does not exist, as the engine does. A
+    /// COMPOUND plays the scripts of its model, so its clip gets no check. Without the game data, no clip check runs.
+    /// An animation file of a mod that does not read gives one warning and no exception, and its clips are then not
+    /// known.
+    /// </summary>
+    [Fact]
+    public void AnUnknownClipIsAnErrorAndAnAnimationFileThatDoesNotReadIsAWarning()
+    {
+        using var ws = Workspace();
+        ws.WriteBase(@"DATA\CHARACTERS\bodyparts.ini", "[Animations]\nanim = characters\\walk.anm\nanim = characters\\gone.anm\n");
+        AnimationWorkspace.Write(System.IO.Path.Combine(ws.Base, @"DATA\CHARACTERS\walk.anm"), "Sc_Walk");
+        ws.WriteBase(Path, """
+            duration = 10
+            entities = {
+                { entity_name = "Man", type = DEFORMABLE, userprops = { Actor = "Man" } },
+                { entity_name = "Door", type = COMPOUND }
+            }
+            events = {
+                { 1, START_MOTION, { "Man" }, { animation = "sc_walk" } },
+                { 2, START_MOTION, { "Man" }, { animation = "Sc_Typo" } },
+                { 3, START_MOTION, { "Door" }, { animation = "Sc_loop" } }
+            }
+            """);
+        var lower = FileSystem.FromPath(ws.Base);
+        var db = Loaded(lower);
+        const string Typo = "event { 2, START_MOTION, { \"Man\" } }, props.animation: The game has no animation \"Sc_Typo\". " +
+                            "The character does not move.";
+
+        Assert.Equal([Typo], CutsceneCheck.Errors(lower, Path, db).Select(p => p.Message));
+        Assert.Empty(CutsceneCheck.Errors(lower, Path, null));
+
+        var overlay = ws.Build(ws.Mod("m", new()
+        {
+            [PatchFile] = Patch("""{ ol_match = "Door", ol_set = { template_name = "" } }"""),
+            [@"files\DATA\CHARACTERS\walk.anm"] = "not an animation file",
+        }));
+        var modded = overlay.CreateFileSystem();
+        var problems = CutsceneCheck.NewProblems(lower, modded, overlay.CutscenePaths, db, Loaded(modded));
+
+        Assert.Equal(["event { 1, START_MOTION, { \"Man\" } }, props.animation: The game has no animation \"sc_walk\". " +
+                      "The character does not move."], problems.Where(p => p.Severity == DiagnosticSeverity.Error).Select(p => p.Message));
+        var warning = Assert.Single(problems, p => p.Severity == DiagnosticSeverity.Warning);
+        Assert.EndsWith("walk.anm", warning.Source, System.StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("OpenLancer cannot read this animation file, so the clip list has no clips from it. ", warning.Message);
+
+        // The game data of a view, with the [Animations] lines of its bodyparts.ini.
+        static GameItemDb Loaded(FileSystem fs)
+        {
+            var data = new GameItemDb(fs);
+            data.Ini.Bodyparts = new LibreLancer.Data.Schema.Characters.BodypartsIni(data.DataPath(@"characters\bodyparts.ini")!, data.Ini);
+            return data;
+        }
+    }
+
+    /// <summary>
     /// The game makes no COMPOUND of a script that it plays only in space (Cutscene.cs:101-113). The check reads the INI
     /// lines that name the script, also without the game data: a script that only <c>[Trigger] Act_CallThorn</c> names
     /// has no COMPOUND error. A mission ambient plays the script in a room, so then the COMPOUND error is back.

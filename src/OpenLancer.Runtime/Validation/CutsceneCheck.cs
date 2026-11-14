@@ -6,6 +6,7 @@ using LibreLancer.Data.GameData;
 using LibreLancer.Data.GameData.World;
 using LibreLancer.Data.IO;
 using OpenLancer.Data;
+using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Thn;
 using OpenLancer.Runtime.Thn;
@@ -27,6 +28,10 @@ namespace OpenLancer.Runtime.Validation;
 /// template of each base that plays it. The INI lines also tell when the game plays the cutscene only in space, where
 /// it makes no COMPOUND. The check reads the INI lines only for such a template, or for a COMPOUND with a
 /// problem.</para>
+/// <para>A clip of a START_MOTION event on a character must be a clip of the animation files that the
+/// <c>[Animations]</c> lines of the loaded data name. The check reads these files once for each view, and only for a
+/// cutscene with such an event. An animation file that does not read gives one warning, and the other files keep their
+/// clips.</para>
 /// <para>The check reads only the listed paths. A check of every cutscene of both views adds about 2.5 s to each
 /// validation.</para>
 /// </remarks>
@@ -38,7 +43,8 @@ public static class CutsceneCheck
     /// messages (<see cref="Diagnostic.NewIn"/>). A message names its entity, and the retail data has a name problem, so
     /// the name problems compare by their subjects: the path of the value and the text, without the entity
     /// (<see cref="Diagnostic.Subject"/>). So a mod that renames an entity with a lower name problem gets no new
-    /// problem.</summary>
+    /// problem. Each animation file of the modded view that does not read, and that the lower view reads, gives a
+    /// warning.</summary>
     /// <param name="paths">The install paths of the cutscenes to check, for example the <c>.thn</c> files of the
     /// merged view of the mods.</param>
     /// <param name="lowerData">The game data of the lower view, or null when it did not load. The checks of templates
@@ -63,6 +69,8 @@ public static class CutsceneCheck
                     problems.Add(problem);
             }
         }
+        if (moddedView.ClipWarnings is { Count: > 0 } warnings)
+            problems.AddRange(Diagnostic.NewIn(lowerView.Animations().Warnings, warnings));
         return problems;
     }
 
@@ -81,9 +89,35 @@ public static class CutsceneCheck
     private sealed class View(FileSystem fs, GameItemDb? data)
     {
         private ThnReferences? references;
+        private (IReadOnlySet<string>? Names, IReadOnlyList<Diagnostic> Warnings)? clips;
 
         /// <summary>The game data of the view, or null when it did not load.</summary>
         public GameItemDb? Data => data;
+
+        /// <summary>The warnings of the animation files that do not read, or none when the view did not read the
+        /// files.</summary>
+        public IReadOnlyList<Diagnostic> ClipWarnings => clips?.Warnings ?? [];
+
+        /// <summary>
+        /// The names of the clips of the animation files that the <c>[Animations]</c> lines of the loaded data name, as
+        /// the engine loads them (GameDataManager.cs:65-85): each line joined to the data path, without a file that
+        /// does not exist. The view reads the files at the first call. Null names when the data did not load or has no
+        /// bodyparts.ini.
+        /// </summary>
+        public (IReadOnlySet<string>? Names, IReadOnlyList<Diagnostic> Warnings) Animations()
+        {
+            if (clips is { } known)
+                return known;
+            if (data?.Ini.Bodyparts is not { } bodyparts)
+            {
+                clips = (null, []);
+                return clips.Value;
+            }
+            var warnings = new List<Diagnostic>();
+            var read = AnimationCatalog.Read(fs, bodyparts.Animations.Select(data.DataPath).OfType<string>(), warnings);
+            clips = (read.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase), warnings);
+            return clips.Value;
+        }
 
         /// <summary>The INI lines of the view that name cutscenes. The scan runs once, when a check first needs
         /// it.</summary>
@@ -125,8 +159,8 @@ public static class CutsceneCheck
         private static bool IsBytecode(byte[] bytes) => bytes is [0x1B, (byte)'L', (byte)'u', (byte)'a', ..];
     }
 
-    /// <summary>The game data around one cutscene of a view: the templates and the costumes of the loaded data, and the
-    /// INI lines that name the cutscene.</summary>
+    /// <summary>The game data around one cutscene of a view: the templates, the costumes and the clips of the loaded
+    /// data, and the INI lines that name the cutscene.</summary>
     private sealed class Script(View view, string path) : IThnGameData
     {
         private IReadOnlyList<IReadOnlyDictionary<string, string>>? bases;
@@ -137,6 +171,9 @@ public static class CutsceneCheck
         {
             if (view.Data is not { } db)
                 return null;
+            // The engine finds a clip by the name as it is (AnimationComponent.cs:192-203).
+            if (kind == ThnItemKind.Animation)
+                return view.Animations().Names is { } names ? Has(names.Contains(template)) : null;
             if (!template.StartsWith('$') || !ThnTemplateRules.RoomFillsIn(kind))
                 return State(db, kind, template);
             // Only a template that starts with $ has a substitution.

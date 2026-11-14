@@ -64,7 +64,7 @@ public sealed class ThnAnimationPickerTests
     public void OnlyTheAnimationOfACharacterGetsThePicker()
     {
         var script = ThnScriptModel.From(Evaluate(Script), ThnElementId.Counter());
-        const string path = ThnAnimationPicker.AnimationPath;
+        const string path = ThnTemplateRules.AnimationPath;
 
         Assert.True(ThnAnimationPicker.Applies(EventTypes.StartMotion, path, script, ["Hero"]));
         Assert.True(ThnAnimationPicker.Applies(EventTypes.StartMotion, path, script, ["hero", "Door"]));
@@ -77,8 +77,59 @@ public sealed class ThnAnimationPickerTests
         Assert.False(ThnAnimationPicker.Applies(EventTypes.StartMotion, "props.start_time", script, ["Hero"]));
         Assert.False(ThnAnimationPicker.Applies(EventTypes.StartSound, path, script, ["Hero"]));
         Assert.False(ThnAnimationPicker.Applies(null, path, script, ["Hero"]));
-        Assert.Equal("COMPOUND", ThnAnimationPicker.TargetType(script, ["Door"]));
-        Assert.Null(ThnAnimationPicker.TargetType(script, ["Nobody"]));
+        var entities = script.Entities.Select(e => e.Table).ToList();
+        Assert.Equal("COMPOUND", ThnTemplateRules.TargetType(entities, ["Door"], Evaluator.Symbols));
+        Assert.Null(ThnTemplateRules.TargetType(entities, ["Nobody"], Evaluator.Symbols));
+    }
+
+    /// <summary>
+    /// The picker and the save gate use one rule for the clip list (<see cref="ThnTemplateRules.PlaysClips"/>). So the
+    /// gate checks the clip of a START_MOTION event exactly where the row gets the picker: on a DEFORMABLE, not on a
+    /// COMPOUND, on the last entity of a name of two entities, and not on a target that names no entity.
+    /// </summary>
+    [Fact]
+    public void ThePickerAndTheSaveGateUseOneRuleForTheClipList()
+    {
+        string[] targets = ["Hero", "hero", "Door", "Twin", "Shifted", "Guard", "Nobody"];
+        var events = string.Join(",\n", targets.Select((t, i) =>
+            $$"""{ {{i + 1}}, START_MOTION, { "{{t}}" }, { animation = "Sc_unknown" } }"""));
+        var text = Script[..Script.IndexOf("events = {", StringComparison.Ordinal)] + $"events = {{\n{events}\n}}\n";
+        var globals = Evaluate(text);
+        var script = ThnScriptModel.From(globals, ThnElementId.Counter());
+
+        var checkedTargets = ThnChecks.NameProblems(@"DATA\SCRIPTS\x.thn", globals, Evaluator, new NoClips())
+            .Select(p => targets[p.Cutscene!.Index]).ToList();
+        var pickerTargets = targets
+            .Where(t => ThnAnimationPicker.Applies(EventTypes.StartMotion, ThnTemplateRules.AnimationPath, script, [t]))
+            .ToList();
+
+        Assert.Equal(["Hero", "hero", "Twin", "Guard"], pickerTargets);
+        Assert.Equal(pickerTargets, checkedTargets);
+    }
+
+    /// <summary>The field, the side pane and the save gate give one text for a clip that the game does not have: the
+    /// reason and the consequence come from <see cref="ThnTemplateRules.UnknownClip"/>.</summary>
+    [Fact]
+    public void TheFieldAndTheSaveGateShareTheTextOfAnUnknownClip()
+    {
+        var clips = new AnimationClips([new AnimationClip(MaleWalk, BodyMale)], []);
+        var text = ThnTemplateRules.UnknownClip("Sc_typo");
+        var gate = ThnChecks.NameProblems(@"DATA\SCRIPTS\x.thn", Evaluate(Script.Replace("Sc_walk", "Sc_typo",
+            StringComparison.Ordinal)), Evaluator, new NoClips()).Single();
+
+        Assert.Equal("The game has no animation \"Sc_typo\". The character does not move.", text);
+        Assert.EndsWith(ThnTemplateRules.ClipConsequence, text, StringComparison.Ordinal);
+        Assert.StartsWith(text, ThnAnimationPicker.FieldTooltip(clips, null, "Sc_typo", null), StringComparison.Ordinal);
+        Assert.Equal($"event {{ 1, START_MOTION, {{ \"Hero\" }} }}, props.animation: {text}", gate.Message);
+    }
+
+    /// <summary>Game data that has each item and no clip.</summary>
+    private sealed class NoClips : IThnGameData
+    {
+        public bool MakesCompounds => true;
+
+        public ThnItemState? Item(ThnItemKind kind, string template) =>
+            kind == ThnItemKind.Animation ? ThnItemState.Missing : ThnItemState.Ready;
     }
 
     /// <summary>"Preview on" lists the characters of the script, each name once, in the order of the script. A name whose
@@ -222,7 +273,7 @@ public sealed class ThnAnimationPickerTests
             ThnAnimationPicker.FieldTooltip(clips, walk, MaleWalk, null));
         Assert.Equal($"{MaleWalk}\nSkeletons: male body\n\n{readOnly}",
             ThnAnimationPicker.FieldTooltip(clips, walk, MaleWalk, readOnly));
-        Assert.Equal($"{ThnAnimationPicker.UnknownClip}\n\n{ThnAnimationPicker.ClickToPick}",
+        Assert.Equal($"{ThnTemplateRules.UnknownClip("Sc_typo")}\n\n{ThnAnimationPicker.ClickToPick}",
             ThnAnimationPicker.FieldTooltip(clips, null, "Sc_typo", null));
         Assert.Equal(readOnly, ThnAnimationPicker.FieldTooltip(clips, null, "", readOnly));
 
