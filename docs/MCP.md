@@ -565,6 +565,8 @@ A template that names no item of the data lists is a problem too. An example is 
 | COMPOUND | By the category: `solar_archetype`, `ship`, `petal_room`, `petal_cart`, `petal_prop`, `equipment`, or `asteroid` and `asteroid_mine` |
 | PSYS | `effect` and `vis_effect` |
 
+A clip of a START_MOTION event on a character that the game does not have is a problem too: the character does not move. The clip is the value of `props.animation`. Get the clip names from `list_values` with the list `animation`. The detail of each row is the file of the clip. The list has the clips of the `.anm` files that the `[Animations]` lines of bodyparts.ini name, with the unsaved edits. A COMPOUND plays the scripts of its own model, so a clip on a COMPOUND is not checked. `save` refuses such a clip with the text of the save gate of the editor.
+
 Each such problem gives the reference of its element. It gives the reference of the script when the problem is about the whole script. It also does so when another entity has the same name, or another event has the same time, type and targets. The active mod causes these problems, so their origin is the active mod. `check` with the scope `all` and the error `save_blocked` name the same references.
 
 `get_cutscene` gives the entities and the events of a script, each with its fields. They come in pages, as the rows of a list tool do: first the entities, then the events. `entity_count` and `event_count` give the numbers of the whole script, and `next_cursor` gives the next page. A large retail script has more than a thousand elements. Use a smaller `limit` when a page is larger than the size limit of a result, or read one element with `get_item`.

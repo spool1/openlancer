@@ -647,6 +647,8 @@ A whole file of a later mod replaces the script and discards the patches before 
 
 The check also reports a template that names no item as an error, where the engine does not stop. Such templates are the prop, the equipment or the asteroid of a COMPOUND, and the effect of a PSYS. The engine reads the template of a PSYS as it is, also a template that starts with `$`. The check compares these problems by the value and the text, without the entity. So a mod that renames an entity with such a problem of the lower data gets no new problem.
 
+The check also reports the clip of a START_MOTION event on a character as an error when the game does not have the clip. The character then does not move. The clips are the scripts of the `.anm` files that the `[Animations]` lines of bodyparts.ini name, as the engine loads them. The check reads these files once for each view, and only for a script with such an event. A clip on a COMPOUND names a script of its model, so it gets no check. An `.anm` file that does not read gives one warning, and the other files keep their clips.
+
 The scene does not make a REFERENCE entity, or an entity that a later entity with the same name hides. So the checks of the scene skip these entities, and a target with the name of such an entity names an object of another script of the scene. `flags` gives REFERENCE also as a name of another group, because the engine casts the name to its number: `flags = CAMERA` is 3, which is REFERENCE and LIT_DYNAMIC. A room fills in the `$terrain_*` templates with the terrain of its base, so the check reads the template of each base that plays the script. The game makes no COMPOUND of a script that only `[Trigger] Act_CallThorn` lines name, because it plays such a script in space with the objects of the mission. So the checks of a COMPOUND skip such a script.
 
 The check does not know the objects of the other scripts of a room. So a target that names no entity of the script is not an error, also for SET_CAMERA and START_PATH_ANIMATION. The engine stops when no script of the scene has that name.
@@ -1036,14 +1038,17 @@ The editor reads some files only for the lists, for example `solararch.ini` and 
 
 The Assets panel uses two more lists. The `asteroid` list holds the `[Asteroid]` sections of the files of `[Data] asteroids`. The `model` list holds the `.cmp`, `.3db` and `.sph` files below `DATA`. A list field also takes a tile of the Assets panel (see "The Assets panel").
 
-The save gate checks the templates of the cutscenes with more lists (see "The save gate"):
+The save gate checks the templates and the clips of the cutscenes with more lists (see "The save gate"):
 
 | List | Entries |
 |---|---|
 | `asteroid_mine` | The `[AsteroidMine]` sections of the files of `[Data] asteroids`. The engine puts the asteroids and the mines in one collection. So a template of the category `asteroid` names an entry of `asteroid` or of `asteroid_mine`. |
 | `petal_room`, `petal_prop`, `petal_cart` | The first values of the `room`, `prop` and `cart` lines of the `[ObjectTable]` sections of each `[Data] PetalDB` file. The engine reads each such file. When two files give one name, the engine uses the first file. |
+| `animation` | The clips of a character: the scripts of the `.anm` files that the `[Animations]` lines of bodyparts.ini name. The engine reads value 0 of each line, joins it to the data path, and skips a file that does not exist. When two files give one name, the engine uses the last file. The detail of an entry is its file name. |
 
 The templates of a cutscene also use the lists `solar_archetype`, `ship`, `equipment`, `costume`, `effect` and `vis_effect`, and `sound`.
+
+The list `animation` reads only the node and the string blocks of each `.anm` file, not the keys. It keeps the names of each file with the length and the last write time of the file on disk. So a save reads no `.anm` file again, and a new `[Animations]` line reads only its own file. An unsaved `[Animations]` line of the active mod changes the list at once. An `.anm` file that does not read gives one warning of the list, and the other files keep their clips.
 
 ### The raw INI block
 
@@ -1095,6 +1100,7 @@ Each save runs the save gate first, also a save with nothing to write, and also 
   - the effect of a PSYS: the scene does not show the entity.
 
   The check skips a template that the room fills in, for example `$terrain_dyna_01`. It also skips the templates `PlayerShip` and `PlayerShipEngines`, the costume of a DEFORMABLE with `userprops.Actor`, and the template of a SOUND. A SOUND can also name a voice line. The game makes no COMPOUND of a script that only `[Trigger] Act_CallThorn` lines name, so the check skips the COMPOUNDs of such a script.
+- A clip of a START_MOTION event on a character, in a cutscene that the active mod changes, when the list `animation` does not have the clip. The engine finds a clip by its name as it is, without letter case. The message says what the scene does: "The character does not move." The check applies only when the first target of the event names an entity, and the last entity with that name is a DEFORMABLE. The clip picker of the Inspector uses the same rule. A clip that the lower cutscene has with the same problem in the lower data does not block the save. A clip that the active mod removes blocks the save, also when the clip does not change.
 
 A field-check error or a missing required key that the base game has too does not block the save. This is true when the key has the value of the base data, no lower mod changes the section, and the same check of the base version of the section gives the same error. For example, the active mod changes the loadout of a retail object, and the position of the object in the base data has a value that is not a number. The save continues with a warning that ends with "The base game has the same problem, so the save continues." Each other error blocks the save, also when it is a value of the base data: an error of a key that the active mod writes again, an error that a key of the active mod causes, an error of a key that a lower mod changes, and each error that reads another section.
 

@@ -9,7 +9,7 @@ This version has these limits:
 - The preview plays the sounds of the open script in 2D only. It does not play the position of a sound, START_AUDIO_PROP_ANIM, or the sounds of the other scripts of a room.
 - A new cutscene is a text file. Nobody checked a new cutscene in the retail games yet, so the editor marks it "not checked in the retail games".
 - The editor cannot change a whole cutscene file of a mod into a patch.
-- The validation reports only the errors that stop a cutscene and the templates that name no item. It does not report warnings, for example an event after the end of the script.
+- The validation reports only the errors that stop a cutscene, the templates that name no item and the clips that the game does not have. It does not report warnings, for example an event after the end of the script.
 - The save gate checks only the cutscenes that the active mod changes. So a delete or a rename of a costume or another item does not stop the save when only an unchanged cutscene names the item.
 
 ## Browse and preview the retail cutscenes
@@ -180,9 +180,9 @@ The Inspector shows the selected entity or event, the selected events, or the cu
 - A SOUND entity has the row **Preview**. Play plays the sound of its template once from its start, in 2D, with the voice rule of the preview. Stop stops it.
 - The cutscene page has the section **Problems** when the script has problems that the lower cutscene does not have. These problems stop Save and Play. A click on a problem selects its element. The state of a new cutscene says "not checked in the retail games". The section shows two kinds of problems:
   - An error crashes the game when it plays the script, for example a LIGHT without `spatialprops.pos`. A template that names no costume, solar archetype, ship, room or cart is such an error too. A solar archetype, a ship, an equipment or an asteroid without a model file is also an error. The game makes the equipment of some section types without a model, for example a `[Light]` or a `[Commodity]`. Such an equipment is an error too. The tooltip of an error starts with "The game crashes when it plays this cutscene."
-  - A name problem is a template that names no item, where the game does not crash. Such templates are a prop, an equipment or an asteroid of a COMPOUND, and an effect of a PSYS. The text tells what the scene does without the item, for example "The scene shows the entity without a model."
+  - A name problem is a template that names no item, where the game does not crash. Such templates are a prop, an equipment or an asteroid of a COMPOUND, and an effect of a PSYS. The text tells what the scene does without the item, for example "The scene shows the entity without a model." A clip of a character that the game does not have is also a name problem (see "The animation of a character").
 
-  The check reads the data lists of the edit view with the unsaved edits. So a costume that you add in `costumes.ini` is known before the save. When the lists have the name but the game cannot use the item, the text tells why. An example is a costume whose body names no body part. A template that the lower cutscene has with the same problem in the lower game data stays out of the section. This is also true after a rename of its entity. When an INI edit of the active mod deletes, renames or breaks the item of a template, the problem stays in the section. The check skips a template that the room fills in, for example `$terrain_dyna_01`, a DEFORMABLE with `userprops.Actor`, and a SOUND.
+  The check reads the data lists of the edit view with the unsaved edits. So a costume that you add in `costumes.ini`, or a clip of a new `[Animations]` line in bodyparts.ini, is known before the save. When the lists have the name but the game cannot use the item, the text tells why. An example is a costume whose body names no body part. A template that the lower cutscene has with the same problem in the lower game data stays out of the section. This is also true after a rename of its entity. When an INI edit of the active mod deletes, renames or breaks the item of a template, the problem stays in the section. The check skips a template that the room fills in, for example `$terrain_dyna_01`, a DEFORMABLE with `userprops.Actor`, and a SOUND.
 
 ### The animation of a character
 
@@ -210,7 +210,11 @@ To change the animation of a character:
 
 One opening of the list is one entry of the edit history. A click on the current clip makes no change. While **Body part** or **Preview on** is open, Esc closes only that dropdown. **Preview** plays the cutscene preview from the time of the event. It also works when the row is read-only.
 
-When the event names a clip that the game does not have, the field shows "Missing (Animation)" in the warning color. The warning below the field says: "The game has no animation with this name. The character does not move."
+When the event names a clip that the game does not have, the field shows "Missing (Animation)" in the warning color. The text below the field gives the name of the clip, for example `The game has no animation "Sc_wave". The character does not move.`
+
+The save gate checks the clip of each START_MOTION event on a character with the same rule and the same text. A clip of the active mod that the game does not have stops Save and Play. The Problems section shows it, and a click on it selects the event. A clip that the lower cutscene has with the same problem in the lower game data stays out of the gate. A clip that the active mod removes, for example with its own `.anm` file without the clip, stops the save. A clip on a COMPOUND, and a clip on a target that names no entity of the script, get no check.
+
+The gate reads the clips from the data list `animation`. The list has the clips of the `.anm` files that the `[Animations]` lines of bodyparts.ini name, with the unsaved edits of the active mod. So a clip of a new `[Animations]` line is known before the save. A file that does not exist adds no clip, as in the game. `oltool validate` reports the same problem as an error. `list_values` with the list `animation` gives the clips to an agent (see [MCP.md](MCP.md)).
 
 ## Edit a cutscene
 
@@ -220,6 +224,7 @@ When the event names a clip that the game does not have, the field shows "Missin
 4. Press Ctrl+S. The Console shows the save, for example "Saved mod 'my-mod' (save 1): 1 file written, 0 files deleted." and "Wrote patches\DATA\Scripts\Story\s002xe_nrml_sinclair_li_01_Cityscape_01.thn".
    - If an edit gives an error that crashes the game, the save writes nothing. The Console line starts with "The game crashes when it plays this cutscene." and names the element and the key. Click the line to select the element. Correct the value or undo the edit, then save again.
    - If a template names no item of the game data, the save also writes nothing. The Console line names the element and the template, and tells what the scene does without the item. This is also true after an INI edit that deletes, renames or breaks the item. Pick an item of the list or undo the edit, then save again.
+   - If a character gets a clip that the game does not have, the save also writes nothing. The Console line names the event and the clip. Pick a clip of the list or undo the edit, then save again.
 5. Wait for the validation. The Console shows "Validation OK for save 1: no errors, 0 warnings that the mod adds.", or the errors of the save.
 
 The patch holds only the values that the edits change. A save keeps the bytes of a patch that the edits do not change, and it deletes a patch that changes nothing after the edits. "What stays in a patch file" in [MOD_FORMAT.md](MOD_FORMAT.md) gives the rules. The game plays the patched cutscene after `oltool deploy`. Play shows it without a deploy (see [PLAY.md](PLAY.md)).
