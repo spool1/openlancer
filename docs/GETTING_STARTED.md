@@ -62,7 +62,7 @@ For Freelancer 1.0, patch the game to 1.1 first. The 1.0 program does not start 
 2. In the main menu of the game, start a new game or load a save.
 3. In the editor window, click the **Stop** button.
 
-Ctrl+F5 plays in the game of your last Play in the game. The first time, it plays in the first linked game that has its game program. To play in another linked game, click its item in the Play menu, for example **Play > Play in HD Edition 0.7.1**.
+Ctrl+F5 plays in the game of your last Play in the game. The first time, it plays in the first linked game that has its game program. To play in another linked game, click its item in the Play menu. An example is **Play > Play in HD Edition 0.7.1**.
 
 The editor saves the mod and installs the mods into a play copy of the game. A play copy is a folder next to the game folder. Then the editor starts the game program of the play copy. Your game folder does not change. The first play copy takes some seconds to make.
 
