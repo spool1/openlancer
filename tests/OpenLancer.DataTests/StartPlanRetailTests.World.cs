@@ -443,6 +443,35 @@ public sealed partial class StartPlanRetailTests
         }
     }
 
+    /// <summary>
+    /// The rows of the two passes of the replay (issue #46) in both games. The path shows the time of an old timer only
+    /// at a later trigger, but the timer ran at its early step. At M04 juni_mactan_tether, an old timer sets the
+    /// objective of the jump gate in Li01. The later triggers of the path set other objectives. So the setup does not set
+    /// the objective of the jump gate. At M01a com_0420, the 1 s timer tm_o_attack_cam runs before d_order. So
+    /// d_order stops the 8 s timer lsf_reinforcements_arrive that tm_o_attack_cam starts, and it does not wait.
+    /// </summary>
+    [Fact]
+    public void TheReplayRunsEachOldTimerAtItsEarlyStep()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var tether = Plan(Slot(scripts, "M04"), "juni_mactan_tether");
+            Assert.True(tether.CanStart, $"{set}: {tether.Reason}");
+            var objectives = tether.Setup[0].Lines.Where(l => l.Key == "Act_SetNNObj").Select(l => l.Values[0]).ToList();
+            Assert.DoesNotContain("nn_badlands_jumpgate", objectives);
+            Assert.Equal("nn_blank", objectives.LastOrDefault());
+
+            var m01a = Slot(scripts, "M01a");
+            var help = Plan(m01a, "com_0420");
+            Assert.True(help.CanStart, $"{set}: {help.Reason}");
+            Assert.DoesNotContain("lsf_reinforcements_arrive", help.ActiveSet);
+            var ran = StartReplay.Run(m01a.Index, MissionStartPoint.At("com_0420")).Changes
+                .Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger.Nickname).ToList();
+            Assert.True(ran.IndexOf("tm_o_attack_cam") >= 0 && ran.IndexOf("tm_o_attack_cam") < ran.IndexOf("d_order"),
+                $"{set}: {string.Join(" ", ran)}");
+        }
+    }
+
     /// <summary>The row of issue 45 in both games. M04 juni_mactan_tether starts in Iw03, after the jump from Li01. The
     /// game sent the exit from Li01 at the jump, so leaving_liberty_01 stopped the fail watcher too_far_from_magellan_dock
     /// of a point in Li01. arrive_at_jumpgate starts leaving_liberty_01, so it ran before the jump. A start at
