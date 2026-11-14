@@ -31,11 +31,11 @@ internal sealed partial record StartReplay
     /// times. A timer that counts only in space does not run when the path showed the player docked after its start. A
     /// waiting trigger that can stop the timer does not keep it waiting.</item>
     /// <item>The two passes. The run test can find a timer only at a later trigger of the path than in the game. So the
-    /// replay makes two passes. Pass 1 uses the run test and records each timer that it runs, with its start. Pass 2 does
-    /// not use the run test. It runs each recorded timer before the first trigger of the path after its start, unless
-    /// that trigger is known to come first. When the replay goes back from such a run, pass 2 tries the timer again
-    /// before the next trigger of the path. When pass 1 runs no timer, pass 2 gives the same result, so the replay skips
-    /// it.</item>
+    /// replay makes two passes. Pass 1 uses the run test. It records each timer that it runs, with its start and the
+    /// next trigger of the path. Pass 2 does not use the run test. It runs each recorded timer before the first trigger
+    /// of the path after its start, unless that trigger is known to come first. Pass 2 never runs a timer later in the
+    /// path than pass 1. When the replay goes back from such a run, pass 2 tries the timer again in the next timer call.
+    /// When pass 1 runs no timer, pass 2 gives the same result, so the replay skips it.</item>
     /// <item>The start of a timer. Pass 2 knows a timer by its name and its start. The start is the trigger whose run
     /// started the timer and the number of that run, or the first starts of the replay. So when a trigger starts the
     /// timer again, pass 2 does not run it for the old start.</item>
@@ -81,8 +81,9 @@ internal sealed partial record StartReplay
         private readonly HashSet<string> activated = new(StringComparer.OrdinalIgnoreCase);
         private readonly StartTimeline timeline;
 
-        /// <summary>The timers that pass 2 runs at their early steps, or null in pass 1.</summary>
-        private readonly IReadOnlySet<TimerKey>? early;
+        /// <summary>The timers that pass 2 runs at their early steps, as <see cref="TimerRuns"/> of pass 1 gives them.
+        /// Null in pass 1.</summary>
+        private readonly IReadOnlyDictionary<TimerKey, int>? early;
 
         private int read;
 
@@ -104,9 +105,9 @@ internal sealed partial record StartReplay
         private string? hinted;
 
         /// <param name="path">The path from the root to the chosen trigger.</param>
-        /// <param name="early">For pass 2: the timers that the timer rule of pass 1 ran. Null for pass 1.</param>
+        /// <param name="early">For pass 2: the <see cref="TimerRuns"/> of pass 1. Null for pass 1.</param>
         public Replayer(MissionIndex index, MissionTrigger chosen, IReadOnlyList<MissionTrigger> path,
-            IReadOnlySet<TimerKey>? early = null)
+            IReadOnlyDictionary<TimerKey, int>? early = null)
         {
             this.index = index;
             this.chosen = chosen;
@@ -130,8 +131,9 @@ internal sealed partial record StartReplay
         /// <summary>The jumps that the system rule finds, as <see cref="StartReplay.Jumps"/> tells.</summary>
         public List<int> Jumps { get; } = [];
 
-        /// <summary>The timers that the timer rule ran in pass 1, each with its start.</summary>
-        public HashSet<TimerKey> TimerRuns { get; } = [];
+        /// <summary>The timers that the timer rule ran in pass 1, each with its start. The value is the position of the
+        /// next trigger of the path when the timer ran.</summary>
+        public Dictionary<TimerKey, int> TimerRuns { get; } = [];
 
         /// <summary>The rules before a trigger of the path runs, in the order of the summary of the class.</summary>
         /// <param name="position">The position of the trigger in the path.</param>
@@ -226,7 +228,8 @@ internal sealed partial record StartReplay
                     // bound of 0 runs no timer.
                     if (early == null
                             ? time <= timeline.Bound(start, position, next)
-                            : early.Contains(KeyOf(slot, start)) && !KnownBefore(position, slot, start))
+                            : early.TryGetValue(KeyOf(slot, start), out var late) &&
+                              (position >= late || !KnownBefore(position, slot, start)))
                         (due, dueStart, dueTime) = (waiting, start, time);
                 }
                 if (due == null)
@@ -235,7 +238,7 @@ internal sealed partial record StartReplay
                 // The run removes the start of the timer, so read the key first.
                 var key = KeyOf(program.SlotOf(due), dueStart);
                 if (TryRun([due], rest) && early == null)
-                    TimerRuns.Add(key);
+                    TimerRuns.TryAdd(key, position);
             }
         }
 

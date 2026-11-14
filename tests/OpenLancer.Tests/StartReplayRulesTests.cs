@@ -570,6 +570,52 @@ public sealed class StartReplayRulesTests
     }
 
     /// <summary>
+    /// The path timer q_done takes at most 2 s, so its own time is known to come before the 10 s of q_old. But q_done
+    /// completes the objective q_goal, so the objective rule runs q_activate (10 s) before it. So q_done comes at least
+    /// 10 s after the start, and pass 1 runs q_old before q_done. Pass 2 never runs a timer at a later trigger of the
+    /// path than pass 1. So q_old does not wait at the start.
+    /// </summary>
+    [Fact]
+    public void PassTwoNeverRunsATimerAtALaterTriggerThanPassOne()
+    {
+        const string text = """
+            [Trigger]
+            nickname = q_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = q_activate
+            Act_ActTrig = q_old
+            Act_ActTrig = q_done
+
+            [Trigger]
+            nickname = q_activate
+            Cnd_Timer = 10
+            Act_SetNNObj = q_goal
+
+            [Trigger]
+            nickname = q_old
+            Cnd_Timer = 10
+            Act_SpawnSolar = q_buoy
+
+            [Trigger]
+            nickname = q_done
+            Cnd_Timer = 2
+            Act_SetNNState = q_goal, COMPLETE
+            Act_ActTrig = q_chosen
+
+            [Trigger]
+            nickname = q_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "q_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["q_start", "q_old", "q_activate", "q_done"], Ran(replay));
+        Assert.DoesNotContain("q_old", Waiting(replay));
+    }
+
+    /// <summary>
     /// The timeline keeps the newest start of each trigger as the machine does. A start of an active trigger keeps the
     /// old start. A stop, then a start in one action list gives a new start. A start, then a stop in one action list
     /// gives no start. Two timers of the path in a chain give the sum of their shortest times.
