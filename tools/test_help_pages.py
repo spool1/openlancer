@@ -24,6 +24,11 @@ GAME = "Game"
 PLAY = "Play the mod in the game (Ctrl+F5)"
 NO_CODE = "OpenLancer contains no code of the Freelancer-Decomp project."
 PROJECT = "Freelancer-Decomp"
+# The second part of the project name, in lower case. A page that has it outside the allowed words names the project.
+WORD = PROJECT.split("-")[1].lower()
+# The help pages other than the new pages and the README. They do not name the project of the source build at all.
+OTHER_PAGES = ("docs/GAME_LINK.md", "docs/PLAY.md", "docs/MOD_FORMAT.md", "docs/MISSIONS.md", "docs/CUTSCENES.md",
+               "docs/MCP.md")
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 FENCE = re.compile(r"^```.*?^```[ \t]*$", re.M | re.S)
 CODE_SPAN = re.compile(r"`[^`\n]*`")
@@ -166,7 +171,8 @@ def readme_first_problems(text, readme_header, readme_rows):
 
 
 def project_problems(text, source_build):
-    """The lines of a page that name the project of the source build, or a decompilation, outside the allowed words.
+    """The lines of a page that name the project of the source build outside the allowed words. A line with the second
+    part of the name in another word names it too.
     The allowed words are the game cell of the README row (source_build) and the README sentence NO_CODE. The game cell
     is allowed as the first cell of a table row, or as a whole line (the game block of README-FIRST.txt). A page
     without the sentence NO_CODE is also a problem."""
@@ -175,7 +181,7 @@ def project_problems(text, source_build):
         rest = line.replace(NO_CODE, "")
         if line == source_build or line.startswith("|") and line.strip("| ").split(" |")[0] == source_build:
             rest = rest.replace(source_build, "", 1)
-        if "decomp" in rest.lower():
+        if WORD in rest.lower():
             problems.append(f"line {number}: {line}")
     return problems
 
@@ -324,10 +330,19 @@ class HelpPageTests(unittest.TestCase):
         source_build = supported_games()[1][3][GAME]
         allowed = f"| {source_build} | Yes |\n{NO_CODE}\n"
         self.assertEqual([], project_problems(allowed, source_build))
-        for added in ("A decomp build is a play target only.", f"Build the {PROJECT} project first.",
-                      "Open a decompiled file.", f"| {source_build} | Yes, a {PROJECT} build |"):
+        for added in (f"A {WORD} build is a play target only.", f"Build the {PROJECT} project first.",
+                      f"Open a {WORD}iled file.", f"| {source_build} | Yes, a {PROJECT} build |"):
             self.assertEqual([f"line 3: {added}"], project_problems(allowed + added + "\n", source_build), added)
         self.assertEqual([f"no sentence '{NO_CODE}'"], project_problems(f"| {source_build} | Yes |\n", source_build))
+
+    def test_the_other_help_pages_and_the_game_texts_do_not_name_the_project_of_the_source_build(self):
+        """The owner rule of 2026-11-14 allows the name only in the words of the README row and sentence, in the new
+        pages and README-FIRST.txt. The other help pages and the texts of the Game link window send the user to the
+        README table in its place."""
+        for path in OTHER_PAGES + (GAME_TEXTS,):
+            text = read(path)
+            self.assertEqual([], [line for line in text.split("\n") if WORD in line.lower()], path)
+        self.assertIn("README table Supported games", read(GAME_TEXTS))
 
     def test_getting_started_asks_for_a_retail_game_as_the_base_of_the_profile(self):
         """The first-run card refuses a source build as the base of the profile, with the first sentence of

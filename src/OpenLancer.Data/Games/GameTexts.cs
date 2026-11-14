@@ -106,8 +106,11 @@ public static class GameTexts
                                             "Use a retail game folder as the base of the profile. Then play the profile " +
                                             "in this build with Play > Play in source build.";
 
-    public const string SourceBuildTooltip = "A game that you built from source code, for example Freelancer-Decomp, " +
-                                             "with bin\\freelancer.exe and its DATA folder.";
+    /// <summary>The tooltip of a source build in the Game link window. The README table "Supported games" names the
+    /// supported source build, so the tooltip names no project.</summary>
+    public const string SourceBuildTooltip = "A game that you built from source code, with bin\\freelancer.exe and its " +
+                                             "DATA folder. The README table Supported games names the supported " +
+                                             "source build.";
 
     /// <summary>The note of a source build with retail INI files.</summary>
     /// <param name="build">The name of the build of the source build, for example "Freelancer 1.1".</param>

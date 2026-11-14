@@ -104,7 +104,7 @@ If you have a version of Freelancer that OpenLancer does not know, please run `o
 
 ## Source builds
 
-A source build is a game that you built from source code, for example Freelancer-Decomp. Its folder has the program and its DLLs in `bin`, and the game data in `DATA`:
+A source build is a game that you built from source code. The table "Supported games" of the [README](../README.md#supported-games) names the supported source build. Its folder has the program and its DLLs in `bin`, and the game data in `DATA`:
 
 ```
 <source build>\
