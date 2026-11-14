@@ -21,7 +21,8 @@ SYSTEM REQUIREMENTS
 -------------------
 - Windows 10 or Windows 11, 64-bit.
 - A graphics card and a driver with OpenGL 3.2 or later.
-- An installed copy of a game of the list SUPPORTED GAMES below.
+- An installed copy of a retail game of the list SUPPORTED GAMES below:
+  Freelancer 1.0, Freelancer 1.1 or Freelancer: HD Edition 0.7.1.
 - About 160 MB of disk space.
 You do not need to install .NET.
 
@@ -53,6 +54,9 @@ A source build of the Freelancer-Decomp project that you build yourself
 
 F5 plays the mod in the OpenLancer engine with the data of any linked game.
 OpenLancer contains no code of the Freelancer-Decomp project.
+
+A source build is a play target only. Make the profile with a retail game
+first.
 
 
 GETTING STARTED

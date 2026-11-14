@@ -40,6 +40,12 @@ PLAY_STEPS = (("docs/GETTING_STARTED.md", "## Play the change in your game (Ctrl
 ZIP_PAGES = (README, "docs/MISSIONS.md", "docs/CUTSCENES.md")
 DEVELOPER_ONLY = re.compile(r"start\.bat|--bench-")
 HEADING = re.compile(r"(#{1,6}) +(.+)")
+# A source build is never the base of a profile. The first-run card refuses it with the message of
+# GameTexts.SourceBuildNoBase. So the requirements of the zip name only the retail games of the table, and the games
+# lists tell that a source build is a play target only.
+RETAIL_BASES = "Freelancer 1.0, Freelancer 1.1 or Freelancer: HD Edition 0.7.1."
+PLAY_TARGET_ONLY = "A source build is a play target only. Make the profile with a retail game first."
+GAME_TEXTS = "src/OpenLancer.Data/Games/GameTexts.cs"
 
 
 def read(path):
@@ -109,16 +115,23 @@ def plain(cell):
     return cell.replace("**", "")
 
 
+def text_section(text, heading):
+    """The text of a section of README-FIRST.txt, from the line under its rule line to the next two empty lines. None
+    when the text has no such section."""
+    match = re.search(rf"^{re.escape(heading)}\n-+\n(.*?)\n\n\n", text, re.M | re.S)
+    return match.group(1) if match else None
+
+
 def readme_first_games(text):
     """The game blocks of the section SUPPORTED GAMES of README-FIRST.txt, as (game, {label: value}) in the order of
     the text, or None when the text has no such section. A block is a line without indent, then one line
     "  <label>: <value>" for each entry. A value can go on in the next lines with a larger indent. A line without indent
     and without entries is not a game."""
-    match = re.search(r"^SUPPORTED GAMES\n-+\n(.*?)\n\n\n", text, re.M | re.S)
-    if match is None:
+    games = text_section(text, "SUPPORTED GAMES")
+    if games is None:
         return None
     blocks, label = [], None
-    for line in match.group(1).split("\n"):
+    for line in games.split("\n"):
         if line.startswith("    ") and label:
             blocks[-1][1][label] += " " + line.strip()
         elif line.startswith("  ") and blocks:
@@ -164,6 +177,20 @@ def project_problems(text, source_build):
             rest = rest.replace(source_build, "", 1)
         if "decomp" in rest.lower():
             problems.append(f"line {number}: {line}")
+    return problems
+
+
+def base_problems(requirements, games):
+    """The problems of the texts about the base of a profile. requirements: the requirements of the zip, which must
+    name only the retail games RETAIL_BASES. games: the games list, which must have the sentence PLAY_TARGET_ONLY."""
+    requirements, games = " ".join(requirements.split()), " ".join(games.split())
+    problems = []
+    if "retail game" not in requirements or RETAIL_BASES not in requirements:
+        problems.append(f"the requirements do not ask for a retail game: {RETAIL_BASES}")
+    if "source build" in requirements.lower():
+        problems.append("the requirements name the source build")
+    if PLAY_TARGET_ONLY not in games:
+        problems.append(f"no sentence '{PLAY_TARGET_ONLY}'")
     return problems
 
 
@@ -302,6 +329,22 @@ class HelpPageTests(unittest.TestCase):
             self.assertEqual([f"line 3: {added}"], project_problems(allowed + added + "\n", source_build), added)
         self.assertEqual([f"no sentence '{NO_CODE}'"], project_problems(f"| {source_build} | Yes |\n", source_build))
 
+    def test_getting_started_asks_for_a_retail_game_as_the_base_of_the_profile(self):
+        """The first-run card refuses a source build as the base of the profile, with the first sentence of
+        PLAY_TARGET_ONLY."""
+        text = read("docs/GETTING_STARTED.md")
+        self.assertEqual([], base_problems(section(text, "## What you need"), section(text, "## Supported games")))
+        self.assertIn(PLAY_TARGET_ONLY.split(". ")[0] + ".", read(GAME_TEXTS))
+
+    def test_requirements_that_allow_a_source_build_as_the_base_are_a_problem(self):
+        good = f"- An installed copy of a retail game of the list: {RETAIL_BASES}\n"
+        self.assertEqual([], base_problems(good, f"The list.\n{PLAY_TARGET_ONLY}"))
+        self.assertEqual([f"the requirements do not ask for a retail game: {RETAIL_BASES}",
+                          f"no sentence '{PLAY_TARGET_ONLY}'"],
+                         base_problems("- An installed copy of a game of the list SUPPORTED GAMES below.", "The list."))
+        self.assertEqual(["the requirements name the source build"],
+                         base_problems(good + "- Or a source build.", PLAY_TARGET_ONLY))
+
     def test_the_play_steps_give_the_play_support_of_freelancer_1_0(self):
         """The Play menu lists Freelancer 1.0, so these steps can start its program. They give the README cell."""
         cell = next(row[PLAY] for row in supported_games()[1] if row[GAME].startswith("Freelancer 1.0"))
@@ -420,6 +463,11 @@ class ReadmeFirstGamesTests(unittest.TestCase):
         self.assertEqual(["Freelancer 1.1 (retail): the README has no column 'Edit mods'"],
                          readme_first_problems(other, header, rows))
         self.assertEqual(["no section SUPPORTED GAMES"], readme_first_problems("No section.\n", header, rows))
+
+    def test_readme_first_asks_for_a_retail_game_as_the_base_of_the_profile(self):
+        text = self.readme_first()
+        self.assertEqual([], base_problems(text_section(text, "SYSTEM REQUIREMENTS"),
+                                           text_section(text, "SUPPORTED GAMES")))
 
     def test_the_game_cell_of_the_source_build_can_be_a_whole_line(self):
         source_build = supported_games()[1][3][GAME]
