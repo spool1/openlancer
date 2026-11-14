@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using LibreLancer.Data.GameData;
 using LibreLancer.Data.Schema;
 using LibreLancer.Thn;
+using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Inspector;
@@ -334,68 +333,38 @@ public sealed class ThnAnimationPickerTests
         Assert.Null(clips.IdleFor(clips.Find(SharedClip)!, FLGender.male));
     }
 
+    /// <summary>
+    /// The state makes the clips once for each data of the list <c>animation</c>. New data, for example after an edit of
+    /// the <c>[Animations]</c> lines, makes them again. No data and data without clips give the reason, and the row keeps
+    /// its text field.
+    /// </summary>
     [Fact]
-    public void ACostumeGivesTheNicknamesOfItsBodyParts()
+    public void TheStateMakesTheClipsOnceForEachDataOfTheList()
     {
-        var costume = new Costume
-        {
-            Body = new Bodypart { Nickname = "body_m1" },
-            Head = new Bodypart { Nickname = "head_m1" },
-            RightHand = new Bodypart { Nickname = "hand_r" },
-        };
+        var state = new ClipPickerState();
+        var data = new AnimationData(Clips().Clips, Skeletons(), []);
 
-        var names = AnimationClips.Bodyparts(costume)!;
-
-        Assert.True(names.SetEquals(["body_m1", "head_m1", "hand_r"]));
-        Assert.Contains("BODY_M1", names);
-        Assert.Null(AnimationClips.Bodyparts(null));
-    }
-
-    /// <summary>The state reads the clips once for each game data. A read error and a list without clips give the
-    /// reason, and the row keeps its text field.</summary>
-    [Fact]
-    public void TheStateReadsTheClipsOnceForEachGameData()
-    {
-        var reads = 0;
-        var state = new ClipPickerState<object>(_ =>
-        {
-            reads++;
-            return Clips();
-        });
-        var data = new object();
-
-        Assert.NotNull(state.Get(data, out var reason));
+        var clips = state.Get(data, out var reason);
+        Assert.NotNull(clips);
         Assert.Null(reason);
-        Assert.Same(state.Get(data, out _), state.Get(data, out _));
-        Assert.Equal(1, reads);
-        Assert.NotNull(state.Get(new object(), out _));
-        Assert.Equal(2, reads);
+        Assert.Same(clips, state.Get(data, out _));
+        Assert.NotSame(clips, state.Get(data with { }, out _));
         Assert.Null(state.Get(null, out reason));
-        Assert.Equal(ClipPickerState<object>.NotLoaded, reason);
-
-        var empty = new ClipPickerState<object>(_ => new AnimationClips([], []));
-        Assert.Null(empty.Get(data, out reason));
+        Assert.Equal(ClipPickerState.NoBodyparts, reason);
+        Assert.Null(state.Get(new AnimationData([], [], []), out reason));
         Assert.Equal("The editor found no animation clips in the game data.", reason);
-        var broken = new ClipPickerState<object>(_ => throw new InvalidDataException("The file is not a UTF file."));
-        Assert.Null(broken.Get(data, out reason));
-        Assert.Equal("The editor cannot read the animation files: The file is not a UTF file.", reason);
     }
 
-    /// <summary>The chosen character belongs to one event, so another event forgets it. Reset forgets the game data, the
-    /// chosen character, the shown event and the filter, so the next profile starts clean.</summary>
+    /// <summary>The chosen character belongs to one event, so another event forgets it. Reset forgets the data of the
+    /// list, the chosen character, the shown event and the filter, so the next profile starts clean.</summary>
     [Fact]
     public void ResetForgetsTheGameDataAndTheChoices()
     {
-        var reads = 0;
-        var state = new ClipPickerState<object>(_ =>
-        {
-            reads++;
-            return Clips();
-        });
-        var data = new object();
+        var state = new ClipPickerState();
+        var data = new AnimationData(Clips().Clips, Skeletons(), []);
         var first = new ThnRef("a.thn", ThnElementKind.Event, new ThnElementId(1));
         var second = new ThnRef("a.thn", ThnElementKind.Event, new ThnElementId(2));
-        state.Get(data, out _);
+        var clips = state.Get(data, out _);
         state.Show(first);
         state.Chosen = "Guard";
         state.Part = ClipPart.Head;
@@ -409,11 +378,66 @@ public sealed class ThnAnimationPickerTests
         state.Reset();
         Assert.Null(state.Chosen);
         Assert.Equal(ClipPart.All, state.Part);
-        state.Get(data, out _);
-        Assert.Equal(2, reads);
+        Assert.NotSame(clips, state.Get(data, out _));
         state.Chosen = "Guard";
         state.Show(second);
         Assert.Null(state.Chosen);
+    }
+
+    /// <summary>
+    /// The picker reads the data list <c>animation</c> of the session, so an unsaved <c>[Animations]</c> line shows its
+    /// clips at once. A file of the list that does not read gives a warning, which the side pane shows, and the other
+    /// files keep their clips.
+    /// </summary>
+    [Fact]
+    public void ThePickerReadsTheSessionListWithTheUnsavedEdits()
+    {
+        using var ws = AnimationWorkspace.Create();
+        var session = ws.Session("act");
+        var state = new ClipPickerState();
+
+        var before = state.Get(session.Lists.Animations(), out _)!;
+        session.Execute(AnimationWorkspace.AddLine(@"characters\animations\extra.anm"));
+        var after = state.Get(session.Lists.Animations(), out _)!;
+        session.Execute(AnimationWorkspace.AddLine(@"characters\animations\broken.anm"));
+        var broken = state.Get(session.Lists.Animations(), out _)!;
+
+        Assert.False(before.Contains("Sc_Extra"));
+        Assert.True(after.Contains("Sc_Extra"));
+        Assert.Empty(after.Warnings);
+        var warning = Assert.Single(broken.Warnings);
+        Assert.Equal("broken.anm", AnimationClips.FileName(warning.Source), ignoreCase: true);
+        Assert.True(broken.Contains("Sc_Extra"));
+    }
+
+    /// <summary>
+    /// Decision D119 with a costume that only W has: the costume of the target comes from the costume list of W, so an
+    /// unsaved new costume orders the clips too. Its body gives the skeletons of the first group and the sex of the idle.
+    /// A template that the list does not have gives no costume, so the list has one group without a header.
+    /// </summary>
+    [Fact]
+    public void ACostumeThatOnlyWHasOrdersTheClips()
+    {
+        using var ws = AnimationWorkspace.Create();
+        var session = ws.Session("act");
+        ThnDataWorkspace.SetTemplate(session, "Man", "newbie");
+        var clips = AnimationClips.From(session.Lists.Animations()!);
+        Assert.Null(ThnAnimationPicker.CostumeOf(session, ThnSessions.W(session), "Man"));
+
+        session.Execute(EditCommand.AddSection(ThnDataWorkspace.CostumesPath, "Costume",
+            [ThnDataWorkspace.Line("nickname", "newbie"), ThnDataWorkspace.Line("body", "body1"),
+                ThnDataWorkspace.Line("head", "head1")]));
+        var parts = ThnAnimationPicker.CostumeOf(session, ThnSessions.W(session), "MAN")!;
+        var model = clips.Model("", parts.Names, "Man");
+
+        Assert.Equal("body1", parts.Body);
+        Assert.True(parts.Names.SetEquals(["BODY1", "head1"]));
+        Assert.Equal([("Sc_Run", "Skeletons of Man"), ("SC_WALK", "Skeletons of Man"), ("Sc_Sit", AnimationClips.OtherSkeletons)],
+            model.Rows.Select(r => (r.Value, r.Group)));
+        Assert.Equal(FLGender.male, clips.SexOf(parts));
+        Assert.Equal(FLGender.unset, clips.SexOf(null));
+        Assert.Equal(FLGender.unset, clips.SexOf(new CostumeParts("body_x", Set("body_x"))));
+        Assert.Null(ThnAnimationPicker.CostumeOf(session, ThnSessions.W(session), "Ship"));
     }
 
     /// <summary>The clip preview keeps its character while the side pane draws in each frame. It frees the character at

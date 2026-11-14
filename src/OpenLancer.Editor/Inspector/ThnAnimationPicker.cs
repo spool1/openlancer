@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using ImGuiNET;
-using LibreLancer;
-using LibreLancer.Data.GameData;
-using LibreLancer.Data.Schema;
 using LibreLancer.ImUI;
 using LibreLancer.Thn;
 using OpenLancer.Data;
+using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Cutscene;
@@ -19,9 +17,11 @@ namespace OpenLancer.Editor.Inspector;
 
 /// <summary>
 /// The Animation row of a START_MOTION event whose first target is a character (a DEFORMABLE entity), as section 12.1
-/// of the M8b design plans it. The field opens the list picker with the clips of the game data, grouped by the
-/// skeletons of the costume of the target. The side pane plays the hovered clip on a character of the scene: the clip
-/// preview. The <b>Preview</b> button plays the cutscene preview from the time of the event.
+/// of the M8b design plans it. The field opens the list picker with the clips of the data list <c>animation</c> of the
+/// session, grouped by the skeletons of the costume of the target. The list and the costume come from W, so an unsaved
+/// INI edit shows. The side pane plays the hovered clip on a character of the scene: the clip preview. The clip preview
+/// plays the clips of the game data of the last save. The <b>Preview</b> button plays the cutscene preview from the
+/// time of the event.
 /// </summary>
 /// <remarks>A COMPOUND plays the scripts of its own model, not the clips of the <c>.anm</c> files (GameObject.cs:602-605),
 /// so the row of another target keeps its text field (risk R5 of the M8b design). The save gate checks the clip with
@@ -43,6 +43,11 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
     /// reason.</summary>
     public const string NoPreview = "The cutscene has no preview.";
 
+    /// <summary>The text of the clip preview for a clip that the list has and the game data of the last save does not
+    /// have, for example a clip of an unsaved <c>[Animations]</c> line.</summary>
+    public const string NotSaved = "The clip preview plays the clips of the game data of the last save. That data does " +
+                                   "not have this clip. Save the mod, then the clip preview can play it.";
+
     private const string NotSet = "Not set";
 
     private const string Note =
@@ -55,7 +60,7 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
 
     private static readonly ClipPart[] Parts = Enum.GetValues<ClipPart>();
 
-    private readonly ClipPickerState<GameDataManager> state = new(AnimationClips.Read);
+    private readonly ClipPickerState state = new();
     private readonly ThnAnimationPreview preview = new(window);
 
     // The frame in which the side pane drew last, or -1 when the clip preview has no character.
@@ -159,8 +164,8 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
     public void Draw(CutsceneWorkspace workspace, string label, ThnFieldState field, TimelineEvent info, string? note,
         Func<string, ThnFieldParse> parse)
     {
-        var data = window.Session?.GameData;
-        if (state.Get(data, out var reason) is not { } clips)
+        string? reason = ClipPickerState.NotLoaded;
+        if (window.Session is not { } session || state.Get(session.Edits.Lists.Animations(), out reason) is not { } clips)
         {
             grid.ThnTextRow(label, field, note == null ? reason : $"{reason}\n\n{note}", parse, NotSet);
             return;
@@ -172,7 +177,7 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
         // The game finds the clip by the name as it is, so the value keeps its spaces.
         var current = ThnFieldEdit.Format(field.Kind, field.Value);
         var clip = clips.Find(current);
-        var blocked = script != null && workspace.Path is { } path && window.Session is { } session &&
+        var blocked = script != null && workspace.Path is { } path &&
                       Blocked(session.Edits.CutsceneErrors(path), script, field.Target);
         grid.ThnRow(label, field, note ?? Note, () =>
         {
@@ -189,9 +194,9 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
             }
 
             grid.ThnListPopup(field, clicked,
-                () => clips.Model(current, AnimationClips.Bodyparts(CostumeOf(script, data, target)), target),
+                () => clips.Model(current, CostumeOf(session.Edits, script, target)?.Names, target),
                 ObjectKinds.Thn.Clip, parse, new ListPickerPane(PaneWidth, PaneHeight, PartFilter,
-                    row => clips.Shows(row, state.Part), row => Pane(workspace, data, clips, row, target)));
+                    row => clips.Shows(row, state.Part), row => Pane(workspace, session, clips, row, target)));
             ImGui.SameLine(0, style.ItemInnerSpacing.X);
             // The button only plays the preview, so it stays active in the read-only state.
             var disabled = PreviewDisabled(current, workspace.Transport != null, workspace.Problem);
@@ -228,10 +233,17 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
     private static string? TypeOf(ThnElement entity) =>
         ThnSchema.TypeOf(ThnElementKind.Entity, entity.Table, CutsceneWorkspace.Symbols);
 
-    /// <summary>The costume of the entity with a name: its <c>template_name</c> in the costumes of the game data, or
-    /// null.</summary>
-    private static Costume? CostumeOf(ThnScriptModel? script, GameDataManager? data, string name) =>
-        Template(script, name) is { } template ? data?.Items.Costumes.Get(template) : null;
+    /// <summary>
+    /// The body parts of the costume of the entity with a name: its <c>template_name</c> in the costume list of W, with
+    /// the unsaved edits. So a new costume orders the clip list too. Null when the entity has no template, or when the
+    /// list has no such costume.
+    /// </summary>
+    internal static CostumeParts? CostumeOf(EditSession edits, ThnScriptModel? script, string name) =>
+        Template(script, name) is { } template &&
+        edits.Lists.List(ThnTemplateRules.Costume.Lists)?.Find(template)?.Section is { } section &&
+        edits.Get(section) is { } costume
+            ? CostumeParts.Of(costume)
+            : null;
 
     /// <summary>Closes the dropdown that is open now on Esc. ImGui closes a popup on Esc only with keyboard navigation,
     /// which the editor does not use. The list picker then keeps the clip.</summary>
@@ -273,12 +285,23 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
         return changed;
     }
 
-    /// <summary>The side pane: the hovered clip, its files and its skeletons, the character of the clip preview, the
-    /// hints, and the clip preview.</summary>
-    private void Pane(CutsceneWorkspace workspace, GameDataManager? data, AnimationClips clips, ListPickerRow? row,
+    /// <summary>The side pane: the files of the list that do not read, the hovered clip, its files and its skeletons,
+    /// the character of the clip preview, the hints, and the clip preview.</summary>
+    private void Pane(CutsceneWorkspace workspace, EditorSession session, AnimationClips clips, ListPickerRow? row,
         string target)
     {
         paneFrame = ImGui.GetFrameCount();
+        if (clips.Warnings.Count > 0)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, EditorTheme.Warning);
+            foreach (var warning in clips.Warnings)
+            {
+                ImGui.TextWrapped($"{AnimationClips.FileName(warning.Source)}: {warning.Message}");
+            }
+
+            ImGui.PopStyleColor();
+        }
+
         if (row == null)
         {
             ImGui.TextDisabled("Hover over a clip to see it here.");
@@ -339,7 +362,14 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
             return;
         }
 
-        var sex = CostumeOf(script, data, on)?.Body?.Sex ?? FLGender.unset;
+        // The clip preview plays the scripts of the game data of the last save, which can lack a clip of W.
+        if (session.GameData?.GetCharacterAnimations().Scripts.ContainsKey(clip.Name) == false)
+        {
+            ImGui.TextWrapped(NotSaved);
+            return;
+        }
+
+        var sex = clips.SexOf(CostumeOf(session.Edits, script, on));
         preview.Draw(workspace.Visible?.CharacterOf(on), clip.Name, clips.IdleFor(clip, sex));
     }
 }

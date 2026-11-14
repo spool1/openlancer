@@ -186,17 +186,17 @@ The Inspector shows the selected entity or event, the selected events, or the cu
 
 ### The animation of a character
 
-When the first target of a START_MOTION event is a character (a DEFORMABLE entity), the `animation` row has a list of the animation clips. The clips are the scripts of the `.anm` files that the `[Animations]` lines of bodyparts.ini name. For a name that two files have, the list has the clip of the last file. The game also plays the clip of the last file.
+When the first target of a START_MOTION event is a character (a DEFORMABLE entity), the `animation` row has a list of the animation clips. The clips are the scripts of the `.anm` files that the `[Animations]` lines of bodyparts.ini name. For a name that two files have, the list has the clip of the last file. The game also plays the clip of the last file. The list is the data list `animation` of the edit view with the unsaved INI edits, so the row and the save gate read the same clips.
 
-A COMPOUND plays the scripts of its own model, so the row of a COMPOUND keeps its text field. A target that names no entity of the script also keeps the text field. When the editor cannot read the clips, the row keeps its text field, and the note of the row gives the reason.
+A COMPOUND plays the scripts of its own model, so the row of a COMPOUND keeps its text field. A target that names no entity of the script also keeps the text field. When the game data has no bodyparts.ini or no clip, the row keeps its text field, and the note of the row gives the reason. When the list cannot read an `.anm` file, the side pane names the file.
 
-The list shows the clips of the skeletons of the costume of the target first, under "Skeletons of" and the name of the target. The other clips follow under "Other skeletons". The skeletons come from the `[PetalAnimations]` and `[Skeleton]` sections of bodyparts.ini. A clip name that two files have belongs to the skeletons of both files.
+The list shows the clips of the skeletons of the costume of the target first, under "Skeletons of" and the name of the target. The other clips follow under "Other skeletons". The skeletons come from the `[PetalAnimations]` and `[Skeleton]` sections of bodyparts.ini. A clip name that two files have belongs to the skeletons of both files. The costume comes from the costume list of the edit view with the unsaved edits. So a costume that you add in `costumes.ini` orders the list too.
 
 The search finds a clip by its name or by its label. **Body part** shows only the clips of the body, the head or the hand skeletons. Its value "Other" shows the clips of the files that no skeleton lists.
 
 A label, for example "Walk", comes from a word in the clip name. A word counts only at the start of a part of the name in capitals, so a label can be missing or wrong. Look at each clip in the clip preview before you use it.
 
-The clip preview at the right of the list plays a clip in a loop. It plays the last clip that the mouse was on, or the clip that Up or Down selected. The character is a copy of a character of the cutscene preview, so the clip preview needs the cutscene preview. **Preview on** selects the character. At first, it selects the target of the event. A head or a hand clip plays over a standing idle of the body, so the body does not keep its bind pose.
+The clip preview at the right of the list plays a clip in a loop. It plays the last clip that the mouse was on, or the clip that Up or Down selected. The character is a copy of a character of the cutscene preview, so the clip preview needs the cutscene preview. **Preview on** selects the character. At first, it selects the target of the event. A head or a hand clip plays over a standing idle of the body, so the body does not keep its bind pose. The clip preview plays the clips of the game data of the last save. For a clip that only an unsaved INI edit gives, the pane tells you to save first.
 
 The clip preview has the controls of the Unity animation preview. A drag with the left or the middle mouse button pans the view. A drag with the right mouse button, or Alt with a left drag, orbits the view. The wheel, or Alt with a right drag, zooms. Shift makes the orbit and the zoom faster. F puts back the pan and the zoom, and **Reset view** also puts back the orbit.
 

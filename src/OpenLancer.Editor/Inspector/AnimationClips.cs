@@ -2,10 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using LibreLancer;
-using LibreLancer.Data.GameData;
-using LibreLancer.Data.Ini;
 using LibreLancer.Data.Schema;
+using OpenLancer.Data;
+using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Thn;
 
@@ -30,12 +29,32 @@ internal enum ClipPart
     Other,
 }
 
+/// <summary>The body parts of a costume of W, for the order of the clip list and the idle of the clip preview.</summary>
+/// <param name="Body">The nickname of the body, or null.</param>
+/// <param name="Names">The nicknames of the body, the head and the hands, without letter case.</param>
+internal sealed record CostumeParts(string? Body, IReadOnlySet<string> Names)
+{
+    /// <summary>The body parts that a <c>[Costume]</c> section names: value 0 of the last <c>body</c>, <c>head</c>,
+    /// <c>lefthand</c> and <c>righthand</c> line with a value (Costume.cs of the engine schema).</summary>
+    public static CostumeParts Of(SectionView costume)
+    {
+        string? Value(string key) =>
+            costume.Lines(key).LastOrDefault(l => l.Values.Count > 0)?.Values[0].ToString()?.Trim() is { Length: > 0 } value
+                ? value
+                : null;
+
+        return new CostumeParts(Value("body"),
+            new[] { "body", "head", "lefthand", "righthand" }.Select(Value).OfType<string>()
+                .ToHashSet(StringComparer.OrdinalIgnoreCase));
+    }
+}
+
 /// <summary>
-/// The animation clips of the game data for the picker of the animation of a START_MOTION event (section 12.1 of the
-/// M8b design), without ImGui. The clips are the scripts of the files that the <c>[Animations]</c> lines of
-/// bodyparts.ini name, in the load order of the engine: for a name in two files, the last file wins. The skeletons of
-/// bodyparts.ini group the clips by the files of their <c>[PetalAnimations]</c>. A name in two files belongs to the
-/// skeletons of both files.
+/// The animation clips of W for the picker of the animation of a START_MOTION event (section 12.1 of the M8b design),
+/// without ImGui. The clips come from the data list <c>animation</c> (see <see cref="DataLists.Animations"/>): the
+/// scripts of the files that the <c>[Animations]</c> lines of bodyparts.ini name, in the load order of the engine. For a
+/// name in two files, the last file wins. The skeletons of bodyparts.ini group the clips by the files of their
+/// <c>[PetalAnimations]</c>. A name in two files belongs to the skeletons of both files.
 /// </summary>
 internal sealed class AnimationClips
 {
@@ -64,8 +83,11 @@ internal sealed class AnimationClips
 
     /// <param name="clips">The clips, sorted by name.</param>
     /// <param name="skeletons">The skeletons of bodyparts.ini.</param>
-    public AnimationClips(IReadOnlyList<AnimationClip> clips, IReadOnlyList<AnimationSkeleton> skeletons)
+    /// <param name="warnings">One warning for each animation file that the list cannot read, or null for none.</param>
+    public AnimationClips(IReadOnlyList<AnimationClip> clips, IReadOnlyList<AnimationSkeleton> skeletons,
+        IReadOnlyList<Diagnostic>? warnings = null)
     {
+        Warnings = warnings ?? [];
         Clips = clips;
         this.skeletons = skeletons;
         for (var i = 0; i < clips.Count; i++)
@@ -86,22 +108,11 @@ internal sealed class AnimationClips
     /// <summary>The clips, sorted by name.</summary>
     public IReadOnlyList<AnimationClip> Clips { get; }
 
-    /// <summary>Reads the clips and the skeletons of the game data.</summary>
-    public static AnimationClips Read(GameDataManager data)
-    {
-        var items = data.Items;
-        var clips = AnimationCatalog.Read(items.VFS,
-            items.Ini.Bodyparts.Animations.Select(items.DataPath).OfType<string>());
-        IReadOnlyList<AnimationSkeleton> skeletons = [];
-        if (items.Ini.Freelancer.BodypartsPath is { } path && items.VFS.FileExists(path))
-        {
-            // The engine ignores [PetalAnimations] (BodypartsIni.cs:40-42), so the editor reads the file again.
-            using var stream = items.VFS.Open(path);
-            skeletons = AnimationCatalog.Skeletons(IniFile.ParseFile(path, stream), items.DataPath);
-        }
+    /// <summary>One warning for each animation file that the list cannot read. Its clips are not in the list.</summary>
+    public IReadOnlyList<Diagnostic> Warnings { get; }
 
-        return new AnimationClips(clips, skeletons);
-    }
+    /// <summary>The clips, the skeletons and the warnings of the data list <c>animation</c> of a session.</summary>
+    public static AnimationClips From(AnimationData data) => new(data.Clips, data.Skeletons, data.Warnings);
 
     /// <summary>True when the game has a clip with the name, without letter case.</summary>
     public bool Contains(string name) => byName.ContainsKey(name);
@@ -171,12 +182,16 @@ internal sealed class AnimationClips
         return Idle(sex);
     }
 
-    /// <summary>The nicknames of the body parts of a costume, without letter case, or null for no costume.</summary>
-    public static IReadOnlySet<string>? Bodyparts(Costume? costume) =>
-        costume == null
-            ? null
-            : new[] { costume.Body, costume.Head, costume.LeftHand, costume.RightHand }.OfType<Bodypart>()
-                .Select(b => b.Nickname).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// The sex of the body of a costume: the sex of the body skeleton that lists the body. The engine gives a body part
+    /// the sex of the last <c>[Skeleton]</c> before it in the same way (BodypartsIni.cs:43-60). Unset for no costume, a
+    /// costume without a body, a body that no skeleton lists, or a skeleton without a sex.
+    /// </summary>
+    public FLGender SexOf(CostumeParts? costume) =>
+        costume?.Body is { } body
+            ? skeletons.FirstOrDefault(s => s.Parts.HasFlag(SkeletonParts.Body) && s.Bodyparts.Contains(body))?.Sex ??
+              FLGender.unset
+            : FLGender.unset;
 
     /// <summary>
     /// The rows of the list (decision D119): the clips of the skeletons of the costume of the target first, under the
@@ -267,7 +282,8 @@ internal sealed class AnimationClips
     private IEnumerable<AnimationSkeleton> SkeletonsOf(AnimationClip clip) =>
         clip.Archives.SelectMany(archive => byArchive.GetValueOrDefault(archive) ?? []).Distinct();
 
-    private static string FileName(string archive) => Path.GetFileName(archive.Replace('\\', '/'));
+    /// <summary>The file name of an install path, for example "body_m.anm".</summary>
+    internal static string FileName(string archive) => Path.GetFileName(archive.Replace('\\', '/'));
 
     /// <summary>A skeleton as text, for example "male body" or "hands".</summary>
     private static string Describe(AnimationSkeleton skeleton)
@@ -294,23 +310,25 @@ internal sealed class AnimationClips
 }
 
 /// <summary>
-/// The state of the clip picker in a profile session, without ImGui. It holds the clips of the game data that the
-/// editor loaded last, and the body part filter. It also holds the character of the clip preview that the user chose
-/// for the shown event. New game data, for example after a save or a change of the active mod, reads the clips again.
-/// <see cref="Reset"/> forgets all when the profile closes.
+/// The state of the clip picker in a profile session, without ImGui. It holds the clips of the data list
+/// <c>animation</c> of the session (see <see cref="DataLists.Animations"/>), and the body part filter. So an unsaved
+/// edit of the <c>[Animations]</c> lines shows in the list. It also holds the character of the clip preview that the
+/// user chose for the shown event. New data of the list makes the clips again. <see cref="Reset"/> forgets all when the
+/// profile closes.
 /// </summary>
-/// <typeparam name="TData">The game data. A test can use another class.</typeparam>
-internal sealed class ClipPickerState<TData>(Func<TData, AnimationClips> read) where TData : class
+internal sealed class ClipPickerState
 {
     /// <summary>The reason when the editor has no game data.</summary>
     public const string NotLoaded = "The game data is not loaded.";
 
+    /// <summary>The reason when the game data has no bodyparts.ini, so the list has no clips.</summary>
+    public const string NoBodyparts = "The game data has no bodyparts.ini, so the editor has no animation clips.";
+
     /// <summary>The reason when the game data has no clip.</summary>
     public const string NoClips = "The editor found no animation clips in the game data.";
 
-    private TData? data;
+    private AnimationData? data;
     private AnimationClips? clips;
-    private string? error;
     private ThnRef? shown;
 
     /// <summary>The body part filter of the list.</summary>
@@ -319,37 +337,25 @@ internal sealed class ClipPickerState<TData>(Func<TData, AnimationClips> read) w
     /// <summary>The character of the clip preview that the user chose for the shown event, or null.</summary>
     public string? Chosen { get; set; }
 
-    /// <summary>The clips of the game data, or null with the reason when the list is not available.</summary>
-    public AnimationClips? Get(TData? current, out string? reason)
+    /// <summary>The clips of the data of the list, or null with the reason when the list is not available. The clips
+    /// stay the same object while the data of the list stays the same object.</summary>
+    /// <param name="current">The data of the list <c>animation</c>, or null when the game data has no
+    /// bodyparts.ini.</param>
+    public AnimationClips? Get(AnimationData? current, out string? reason)
     {
         if (current == null)
         {
-            reason = NotLoaded;
+            reason = NoBodyparts;
             return null;
         }
 
         if (!ReferenceEquals(current, data))
         {
             data = current;
-            clips = null;
-            error = null;
-            try
-            {
-                clips = read(current);
-                if (clips.Clips.Count == 0)
-                {
-                    clips = null;
-                    error = NoClips;
-                }
-            }
-            catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException)
-            {
-                error = $"The editor cannot read the animation files: {e.Message}";
-                FLLog.Warning("Animation clips", e.ToString());
-            }
+            clips = current.Clips.Count == 0 ? null : AnimationClips.From(current);
         }
 
-        reason = error;
+        reason = clips == null ? NoClips : null;
         return clips;
     }
 
@@ -363,12 +369,11 @@ internal sealed class ClipPickerState<TData>(Func<TData, AnimationClips> read) w
         }
     }
 
-    /// <summary>Forgets the game data, the clips, the shown event, the chosen character and the filter.</summary>
+    /// <summary>Forgets the data of the list, the clips, the shown event, the chosen character and the filter.</summary>
     public void Reset()
     {
         data = null;
         clips = null;
-        error = null;
         shown = null;
         Chosen = null;
         Part = ClipPart.All;

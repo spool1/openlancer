@@ -8,6 +8,7 @@ using LibreLancer.Data.IO;
 using LibreLancer.Data.Schema;
 using LibreLancer.Thn;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Cutscene;
@@ -19,27 +20,31 @@ namespace OpenLancer.DataTests;
 
 /// <summary>
 /// The clip list of the animation picker and the data list <c>animation</c> on the retail data (section 12.1 of the M8b
-/// design). The lists have the names of the animation table of the engine, and the last file wins for a name in two
-/// files. Each START_MOTION value on a character is in the data list, so the save gate gives no retail clip problem.
+/// design). The picker reads the data list of the session. The lists have the names of the animation table of the
+/// engine, and the last file wins for a name in two files. Each START_MOTION value on a character is in the data list,
+/// so the save gate gives no retail clip problem.
 /// </summary>
 public sealed class AnimationCatalogRetailTests(ITestOutputHelper output)
 {
     private const string Flicker = "Sc_ADHEAD_MOTION_FLCKR_EYES_000LV_XA_06";
 
     /// <summary>
-    /// The list has the names of the table that the engine plays from, without letter case. A facial clip that four files
-    /// have comes from the last file, FacialJuni.anm. The clip also belongs to the skeletons of the other files, so a
-    /// male head gets it in the group of its own skeletons.
+    /// The clip list of the picker comes from the data list <c>animation</c> of a session. It has the names of the table
+    /// that the engine plays from, without letter case. A facial clip that four files have comes from the last file,
+    /// FacialJuni.anm. The clip also belongs to the skeletons of the other files, so each costume with a male head of
+    /// the costume list of W gets it in the group of its own skeletons.
     /// </summary>
     [Fact]
     public void TheListHasTheNamesOfTheEngineTable()
     {
-        GameDataPaths.RequireBase();
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "m8clist");
+        var session = workspace.Open();
         var data = RetailGame.Instance.Data;
         var clock = Stopwatch.StartNew();
-        var clips = AnimationClips.Read(data);
+        var clips = AnimationClips.From(session.Lists.Animations()!);
         var read = clock.Elapsed;
         var table = data.GetCharacterAnimations().Scripts.Keys;
+        var costumes = session.Lists.List("costume")!;
 
         Assert.Equal(table.Count, clips.Clips.Count);
         Assert.True(clips.Clips.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(table));
@@ -50,10 +55,42 @@ public sealed class AnimationCatalogRetailTests(ITestOutputHelper output)
         var males = data.Items.Costumes.Where(c => c.Head?.Sex == FLGender.male).ToList();
         Assert.NotEmpty(males);
         Assert.All(males, costume => Assert.Equal("Skeletons of the target",
-            clips.Model(Flicker, AnimationClips.Bodyparts(costume), "the target").Rows.Single(r => r.Value == Flicker)
-                .Group));
+            clips.Model(Flicker, CostumeParts.Of(session.Get(costumes.Find(costume.Nickname)!.Section!)!).Names,
+                "the target").Rows.Single(r => r.Value == Flicker).Group));
         output.WriteLine($"{clips.Clips.Count} clips in {clips.Clips.Select(c => c.Archive).Distinct().Count()} files, " +
                          $"read in {read.TotalMilliseconds:0.0} ms. {Flicker} is in {flicker.Archives.Count} files.");
+    }
+
+    /// <summary>
+    /// The juni case of the M21 design (section 15.2, item 7): the START_MOTION list of a DEFORMABLE with the costume
+    /// juni starts with the clips of FacialJuni.anm and BodyGenericFemale.anm, from the session list. The costume comes
+    /// from the costume list of W, as the picker reads it, and its body gives the female idle.
+    /// </summary>
+    [Fact]
+    public void TheListOfACharacterWithTheCostumeJuniStartsWithItsOwnFiles()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "m8clist");
+        var session = workspace.Open();
+        var clips = AnimationClips.From(session.Lists.Animations()!);
+        var juni = CostumeParts.Of(session.Get(session.Lists.List("costume")!.Find("juni")!.Section!)!);
+
+        var model = clips.Model("", juni.Names, "Juni");
+        var own = model.Rows.TakeWhile(r => r.Group == "Skeletons of Juni").Select(r => clips.Find(r.Value)!).ToList();
+        var skeletonFiles = session.Lists.Animations()!.Skeletons.Where(s => s.Bodyparts.Overlaps(juni.Names))
+            .SelectMany(s => s.Archives).Select(FileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        bool OfJuni(AnimationClip clip) => clip.Archives.Select(FileName).Any(skeletonFiles.Contains);
+
+        output.WriteLine($"juni: {string.Join(", ", juni.Names.Order(StringComparer.OrdinalIgnoreCase))}. The files of its " +
+                         $"skeletons: {string.Join(", ", skeletonFiles.Order(StringComparer.OrdinalIgnoreCase))}. " +
+                         $"{own.Count} of {model.Rows.Count} clips come first.");
+        Assert.Contains("FacialJuni.anm", skeletonFiles);
+        Assert.Contains("BodyGenericFemale.anm", skeletonFiles);
+        Assert.Equal(clips.Clips.Count(OfJuni), own.Count);
+        Assert.All(own, c => Assert.True(OfJuni(c), c.Name));
+        Assert.All(model.Rows.Skip(own.Count), r => Assert.Equal(AnimationClips.OtherSkeletons, r.Group));
+        Assert.Contains(own, c => FileName(c.Archive).Equals("FacialJuni.anm", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(own, c => FileName(c.Archive).Equals("BodyGenericFemale.anm", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(FLGender.female, clips.SexOf(juni));
     }
 
     /// <summary>
@@ -67,7 +104,8 @@ public sealed class AnimationCatalogRetailTests(ITestOutputHelper output)
     {
         using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "m8clist");
         var session = workspace.Open();
-        var engine = AnimationClips.Read(RetailGame.Instance.Data).Clips;
+        var items = RetailGame.Instance.Data.Items;
+        var engine = AnimationCatalog.Read(items.VFS, items.Ini.Bodyparts.Animations.Select(items.DataPath).OfType<string>());
 
         var clock = Stopwatch.StartNew();
         var list = session.Lists.List("animation")!;

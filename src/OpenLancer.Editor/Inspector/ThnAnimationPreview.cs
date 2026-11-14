@@ -117,7 +117,7 @@ internal sealed class ThnAnimationPreview(EditorWindow window) : IDisposable
         var session = window.Session;
         if (session?.GameData is not { } data)
         {
-            ImGui.TextWrapped(ClipPickerState<GameDataManager>.NotLoaded);
+            ImGui.TextWrapped(ClipPickerState.NotLoaded);
             return;
         }
 

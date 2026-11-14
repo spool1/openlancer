@@ -115,27 +115,32 @@ public sealed class AnimationPreviewRetailTests
     }
 
     /// <summary>
-    /// A head clip plays over the standing idle of the sex of the body. The sex comes from the [Skeleton] of the body part
-    /// (Bodypart.Sex), so a female body without a sex word in its path, for example the body of a story character, also
-    /// gets the female idle.
+    /// A head clip plays over the standing idle of the sex of the body. The sex comes from the body skeleton of
+    /// bodyparts.ini that lists the body of the costume of W. It equals the sex of the engine (Bodypart.Sex) for each
+    /// retail costume with a body. So a female body without a sex word in its path, for example the body of a story
+    /// character, also gets the female idle.
     /// </summary>
     [Fact]
     public void EachCostumeGetsTheIdleOfTheSexOfItsBody()
     {
-        GameDataPaths.RequireBase();
-        var data = RetailGame.Instance.Data;
-        var clips = AnimationClips.Read(data);
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "m8cidle");
+        var session = workspace.Open();
+        var clips = AnimationClips.From(session.Lists.Animations()!);
+        var list = session.Lists.List("costume")!;
         var head = clips.Clips.First(c => clips.PartsOf(c) == SkeletonParts.Head);
-        var costumes = data.Items.Costumes.Where(c => c.Body != null).ToList();
+        var costumes = RetailGame.Instance.Data.Items.Costumes.Where(c => c.Body != null).ToList();
         var noWord = 0;
         foreach (var costume in costumes)
         {
-            var idle = clips.IdleFor(head, costume.Body.Sex);
+            var parts = CostumeParts.Of(session.Get(list.Find(costume.Nickname)!.Section!)!);
+            var sex = clips.SexOf(parts);
+            Assert.True(sex == costume.Body.Sex, $"{costume.Nickname}: the engine gives {costume.Body.Sex}, the list {sex}.");
+            var idle = clips.IdleFor(head, sex);
             Assert.NotNull(idle);
             var skeletons = clips.SkeletonText(clips.Find(idle)!)["Skeletons: ".Length..].Split(", ");
-            Assert.Contains($"{costume.Body.Sex} body", skeletons);
+            Assert.Contains($"{sex} body", skeletons);
             var path = costume.Body.Path ?? "";
-            if (costume.Body.Sex == FLGender.female && !path.Contains("female", StringComparison.OrdinalIgnoreCase) &&
+            if (sex == FLGender.female && !path.Contains("female", StringComparison.OrdinalIgnoreCase) &&
                 !path.Contains("juni", StringComparison.OrdinalIgnoreCase))
             {
                 noWord++;
