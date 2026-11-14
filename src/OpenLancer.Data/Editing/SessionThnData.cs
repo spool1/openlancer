@@ -48,8 +48,9 @@ internal sealed class SessionThnData : IThnGameData
 
     public string? Reason(ThnItemKind kind, string template) => Get(kind, template).Reason;
 
-    /// <summary>The INI lines of the edit view tell when the game plays the script only in space. The session reads
-    /// them once for each edit view, and only when a COMPOUND has a problem.</summary>
+    /// <summary>The INI lines of W tell when the game plays the script only in space (see
+    /// <see cref="EditSession.PlaysOnlyInSpace"/>), so an unsaved <c>Act_CallThorn</c> line counts. The data reads them
+    /// only when a COMPOUND has a problem.</summary>
     public bool MakesCompounds => makesCompounds ??= !OnlyInSpace();
 
     /// <summary>
@@ -71,7 +72,7 @@ internal sealed class SessionThnData : IThnGameData
         return answer;
     }
 
-    private bool OnlyInSpace() => session.EditViewReferences.OnlyInSpace(path);
+    private bool OnlyInSpace() => session.PlaysOnlyInSpace(path);
 
     private Answer Compute(ThnItemKind kind, string template)
     {
@@ -81,7 +82,8 @@ internal sealed class SessionThnData : IThnGameData
         var ids = ThnTemplateRules.ListsOf(kind);
         if (lists.List(ids) is not { } list)
             return default;
-        if (Find(list, kind, template) is not { } entry)
+        // The engine finds an item and a clip by the name as it is, so a name with a space around it names no item.
+        if (list.FindAsWritten(template) is not { } entry)
             return new Answer(ThnItemState.Missing, kind == ThnItemKind.Animation
                 ? lists.LowerLayerHasClip(template)
                 : ids.Any(id => lists.RemovedOf(id, null, template) != null), null);
@@ -92,14 +94,6 @@ internal sealed class SessionThnData : IThnGameData
         var (state, reason) = Model(kind, section);
         return new Answer(state, state != ThnItemState.Ready && lists.ChangedByActiveMod(entry), reason);
     }
-
-    /// <summary>The entry of a name of a list. The engine finds a clip by the name as it is, so a clip name with spaces
-    /// around it names no clip.</summary>
-    private static ListEntry? Find(ListView list, ThnItemKind kind, string name) =>
-        list.Find(name) is { } entry &&
-        (kind != ThnItemKind.Animation || entry.Value.Equals(name, StringComparison.OrdinalIgnoreCase))
-            ? entry
-            : null;
 
     /// <summary>The model of the section of an item, as the engine gives it: the file of the last <c>DA_archetype</c>
     /// line with a value, when the file exists in the edit view (GameItemDb.cs:122-138, :2088-2105). An equipment also

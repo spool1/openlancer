@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using LibreLancer.Data.Ini;
 using LibreLancer.Data.IO;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
@@ -27,6 +28,10 @@ public sealed partial class EditSession
 
     /// <summary>The INI lines of the edit view that name cutscenes, for the edit view that gave them.</summary>
     private (ModOverlay View, ThnReferences References)? editViewReferences;
+
+    /// <summary>The INI files that a command changed, and their lines of W that name cutscenes, for the
+    /// <see cref="CacheRevision"/> that gave them.</summary>
+    private (int Revision, HashSet<string> Files, ThnReferences References)? changedIniReferences;
 
     /// <summary>The install paths of the cutscene scripts that the session opened, in normal form. A new cutscene that
     /// does not exist now, before New cutscene or after an undo of it, is not in the list.</summary>
@@ -257,6 +262,55 @@ public sealed partial class EditSession
     }
 
     /// <summary>
+    /// True when the game plays a script only in space, as W gives it (see <see cref="ThnReferences.OnlyInSpace(string)"/>).
+    /// The lines of W replace the lines of the edit view in each INI file that a command changed. So an unsaved
+    /// <c>Act_CallThorn</c> line counts at once, and the save gate gives the same result in one save and in two saves.
+    /// The session reads the changed files once for each <see cref="CacheRevision"/>.
+    /// </summary>
+    internal bool PlaysOnlyInSpace(string path)
+    {
+        var (files, changed) = ChangedIniReferences();
+        return ThnReferences.OnlyInSpace(EditViewReferences.UsedBy(path).Where(r => !files.Contains(r.File))
+            .Concat(changed.UsedBy(path)));
+    }
+
+    /// <summary>The INI files that a command changed, and their lines of W that name cutscenes. A file that W does not
+    /// have, for example after the undo of a new file, has no lines.</summary>
+    private (HashSet<string> Files, ThnReferences References) ChangedIniReferences()
+    {
+        if (changedIniReferences is not { } known || known.Revision != CacheRevision)
+        {
+            var files = touched.Where(p => p.EndsWith(".ini", StringComparison.OrdinalIgnoreCase))
+                .ToHashSet(VfsPath.Comparer);
+            var references = ThnReferences.Read(files.Order(StringComparer.OrdinalIgnoreCase).Select(file =>
+                (file, documents.GetValueOrDefault(file) is { State.Exists: true } document
+                    ? document.Working
+                    : (IReadOnlyList<Section>)[])));
+            known = (CacheRevision, files, references);
+            changedIniReferences = known;
+        }
+        return (known.Files, known.References);
+    }
+
+    /// <summary>The install paths of the cutscenes that the active mod changes, in normal form: the files that a
+    /// command changed, and the patches and the whole files of the mod.</summary>
+    private IEnumerable<string> ChangedCutscenePaths(Mod active) =>
+        touched.Concat(active.Patches.Keys).Concat(active.Files.Keys).Select(p => VfsPath.Normalize(p) ?? p)
+            .Where(p => p.EndsWith(".thn", StringComparison.OrdinalIgnoreCase)).Distinct(VfsPath.Comparer);
+
+    /// <summary>
+    /// The cutscenes whose errors the save gate gives (see <see cref="CutsceneGateErrors"/>): each cutscene that the
+    /// active mod changes and that the editor can change, as install paths in normal form. Empty without an active mod.
+    /// An agent batch that changes an INI file compares their errors before and after the batch.
+    /// </summary>
+    internal IReadOnlyList<string> GateCutscenes() =>
+        ActiveMod is { } active
+            ? ChangedCutscenePaths(active)
+                .Where(p => TryCutscene(p, out var document) && document is { ReadOnlyReason: null, State.Exists: true })
+                .ToList()
+            : [];
+
+    /// <summary>
     /// The cutscene errors of the save gate: the errors of each cutscene that the active mod changes (see
     /// <see cref="CutsceneErrors"/>), in the files that a command changed and in the patches and whole files of the
     /// mod. A cutscene that the editor cannot change, or a new cutscene that does not exist now, is not checked. A whole
@@ -265,9 +319,7 @@ public sealed partial class EditSession
     /// </summary>
     private IEnumerable<Diagnostic> CutsceneGateErrors(Mod active)
     {
-        var paths = touched.Concat(active.Patches.Keys).Concat(active.Files.Keys).Select(p => VfsPath.Normalize(p) ?? p)
-            .Where(p => p.EndsWith(".thn", StringComparison.OrdinalIgnoreCase)).Distinct(VfsPath.Comparer);
-        foreach (var path in paths)
+        foreach (var path in ChangedCutscenePaths(active))
         {
             if (TryCutscene(path, out var document))
             {

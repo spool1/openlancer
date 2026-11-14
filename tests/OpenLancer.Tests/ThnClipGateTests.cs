@@ -103,6 +103,20 @@ public sealed class ThnClipGateTests
         Assert.False(session.Save().Saved);
     }
 
+    /// <summary>No room fills in a clip, so a clip that starts with <c>$</c> is a name as it is. A clip that the game
+    /// does not have blocks the save.</summary>
+    [Fact]
+    public void AClipThatStartsWithADollarSignIsCheckedAsItIs()
+    {
+        using var ws = AnimationWorkspace.Create();
+        var session = ws.Session("act");
+
+        SetClip(session, 0, "$x");
+
+        Assert.Equal([Typo.Replace("Sc_Typo", "$x")], Errors(session));
+        Assert.False(session.Save().Saved);
+    }
+
     /// <summary>
     /// A START_MOTION event on a character without the clip key makes the engine throw when it looks for the clip. An
     /// agent can remove the key with <c>set_fields</c>, and <c>save</c> then refuses with the crash text of the

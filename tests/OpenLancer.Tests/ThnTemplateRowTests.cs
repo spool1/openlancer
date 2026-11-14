@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Inspector;
@@ -134,6 +135,24 @@ public sealed class ThnTemplateRowTests
     }
 
     /// <summary>
+    /// The engine finds the item of a template by the text as it is. So a known name with a space after it shows
+    /// "Missing" with the error of the save gate, as <c>oltool validate</c> reports it.
+    /// </summary>
+    [Fact]
+    public void AKnownNameWithASpaceAroundItShowsMissing()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        ThnDataWorkspace.SetTemplate(session, "Man", "trent ");
+
+        var (look, gate) = LookOf(session, "Man");
+
+        Assert.Equal(("Missing (Costume): trent ", EditorTheme.Error, true, (ListEntry?)null),
+            (look.Text, look.Color, look.Error, look.Entry));
+        Assert.NotNull(gate);
+    }
+
+    /// <summary>
     /// A value that the lower cutscene has with the same problem stays out of the save gate, so it has the warning
     /// color without the red frame, with the text of the check. A missing name that the save gate does not check has the
     /// warning color and tells why. Here these are a COMPOUND in a script that the game plays only in space, and a
@@ -249,7 +268,7 @@ public sealed class ThnTemplateRowTests
         var current = element.Table[ThnTemplateRow.Path] is ThnText text ? text.Value : "";
         var list = session.Lists.List(row.Lists)!;
         var look = row.LookIn(session, path, script, target, list, current, entry => name ?? entry.Value);
-        Assert.Same(current.Length == 0 ? null : list.Find(current), look.Entry);
+        Assert.Same(current.Length == 0 ? null : list.FindAsWritten(current), look.Entry);
         return (look, ThnFieldProblems.At(session.CutsceneErrors(path), script, target, ThnTemplateRow.Path));
     }
 }

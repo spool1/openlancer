@@ -22,6 +22,7 @@ internal static class ThnDataWorkspace
     public const string BodypartsPath = @"DATA\CHARACTERS\bodyparts.ini";
     public const string SpaceScript = @"DATA\MISSIONS\M01A\space.thn";
     public const string EquipmentPath = @"DATA\EQUIPMENT\misc_equip.ini";
+    public const string MissionPath = @"DATA\MISSIONS\M01A\m01a.ini";
 
     public const string Script = """
         duration = 10
@@ -120,7 +121,7 @@ internal static class ThnDataWorkspace
             entities = { { entity_name = "Ship", type = COMPOUND, template_name = "ship1", userprops = { category = "ship" } } }
             events = {}
             """);
-        ws.WriteBase(@"DATA\MISSIONS\M01A\m01a.ini", "[Trigger]\nnickname = t1\nAct_CallThorn = Missions\\\\M01A\\\\space.thn\n");
+        ws.WriteBase(MissionPath, "[Trigger]\nnickname = t1\nAct_CallThorn = Missions\\\\M01A\\\\space.thn\n");
         return ws;
     }
 
@@ -131,6 +132,13 @@ internal static class ThnDataWorkspace
             new ThnPath("template_name"), new ThnText(template)));
 
     public static EntryView Line(string name, string value) => new(name, [new StringValue(value)]);
+
+    /// <summary>The trigger of the mission file. Its <c>Act_CallThorn</c> line plays <see cref="SpaceScript"/>.</summary>
+    public static SectionRef Trigger => new(MissionPath, new SectionIdentity("Trigger", "t1"));
+
+    /// <summary>Sets the <c>Act_CallThorn</c> line of the trigger, with the guard of the mission files open.</summary>
+    public static void CallThorn(EditSession session, string script) =>
+        session.Execute(MissionTestData.Raw(EditCommand.SetLinesFromText(Trigger, "Act_CallThorn", [script])));
 
     public static SectionRef Costume(string nickname) => new(CostumesPath, new SectionIdentity("Costume", nickname));
 
@@ -155,6 +163,8 @@ public sealed class ThnNameGateTests
     private static string CostumeWithoutBody(string costume) =>
         Crash + $"entity \"Man\", template_name: The costume \"{costume}\" is not usable: 'body = no_body': no body has " +
         "the name 'no_body'. A DEFORMABLE without userprops.Actor needs it.";
+
+    private const string GhostShip = Crash + "entity \"Ship\", template_name: The game data has no ship \"ghost_ship\".";
 
     private static string[] Errors(EditSession session, string path = ScriptPath) =>
         [.. session.CutsceneErrors(path).Select(e => e.Message)];
@@ -316,6 +326,72 @@ public sealed class ThnNameGateTests
     }
 
     /// <summary>
+    /// The space rule reads the INI lines of W. An unsaved <c>Act_CallThorn</c> line that makes the script a script of
+    /// space removes the COMPOUND error at once, also from the cached result. So the trigger and the COMPOUND save in one
+    /// save, as in two saves.
+    /// </summary>
+    [Fact]
+    public void AnUnsavedTriggerOfSpaceRemovesTheCompoundErrorAndBothEditsSaveInOneSave()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        ThnDataWorkspace.SetTemplate(session, "Ship", "ghost_ship");
+        Assert.Equal([GhostShip], Errors(session));
+
+        ThnDataWorkspace.CallThorn(session, @"Scripts\x.thn");
+
+        Assert.Empty(Errors(session));
+        AssertSaved(session.Save());
+        Assert.Empty(Errors(session));
+    }
+
+    /// <summary>
+    /// An unsaved removal of the only <c>Act_CallThorn</c> line of a script of space makes the game build its
+    /// COMPOUNDs. So the cached result of the script changes at once, and the save stops with the error. An undo heals
+    /// it.
+    /// </summary>
+    [Fact]
+    public void AnUnsavedRemovalOfTheTriggerOfSpaceChecksTheCachedCompoundAgain()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        ThnDataWorkspace.SetTemplate(session, "Ship", "ghost_ship", ThnDataWorkspace.SpaceScript);
+        Assert.Empty(Errors(session, ThnDataWorkspace.SpaceScript));
+
+        session.Execute(MissionTestData.Raw(EditCommand.RemoveName(ThnDataWorkspace.Trigger, "Act_CallThorn")));
+
+        Assert.Equal([GhostShip], Errors(session, ThnDataWorkspace.SpaceScript));
+        var refused = session.Save();
+        Assert.False(refused.Saved);
+        Assert.Contains(refused.Problems, p => p.Message == GhostShip);
+
+        session.Undo();
+        Assert.Empty(Errors(session, ThnDataWorkspace.SpaceScript));
+        AssertSaved(session.Save());
+    }
+
+    /// <summary>
+    /// A saved change of the trigger of space checks the cached result again: the save of the new line makes the game
+    /// build the COMPOUNDs of the old script of space. The save stops with the error, and the cutscene keeps it.
+    /// </summary>
+    [Fact]
+    public void ASaveOfANewTriggerLineChecksTheOldScriptOfSpaceAgain()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        ThnDataWorkspace.SetTemplate(session, "Ship", "ghost_ship", ThnDataWorkspace.SpaceScript);
+        AssertSaved(session.Save());
+        Assert.Empty(Errors(session, ThnDataWorkspace.SpaceScript));
+
+        ThnDataWorkspace.CallThorn(session, @"Scripts\x.thn");
+        var refused = session.Save();
+
+        Assert.False(refused.Saved);
+        Assert.Contains(refused.Problems, p => p.Message == GhostShip);
+        Assert.Equal([GhostShip], Errors(session, ThnDataWorkspace.SpaceScript));
+    }
+
+    /// <summary>
     /// A missing equipment, prop or effect does not crash the game, so its problem has no crash start. It still blocks
     /// the save, because the value of the active mod is outside a closed list. The mines, the visual effects and the
     /// props of each petalDB file are known. A template that the room fills in, PlayerShipEngines and a SOUND give no
@@ -350,6 +426,46 @@ public sealed class ThnNameGateTests
         ThnDataWorkspace.SetTemplate(session, "Gear", "thruster1");
         ThnDataWorkspace.SetTemplate(session, "Fx", "visfx1");
         Assert.Empty(Errors(session));
+    }
+
+    /// <summary>
+    /// The engine finds the item of a template by the text as it is, without a trim, as <c>oltool validate</c> does. So
+    /// a known costume with a space after it crashes the game, and a known effect with a space before it is a name
+    /// problem. Both block the save.
+    /// </summary>
+    [Fact]
+    public void AKnownNameWithASpaceAroundItBlocksTheSave()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+
+        ThnDataWorkspace.SetTemplate(session, "Man", "trent ");
+        ThnDataWorkspace.SetTemplate(session, "Fx", " fx1");
+
+        Assert.Equal([CostumeMissing.Replace("\"ghost\"", "\"trent \""),
+            "entity \"Fx\", template_name: The game data has no effect \" fx1\". The scene does not show this entity."],
+            Errors(session));
+        Assert.False(session.Save().Saved);
+    }
+
+    /// <summary>
+    /// A PSYS template that starts with <c>$</c> names an effect as it is: the room fills in only the templates of the
+    /// other types. So an unknown such effect blocks the save as a name problem.
+    /// </summary>
+    [Fact]
+    public void AnEffectThatStartsWithADollarSignIsCheckedAsItIs()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+
+        ThnDataWorkspace.SetTemplate(session, "Fx", "$ghost_fx");
+
+        string[] expected =
+            ["entity \"Fx\", template_name: The game data has no effect \"$ghost_fx\". The scene does not show this entity."];
+        Assert.Equal(expected, Errors(session));
+        var refused = session.Save();
+        Assert.False(refused.Saved);
+        Assert.Equal(expected, refused.Problems.Select(p => p.Message));
     }
 
     /// <summary>

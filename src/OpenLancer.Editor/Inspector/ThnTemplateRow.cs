@@ -156,7 +156,8 @@ internal sealed record ThnTemplateRow(ThnTemplateRule? Rule, string? Label, bool
     public ThnTemplateLook LookIn(EditSession edits, string path, ThnScriptModel script, ThnRef entity, ListView list,
         string current, Func<ListEntry, string> name)
     {
-        var entry = current.Length == 0 ? null : list.Find(current);
+        // The engine finds the item by the template as it is, as the save gate does.
+        var entry = current.Length == 0 ? null : list.FindAsWritten(current);
         var problem = ThnFieldProblems.At(edits.CutsceneChecks(path), script, entity, Path);
         var blocked = ThnFieldProblems.At(edits.CutsceneErrors(path), script, entity, Path) != null;
         return Look(current, entry, entry == null ? null : name(entry), problem, blocked);

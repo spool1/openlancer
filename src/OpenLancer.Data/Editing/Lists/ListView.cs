@@ -130,6 +130,11 @@ public sealed class ListView
     /// <c>Scripts/Bases/x.THN</c> name one entry.</summary>
     public ListEntry? Find(string value) => Key(value) is { } key ? byValue.GetValueOrDefault(key) : null;
 
+    /// <summary>The entry with the name as it is written, or null. It is <see cref="Find"/>, but a value with a space
+    /// before or after it names no entry. The engine finds a cutscene template and a clip by the text as the script has
+    /// it, without a trim.</summary>
+    public ListEntry? FindAsWritten(string value) => value.Length == value.Trim().Length ? Find(value) : null;
+
     private string? Key(string value) => keyOf == null ? value.Trim() : keyOf(value.Trim());
 
     /// <summary>The groups of names with one FLHash that hold the name.</summary>

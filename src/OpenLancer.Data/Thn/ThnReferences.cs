@@ -191,6 +191,16 @@ public sealed class ThnReferences
         return scanner.Result(problems);
     }
 
+    /// <summary>Reads the sections of INI files, in the order of the files. The edit session uses it for the INI files
+    /// of W that differ from the files on disk.</summary>
+    public static ThnReferences Read(IEnumerable<(string File, IReadOnlyList<Section> Sections)> files)
+    {
+        var scanner = new Scanner();
+        foreach (var (file, sections) in files)
+            scanner.Read(file, sections);
+        return scanner.Result([]);
+    }
+
     /// <summary>The values that name a script, in scan order. Empty when no value names it.</summary>
     public IReadOnlyList<ThnReference> UsedBy(string thnPath) =>
         VfsPath.Normalize(thnPath) is { } path && byPath.TryGetValue(path, out var list) ? list : NoReferences;
@@ -202,7 +212,21 @@ public sealed class ThnReferences
     /// <summary>True when the game plays the script only in space: each value that names it is an
     /// <c>Act_CallThorn</c>, and at least one value names it. The space scene makes no COMPOUND of the script, and uses
     /// the objects of the mission in their place (Cutscene.cs:101-113).</summary>
-    public bool OnlyInSpace(string thnPath) => UsedBy(thnPath) is { Count: > 0 } uses && uses.All(IsSpace);
+    public bool OnlyInSpace(string thnPath) => OnlyInSpace(UsedBy(thnPath));
+
+    /// <summary>True when the values that name a script make the game play it only in space: each value is an
+    /// <c>Act_CallThorn</c>, and there is at least one value (see <see cref="OnlyInSpace(string)"/>).</summary>
+    public static bool OnlyInSpace(IEnumerable<ThnReference> uses)
+    {
+        var any = false;
+        foreach (var use in uses)
+        {
+            if (!IsSpace(use))
+                return false;
+            any = true;
+        }
+        return any;
+    }
 
     private static bool IsSpace(ThnReference reference) => Same(reference.Key, SpaceKey);
 
