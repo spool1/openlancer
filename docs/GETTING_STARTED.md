@@ -22,10 +22,12 @@ OpenLancer has no installer. "WHERE OPENLANCER KEEPS FILES" in `README-FIRST.txt
 
 1. Double-click `OpenLancer.Editor.exe`.
 2. If Windows shows "Windows protected your PC", do the steps of [Windows protected your PC](TROUBLESHOOTING.md#windows-protected-your-pc).
-3. The editor shows "Link your Freelancer game". Click **Select game folder...**.
-4. Select the folder of your game. This folder contains the `EXE` and `DATA` folders. You can also drag the folder to the editor window.
+3. On the card "Link your Freelancer game", click **Select game folder...**.
+4. Select the folder of your game. This folder contains the `EXE` and `DATA` folders.
 5. Make sure that the editor shows "Game found" and the name of your game, for example "Freelancer 1.1".
 6. Click **Create profile and open**.
+
+Instead of steps 3 and 4, you can drag the game folder to the editor window.
 
 The editor makes a profile for your game and an empty mod, `my-mod`, in `Documents\OpenLancer`. Then it opens the profile, and the Scene shows a star system in 3D. Your edits go into `my-mod`.
 
@@ -46,15 +48,21 @@ Press Ctrl+S. The editor saves your change in the mod `my-mod`. Before the save,
 
 1. Press F5. The game starts at the camera of the Scene, with your change.
 2. Fly and look at your change.
-3. Press Shift+F5 to stop the game.
+3. In the editor window, click the **Stop** button.
+
+The Stop button is in the middle of the menu bar of the editor. Shift+F5 also stops the game, but only while the editor window is active. The game window does not use the keys of the editor.
 
 F5 plays the mod in the OpenLancer engine, not in the original game program. It installs nothing. While the game runs, each save of the editor reloads the game. [PLAY.md](PLAY.md) tells more about Play.
 
 ## Play the change in your game (Ctrl+F5)
 
-1. Press Ctrl+F5. Or click the Play menu and the item of your game, for example **Play > Play in HD Edition 0.7.1**. Ctrl+F5 plays in the game of the last Play in the game.
+For Freelancer 1.0, patch the game to 1.1 first. The 1.0 program does not start on Windows 10 and 11. See [Supported games](#supported-games).
+
+1. Press Ctrl+F5.
 2. In the main menu of the game, start a new game or load a save.
-3. Press Shift+F5 to stop the game.
+3. In the editor window, click the **Stop** button.
+
+Ctrl+F5 plays in the game of your last Play in the game. The first time, it plays in the first linked game that has its game program. To play in another linked game, click its item in the Play menu, for example **Play > Play in HD Edition 0.7.1**.
 
 The editor saves the mod and installs the mods into a play copy of the game. A play copy is a folder next to the game folder. Then the editor starts the game program of the play copy. Your game folder does not change. The first play copy takes some seconds to make.
 

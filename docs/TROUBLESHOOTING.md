@@ -97,6 +97,9 @@ The game of Ctrl+F5 is the game program of the play copy.
 - Make sure that your game starts from its own folder, without OpenLancer. The play copy starts the same game program. When the game does not start without OpenLancer, repair the game first, for example with its installer.
 - When the game stops with an error, the Console says "The game of the play copy stopped with exit code" and the number.
 - To find a problem in the play copy, click **Check play copy** (see [The play copy](#the-play-copy)).
+- To find a problem in the game folder, check it (see [Check the game folder](#check-the-game-folder)).
+
+### Check the game folder
 
 To check the game folder in the editor:
 
@@ -106,8 +109,14 @@ To check the game folder in the editor:
 
 To check the game folder with `oltool`:
 
-1. Open a command prompt in the OpenLancer folder.
-2. Run `oltool game "<your game folder>"`.
+1. In File Explorer, open the OpenLancer folder.
+2. Click the address bar of the folder.
+3. Type `cmd`.
+4. Press Enter. A command prompt opens in the OpenLancer folder.
+5. Type `.\oltool game "<your game folder>"`.
+6. Press Enter.
+
+The command also works in PowerShell, for example after **Open in Terminal**. PowerShell needs the `.\` before `oltool`.
 
 The output names the game, its version, its folder and the changed INI files. It contains no game content. "oltool game" in [GAME_LINK.md](GAME_LINK.md#oltool-game) tells more.
 
@@ -129,14 +138,17 @@ A program that keeps a log open, for example a log viewer, stops the move. Then 
 
 ## Report a problem
 
-1. In the editor, click **Help > Report a problem**. The editor copies a short text with the version, the commit, the linked game and the Windows version. Then it opens the bug report form in your browser.
-2. Paste the text into the first field of the form.
+1. In the editor, click **Help > Report a problem**. The editor copies a report text and opens the bug report form in your browser.
+2. Paste the report text into the first field of the form.
 3. Write what you did, what you expected and what occurred.
 4. Click **Help > Open log folder**.
-5. Attach `OpenLancer.Editor.log.txt`. For a problem in Play, also attach `OpenLancer.Play.log.txt`.
-6. If the editor crashed and you started it again, attach `OpenLancer.Editor.log.previous.txt`.
-7. If the game of Play crashed and you started Play again, attach `OpenLancer.Play.log.previous.txt`.
-8. For a problem with your game folder, attach the output of `oltool game`.
+5. Attach `OpenLancer.Editor.log.txt`.
+6. For a problem in Play, attach `OpenLancer.Play.log.txt`.
+7. If the editor crashed and you started it again, attach `OpenLancer.Editor.log.previous.txt`.
+8. If the game of Play crashed and you started Play again, attach `OpenLancer.Play.log.previous.txt`.
+9. For a problem with your game folder, attach the output of `oltool game` (see [Check the game folder](#check-the-game-folder)).
+
+The report text gives the version, the commit, the linked game and the Windows version.
 
 The log files and the output of `oltool game` show the paths of your folders. A path can contain your Windows user name. Before you attach a file, remove the text that you do not want to share.
 

@@ -27,6 +27,13 @@ LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 FENCE = re.compile(r"^```.*?^```[ \t]*$", re.M | re.S)
 CODE_SPAN = re.compile(r"`[^`\n]*`")
 CONTRACTION = re.compile(r"(?i)\b(?:\w+n't|\w+'(?:re|ve|ll|m|d)|(?:it|that|there|what|here|let)'s)\b")
+# The verbs that start a command in the steps of the pages.
+IMPERATIVES = {"attach", "click", "close", "copy", "correct", "do", "double-click", "download", "drag", "extract",
+               "fly", "get", "go", "install", "link", "make", "open", "paste", "press", "remove", "repair", "run",
+               "select", "start", "type", "write"}
+# The Play sections that must give the Play support of Freelancer 1.0, because their steps can start the 1.0 program.
+PLAY_STEPS = (("docs/GETTING_STARTED.md", "## Play the change in your game (Ctrl+F5)"),
+              ("docs/PLAY.md", "## Play in the game"))
 
 
 def read(path):
@@ -68,12 +75,57 @@ def supported_games(repo=REPO):
     return header, [dict(zip(header, row)) for row in rows]
 
 
-def games_table(text):
-    """The table of a page whose first column is the game and which has the Play column, or None."""
-    for header, *rows in tables(text):
-        if header[0] == GAME and PLAY in header:
-            return header, [dict(zip(header, row)) for row in rows]
-    return None
+def games_problems(text, readme_header, readme_rows):
+    """The differences between the games tables of a page and the README table "Supported games". A games table has
+    the game in its first column and has the Play column. The page must have one or more games tables, and each one
+    must have the games of the README in their order, with the README cell in each column."""
+    problems = []
+    found = [table for table in tables(text) if table[0][0] == GAME and PLAY in table[0]]
+    if not found:
+        problems.append(f"no table with the columns '{GAME}' and '{PLAY}'")
+    readme_games = [row[GAME] for row in readme_rows]
+    for number, (header, *cells) in enumerate(found, 1):
+        rows = [dict(zip(header, row)) for row in cells]
+        problems += [f"table {number}: the README has no column '{column}'" for column in header
+                     if column not in readme_header]
+        games = [row.get(GAME) for row in rows]
+        if games != readme_games:
+            problems.append(f"table {number}: the games {games} are not the games {readme_games} of the README")
+            continue
+        problems += [f"table {number}: {row[GAME]}, {column}: '{row.get(column)}' is not '{readme_row[column]}'"
+                     for readme_row, row in zip(readme_rows, rows) for column in header
+                     if column in readme_header and row.get(column) != readme_row[column]]
+    return problems
+
+
+def project_problems(text, source_build):
+    """The lines of a page that name the project of the source build, or a decompilation, outside the allowed words.
+    The allowed words are the game cell of the README row (source_build) and the README sentence NO_CODE. A page
+    without the sentence NO_CODE is also a problem."""
+    problems = [] if NO_CODE in text else [f"no sentence '{NO_CODE}'"]
+    for number, line in enumerate(text.split("\n"), 1):
+        rest = line.replace(NO_CODE, "")
+        if line.startswith("|") and line.strip("| ").split(" |")[0] == source_build:
+            rest = rest.replace(source_build, "", 1)
+        if "decomp" in rest.lower():
+            problems.append(f"line {number}: {line}")
+    return problems
+
+
+def numbered_steps(text):
+    """The text of each item of a numbered list, without its number."""
+    return re.findall(r"^\d+\. +(.+)$", FENCE.sub("", text), re.M)
+
+
+def actions(step):
+    """The number of commands of a numbered step. A command is a sentence that starts with a verb of IMPERATIVES,
+    also after "Or", "Then", "also" or a condition that ends with a comma, for example "If the editor crashed, attach ..."."""
+    count = 0
+    for sentence in re.split(r"(?<=[.!?])\s+", prose(step).replace("**", "")):
+        words = re.sub(r"^(?:If|When|For|In|On|Before|After|Instead of)\b[^,]*, ", "", sentence).split()
+        words = words[1:] if words[:1] in (["Or"], ["Then"], ["also"]) else words
+        count += bool(words) and words[0].lower() in IMPERATIVES
+    return count
 
 
 def anchor(heading):
@@ -142,27 +194,79 @@ class HelpPageTests(unittest.TestCase):
         self.assertIn(NO_CODE, read(README))
 
     def test_each_page_names_the_games_of_the_readme_with_their_play_support(self):
-        readme_header, readme_rows = supported_games()
+        header, rows = supported_games()
         for page in PAGES:
-            table = games_table(read(page))
-            self.assertIsNotNone(table, f"{page} has no table with the columns '{GAME}' and '{PLAY}'.")
-            header, rows = table
-            self.assertEqual([], [column for column in header if column not in readme_header], page)
-            self.assertEqual([row[GAME] for row in readme_rows], [row.get(GAME) for row in rows], page)
-            for readme_row, row in zip(readme_rows, rows):
-                for column in header:
-                    self.assertEqual(readme_row[column], row.get(column), f"{page}: {row[GAME]}, {column}")
+            self.assertEqual([], games_problems(read(page), header, rows), page)
+
+    def test_each_games_table_of_a_page_must_be_the_same_as_the_readme(self):
+        header, rows = supported_games()
+        good = "\n".join(["| Game | Play the mod in the game (Ctrl+F5) |", "|---|---|"] +
+                         [f"| {row[GAME]} | {row[PLAY]} |" for row in rows]) + "\n"
+        self.assertEqual([], games_problems(good, header, rows))
+        self.assertEqual([], games_problems(good + "\n| File | Content |\n|---|---|\n| a | b |\n", header, rows))
+        second = good + "\n| Game | Play the mod in the game (Ctrl+F5) |\n|---|---|\n| Freelancer 1.0 (retail) | Yes |\n"
+        self.assertEqual(1, len(games_problems(second, header, rows)), second)
+        self.assertIn("table 2", games_problems(second, header, rows)[0])
+        lines = good.split("\n")
+        swapped = "\n".join(lines[:2] + [lines[3], lines[2]] + lines[4:])
+        self.assertEqual(1, len(games_problems(swapped, header, rows)), swapped)
+        changed = good.replace(rows[2][PLAY], "Yes")
+        self.assertEqual(["table 1: Freelancer 1.0 (retail), Play the mod in the game (Ctrl+F5): 'Yes' is not "
+                          f"'{rows[2][PLAY]}'"], games_problems(changed, header, rows))
+        self.assertEqual([f"no table with the columns '{GAME}' and '{PLAY}'"], games_problems("No table.\n", header,
+                                                                                               rows))
 
     def test_each_page_names_the_project_of_the_source_build_only_in_the_allowed_words(self):
         source_build = supported_games()[1][3][GAME]
         for page in PAGES:
-            text = read(page)
-            self.assertIn(NO_CODE, text, page)
-            self.assertNotIn("decompil", text.lower(), page)
-            for number, line in enumerate(text.split("\n"), 1):
-                row = line.startswith("|") and line.strip("| ").split(" |")[0] == source_build
-                if not row:
-                    self.assertNotIn(PROJECT, line.replace(NO_CODE, ""), f"{page}:{number}")
+            self.assertEqual([], project_problems(read(page), source_build), page)
+
+    def test_the_project_of_the_source_build_outside_the_allowed_words_is_a_problem(self):
+        source_build = supported_games()[1][3][GAME]
+        allowed = f"| {source_build} | Yes |\n{NO_CODE}\n"
+        self.assertEqual([], project_problems(allowed, source_build))
+        for added in ("A decomp build is a play target only.", f"Build the {PROJECT} project first.",
+                      "Open a decompiled file.", f"| {source_build} | Yes, a {PROJECT} build |"):
+            self.assertEqual([f"line 3: {added}"], project_problems(allowed + added + "\n", source_build), added)
+        self.assertEqual([f"no sentence '{NO_CODE}'"], project_problems(f"| {source_build} | Yes |\n", source_build))
+
+    def test_the_play_steps_give_the_play_support_of_freelancer_1_0(self):
+        """The Play menu lists Freelancer 1.0, so these steps can start its program. They give the README cell."""
+        cell = next(row[PLAY] for row in supported_games()[1] if row[GAME].startswith("Freelancer 1.0"))
+        for page, heading in PLAY_STEPS:
+            text = section(read(page), heading)
+            self.assertIsNotNone(text, f"{page}: {heading}")
+            self.assertIn(cell.lower(), " ".join(text.lower().split()), f"{page}: {heading}")
+
+    def test_a_step_that_stops_the_game_goes_to_the_editor_window(self):
+        """Shift+F5 and the Stop button are parts of the editor. The game window does not use the keys of the
+        editor."""
+        stops = [step for page in PAGES for step in numbered_steps(read(page)) if re.search(r"Shift\+F5|\bStop\b", step)]
+        self.assertNotEqual([], stops)
+        for step in stops:
+            self.assertIn("editor window", step)
+
+    def test_a_step_that_runs_oltool_works_in_cmd_and_in_powershell(self):
+        """PowerShell runs a program of the current folder only with ".\\" before its name. cmd also accepts it."""
+        commands = [step for page in PAGES for step in numbered_steps(read(page))
+                    if re.match(r"(?:Type|Run)\b", step) and "oltool" in step]
+        self.assertNotEqual([], commands)
+        for step in commands:
+            self.assertRegex(step, r"`\.\\oltool ")
+
+    def test_each_numbered_step_has_one_command(self):
+        for page in PAGES:
+            self.assertEqual([], [step for step in numbered_steps(read(page)) if actions(step) != 1], page)
+
+    def test_the_commands_of_a_step_are_counted(self):
+        for step, expected in (("Press Ctrl+F5.", 1),
+                               ("Press Ctrl+F5. Or click the Play menu and the item of your game.", 2),
+                               ("Attach `a.txt`. For a problem in Play, also attach `b.txt`.", 2),
+                               ("In the editor, click **Help > Report a problem**. The editor copies a text.", 1),
+                               ("If Windows shows \"Windows protected your PC\", do the steps of [it](#it).", 1),
+                               ("Click **Select game folder...**. Then select the folder.", 2),
+                               ("The editor shows a card.", 0)):
+            self.assertEqual(expected, actions(step), step)
 
     def test_each_relative_link_names_a_file_and_a_heading_that_exist(self):
         for page in PAGES:
