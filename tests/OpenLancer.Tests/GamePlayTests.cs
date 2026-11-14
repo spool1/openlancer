@@ -190,6 +190,24 @@ public sealed class GamePlayTests : IAsyncDisposable
 
     public ValueTask DisposeAsync() => rig.DisposeAsync();
 
+    /// <summary>The README table "Supported games" says that Freelancer 1.0 needs the 1.1 patch before Ctrl+F5. The
+    /// item of a 1.0 game gives that cell in its tooltip. The item of a 1.1 game has no such note.</summary>
+    [Fact]
+    public void TheItemOfFreelancer10TellsToPatchTheGameFirst()
+    {
+        var oneZero = Assert.Single(PlayTarget.Of(rig.Host.Games));
+        var oneOne = oneZero with { Game = oneZero.Game with { Version = "1.1" } };
+        Assert.Equal((GameKind.Vanilla, "1.0"), (oneZero.Game.Kind, oneZero.Game.Version));
+        var readme = File.ReadAllText(RepoFiles.Of("README.md"));
+
+        Assert.Equal(PlayTarget.PatchFirst, oneZero.Note);
+        Assert.EndsWith($"\n\n{PlayTarget.PatchFirst}", PlayMenu.GameTooltip(oneZero));
+        Assert.Null(oneOne.Note);
+        Assert.DoesNotContain(PlayTarget.PatchFirst, PlayMenu.GameTooltip(oneOne));
+        Assert.Contains($"| Freelancer 1.0 (retail) | Yes. It has the same INI files as 1.1. | Yes, for 1.1 | {PlayTarget.PatchFirst} |",
+            readme);
+    }
+
     [Fact]
     public async Task TheGameStartsInItsProgramFolder()
     {
@@ -205,6 +223,8 @@ public sealed class GamePlayTests : IAsyncDisposable
         Assert.Equal("Playing in Freelancer 1.0 (play copy)", rig.Plays.GameStatus);
         Assert.Contains(PlayCopyTexts.Make("Freelancer 1.0", rig.Game.CopyFolder), rig.Console);
         Assert.Contains("Play in Freelancer 1.0: OpenLancer installed 1 file. The game starts.", rig.Console);
+        // The program of 1.0 does not start on Windows 10 and 11, so the Console gives the Play cell of the README.
+        Assert.Contains($"Play in Freelancer 1.0: {PlayTarget.PatchFirst}", rig.Console);
         Assert.Contains(GamePlay.SavesNote, rig.Console);
         Assert.Equal(rig.Game.Root, rig.Host.Settings.LastGameTarget);
         Assert.Equal(1, rig.Host.SaveCalls);

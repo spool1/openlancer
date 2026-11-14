@@ -758,6 +758,11 @@ internal sealed class GamePlay : IDisposable, IGameStop
         Log(ConsoleSeverity.Info, $"Play in {request.Target.Name}: OpenLancer installed " +
                                   $"{(prepared.Files == 1 ? "1 file" : $"{prepared.Files} files")}. " +
                                   (request.Kind == JobKind.Server ? "The test server starts." : "The game starts."));
+        if (request.Target.Note is { } note)
+        {
+            Log(ConsoleSeverity.Warning, $"Play in {request.Target.Name}: {note}");
+        }
+
         if (request.Kind == JobKind.Server)
         {
             StartServer(request.Target, prepared.Installed);

@@ -295,7 +295,9 @@ The Console counts the lines of each load of the game: the start, each reload, a
 
 ## Play in the game
 
-Play in the game plays the profile in your own copy of the retail game. The game can be Freelancer: HD Edition 0.7.1, Freelancer 1.1 or a source build (see [GAME_LINK.md](GAME_LINK.md)). For Freelancer 1.0, patch the game to 1.1 first. The 1.0 program does not start on Windows 10 and 11. The editor installs the mods into a play copy of the game, and starts the game program of the play copy. Your game folder does not change.
+Play in the game plays the profile in your own copy of the retail game. The game can be Freelancer: HD Edition 0.7.1, Freelancer 1.1 or a source build (see [GAME_LINK.md](GAME_LINK.md)). For Freelancer 1.0, patch the game to 1.1 first. The 1.0 program does not start on Windows 10 and 11. The tooltip of the item of a 1.0 game and the Console tell this too.
+
+The editor installs the mods into a play copy of the game, and starts the game program of the play copy. Your game folder does not change.
 
 1. Link the game folder in File > Game link. The folder must contain the game program.
 2. Click Play > Play in HD Edition 0.7.1, or the item of another game. Or press Ctrl+F5.

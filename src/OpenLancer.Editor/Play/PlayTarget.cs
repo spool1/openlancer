@@ -19,6 +19,13 @@ internal sealed record PlayTarget(GameReport Game)
     /// <summary>The name in the menu and the status bar, for example "HD Edition 0.7.1" or "source build".</summary>
     public string Name => Game.Kind == GameKind.SourceBuild ? "source build" : Game.ShortName;
 
+    /// <summary>The Play cell of Freelancer 1.0 in the README table "Supported games".</summary>
+    public const string PatchFirst = "Patch the game to 1.1 first. The 1.0 program does not start on Windows 10 and 11.";
+
+    /// <summary>What the user must know before Play in the game starts this game, or null. The program of Freelancer
+    /// 1.0 does not start on Windows 10 and 11, so its note is the Play cell of 1.0 in the README.</summary>
+    public string? Note => Game is { Kind: GameKind.Vanilla, Version: "1.0" } ? PatchFirst : null;
+
     /// <summary>True when the program folder of the game has <c>FLServer.exe</c>, so Host test server can run.</summary>
     public bool HasServer =>
         File.Exists(Path.Combine(Root, Game.Layout == GameLayout.SourceBuild ? "bin" : "EXE", TestServer.ProgramName));

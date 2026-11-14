@@ -276,6 +276,11 @@ internal sealed class PlayMenu(EditorWindow window)
     /// The items of Play in the game (section 8.8 of the M11 design, decision D324). Each play target has an item. Host
     /// test server has an item for each play target with FLServer.exe. Join test server and Stop test server follow.
     /// </summary>
+    /// <summary>The tooltip of a Play in the game item, with the note of the game (see <see cref="PlayTarget.Note"/>).</summary>
+    internal static string GameTooltip(PlayTarget target) =>
+        $"Save the active mod, install the mods of the profile into the play copy of {target.Root}, and start its " +
+        "game. Your game folder does not change." + (target.Note is { } note ? $"\n\n{note}" : "");
+
     private void GameItems()
     {
         var games = window.GamePlay;
@@ -293,9 +298,7 @@ internal sealed class PlayMenu(EditorWindow window)
         foreach (var target in targets)
         {
             if (MenuItems.Item(EditorIcons.Rocket, $"Play in {target.Name}##{target.Root}", block,
-                    $"Save the active mod, install the mods of the profile into the play copy of {target.Root}, and " +
-                    "start its game. Your game folder does not change.",
-                    target == last ? EditorKeys.PlayInGame.Chord.Text : ""))
+                    GameTooltip(target), target == last ? EditorKeys.PlayInGame.Chord.Text : ""))
             {
                 games.Play(target);
             }
