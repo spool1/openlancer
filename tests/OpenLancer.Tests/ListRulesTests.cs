@@ -287,21 +287,21 @@ public sealed class ListRulesTests
         Assert.Equal(".", Rules.Lists["model"].Source!.Folder);
     }
 
-    /// <summary>The source kind animationScripts gives the clips of the animation files of a role (section 12.1 of the
+    /// <summary>The sourceKind animationScripts gives the clips of the animation files of a role (section 12.1 of the
     /// M8b design). It needs a role and no sections, values, files or scope. Another source kind is an error.</summary>
     [Fact]
     public void TheAnimationSourceKindNeedsARoleAndNoSections()
     {
         Assert.True(Rules.Lists["animation"].Source!.AnimationScripts);
         Assert.Equal(("Animation", "Animation"), (Rules.Lists["animation"].Label, Rules.Lists["animation"].Kind));
-        Assert.True(ListRules.Parse(FilesRules("""{ "role": "system", "kind": "animationScripts" }""", ""))
+        Assert.True(ListRules.Parse(FilesRules("""{ "role": "system", "sourceKind": "animationScripts" }""", ""))
             .Lists["nebula_file"].Source!.AnimationScripts);
         Assert.Contains("needs a role", Assert.Throws<InvalidDataException>(() => ListRules.Parse(
-            FilesRules("""{ "kind": "animationScripts" }""", ""))).Message);
+            FilesRules("""{ "sourceKind": "animationScripts" }""", ""))).Message);
         Assert.Contains("needs a role", Assert.Throws<InvalidDataException>(() => ListRules.Parse(
-            FilesRules("""{ "role": "system", "kind": "animationScripts", "sections": ["Animations"] }""", ""))).Message);
+            FilesRules("""{ "role": "system", "sourceKind": "animationScripts", "sections": ["Animations"] }""", ""))).Message);
         Assert.Contains("is not known", Assert.Throws<InvalidDataException>(() => ListRules.Parse(
-            FilesRules("""{ "role": "system", "kind": "sounds" }""", ""))).Message);
+            FilesRules("""{ "role": "system", "sourceKind": "sounds" }""", ""))).Message);
     }
 
     /// <summary>Decision D267 of the M23 design: the categories of the Assets panel are rule data. Each category names

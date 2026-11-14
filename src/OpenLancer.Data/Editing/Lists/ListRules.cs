@@ -228,7 +228,7 @@ internal sealed record SceneTemplateDefinition(string Id, string Label, IReadOnl
 /// <param name="FileClass">For a files list: the full name of a <c>[ParsedIni]</c> class of the engine, for example
 /// <c>LibreLancer.Data.Schema.Universe.Nebula</c> (milestone M22). A file is an entry only when it has a section and
 /// each of its section types is a section of the class. Null for a file of any content.</param>
-/// <param name="AnimationScripts">True for the list of the animation clips (source kind <c>animationScripts</c>,
+/// <param name="AnimationScripts">True for the list of the animation clips (<c>"sourceKind": "animationScripts"</c>,
 /// section 12.1 of the M8b design): the scripts of the animation files that the <c>[Animations]</c> lines of the files
 /// of the role name (see <see cref="AnimationList"/>). Such a source has a role and no sections.</param>
 internal sealed record ListSource(string? Role, IReadOnlyList<string> Sections, IReadOnlyList<string>? Keys,
@@ -446,7 +446,7 @@ internal sealed class ListRules
             source = new ListSource(String(s, "role"), Strings(s, "sections"),
                 s.TryGetProperty("keys", out _) ? Strings(s, "keys") : null, where, values,
                 String(s, "scope") == "file", files, String(s, "folder"), String(s, "fileClass"),
-                String(s, "kind") switch
+                String(s, "sourceKind") switch
                 {
                     null => false,
                     "animationScripts" => true,
