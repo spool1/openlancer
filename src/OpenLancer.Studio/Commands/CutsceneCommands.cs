@@ -479,8 +479,9 @@ public static class CutsceneCommands
     /// <para>A position or a rotation for a type without a place (see <see cref="ThnTemplates.HasPlace"/>) refuses with
     /// <see cref="MissionErrors.NoPlace"/>. No retail script has two SCENE entities. So a second SCENE refuses with
     /// <see cref="MissionErrors.OneScene"/>.</para>
-    /// <para>The checks of the session do not read the game data. So a template that the game data does not have is
-    /// not a refusal. The save validation of the editor and the check of a cutscene with game data report it.</para>
+    /// <para>A template that names no item of its data list is not a refusal. The cutscene checks of the session give
+    /// it as a problem (see <see cref="EditSession.CutsceneErrors"/>), and the save gate stops the save until the user
+    /// corrects it.</para>
     /// </remarks>
     /// <param name="path">The install path of the script.</param>
     /// <param name="type">The THN name of the entity type, for example <c>CAMERA</c>.</param>

@@ -159,6 +159,8 @@ internal sealed class EditScope
         missionCommands += batch.Commands.Sum(CountOf);
         if (missionCommands > AgentLimits.MissionCommands)
             throw Budget(MissionEditTools.MissionBudget, "limit_mission_budget", commandsField);
+        // A mission line can play a cutscene in space, which changes its checks.
+        checks.BeforeIniEdit();
         var result = Session.Missions.Apply(batch with
         {
             Origin = EditOrigin.Agent,
@@ -267,6 +269,10 @@ internal sealed class EditScope
         {
             cutscenes.Before(cutscene);
             checks.BeforeCutscene(cutscene.Path);
+        }
+        else
+        {
+            checks.BeforeIniEdit();
         }
         checks.Before(plan, targets ?? []);
         Batch.Label ??= plan.Label;
@@ -760,8 +766,9 @@ internal static class EditTools
 /// that the batch adds and removes (section 4.0.5 of the M6b design, item 2). The problems are the field checks and the
 /// list checks of the sections that the commands name, before and after the batch. A cutscene that a command changes
 /// gives the errors of its cutscene checks before and after the batch (see <see cref="EditSession.CutsceneErrors"/>,
-/// section 12.6 of the MCP1 design). The problems are data, not errors. So the edit applies, as an edit of the user
-/// applies.
+/// section 12.6 of the MCP1 design). A batch that changes an INI file also gives the errors of each cutscene that the
+/// save gate checks, because an INI edit can break a template. The problems are data, not errors. So the edit applies,
+/// as an edit of the user applies.
 /// </summary>
 /// <remarks>
 /// <para>The problems of a section that the batch removes do not count as fixed. A renamed section compares its
@@ -784,12 +791,30 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
     /// touch. A new cutscene of the batch had no errors.</summary>
     private readonly List<(string Path, IReadOnlyList<Diagnostic> Errors)> cutscenesBefore = [];
 
+    /// <summary>True after the first plan of the batch that changes an INI file.</summary>
+    private bool gateCutscenesNoted;
+
     /// <summary>Notes a cutscene that a plan changes, and the errors of its cutscene checks now, at the first
     /// touch.</summary>
     public void BeforeCutscene(string path)
     {
         if (!cutscenesBefore.Any(c => OpenLancer.Data.IO.VfsPath.Comparer.Equals(c.Path, path)))
             cutscenesBefore.Add((path, session.CutsceneErrors(path)));
+    }
+
+    /// <summary>
+    /// Notes each cutscene that the save gate checks, and its errors now, before the first plan of the batch that
+    /// changes an INI file. An INI edit can break the template of a cutscene that the batch does not change, for example
+    /// with the removal of the <c>DA_archetype</c> line of an equipment. So the result gives such a problem at once, as
+    /// the save gate does. A batch that changes only cutscenes reads no other cutscene.
+    /// </summary>
+    public void BeforeIniEdit()
+    {
+        if (gateCutscenesNoted)
+            return;
+        gateCutscenesNoted = true;
+        foreach (var path in session.GateCutscenes())
+            BeforeCutscene(path);
     }
 
     /// <summary>Notes the sections of a plan before its command runs, and their problems now.</summary>

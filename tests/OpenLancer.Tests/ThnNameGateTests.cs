@@ -549,6 +549,34 @@ public sealed class ThnNameGateTests
         Assert.Empty(fix["new_problems"]!.AsArray());
     }
 
+    /// <summary>
+    /// An agent edit of an INI section that breaks the template of a cutscene of the active mod gives the cutscene
+    /// problem in <c>new_problems</c>, as the save gate gives it. The batch does not change the cutscene. The edit that
+    /// puts back the line gives the problem in <c>fixed_problems</c>.
+    /// </summary>
+    [Fact]
+    public void AnAgentIniEditThatBreaksATemplateGivesTheCutsceneProblem()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(ThnEdits.Set(Entity(session, "Cam"), new ThnPath("cameraprops.fovh"), new ThnNumber(20)));
+        var host = new TestAgentHost(session);
+        var gear = AgentCalls.Json($"sec:{ThnDataWorkspace.EquipmentPath}#Thruster/thruster1");
+        const string noModel = Crash + "entity \"Gear\", template_name: The equipment \"thruster1\" has no model: its " +
+                               "[Thruster] section has no DA_archetype line.";
+
+        var broken = AgentCalls.Ok(host, "set_fields", $$"""{ "ref": {{gear}}, "fields": { "DA_archetype": null } }""");
+        var mended = AgentCalls.Ok(host, "set_fields",
+            $$"""{ "ref": {{gear}}, "fields": { "DA_archetype": "equipment\\thruster1.3db" } }""");
+
+        Assert.Equal("applied", (string?)broken["status"]);
+        var problem = Assert.Single(broken["new_problems"]!.AsArray(), p => (string?)p!["message"] == noModel)!;
+        Assert.Equal($"thn:{ScriptPath}#entity/Gear", (string?)problem["ref"]);
+        Assert.Contains(noModel, mended["fixed_problems"]!.AsArray().Select(p => (string?)p!["message"]));
+        Assert.DoesNotContain(noModel, mended["new_problems"]!.AsArray().Select(p => (string?)p!["message"]));
+        Assert.Empty(Errors(session));
+    }
+
     /// <summary>The Problems section of the Cutscene page shows an error without its crash start, and a name problem
     /// whole.</summary>
     [Fact]

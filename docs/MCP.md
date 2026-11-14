@@ -304,7 +304,7 @@ Each command sees the result of the commands before it. So a later command can n
 
 A name has only letters, digits, `_` and `-`, with at most 64 characters. A name that Windows uses for a device, for example `nul` or `com1`, is not correct in any letter case. A bad name gives `invalid_value` with the detail `NameInvalid`, as the other names of the mission commands do. A path with a file gives `name_taken` with the detail `PathInUse`. A script directly in `DATA\MISSIONS` cannot get its own file, so the command gives `BadPath`.
 
-The builds of the old file do not move. The game looks for the build of a mission ship in the ship build file of its script first, then in the shared files `DATA\MISSIONS\npcships.ini` and `DATA\MISSIONS\npcships_test.ini`. It does not spawn a ship whose build it does not find. So each batch that points the line at another file gives a warning, also with `set_item_key`. The warning names the builds that are only in the old file, and the two files. The mission checks do not find this problem, so strict mode does not refuse the batch.
+The builds of the old file do not move. The game looks for the build of a mission ship in the ship build file of its script first. Then it looks in the shared files `DATA\MISSIONS\npcships.ini` and `DATA\MISSIONS\npcships_test.ini`. It does not spawn a ship whose build it does not find. So each batch that points the line at another file gives a warning, also with `set_item_key`. The warning names the builds that are only in the old file, and the two files. The mission checks do not find this problem, so strict mode does not refuse the batch.
 
 The commands do not change the world files of the missions, for example the pilot files and the encounter files, because encounters and bases use them too. The `npc_ship_file` line of a script can name only a ship build file or a new file. A ship build file is in a folder under `DATA\MISSIONS` outside the encounters folder, and it has only `[NPCShipArch]` sections. The shared ship build file `DATA\MISSIONS\npcships.ini` is also correct. A command that sets the line to another file gives `invalid_value` with the detail `NotShipBuildFile`, and nothing changes. A command in a `command_group` gets the same check.
 
@@ -537,7 +537,7 @@ A cutscene that the editor cannot change gives `refused` with the reason. An exa
 
 `template` is the costume of a DEFORMABLE, the sound of a SOUND or the effect of a PSYS. `list_values` with the list `costume` gives the costumes. A COMPOUND takes as its template the nickname of an item of its category. For example, it takes a solar archetype when `userprops.category` is `"Solar"`, and a ship when it is `"Spaceship"`. So a COMPOUND with a template needs `userprops.category` too. The tool does not write a default category, because the category depends on the template. A template with a character outside ASCII, or with the character U+0000, gives `invalid_value`.
 
-The tool adds a DEFORMABLE without a template and without `userprops.Actor`, and a COMPOUND with a template and no category. The result gives the error in `new_problems`, and the save stops until you correct it. The checks of a call do not read the game data. So a template that the game data does not have is not an error of the call. The save validation of the editor and `check` with a target report it.
+The tool adds a DEFORMABLE without a template and without `userprops.Actor`, and a COMPOUND with a template and no category. The result gives the error in `new_problems`, and the save stops until you correct it. The same is true for a template that names no item of its data list. Such a template is not a refusal of the call.
 
 A name of another entity of the script gives `name_taken`, also in other letter case, because the game finds an entity by its name without letter case. An empty name gives `refused` with the detail `NameInvalid`. A name with a character outside ASCII, or with the character U+0000, gives the same error.
 
@@ -561,9 +561,11 @@ When the event at the index has another type or time, the call gives `stale_revi
 
 The result gives each new and changed item as it is after the call. So an event reference in `adds` or `changes` has the index after the call. A deleted event has its index before the call, because the script does not have the event after the call. A new script is one add, and `select` names the last new item. Each step of `edit_batch` gives its references as they are after that step.
 
-The result also gives the problems of the cutscene checks that the call adds and removes, in `new_problems` and `fixed_problems`. The save stops for each such problem. The game crashes when it plays a cutscene with an error, and the message of an error starts with "The game crashes when it plays this cutscene."
+The result also gives the problems of the cutscene checks that the call adds and removes, in `new_problems` and `fixed_problems`. The save stops for each such problem. The game crashes when it plays a cutscene with an error. The message of an error starts with "The game crashes when it plays this cutscene."
 
-A template that names no item of the data lists is a problem too. An example is a costume or an effect that the game data does not have. The message of a template that does not crash the game tells what the scene does without the item. When the lists have the name but the game cannot use the item, the message tells why. An INI edit of the active mod that deletes, renames or breaks the item also gives the problem. The check reads the data lists with the unsaved edits. `list_values` gives the names of these lists:
+A template that names no item of the data lists is a problem too. An example is a costume or an effect that the game data does not have. The message of a template that does not crash the game tells what the scene does without the item. When the lists have the name but the game cannot use the item, the message tells why.
+
+The check reads the data lists with the unsaved edits. So an INI edit of the active mod that deletes, renames or breaks the item also gives the problem. The result of such an edit gives the problem of each cutscene that the save gate checks, also when the call does not change the cutscene. `list_values` gives the names of these lists:
 
 | Template | Lists |
 |---|---|
@@ -571,7 +573,9 @@ A template that names no item of the data lists is a problem too. An example is 
 | COMPOUND | By the category: `solar_archetype`, `ship`, `petal_room`, `petal_cart`, `petal_prop`, `equipment`, or `asteroid` and `asteroid_mine` |
 | PSYS | `effect` and `vis_effect` |
 
-A clip of a START_MOTION event on a character that the game does not have is a problem too: the character does not move. An empty clip is such a problem, so give the clip in the `fields` of `cutscene_add_event`. The clip is the value of `props.animation`. Without this key, the event crashes the game. Get the clip names from `list_values` with the list `animation`. The detail of each row is the file of the clip. The list has the clips of the `.anm` files that the `[Animations]` lines of bodyparts.ini name, with the files of the mods. The tools cannot change these lines. A COMPOUND plays the scripts of its own model, so a clip on a COMPOUND is not checked. `save` refuses such a clip with the text of the save gate of the editor.
+A clip of a START_MOTION event on a character that the game does not have is a problem too: the character does not move. An empty clip is such a problem, so give the clip in the `fields` of `cutscene_add_event`. The clip is the value of `props.animation`. Without this key, the event crashes the game. `save` refuses such a clip with the text of the save gate of the editor. A COMPOUND plays the scripts of its own model, so the check skips a clip on a COMPOUND.
+
+Get the clip names from `list_values` with the list `animation`. The detail of each row is the file of the clip. The list has the clips of the `.anm` files that the `[Animations]` lines of bodyparts.ini name, with the files of the mods. The tools cannot change these lines.
 
 Each such problem gives the reference of its element. It gives the reference of the script when the problem is about the whole script. It also does so when another entity has the same name, or another event has the same time, type and targets. The active mod causes these problems, so their origin is the active mod. `check` with the scope `all` and the error `save_blocked` name the same references.
 
