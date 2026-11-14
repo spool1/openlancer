@@ -23,8 +23,8 @@ public sealed class StartReplayRulesTests
 
     /// <summary>
     /// A start that starts two timers: the shorter t_short and the longer t_long. t_long is on the path, so at least its
-    /// time passed before the trigger after it. The shorter timer ran first in the game, so it does not wait at the start,
-    /// and its run comes before the run of t_long (the first case of issue #46).
+    /// time passed before the trigger after it. The shorter timer ran first in the game. So it does not wait at the start,
+    /// and its run comes before the run of t_long. This is the first case of issue #46.
     /// </summary>
     [Fact]
     public void AShorterSiblingOfATimerOfThePathRunsBeforeIt()

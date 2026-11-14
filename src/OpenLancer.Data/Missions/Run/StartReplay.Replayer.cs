@@ -7,16 +7,16 @@ namespace OpenLancer.Data.Missions.Run;
 internal sealed partial record StartReplay
 {
     /// <summary>
-    /// The machine of an approximate replay, with the waiting triggers that the path shows ran in the game (fix of the
-    /// review of 2026-10-28, issue #46). The replay has no world and no time. So a trigger that waits for the world or for
-    /// a time stays active, also when the game ran it long before the chosen trigger. These rules run such a trigger at
-    /// the point where the path shows its event. Before each trigger of the path, the rules run in this order: timers,
-    /// objectives, the space test before the first place, systems, launch, and timers again. Then the trigger of the path
-    /// runs, and the space test follows.
+    /// The machine of an approximate replay, with the waiting triggers that the path shows ran in the game (review of
+    /// 2026-10-28, issue #46). The replay has no world and no time. So a trigger that waits for the world or for a time
+    /// stays active, also when the game ran it long before the chosen trigger. These rules run such a trigger at the point
+    /// where the path shows its event. The rules run in this order before each trigger of the path: timers, objectives,
+    /// the early space test, systems, launch, and timers again. Then the trigger of the path runs, and the space test
+    /// follows.
     /// <list type="bullet">
     /// <item>Timers (issue #46). A waiting timer ran when the path shows that at least its time passed since its start.
-    /// All timers count on the same heartbeats. A run comes at least at the time of the run that started it, and a timer
-    /// comes at least its shortest time after its start. A trigger of the path comes after the trigger of the path before
+    /// All timers count on the same heartbeats. A run comes at or after the run that started it. A timer comes at least
+    /// its shortest time after its start. A trigger of the path comes after the trigger of the path before
     /// it, and after each run with a known time since then. When the player jumps, retail brings each jumper into the new
     /// system 3 s after the player. So a trigger of the path that waits for jumpers to arrive comes at least 3 s after the
     /// arrival of the player. The arrival of the player comes after the trigger of the path before it. A waiting timer
@@ -66,8 +66,8 @@ internal sealed partial record StartReplay
         /// <summary>The number of changes when the path last showed the player docked, or -1.</summary>
         private int docked = -1;
 
-        /// <summary>The system of the last arrival of the player that the system rule found, and the position of the
-        /// trigger of the path before it, or null.</summary>
+        /// <summary>The system of the last arrival of the player, and the position of the trigger of the path before it,
+        /// or null.</summary>
         private (string System, int Before)? arrival;
 
         /// <summary>True while the path shows the player in space, false while docked, null when no line tells.</summary>
@@ -201,9 +201,9 @@ internal sealed partial record StartReplay
             }
         }
 
-        /// <summary>The arrival part of the timer rule. A trigger of the path that waits for ships to arrive in the system
-        /// of the last arrival of the player comes at least 3 s after that arrival, when each ship is a jumper. An
-        /// <c>Act_Jumper</c> line of the replay changes the flag of its ship.</summary>
+        /// <summary>The arrival part of the timer rule. A trigger of the path can wait for ships to arrive in the system of
+        /// the last arrival of the player. When each ship is a jumper, that trigger comes at least 3 s after the arrival.
+        /// An <c>Act_Jumper</c> line of the replay changes the flag of its ship.</summary>
         /// <param name="position">The position of the trigger in the path.</param>
         private void Arrival(int position)
         {

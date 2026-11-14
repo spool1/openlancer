@@ -655,8 +655,8 @@ internal static class StartWorld
         /// destroy still runs, so the triggers that wait for its end still run.</item>
         /// <item>A trigger that ran in the replay does not count when the triggers of the start reach it only through a
         /// timer. Its first run made its objects, so they exist at the chosen trigger in the game too. The timer can run
-        /// it a second time only later. The replay also keeps an old timer that the game ran long before, because the
-        /// replay has no time.</item>
+        /// it a second time only later. The replay also keeps an old timer whose time the path does not show, also when
+        /// the game ran it long before.</item>
         /// </list>
         /// </summary>
         private void MadeAgain()

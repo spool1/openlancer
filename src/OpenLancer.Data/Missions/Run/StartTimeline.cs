@@ -14,8 +14,8 @@ namespace OpenLancer.Data.Missions.Run;
 /// <list type="number">
 /// <item>A run whose starter is at or after the anchor comes at least at the time of its starter. A timer comes at least
 /// its shortest time after its starter. This applies to the runs of the path and to the runs of the rules.</item>
-/// <item>A run of the path also comes at or after the run of the path before it, and at or after each run with a known
-/// time since that run of the path.</item>
+/// <item>A run of the path also comes at or after the run of the path before it. It also comes at or after each run with
+/// a known time since then.</item>
 /// <item>A run of the path can have a delay: it comes at least a number of heartbeats after an earlier run of the path.
 /// An arrival of jumpers after the player has such a delay.</item>
 /// <item>Each other run has no known time.</item>
@@ -141,8 +141,8 @@ internal sealed class StartTimeline
         return bound;
     }
 
-    /// <summary>The least time of each run from an anchor, and the largest known time since the last run of the path
-    /// (0 when no time is known).</summary>
+    /// <summary>The least time of each run from an anchor. Also the largest known time since the last run of the path, or
+    /// 0.</summary>
     private (int[] Times, int Since) TimesFrom(int anchor)
     {
         if (cache.TryGetValue(anchor, out var known))
@@ -228,7 +228,7 @@ internal sealed class StartTimeline
             starts[slot] = start;
     }
 
-    /// <summary>A run: the index of its Ran change, the slot of its trigger, the start that it used (a run index,
-    /// <see cref="First"/> or <see cref="NoStart"/>), and the changes of the starts to undo it.</summary>
+    /// <summary>A run of the timeline. <c>By</c> is the start that it used: a run index, <see cref="First"/> or
+    /// <see cref="NoStart"/>. <c>Undo</c> holds the changes of the starts that undo the run.</summary>
     private sealed record Run(int Change, int Slot, int By, List<(int Slot, int Before)> Undo);
 }
