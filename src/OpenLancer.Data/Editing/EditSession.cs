@@ -778,9 +778,29 @@ public sealed partial class EditSession : IDisposable
         return true;
     }
 
-    /// <summary>The file system of the edit view for <see cref="LetterCaseOfFiles"/>, made once for each edit
+    /// <summary>The file system of the edit view for <see cref="EditViewFiles"/>, made once for each edit
     /// view.</summary>
-    private (ModOverlay View, LibreLancer.Data.IO.FileSystem Files)? caseFiles;
+    private (ModOverlay View, LibreLancer.Data.IO.FileSystem Files)? editViewFiles;
+
+    /// <summary>The file system of the edit view, made once for each edit view. <see cref="LetterCaseOfFiles"/> and
+    /// <see cref="HasFile"/> read it.</summary>
+    private LibreLancer.Data.IO.FileSystem EditViewFiles
+    {
+        get
+        {
+            if (editViewFiles is var (view, files) && ReferenceEquals(view, EditView))
+                return files;
+            files = EditView.CreateFileSystem();
+            editViewFiles = (EditView, files);
+            return files;
+        }
+    }
+
+    /// <summary>True when W or the edit view has a file at an install path, in any letter case. It opens no document,
+    /// so the live check of a typed file name records no file for the save.</summary>
+    /// <param name="normal">An install path in normal form.</param>
+    internal bool HasFile(string normal) =>
+        documents.TryGetValue(normal, out var document) && document.State.Exists || EditViewFiles.FileExists(normal);
 
     /// <summary>
     /// An install path with the letter case of the folders and the file of the edit view. A part that the edit view does
@@ -789,11 +809,7 @@ public sealed partial class EditSession : IDisposable
     /// <param name="normal">An install path in normal form.</param>
     internal string LetterCaseOfFiles(string normal)
     {
-        if (caseFiles is not var (view, files) || !ReferenceEquals(view, EditView))
-        {
-            files = EditView.CreateFileSystem();
-            caseFiles = (EditView, files);
-        }
+        var files = EditViewFiles;
         var parts = normal.Split(Separator);
         var folder = "";
         for (var i = 0; i < parts.Length; i++)

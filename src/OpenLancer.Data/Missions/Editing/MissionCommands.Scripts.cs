@@ -111,6 +111,35 @@ public sealed record DeleteScript(ScriptRef Script) : MissionCommand
 }
 
 /// <summary>
+/// Makes a new empty ship build file in the folder of a script, as a whole file of the active mod, and points the
+/// <c>[Mission] npc_ship_file</c> line of the script at it (#18). The builds of the old file do not move. The check of the
+/// path is <see cref="MissionEditor.NewShipFileRefusal"/>, which the popup "New file..." of the Mission page uses too.
+/// </summary>
+/// <param name="Path">The install path of the new file: <c>&lt;folder of the script&gt;\&lt;name&gt;.ini</c>.</param>
+public sealed record NewShipBuildFile(ScriptRef Script, string Path) : MissionCommand
+{
+    protected override string Describe() => $"New ship build file {MissionFiles.Display(Path)}";
+
+    internal override void Run(MissionDraft d)
+    {
+        var script = d.Script(Script.Path);
+        var header = ItemRef.Of(script.Path, "Mission", null);
+        var (document, index) = d.Item(header, lines: true);
+        d.Editable(document, index);
+        if (d.Editor.NewShipFileProblem(script.Path, Path) is { } problem)
+            throw d.Refuse(problem with { Field = "path" });
+        var file = d.NewFile(d.NewFilePath(Path, field: "path", shipFile: true));
+        d.SetFile(file, [], exists: true);
+        var lineBack = d.RunInner(new SetItemKey(header, "npc_ship_file",
+            [LineSpec.Raw("npc_ship_file", MissionFiles.Display(file.Path))]));
+        var reference = new ScriptRef(file.Path);
+        d.Adds.Add(reference.ToString());
+        // The delete runs first: DeleteScript takes only a guarded file, and the file is guarded while the line names it.
+        d.Inverse(new CommandGroup([new DeleteScript(reference), .. lineBack]));
+    }
+}
+
+/// <summary>
 /// Gives a text id of a line own text: the text goes into <c>strings.json</c> of the active mod, and the line gets its
 /// <c>$str:</c> placeholder, by the key rules of MOD_FORMAT "New items, renames and text".
 /// </summary>

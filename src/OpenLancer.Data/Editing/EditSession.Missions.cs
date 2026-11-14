@@ -112,6 +112,14 @@ public sealed partial class EditSession
     internal bool HoldsOnlyShipBuilds(string path) =>
         OpenDocument(path) is not { State.Exists: true } document || !document.HoldsScript && OnlyShipBuilds(document.Working);
 
+    /// <summary>True for a file that the <c>npc_ship_file</c> line of a script can name: a file below
+    /// <c>DATA\MISSIONS</c> outside the encounters folder that <see cref="HoldsOnlyShipBuilds"/> takes (final finding 5
+    /// of MCP1-3). This includes a shared file directly in <c>DATA\MISSIONS</c>, for example <c>npcships.ini</c>, and a
+    /// path without a file.</summary>
+    /// <param name="path">An install path in normal form.</param>
+    internal bool CanBeShipBuildFile(string path) =>
+        (DataPath("MISSIONS") is not { } missions || MissionFiles.IsScanned(path, missions)) && HoldsOnlyShipBuilds(path);
+
     /// <summary>True when each section is an <c>[NPCShipArch]</c> section.</summary>
     internal static bool OnlyShipBuilds(IEnumerable<Section> sections) =>
         sections.All(s => s.Name.Equals("NPCShipArch", StringComparison.OrdinalIgnoreCase));

@@ -95,6 +95,7 @@ public sealed class MissionInverseTests
         ["set_act"] = () => new SetAct(new ActRef(Script, "act_1")) { Name = "The start", Text = "The player launches." },
         ["set_act_members"] = () => new SetActMembers(new ActRef(Script, "act_1"), ["ol_end", "ol_start"]),
         ["apply_fix"] = () => new ApplyFix(TestScript, "M04|ol_wave|system", "move"),
+        ["new_ship_build_file"] = () => new NewShipBuildFile(TestScript, @"DATA\MISSIONS\OL_TEST\ships_new.ini"),
     };
 
     [Theory]

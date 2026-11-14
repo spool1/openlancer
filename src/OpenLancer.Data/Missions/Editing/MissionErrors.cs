@@ -422,6 +422,31 @@ public static class MissionErrors
             @"DATA\MISSIONS outside the encounters folder, with the extension .ini, for example " +
             @"DATA\MISSIONS\MY_MISSION\npcships.ini. The script then names it in its npc_ship_file line.");
 
+    /// <summary>The name of a new ship build file of a script is empty or does not obey the name rule of New cutscene
+    /// (#18).</summary>
+    /// <param name="problem">The text of the name rule, for example <see cref="Thn.ThnEdits.BadName"/>.</param>
+    internal static EditError ShipFileNameError(string problem) => new(EditErrorKind.InvalidValue, NameInvalid, problem);
+
+    /// <summary>The text of an empty name of a new ship build file.</summary>
+    public const string NoShipFileName = "Type a name for the ship build file.";
+
+    /// <summary>The path of a new ship build file is not in the folder of its script (#18).</summary>
+    internal static EditError ShipFileFolderError(string folder) =>
+        new(EditErrorKind.InvalidArgument, BadPath,
+            $@"A new ship build file goes into the folder of its script, with the extension .ini. Give a path such as " +
+            $@"{folder}\npcships.ini.");
+
+    /// <summary>A script directly in <c>DATA\MISSIONS</c> cannot get its own ship build file (#18), because a file
+    /// directly in that folder is world data (review finding RB2).</summary>
+    internal static EditError ShipFileOfScriptInMissionsError(string script) =>
+        new(EditErrorKind.Refused, BadPath,
+            $@"{script} is directly in DATA\MISSIONS. Encounters and bases use the files of that folder too, so this " +
+            "script cannot get its own ship build file there. Pick a ship build file that exists.");
+
+    /// <summary>The edit view or W has a file at the path of a new ship build file (#18).</summary>
+    internal static EditError ShipFileInUseError(string path) =>
+        new(EditErrorKind.NameTaken, PathInUse, $"A file exists at {path}. Use another name.");
+
     internal static EditError NotTextIdError(string label) =>
         new(EditErrorKind.InvalidArgument, NotTextId,
             $"{label} is not a text id, so it cannot have text of the mod. Pick a value that is a text id.");

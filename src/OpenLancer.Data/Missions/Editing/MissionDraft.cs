@@ -157,7 +157,7 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
     {
         foreach (var (path, document) in Touched)
         {
-            if (Session.ShipBuildFileOf(document.Working) is not { } file || IsShipBuildFile(file) ||
+            if (Session.ShipBuildFileOf(document.Working) is not { } file || Session.CanBeShipBuildFile(file) ||
                 Before.TryGetValue(path, out var before) && VfsPath.Comparer.Equals(Session.ShipBuildFileOf(before.Working), file))
                 continue;
             throw Refuse(MissionErrors.NotShipBuildFileError(path, Session.OpenDocument(file)?.Path ?? file));
@@ -180,15 +180,6 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
             .Distinct(VfsPath.Comparer)
             .FirstOrDefault(p => !VfsPath.Comparer.Equals(p, path) && Session.OpenDocument(p) is { State.Exists: true } &&
                                  VfsPath.Comparer.Equals(Session.ShipBuildFileOf(p), path));
-
-    /// <summary>True for a file that the <c>npc_ship_file</c> line of a script can name (see
-    /// <see cref="CheckShipBuildFiles"/>).</summary>
-    private bool IsShipBuildFile(string path)
-    {
-        if (Session.DataPath("MISSIONS") is { } missions && !MissionFiles.IsScanned(path, missions))
-            return false;
-        return Session.HoldsOnlyShipBuilds(path);
-    }
 
     /// <summary>True for a shared ship build file of the missions (see <see cref="SharedBuildFiles"/>).</summary>
     public bool IsSharedBuildFile(string path) =>

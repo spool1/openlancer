@@ -360,8 +360,17 @@ public static class ThnEdits
             !normal.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
             return $@"A new cutscene goes into the folder {folder} of the active mod.";
         var name = System.IO.Path.GetFileNameWithoutExtension(normal);
-        if (name.Length == 0)
-            return "Type a name for the cutscene.";
+        return name.Length == 0 ? "Type a name for the cutscene." : NameProblem(name);
+    }
+
+    /// <summary>
+    /// Why a name is not the name of a new file, or null: the name has a character other than letters, digits,
+    /// <c>_</c> and <c>-</c>, has more than <see cref="MaxNameLength"/> characters, or names a Windows device. New
+    /// cutscene and the new ship build file of a mission script use this rule. The caller refuses an empty name with its
+    /// own text.
+    /// </summary>
+    internal static string? NameProblem(string name)
+    {
         if (!IsNameText(name))
             return BadName;
         if (name.Length > MaxNameLength)
@@ -370,8 +379,8 @@ public static class ThnEdits
     }
 
     /// <summary>True for a text of letters, digits, <c>_</c> and <c>-</c> only: the characters of the name of a new
-    /// cutscene.</summary>
-    private static bool IsNameText(string name) =>
+    /// file.</summary>
+    internal static bool IsNameText(string name) =>
         name.All(c => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '_' or '-');
 
     private static void CheckKind(ThnRef target, ThnElementKind kind)

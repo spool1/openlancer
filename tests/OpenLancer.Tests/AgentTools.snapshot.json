@@ -20240,6 +20240,34 @@
             "additionalProperties": false,
             "description": "Moves a ship or a formation section before another section of its file, or to the end. The place of another section type has no effect in the game."
           },
+          "new_ship_build_file": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "new_ship_build_file",
+                "description": "The kind of the command."
+              },
+              "script": {
+                "type": "string",
+                "pattern": "^(msn):",
+                "examples": [
+                  "msn:DATA\\MISSIONS\\M02\\m02.ini"
+                ],
+                "description": "The msn: reference of the script."
+              },
+              "path": {
+                "type": "string",
+                "description": "The install path of the new file in the folder of the script, for example DATA\\MISSIONS\\MY\\npcships_2.ini. The name has only letters, digits, \u0027_\u0027 and \u0027-\u0027, and the extension is .ini. A path with a file gives PathInUse. A script directly in DATA\\MISSIONS gives BadPath."
+              }
+            },
+            "required": [
+              "kind",
+              "script",
+              "path"
+            ],
+            "additionalProperties": false,
+            "description": "Makes a new empty ship build file in the folder of a script. It is a whole file of the active mod. The npc_ship_file line of the script then names it. The builds of the old file do not move."
+          },
           "place_mission_ship": {
             "type": "object",
             "properties": {
@@ -22315,6 +22343,9 @@
               },
               {
                 "$ref": "#/$defs/move_section"
+              },
+              {
+                "$ref": "#/$defs/new_ship_build_file"
               },
               {
                 "$ref": "#/$defs/place_mission_ship"
