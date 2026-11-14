@@ -135,8 +135,7 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
     /// <param name="problems">The problems of the save gate (see <c>EditSession.CutsceneErrors</c>).</param>
     /// <param name="script">The version of W that gave the problems.</param>
     internal static bool Blocked(IReadOnlyList<Diagnostic> problems, ThnScriptModel script, ThnRef target) =>
-        problems.Any(p => p.Cutscene is { Kind: ThnElementKind.Event, Value: ThnTemplateRules.AnimationPath } place &&
-                          place.ElementIn(script)?.Id == target.Id);
+        ThnFieldProblems.At(problems, script, target, ThnTemplateRules.AnimationPath) != null;
 
     /// <summary>The text, the color and the red frame of the closed field. An empty or an unknown clip has the color
     /// and the frame of an error when the save gate blocks it, else the warning color, for example for a retail clip

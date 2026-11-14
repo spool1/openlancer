@@ -599,6 +599,9 @@ public sealed class ThnChecksTests
         }
         Assert.Equal(["asteroid", "equipment", "equipment cart", "prop", "room", "ship", "solar", "spaceship"],
             ThnTemplateRules.Categories.Keys.Order(System.StringComparer.Ordinal));
+        // The Inspector names each template row with the label of the first list of its rule.
+        Assert.All(ThnTemplateRules.Categories.Values.Concat([ThnTemplateRules.Costume, ThnTemplateRules.Effect,
+            ThnTemplateRules.Sound]), rule => Assert.Equal(ListRules.Retail.Lists[rule.Lists[0]].Label, rule.Label));
         Assert.Equal(["asteroid", "asteroid_mine"], ThnTemplateRules.Categories["Asteroid"].Lists);
         Assert.Equal(["effect", "vis_effect"], ThnTemplateRules.Effect.Lists);
         Assert.False(ThnTemplateRules.Sound.Closed);

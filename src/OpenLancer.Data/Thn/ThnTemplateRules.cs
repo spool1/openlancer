@@ -15,7 +15,10 @@ namespace OpenLancer.Data.Thn;
 /// or null when it stops.</param>
 /// <param name="Closed">False when a value outside the lists is valid, for example a SOUND that names a voice line.
 /// Such a value gives no problem.</param>
-public sealed record ThnTemplateRule(ThnItemKind Kind, string What, bool MissingStops, string? Consequence, bool Closed)
+/// <param name="Label">The name of the item in the Inspector, for example "Solar archetype". It is the label of the
+/// first data list of the item.</param>
+public sealed record ThnTemplateRule(ThnItemKind Kind, string What, bool MissingStops, string? Consequence, bool Closed,
+    string Label)
 {
     /// <summary>The data lists of the item, in order (see <see cref="ThnTemplateRules.ListsOf"/>).</summary>
     public IReadOnlyList<string> Lists => ThnTemplateRules.ListsOf(Kind);
@@ -61,28 +64,30 @@ public static class ThnTemplateRules
     /// </summary>
     public static IReadOnlyDictionary<string, ThnTemplateRule> Categories { get; } = new Dictionary<string, ThnTemplateRule>
     {
-        ["solar"] = new(ThnItemKind.Archetype, "solar archetype", MissingStops: true, null, Closed: true),
-        ["ship"] = new(ThnItemKind.Ship, "ship", MissingStops: true, null, Closed: true),
-        ["spaceship"] = new(ThnItemKind.Ship, "ship", MissingStops: true, null, Closed: true),
-        ["prop"] = new(ThnItemKind.Prop, "prop of petalDB", MissingStops: false, NoModel, Closed: true),
-        ["room"] = new(ThnItemKind.Room, "room of petalDB", MissingStops: true, null, Closed: true),
-        ["equipment cart"] = new(ThnItemKind.Cart, "cart of petalDB", MissingStops: true, null, Closed: true),
-        ["equipment"] = new(ThnItemKind.Equipment, "equipment", MissingStops: false, NoModel, Closed: true),
-        ["asteroid"] = new(ThnItemKind.Asteroid, "asteroid", MissingStops: false, NoModel, Closed: true),
+        ["solar"] = new(ThnItemKind.Archetype, "solar archetype", MissingStops: true, null, Closed: true, "Solar archetype"),
+        ["ship"] = new(ThnItemKind.Ship, "ship", MissingStops: true, null, Closed: true, "Ship"),
+        ["spaceship"] = new(ThnItemKind.Ship, "ship", MissingStops: true, null, Closed: true, "Ship"),
+        ["prop"] = new(ThnItemKind.Prop, "prop of petalDB", MissingStops: false, NoModel, Closed: true, "Prop"),
+        ["room"] = new(ThnItemKind.Room, "room of petalDB", MissingStops: true, null, Closed: true, "Room"),
+        ["equipment cart"] = new(ThnItemKind.Cart, "cart of petalDB", MissingStops: true, null, Closed: true, "Cart"),
+        ["equipment"] = new(ThnItemKind.Equipment, "equipment", MissingStops: false, NoModel, Closed: true, "Equipment"),
+        ["asteroid"] = new(ThnItemKind.Asteroid, "asteroid", MissingStops: false, NoModel, Closed: true, "Asteroid"),
     }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The costume of a DEFORMABLE without <c>userprops.Actor</c> (ThnScriptInstance.cs:255-264). With an
     /// Actor, the costume loads only when no room NPC or RTC character plays the actor, so the checks skip it.</summary>
-    public static ThnTemplateRule Costume { get; } = new(ThnItemKind.Costume, "costume", MissingStops: true, null, Closed: true);
+    public static ThnTemplateRule Costume { get; } =
+        new(ThnItemKind.Costume, "costume", MissingStops: true, null, Closed: true, "Costume");
 
     /// <summary>The effect of a PSYS (ThnScriptInstance.cs:192-205). Without the effect, the scene shows nothing for the
     /// entity.</summary>
     public static ThnTemplateRule Effect { get; } = new(ThnItemKind.Effect, "effect", MissingStops: false,
-        "The scene does not show this entity.", Closed: true);
+        "The scene does not show this entity.", Closed: true, "Effect");
 
     /// <summary>The sound of a SOUND (ThnScriptInstance.cs:282-288). A template can also name a voice line, so a name
     /// outside the list is valid.</summary>
-    public static ThnTemplateRule Sound { get; } = new(ThnItemKind.Sound, "sound", MissingStops: false, null, Closed: false);
+    public static ThnTemplateRule Sound { get; } =
+        new(ThnItemKind.Sound, "sound", MissingStops: false, null, Closed: false, "Sound");
 
     /// <summary>The data lists of a kind of item, in order. The first list with the name gives the item, as the engine
     /// first reads the effects and then the visual effects (ThnScriptInstance.cs:194-196). The engine puts the asteroids
@@ -109,6 +114,19 @@ public static class ThnTemplateRules
     /// :282-288).</summary>
     public static bool RoomFillsIn(ThnItemKind kind) => kind is not (ThnItemKind.Effect or ThnItemKind.Sound or
         ThnItemKind.Animation);
+
+    /// <summary>The value of a key of the <c>userprops</c> of an entity, or null. The engine finds such a key without
+    /// letter case, and the last key with the name wins (ThnScript.cs:305-314).</summary>
+    public static ThnValue? UserProp(ThnTable entity, string key) =>
+        entity["userprops"] is ThnTable props
+            ? props.Record.LastOrDefault(f => f.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value
+            : null;
+
+    /// <summary>True when a DEFORMABLE loads the costume of its template: it has no <c>userprops.Actor</c>, or an empty
+    /// one. With an Actor, the costume loads only when no room NPC or RTC character plays the actor
+    /// (ThnScriptInstance.cs:255-264). The engine reads an Actor with <c>ToString</c>, so only an empty text counts as
+    /// no Actor.</summary>
+    public static bool LoadsCostume(ThnTable entity) => UserProp(entity, "Actor") is null or ThnText { Value.Length: 0 };
 
     /// <summary>True for an item whose model file the engine loads when it builds the entity: a solar archetype, a ship,
     /// an equipment or an asteroid. The engine stops when the item has no <c>DA_archetype</c> line, or when the file of

@@ -628,6 +628,14 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
             return;
         }
 
+        // The template of a DEFORMABLE, a COMPOUND, a PSYS and a SOUND names an item of the data lists.
+        if (kind == ThnElementKind.Entity && path.Text == ThnTemplateRow.Path &&
+            ThnTemplateRow.Of(table, Symbols) is { } template)
+        {
+            Template(workspace, target, template, label, field, note, Parser(row.Kind));
+            return;
+        }
+
         switch (row.Kind)
         {
             case ThnKeyKind.Vector:
@@ -656,6 +664,53 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
                 grid.ThnTextRow(label, field, note, Parser(row.Kind), NotSet);
                 break;
         }
+    }
+
+    /// <summary>
+    /// The template row of an entity (section 12.1 of the M8b design): the list picker of the data lists of the template,
+    /// as a bound row has it. One opening is one entry of the edit history. The check of the save gate shows below the
+    /// field. A template that names no item of a list, or whose list the editor cannot make, keeps the text field, and
+    /// the note tells why.
+    /// </summary>
+    /// <param name="note">The note of the schema row, or null.</param>
+    private void Template(CutsceneWorkspace workspace, ThnRef entity, ThnTemplateRow template, string label,
+        ThnFieldState field, string? note, Func<string, ThnFieldParse> parse)
+    {
+        var edits = window.Session!.Edits;
+        field = field with { Evidence = field.Evidence == null ? template.Evidence : $"{field.Evidence}, {template.Evidence}" };
+        var list = template.Lists.Count > 0 ? edits.Lists.List(template.Lists) : null;
+        if (list == null || workspace.Working is not { } script || workspace.Path is not { } path)
+        {
+            var reason = template.TextReason ?? $"{ThnTemplateRow.NoList}\n\n{template.Note}";
+            grid.ThnTextRow(template.Label ?? label, field, note == null ? reason : $"{reason}\n\n{note}", parse, NotSet);
+            return;
+        }
+
+        var current = ThnFieldEdit.Format(field.Kind, field.Value);
+        var entry = current.Length == 0 ? null : list.Find(current);
+        var problem = ThnFieldProblems.At(edits.CutsceneChecks(path), script, entity, ThnTemplateRow.Path);
+        var blocked = ThnFieldProblems.At(edits.CutsceneErrors(path), script, entity, ThnTemplateRow.Path) != null;
+        var look = template.Look(current, entry, entry == null ? null : grid.EntryName(entry), problem, blocked);
+        grid.ThnRow(template.Label!, field, note == null ? template.Note : $"{template.Note}\n\n{note}", () =>
+        {
+            ImGui.BeginDisabled(field.ReadOnly != null);
+            var clicked = PropertyGrid.PickerField(look.Text, look.Dim, look.Color, look.Error,
+                entry != null ? ObjectKinds.OfList(list.Kind) : null, -1);
+            ImGui.EndDisabled();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.ForTooltip))
+            {
+                var about = entry != null ? grid.EntryTooltip(list, entry) : look.Below ?? look.Text;
+                ImGui.SetTooltip($"{about}\n\n{field.ReadOnly ?? template.ClickToPick}");
+            }
+
+            grid.ThnListPopup(field, clicked, list, current, parse);
+            if (look.Below != null)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, look.BelowColor);
+                ImGui.TextWrapped(look.Below);
+                ImGui.PopStyleColor();
+            }
+        });
     }
 
     /// <summary>A checkbox for <c>Y</c> or <c>N</c>. A stored number stays a number (0 or 1).</summary>

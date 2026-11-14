@@ -320,7 +320,7 @@ internal sealed partial class PropertyGrid
 
     /// <summary>The display name of an entry: the text of its <c>ids_name</c>, its own name (for example the file name
     /// of a cutscene), or its nickname.</summary>
-    private string EntryName(ListEntry entry) =>
+    internal string EntryName(ListEntry entry) =>
         entry.Section != null && window.Session?.SectionName(entry.Section) is { Length: > 0 } name ? name
         : entry.Name ?? entry.Value;
 

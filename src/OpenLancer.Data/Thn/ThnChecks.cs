@@ -459,7 +459,7 @@ public static class ThnChecks
             if (entity["template_name"] is not ThnText { Value.Length: > 0 } template ||
                 template.Value.Equals(ThnTemplateRules.PlayerShip, StringComparison.OrdinalIgnoreCase))
                 return null;
-            if (Get(entity[UserProps], "category", userProps: true) is not ThnText category)
+            if (ThnTemplateRules.UserProp(entity, "category") is not ThnText category)
                 return ("userprops.category", "The key is missing. The engine needs it for a COMPOUND with a template.", false);
             var categories = ThnTemplateRules.Categories;
             if (!categories.TryGetValue(category.Value, out var rule))
@@ -507,8 +507,7 @@ public static class ThnChecks
         /// Actor with <c>ToString</c>, so only a missing or an empty Actor loads the costume.</summary>
         private void Deformable(Element entity)
         {
-            var actor = Get(entity.Table[UserProps], "Actor", userProps: true);
-            if (actor != null && actor is not ThnText { Value.Length: 0 })
+            if (!ThnTemplateRules.LoadsCostume(entity.Table))
                 return;
             if (entity.Table["template_name"] is not ThnText template)
             {

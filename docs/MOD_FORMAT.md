@@ -1039,7 +1039,7 @@ The editor reads some files only for the lists, for example `solararch.ini` and 
 
 The Assets panel uses two more lists. The `asteroid` list holds the `[Asteroid]` sections of the files of `[Data] asteroids`. The `model` list holds the `.cmp`, `.3db` and `.sph` files below `DATA`. A list field also takes a tile of the Assets panel (see "The Assets panel").
 
-The save gate checks the templates and the clips of the cutscenes with more lists (see "The save gate"):
+The save gate checks the templates and the clips of the cutscenes with more lists (see "The save gate"). The template rows and the clip picker of the cutscene Inspector use the same lists (see [CUTSCENES.md](CUTSCENES.md)):
 
 | List | Entries |
 |---|---|

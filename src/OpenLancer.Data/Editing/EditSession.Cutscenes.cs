@@ -179,11 +179,29 @@ public sealed partial class EditSession
         var errors = crashes.Concat(NewNameProblems(document.Working, lower.NameProblems, working.NameProblems))
             .Select(e => e with { Severity = DiagnosticSeverity.Error, Origin = e.Origin ?? origin })
             .ToList();
-        cutsceneErrors[document.Path] = new CutsceneCheckState(document.Working, document.Base, data, lower, errors)
+        var checks = working.Errors.Select(e => e with { Message = $"{CutsceneCrash} {e.Message}" })
+            .Concat(working.NameProblems).ToList();
+        cutsceneErrors[document.Path] = new CutsceneCheckState(document.Working, document.Base, data, lower, errors, checks)
         {
             Revision = CacheRevision,
         };
         return errors;
+    }
+
+    /// <summary>
+    /// All problems of the checks of W of a cutscene with the game data of W, before the compare with B (see
+    /// <see cref="CutsceneErrors"/>). So the result also has the problems that B has, for example a retail template that
+    /// the lists do not have. An error starts with <see cref="CutsceneCrash"/>, as in <see cref="CutsceneErrors"/>. The
+    /// Inspector shows these problems at their fields, and the color of a field tells if the save gate refuses the
+    /// problem. The result shares the cache of <see cref="CutsceneErrors"/>. Empty when the session has no W of the
+    /// cutscene.
+    /// </summary>
+    public IReadOnlyList<Diagnostic> CutsceneChecks(string path)
+    {
+        CutsceneErrors(path);
+        return CutsceneDocument(path) is { } document && cutsceneErrors.GetValueOrDefault(document.Path) is { } known
+            ? known.Checks
+            : [];
     }
 
     /// <summary>
@@ -214,10 +232,10 @@ public sealed partial class EditSession
         }
     }
 
-    /// <summary>The errors of a cutscene, with the W, the B and the game data that gave them, and the problems of
-    /// B.</summary>
+    /// <summary>The errors of a cutscene, with the W, the B and the game data that gave them, the problems of B, and
+    /// all problems of W (see <see cref="CutsceneChecks"/>).</summary>
     private sealed record CutsceneCheckState(ThnScriptModel Working, ThnScriptModel? Base, SessionThnData Data,
-        ThnCheckResult Lower, IReadOnlyList<Diagnostic> Errors)
+        ThnCheckResult Lower, IReadOnlyList<Diagnostic> Errors, IReadOnlyList<Diagnostic> Checks)
     {
         /// <summary>The <see cref="CacheRevision"/> of the last call that found the game data the same.</summary>
         public int Revision { get; set; }

@@ -5,6 +5,7 @@ using System.Text;
 using ImGuiNET;
 using LibreLancer.ImUI;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Ui;
@@ -134,13 +135,32 @@ internal sealed partial class PropertyGrid
     /// <param name="kind">The kind of the entries, for their glyph.</param>
     /// <param name="parse">Gives the value of the text of a row.</param>
     /// <param name="pane">The side pane of the popup, or null for the footer.</param>
+    /// <param name="usedBy">The number of INI lines that name an entry, for the footer, or null for none.</param>
     public void ThnListPopup(ThnFieldState field, bool open, Func<ListPickerModel> model, ObjectKind kind,
-        Func<string, ThnFieldParse> parse, ListPickerPane? pane = null) =>
-        listPicker.Draw("##thnlist", open, model, kind, _ => 0, fieldEdits.IsOpenFor, (popup, events, selected) =>
-        {
-            picked = selected;
-            RouteEvents(popup, field.Key, events, () => ThnBegin(field, parse), _ => picked);
-        }, pane);
+        Func<string, ThnFieldParse> parse, ListPickerPane? pane = null, Func<ListEntry, int>? usedBy = null) =>
+        listPicker.Draw("##thnlist", open, model, kind, usedBy ?? (_ => 0), fieldEdits.IsOpenFor,
+            (popup, events, selected) =>
+            {
+                picked = selected;
+                RouteEvents(popup, field.Key, events, () => ThnBegin(field, parse), _ => picked);
+            }, pane);
+
+    /// <summary>
+    /// The popup of a data list for a cutscene value, for example the costume of a DEFORMABLE (section 12.1 of the M8b
+    /// design). The rows are the entries of the list with their names, as in a bound row, and the footer tells about
+    /// the entry. A value outside the list gets the "Missing" row. One opening is one entry of the edit history.
+    /// </summary>
+    /// <param name="current">The value of the field.</param>
+    public void ThnListPopup(ThnFieldState field, bool open, ListView list, string current,
+        Func<string, ThnFieldParse> parse) =>
+        ThnListPopup(field, open, () => new ListPickerModel(Named(list), false, PickerValue(list, current)),
+            ObjectKinds.OfList(list.Kind), parse, usedBy: UsedBy(list));
+
+    /// <summary>The tooltip of an entry of a data list in a cutscene row: the name and the nickname, the kind, the file,
+    /// the layer and the number of INI lines that name it.</summary>
+    internal string EntryTooltip(ListView list, ListEntry entry) =>
+        string.Join("\n", ListPickerModel.Footer(
+            new ListPickerRow(ListRowKind.Entry, entry.Value, EntryName(entry), entry), list.Label, UsedBy(list)));
 
     /// <summary>The labels X, Y and Z, in the axis colors.</summary>
     internal static IReadOnlyList<ComponentLabel> Axes => AxisLabels;
