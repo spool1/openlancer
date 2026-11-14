@@ -14,8 +14,8 @@ This version has these limits:
 
 ## Browse and preview the retail cutscenes
 
-1. Run `start.bat` to build and start the editor.
-2. Click File > Open profile, then click a profile. A profile without mods shows only the retail data.
+1. Start `OpenLancer.Editor.exe` in the folder that you extracted from the release zip. The editor opens the profile that you opened last. The first time, link your game as [Getting started](GETTING_STARTED.md#start-the-editor-and-link-your-game) tells.
+2. To open another profile, click File > Open profile, then click the profile. A profile without mods shows only the retail data.
 3. Click Mod > None (read-only). The editor then shows all mods of the profile and takes no edits.
 4. Click the Cutscenes tab at the bottom of the window. A scan reads each script one time. Until the scan ends, the toolbar of the tab shows "reading" and the count of the scripts that it read.
 5. Type a part of the name or of the path in the filter field, for example `s002xe`. To show one category or group of scripts, select it in the group menu next to the filter, for example Main story or Mission 1.
@@ -109,9 +109,7 @@ A START_SOUND without `props.duration` plays nothing, as in the game. A voice li
 
 When the script has no camera, the view shows only "This script has no camera". A problem of a build shows as a banner with the message of the engine, and the view keeps the last frame. A script with a path text that is not only a path does not go to the engine. Its build stops with a Console error that names the entity.
 
-The readout button shows the build time, the step time and the steps of each frame. The editor option `--bench-cutscene <install path>...` opens the profile of the command line without an active mod, previews each script to its end (at most 600 s), and then jumps back to the middle of that time. The first build loads the models, and the build of the jump back finds them loaded, as each jump back and each edit does. The bench writes the times of both builds and catch-ups and the active camera to the log, and closes. A wrong command line of the bench gives the exit code 2, and a script that fails gives the exit code 1. The bench does not change the editor settings. The bench starts a new engine log of the editor, `%LOCALAPPDATA%\OpenLancer\logs\OpenLancer.Editor.log.txt`, as each start of the editor does. The log of the last session moves to `OpenLancer.Editor.log.previous.txt`. While another editor runs, the bench writes `OpenLancer.Editor.log.0.txt`, and the log of the other editor stays.
-
-A wrong command line of a normal start, for example two profile files, opens the editor without a profile. The Welcome screen shows the problem.
+The readout button shows the build time, the step time and the steps of each frame. The bench of the preview is in [For developers](#for-developers).
 
 ### The cutscene list
 
@@ -279,3 +277,13 @@ The keys of the preview work only while the Timeline or the Cutscene tab has the
 | After a jump, a particle effect that started before the playhead shows its first state, and the tag "Effects start at the playhead" shows. A play with pre-roll shows the effect as the game shows it. | Shows each effect at its age. |
 | Stops at the end of the script, so it does not run an event after the end. | Runs such an event only when the time of its last frame passes the time of the event. |
 | Plays the goods cart scripts and the GCS scripts other than the fidgets. | Does not play them. So the game cannot show an edit of such a script. |
+
+## For developers
+
+To build the editor from the source code and start it, run `start.bat` in the folder of the repository. "Set up > Developers" in [README.md](../README.md#developers) gives the steps before the first build.
+
+The editor option `--bench-cutscene <install path>...` opens the profile of the command line without an active mod. It previews each script to its end (at most 600 s), and then jumps back to the middle of that time. The first build loads the models, and the build of the jump back finds them loaded, as each jump back and each edit does. The bench writes the times of both builds and catch-ups and the active camera to the log, and closes. A wrong command line of the bench gives the exit code 2, and a script that fails gives the exit code 1. The bench does not change the editor settings.
+
+The bench starts a new engine log of the editor, `%LOCALAPPDATA%\OpenLancer\logs\OpenLancer.Editor.log.txt`, as each start of the editor does. The log of the last session moves to `OpenLancer.Editor.log.previous.txt`. While another editor runs, the bench writes `OpenLancer.Editor.log.0.txt`, and the log of the other editor stays.
+
+A wrong command line of a normal start, for example two profile files, opens the editor without a profile. The Welcome screen shows the problem.

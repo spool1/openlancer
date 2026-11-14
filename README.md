@@ -92,22 +92,41 @@ To report a bug, click **Help > Report a problem**. The editor copies a short te
 
 *Select an object in the Hierarchy or the Scene, change it in the Inspector, or drag an asset from the Assets panel into the Scene.*
 
-See [docs/MOD_FORMAT.md](docs/MOD_FORMAT.md). `samples/mods/ol-sample` is a complete example: it changes a price, and it adds a new ship that Manhattan sells.
+Start with the release zip and the editor (see [Players](#players)). At the first start, the editor makes a profile for your game and an empty mod, `my-mod`, and opens the profile. Your edits go into `my-mod`.
+
+1. Select an object in the Hierarchy or the Scene.
+2. Change the object in the Inspector, or drag an arrow of the gizmo in the Scene.
+3. Press Ctrl+S. The editor checks the mod and saves the change in `my-mod`.
+4. Press F5. The game starts in the OpenLancer engine at the camera of the Scene, with your change.
+5. In the editor window, click the **Stop** button.
+6. Press Ctrl+F5. The editor installs the mods into a play copy of your game and starts the game program of the play copy.
+7. In the editor window, click the **Stop** button.
+8. Click **Mod > Export mod...**. The export makes the packages that players install.
+
+[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) gives each step with more detail. For Freelancer 1.0, patch the game to 1.1 before you press Ctrl+F5 (see [Supported games](#supported-games)).
+
+See [docs/MOD_FORMAT.md](docs/MOD_FORMAT.md) for the files of a mod. `samples/mods/ol-sample` is a complete example: it changes a price, and it adds a new ship that Manhattan sells.
+
+The export makes a drop-in zip and an FLMM package for HD Edition 0.7.1 and for Freelancer 1.1 from the files of your linked games. It also makes a zip of the mod folder for OpenLancer. `oltool export` makes the same packages. See "Export" in [docs/MOD_FORMAT.md](docs/MOD_FORMAT.md).
+
+**Mod > Mods...** shows each mod of the profile and the workspace with its export state. Give a mod the display name that players see, and write the texts of its Nexus page before the export. A publish checklist tells what a release still needs, and the History tab shows each export and test play. See "The Mods window" in [docs/MOD_FORMAT.md](docs/MOD_FORMAT.md).
+
+Some data loads in OpenLancer but crashes the retail game, for example a good with the price 0. For a mod with a retail target, the editor stops a save, a Play in the game and an export with such data. The Console tells why. See "Content checks of the retail game" in [docs/MOD_FORMAT.md](docs/MOD_FORMAT.md).
+
+### For developers: the command line
+
+`oltool` checks, merges and installs the mods of a profile from the command line. These steps use the [folder layout](#folder-layout) of the repository:
 
 1. Make a profile, for example `GameData\profiles\my.json` with `{ "mods": [ "../mods/my-mod" ] }`.
 2. Run `oltool validate GameData\profiles\my.json`.
 3. Run `oltool deploy GameData\profiles\my.json`.
 4. Start the game with `lancer.exe GameData\profiles\my.lancer.ini`.
 
-To make the packages that players install, pick **Mod > Export mod...** in the editor, or run `oltool export`. The export makes a drop-in zip and an FLMM package for HD Edition 0.7.1 and for Freelancer 1.1 from the files of your linked games. It also makes a zip of the mod folder for OpenLancer. See "Export" in [docs/MOD_FORMAT.md](docs/MOD_FORMAT.md).
-
-**Mod > Mods...** shows each mod of the profile and the workspace with its export state. Give a mod the display name that players see, and write the texts of its Nexus page before the export. A publish checklist tells what a release still needs, and the History tab shows each export and test play. See "The Mods window" in [docs/MOD_FORMAT.md](docs/MOD_FORMAT.md).
-
-Some data loads in OpenLancer but crashes the retail game, for example a good with the price 0. For a mod with a retail target, the editor stops a save, a Play in the game and an export with such data. The Console tells why. Run `oltool validate GameData\profiles\my.json --target hde-0.7.1 --game "<HD Edition folder>"` to check a profile for a retail game. See "Content checks of the retail game" in [docs/MOD_FORMAT.md](docs/MOD_FORMAT.md).
+To check a profile for a retail game, run `oltool validate GameData\profiles\my.json --target hde-0.7.1 --game "<HD Edition folder>"`.
 
 ## Play from the editor
 
-Run `start.bat` to build and start the editor. Open a profile and a system, then press F5. The game starts at the Scene camera with the edits of the active mod, and a save reloads the running game. See [docs/PLAY.md](docs/PLAY.md).
+Start the editor from the release zip (see [Players](#players)). Open a profile and a system, then press F5. The game starts at the Scene camera with the edits of the active mod, and a save reloads the running game. See [docs/PLAY.md](docs/PLAY.md).
 
 To play the mods in your own retail game, pick **Play > Play in HD Edition 0.7.1** (or another linked game), or press Ctrl+F5. The editor installs the mods into a play copy next to the game and starts the game of the play copy. Your game folder does not change. **Play > Host test server** starts FLServer of the play copy with the mods. See "Play in the game" in [docs/PLAY.md](docs/PLAY.md) and "Play copies" in [docs/GAME_LINK.md](docs/GAME_LINK.md).
 
@@ -140,9 +159,11 @@ To test the logic of a mission without the game, open the **Dry run** panel of t
 
 A graph file of the mod keeps the places of the nodes that you move, the acts that you edit and the prefab instances. The game does not read it. See "Editor files of missions" in [docs/MOD_FORMAT.md](docs/MOD_FORMAT.md). [docs/MISSIONS.md](docs/MISSIONS.md) is the help page of the mission studio.
 
+### For developers: the frame time bench
+
 To measure the frame time of the Mission tab, start the editor with `OpenLancer.Editor <profile.json> --bench-mission <install path>...`. For example, give the scripts `DATA\MISSIONS\M10\m10.ini` and `DATA\MISSIONS\M06\m06.ini`. The bench opens the profile without an active mod and shows each mission with the Scene beside it. For each mission, it draws 300 frames in the Beats lens and 300 frames in the Logic lens with "Show lines". The frames pan and zoom the graph.
 
-Then the bench writes the median and the 95th percentile of the frame times to the engine log of the editor, and closes. The gates are a median under 16 ms in the Beats lens and under 33 ms in the Logic lens. A case above its gate, or a script that the mission checks do not have, gives the exit code 1. The bench does not change the editor settings. The log is the file of the cutscene bench `--bench-cutscene` (see "The Cutscene tab" in [docs/CUTSCENES.md](docs/CUTSCENES.md)).
+Then the bench writes the median and the 95th percentile of the frame times to the engine log of the editor, and closes. The gates are a median under 16 ms in the Beats lens and under 33 ms in the Logic lens. A case above its gate, or a script that the mission checks do not have, gives the exit code 1. The bench does not change the editor settings. The log is the file of the cutscene bench `--bench-cutscene` (see "For developers" in [docs/CUTSCENES.md](docs/CUTSCENES.md#for-developers)).
 
 ## Study and edit cutscenes
 

@@ -34,6 +34,11 @@ IMPERATIVES = {"attach", "click", "close", "copy", "correct", "do", "double-clic
 # The Play sections that must give the Play support of Freelancer 1.0, because their steps can start the 1.0 program.
 PLAY_STEPS = (("docs/GETTING_STARTED.md", "## Play the change in your game (Ctrl+F5)"),
               ("docs/PLAY.md", "## Play in the game"))
+# The pages whose steps start from the release zip. They name start.bat and the bench options of the editor only in a
+# section for developers.
+ZIP_PAGES = (README, "docs/MISSIONS.md", "docs/CUTSCENES.md")
+DEVELOPER_ONLY = re.compile(r"start\.bat|--bench-")
+HEADING = re.compile(r"(#{1,6}) +(.+)")
 
 
 def read(path):
@@ -174,6 +179,23 @@ def prose(text):
     return CODE_SPAN.sub("", FENCE.sub("", text))
 
 
+def developer_problems(text):
+    """The lines of a Markdown text that name start.bat or a bench option of the editor outside a section for
+    developers. A section is for developers when its heading, or the heading of a section that holds it, contains the
+    word "developers" in any letter case. A line in a code block is never a heading, but it can be a problem."""
+    headings, problems, code = [], [], False
+    for number, line in enumerate(text.split("\n"), 1):
+        if line.startswith("```"):
+            code = not code
+        heading = None if code else HEADING.match(line)
+        if heading:
+            level = len(heading.group(1))
+            headings = [(other, name) for other, name in headings if other < level] + [(level, heading.group(2))]
+        if DEVELOPER_ONLY.search(line) and not any("developers" in name.lower() for _, name in headings):
+            problems.append(f"line {number}: {line}")
+    return problems
+
+
 class HelpPageTests(unittest.TestCase):
     def test_each_page_exists_and_the_content_scan_allows_it(self):
         for page in PAGES:
@@ -308,6 +330,59 @@ class HelpPageTests(unittest.TestCase):
             self.assertIsNotNone(text, heading)
             for page in PAGES:
                 self.assertIn(f"]({page})", text, heading)
+
+
+class ZipPageTests(unittest.TestCase):
+    """The steps of the README, MISSIONS.md and CUTSCENES.md start from the release zip. The steps for developers are in
+    their own sections."""
+
+    def test_the_zip_pages_name_the_developer_steps_only_in_sections_for_developers(self):
+        for page in ZIP_PAGES:
+            self.assertEqual([], developer_problems(read(page)), page)
+
+    def test_a_developer_step_outside_a_section_for_developers_is_a_problem(self):
+        text = "\n".join([
+            "# Page",
+            "Run `start.bat`.",
+            "## Set up",
+            "### Developers",
+            "Run `start.bat`.",
+            "## Make a mod",
+            "Use `--bench-mission`.",
+            "### For developers: the command line",
+            "Run `start.bat`.",
+            "#### Build",
+            "Run `start.bat` again.",
+            "## Play from start.bat",
+            "```",
+            "# start.bat is not a heading here",
+            "```",
+            "## For Developers",
+            "Use `--bench-cutscene`.",
+        ])
+        self.assertEqual(["line 2: Run `start.bat`.", "line 7: Use `--bench-mission`.", "line 12: ## Play from start.bat",
+                          "line 14: # start.bat is not a heading here"], developer_problems(text))
+
+    def test_the_first_step_of_a_page_starts_the_editor_of_the_release_zip(self):
+        for page, heading in (("docs/MISSIONS.md", "## Open a mission"),
+                              ("docs/CUTSCENES.md", "## Browse and preview the retail cutscenes")):
+            first = numbered_steps(section(read(page), heading))[0]
+            self.assertIn("`OpenLancer.Editor.exe`", first, page)
+            self.assertIn("release zip", first, page)
+            self.assertIn("](GETTING_STARTED.md#", first, page)
+
+    def test_make_a_mod_starts_from_the_release_zip(self):
+        text = section(read(README), "## Make a mod")
+        players = text.split("\n### ")[0]
+        self.assertIn("](docs/GETTING_STARTED.md)", players)
+        for part in ("release zip", "`my-mod`", "Ctrl+S", "F5", "Ctrl+F5", "**Mod > Export mod...**"):
+            self.assertIn(part, players)
+        self.assertNotIn("oltool validate", players)
+        self.assertIn("oltool deploy", section(text, "### For developers: the command line"))
+
+    def test_the_links_of_the_zip_pages_name_files_and_headings_that_exist(self):
+        for page in ZIP_PAGES:
+            self.assertEqual([], link_problems(page), page)
 
 
 if __name__ == "__main__":

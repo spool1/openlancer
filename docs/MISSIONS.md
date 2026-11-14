@@ -16,8 +16,8 @@ This version has these limits:
 
 ## Open a mission
 
-1. Run `start.bat` to build and start the editor.
-2. Click File > Open profile, then click a profile.
+1. Start `OpenLancer.Editor.exe` in the folder that you extracted from the release zip. The editor opens the profile that you opened last. The first time, link your game as [Getting started](GETTING_STARTED.md#start-the-editor-and-link-your-game) tells.
+2. To open another profile, click File > Open profile, then click the profile.
 3. Click the Missions tab at the bottom of the window. The 14 story missions come first, in the order of the game. The other scripts of the game data and the mods follow.
 4. Type a name, a nickname or a value in the search field. For example, type `m04` or a trigger name.
 5. Double-click a row. The mission opens in the Mission tab, beside the Scene tab. One mission is open at a time.
@@ -506,3 +506,9 @@ The category "Mission prefabs" of the Assets panel shows the prefab assets of th
 ## Files of the studio
 
 The editor keeps the places of the nodes, the acts and the records of the linked instances in a graph file of the mod. It keeps each prefab asset in a prefab file. The game does not read these files. See "Editor files of missions" in [MOD_FORMAT.md](MOD_FORMAT.md).
+
+## For developers
+
+To build the editor from the source code and start it, run `start.bat` in the folder of the repository. "Set up > Developers" in [README.md](../README.md#developers) gives the steps before the first build.
+
+The frame time bench of the Mission tab, `--bench-mission`, is in [README.md](../README.md#for-developers-the-frame-time-bench).
