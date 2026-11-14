@@ -4,10 +4,10 @@ using OpenLancer.Runtime;
 
 namespace OpenLancer.Editor.Help;
 
-/// <summary>The file of Help &gt; Getting started, or the reason why the item is off.</summary>
+/// <summary>The file of Help &gt; Read me first, or the reason why the item is off.</summary>
 /// <param name="Path">The full path of the file.</param>
 /// <param name="Reason">Why the file cannot open, or null when it exists.</param>
-internal sealed record GettingStartedFile(string Path, string? Reason);
+internal sealed record ReadmeFirstFile(string Path, string? Reason);
 
 /// <summary>
 /// The targets of the items of the Help menu. They have no ImGui call and no process start, so a test can check each
@@ -27,7 +27,7 @@ internal static class HelpLinks
     /// <summary>The text file that the release zip has next to the editor.</summary>
     public const string ReadmeFirst = "README-FIRST.txt";
 
-    /// <summary>The reason why Getting started is off in a build without <see cref="ReadmeFirst"/>, for example a build
+    /// <summary>The reason why Read me first is off in a build without <see cref="ReadmeFirst"/>, for example a build
     /// from the repository.</summary>
     public const string NoReadmeFirst =
         "This build has no README-FIRST.txt next to the editor. The file comes with the release zip. Use Documentation " +
@@ -41,11 +41,16 @@ internal static class HelpLinks
     /// commit, and a build without a commit gets master (see <see cref="BuildVersion.DocsRef"/>).</summary>
     public static string Documentation(BuildVersion build) => $"{Repository}/blob/{build.DocsRef}/README.md";
 
-    /// <summary>The file of Getting started: <see cref="ReadmeFirst"/> in the folder of the editor.</summary>
+    /// <summary>The help page Getting started of a build, <c>docs/GETTING_STARTED.md</c>, at the same commit or tag as
+    /// <see cref="Documentation"/>. The item and the page have the same name.</summary>
+    public static string GettingStarted(BuildVersion build) =>
+        $"{Repository}/blob/{build.DocsRef}/docs/GETTING_STARTED.md";
+
+    /// <summary>The file of Read me first: <see cref="ReadmeFirst"/> in the folder of the editor.</summary>
     /// <param name="editorFolder">The folder of the editor program, for example <c>AppContext.BaseDirectory</c>.</param>
-    public static GettingStartedFile GettingStarted(string editorFolder)
+    public static ReadmeFirstFile ReadmeFirstOf(string editorFolder)
     {
         var path = Path.GetFullPath(Path.Combine(editorFolder, ReadmeFirst));
-        return new GettingStartedFile(path, File.Exists(path) ? null : NoReadmeFirst);
+        return new ReadmeFirstFile(path, File.Exists(path) ? null : NoReadmeFirst);
     }
 }

@@ -127,12 +127,12 @@ public sealed class HelpMenuTests : IDisposable
     }
 
     [Fact]
-    public void GettingStartedOpensReadmeFirstNextToTheEditor()
+    public void ReadMeFirstOpensReadmeFirstNextToTheEditor()
     {
         var path = Path.Combine(ws.Root, "README-FIRST.txt");
         File.WriteAllText(path, "Start here.");
 
-        var file = HelpLinks.GettingStarted(ws.Root);
+        var file = HelpLinks.ReadmeFirstOf(ws.Root);
 
         Assert.Equal(Path.GetFullPath(path), file.Path);
         Assert.Null(file.Reason);
@@ -140,9 +140,9 @@ public sealed class HelpMenuTests : IDisposable
     }
 
     [Fact]
-    public void GettingStartedIsOffWithItsReasonInABuildWithoutReadmeFirst()
+    public void ReadMeFirstIsOffWithItsReasonInABuildWithoutReadmeFirst()
     {
-        var file = HelpLinks.GettingStarted(ws.Root);
+        var file = HelpLinks.ReadmeFirstOf(ws.Root);
 
         Assert.Equal(HelpLinks.NoReadmeFirst, file.Reason);
         Assert.False(FolderActions.IsTextFile(file.Path));
@@ -241,8 +241,8 @@ public sealed class HelpMenuTests : IDisposable
         var items = HelpMenu.Items(BuildInfo.Current, ws.Root);
 
         Assert.Equal(
-            ["Documentation", "Getting started", "Keys...", "Discord", "Report a problem", "Open log folder",
-                "About OpenLancer..."],
+            ["Documentation", "Getting started", "Read me first", "Keys...", "Discord", "Report a problem",
+                "Open log folder", "About OpenLancer..."],
             items.Select(i => i.Label));
         Assert.Equal(["Discord", "About OpenLancer..."], items.Where(i => i.StartsGroup).Select(i => i.Label));
         Assert.All(items, i => Assert.EndsWith(".", i.Tooltip));
@@ -268,7 +268,8 @@ public sealed class HelpMenuTests : IDisposable
         });
 
         Assert.Equal([$"web {HelpLinks.Repository}/blob/{Hash}/README.md"], calls["Documentation"]);
-        Assert.Equal([$"text {Path.GetFullPath(readme)}"], calls["Getting started"]);
+        Assert.Equal([$"web {HelpLinks.Repository}/blob/{Hash}/docs/GETTING_STARTED.md"], calls["Getting started"]);
+        Assert.Equal([$"text {Path.GetFullPath(readme)}"], calls["Read me first"]);
         Assert.Equal(["keys"], calls["Keys..."]);
         Assert.Equal([$"web {HelpLinks.Discord}"], calls["Discord"]);
         Assert.Equal([$"copy {header}", $"info {HelpMenu.ReportCopied}", $"web {HelpLinks.ReportForm}"],
@@ -290,11 +291,28 @@ public sealed class HelpMenuTests : IDisposable
     }
 
     [Fact]
-    public void GettingStartedIsOffInTheMenuOfABuildWithoutReadmeFirst()
+    public void ReadMeFirstIsOffInTheMenuOfABuildWithoutReadmeFirst()
     {
-        var item = HelpMenu.Items(BuildInfo.Current, ws.Root).Single(i => i.Label == "Getting started");
+        var items = HelpMenu.Items(BuildInfo.Current, ws.Root);
 
-        Assert.Equal(HelpLinks.NoReadmeFirst, item.Unavailable);
+        Assert.Equal(HelpLinks.NoReadmeFirst, items.Single(i => i.Label == "Read me first").Unavailable);
+        Assert.Null(items.Single(i => i.Label == "Getting started").Unavailable);
+    }
+
+    /// <summary>
+    /// Getting started opens the help page with the same name, at the commit or the tag of Documentation. So the name
+    /// "Getting started" means one document in the menu and in the help pages. The page has the title of the item.
+    /// </summary>
+    [Fact]
+    public void GettingStartedOpensThePageWithTheSameName()
+    {
+        var link = HelpLinks.GettingStarted(BuildInfo.Parse("1.0.0", null));
+        var page = File.ReadAllLines(RepoFiles.Of("docs", "GETTING_STARTED.md"));
+
+        Assert.Equal("https://github.com/spool1/openlancer/blob/v1.0.0/docs/GETTING_STARTED.md", link);
+        Assert.Equal($"{HelpLinks.Repository}/blob/{BuildInfo.DocsRef}/docs/GETTING_STARTED.md",
+            HelpLinks.GettingStarted(BuildInfo.Current));
+        Assert.Equal("# Getting started", page[0]);
     }
 
     [Fact]

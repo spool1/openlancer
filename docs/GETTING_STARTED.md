@@ -8,7 +8,7 @@ This page tells how to make your first mod with the release zip of OpenLancer. Y
 - A graphics card and a driver with OpenGL 3.2 or later.
 - Your own installed copy of a retail game of the table [Supported games](#supported-games): Freelancer 1.0, Freelancer 1.1 or Freelancer: HD Edition 0.7.1.
 
-You do not need to install .NET. `README-FIRST.txt` in the zip gives all the system requirements. In the editor, **Help > Getting started** opens that file.
+You do not need to install .NET. `README-FIRST.txt` in the zip gives all the system requirements. In the editor, **Help > Read me first** opens that file, and **Help > Getting started** opens this page.
 
 ## Install OpenLancer
 

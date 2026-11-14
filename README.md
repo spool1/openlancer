@@ -76,7 +76,9 @@ The data tests read `..\GameData\base`. Set `OPENLANCER_BASE` to use a different
 
 ## Help menu
 
-**Help > Documentation** opens this README for your version in the browser. It links the help pages. **Help > Getting started** opens `README-FIRST.txt` of the release zip. **Help > Keys...** lists the keys of the editor, the Scene, the Hierarchy and the cutscene preview, and the mouse controls of the Scene. The help buttons of the Scene and the Cutscene toolbars give each key the same name. **Help > About OpenLancer...** shows the version, the commit and the engine commit of your build. Click **Copy** to copy them. The window title also shows the version. When an item cannot open its page, file or folder, the Console tells why, with the source "Help".
+**Help > Documentation** opens this README for your version in the browser. It links the help pages. **Help > Getting started** opens the page [Getting started](docs/GETTING_STARTED.md) for your version. **Help > Read me first** opens `README-FIRST.txt` of the release zip. When an item cannot open its page, file or folder, the Console tells why, with the source "Help".
+
+**Help > Keys...** lists the keys of the editor, the Scene, the Hierarchy and the cutscene preview, and the mouse controls of the Scene. The help buttons of the Scene and the Cutscene toolbars give each key the same name. **Help > About OpenLancer...** shows the version, the commit and the engine commit of your build. Click **Copy** to copy them. The window title also shows the version.
 
 A menu item that is off tells why: point to it, and its tooltip gives the reason. An empty panel tells what to do next, for example "Select a system in the Scene toolbar." When the panel knows why it is empty, for example after the error of a read, it also shows the reason above the next action.
 

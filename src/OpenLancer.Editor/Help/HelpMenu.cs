@@ -109,7 +109,7 @@ internal sealed class HelpMenu(EditorWindow window) : IHelpMenuHost
     /// <c>AppContext.BaseDirectory</c>.</param>
     public static IReadOnlyList<HelpItem> Items(BuildVersion build, string editorFolder)
     {
-        var readme = HelpLinks.GettingStarted(editorFolder);
+        var readme = HelpLinks.ReadmeFirstOf(editorFolder);
         return
         [
             new HelpItem(EditorIcons.Book, "Documentation",
@@ -117,7 +117,12 @@ internal sealed class HelpMenu(EditorWindow window) : IHelpMenuHost
                 HelpAction.WebLink,
                 HelpLinks.Documentation(build)),
             new HelpItem(EditorIcons.QuestionCircle, "Getting started",
-                "Opens README-FIRST.txt: the first steps, the system requirements and what this version can do.",
+                "Opens the help page Getting started of this version in the browser: link your game, make a change, " +
+                "save it, play it and export the mod.",
+                HelpAction.WebLink, HelpLinks.GettingStarted(build)),
+            new HelpItem(EditorIcons.Flag, "Read me first",
+                "Opens README-FIRST.txt of the release zip: the system requirements, the supported games and what " +
+                "this version can do.",
                 HelpAction.TextFile, readme.Path, readme.Reason),
             new HelpItem(EditorIcons.Keyboard, "Keys...",
                 "Shows the keys of the editor, the Scene, the Hierarchy and the cutscene preview.", HelpAction.Keys),
