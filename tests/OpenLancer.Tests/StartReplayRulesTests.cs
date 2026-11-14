@@ -570,6 +570,112 @@ public sealed class StartReplayRulesTests
     }
 
     /// <summary>
+    /// A Cnd_True trigger of the path runs at once, so it adds no time. b_hop comes between the start and the path timer
+    /// b_first (5 s). So b_first is known to come before the 15 s of b_old, and b_old runs at the next step, before the
+    /// base entry b_dock.
+    /// </summary>
+    [Fact]
+    public void ACndTrueTriggerOfThePathAddsNoTime()
+    {
+        const string text = """
+            [Trigger]
+            nickname = b_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = b_old
+            Act_ActTrig = b_hop
+
+            [Trigger]
+            nickname = b_old
+            Cnd_Timer = 15
+            Act_SpawnSolar = b_buoy
+
+            [Trigger]
+            nickname = b_hop
+            Cnd_True = no_params
+            Act_ActTrig = b_first
+
+            [Trigger]
+            nickname = b_first
+            Cnd_Timer = 5
+            Act_ActTrig = b_dock
+
+            [Trigger]
+            nickname = b_dock
+            Cnd_BaseEnter = b_base
+            Act_ActTrig = b_last
+
+            [Trigger]
+            nickname = b_last
+            Cnd_Timer = 20
+            Act_ActTrig = b_chosen
+
+            [Trigger]
+            nickname = b_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "b_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["b_start", "b_hop", "b_first", "b_old", "b_dock", "b_last"], Ran(replay));
+    }
+
+    /// <summary>
+    /// The objective rule runs c_activate before the path trigger c_first, and c_activate starts c_old. The game can run
+    /// such a trigger earlier than the replay does. So the step of its run does not show when the time of c_old starts,
+    /// and c_first is not known to come first. Pass 2 runs c_old at the first timer call after its start.
+    /// </summary>
+    [Fact]
+    public void ARunOfARuleDoesNotShowWhereTheTimeOfATimerStarts()
+    {
+        const string text = """
+            [Trigger]
+            nickname = c_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = c_activate
+            Act_ActTrig = c_first
+
+            [Trigger]
+            nickname = c_activate
+            Cnd_BaseEnter = c_base
+            Act_SetNNObj = c_goal
+            Act_ActTrig = c_old
+
+            [Trigger]
+            nickname = c_old
+            Cnd_Timer = 15
+            Act_SpawnSolar = c_buoy
+
+            [Trigger]
+            nickname = c_first
+            Cnd_Timer = 5
+            Act_SetNNState = c_goal, COMPLETE
+            Act_ActTrig = c_dock
+
+            [Trigger]
+            nickname = c_dock
+            Cnd_BaseEnter = c_base_two
+            Act_ActTrig = c_last
+
+            [Trigger]
+            nickname = c_last
+            Cnd_Timer = 20
+            Act_ActTrig = c_chosen
+
+            [Trigger]
+            nickname = c_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "c_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["c_start", "c_activate", "c_old", "c_first", "c_dock", "c_last"], Ran(replay));
+    }
+
+    /// <summary>
     /// The first starts of the replay also start the time of the root. s_root (5 s) and s_old (12 s) are both in the
     /// start set, and s_root is the root of the path. So s_root is known to come before the time of s_old, and s_old
     /// runs after it, before s_next. So the objective line of s_old comes last, as in the game.
@@ -651,6 +757,113 @@ public sealed class StartReplayRulesTests
         Assert.Equal(StartRefusal.None, replay.Refusal);
         Assert.Equal(["q_start", "q_old", "q_activate", "q_done"], Ran(replay));
         Assert.DoesNotContain("q_old", Waiting(replay));
+    }
+
+    /// <summary>
+    /// The Cnd_True trigger a_starter runs two times: on the path, and again when a_dock starts it. Each run starts
+    /// a_timer. Pass 1 runs a_timer for the first start only, because the path shows no time after the second start. The
+    /// start of a timer holds the number of the run of its starter, so pass 2 does not run a_timer for the second start.
+    /// </summary>
+    [Fact]
+    public void PassTwoKnowsTheRunOfTheStarterOfATimer()
+    {
+        const string text = """
+            [Trigger]
+            nickname = a_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = a_starter
+
+            [Trigger]
+            nickname = a_starter
+            Cnd_True = no_params
+            Act_ActTrig = a_timer
+            Act_ActTrig = a_first
+
+            [Trigger]
+            nickname = a_timer
+            Cnd_Timer = 5
+            Act_SpawnSolar = a_buoy
+
+            [Trigger]
+            nickname = a_first
+            Cnd_Timer = 10
+            Act_ActTrig = a_dock
+
+            [Trigger]
+            nickname = a_dock
+            Cnd_BaseEnter = a_base
+            Act_ActTrig = a_starter
+            Act_ActTrig = a_comm
+
+            [Trigger]
+            nickname = a_comm
+            Cnd_CommComplete = a_line
+            Act_ActTrig = a_chosen
+
+            [Trigger]
+            nickname = a_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "a_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["a_start", "a_starter", "a_timer", "a_first", "a_dock", "a_starter", "a_comm"], Ran(replay));
+        Assert.Contains("a_timer", Waiting(replay));
+    }
+
+    /// <summary>
+    /// Pass 1 runs d_old before d_last. Pass 2 tries it at its early step, before the base entry d_dock. There its run
+    /// starts d_link, which runs the path trigger d_hop before its point, so the replay goes back. Pass 2 tries the timer
+    /// again in the next timer call, and it runs before d_last.
+    /// </summary>
+    [Fact]
+    public void PassTwoTriesATimerAgainAfterARunThatWentBack()
+    {
+        const string text = """
+            [Trigger]
+            nickname = d_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = d_old
+            Act_ActTrig = d_dock
+
+            [Trigger]
+            nickname = d_old
+            Cnd_Timer = 15
+            Act_ActTrig = d_link
+
+            [Trigger]
+            nickname = d_link
+            Cnd_True = no_params
+            Act_ActTrig = d_hop
+
+            [Trigger]
+            nickname = d_dock
+            Cnd_BaseEnter = d_base
+            Act_ActTrig = d_hop
+
+            [Trigger]
+            nickname = d_hop
+            Cnd_True = no_params
+            Act_ActTrig = d_last
+
+            [Trigger]
+            nickname = d_last
+            Cnd_Timer = 20
+            Act_ActTrig = d_chosen
+
+            [Trigger]
+            nickname = d_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "d_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["d_start", "d_dock", "d_hop", "d_old", "d_link", "d_hop", "d_last"], Ran(replay));
+        Assert.DoesNotContain("d_old", Waiting(replay));
     }
 
     /// <summary>
