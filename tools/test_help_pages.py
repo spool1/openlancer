@@ -1,4 +1,6 @@
-"""Tests of the help pages for the users of the release zip (#61). Run them with: python -B -m unittest discover -s tools
+"""Tests of the help pages for the users of the release zip (#61).
+
+Run them with: python -B -m unittest discover -s tools
 
 docs/GETTING_STARTED.md and docs/TROUBLESHOOTING.md name the same supported games and the same Play support as the
 README table "Supported games" (the owner decided this on 2026-11-14). They name the project of the source build only in
@@ -185,7 +187,8 @@ class HelpPageTests(unittest.TestCase):
     def test_the_pages_name_no_internal_id(self):
         pattern = internal_ids(REPO)
         for page in PAGES:
-            found = [(n, m.group(0)) for n, line in enumerate(read(page).split("\n"), 1) for m in pattern.finditer(line)]
+            lines = enumerate(read(page).split("\n"), 1)
+            found = [(n, m.group(0)) for n, line in lines for m in pattern.finditer(line)]
             self.assertEqual([], found, page)
 
     def test_the_pages_have_no_semicolon_and_no_contraction(self):
@@ -193,6 +196,14 @@ class HelpPageTests(unittest.TestCase):
             text = prose(read(page))
             self.assertNotIn(";", text, page)
             self.assertEqual([], CONTRACTION.findall(text), page)
+
+    def test_the_readme_links_both_pages_for_players_and_in_the_help_menu(self):
+        readme = read(README)
+        for heading in ("### Players", "## Help menu"):
+            text = section(readme, heading)
+            self.assertIsNotNone(text, heading)
+            for page in PAGES:
+                self.assertIn(f"]({page})", text, heading)
 
 
 if __name__ == "__main__":

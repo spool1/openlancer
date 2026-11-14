@@ -91,7 +91,11 @@ public sealed class HelpMenuTests : IDisposable
         var readme = File.ReadAllText(RepoFiles.Of(link[link.LastIndexOf('/')..].TrimStart('/')));
 
         Assert.Contains("## Help menu", readme);
-        Assert.All(new[] { "GAME_LINK", "PLAY", "MOD_FORMAT", "MISSIONS", "CUTSCENES", "MCP" },
+        Assert.All(
+            new[]
+            {
+                "GETTING_STARTED", "TROUBLESHOOTING", "GAME_LINK", "PLAY", "MOD_FORMAT", "MISSIONS", "CUTSCENES", "MCP",
+            },
             page => Assert.Contains($"(docs/{page}.md)", readme));
         Assert.False(File.Exists(RepoFiles.Of("docs", "README.md")));
     }

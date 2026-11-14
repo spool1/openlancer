@@ -62,6 +62,8 @@ You need your own installed copy of Freelancer (2003): the retail game 1.0 or 1.
 
 The editor makes a profile for your game and an empty mod, `my-mod`, and opens the profile. Your edits go into `my-mod`. OpenLancer reads the files of the game folder. It never changes them. Your profiles and mods go to `Documents\OpenLancer`. **File > Game link...** shows the linked games and their profiles. When you move the game, **Relink...** in that window gives the profiles the new folder. See [docs/GAME_LINK.md](docs/GAME_LINK.md).
 
+[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) gives the first steps of a mod with the release zip: the first change, the save, F5, Ctrl+F5 and the export. When OpenLancer or the game does not start, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+
 ### Developers
 
 1. Clone with submodules: `git clone --recursive <url> OpenLancer`.
@@ -81,6 +83,8 @@ A menu item that is off tells why: point to it, and its tooltip gives the reason
 To report a bug, click **Help > Report a problem**. The editor copies a short text with the version, the commit, the linked game and the Windows version, and opens the bug report form. Paste the text into the first field of the form.
 
 **Help > Open log folder** opens the log files of the editor and the game. When the editor or the game starts, it moves the log of its last run to the file that ends in `.log.previous.txt`. Attach `OpenLancer.Editor.log.txt` to the report. For a problem in Play, also attach `OpenLancer.Play.log.txt`. If the editor crashed and you started it again, attach `OpenLancer.Editor.log.previous.txt`. If the game of Play crashed and you started Play again, attach `OpenLancer.Play.log.previous.txt`.
+
+[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) tells what to do when OpenLancer or the game does not start, and how to report a problem. [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) gives the first steps of a mod with the release zip.
 
 ## Make a mod
 
