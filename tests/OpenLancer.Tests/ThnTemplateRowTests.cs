@@ -135,9 +135,9 @@ public sealed class ThnTemplateRowTests
 
     /// <summary>
     /// A value that the lower cutscene has with the same problem stays out of the save gate, so it has the warning
-    /// color without the red frame, with the text of the check. A missing name that the save gate does not check, here
-    /// a COMPOUND in a script that the game plays only in space, has the warning color and tells why. A known name with
-    /// a problem, here an equipment without a model, has the color of its problem.
+    /// color without the red frame, with the text of the check. A missing name that the save gate does not check has the
+    /// warning color and tells why. Here these are a COMPOUND in a script that the game plays only in space, and a
+    /// REFERENCE entity. A known name with a problem, here an equipment without a model, has the color of its problem.
     /// </summary>
     [Fact]
     public void ARetailValueAndAnUncheckedNameHaveTheWarningColor()
@@ -146,10 +146,13 @@ public sealed class ThnTemplateRowTests
         var session = ws.Session("act");
         ThnDataWorkspace.SetTemplate(session, "Ship", "ghost_ship", ThnDataWorkspace.SpaceScript);
         ThnDataWorkspace.SetTemplate(session, "Gear", "light1");
+        ThnDataWorkspace.SetTemplate(session, "Station", "ghost_station");
+        session.Execute(ThnEdits.Set(Entity(session, "Station"), new ThnPath("flags"), new ThnSymbol("REFERENCE")));
 
         var (old, oldGate) = LookOf(session, "Old");
         var (space, _) = LookOf(session, "Ship", ThnDataWorkspace.SpaceScript);
         var (light, _) = LookOf(session, "Gear", name: "light1");
+        var (reference, referenceGate) = LookOf(session, "Station");
 
         Assert.Null(oldGate);
         Assert.Equal(("Missing (Ship): old_ship", EditorTheme.Warning, false, EditorTheme.Warning),
@@ -157,6 +160,9 @@ public sealed class ThnTemplateRowTests
         Assert.Equal(Crash + "The game data has no ship \"old_ship\".", old.Below);
         Assert.Equal(("Missing (Ship): ghost_ship", EditorTheme.Warning, false, ThnTemplateRow.NotChecked),
             (space.Text, space.Color, space.Error, space.Below));
+        Assert.Null(referenceGate);
+        Assert.Equal(("Missing (Solar archetype): ghost_station", EditorTheme.Warning, false, ThnTemplateRow.NotChecked),
+            (reference.Text, reference.Color, reference.Error, reference.Below));
         Assert.Equal(("light1", EditorTheme.Error, true), (light.Text, light.Color, light.Error));
         Assert.Equal(Crash + "The equipment \"light1\" has no model: the game makes the [Light] items without a model.",
             light.Below);
