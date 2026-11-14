@@ -557,7 +557,7 @@ The result gives each new and changed item as it is after the call. So an event 
 
 The result also gives the problems of the cutscene checks that the call adds and removes, in `new_problems` and `fixed_problems`. The save stops for each such problem. The game crashes when it plays a cutscene with an error, and the message of an error starts with "The game crashes when it plays this cutscene."
 
-A template that names no item of the data lists is a problem too. An example is a costume or an effect that the game data does not have. The message of a template that does not crash the game tells what the scene does without the item. The check reads the data lists with the unsaved edits. `list_values` gives the names of these lists:
+A template that names no item of the data lists is a problem too. An example is a costume or an effect that the game data does not have. The message of a template that does not crash the game tells what the scene does without the item. When the lists have the name but the game cannot use the item, the message tells why. An INI edit of the active mod that deletes, renames or breaks the item also gives the problem. The check reads the data lists with the unsaved edits. `list_values` gives the names of these lists:
 
 | Template | Lists |
 |---|---|
