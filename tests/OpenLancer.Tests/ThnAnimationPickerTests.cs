@@ -482,6 +482,25 @@ public sealed class ThnAnimationPickerTests
         Assert.Null(problem);
     }
 
+    /// <summary>
+    /// The sex of a body comes from the last skeleton that lists its nickname, because the engine keeps the last body
+    /// part with a nickname. A skeleton without a valid sex gives no sex, so the idle takes the sex of the skeletons of
+    /// the clip.
+    /// </summary>
+    [Fact]
+    public void TheSexOfABodyComesFromTheLastSkeletonThatListsIt()
+    {
+        var clips = new AnimationClips(Clips().Clips,
+        [
+            new([BodyMale], FLGender.male, SkeletonParts.Body, Set("body_twice")),
+            new([BodyFemale], FLGender.female, SkeletonParts.Body, Set("BODY_TWICE")),
+            new([Hands], FLGender.unset, SkeletonParts.Body, Set("body_none")),
+        ]);
+
+        Assert.Equal(FLGender.female, clips.SexOf(new CostumeParts("body_twice", Set("body_twice"))));
+        Assert.Equal(FLGender.unset, clips.SexOf(new CostumeParts("body_none", Set("body_none"))));
+    }
+
     /// <summary>The clip preview keeps its character while the side pane draws in each frame. It frees the character at
     /// the start of the first frame after a frame without the pane, for example after a click on another element of the
     /// Timeline.</summary>

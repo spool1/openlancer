@@ -183,14 +183,17 @@ internal sealed class AnimationClips
     }
 
     /// <summary>
-    /// The sex of the body of a costume: the sex of the body skeleton that lists the body. The engine gives a body part
-    /// the sex of the last <c>[Skeleton]</c> before it in the same way (BodypartsIni.cs:43-60). Unset for no costume, a
-    /// costume without a body, a body that no skeleton lists, or a skeleton without a sex.
+    /// The sex of the body of a costume: the sex of the last skeleton that lists the nickname of the body. The engine
+    /// keeps the last body part with a nickname (GameItemCollection.cs:54-69), and it gives a body part the sex of the
+    /// last <c>[Skeleton]</c> before it (BodypartsIni.cs:43-60). Unset for no costume, a costume without a body, a body
+    /// that no skeleton lists, or a skeleton without a sex.
     /// </summary>
+    /// <remarks>A <c>[Skeleton]</c> with another sex value, for example "none", has no sex here. The engine keeps the sex
+    /// of the <c>[Skeleton]</c> before it (see <see cref="AnimationCatalog.Skeletons"/>). So a body of such a skeleton
+    /// gives unset, and <see cref="IdleFor"/> then takes the sex of the skeletons of the clip.</remarks>
     public FLGender SexOf(CostumeParts? costume) =>
         costume?.Body is { } body
-            ? skeletons.FirstOrDefault(s => s.Parts.HasFlag(SkeletonParts.Body) && s.Bodyparts.Contains(body))?.Sex ??
-              FLGender.unset
+            ? skeletons.LastOrDefault(s => s.Bodyparts.Contains(body))?.Sex ?? FLGender.unset
             : FLGender.unset;
 
     /// <summary>
