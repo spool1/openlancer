@@ -764,6 +764,25 @@ public sealed class StartPlacesTests
         Assert.Null(MissionWorld.Empty.ObjectOf("ol_buoy"));
     }
 
+    /// <summary>The world lists each jump object of a system that leads to another system, in file order and without
+    /// letter case. The first one is the arrival of a jump. An object of another system or to another system does not
+    /// count.</summary>
+    [Fact]
+    public void TheWorldListsEachJumpObjectOfASystemToAnotherSystem()
+    {
+        var hole = GateToA with { Nickname = "ol_hole_b_to_a", Position = new Vector3(1, 2, 3) };
+        var toC = GateToA with { Nickname = "ol_gate_b_to_c", JumpTo = "ol_sys_c" };
+        var fromA = GateToA with { Nickname = "ol_gate_a_to_b", System = "ol_sys_a", JumpTo = "ol_sys_b" };
+        var world = World([hole, toC, fromA, GateToA]);
+
+        Assert.Equal([hole, GateToA], world.JumpsTo(" OL_SYS_B ", "ol_sys_a"));
+        Assert.Equal([fromA], world.JumpsTo("ol_sys_a", "OL_SYS_B"));
+        Assert.Empty(world.JumpsTo("ol_sys_c", "ol_sys_b"));
+        Assert.Equal(hole, world.JumpInto("ol_sys_b", "ol_sys_a"));
+        Assert.Equal([hole, GateToA], world.WithFiles(_ => false).JumpsTo("ol_sys_b", "ol_sys_a"));
+        Assert.Empty(MissionWorld.Empty.JumpsTo("ol_sys_b", "ol_sys_a"));
+    }
+
     /// <summary>The dock object of a base is the first object, in file order, whose dock key names the base, without
     /// letter case. Each copy of the world keeps it. The setup puts the companions of a base start 1,000 units in front
     /// of it, as the start after a jump is in front of the jump gate.</summary>

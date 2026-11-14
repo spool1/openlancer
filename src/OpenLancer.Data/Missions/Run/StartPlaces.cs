@@ -140,13 +140,46 @@ internal static class StartPlaces
         return (new Vector3(p[0], p[1], p[2]), turn);
     }
 
+    /// <summary>A distance condition of the player: Cnd_DistVec of the player and a point, or Cnd_DistShip of the player
+    /// and another ship.</summary>
+    /// <param name="Inside">True when the condition waits for the player inside the radius, false for outside.</param>
+    /// <param name="Point">The point of Cnd_DistVec, or null.</param>
+    /// <param name="Other">The other ship of Cnd_DistShip, or null.</param>
+    /// <param name="Radius">The radius of Cnd_DistVec or the range of Cnd_DistShip, or null when it is not a
+    /// number.</param>
+    /// <param name="Hold">True when the condition has a hold time above 0.</param>
+    internal sealed record PlayerDistance(bool Inside, Vector3? Point, string? Other, float? Radius, bool Hold);
+
+    /// <summary>The distance condition of the player of a line, or null for another line. The side must be inside or
+    /// outside. The player is the ship of Cnd_DistVec, and the ship or the other ship of Cnd_DistShip.</summary>
+    internal static PlayerDistance? DistanceOf(MissionLine? condition)
+    {
+        if (condition == null)
+            return null;
+        var side = condition.ValueOf("side");
+        if (!MissionIndex.Is(side, "inside") && !MissionIndex.Is(side, "outside"))
+            return null;
+        var inside = MissionIndex.Is(side, "inside");
+        var hold = Parse(condition.ValueOf("hold")) is > 0f;
+        var ship = condition.ValueOf("ship");
+        if (MissionIndex.Is(condition.Key, "Cnd_DistVec") && MissionIndex.Is(ship, "Player"))
+        {
+            var point = condition.Name?.Value("point") is { } spec && Numbers(condition, spec.Index, 3) is { } p
+                ? new Vector3(p[0], p[1], p[2])
+                : (Vector3?)null;
+            return new PlayerDistance(inside, point, null, Parse(condition.ValueOf("radius")), hold);
+        }
+        if (!MissionIndex.Is(condition.Key, "Cnd_DistShip"))
+            return null;
+        var other = condition.ValueOf("other");
+        var name = MissionIndex.Is(ship, "Player") ? other : MissionIndex.Is(other, "Player") ? ship : null;
+        return name == null ? null : new PlayerDistance(inside, null, name, Parse(condition.ValueOf("range")), hold);
+    }
+
     /// <summary>The point of a Cnd_DistVec line that waits for the player inside its sphere, with the offset, or
     /// null.</summary>
     private static Vector3? NearPoint(MissionLine condition) =>
-        MissionIndex.Is(condition.Key, "Cnd_DistVec") && MissionIndex.Is(condition.ValueOf("side"), "inside") &&
-        condition.Name?.Value("point") is { } spec && Numbers(condition, spec.Index, 3) is { } p
-            ? new Vector3(p[0], p[1], p[2] + Offset)
-            : null;
+        DistanceOf(condition) is { Inside: true, Point: { } point } ? point + new Vector3(0, 0, Offset) : null;
 
     /// <summary>True when the chosen trigger waits for the player at another place: an arrival in a system, or a place
     /// in space. Its own lines then tell where the player will be, not where the player is.</summary>
@@ -512,17 +545,10 @@ internal static class StartPlaces
         /// <summary>The object of the game data of a Cnd_DistShip line that waits for the player inside its range, and
         /// the distance of the start from the object, or null. The player is near that object. The start is at the edge
         /// of the range, at least <see cref="Offset"/> units away, so it is not in the body of a big object.</summary>
-        private (WorldObject Near, float Distance)? NearObject(MissionLine condition)
-        {
-            if (!MissionIndex.Is(condition.Key, "Cnd_DistShip") || !MissionIndex.Is(condition.ValueOf("side"), "inside"))
-                return null;
-            var ship = condition.ValueOf("ship");
-            var other = condition.ValueOf("other");
-            var name = MissionIndex.Is(ship, "Player") ? other : MissionIndex.Is(other, "Player") ? ship : null;
-            if (name == null || index.World.ObjectOf(name) is not { } near)
-                return null;
-            return (near, Math.Max(Offset, Parse(condition.ValueOf("range")) ?? 0));
-        }
+        private (WorldObject Near, float Distance)? NearObject(MissionLine condition) =>
+            DistanceOf(condition) is { Inside: true, Other: { } name } distance && index.World.ObjectOf(name) is { } near
+                ? (near, Math.Max(Offset, distance.Radius ?? 0))
+                : null;
 
         /// <summary>The fact of a place line, or null for another line.</summary>
         /// <param name="target">The trigger of the timeline that a jump-here trigger starts, else null.</param>

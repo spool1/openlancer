@@ -134,9 +134,13 @@ public sealed class MissionWorld
 
     /// <summary>The first object of a system, in file order, whose jump gate or jump hole leads to another system, or
     /// null. A ship that jumps from that other system arrives at this object.</summary>
-    public WorldObject? JumpInto(string system, string from) =>
-        places.Jumps.FirstOrDefault(o => o.System.Equals(system.Trim(), StringComparison.OrdinalIgnoreCase) &&
-                                         o.JumpTo!.Equals(from.Trim(), StringComparison.OrdinalIgnoreCase));
+    public WorldObject? JumpInto(string system, string from) => JumpsTo(system, from).FirstOrDefault();
+
+    /// <summary>Each object of a system, in file order, whose jump gate or jump hole leads to another system. Empty when
+    /// the world does not know such an object.</summary>
+    internal IReadOnlyList<WorldObject> JumpsTo(string system, string to) =>
+        places.Jumps.Where(o => o.System.Equals(system.Trim(), StringComparison.OrdinalIgnoreCase) &&
+                                o.JumpTo!.Equals(to.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
 
     /// <summary>The dock object of a base: the first object of the system files, in file order, whose <c>dock_with</c>
     /// key names the base, without letter case. Null when the world does not know such an object.</summary>
