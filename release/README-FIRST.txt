@@ -4,7 +4,8 @@ OpenLancer @VERSION_TITLE@
 OpenLancer is a mod editor for Freelancer (2003). It is an independent fan
 project. It is not affiliated with, endorsed by or sponsored by Microsoft,
 Digital Anvil or the Librelancer project. OpenLancer uses the name
-"Freelancer" only to identify the game. All trademarks belong to their owners.
+"Freelancer" only to identify the game. All trademarks belong to their
+owners.
 
 @STAGE_NOTE@
 
@@ -20,11 +21,48 @@ SYSTEM REQUIREMENTS
 -------------------
 - Windows 10 or Windows 11, 64-bit.
 - A graphics card and a driver with OpenGL 3.2 or later.
-- An installed copy of Freelancer. This version supports the English
-  Freelancer 1.1 and Freelancer: HD Edition 0.7.1. The editor also opens
-  Freelancer 1.0. Its export makes packages for Freelancer 1.1.
+- An installed copy of a game of the list SUPPORTED GAMES below.
 - About 160 MB of disk space.
 You do not need to install .NET.
+
+
+SUPPORTED GAMES
+---------------
+For each game, the list tells what OpenLancer can do with it.
+
+Freelancer 1.1 (retail)
+  Edit and check mods: Yes
+  Export (drop-in zip and FLMM package): Yes
+  Play the mod in the game (Ctrl+F5): Yes
+
+Freelancer: HD Edition 0.7.1
+  Edit and check mods: Yes
+  Export (drop-in zip and FLMM package): Yes
+  Play the mod in the game (Ctrl+F5): Yes
+
+Freelancer 1.0 (retail)
+  Edit and check mods: Yes. It has the same INI files as 1.1.
+  Export (drop-in zip and FLMM package): Yes, for 1.1
+  Play the mod in the game (Ctrl+F5): Patch the game to 1.1 first. The
+    1.0 program does not start on Windows 10 and 11.
+
+A source build of the Freelancer-Decomp project that you build yourself
+  Edit and check mods: Yes, with its INI files of 1.1
+  Export (drop-in zip and FLMM package): Yes, for 1.1
+  Play the mod in the game (Ctrl+F5): Yes, with Play > Play in source build
+
+F5 plays the mod in the OpenLancer engine with the data of any linked game.
+OpenLancer contains no code of the Freelancer-Decomp project.
+
+
+GETTING STARTED
+---------------
+The next two parts tell how to start the editor and play a first change.
+The help pages of this version give all the steps. They also tell how to
+play the mod in your own game (Ctrl+F5) and how to export it:
+https://github.com/spool1/openlancer/blob/@DOCS_REF@/docs/GETTING_STARTED.md
+When OpenLancer or the game does not start, read the troubleshooting page:
+https://github.com/spool1/openlancer/blob/@DOCS_REF@/docs/TROUBLESHOOTING.md
 
 
 START THE EDITOR
@@ -55,7 +93,8 @@ MAKE A CHANGE AND PLAY IT
 1. Click an object in the Scene. Drag the arrows to move it.
 2. Press Ctrl+S. The editor saves your change in the mod my-mod.
 3. Press F5. The game starts at the camera of the Scene, with your change.
-4. Press Shift+F5 to stop the game.
+4. In the editor window, click the Stop button. It is in the middle of
+   the menu bar.
 To make one more mod, click Mod > New mod.
 
 
@@ -181,8 +220,9 @@ The form is at
 https://github.com/spool1/openlancer/issues/new?template=bug_report.yml
 The log files show the paths of your folders. A path can contain your
 Windows user name. Remove the text that you do not want to share.
-To tell us about your game folder, open a command prompt in the
-OpenLancer folder. Run: oltool game "<your game folder>"
+To tell us about your game folder, open the OpenLancer folder in File
+Explorer. Type cmd in the address bar of the folder, and press Enter. In
+the command prompt, run: .\oltool game "<your game folder>"
 Attach the output. It names the game, its version, its folder and the
 changed INI files. It contains no game content.
 Do not attach game files.

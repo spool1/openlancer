@@ -11,7 +11,8 @@ Usage:
   python tools/release_check.py docs <stage> --repo <clone> --version <v> --commit <sha> --fork-commit <sha>
                                      [--notes-out <file>] [--dry-run]
       Writes README-FIRST.txt, LICENSE.txt, NOTICE.txt and licenses/<component>.txt into the stage folder, and the
-      release notes with the commits filled in. A dry run without a notes file writes no notes.
+      release notes with the commits filled in. A dry run without a notes file writes no notes. README-FIRST.txt links
+      the help pages of the release tag, or of the commit for a development version.
   python tools/release_check.py stage <stage> --repo <clone> --version <v> [--forbid <text>]...
       Runs the checks a to i on the stage folder. It stops at the first check that finds a problem and lists each
       problem of that check.
@@ -385,13 +386,21 @@ def stage_note(version):
     return textwrap.fill(note + " Keep a backup copy of your mods.", 76)
 
 
-def readme_first(repo, version):
+def docs_ref(version, commit):
+    """The git reference of the help pages of a version: the tag "v<version>", or the commit for a development version.
+    BuildVersion.DocsRef of OpenLancer.Data uses the same rule, so README-FIRST.txt and Help > Documentation link the
+    help pages of the same version."""
+    return commit if is_development(version) else f"v{version}"
+
+
+def readme_first(repo, version, commit):
     """The text of README-FIRST.txt of a version and the problems of its placeholders. The title rule under the first
-    line is as long as the title."""
+    line is as long as the title. The links to the help pages name the git reference of docs_ref."""
     text = read_text(os.path.join(repo, "release", "README-FIRST.txt"))
     title = f"OpenLancer {version_title(version)}"
     return fill("release/README-FIRST.txt", text.replace("@TITLE_RULE@", "=" * len(title)),
-                {"@VERSION@": version, "@VERSION_TITLE@": version_title(version), "@STAGE_NOTE@": stage_note(version)})
+                {"@VERSION@": version, "@VERSION_TITLE@": version_title(version), "@STAGE_NOTE@": stage_note(version),
+                 "@DOCS_REF@": docs_ref(version, commit)})
 
 
 def disk_claim_problems(readme, size):
@@ -442,7 +451,7 @@ def docs(stage, repo, version, commit, fork_commit, notes_out=None, dry_run=Fals
     """
     data = load_release_data(repo)
     problems = []
-    readme, found = readme_first(repo, version)
+    readme, found = readme_first(repo, version, commit)
     problems += found
     problems += disk_claim_problems(readme, sum(os.path.getsize(os.path.join(stage, *name.split("/")))
                                                 for name in files_below(stage)))

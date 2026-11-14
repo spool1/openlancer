@@ -130,6 +130,13 @@ class VersionTests(unittest.TestCase):
         for version in ("1.0.0", "1.0.0-beta.1", "1.0.0-rc.1", "0.1.0-preview", "1.0.0-beta.1-dev"):
             self.assertFalse(rc.is_development(version), version)
 
+    def test_the_help_pages_of_a_release_are_at_its_tag_and_of_a_development_version_at_its_commit(self):
+        """BuildVersion.DocsRef of OpenLancer.Data uses the same rule for Help > Documentation."""
+        for version in ("1.0.0", "1.0.0-beta.1", "1.0.0-rc.1", "0.1.0-preview", "1.0.0-beta.1-dev"):
+            self.assertEqual(f"v{version}", rc.docs_ref(version, "abc1234"), version)
+        for version in ("1.0.0-dev", "1.1.0-dev.2"):
+            self.assertEqual("abc1234", rc.docs_ref(version, "abc1234"), version)
+
     def test_the_name_command_prints_only_the_name(self):
         self.assertEqual((0, "OpenLancer-1.0.0-dev-dryrun-abc1234-win-x64.zip\n"),
                          self.name_command("--version", "1.0.0-dev", "--sha7", "abc1234", "--dry-run"))
@@ -351,7 +358,8 @@ class RepoFixture(unittest.TestCase):
         write(os.path.join(self.repo, "data-manifest", "vanilla-1.0.tsv"),
               f"exe/freelancer.exe\t9\t{hashlib.sha256(b'retail!!!').hexdigest()}\n")
         write(os.path.join(self.repo, "release", "README-FIRST.txt"),
-              "OpenLancer @VERSION_TITLE@\n@TITLE_RULE@\nFolder OpenLancer-v@VERSION@\nA new feature. [if built]\n")
+              "OpenLancer @VERSION_TITLE@\n@TITLE_RULE@\nFolder OpenLancer-v@VERSION@\nHelp pages of @DOCS_REF@\n"
+              "A new feature. [if built]\n")
         write(os.path.join(self.repo, "release", "notes", "v1.0.0-test.md"), "Commit @COMMIT@, fork @FORK_COMMIT@.\n")
         write(os.path.join(self.repo, "lib", "a.c"), "/* Copyright (c) 2020 Alice\n * Free. */\nint a;\n")
         write(os.path.join(self.repo, "src", "App", "App.csproj"),
@@ -398,6 +406,7 @@ class DocsTests(RepoFixture):
             readme = f.read().decode("utf-8")
         self.assertTrue(readme.startswith("OpenLancer v1.0.0 (test)\r\n========================\r\n"))
         self.assertIn("Folder OpenLancer-v1.0.0-test\r\n", readme)
+        self.assertIn("Help pages of v1.0.0-test\r\n", readme)
         with open(os.path.join(self.stage, "licenses", "alice.txt"), encoding="utf-8") as f:
             alice = f.read()
         self.assertIn("Copyright (c) 2020 Alice\n\n" + rc.RULE + "\n\nCopyright (c) 2020 Alice\nFree.\n", alice)
@@ -626,9 +635,13 @@ class ReadmeFirstTests(unittest.TestCase):
     that is false for this version."""
 
     VERSIONS = ("1.0.0-dev", "1.0.0-beta.1", "1.0.0-rc.1", "1.0.0")
+    # The commit of the release. tools/release.ps1 gives the full commit.
+    COMMIT = "0123456789abcdef0123456789abcdef01234567"
+    # A link to a file of the repository on GitHub: the git reference and the path of the file.
+    LINK = re.compile(r"https://github\.com/spool1/openlancer/blob/([^/\s]+)/(\S+)")
 
     def filled(self, version):
-        text, problems = rc.readme_first(REPO, version)
+        text, problems = rc.readme_first(REPO, version, self.COMMIT)
         self.assertEqual([], problems, version)
         return text
 
@@ -645,7 +658,25 @@ class ReadmeFirstTests(unittest.TestCase):
             self.assertEqual(f"OpenLancer {rc.version_title(version)}", title)
             self.assertEqual("=" * len(title), rule)
             self.assertIn(f"Open the folder OpenLancer-v{version}.", text)
+            self.assertIn(f"/blob/{rc.docs_ref(version, self.COMMIT)}/docs/", text)
             self.assertIsNone(rc.PLACEHOLDER.search(text), version)
+
+    def test_getting_started_links_the_help_pages_of_the_version_or_of_the_commit(self):
+        """The links open the pages of the version of the zip, as Help > Documentation does (#61). Only a dry run builds
+        a development version, and its links name the commit."""
+        for version, ref in (("1.0.0-dev", self.COMMIT), ("1.0.0-beta.1", "v1.0.0-beta.1"),
+                             ("1.0.0-rc.1", "v1.0.0-rc.1"), ("1.0.0", "v1.0.0")):
+            links = self.LINK.findall(self.section(self.filled(version), "GETTING STARTED"))
+            self.assertEqual([(ref, "docs/GETTING_STARTED.md"), (ref, "docs/TROUBLESHOOTING.md")], links, version)
+            for _, path in links:
+                self.assertTrue(os.path.isfile(os.path.join(REPO, *path.split("/"))), path)
+
+    def test_each_line_fits_the_width_of_the_text(self):
+        """A link cannot wrap, so only a line that is a link can be longer."""
+        for version in self.VERSIONS:
+            long = [line for line in self.filled(version).split("\n")
+                    if len(line) > 76 and not re.fullmatch(r"https://\S+", line)]
+            self.assertEqual([], long, version)
 
     def test_the_text_makes_no_old_claim(self):
         text = " ".join(self.filled("1.0.0-beta.1").split())
@@ -679,13 +710,13 @@ class ReadmeFirstTests(unittest.TestCase):
         for version in (*self.VERSIONS, "1.0.0-rc.12", "0.1.0-preview"):
             self.assertTrue(all(len(line) <= 76 for line in rc.stage_note(version).split("\n")), version)
 
-    def test_the_supported_games_are_freelancer_1_1_and_hd_edition_0_7_1(self):
-        """Round 3 checks the claims, so the text says supports, not tested. It also tells a user of 1.0 what works."""
-        requirements = " ".join(self.section(self.filled("1.0.0"), "SYSTEM REQUIREMENTS").split())
-        self.assertIn("This version supports the English Freelancer 1.1 and Freelancer: HD Edition 0.7.1.",
-                      requirements)
-        self.assertIn("The editor also opens Freelancer 1.0. Its export makes packages for Freelancer 1.1.",
-                      requirements)
+    def test_the_system_requirements_name_the_supported_games(self):
+        """The section SUPPORTED GAMES names the games of the README table "Supported games" with their Play support
+        (#61). tools/test_help_pages.py compares each game with the README table."""
+        text = self.filled("1.0.0")
+        requirements = " ".join(self.section(text, "SYSTEM REQUIREMENTS").split())
+        self.assertIn("An installed copy of a game of the list SUPPORTED GAMES below.", requirements)
+        self.assertIn("\nFreelancer: HD Edition 0.7.1\n", self.section(text, "SUPPORTED GAMES"))
 
     def test_the_text_claims_the_disk_space(self):
         """The docs step compares the claim with the size of the release."""

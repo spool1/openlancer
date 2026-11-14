@@ -14,6 +14,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import content_scan  # noqa: E402
+import release_check  # noqa: E402
 from test_release_check import internal_ids  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -103,14 +104,63 @@ def games_problems(text, readme_header, readme_rows):
     return problems
 
 
+def plain(cell):
+    """A cell of the README table as plain text, without the bold marks."""
+    return cell.replace("**", "")
+
+
+def readme_first_games(text):
+    """The game blocks of the section SUPPORTED GAMES of README-FIRST.txt, as (game, {label: value}) in the order of
+    the text, or None when the text has no such section. A block is a line without indent, then one line
+    "  <label>: <value>" for each entry. A value can go on in the next lines with a larger indent. A line without indent
+    and without entries is not a game."""
+    match = re.search(r"^SUPPORTED GAMES\n-+\n(.*?)\n\n\n", text, re.M | re.S)
+    if match is None:
+        return None
+    blocks, label = [], None
+    for line in match.group(1).split("\n"):
+        if line.startswith("    ") and label:
+            blocks[-1][1][label] += " " + line.strip()
+        elif line.startswith("  ") and blocks:
+            label, _, value = line.strip().partition(": ")
+            blocks[-1][1][label] = value
+        else:
+            blocks.append((line, {}))
+            label = None
+    return [(game, entries) for game, entries in blocks if entries]
+
+
+def readme_first_problems(text, readme_header, readme_rows):
+    """The differences between the section SUPPORTED GAMES of README-FIRST.txt and the README table "Supported games".
+    The section must have the games of the README in their order. Each game has an entry for the Play column, and each
+    entry has the label of a README column and the plain README cell."""
+    blocks = readme_first_games(text)
+    if blocks is None:
+        return ["no section SUPPORTED GAMES"]
+    games, readme_games = [game for game, _ in blocks], [plain(row[GAME]) for row in readme_rows]
+    if games != readme_games:
+        return [f"the games {games} are not the games {readme_games} of the README"]
+    problems = []
+    for (game, entries), row in zip(blocks, readme_rows):
+        if PLAY not in entries:
+            problems.append(f"{game}: no entry '{PLAY}'")
+        for label, value in entries.items():
+            if label == GAME or label not in readme_header:
+                problems.append(f"{game}: the README has no column '{label}'")
+            elif value != plain(row[label]):
+                problems.append(f"{game}, {label}: '{value}' is not '{plain(row[label])}'")
+    return problems
+
+
 def project_problems(text, source_build):
     """The lines of a page that name the project of the source build, or a decompilation, outside the allowed words.
-    The allowed words are the game cell of the README row (source_build) and the README sentence NO_CODE. A page
+    The allowed words are the game cell of the README row (source_build) and the README sentence NO_CODE. The game cell
+    is allowed as the first cell of a table row, or as a whole line (the game block of README-FIRST.txt). A page
     without the sentence NO_CODE is also a problem."""
     problems = [] if NO_CODE in text else [f"no sentence '{NO_CODE}'"]
     for number, line in enumerate(text.split("\n"), 1):
         rest = line.replace(NO_CODE, "")
-        if line.startswith("|") and line.strip("| ").split(" |")[0] == source_build:
+        if line == source_build or line.startswith("|") and line.strip("| ").split(" |")[0] == source_build:
             rest = rest.replace(source_build, "", 1)
         if "decomp" in rest.lower():
             problems.append(f"line {number}: {line}")
@@ -330,6 +380,54 @@ class HelpPageTests(unittest.TestCase):
             self.assertIsNotNone(text, heading)
             for page in PAGES:
                 self.assertIn(f"]({page})", text, heading)
+
+
+class ReadmeFirstGamesTests(unittest.TestCase):
+    """release/README-FIRST.txt of the release zip names the same supported games and the same Play support as the
+    README table "Supported games" (the owner decided this on 2026-11-14)."""
+
+    def readme_first(self):
+        text, problems = release_check.readme_first(REPO, "1.0.0", "0" * 40)
+        self.assertEqual([], problems)
+        return text
+
+    def test_readme_first_names_the_games_of_the_readme_with_their_play_support(self):
+        header, rows = supported_games()
+        self.assertEqual([], readme_first_problems(self.readme_first(), header, rows))
+
+    def test_readme_first_names_the_project_of_the_source_build_only_in_the_allowed_words(self):
+        self.assertEqual([], project_problems(self.readme_first(), supported_games()[1][3][GAME]))
+
+    def test_each_game_of_readme_first_must_be_the_same_as_the_readme(self):
+        header, rows = supported_games()
+        blocks = [plain(row[GAME]) + "\n" + "\n".join(f"  {column}: {plain(row[column])}" for column in header[1:])
+                  for row in rows]
+
+        def text(parts):
+            return "SUPPORTED GAMES\n---------------\nThe intro.\n\n" + "\n\n".join(parts) + "\n\nThe end.\n\n\n"
+
+        self.assertEqual([], readme_first_problems(text(blocks), header, rows))
+        play = [plain(row[GAME]) + f"\n  {PLAY}: {plain(row[PLAY])}" for row in rows]
+        self.assertEqual([], readme_first_problems(text(play), header, rows))
+        wrapped = text(blocks).replace("The 1.0 program", "The 1.0\n    program")
+        self.assertEqual([], readme_first_problems(wrapped, header, rows))
+        self.assertEqual(1, len(readme_first_problems(text([blocks[1], blocks[0]] + blocks[2:]), header, rows)))
+        self.assertEqual([f"Freelancer 1.0 (retail), {PLAY}: 'Yes' is not '{plain(rows[2][PLAY])}'"],
+                         readme_first_problems(text(blocks).replace(plain(rows[2][PLAY]), "Yes"), header, rows))
+        no_play = [block.split(f"\n  {PLAY}")[0] for block in blocks]
+        self.assertEqual(4, len(readme_first_problems(text(no_play), header, rows)))
+        other = text(blocks).replace("  Edit and check mods:", "  Edit mods:", 1)
+        self.assertEqual(["Freelancer 1.1 (retail): the README has no column 'Edit mods'"],
+                         readme_first_problems(other, header, rows))
+        self.assertEqual(["no section SUPPORTED GAMES"], readme_first_problems("No section.\n", header, rows))
+
+    def test_the_game_cell_of_the_source_build_can_be_a_whole_line(self):
+        source_build = supported_games()[1][3][GAME]
+        self.assertEqual([], project_problems(f"{source_build}\n  Play: Yes\n{NO_CODE}\n", source_build))
+        self.assertEqual(["line 2:   Play: Yes, a Freelancer-Decomp build"],
+                         project_problems(f"{source_build}\n  Play: Yes, a {PROJECT} build\n{NO_CODE}\n", source_build))
+        self.assertEqual([f"line 1: The {source_build}"], project_problems(f"The {source_build}\n{NO_CODE}\n",
+                                                                            source_build))
 
 
 class ZipPageTests(unittest.TestCase):
