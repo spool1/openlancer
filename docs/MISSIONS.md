@@ -393,7 +393,7 @@ The `npc_ship_file` line of the `[Mission]` section names the file of the ship b
 - A value that names a file that cannot be a ship build file has a note too. Examples are a file with other sections and an encounter file. Pick a file of the list, or make a new file.
 - When the checks find a problem at the line, the note shows the problem.
 
-The game finds the build of a mission ship only in the ship build file of the mission, then in the shared files `DATA\MISSIONS\npcships.ini` and `DATA\MISSIONS\npcships_test.ini`. It does not spawn a ship whose build it does not find. So a choice of the dropdown and "New file..." show a warning when builds of the mission are only in the old file. The warning names these builds. The mission checks do not find this problem, so a save does not stop for it.
+The game looks for the build of a mission ship in the ship build file of the mission first, then in the shared files `DATA\MISSIONS\npcships.ini` and `DATA\MISSIONS\npcships_test.ini`. It does not spawn a ship whose build it does not find. So a choice of the dropdown and "New file..." show a warning when builds of the mission are only in the old file. The warning names these builds. The mission checks do not find this problem, so a save does not stop for it.
 
 To make a new ship build file for the mission:
 
