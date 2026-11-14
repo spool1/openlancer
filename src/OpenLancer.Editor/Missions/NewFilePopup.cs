@@ -99,7 +99,7 @@ internal sealed class NewFilePopup(string id)
         ImGui.BeginDisabled(refusal != null);
         var create = ImGui.Button("Create") || enter && refusal == null;
         ImGui.EndDisabled();
-        ImGui.SetItemTooltip(refusal ?? "Makes the file and names it in the line.");
+        ImGui.SetItemTooltip(refusal ?? current.CreateTooltip);
         ImGui.SameLine();
         if (ImGui.Button("Cancel") || ImGui.IsKeyPressed(ImGuiKey.Escape, false))
         {

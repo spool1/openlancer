@@ -105,6 +105,24 @@ public sealed class ThnTemplateRowTests
     }
 
     /// <summary>
+    /// Only the note of the list picker tells that the list has the unsaved edits. When the editor cannot make the list,
+    /// the row keeps its text field with <see cref="ThnTemplateRow.Note"/>, so the note does not describe a list that the
+    /// row does not show.
+    /// </summary>
+    [Fact]
+    public void OnlyThePickerNoteDescribesTheList()
+    {
+        var rows = Rows();
+
+        Assert.All(new[] { "Man", "Station", "Fx", "Voice" }, name =>
+        {
+            Assert.DoesNotContain(ThnTemplateRow.Unsaved, rows[name]!.Note);
+            Assert.Equal($"{rows[name]!.Note} {ThnTemplateRow.Unsaved}", rows[name]!.PickerNote);
+        });
+        Assert.StartsWith("The costume of the character", rows["Man"]!.Note);
+    }
+
+    /// <summary>
     /// A value of the active mod outside a closed list shows "Missing (Label): value" with the color and the red frame
     /// of an error, and the text below the field is the text of the save gate without the element and the path. The
     /// crash start stays on a crash. A name problem has no crash start. A known value shows in the text color without

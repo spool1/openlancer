@@ -65,8 +65,10 @@ public static class PlayCopyTexts
         "OpenLancer cannot make the play copy next to the game. Select a folder on drive " +
         $"{drive}. OpenLancer makes hard links there, so the folder must be on the same drive as the game. ({reason})";
 
+    /// <summary>The question after the probe failed in a folder that the user selected, on any drive.</summary>
     public static string FullCopyQuestion(string size) =>
-        $"A play copy on another drive needs a full copy of the game: {size}. Make a full copy?";
+        $"OpenLancer cannot make hard links in this folder. A play copy there needs a full copy of the game: {size}. " +
+        "Make a full copy?";
 
     public static string ReadMe(string source) =>
         $"This folder is an OpenLancer play copy of {source}. Many files in DATA and DLLS are hard links to the files " +

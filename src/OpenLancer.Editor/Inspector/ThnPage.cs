@@ -72,12 +72,17 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
     private static IReadOnlyDictionary<string, ThnSymbolInfo> Symbols => CutsceneWorkspace.Symbols;
 
     /// <summary>The text of a problem in the Problems section: the message without the start that says that the game
-    /// crashes, because the tooltip gives the whole message. A name problem does not crash the game, so it keeps its
-    /// whole message.</summary>
+    /// crashes, because the label and the tooltip tell it (see <see cref="ProblemLabel"/>). A name problem does not crash
+    /// the game, so it keeps its whole message.</summary>
     internal static string ProblemText(Diagnostic problem) =>
-        problem.Message.StartsWith(EditSession.CutsceneCrash, StringComparison.Ordinal)
-            ? problem.Message[EditSession.CutsceneCrash.Length..].TrimStart()
-            : problem.Message;
+        Crashes(problem) ? problem.Message[EditSession.CutsceneCrash.Length..].TrimStart() : problem.Message;
+
+    /// <summary>The label of a problem in the Problems section: "Crash" for an error that crashes the game, and "Name
+    /// problem" for a template or a clip that names no item. So the row tells which problems crash the game.</summary>
+    internal static string ProblemLabel(Diagnostic problem) => Crashes(problem) ? "Crash" : "Name problem";
+
+    private static bool Crashes(Diagnostic problem) =>
+        problem.Message.StartsWith(EditSession.CutsceneCrash, StringComparison.Ordinal);
 
     public void Draw(object item)
     {
@@ -155,8 +160,8 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         {
             foreach (var error in errors.Take(100))
             {
-                if (grid.Link("Error", ProblemText(error), $"{error.Message}\n\nThe save and Play stop until you correct " +
-                                                          "this. Click to select the element.") &&
+                if (grid.Link(ProblemLabel(error), ProblemText(error),
+                        $"{error.Message}\n\nThe save and Play stop until you correct this. Click to select the element.") &&
                     error.Cutscene is { } place)
                 {
                     workspace.Show(place);
@@ -689,7 +694,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         var current = ThnFieldEdit.Format(field.Kind, field.Value);
         var look = template.LookIn(edits, path, script, entity, list, current, grid.EntryName);
         var entry = look.Entry;
-        grid.ThnRow(template.Label!, field, note == null ? template.Note : $"{template.Note}\n\n{note}", () =>
+        grid.ThnRow(template.Label!, field, note == null ? template.PickerNote : $"{template.PickerNote}\n\n{note}", () =>
         {
             ImGui.BeginDisabled(field.ReadOnly != null);
             var clicked = PropertyGrid.PickerField(look.Text, look.Dim, look.Color, look.Error,

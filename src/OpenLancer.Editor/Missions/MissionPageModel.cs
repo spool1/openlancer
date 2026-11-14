@@ -144,7 +144,7 @@ internal sealed record FieldEdit(EditWidget Widget, string Label)
     public IReadOnlyDictionary<string, string> ChoiceNotes { get; init; } = new Dictionary<string, string>();
 
     /// <summary>The warnings of the choices of a dropdown by their value: what goes wrong in the game after a pick of
-    /// the choice. The dropdown shows a warning under its choice, in the warning color, and in the tooltip of the
+    /// the choice. The dropdown marks such a choice with the warning glyph and gives the warning in the tooltip of the
     /// choice.</summary>
     public IReadOnlyDictionary<string, string> ChoiceWarnings { get; init; } = new Dictionary<string, string>();
 
@@ -171,6 +171,12 @@ internal sealed record NewFileItem(string Title, string Tooltip, string Note, st
 
     /// <summary>What goes wrong in the game after "Create", or null. The popup shows it in the warning color.</summary>
     public string? Warning { get; init; }
+
+    /// <summary>The label of the field that "Create" sets to the new file, for example "Ship build file".</summary>
+    public required string Field { get; init; }
+
+    /// <summary>The tooltip of "Create" when the name has no refusal.</summary>
+    public string CreateTooltip => $"Makes the file and sets the field {Field} to it.";
 }
 
 /// <summary>An item of a row menu or a page menu, for example "Move up". It runs a batch, or goes to a link. An item
@@ -448,11 +454,12 @@ internal sealed partial record MissionPageModel(string Title, string Kind, char 
                         [LineSpec.Raw("npc_ship_file", path)])])
                     : null,
                 NewFile = new NewFileItem("New ship build file",
-                    "Make a new empty ship build file in the folder of the script, and name it in this line.",
+                    $"Make a new empty ship build file in the folder of the script, and set the field {label} to it.",
                     KeepsBuildsNote, context.FreeShipFileName(script), PathOf,
                     name => context.NewShipFileRefusal(script, PathOf(name)),
                     name => new MissionBatch("New ship build file", [new NewShipBuildFile(new ScriptRef(script), PathOf(name))]))
                 {
+                    Field = label,
                     Warning = context.LostBuilds(script, null) is { Count: > 0 } lost
                         ? MissionErrors.LostBuildsText("the new file", shown, lost)
                         : null,

@@ -68,8 +68,8 @@ internal sealed record ThnTemplateRow(ThnTemplateRule? Rule, string? Label, bool
     public const string Path = "template_name";
 
     /// <summary>The text below the field of a missing name that the save gate does not check.</summary>
-    public const string NotChecked =
-        "The game does not build this entity from its template here, so the save gate does not check the name.";
+    public const string NotChecked = "The game does not build this entity from its template in this script, so the " +
+                                     "save gate does not check the name.";
 
     /// <summary>The note of a row whose list the editor cannot make.</summary>
     public const string NoList = "The editor cannot make the list of this kind from the game data, so the row keeps " +
@@ -80,7 +80,12 @@ internal sealed record ThnTemplateRow(ThnTemplateRule? Rule, string? Label, bool
     private const string PsysEvidence = "ThnScriptInstance.cs:192-205";
     private const string SoundEvidence = "ThnScriptInstance.cs:282-288";
 
-    private const string Unsaved = "The list has the items of the edit view, also the unsaved edits.";
+    /// <summary>The last sentence of <see cref="PickerNote"/>.</summary>
+    internal const string Unsaved = "The list has the items of the edit view, also the unsaved edits.";
+
+    /// <summary>The note of the row with its list picker: <see cref="Note"/> and <see cref="Unsaved"/>. A row that keeps
+    /// its text field shows only <see cref="Note"/>, because it has no list.</summary>
+    public string PickerNote => $"{Note} {Unsaved}";
 
     /// <summary>Why the row keeps its text field, or null when it gets the list picker.</summary>
     public string? TextReason { get; init; }
@@ -101,7 +106,7 @@ internal sealed record ThnTemplateRow(ThnTemplateRule? Rule, string? Label, bool
             case ThnTemplateRules.CharacterType:
                 return ThnTemplateRules.LoadsCostume(entity)
                     ? Listed(ThnTemplateRules.Costume, true, CostumeEvidence,
-                        $"The costume of the character: its body, its head and its hands. {Unsaved}", template)
+                        "The costume of the character: its body, its head and its hands.", template)
                     : Listed(ThnTemplateRules.Costume, false, CostumeEvidence,
                         "The costume of the character. The entity has userprops.Actor, so the scene loads this costume " +
                         "only when no room NPC or RTC character plays the actor.", template);
@@ -121,13 +126,13 @@ internal sealed record ThnTemplateRow(ThnTemplateRule? Rule, string? Label, bool
 
                 return Listed(rule, true, CompoundEvidence,
                     $"The {rule.What} that the COMPOUND shows. Its userprops.category \"{category.Value}\" gives the kind " +
-                    $"of the item. {Unsaved}", template);
+                    "of the item.", template);
             case "PSYS":
                 return Is(template, ThnTemplateRules.PlayerShipEngines)
                     ? Text(PsysEvidence, "PlayerShipEngines names no effect. The scene gives this entity the engine " +
                                          "effect of the player ship (ThnScriptInstance.cs:98-104), so the row has no list.")
                     : Listed(ThnTemplateRules.Effect, true, PsysEvidence,
-                        $"The effect that the PSYS shows: an effect or a visual effect. {Unsaved}", template);
+                        "The effect that the PSYS shows: an effect or a visual effect.", template);
             case "SOUND":
                 return Listed(ThnTemplateRules.Sound, false, SoundEvidence,
                     "The sound that the SOUND plays. A SOUND can also name a voice line, so a name outside the list is " +

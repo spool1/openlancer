@@ -327,8 +327,25 @@ internal sealed partial class MissionPage
         ImGui.PopTextWrapPos();
     }
 
+    /// <summary>The line at the top of a dropdown with a choice that has a warning.</summary>
+    internal const string WarningHint = "Point to a choice with this mark to read its warning.";
+
+    /// <summary>
+    /// The look of a choice of a dropdown of words: the text of the row, its tooltip, and the note under the row. A
+    /// choice with a warning gets the warning glyph, and only its tooltip gives the warning. So a list of many files
+    /// stays short, and the file names stay easy to find.
+    /// </summary>
+    internal static (string Text, string? Tooltip, string? Below) ChoiceLook(string value, string label, string? note,
+        string? warning)
+    {
+        var text = warning != null ? $"{EditorIcons.ExclamationTriangle}  {label}" : label;
+        var lines = new[] { label != value ? value : null, note, warning }.OfType<string>().ToList();
+        return (text, lines.Count > 0 ? string.Join("\n", lines) : null, note);
+    }
+
     /// <summary>A dropdown of the words of a set, or of the conditions of the field "Event" by event group. A choice
-    /// with a note or a warning shows it under the choice. The item "New file..." at the end opens its popup.</summary>
+    /// with a note shows it under the choice. A choice with a warning shows the warning glyph and gives the warning in
+    /// its tooltip (see <see cref="ChoiceLook"/>). The item "New file..." at the end opens its popup.</summary>
     private void Words(PageField field, FieldEdit edit)
     {
         var current = edit.Choices.FirstOrDefault(c => string.Equals(c.Value, edit.Value, StringComparison.OrdinalIgnoreCase));
@@ -339,6 +356,11 @@ internal sealed partial class MissionPage
         }
 
         EditorTheme.PushMenuColors();
+        if (edit.ChoiceWarnings.Count > 0)
+        {
+            ImGui.TextColored(EditorTheme.Warning, $"{EditorIcons.ExclamationTriangle}  {WarningHint}");
+        }
+
         string? group = null;
         foreach (var (value, label, choiceGroup) in edit.Choices)
         {
@@ -348,32 +370,23 @@ internal sealed partial class MissionPage
                 ImGui.SeparatorText(group);
             }
 
-            if (ImGui.Selectable($"{label}##{value}", string.Equals(value, edit.Value, StringComparison.OrdinalIgnoreCase)))
+            var (text, tooltip, below) = ChoiceLook(value, label, edit.ChoiceNotes.GetValueOrDefault(value),
+                edit.ChoiceWarnings.GetValueOrDefault(value));
+            if (ImGui.Selectable($"{text}##{value}", string.Equals(value, edit.Value, StringComparison.OrdinalIgnoreCase)))
             {
                 Run(edit.Make?.Invoke(MissionValue.Of(value)));
             }
 
-            var note = edit.ChoiceNotes.GetValueOrDefault(value);
-            var warning = edit.ChoiceWarnings.GetValueOrDefault(value);
-            if (!string.Equals(label, value, StringComparison.Ordinal) || note != null || warning != null)
+            if (tooltip != null)
             {
-                ImGui.SetItemTooltip(string.Join("\n", new[] { label != value ? value : null, note, warning }.OfType<string>()));
+                ImGui.SetItemTooltip(tooltip);
             }
 
-            if (note != null || warning != null)
+            if (below != null)
             {
                 ImGui.Indent();
                 ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + 360 * ImGuiHelper.Scale);
-                if (note != null)
-                {
-                    ImGui.TextDisabled(note);
-                }
-
-                if (warning != null)
-                {
-                    ImGui.TextColored(EditorTheme.Warning, warning);
-                }
-
+                ImGui.TextDisabled(below);
                 ImGui.PopTextWrapPos();
                 ImGui.Unindent();
             }

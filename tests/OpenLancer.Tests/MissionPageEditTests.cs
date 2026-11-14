@@ -6,6 +6,7 @@ using OpenLancer.Data.Editing.Fields;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Editor.Missions;
+using OpenLancer.Editor.Ui;
 using Xunit;
 using static OpenLancer.Tests.MissionEdits;
 
@@ -287,12 +288,35 @@ public sealed class MissionPageEditTests
             Assert.Single(item.Make(item.DefaultName).Commands));
         Assert.Equal(@"With the new file, the game cannot find the ship build ol_build_1 of this mission. This build is " +
                      @"only in MISSIONS\OL_TEST\npcships.ini. The game does not spawn the ships that use it.", item.Warning);
+        // The tooltips name the field that the user sees, not the INI line.
+        Assert.Equal("Make a new empty ship build file in the folder of the script, and set the field Ship build file " +
+                     "to it.", item.Tooltip);
+        Assert.Equal("Makes the file and sets the field Ship build file to it.", item.CreateTooltip);
         Run(m, item.Make(item.DefaultName));
         Assert.Equal([@"npc_ship_file = MISSIONS\OL_TEST\npcships_2.ini"], m.Lines(Item("Mission", null)));
         var edit = Field(MissionPage(m), "files", "Ship build file").Edit!;
         Assert.Equal(@"MISSIONS\OL_TEST\npcships_2.ini", edit.Value);
         Assert.Contains(@"MISSIONS\OL_TEST\npcships_2.ini", edit.Choices.Select(c => c.Value));
         Assert.Equal("npcships_3", edit.NewFile!.DefaultName);
+    }
+
+    /// <summary>
+    /// A choice with a warning shows the warning glyph and gives the warning only in its tooltip, so the dropdown of a
+    /// retail mission with many files stays short. A note, for example of the shared file, shows under its choice and
+    /// in the tooltip. A plain choice has no tooltip.
+    /// </summary>
+    [Fact]
+    public void AChoiceWithAWarningShowsTheGlyphAndGivesTheWarningInItsTooltip()
+    {
+        var warned = Editor.Inspector.MissionPage.ChoiceLook("a.ini", "a.ini", null, "Lost builds.");
+        var noted = Editor.Inspector.MissionPage.ChoiceLook("b.ini", "b.ini", "Shared.", null);
+        var plain = Editor.Inspector.MissionPage.ChoiceLook("c.ini", "c.ini", null, null);
+        var both = Editor.Inspector.MissionPage.ChoiceLook("d.ini", "File d", "Shared.", "Lost builds.");
+
+        Assert.Equal(($"{EditorIcons.ExclamationTriangle}  a.ini", "Lost builds.", (string?)null), warned);
+        Assert.Equal(("b.ini", "Shared.", "Shared."), noted);
+        Assert.Equal(("c.ini", (string?)null, (string?)null), plain);
+        Assert.Equal(($"{EditorIcons.ExclamationTriangle}  File d", "d.ini\nShared.\nLost builds.", "Shared."), both);
     }
 
     /// <summary>A value of the field "Ship build file" that names no file shows the problem of the checks at the line,

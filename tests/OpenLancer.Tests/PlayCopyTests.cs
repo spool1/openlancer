@@ -38,6 +38,18 @@ public sealed class PlayCopyTests : IDisposable
 
     private static PlayCopyEntry Entry(PlayCopy copy, string path) => copy.Record.Entries[path];
 
+    /// <summary>The editor asks for a full copy when the probe fails in a folder that the user selected, also on the
+    /// drive of the game. So the question names the real cause, the hard links, and not another drive.</summary>
+    [Fact]
+    public void TheFullCopyQuestionNamesTheHardLinksAsTheCause()
+    {
+        var question = PlayCopyTexts.FullCopyQuestion("2.5 GB");
+
+        Assert.Equal("OpenLancer cannot make hard links in this folder. A play copy there needs a full copy of the game: " +
+                     "2.5 GB. Make a full copy?", question);
+        Assert.DoesNotContain("drive", question);
+    }
+
     [Fact]
     public void ACopyLinksBinaryDataAndCopiesTextDataAndExe()
     {

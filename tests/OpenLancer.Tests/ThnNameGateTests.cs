@@ -577,8 +577,9 @@ public sealed class ThnNameGateTests
         Assert.Empty(Errors(session));
     }
 
-    /// <summary>The Problems section of the Cutscene page shows an error without its crash start, and a name problem
-    /// whole.</summary>
+    /// <summary>The Problems section of the Cutscene page shows an error with the label "Crash" and without its crash
+    /// start. It shows a name problem whole, with the label "Name problem". So the row tells which problems crash the
+    /// game.</summary>
     [Fact]
     public void TheProblemsSectionShowsANameProblemWhole()
     {
@@ -586,7 +587,9 @@ public sealed class ThnNameGateTests
                             "entity without a model.";
 
         Assert.Equal(name, ThnPage.ProblemText(Diagnostic.Error(ScriptPath, name)));
+        Assert.Equal("Name problem", ThnPage.ProblemLabel(Diagnostic.Error(ScriptPath, name)));
         Assert.Equal("entity \"Man\", template_name: The costume \"ghost\" is not in the game data. A DEFORMABLE without " +
                      "userprops.Actor needs it.", ThnPage.ProblemText(Diagnostic.Error(ScriptPath, CostumeMissing)));
+        Assert.Equal("Crash", ThnPage.ProblemLabel(Diagnostic.Error(ScriptPath, CostumeMissing)));
     }
 }
