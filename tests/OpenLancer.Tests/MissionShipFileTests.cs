@@ -46,8 +46,84 @@ public sealed class MissionShipFileTests
         Assert.Equal([true, false, false], files.Select(f => f.Shared));
         Assert.Equal(SharedShips, files[0].Path);
         // A new file of W is in the list before a save.
+        const string newValue = @"MISSIONS\OL_TEST\ships_new.ini";
         m.Apply(new NewShipBuildFile(TestScript, NewShips));
-        Assert.Contains(@"MISSIONS\OL_TEST\ships_new.ini", m.Missions.ShipBuildFiles().Select(f => f.Value));
+        Assert.Contains(newValue, m.Missions.ShipBuildFiles().Select(f => f.Value));
+        // A file that the session deleted is not in the list, also while the line names it (review of #18).
+        m.Apply(new DeleteScript(new ScriptRef(NewShips)));
+        Assert.Equal([@"npc_ship_file = MISSIONS\OL_TEST\ships_new.ini"], m.Lines(Item("Mission", null)));
+        Assert.DoesNotContain(newValue, m.Missions.ShipBuildFiles().Select(f => f.Value));
+        m.Session.Undo();
+        // A new file stays in the list when the line names another file again, so the user can find it (review of #18).
+        m.Apply(new SetItemKey(Item("Mission", null), "npc_ship_file", [LineSpec.Raw("npc_ship_file", @"missions\ol_test\npcships.ini")]));
+        Assert.False(m.Missions.IsMissionFile(NewShips));
+        Assert.Contains(newValue, m.Missions.ShipBuildFiles().Select(f => f.Value));
+    }
+
+    /// <summary>The lost builds of a change of the line are the builds of the [NPC] sections that only the old file has:
+    /// the game finds a build in the ship build file of the script, then in the global ship build files (review of
+    /// #18).</summary>
+    [Fact]
+    public void TheLostBuildsAreTheBuildsThatOnlyTheOldFileHas()
+    {
+        const string copy = @"DATA\MISSIONS\OL_COPY\npcships.ini";
+        using var m = Create(setup: ws =>
+        {
+            ws.WriteBase(@"DATA\MISSIONS\OL_OTHER\npcships.ini", ShipsText.Replace("ol_build_1", "ol_other_build"));
+            ws.WriteBase(copy, ShipsText);
+            ws.WriteBase(@"DATA\MISSIONS\OL_GONE\ol_gone.ini", "[Mission]\nnpc_ship_file = missions\\ol_gone\\gone.ini\n\n" +
+                                                                "[NPC]\nnickname = ol_npc_gone\nnpc_ship_arch = ol_build_1\n");
+        });
+
+        // ol_npc_1 names ol_build_1 of the own file. ol_npc_shared names the build of the shared file.
+        Assert.Equal(["ol_build_1"], m.Missions.LostBuilds(Script, null));
+        Assert.Equal(["ol_build_1"], m.Missions.LostBuilds(Script, @"DATA\MISSIONS\OL_OTHER\npcships.ini"));
+        Assert.Equal(["ol_build_1"], m.Missions.LostBuilds(Script, @"DATA\MISSIONS\OL_GONE\gone.ini"));
+        Assert.Empty(m.Missions.LostBuilds(Script, Ships));
+        Assert.Empty(m.Missions.LostBuilds(Script, copy));
+        // A script whose line names no file loses no build.
+        Assert.Empty(m.Missions.LostBuilds(@"DATA\MISSIONS\OL_GONE\ol_gone.ini", null));
+
+        // The game also reads npcships_test.ini for all missions, so a build in it is not lost.
+        using var global = Create(setup: ws => ws.WriteBase(@"DATA\MISSIONS\npcships_test.ini", ShipsText));
+        Assert.Empty(global.Missions.LostBuilds(Script, null));
+    }
+
+    /// <summary>A batch that points the line at another file warns about the builds that the game then does not find,
+    /// in its warnings and its notes (review of #18). The builds stay in the old file.</summary>
+    [Fact]
+    public void ABatchThatLosesBuildsWarns()
+    {
+        const string copy = @"DATA\MISSIONS\OL_TEST\copy.ini";
+        using var m = Create(setup: ws => ws.WriteBase(copy, ShipsText));
+        var lost = @"With MISSIONS\OL_TEST\ships_new.ini, the game cannot find the ship build ol_build_1 of this mission. " +
+                   @"This build is only in MISSIONS\OL_TEST\npcships.ini. The game does not spawn the ships that use it.";
+
+        var result = m.Apply(new NewShipBuildFile(TestScript, NewShips));
+
+        var warning = Assert.Single(result.Warnings);
+        Assert.Equal((Data.DiagnosticSeverity.Warning, lost, TestScript.ToString()), (warning.Severity, warning.Message, warning.Ref));
+        Assert.Contains(lost, result.Notes);
+        Assert.True(m.Has(Item("NPCShipArch", "ol_build_1", Ships)));
+        // The inverse points the line back, so the game finds the build again.
+        Assert.Empty(m.Apply(result.Inverse!).Warnings);
+        // A file with the build gives no warning.
+        Assert.Empty(m.Apply(new SetItemKey(Item("Mission", null), "npc_ship_file",
+            [LineSpec.Raw("npc_ship_file", @"missions\ol_test\copy.ini")])).Warnings);
+        // A line without a file loses the builds too.
+        var gone = m.Apply(new SetItemKey(Item("Mission", null), "npc_ship_file", [LineSpec.Raw("npc_ship_file", @"missions\ol_test\gone.ini")]));
+        Assert.Equal(@"With missions\ol_test\gone.ini, the game cannot find the ship build ol_build_1 of this mission. " +
+                     @"This build is only in MISSIONS\OL_TEST\copy.ini. The game does not spawn the ships that use it.",
+            Assert.Single(gone.Warnings).Message);
+    }
+
+    /// <summary>The warning names at most five builds.</summary>
+    [Fact]
+    public void TheWarningNamesAtMostFiveBuilds()
+    {
+        Assert.Equal("With this file, the game cannot find 7 ship builds of this mission: b1, b2, b3, b4, b5 and 2 more. " +
+                     "These builds are only in old.ini. The game does not spawn the ships that use them.",
+            MissionErrors.LostBuildsText("this file", "old.ini", ["b1", "b2", "b3", "b4", "b5", "b6", "b7"]));
     }
 
     [Fact]

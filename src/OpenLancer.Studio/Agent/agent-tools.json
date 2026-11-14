@@ -962,10 +962,10 @@
       }
     },
     "new_ship_build_file": {
-      "description": "Makes a new empty ship build file in the folder of a script. It is a whole file of the active mod. The npc_ship_file line of the script then names it. The builds of the old file do not move.",
+      "description": "Makes a new empty ship build file in the folder of a script. It is a whole file of the active mod. The npc_ship_file line of the script then names it. The builds of the old file do not move. The game finds a ship build only in the file of the script or in a shared file. The result warns about each build that is only in the old file. The game does not spawn the ships that use such a build.",
       "fields": {
         "script": "The msn: reference of the script.",
-        "path": "The install path of the new file in the folder of the script, for example DATA\\MISSIONS\\MY\\npcships_2.ini. The name has only letters, digits, '_' and '-', and the extension is .ini. A path with a file gives PathInUse. A script directly in DATA\\MISSIONS gives BadPath."
+        "path": "The install path of the new file in the folder of the script, for example DATA\\MISSIONS\\MY\\npcships_2.ini. The name has only letters, digits, '_' and '-', with at most 64 characters, and the extension is .ini. A name that Windows uses for a device, for example nul, is not correct. A bad name gives invalid_value with the detail NameInvalid. A path with a file gives PathInUse. A script directly in DATA\\MISSIONS gives BadPath."
       }
     },
     "place_mission_ship": {

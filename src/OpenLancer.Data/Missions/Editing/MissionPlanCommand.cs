@@ -62,6 +62,7 @@ internal sealed class MissionPlanCommand : EditCommand
                     });
                 }
             }
+            draft.WarnLostBuilds();
             Draft = draft;
         }
         finally

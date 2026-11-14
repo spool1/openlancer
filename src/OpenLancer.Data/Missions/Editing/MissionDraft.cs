@@ -173,6 +173,38 @@ internal sealed partial class MissionDraft(MissionEditor editor, EditSession.Com
         }
     }
 
+    /// <summary>
+    /// Warns about each script whose <c>npc_ship_file</c> line the batch points at another file, when the game then does
+    /// not find ship builds that the <c>[NPC]</c> sections of the script name (see <see cref="MissionEditor.LostBuilds"/>,
+    /// review of #18). The builds stay in the old file. The warning is also a note, so the Console of the studio shows
+    /// it. The plan command calls it once, after the last command. A new script and a line that names the same file as
+    /// before the batch give no warning.
+    /// </summary>
+    public void WarnLostBuilds()
+    {
+        foreach (var (path, document) in Touched)
+        {
+            if (!document.HoldsScript || !document.State.Exists || !Before.TryGetValue(path, out var before) ||
+                !before.Exists || Session.ShipBuildFileOf(before.Working) is not { } old)
+                continue;
+            var now = Session.ShipBuildFileOf(document.Working);
+            if (now != null && VfsPath.Comparer.Equals(old, now))
+                continue;
+            // The game found the builds of the old file as the file was before the batch.
+            var oldBuilds = Before.TryGetValue(old, out var oldBefore)
+                ? MissionEditor.BuildNames(oldBefore.Exists ? oldBefore.Working : null)
+                : Editor.BuildsOf(old);
+            var lost = Editor.LostBuilds(document.Working, oldBuilds, Editor.BuildsOf(now));
+            if (lost.Count == 0)
+                continue;
+            // The text gives the paths in the letter case of the files.
+            string Display(string file) => MissionFiles.Display(Session.OpenDocument(file)?.Path ?? file);
+            var message = MissionErrors.LostBuildsText(now != null ? Display(now) : null, Display(old), lost);
+            Notes.Add(message);
+            Warnings.Add(new Problem(DiagnosticSeverity.Warning, message) { Ref = new ScriptRef(document.Path).ToString() });
+        }
+    }
+
     /// <summary>A script of W whose <c>npc_ship_file</c> line names a file, or null. It reads the scripts of the scan
     /// and the scripts that the batch changed.</summary>
     private string? ScriptNaming(string path) =>

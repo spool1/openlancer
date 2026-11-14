@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using OpenLancer.Data.Editing.Commands;
 
 namespace OpenLancer.Data.Missions.Editing;
@@ -446,6 +447,30 @@ public static class MissionErrors
     /// <summary>The edit view or W has a file at the path of a new ship build file (#18).</summary>
     internal static EditError ShipFileInUseError(string path) =>
         new(EditErrorKind.NameTaken, PathInUse, $"A file exists at {path}. Use another name.");
+
+    /// <summary>The most ship builds that <see cref="LostBuildsText"/> names.</summary>
+    private const int LostBuildNames = 5;
+
+    /// <summary>
+    /// The warning of a change of the <c>npc_ship_file</c> line of a script after which the game does not find ship
+    /// builds of the script (see <see cref="MissionEditor.LostBuilds"/>, review of #18). The field "Ship build file",
+    /// its popup "New file..." and the result of a batch give it. The text names at most five builds.
+    /// </summary>
+    /// <param name="file">The file that the line names after the change, for example "this file", or null for no
+    /// file.</param>
+    /// <param name="old">The file that the line names before the change, which keeps the builds.</param>
+    /// <param name="builds">The builds that the game does not find, at least one.</param>
+    public static string LostBuildsText(string? file, string old, IReadOnlyList<string> builds)
+    {
+        var with = file != null ? $"With {file}" : "Without a ship build file";
+        var names = string.Join(", ", builds.Take(LostBuildNames)) +
+                    (builds.Count > LostBuildNames ? $" and {builds.Count - LostBuildNames} more" : "");
+        return builds.Count == 1
+            ? $"{with}, the game cannot find the ship build {names} of this mission. This build is only in {old}. " +
+              "The game does not spawn the ships that use it."
+            : $"{with}, the game cannot find {builds.Count} ship builds of this mission: {names}. These builds are only " +
+              $"in {old}. The game does not spawn the ships that use them.";
+    }
 
     internal static EditError NotTextIdError(string label) =>
         new(EditErrorKind.InvalidArgument, NotTextId,

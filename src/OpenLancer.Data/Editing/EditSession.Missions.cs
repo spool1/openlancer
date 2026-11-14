@@ -200,6 +200,11 @@ public sealed partial class EditSession
     internal IEnumerable<string> OpenMissionScripts() =>
         documents.Values.Where(d => d is { HoldsScript: true, State.Exists: true }).Select(d => d.Path);
 
+    /// <summary>The install paths of the files that the session opened and that exist in W, except the scripts. So the
+    /// list of the field "Ship build file" keeps a new ship build file that no line names now (#18).</summary>
+    internal IReadOnlyList<string> OpenFilesExceptScripts() =>
+        documents.Values.Where(d => d is { HoldsScript: false, State.Exists: true }).Select(d => d.Path).ToList();
+
     /// <summary>A new number for a run of the mission checks, so the result of an older run is dropped.</summary>
     internal int NextMissionGeneration() => ++missionGeneration;
 

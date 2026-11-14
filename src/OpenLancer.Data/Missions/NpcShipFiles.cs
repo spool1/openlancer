@@ -13,6 +13,11 @@ namespace OpenLancer.Data.Missions;
 /// </summary>
 internal static class NpcShipFiles
 {
+    /// <summary>The ship build files that the game reads for all missions, encounters and bases, relative to the data
+    /// folder. The game finds the build of a mission ship in the ship build file of its script first, then in these
+    /// files.</summary>
+    public static readonly IReadOnlyList<string> GlobalFiles = [@"MISSIONS\npcships.ini", @"MISSIONS\npcships_test.ini"];
+
     /// <summary>
     /// The files of NPC ship builds:
     /// <list type="bullet">
@@ -31,8 +36,7 @@ internal static class NpcShipFiles
         IEnumerable<(string Path, IReadOnlyList<Section>? Sections)> files)
     {
         var result = new List<string>();
-        result.AddRange(new[] { dataPath(@"MISSIONS\npcships.ini"), dataPath(@"MISSIONS\npcships_test.ini") }
-            .OfType<string>());
+        result.AddRange(GlobalFiles.Select(dataPath).OfType<string>());
         if (dataPath("MISSIONS") is { } missions)
             result.AddRange(folders(missions).Select(f => VfsPath.Normalize($@"{missions}\{f}\npcships.ini")).OfType<string>());
         foreach (var (path, sections) in files)
