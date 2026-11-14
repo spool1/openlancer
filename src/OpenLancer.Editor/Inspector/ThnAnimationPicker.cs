@@ -290,7 +290,7 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
             ImGui.PushStyleColor(ImGuiCol.Text, EditorTheme.Warning);
             foreach (var warning in clips.Warnings)
             {
-                ImGui.TextWrapped($"{AnimationClips.FileName(warning.Source)}: {warning.Message}");
+                ImGui.TextWrapped(AnimationClips.WarningText(warning));
             }
 
             ImGui.PopStyleColor();

@@ -285,6 +285,10 @@ internal sealed class AnimationClips
     /// <summary>The file name of an install path, for example "body_m.anm".</summary>
     internal static string FileName(string archive) => Path.GetFileName(archive.Replace('\\', '/'));
 
+    /// <summary>A warning of the list as a line, for example "broken.anm: OpenLancer cannot read this animation
+    /// file ...".</summary>
+    internal static string WarningText(Diagnostic warning) => $"{FileName(warning.Source)}: {warning.Message}";
+
     /// <summary>A skeleton as text, for example "male body" or "hands".</summary>
     private static string Describe(AnimationSkeleton skeleton)
     {
@@ -324,7 +328,8 @@ internal sealed class ClipPickerState
     /// <summary>The reason when the game data has no bodyparts.ini, so the list has no clips.</summary>
     public const string NoBodyparts = "The game data has no bodyparts.ini, so the editor has no animation clips.";
 
-    /// <summary>The reason when the game data has no clip.</summary>
+    /// <summary>The reason when the game data has no clip. The warnings of the list follow it, one on each line,
+    /// because an animation file that does not read gives no clips.</summary>
     public const string NoClips = "The editor found no animation clips in the game data.";
 
     private AnimationData? data;
@@ -355,7 +360,9 @@ internal sealed class ClipPickerState
             clips = current.Clips.Count == 0 ? null : AnimationClips.From(current);
         }
 
-        reason = clips == null ? NoClips : null;
+        reason = clips == null
+            ? string.Join("\n", current.Warnings.Select(AnimationClips.WarningText).Prepend(NoClips))
+            : null;
         return clips;
     }
 

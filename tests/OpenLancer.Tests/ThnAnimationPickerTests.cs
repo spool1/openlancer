@@ -337,7 +337,7 @@ public sealed class ThnAnimationPickerTests
     /// <summary>
     /// The state makes the clips once for each data of the list <c>animation</c>. New data, for example after an edit of
     /// the <c>[Animations]</c> lines, makes them again. No data and data without clips give the reason, and the row keeps
-    /// its text field.
+    /// its text field. The reason of data without clips names each animation file that does not read.
     /// </summary>
     [Fact]
     public void TheStateMakesTheClipsOnceForEachDataOfTheList()
@@ -354,6 +354,9 @@ public sealed class ThnAnimationPickerTests
         Assert.Equal(ClipPickerState.NoBodyparts, reason);
         Assert.Null(state.Get(new AnimationData([], [], []), out reason));
         Assert.Equal("The editor found no animation clips in the game data.", reason);
+        var unreadable = OpenLancer.Data.Diagnostic.Warning(@"DATA\characters\animations\broken.anm", "The file does not read.");
+        Assert.Null(state.Get(new AnimationData([], [], [unreadable]), out reason));
+        Assert.Equal($"{ClipPickerState.NoClips}\nbroken.anm: The file does not read.", reason);
     }
 
     /// <summary>The chosen character belongs to one event, so another event forgets it. Reset forgets the data of the
