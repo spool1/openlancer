@@ -12,15 +12,16 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// A synthetic profile with the game data of the cutscene templates (section 12.1 of the M8b design): solar
-/// archetypes with and without a model file, a ship, an equipment, an asteroid and a mine, body parts and costumes,
-/// effects, sounds, and two petalDB files. The script has an entity of each kind of template, and a retail-like ship
-/// that the lists do not have.
+/// archetypes with and without a model file, a ship, equipment of four section types, an asteroid and a mine, body
+/// parts and costumes, effects, sounds, and two petalDB files. The script has an entity of each kind of template, and a
+/// retail-like ship that the lists do not have.
 /// </summary>
 internal static class ThnDataWorkspace
 {
     public const string CostumesPath = @"DATA\CHARACTERS\costumes.ini";
     public const string BodypartsPath = @"DATA\CHARACTERS\bodyparts.ini";
     public const string SpaceScript = @"DATA\MISSIONS\M01A\space.thn";
+    public const string EquipmentPath = @"DATA\EQUIPMENT\misc_equip.ini";
 
     public const string Script = """
         duration = 10
@@ -29,7 +30,7 @@ internal static class ThnDataWorkspace
             { entity_name = "Ship", type = COMPOUND, template_name = "ship1", userprops = { category = "Spaceship" } },
             { entity_name = "Station", type = COMPOUND, template_name = "station1", userprops = { category = "solar" } },
             { entity_name = "Rock", type = COMPOUND, template_name = "$terrain_dyna_01", userprops = { category = "solar" } },
-            { entity_name = "Gear", type = COMPOUND, template_name = "light1", userprops = { category = "equipment" } },
+            { entity_name = "Gear", type = COMPOUND, template_name = "thruster1", userprops = { category = "equipment" } },
             { entity_name = "Mine", type = COMPOUND, template_name = "mine1", userprops = { category = "asteroid" } },
             { entity_name = "Cup", type = COMPOUND, template_name = "mod_cup", userprops = { category = "prop" } },
             { entity_name = "Bar", type = COMPOUND, template_name = "bar1", userprops = { category = "room" } },
@@ -80,8 +81,24 @@ internal static class ThnDataWorkspace
         ws.WriteBase(@"DATA\SOLAR\station1.cmp", "model");
         ws.WriteBase(@"DATA\SHIPS\shiparch.ini", "[Ship]\nnickname = ship1\nDA_archetype = ships\\ship1.cmp\n");
         ws.WriteBase(@"DATA\SHIPS\ship1.cmp", "model");
-        ws.WriteBase(@"DATA\EQUIPMENT\misc_equip.ini", "[Light]\nnickname = light1\nDA_archetype = equipment\\light1.3db\n");
+        // The engine gives a model to a [Thruster]. It makes a [Light] and a [Commodity] without a model, also with a
+        // model file, and it makes no item of an [Armor].
+        ws.WriteBase(EquipmentPath, """
+            [Thruster]
+            nickname = thruster1
+            DA_archetype = equipment\thruster1.3db
+            [Light]
+            nickname = light1
+            DA_archetype = equipment\light1.3db
+            [Commodity]
+            nickname = commodity1
+            [Armor]
+            nickname = armor1
+            DA_archetype = equipment\armor1.3db
+            """);
+        ws.WriteBase(@"DATA\EQUIPMENT\thruster1.3db", "model");
         ws.WriteBase(@"DATA\EQUIPMENT\light1.3db", "model");
+        ws.WriteBase(@"DATA\EQUIPMENT\armor1.3db", "model");
         ws.WriteBase(@"DATA\SOLAR\asteroidarch.ini", """
             [Asteroid]
             nickname = rock1
@@ -114,6 +131,10 @@ internal static class ThnDataWorkspace
             new ThnPath("template_name"), new ThnText(template)));
 
     public static EntryView Line(string name, string value) => new(name, [new StringValue(value)]);
+
+    public static SectionRef Costume(string nickname) => new(CostumesPath, new SectionIdentity("Costume", nickname));
+
+    public static SectionRef Equipment(string type, string nickname) => new(EquipmentPath, new SectionIdentity(type, nickname));
 }
 
 /// <summary>
@@ -124,8 +145,16 @@ internal static class ThnDataWorkspace
 /// </summary>
 public sealed class ThnNameGateTests
 {
-    private const string CostumeMissing = "The game crashes when it plays this cutscene. entity \"Man\", template_name: The " +
-                                          "costume \"ghost\" is not in the game data. A DEFORMABLE without userprops.Actor needs it.";
+    private const string Crash = "The game crashes when it plays this cutscene. ";
+
+    private const string CostumeMissing = Crash + "entity \"Man\", template_name: The costume \"ghost\" is not in the game " +
+                                          "data. A DEFORMABLE without userprops.Actor needs it.";
+
+    /// <summary>The message of a costume whose body names no body part. The lists have the costume, so the message
+    /// gives the reason of the list checks.</summary>
+    private static string CostumeWithoutBody(string costume) =>
+        Crash + $"entity \"Man\", template_name: The costume \"{costume}\" is not usable: 'body = no_body': no body has " +
+        "the name 'no_body'. A DEFORMABLE without userprops.Actor needs it.";
 
     private static string[] Errors(EditSession session, string path = ScriptPath) =>
         [.. session.CutsceneErrors(path).Select(e => e.Message)];
@@ -174,7 +203,7 @@ public sealed class ThnNameGateTests
 
     /// <summary>An unsaved edit of costumes.ini that adds the costume heals the problem without a save. A costume of
     /// the active mod whose body names no body part is not usable: the engine drops it (GameItemDb.cs:974-978). So it
-    /// blocks the save too.</summary>
+    /// blocks the save too, and the message tells why, because the lists have the costume.</summary>
     [Fact]
     public void AnUnsavedCostumeEditCountsAndACostumeWithoutABodyBlocks()
     {
@@ -190,8 +219,72 @@ public sealed class ThnNameGateTests
         session.Execute(EditCommand.AddSection(ThnDataWorkspace.CostumesPath, "Costume",
             [ThnDataWorkspace.Line("nickname", "broken"), ThnDataWorkspace.Line("body", "no_body")]));
         ThnDataWorkspace.SetTemplate(session, "Man", "broken");
-        Assert.Equal([CostumeMissing.Replace("ghost", "broken")], Errors(session));
-        Assert.Contains(session.SaveProblems(), p => p.Message == CostumeMissing.Replace("ghost", "broken"));
+        Assert.Equal([CostumeWithoutBody("broken")], Errors(session));
+        Assert.Contains(session.SaveProblems(), p => p.Message == CostumeWithoutBody("broken"));
+    }
+
+    /// <summary>
+    /// An INI edit of the active mod that removes or breaks the item of a template blocks the save of a cutscene that
+    /// the active mod changes, also when the template does not change. The lower data has the item, so B does not have
+    /// the problem. The edits are a delete and a rename of the costume, a body that names no body part, and an
+    /// equipment without its <c>DA_archetype</c> line. An undo heals each problem.
+    /// </summary>
+    [Fact]
+    public void AnItemThatTheActiveModRemovesOrBreaksBlocksTheSave()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(ThnEdits.Set(Entity(session, "Cam"), new ThnPath("cameraprops.fovh"), new ThnNumber(20)));
+        var trentMissing = CostumeMissing.Replace("ghost", "trent");
+        Assert.Empty(Errors(session));
+
+        session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
+        Assert.Equal([trentMissing], Errors(session));
+        Assert.Contains(session.SaveProblems(), p => p.Message == trentMissing);
+        session.Undo();
+        Assert.Empty(Errors(session));
+
+        session.Execute(EditCommand.Rename(ThnDataWorkspace.Costume("trent"), "trent_new"));
+        Assert.Equal([trentMissing], Errors(session));
+        session.Undo();
+
+        session.Execute(EditCommand.SetLinesFromText(ThnDataWorkspace.Costume("trent"), "body", ["no_body"]));
+        Assert.Equal([CostumeWithoutBody("trent")], Errors(session));
+        session.Undo();
+
+        session.Execute(EditCommand.RemoveName(ThnDataWorkspace.Equipment("Thruster", "thruster1"), "DA_archetype"));
+        Assert.Equal([Crash + "entity \"Gear\", template_name: The equipment \"thruster1\" has no model: its [Thruster] " +
+                      "section has no DA_archetype line."], Errors(session));
+        session.Undo();
+        Assert.Empty(Errors(session));
+        AssertSaved(session.Save());
+    }
+
+    /// <summary>
+    /// The engine gives a model only to the equipment of some section types (GameItemDb.cs:1008-1303). It makes a
+    /// <c>[Light]</c> or a <c>[Commodity]</c> without a model, also with a <c>DA_archetype</c> line and its file, so a
+    /// COMPOUND with such an item crashes the game. It makes no item of an <c>[Armor]</c>, so the scene shows that
+    /// entity without a model. The lists have these names, so each message tells why.
+    /// </summary>
+    [Fact]
+    public void AnEquipmentOfASectionTypeWithoutAModelCrashesTheGame()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+
+        ThnDataWorkspace.SetTemplate(session, "Gear", "light1");
+        Assert.Equal([Crash + "entity \"Gear\", template_name: The equipment \"light1\" has no model: the game makes the " +
+                      "[Light] items without a model."], Errors(session));
+        Assert.False(session.Save().Saved);
+        ThnDataWorkspace.SetTemplate(session, "Gear", "commodity1");
+        Assert.Equal([Crash + "entity \"Gear\", template_name: The equipment \"commodity1\" has no model: the game makes the " +
+                      "[Commodity] items without a model."], Errors(session));
+        ThnDataWorkspace.SetTemplate(session, "Gear", "armor1");
+        Assert.Equal(["entity \"Gear\", template_name: The equipment \"armor1\" is not usable: the game makes no equipment " +
+                      "from [Armor] sections. The scene shows the entity without a model."], Errors(session));
+
+        ThnDataWorkspace.SetTemplate(session, "Gear", "thruster1");
+        Assert.Empty(Errors(session));
     }
 
     /// <summary>
@@ -207,14 +300,15 @@ public sealed class ThnNameGateTests
 
         ThnDataWorkspace.SetTemplate(session, "Ship", "ghost_ship");
         ThnDataWorkspace.SetTemplate(session, "Station", "no_model");
-        ThnDataWorkspace.SetTemplate(session, "Gear", "LIGHT1");
+        ThnDataWorkspace.SetTemplate(session, "Gear", "THRUSTER1");
         Assert.Equal([
             "The game crashes when it plays this cutscene. entity \"Ship\", template_name: The game data has no ship \"ghost_ship\".",
-            "The game crashes when it plays this cutscene. entity \"Station\", template_name: The solar archetype \"no_model\" has no model.",
+            "The game crashes when it plays this cutscene. entity \"Station\", template_name: The solar archetype \"no_model\" has " +
+            "no model: its [Solar] section has no DA_archetype line.",
         ], Errors(session));
         ThnDataWorkspace.SetTemplate(session, "Station", "lost_model");
         Assert.Contains("The game crashes when it plays this cutscene. entity \"Station\", template_name: The solar archetype " +
-                        "\"lost_model\" has no model.", Errors(session));
+                        "\"lost_model\" has no model: the model file 'solar\\lost.cmp' does not exist.", Errors(session));
 
         ThnDataWorkspace.SetTemplate(session, "Ship", "ghost_ship", ThnDataWorkspace.SpaceScript);
         Assert.Equal("ghost_ship", ((ThnText)session.Cutscene(ThnDataWorkspace.SpaceScript)!.Entities[0].Table["template_name"]!).Value);
@@ -253,7 +347,7 @@ public sealed class ThnNameGateTests
         Assert.False(refused.Saved);
         Assert.Equal(expected, refused.Problems.Select(p => p.Message));
 
-        ThnDataWorkspace.SetTemplate(session, "Gear", "light1");
+        ThnDataWorkspace.SetTemplate(session, "Gear", "thruster1");
         ThnDataWorkspace.SetTemplate(session, "Fx", "visfx1");
         Assert.Empty(Errors(session));
     }

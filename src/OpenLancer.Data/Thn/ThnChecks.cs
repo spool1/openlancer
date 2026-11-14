@@ -69,6 +69,13 @@ public interface IThnGameData
     ThnItemState? Item(ThnItemKind kind, string template);
 
     /// <summary>
+    /// Why the item of a template has the state that <see cref="Item"/> gives, as a clause that ends with a period, or
+    /// null. The checks add it to the message. Examples are a costume that the lists have but the engine drops, because
+    /// its body names no body part (Missing), and an equipment of a section type that gets no model (NoModel).
+    /// </summary>
+    string? Reason(ThnItemKind kind, string template) => null;
+
+    /// <summary>
     /// False when the game makes no COMPOUND of the script. This is so when the game plays the script only in space: the
     /// space scene uses the objects of the mission in their place (Cutscene.cs:101-113, ThnScriptInstance.cs:113).
     /// </summary>
@@ -414,13 +421,26 @@ public static class ThnChecks
             }
             return data?.Item(rule.Kind, template.Value) switch
             {
-                ThnItemState.NoModel => ("template_name", $"The {rule.What} {Shown(template)} has no model.", false),
-                ThnItemState.Missing when rule.MissingStops =>
-                    ("template_name", $"The game data has no {rule.What} {Shown(template)}.", false),
-                ThnItemState.Missing => ("template_name", Missing(rule, template), true),
+                ThnItemState.NoModel => ("template_name", NoModel(rule, template), false),
+                ThnItemState.Missing when rule.MissingStops => ("template_name", Absent(rule, template), false),
+                ThnItemState.Missing => ("template_name", $"{Absent(rule, template)} {rule.Consequence}", true),
                 _ => null,
             };
         }
+
+        /// <summary>The message of a template that names no item: the game data has no such item, or the engine cannot
+        /// use it (<see cref="IThnGameData.Reason"/>).</summary>
+        /// <param name="missing">The text when the game data has no such item, or null for the usual text.</param>
+        private string Absent(ThnTemplateRule rule, ThnText template, string? missing = null) =>
+            data?.Reason(rule.Kind, template.Value) is { } reason
+                ? $"The {rule.What} {Shown(template)} is not usable: {reason}"
+                : missing ?? $"The game data has no {rule.What} {Shown(template)}.";
+
+        /// <summary>The message of an item without a model, with the reason when the game data tells it.</summary>
+        private string NoModel(ThnTemplateRule rule, ThnText template) =>
+            data?.Reason(rule.Kind, template.Value) is { } reason
+                ? $"The {rule.What} {Shown(template)} has no model: {reason}"
+                : $"The {rule.What} {Shown(template)} has no model.";
 
         /// <summary>A PSYS gets the effect of its template, or no effect (ThnScriptInstance.cs:192-205). The engine
         /// gives the template <c>PlayerShipEngines</c> to the engine of the player ship (ThnScriptInstance.cs:98-104),
@@ -432,7 +452,7 @@ public static class ThnChecks
                 return;
             var rule = ThnTemplateRules.Effect;
             if (data?.Item(rule.Kind, template.Value) == ThnItemState.Missing)
-                Add(entity, "template_name", Missing(rule, template), name: true);
+                Add(entity, "template_name", $"{Absent(rule, template)} {rule.Consequence}", name: true);
         }
 
         /// <summary>A DEFORMABLE without an Actor loads its costume (ThnScriptInstance.cs:255-264). The engine reads an
@@ -447,10 +467,11 @@ public static class ThnChecks
                 Add(entity, "template_name", "The key is missing. A DEFORMABLE without userprops.Actor needs a costume.");
                 return;
             }
-            var state = data?.Item(ThnTemplateRules.Costume.Kind, template.Value);
+            var rule = ThnTemplateRules.Costume;
+            var state = data?.Item(rule.Kind, template.Value);
             if (state == ThnItemState.Missing)
-                Add(entity, "template_name", $"The costume {Shown(template)} is not in the game data. A DEFORMABLE without " +
-                                             "userprops.Actor needs it.");
+                Add(entity, "template_name", Absent(rule, template, $"The costume {Shown(template)} is not in the game data.") +
+                                             " A DEFORMABLE without userprops.Actor needs it.");
             else if (state == ThnItemState.NoModel)
                 Add(entity, "template_name", $"The costume {Shown(template)} has no body. A DEFORMABLE without " +
                                              "userprops.Actor needs it.");
@@ -549,10 +570,6 @@ public static class ThnChecks
 
     private static bool HasNumbers(ThnValue? value, int count) =>
         value is ThnTable { List: var items } && items.Length >= count && items.Take(count).All(i => i is ThnNumber);
-
-    /// <summary>The message of a template that names no item, where the engine does not stop.</summary>
-    private static string Missing(ThnTemplateRule rule, ThnValue template) =>
-        $"The game data has no {rule.What} {Shown(template)}. {rule.Consequence}";
 
     /// <summary>The message of a value of another kind.</summary>
     private static string Value(ThnValue value, string expected) =>

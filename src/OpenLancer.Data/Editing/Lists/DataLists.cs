@@ -47,8 +47,9 @@ public sealed class DataLists
     private readonly Dictionary<string, RemovedPart> removedParts = new(VfsPath.Comparer);
     private int checksRevision = int.MinValue;
 
-    // The section that gives each entry of a sections list, as the lists read its file (see SectionOf).
-    private readonly ConditionalWeakTable<ListEntry, Section> entrySections = new();
+    // The table and the index of the section that gives each entry of a sections list, as the lists read its file (see
+    // SectionOf).
+    private readonly ConditionalWeakTable<ListEntry, EntrySource> entrySources = new();
 
     /// <summary>The last <see cref="ReferencePart.Id"/>.</summary>
     private long partIds;
@@ -531,8 +532,8 @@ public sealed class DataLists
                 Problem = $"{count} sections have the name '{entry.Value}', so the game finds none of them.",
                 UnusableByActiveMod = anyChanged,
             };
-            if (entrySections.TryGetValue(entry, out var section))
-                entrySections.AddOrUpdate(unusable, section);
+            if (entrySources.TryGetValue(entry, out var source))
+                entrySources.AddOrUpdate(unusable, source);
             return unusable;
         }).ToList();
         var collisions = definition.Hash ? Collisions(order) : [];
@@ -649,7 +650,7 @@ public sealed class DataLists
             Unsaved = unsaved,
             UnusableByActiveMod = missing.Count > 0 && ChangedByActiveMod(table, index),
         };
-        entrySections.AddOrUpdate(entry, section);
+        entrySources.AddOrUpdate(entry, new EntrySource(table, index));
         return entry;
     }
 
@@ -659,7 +660,14 @@ public sealed class DataLists
     /// data of such a whole file. Null for an entry of a files list or of an enum, and for an entry of another session.
     /// Do not change the section.
     /// </summary>
-    internal Section? SectionOf(ListEntry entry) => entrySections.TryGetValue(entry, out var section) ? section : null;
+    internal Section? SectionOf(ListEntry entry) =>
+        entrySources.TryGetValue(entry, out var source) ? source.Table.Working[source.Index] : null;
+
+    /// <summary>True when the active mod adds or changes the section that gives an entry of a list (see
+    /// <see cref="SectionOf"/> and <see cref="ChangedByActiveMod(FileTable, int)"/>). False for an entry without such a
+    /// section.</summary>
+    internal bool ChangedByActiveMod(ListEntry entry) =>
+        entrySources.TryGetValue(entry, out var source) && ChangedByActiveMod(source.Table, source.Index);
 
     /// <summary>The detail text of an entry: the first line of each detail key, as "key = values".</summary>
     private static string Detail(Section section, ListDefinition definition)
@@ -1067,6 +1075,9 @@ public sealed class DataLists
     /// <param name="IsSystem">True when the file was a system file when the part was built.</param>
     /// <param name="Names">The names that B gives and <paramref name="Now"/> does not, with their lists and their
     /// sections in B.</param>
+    /// <summary>The table and the index of the section that gives an entry of a list.</summary>
+    private sealed record EntrySource(FileTable Table, int Index);
+
     private sealed record RemovedPart(FileTable Now, IReadOnlyList<Section> Base, bool IsSystem,
         IReadOnlyList<(ListDefinition Definition, string Name, SectionRef Lower)> Names);
 

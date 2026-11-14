@@ -528,6 +528,23 @@ public sealed class ThnChecksTests
             System.Enum.GetValues<ThnItemKind>().Where(ThnTemplateRules.NeedsModel));
     }
 
+    /// <summary>The engine gives a model only to the equipment of some section types, and to a munition only with a
+    /// motor (GameItemDb.cs:1008-1303). It makes no item of an [Armor] or a [Shield]. The types compare without letter
+    /// case. A type that is not in the table gives Ready, so it gives no false error.</summary>
+    [Theory]
+    [InlineData("Gun", false, ThnItemState.Ready)]
+    [InlineData("thruster", false, ThnItemState.Ready)]
+    [InlineData("Mine", false, ThnItemState.Ready)]
+    [InlineData("Munition", true, ThnItemState.Ready)]
+    [InlineData("Munition", false, ThnItemState.NoModel)]
+    [InlineData("Light", false, ThnItemState.NoModel)]
+    [InlineData("COMMODITY", false, ThnItemState.NoModel)]
+    [InlineData("Armor", false, ThnItemState.Missing)]
+    [InlineData("Shield", false, ThnItemState.Missing)]
+    [InlineData("NewType", false, ThnItemState.Ready)]
+    public void OnlySomeEquipmentSectionTypesGetAModel(string type, bool motor, ThnItemState state) =>
+        Assert.Equal(state, ThnTemplateRules.EquipmentModel(type, motor));
+
     /// <summary>The game data around a script: each listed item has its state, and each other item is missing.</summary>
     private sealed class FakeData(params (ThnItemKind Kind, string Name, ThnItemState State)[] items) : IThnGameData
     {

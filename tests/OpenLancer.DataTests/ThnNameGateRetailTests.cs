@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using LibreLancer;
+using LibreLancer.Data;
+using LibreLancer.Data.GameData;
 using LibreLancer.Data.IO;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
@@ -19,8 +21,9 @@ namespace OpenLancer.DataTests;
 /// templates and the costumes with the data lists of the session. With that data, the 1,506 retail cutscenes have no
 /// error, so a rename of a retail entity cannot turn a retail error into a false gate error. They have one name
 /// problem: the PSYS "ring_2" of an intro scene names the effect "ring", which the game data does not have. So the gate
-/// compares the name problems by their elements, and a rename of that entity adds no problem. The lists of the
-/// templates hold the items of the engine.
+/// compares the name problems by their elements, and a rename of that entity adds no problem. The 1,524 cutscenes of HD
+/// Edition have no problem. The lists of the templates hold the items of the engine, and the session data gives each
+/// item the model state of the engine.
 /// </summary>
 public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
 {
@@ -29,30 +32,67 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
     [Fact]
     public void TheRetailCutscenesHaveNoProblemWithTheDataOfASession()
     {
-        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "m8cproof");
-        var session = workspace.Open();
-        var view = FileSystem.FromPath(GameDataPaths.RequireBase());
-        var evaluator = ThornEvaluator.Instance;
-        var clock = Stopwatch.StartNew();
-        var (files, errors, names) = (0, new List<Diagnostic>(), new List<Diagnostic>());
-        foreach (var file in VfsFiles.Find(view, ".thn"))
-        {
-            files++;
-            var result = ThnChecks.Check(file, evaluator.Evaluate(view.ReadAllBytes(file), file), evaluator,
-                new SessionThnData(session, file));
-            errors.AddRange(result.Errors);
-            names.AddRange(result.NameProblems);
-        }
+        var (files, errors, names) = CheckEachCutscene(GameDataPaths.RequireBase(), "m8cproof");
 
-        output.WriteLine($"{files} files: {errors.Count} errors and {names.Count} name problems with the data of a session " +
-                         $"in {clock.Elapsed.TotalSeconds:0.0} s.");
-        foreach (var problem in errors.Concat(names).Take(40))
-            output.WriteLine(problem.ToString());
         Assert.Equal(1506, files);
         Assert.Empty(errors);
         var name = Assert.Single(names);
         Assert.Equal((CutsceneCheckRetailTests.WaterPlanet, CutsceneCheckRetailTests.RetailNameProblem),
             (name.Source, name.Message));
+    }
+
+    /// <summary>The cutscenes of HD Edition have no error and no name problem with the data of a session. So a rename
+    /// of an entity of HD Edition cannot turn a problem of the lower data into a false gate error.</summary>
+    [Fact]
+    public void TheHdEditionCutscenesHaveNoProblemWithTheDataOfASession()
+    {
+        var (files, errors, names) = CheckEachCutscene(GameDataPaths.RequireHde(), "m8chde");
+
+        Assert.Equal(1524, files);
+        Assert.Empty(errors);
+        Assert.Empty(names);
+    }
+
+    /// <summary>The session data gives each solar archetype, ship, equipment and asteroid of the template lists the
+    /// state of the engine: the engine has no such item, the item has no model, or it has a model. This is also true for
+    /// the equipment of each section type (<see cref="ThnTemplateRules.EquipmentModel"/>). The room fills in a template
+    /// that starts with <c>$</c>, so the session data gives no state for such a name.</summary>
+    [Fact]
+    public void TheSessionDataGivesEachItemTheModelStateOfTheEngine()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "m8cproof");
+        var session = workspace.Open();
+        var data = new SessionThnData(session, CutsceneCheckRetailTests.WaterPlanet);
+        var db = EngineDataLoader.Load(FileSystem.FromPath(GameDataPaths.RequireBase())).RequireComplete();
+        static ThnItemState State<T>(T? item, Func<T, ResolvedModel?> model) where T : class =>
+            item == null ? ThnItemState.Missing : model(item)?.ModelFile == null ? ThnItemState.NoModel : ThnItemState.Ready;
+        ThnItemState Engine(ThnItemKind kind, string name) => kind switch
+        {
+            ThnItemKind.Archetype => State(db.Archetypes.Get(name), a => a.ModelFile),
+            ThnItemKind.Ship => State(db.Ships.Get(name), s => s.ModelFile),
+            ThnItemKind.Equipment => State(db.Equipment.Get(name), e => e.ModelFile),
+            ThnItemKind.Asteroid => State(db.Asteroids.Get(name), a => a.ModelFile),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+
+        var differences = new List<string>();
+        var counts = new Dictionary<ThnItemState, int>();
+        foreach (var kind in Enum.GetValues<ThnItemKind>().Where(ThnTemplateRules.NeedsModel))
+        {
+            foreach (var entry in session.Lists.List(ThnTemplateRules.ListsOf(kind))!.Entries.Where(e => !e.Value.StartsWith('$')))
+            {
+                var (engine, now) = (Engine(kind, entry.Value), data.Item(kind, entry.Value));
+                counts[engine] = counts.GetValueOrDefault(engine) + 1;
+                if (now != engine)
+                    differences.Add($"{kind} {entry.Value}: the engine gives {engine}, the session data gives {now}.");
+            }
+        }
+
+        output.WriteLine(string.Join(", ", counts.OrderBy(c => c.Key).Select(c => $"{c.Key} {c.Value}")));
+        foreach (var difference in differences.Take(40))
+            output.WriteLine(difference);
+        Assert.Empty(differences);
+        Assert.True(counts.GetValueOrDefault(ThnItemState.NoModel) > 0);
     }
 
     /// <summary>A rename of the entity of the retail name problem adds no problem to the save gate, because the gate
@@ -74,6 +114,31 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
         session.Execute(ThnEdits.Set(target, new ThnPath("template_name"), new ThnText("no_such_effect")));
         Assert.Equal(["entity \"my_ring\", template_name: The game data has no effect \"no_such_effect\". The scene does not " +
                       "show this entity."], session.CutsceneErrors(path).Select(e => e.Message));
+    }
+
+    /// <summary>Checks each cutscene of a game with the data of a session, as the save gate does.</summary>
+    private (int Files, List<Diagnostic> Errors, List<Diagnostic> NameProblems) CheckEachCutscene(string game, string modId)
+    {
+        using var workspace = new RetailWorkspace(game, modId);
+        var session = workspace.Open();
+        var view = FileSystem.FromPath(game);
+        var evaluator = ThornEvaluator.Instance;
+        var clock = Stopwatch.StartNew();
+        var (files, errors, names) = (0, new List<Diagnostic>(), new List<Diagnostic>());
+        foreach (var file in VfsFiles.Find(view, ".thn"))
+        {
+            files++;
+            var result = ThnChecks.Check(file, evaluator.Evaluate(view.ReadAllBytes(file), file), evaluator,
+                new SessionThnData(session, file));
+            errors.AddRange(result.Errors);
+            names.AddRange(result.NameProblems);
+        }
+
+        output.WriteLine($"{files} files: {errors.Count} errors and {names.Count} name problems with the data of a session " +
+                         $"in {clock.Elapsed.TotalSeconds:0.0} s.");
+        foreach (var problem in errors.Concat(names).Take(40))
+            output.WriteLine(problem.ToString());
+        return (files, errors, names);
     }
 
     /// <summary>The petalDB lists hold the rooms, the props and the carts of the engine, and the asteroid lists

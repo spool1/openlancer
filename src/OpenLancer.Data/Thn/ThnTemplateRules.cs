@@ -94,7 +94,32 @@ public static class ThnTemplateRules
 
     /// <summary>True for an item whose model file the engine loads when it builds the entity: a solar archetype, a ship,
     /// an equipment or an asteroid. The engine stops when the item has no <c>DA_archetype</c> line, or when the file of
-    /// the line does not exist (GameItemDb.cs:122-138, :2088-2105, ThnScriptInstance.cs:124-151).</summary>
+    /// the line does not exist (GameItemDb.cs:122-138, :2088-2105, ThnScriptInstance.cs:124-151). An equipment also
+    /// needs a section type that gets a model (see <see cref="EquipmentModel"/>).</summary>
     public static bool NeedsModel(ThnItemKind kind) =>
         kind is ThnItemKind.Archetype or ThnItemKind.Ship or ThnItemKind.Equipment or ThnItemKind.Asteroid;
+
+    /// <summary>
+    /// What the engine makes of an equipment section for a COMPOUND (GameItemDb.cs:1008-1303). Only some section types
+    /// get the model of their <c>DA_archetype</c> line. The engine makes the items of the other types without a model, so
+    /// a COMPOUND with such an item stops the engine (ThnScriptInstance.cs:144-147). The engine makes no item of an
+    /// <c>[Armor]</c> or a <c>[Shield]</c> section, so such a template names no item. The names compare without letter
+    /// case.
+    /// </summary>
+    /// <param name="sectionType">The section type, for example <c>Gun</c>.</param>
+    /// <param name="motor">True when the section has a <c>motor</c> line with a value. Only a <c>[Munition]</c> with a
+    /// motor gets a model (GameItemDb.cs:1012-1043).</param>
+    /// <returns>Ready when the item gets the model of its <c>DA_archetype</c> line, NoModel when the engine makes the
+    /// item without a model, and Missing when the engine makes no item. A type that is not in the table gives Ready, so
+    /// the check gives no false error.</returns>
+    public static ThnItemState EquipmentModel(string sectionType, bool motor) => sectionType.ToLowerInvariant() switch
+    {
+        "munition" => motor ? ThnItemState.Ready : ThnItemState.NoModel,
+        "light" or "scanner" or "tractor" or "cloakingdevice" or "shieldbattery" or "repairkit" or "engine" or "tradelane" or
+            "commodity" or "internalfx" or "attachedfx" => ThnItemState.NoModel,
+        "armor" or "shield" => ThnItemState.Missing,
+        // Gun, Thruster, ShieldGenerator, Power, LootCrate, CargoPod, Countermeasure, CountermeasureDropper, MineDropper
+        // and Mine.
+        _ => ThnItemState.Ready,
+    };
 }

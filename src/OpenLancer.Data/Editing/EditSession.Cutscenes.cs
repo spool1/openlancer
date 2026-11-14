@@ -140,9 +140,11 @@ public sealed partial class EditSession
     /// that names no item, where the scene shows less, for example an entity without a model. Its message tells what the
     /// scene does. Both kinds block the save, because a value of the active mod outside a closed list is an error.</para>
     /// <para>The game data comes from the data lists of W (see <see cref="SessionThnData"/>), so an unsaved INI edit
-    /// counts, for example a new costume. B and W get the same game data. So a retail value that is not in the lists
-    /// gives the same problem in B, and stays out of the result. Each problem keeps the place of the check. B does not
-    /// give the problems, so each problem has the origin of the active mod.</para>
+    /// counts, for example a new costume. B gets the same game data without the answers that the active mod causes
+    /// (<see cref="SessionThnData.Lower"/>). So a retail value that is not in the lists gives the same problem in B, and
+    /// stays out of the result. A costume that the active mod deletes or renames gives no problem in B, so its problem
+    /// in W stays in the result. Each problem keeps the place of the check. B does not give the problems, so each
+    /// problem has the origin of the active mod.</para>
     /// <para>The errors of W and B compare by their messages (<see cref="Diagnostic.NewIn"/>). The retail data has a
     /// name problem, so the name problems compare by their elements (see <see cref="NewNameProblems"/>).</para>
     /// <para>The result is cached. The cache checks W or B again when it changes, and both when the game data gives
@@ -167,7 +169,7 @@ public sealed partial class EditSession
         data ??= new SessionThnData(this, document.Path);
         lower ??= document.Base == null
             ? new ThnCheckResult([], [])
-            : ThnChecks.Check(document.Path, document.Base.ToGlobals(), thn, data);
+            : ThnChecks.Check(document.Path, document.Base.ToGlobals(), thn, data.Lower);
         var working = ThnChecks.Check(document.Path, document.Working.ToGlobals(), thn, data);
         // The lower layer does not give these problems, so the active mod causes them: its patch, its whole file or its
         // edits.
