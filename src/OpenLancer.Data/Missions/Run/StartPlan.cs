@@ -463,10 +463,20 @@ internal sealed partial record StartReplay
 
     /// <summary>The replay of an approximate start (D748): the start set or the load of the root, then each trigger of
     /// the path in order, until the chosen trigger starts. The replay also runs the waiting triggers that the path shows
-    /// ran in the game (<see cref="Replayer"/>).</summary>
+    /// ran in the game (<see cref="Replayer"/>). Pass 1 finds the old timers that ran. Pass 2 runs each of them at its
+    /// early step. When pass 1 runs no old timer, pass 2 gives the same result, so the replay skips it.</summary>
     private static StartReplay Approximate(MissionIndex index, MissionTrigger chosen, IReadOnlyList<MissionTrigger> path)
     {
-        var run = new Replayer(index, chosen, path);
+        var late = new Replayer(index, chosen, path);
+        var replay = Pass(late, chosen, path);
+        return replay.Refusal != StartRefusal.None || late.TimerRuns.Count == 0
+            ? replay
+            : Pass(new Replayer(index, chosen, path, late.TimerRuns), chosen, path);
+    }
+
+    /// <summary>One pass of the replay of an approximate start.</summary>
+    private static StartReplay Pass(Replayer run, MissionTrigger chosen, IReadOnlyList<MissionTrigger> path)
+    {
         var replay = new StartReplay { Kind = StartKind.Approximate, Chosen = chosen, Root = path[0], Path = path };
         // Each trigger of the path runs in order: a trigger that ran goes on, a pending trigger starts at the next
         // heartbeat, and an active trigger runs as if its condition is met now.

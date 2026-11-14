@@ -46,6 +46,9 @@ internal sealed class StartTimeline
     /// <summary>The position of the path of each run of the path.</summary>
     private readonly Dictionary<int, int> positions = [];
 
+    /// <summary>The number of runs of each trigger by slot.</summary>
+    private readonly Dictionary<int, int> numbers = [];
+
     private readonly Dictionary<int, (int From, int Heartbeats)> delays = [];
 
     /// <summary>The least times from each anchor, until the timeline changes.</summary>
@@ -83,6 +86,10 @@ internal sealed class StartTimeline
                 Set(undo[i].Slot, undo[i].Before);
             if (positions.Remove(at, out var position))
                 pathRuns.Remove(position);
+            if (runs[at].Number == 1)
+                numbers.Remove(runs[at].Slot);
+            else
+                numbers[runs[at].Slot] = runs[at].Number - 1;
             runs.RemoveAt(at);
             cache.Clear();
         }
@@ -120,6 +127,15 @@ internal sealed class StartTimeline
 
     /// <summary>The index of the change of a start, or -1 for <see cref="First"/>.</summary>
     public int ChangeOf(int start) => start == First ? -1 : runs[start].Change;
+
+    /// <summary>The source of a start, in words that stay the same in each pass of the replay. It is the slot of the
+    /// trigger whose run made the start, and the number of that run of the trigger. <see cref="First"/> gives (-1,
+    /// 0).</summary>
+    public (int Starter, int Run) SourceOf(int start) => start == First ? (-1, 0) : (runs[start].Slot, runs[start].Number);
+
+    /// <summary>The position of the path of the run that made a start, or -1 when a run of the path did not make
+    /// it.</summary>
+    public int PositionOf(int start) => positions.GetValueOrDefault(start, -1);
 
     /// <summary>
     /// The least time of the next run of the path from an anchor. It is the largest known time since the last run of the
@@ -209,7 +225,9 @@ internal sealed class StartTimeline
             if (!starts.ContainsKey(target))
                 Change(target, index, undo);
         }
-        runs.Add(new Run(change, slot, by, undo));
+        var number = numbers.GetValueOrDefault(slot) + 1;
+        numbers[slot] = number;
+        runs.Add(new Run(change, slot, number, by, undo));
         cache.Clear();
     }
 
@@ -227,7 +245,8 @@ internal sealed class StartTimeline
             starts[slot] = start;
     }
 
-    /// <summary>A run of the timeline. <c>By</c> is the start that it used: a run index, <see cref="First"/> or
-    /// <see cref="NoStart"/>. <c>Undo</c> holds the changes of the starts that undo the run.</summary>
-    private sealed record Run(int Change, int Slot, int By, List<(int Slot, int Before)> Undo);
+    /// <summary>A run of the timeline. <c>Number</c> counts the runs of its trigger, from 1. <c>By</c> is the start that
+    /// it used: a run index, <see cref="First"/> or <see cref="NoStart"/>. <c>Undo</c> holds the changes of the starts that
+    /// undo the run.</summary>
+    private sealed record Run(int Change, int Slot, int Number, int By, List<(int Slot, int Before)> Undo);
 }

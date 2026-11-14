@@ -184,6 +184,8 @@ public sealed class StartReplayRulesTests
     /// A run of a rule with a known time also shows time for the path. The path trigger k_done completes the objective
     /// k_goal, so the objective rule runs k_activate (2 s) before it. So k_done comes at least 2 s after the start, and
     /// the sibling timer k_sibling (2 s) ran too. Without the objective, the path shows no time, and both timers wait.
+    /// Pass 2 runs k_sibling at the first timer call of the step, before the objective rule. The game runs both timers
+    /// on the same heartbeat, so either order is right.
     /// </summary>
     [Theory]
     [InlineData(true)]
@@ -226,7 +228,7 @@ public sealed class StartReplayRulesTests
         Assert.Equal(completes, Ran(replay).Contains("k_activate"));
         Assert.Equal(!completes, Waiting(replay).Contains("k_sibling"));
         if (completes)
-            Assert.Equal(["k_start", "k_activate", "k_sibling", "k_done"], Ran(replay));
+            Assert.Equal(["k_start", "k_sibling", "k_activate", "k_done"], Ran(replay));
     }
 
     /// <summary>
@@ -418,6 +420,156 @@ public sealed class StartReplayRulesTests
     }
 
     /// <summary>
+    /// The path shows the 15 s of e_old only at e_second, so pass 1 runs it late, after the lines of e_first. Pass 2 runs
+    /// it at its early step, before the base entry e_dock, because the path does not show that e_dock came first. So the
+    /// objective line and the destroy line of e_first come after the lines of e_old, as in the game.
+    /// </summary>
+    [Fact]
+    public void PassTwoRunsAnOldTimerAtItsEarlyStep()
+    {
+        const string text = """
+            [Trigger]
+            nickname = e_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = e_old
+            Act_ActTrig = e_dock
+
+            [Trigger]
+            nickname = e_old
+            Cnd_Timer = 15
+            Act_SetNNObj = e_obj_old
+            Act_SpawnSolar = e_buoy
+
+            [Trigger]
+            nickname = e_dock
+            Cnd_BaseEnter = e_base
+            Act_ActTrig = e_first
+
+            [Trigger]
+            nickname = e_first
+            Cnd_Timer = 10
+            Act_SetNNObj = e_obj_new
+            Act_Destroy = e_buoy
+            Act_ActTrig = e_second
+
+            [Trigger]
+            nickname = e_second
+            Cnd_Timer = 10
+            Act_ActTrig = e_chosen
+
+            [Trigger]
+            nickname = e_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "e_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["e_start", "e_old", "e_dock", "e_first", "e_second"], Ran(replay));
+        Assert.Equal(["Act_SetNNObj = e_obj_old", "Act_SpawnSolar = e_buoy", "Act_SetNNObj = e_obj_new",
+            "Act_Destroy = e_buoy"], replay.Effects.Select(e => $"{e.Line.Key.Trim()} = {e.Line.Value(0)}"));
+    }
+
+    /// <summary>
+    /// Pass 1 runs r_timer before r_first. Then the base entry r_dock starts it again, and the path shows no time after
+    /// that start. Pass 2 knows a timer by its name and its start. So the run for the first start does not run the timer
+    /// again for the new start, and it waits at the start.
+    /// </summary>
+    [Fact]
+    public void PassTwoDoesNotRunATimerOfANewStart()
+    {
+        const string text = """
+            [Trigger]
+            nickname = r_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = r_timer
+            Act_ActTrig = r_first
+
+            [Trigger]
+            nickname = r_timer
+            Cnd_Timer = 5
+            Act_SpawnSolar = r_buoy
+
+            [Trigger]
+            nickname = r_first
+            Cnd_Timer = 10
+            Act_ActTrig = r_dock
+
+            [Trigger]
+            nickname = r_dock
+            Cnd_BaseEnter = r_base
+            Act_ActTrig = r_timer
+            Act_ActTrig = r_comm
+
+            [Trigger]
+            nickname = r_comm
+            Cnd_CommComplete = r_line
+            Act_ActTrig = r_chosen
+
+            [Trigger]
+            nickname = r_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "r_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["r_start", "r_timer", "r_first", "r_dock", "r_comm"], Ran(replay));
+        Assert.Contains("r_timer", Waiting(replay));
+    }
+
+    /// <summary>
+    /// The path timer k_first takes at most 5 s, and k_old waits 15 s from the same start. So k_first is known to come
+    /// before the time of k_old, and pass 2 runs k_old at the next step, before the base entry k_dock. When k_first can
+    /// take 15 s, the path does not show that it came first, and k_old runs before it.
+    /// </summary>
+    [Theory]
+    [InlineData("Cnd_Timer = 5", new[] { "k_start", "k_first", "k_old", "k_dock", "k_second" })]
+    [InlineData("Cnd_Timer = 5, 15", new[] { "k_start", "k_old", "k_first", "k_dock", "k_second" })]
+    public void APathTriggerThatIsKnownToComeBeforeKeepsTheTimerWaiting(string first, string[] ran)
+    {
+        var text = """
+            [Trigger]
+            nickname = k_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = k_old
+            Act_ActTrig = k_first
+
+            [Trigger]
+            nickname = k_old
+            Cnd_Timer = 15
+            Act_SpawnSolar = k_buoy
+
+            [Trigger]
+            nickname = k_first
+            {FIRST}
+            Act_ActTrig = k_dock
+
+            [Trigger]
+            nickname = k_dock
+            Cnd_BaseEnter = k_base
+            Act_ActTrig = k_second
+
+            [Trigger]
+            nickname = k_second
+            Cnd_Timer = 20
+            Act_ActTrig = k_chosen
+
+            [Trigger]
+            nickname = k_chosen
+            Cnd_Timer = 5
+            """.Replace("{FIRST}", first);
+
+        var replay = Replay(text, "k_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(ran, Ran(replay));
+    }
+
+    /// <summary>
     /// The timeline keeps the newest start of each trigger as the machine does. A start of an active trigger keeps the
     /// old start. A stop, then a start in one action list gives a new start. A start, then a stop in one action list
     /// gives no start. Two timers of the path in a chain give the sum of their shortest times.
@@ -490,6 +642,11 @@ public sealed class StartReplayRulesTests
         Run("l_restart");
         Assert.True(timeline.Started(trigger("l_timer"), out start));
         Assert.Equal(2, start);
+        // The source of a start names the trigger of the run and the number of that run, not the index of the run.
+        Assert.Equal((program.SlotOf("l_restart"), 1), timeline.SourceOf(start));
+        Assert.Equal((-1, 0), timeline.SourceOf(StartTimeline.First));
+        Assert.Equal(0, timeline.PositionOf(0));
+        Assert.Equal(-1, timeline.PositionOf(start));
         Run("l_cancel");
         Assert.False(timeline.Started(trigger("l_other"), out _));
 
@@ -512,5 +669,9 @@ public sealed class StartReplayRulesTests
         Assert.Equal(0, start);
         Assert.True(timeline.Started(trigger("l_timer"), out start));
         Assert.Equal(2, start);
+        // The cut also removes the numbers of the runs, so the next run of l_first is its first run again.
+        Run("l_first");
+        Assert.True(timeline.Started(trigger("l_second"), out start));
+        Assert.Equal((program.SlotOf("l_first"), 1), timeline.SourceOf(start));
     }
 }

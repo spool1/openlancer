@@ -30,6 +30,18 @@ internal sealed partial record StartReplay
     /// <item>The order and the exceptions. The timers run in the order of their starts, then in the order of their
     /// times. A timer that counts only in space does not run when the path showed the player docked after its start. A
     /// waiting trigger that can stop the timer does not keep it waiting.</item>
+    /// <item>The two passes. The run test can find a timer only at a later trigger of the path than in the game. So the
+    /// replay makes two passes. Pass 1 uses the run test and records each timer that it runs, with its start. Pass 2 does
+    /// not use the run test. It runs each recorded timer before the first trigger of the path after its start, unless
+    /// that trigger is known to come first. When the replay goes back from such a run, pass 2 tries the timer again
+    /// before the next trigger of the path. When pass 1 runs no timer, pass 2 gives the same result, so the replay skips
+    /// it.</item>
+    /// <item>The start of a timer. Pass 2 knows a timer by its name and its start. The start is the trigger whose run
+    /// started the timer and the number of that run, or the first starts of the replay. So when a trigger starts the
+    /// timer again, pass 2 does not run it for the old start.</item>
+    /// <item>Known to come first. A trigger of the path can be known to come before the time of a timer. Then a trigger
+    /// of the path started the timer, and only Cnd_Timer and Cnd_True triggers of the path come after that start. The
+    /// longest times of these timers add up to less than the shortest time of the timer.</item>
     /// </list></item>
     /// <item>A launch of the path ran each trigger that waited for that launch: Cnd_PlayerLaunch, Cnd_SpaceEnter without
     /// a system or with the system of the launch, Cnd_LaunchComplete of the player, and Cnd_BaseExit without a base or
@@ -68,6 +80,10 @@ internal sealed partial record StartReplay
         private readonly ReplayWorld world = new();
         private readonly HashSet<string> activated = new(StringComparer.OrdinalIgnoreCase);
         private readonly StartTimeline timeline;
+
+        /// <summary>The timers that pass 2 runs at their early steps, or null in pass 1.</summary>
+        private readonly IReadOnlySet<TimerKey>? early;
+
         private int read;
 
         /// <summary>The number of changes when the path last showed the player docked, or -1.</summary>
@@ -88,11 +104,14 @@ internal sealed partial record StartReplay
         private string? hinted;
 
         /// <param name="path">The path from the root to the chosen trigger.</param>
-        public Replayer(MissionIndex index, MissionTrigger chosen, IReadOnlyList<MissionTrigger> path)
+        /// <param name="early">For pass 2: the timers that the timer rule of pass 1 ran. Null for pass 1.</param>
+        public Replayer(MissionIndex index, MissionTrigger chosen, IReadOnlyList<MissionTrigger> path,
+            IReadOnlySet<TimerKey>? early = null)
         {
             this.index = index;
             this.chosen = chosen;
             this.path = path;
+            this.early = early;
             program = MachineProgram.Of(index);
             var root = path[0];
             Machine = new TriggerMachine(index, world, new MachineOptions { StopBefore = chosen });
@@ -111,6 +130,9 @@ internal sealed partial record StartReplay
         /// <summary>The jumps that the system rule finds, as <see cref="StartReplay.Jumps"/> tells.</summary>
         public List<int> Jumps { get; } = [];
 
+        /// <summary>The timers that the timer rule ran in pass 1, each with its start.</summary>
+        public HashSet<TimerKey> TimerRuns { get; } = [];
+
         /// <summary>The rules before a trigger of the path runs, in the order of the summary of the class.</summary>
         /// <param name="position">The position of the trigger in the path.</param>
         public void Before(int position)
@@ -121,7 +143,9 @@ internal sealed partial record StartReplay
             Objectives(trigger, rest);
             BeforeInSpace(trigger, rest);
             Systems(position, rest);
-            Arrival(position);
+            // Only the least time of pass 1 uses the arrival.
+            if (early == null)
+                Arrival(position);
             Launch(trigger, rest);
             // Again after the other rules: their runs can show more time.
             Timers(position, rest);
@@ -168,7 +192,8 @@ internal sealed partial record StartReplay
             }
         }
 
-        /// <summary>The timer rule, before a trigger of the path runs (see the summary of the class). One call tries each
+        /// <summary>The timer rule, before a trigger of the path runs (see the summary of the class). Pass 1 runs each
+        /// waiting timer whose time the path shows. Pass 2 runs each timer of pass 1 at its early step. One call tries each
         /// waiting timer at most once.</summary>
         /// <param name="position">The position of the next trigger of the path.</param>
         /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
@@ -199,14 +224,46 @@ internal sealed partial record StartReplay
                         continue;
                     // A timer of 0 s runs at its start. So a waiting timer has a time of at least one heartbeat, and a
                     // bound of 0 runs no timer.
-                    if (time <= timeline.Bound(start, position, next))
+                    if (early == null
+                            ? time <= timeline.Bound(start, position, next)
+                            : early.Contains(KeyOf(slot, start)) && !KnownBefore(position, slot, start))
                         (due, dueStart, dueTime) = (waiting, start, time);
                 }
                 if (due == null)
                     return;
                 tried.Add(due);
-                TryRun([due], rest);
+                // The run removes the start of the timer, so read the key first.
+                var key = KeyOf(program.SlotOf(due), dueStart);
+                if (TryRun([due], rest) && early == null)
+                    TimerRuns.Add(key);
             }
+        }
+
+        private TimerKey KeyOf(int slot, int start)
+        {
+            var (starter, run) = timeline.SourceOf(start);
+            return new TimerKey(slot, starter, run);
+        }
+
+        /// <summary>True when the next trigger of the path is known to come before the time of a waiting timer. A run of
+        /// the path started the timer. After that run, each trigger of the path up to the next trigger has Cnd_Timer or
+        /// Cnd_True. The longest times of these timers add up to less than the shortest time of the waiting timer.</summary>
+        /// <param name="position">The position of the next trigger of the path.</param>
+        private bool KnownBefore(int position, int slot, int start)
+        {
+            var from = timeline.PositionOf(start);
+            if (from < 0)
+                return false;
+            var sum = 0;
+            for (var k = from + 1; k <= position; k++)
+            {
+                var step = program.SlotOf(path[k]);
+                if (program.Kinds[step] == ConditionKind.Timer)
+                    sum += program.TimerLongest[step];
+                else if (program.Kinds[step] != ConditionKind.True)
+                    return false;
+            }
+            return sum < program.TimerShortest[slot];
         }
 
         /// <summary>The arrival part of the timer rule. A trigger of the path can wait for ships to arrive in the system of
@@ -435,7 +492,8 @@ internal sealed partial record StartReplay
 
         /// <summary>Runs a chain of waiting triggers in order. When a run breaks a rule of <see cref="Replayer"/>, the
         /// replay goes back to the state before the chain.</summary>
-        private void TryRun(IReadOnlyList<MissionTrigger> chain, IReadOnlyList<MissionTrigger> rest)
+        /// <returns>True when the chain ran, false when the replay went back.</returns>
+        private bool TryRun(IReadOnlyList<MissionTrigger> chain, IReadOnlyList<MissionTrigger> rest)
         {
             var state = Machine.Snapshot();
             var count = Changes.Count;
@@ -450,14 +508,20 @@ internal sealed partial record StartReplay
             }
             ok = ok && before.All(b => Machine.StateOf(b.Trigger).Runs == b.Runs && (!b.Alive || Alive(b.Trigger)));
             if (ok)
-                return;
+                return true;
             Machine = TriggerMachine.From(state, index, world);
             Changes.RemoveRange(count, Changes.Count - count);
             timeline.Cut(count);
             read = Math.Min(read, count);
+            return false;
         }
 
         private bool Alive(MissionTrigger trigger) => Machine.Active.Contains(trigger) || Machine.Pending.Contains(trigger);
+
+        /// <summary>A timer with its start, in words that stay the same in each pass. It holds the slot of the timer, the
+        /// slot of the trigger whose run started it and the number of that run. The first starts have the starter
+        /// -1.</summary>
+        public readonly record struct TimerKey(int Timer, int Starter, int Run);
 
         /// <summary>The name of a value of a line, or null for an empty value or a word such as no_params, ANY or
         /// ALL.</summary>
