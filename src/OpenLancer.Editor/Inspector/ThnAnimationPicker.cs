@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using ImGuiNET;
 using LibreLancer;
 using LibreLancer.Data.GameData;
 using LibreLancer.Data.Schema;
 using LibreLancer.ImUI;
 using LibreLancer.Thn;
+using OpenLancer.Data;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Cutscene;
@@ -24,7 +26,8 @@ namespace OpenLancer.Editor.Inspector;
 /// <remarks>A COMPOUND plays the scripts of its own model, not the clips of the <c>.anm</c> files (GameObject.cs:602-605),
 /// so the row of another target keeps its text field (risk R5 of the M8b design). The save gate checks the clip with
 /// the same rule (<see cref="ThnTemplateRules.PlaysClips"/>) and the same text
-/// (<see cref="ThnTemplateRules.UnknownClip"/>).</remarks>
+/// (<see cref="ThnTemplateRules.ClipProblem"/>). When the gate blocks the clip, the field has the color and the frame
+/// of an error.</remarks>
 internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid) : IDisposable
 {
     /// <summary>The tooltip of the field when the user can pick a clip.</summary>
@@ -34,7 +37,7 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
     public const string PlaysTheEvent = "Plays the cutscene preview from the time of this event.";
 
     /// <summary>The reason of a disabled <b>Preview</b> button when the event has no clip.</summary>
-    public const string NoClip = "The event has no clip.";
+    public const string NoClip = ThnTemplateRules.NoClip;
 
     /// <summary>The reason of a disabled <b>Preview</b> button when the cutscene has no preview and gives no
     /// reason.</summary>
@@ -111,17 +114,34 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
     internal static string? Template(ThnScriptModel? script, string name) =>
         script?.EntityNamed(name)?.Table["template_name"] is ThnText { Value: var template } ? template : null;
 
-    /// <summary>The tooltip of the field. It has the clip and its skeletons, or the problem of an unknown clip, as the
-    /// save gate gives it. Then it has the click hint, or the reason of the read-only state.</summary>
+    /// <summary>The tooltip of the field. It has the clip and its skeletons, or the problem of an empty or an unknown
+    /// clip, as the save gate gives it. Then it has the click hint, or the reason of the read-only state.</summary>
     /// <param name="current">The value of the field.</param>
     /// <param name="readOnly">Why the row cannot change the value, or null.</param>
     internal static string FieldTooltip(AnimationClips clips, AnimationClip? clip, string current, string? readOnly)
     {
         var action = readOnly ?? ClickToPick;
         return clip != null ? $"{clip.Name}\n{clips.SkeletonText(clip)}\n\n{action}"
-            : current.Length > 0 ? $"{ThnTemplateRules.UnknownClip(current)}\n\n{action}"
-            : action;
+            : $"{ThnTemplateRules.ClipProblem(current)}\n\n{action}";
     }
+
+    /// <summary>True when the save gate blocks the clip of an event: the problems of the cutscene have one at the
+    /// <c>props.animation</c> of the event.</summary>
+    /// <param name="problems">The problems of the save gate (see <c>EditSession.CutsceneErrors</c>).</param>
+    /// <param name="script">The version of W that gave the problems.</param>
+    internal static bool Blocked(IReadOnlyList<Diagnostic> problems, ThnScriptModel script, ThnRef target) =>
+        problems.Any(p => p.Cutscene is { Kind: ThnElementKind.Event, Value: ThnTemplateRules.AnimationPath } place &&
+                          place.ElementIn(script)?.Id == target.Id);
+
+    /// <summary>The text, the color and the red frame of the closed field. An empty or an unknown clip has the color
+    /// and the frame of an error when the save gate blocks it, else the warning color, for example for a retail clip
+    /// that the lower cutscene has too.</summary>
+    /// <param name="current">The value of the field.</param>
+    /// <param name="known">True when the game has the clip.</param>
+    /// <param name="blocked">True when the save gate blocks the clip (see <see cref="Blocked"/>).</param>
+    internal static (string Text, Vector4 Color, bool Error) FieldLook(string current, bool known, bool blocked) =>
+        (known ? current : current.Length == 0 ? NotSet : $"Missing ({ObjectKinds.Thn.Clip.Label}): {current}",
+            blocked ? EditorTheme.Error : known ? EditorTheme.Text : EditorTheme.Warning, blocked);
 
     /// <summary>Why the <b>Preview</b> button is disabled, or null when it is active.</summary>
     /// <param name="current">The value of the field.</param>
@@ -152,16 +172,16 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
         // The game finds the clip by the name as it is, so the value keeps its spaces.
         var current = ThnFieldEdit.Format(field.Kind, field.Value);
         var clip = clips.Find(current);
+        var blocked = script != null && workspace.Path is { } path && window.Session is { } session &&
+                      Blocked(session.Edits.CutsceneErrors(path), script, field.Target);
         grid.ThnRow(label, field, note ?? Note, () =>
         {
             var style = ImGui.GetStyle();
             var button = ImGui.CalcTextSize("Preview").X + 2 * style.FramePadding.X;
-            var (text, dim, color) = current.Length == 0 ? (NotSet, "", EditorTheme.TextDim)
-                : clip != null ? (current, clips.LabelOf(clip), EditorTheme.Text)
-                : ($"Missing ({ObjectKinds.Thn.Clip.Label}): {current}", "", EditorTheme.Warning);
+            var (text, color, error) = FieldLook(current, clip != null, blocked);
             ImGui.BeginDisabled(field.ReadOnly != null);
-            var clicked = PropertyGrid.PickerField(text, dim, color, false, clip != null ? ObjectKinds.Thn.Clip : null,
-                -(button + style.ItemInnerSpacing.X));
+            var clicked = PropertyGrid.PickerField(text, clip != null ? clips.LabelOf(clip) : "", color, error,
+                clip != null ? ObjectKinds.Thn.Clip : null, -(button + style.ItemInnerSpacing.X));
             ImGui.EndDisabled();
             if (ImGui.IsItemHovered(ImGuiHoveredFlags.ForTooltip))
             {
@@ -184,10 +204,10 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
 
             ImGui.EndDisabled();
             ImGui.SetItemTooltip(disabled ?? PlaysTheEvent);
-            if (current.Length > 0 && clip == null)
+            if (clip == null)
             {
-                ImGui.PushStyleColor(ImGuiCol.Text, EditorTheme.Warning);
-                ImGui.TextWrapped(ThnTemplateRules.UnknownClip(current));
+                ImGui.PushStyleColor(ImGuiCol.Text, color);
+                ImGui.TextWrapped(ThnTemplateRules.ClipProblem(current));
                 ImGui.PopStyleColor();
             }
         });
@@ -268,7 +288,7 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
         if (clips.Find(row.Value) is not { } clip)
         {
             ImGui.PushStyleColor(ImGuiCol.Text, EditorTheme.Warning);
-            ImGui.TextWrapped(ThnTemplateRules.UnknownClip(row.Value));
+            ImGui.TextWrapped(ThnTemplateRules.ClipProblem(row.Value));
             ImGui.PopStyleColor();
             return;
         }

@@ -122,6 +122,9 @@ public static class ThnChecks
     /// <summary>The longest value text in a message.</summary>
     private const int ShownLength = 60;
 
+    /// <summary>The error of a START_MOTION event on a character without <c>props.animation</c>.</summary>
+    internal const string MotionNeedsClip = "The key is missing. The engine needs it for a START_MOTION on a DEFORMABLE.";
+
     /// <summary>The keys of an entity. The engine reads them from an entity of each type (ThnScript.cs:253-487).</summary>
     private static readonly ImmutableArray<ThnKeyRow> EntityRows =
         [.. ThnSchema.Rows.Where(r => r.Element == ThnElementKind.Entity).DistinctBy(r => r.Path.Text, StringComparer.Ordinal)];
@@ -320,18 +323,32 @@ public static class ThnChecks
         /// <summary>
         /// A START_MOTION event on a character plays a clip of the animation files (StartMotionEvent.cs:34,
         /// AnimationComponent.cs:192-203). The engine finds the clip by the name as it is, and a character without the
-        /// clip does not move. The check applies only where the rule of the clip list applies
-        /// (<see cref="ThnTemplateRules.PlaysClips"/>), so a COMPOUND, which plays the scripts of its own model, gets no
-        /// check. An empty clip names no clip, as in the clip field.
+        /// clip does not move. An empty clip names no clip either. The check applies only where the rule of the clip
+        /// list applies (<see cref="ThnTemplateRules.PlaysClips"/>), so a COMPOUND, which plays the scripts of its own
+        /// model, gets no check.
         /// </summary>
+        /// <remarks>Without the key, the event has no clip, and the engine throws when it looks for the clip
+        /// (StartMotionEvent.cs:34, AnimationComponent.cs:194). No code catches it (ThnScriptInstance.cs:335). The
+        /// character of a DEFORMABLE has the animations (ThnScriptInstance.cs:266-270), and so does the room NPC that
+        /// plays its Actor. So the missing key is an error.</remarks>
         private void Motion(Element ev, ThnTable targets, ThnTable? props)
         {
-            if (data == null || props?["animation"] is not ThnText { Value.Length: > 0 } clip ||
+            // A props slot that is not a table has its own error.
+            if (props == null && ev.Table.List.Length > ThnElementPaths.PropsSlot ||
                 targets.List[0] is not ThnText first ||
-                !ThnTemplateRules.PlaysClips(entityTables, [first.Value], symbols) ||
-                data.Item(ThnItemKind.Animation, clip.Value) != ThnItemState.Missing)
+                !ThnTemplateRules.PlaysClips(entityTables, [first.Value], symbols))
                 return;
-            Add(ev, ThnTemplateRules.AnimationPath, ThnTemplateRules.UnknownClip(clip.Value), name: true);
+            var value = props?["animation"];
+            if (value == null)
+            {
+                Add(ev, ThnTemplateRules.AnimationPath, MotionNeedsClip);
+                return;
+            }
+            // A value that is not a text has its own error. No clip has an empty name.
+            if (data == null || value is not ThnText { Value: var clip } ||
+                data.Item(ThnItemKind.Animation, clip) != ThnItemState.Missing)
+                return;
+            Add(ev, ThnTemplateRules.AnimationPath, ThnTemplateRules.ClipProblem(clip), name: true);
         }
 
         /// <summary>Checks one key of a row in its root: the record of an entity or the props of an event.</summary>

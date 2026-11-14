@@ -96,8 +96,9 @@ public sealed class AnimationCatalogRetailTests(ITestOutputHelper output)
     }
 
     /// <summary>
-    /// Each START_MOTION value of the retail cutscenes whose first target is a character (DEFORMABLE) is in the data list
-    /// <c>animation</c> of a retail session, by the name as it is. The test chooses the row as the Inspector does: from
+    /// Each START_MOTION event of the retail cutscenes whose first target is a character (DEFORMABLE) has a value that is
+    /// in the data list <c>animation</c> of a retail session, by the name as it is. So no such event lacks the key or has
+    /// an empty clip. The test chooses the row as the Inspector does: from
     /// the targets of the Timeline event and the entities of the script. A value on a COMPOUND names a script of its
     /// model, so the row of such an event keeps its text field (risk R5), and the save gate does not check it.
     /// </summary>
@@ -118,24 +119,29 @@ public sealed class AnimationCatalogRetailTests(ITestOutputHelper output)
             foreach (var ev in TimelineModel.Build(file, script, evaluator.Symbols, ScriptPlay.Normal).Events)
             {
                 if (ev.Kind != EventTypes.StartMotion ||
-                    script.Element(ThnElementKind.Event, ev.Ref.Id) is not { } element ||
-                    ThnElementPaths.Get(ThnElementKind.Event, element.Table, path) is not ThnText value)
+                    script.Element(ThnElementKind.Event, ev.Ref.Id) is not { } element)
                 {
                     continue;
                 }
 
+                var value = ThnElementPaths.Get(ThnElementKind.Event, element.Table, path);
                 if (!ThnAnimationPicker.Applies(ev.Kind, path.Text, script, ev.Targets))
                 {
-                    others++;
-                    otherFiles.Add(file);
+                    if (value is ThnText)
+                    {
+                        others++;
+                        otherFiles.Add(file);
+                    }
+
                     continue;
                 }
 
+                // An event without the key crashes the game, and an empty clip names no clip.
                 characters++;
-                if (clips.Find(value.Value) is not { } clip ||
-                    !clip.Value.Equals(value.Value, StringComparison.OrdinalIgnoreCase))
+                if (value is not ThnText text || clips.Find(text.Value) is not { } clip ||
+                    !clip.Value.Equals(text.Value, StringComparison.OrdinalIgnoreCase))
                 {
-                    missing.Add($"{file}: {value.Value}");
+                    missing.Add($"{file}: {(value is ThnText shown ? shown.Value : "no props.animation")}");
                 }
             }
         }

@@ -47,6 +47,10 @@ public static class ThnTemplateRules
     /// script with the name and starts no motion (AnimationComponent.cs:192-203).</summary>
     public const string ClipConsequence = "The character does not move.";
 
+    /// <summary>The problem of a START_MOTION event on a character with an empty clip. The engine finds no script with
+    /// an empty name either.</summary>
+    public const string NoClip = "The event has no clip.";
+
     private const string NoModel = "The scene shows the entity without a model.";
 
     /// <summary>
@@ -138,10 +142,12 @@ public static class ThnTemplateRules
         IReadOnlyDictionary<string, ThnSymbolInfo> symbols) =>
         TargetType(entities, targets, symbols) == CharacterType;
 
-    /// <summary>The problem of a clip that the game does not have, with its consequence. The clip field of the
-    /// Inspector, the save gate and the agent tools give this text.</summary>
-    public static string UnknownClip(string clip) =>
-        $"The game has no animation {ThnChecks.Shown(new ThnText(clip))}. {ClipConsequence}";
+    /// <summary>The problem of a clip that the game does not have, with its consequence: an empty clip
+    /// (<see cref="NoClip"/>) or a name that no clip has. The clip field of the Inspector, the save gate and the agent
+    /// tools give this text.</summary>
+    public static string ClipProblem(string clip) => clip.Length == 0
+        ? $"{NoClip} {ClipConsequence}"
+        : $"The game has no animation {ThnChecks.Shown(new ThnText(clip))}. {ClipConsequence}";
 
     /// <summary>
     /// What the engine makes of an equipment section for a COMPOUND (GameItemDb.cs:1008-1303). Only some section types

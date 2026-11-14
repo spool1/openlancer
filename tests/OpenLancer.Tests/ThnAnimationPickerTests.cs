@@ -8,6 +8,7 @@ using LibreLancer.Thn;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Inspector;
+using OpenLancer.Editor.Ui;
 using Xunit;
 using static OpenLancer.Tests.ThnScripts;
 
@@ -108,12 +109,12 @@ public sealed class ThnAnimationPickerTests
     }
 
     /// <summary>The field, the side pane and the save gate give one text for a clip that the game does not have: the
-    /// reason and the consequence come from <see cref="ThnTemplateRules.UnknownClip"/>.</summary>
+    /// reason and the consequence come from <see cref="ThnTemplateRules.ClipProblem"/>.</summary>
     [Fact]
     public void TheFieldAndTheSaveGateShareTheTextOfAnUnknownClip()
     {
         var clips = new AnimationClips([new AnimationClip(MaleWalk, BodyMale)], []);
-        var text = ThnTemplateRules.UnknownClip("Sc_typo");
+        var text = ThnTemplateRules.ClipProblem("Sc_typo");
         var gate = ThnChecks.NameProblems(@"DATA\SCRIPTS\x.thn", Evaluate(Script.Replace("Sc_walk", "Sc_typo",
             StringComparison.Ordinal)), Evaluator, new NoClips()).Single();
 
@@ -121,6 +122,23 @@ public sealed class ThnAnimationPickerTests
         Assert.EndsWith(ThnTemplateRules.ClipConsequence, text, StringComparison.Ordinal);
         Assert.StartsWith(text, ThnAnimationPicker.FieldTooltip(clips, null, "Sc_typo", null), StringComparison.Ordinal);
         Assert.Equal($"event {{ 1, START_MOTION, {{ \"Hero\" }} }}, props.animation: {text}", gate.Message);
+    }
+
+    /// <summary>
+    /// The closed field shows a known clip in the text color. An empty or an unknown clip has the color and the red
+    /// frame of an error when the save gate blocks it. Else it has the warning color, for example for a clip that the
+    /// lower cutscene has with the same problem. ThnClipGateTests reads the gate state.
+    /// </summary>
+    [Fact]
+    public void TheFieldShowsAClipThatTheSaveGateBlocksAsAnError()
+    {
+        Assert.Equal((MaleWalk, EditorTheme.Text, false), ThnAnimationPicker.FieldLook(MaleWalk, true, false));
+        Assert.Equal(("Missing (Animation): Sc_typo", EditorTheme.Error, true),
+            ThnAnimationPicker.FieldLook("Sc_typo", false, true));
+        Assert.Equal(("Missing (Animation): Sc_typo", EditorTheme.Warning, false),
+            ThnAnimationPicker.FieldLook("Sc_typo", false, false));
+        Assert.Equal(("Not set", EditorTheme.Error, true), ThnAnimationPicker.FieldLook("", false, true));
+        Assert.Equal(("Not set", EditorTheme.Warning, false), ThnAnimationPicker.FieldLook("", false, false));
     }
 
     /// <summary>Game data that has each item and no clip.</summary>
@@ -273,9 +291,10 @@ public sealed class ThnAnimationPickerTests
             ThnAnimationPicker.FieldTooltip(clips, walk, MaleWalk, null));
         Assert.Equal($"{MaleWalk}\nSkeletons: male body\n\n{readOnly}",
             ThnAnimationPicker.FieldTooltip(clips, walk, MaleWalk, readOnly));
-        Assert.Equal($"{ThnTemplateRules.UnknownClip("Sc_typo")}\n\n{ThnAnimationPicker.ClickToPick}",
+        Assert.Equal($"{ThnTemplateRules.ClipProblem("Sc_typo")}\n\n{ThnAnimationPicker.ClickToPick}",
             ThnAnimationPicker.FieldTooltip(clips, null, "Sc_typo", null));
-        Assert.Equal(readOnly, ThnAnimationPicker.FieldTooltip(clips, null, "", readOnly));
+        Assert.Equal($"{ThnAnimationPicker.NoClip} {ThnTemplateRules.ClipConsequence}\n\n{readOnly}",
+            ThnAnimationPicker.FieldTooltip(clips, null, "", readOnly));
 
         Assert.Null(ThnAnimationPicker.PreviewDisabled(MaleWalk, true, null));
         Assert.Equal(ThnAnimationPicker.NoClip, ThnAnimationPicker.PreviewDisabled("", true, null));

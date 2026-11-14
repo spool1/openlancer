@@ -322,7 +322,8 @@ public sealed class ThnChecksTests
     /// A START_MOTION event on a character plays a clip of the animation files, so a clip that the game does not have is
     /// a name problem: the character does not move. The engine finds a clip by its name as it is. The rule of the clip
     /// picker decides where the check applies: a COMPOUND plays the scripts of its model, a target can name an object
-    /// of another script, and for a name of two entities the last entity counts. An empty clip names no clip.
+    /// of another script, and for a name of two entities the last entity counts. An empty clip names no clip, so it is
+    /// a name problem too.
     /// </summary>
     [Fact]
     public void AnUnknownClipOfACharacterIsANameProblem()
@@ -350,14 +351,50 @@ public sealed class ThnChecksTests
         Assert.Empty(result.Errors);
         Assert.Equal([
             "event { 2, START_MOTION, { \"man\" } }, props.animation: The game has no animation \"Sc_Typo\". The character does not move.",
+            "event { 6, START_MOTION, { \"Man\" } }, props.animation: The event has no clip. The character does not move.",
             "event { 7, START_MOTION, { \"Man\" } }, props.animation: The game has no animation \" Sc_Walk\". The character does not move.",
         ], result.NameProblems.Select(p => p.Message));
         var problem = result.NameProblems[0];
         Assert.Equal((ThnElementKind.Event, 1, ThnTemplateRules.AnimationPath),
             (problem.Cutscene!.Kind, problem.Cutscene.Index, problem.Cutscene.Value));
-        Assert.Equal($"props.animation: {ThnTemplateRules.UnknownClip("Sc_Typo")}", problem.Subject);
+        Assert.Equal($"props.animation: {ThnTemplateRules.ClipProblem("Sc_Typo")}", problem.Subject);
         Assert.Empty(ThnChecks.NameProblems(Script, globals, Evaluator, new FakeData { Loaded = false }));
         Assert.Empty(ThnChecks.NameProblems(Script, globals, Evaluator, null));
+    }
+
+    /// <summary>
+    /// A START_MOTION event on a character without <c>props.animation</c> has no clip, and the engine throws when it
+    /// looks for the clip (StartMotionEvent.cs:34, AnimationComponent.cs:194). So the missing key is an error, also
+    /// without game data and also for a character with an Actor. An event without props has no key either. A COMPOUND,
+    /// a target that names no entity of the script, and a props slot that is not a table get no such error.
+    /// </summary>
+    [Fact]
+    public void AMotionOfACharacterWithoutTheClipKeyIsAnError()
+    {
+        const string entities = """
+            { entity_name = "Man", type = DEFORMABLE, template_name = "trent" },
+            { entity_name = "Npc", type = DEFORMABLE, userprops = { Actor = "Npc" } },
+            { entity_name = "Door", type = COMPOUND }
+            """;
+        const string events = """
+            { 1, START_MOTION, { "Man" }, { time_scale = 1 } },
+            { 2, START_MOTION, { "Npc" }, { duration = 1 } },
+            { 3, START_MOTION, { "Man" } },
+            { 4, START_MOTION, { "Door" }, { time_scale = 1 } },
+            { 5, START_MOTION, { "Nobody" }, { time_scale = 1 } },
+            { 6, START_MOTION, { "Man" }, 5 }
+            """;
+
+        var errors = ThnChecks.Errors(Script, Globals(entities, events), Evaluator);
+
+        Assert.Equal([
+            $"event {{ 1, START_MOTION, {{ \"Man\" }} }}, props.animation: {ThnChecks.MotionNeedsClip}",
+            $"event {{ 2, START_MOTION, {{ \"Npc\" }} }}, props.animation: {ThnChecks.MotionNeedsClip}",
+            $"event {{ 3, START_MOTION, {{ \"Man\" }} }}, props.animation: {ThnChecks.MotionNeedsClip}",
+            "event { 6, START_MOTION, { \"Man\" } }, props: The value is 5, but the engine reads a table there.",
+        ], errors.Select(e => e.Message));
+        Assert.Equal((ThnElementKind.Event, 0, ThnTemplateRules.AnimationPath),
+            (errors[0].Cutscene!.Kind, errors[0].Cutscene!.Index, errors[0].Cutscene!.Value));
     }
 
     /// <summary>

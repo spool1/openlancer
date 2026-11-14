@@ -339,7 +339,7 @@ internal sealed class ThnAnimationPreview(EditorWindow window) : IDisposable
         var scripts = data.GetCharacterAnimations().Scripts;
         if (!scripts.TryGetValue(clip, out var script))
         {
-            problem = ThnTemplateRules.UnknownClip(clip);
+            problem = ThnTemplateRules.ClipProblem(clip);
             return;
         }
 
