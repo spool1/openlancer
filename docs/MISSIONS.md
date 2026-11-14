@@ -382,6 +382,26 @@ The save gate stops a save when a script has an error that the edit made, for ex
 
 An agent of the agent server edits a mission with the same commands. `mission_edit` runs each command of the studio. The trigger tools, `mission_add_item` and `mission_place_prefab` do the gestures with named arguments, for example `mission_add_trigger` and `mission_link_triggers`. Each agent edit is one entry of the history with "Agent: " before its label. The agent tools refuse each edit that adds an error to a script. Beside `mission_dry_run`, `mission_start_plan` gives the plan of a play from a trigger, and `mission_play` starts the play in the editor. [MCP.md](MCP.md) tells about the tools.
 
+### The ship build file
+
+The `npc_ship_file` line of the `[Mission]` section names the file of the ship builds of a mission. A new ship build of the mission goes into this file. The field "Ship build file" in the Files section of the Mission page sets the line:
+
+- The dropdown lists each ship build file that the line can name. Such a file is in a folder under `DATA\MISSIONS`, outside the encounters folder, and has only `[NPCShipArch]` sections. A new file that you did not save is in the list too.
+- The list also has the shared file `DATA\MISSIONS\npcships.ini`, with a note: encounters and bases use its builds too.
+- A pick changes only the line. The builds of the old file do not move.
+- A value that names no file has a note: the editor makes the file when you add the first ship build of the mission. When the checks find a problem at the line, the note shows the problem.
+
+To make a new ship build file for the mission:
+
+1. Open the dropdown of the field "Ship build file".
+2. Click "New file...".
+3. Type a name. Use only letters, digits, `_` and `-`, with at most 64 characters. The popup starts with a free name, for example `npcships_2`.
+4. Read the install path under the name. The file goes into the folder of the script.
+5. If the popup shows a refusal, type another name.
+6. Click "Create".
+
+The editor makes an empty file in the active mod and sets the line. This is one entry of the edit history. A save writes the file. A script directly in `DATA\MISSIONS` cannot get its own file, because encounters and bases use the files of that folder. For such a script, pick a file of the list.
+
 ## Behavior prefabs
 
 A behavior prefab is a group of triggers with named fields, for example "Spawn wave" with the fields Ships, "Spawn when", Orders and Sides. The studio knows three forms:

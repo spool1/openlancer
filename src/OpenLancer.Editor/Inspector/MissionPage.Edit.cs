@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using ImGuiNET;
 using LibreLancer.ImUI;
+using OpenLancer.Data;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Fields;
 using OpenLancer.Data.Editing.Lists;
@@ -34,6 +35,7 @@ internal sealed partial class MissionPage
     private readonly Dictionary<string, int> pickerFrames = [];
     private readonly QuickAdd quickAdd = new();
     private readonly RenamePopup rename = new("##rename");
+    private readonly NewFilePopup newFile = new("##new-file");
     private (string Field, MissionTransaction Transaction)? gesture;
     private string? lastRefusal;
     private readonly Dictionary<string, string> texts = [];
@@ -74,6 +76,7 @@ internal sealed partial class MissionPage
         numbers.Clear();
         activeNumber = null;
         texts.Clear();
+        newFile.Close();
     }
 
     /// <summary>Forgets the values of the number fields for a new model. The field that the user drags keeps its
@@ -163,11 +166,12 @@ internal sealed partial class MissionPage
         }
 
         // The menu of the field comes after its widget, for example "Revert" of an override (section 8.6 of the M6b
-        // design).
+        // design). The note of the field comes under them.
         void Row(Action widget) => grid.Row(field.Label, () =>
         {
             widget();
             RowMenu(id, field.Actions);
+            Note(edit);
         });
 
         switch (edit.Widget)
@@ -301,7 +305,30 @@ internal sealed partial class MissionPage
     private bool Resolves(string ids, string? scope, string value) =>
         window.Session == null || ListsOf(ids, scope).Any(list => list == null || list.Find(value) != null);
 
-    /// <summary>A dropdown of the words of a set, or of the conditions of the field "Event" by event group.</summary>
+    /// <summary>The note under the widget of a field: a problem of the checks in the color of its severity, or a dim
+    /// note.</summary>
+    private static void Note(FieldEdit edit)
+    {
+        if (edit.Note is not { } note)
+        {
+            return;
+        }
+
+        ImGui.PushTextWrapPos(0);
+        if (edit.NoteSeverity is { } severity)
+        {
+            ImGui.TextColored(severity == DiagnosticSeverity.Error ? EditorTheme.Error : EditorTheme.Warning, note);
+        }
+        else
+        {
+            ImGui.TextDisabled(note);
+        }
+
+        ImGui.PopTextWrapPos();
+    }
+
+    /// <summary>A dropdown of the words of a set, or of the conditions of the field "Event" by event group. A choice
+    /// with a note shows the note under it. The item "New file..." at the end opens its popup.</summary>
     private void Words(PageField field, FieldEdit edit)
     {
         var current = edit.Choices.FirstOrDefault(c => string.Equals(c.Value, edit.Value, StringComparison.OrdinalIgnoreCase));
@@ -326,10 +353,29 @@ internal sealed partial class MissionPage
                 Run(edit.Make?.Invoke(MissionValue.Of(value)));
             }
 
-            if (!string.Equals(label, value, StringComparison.Ordinal))
+            var note = edit.ChoiceNotes.GetValueOrDefault(value);
+            if (!string.Equals(label, value, StringComparison.Ordinal) || note != null)
             {
-                ImGui.SetItemTooltip(value);
+                ImGui.SetItemTooltip(string.Join("\n", new[] { label != value ? value : null, note }.OfType<string>()));
             }
+
+            if (note != null)
+            {
+                ImGui.Indent();
+                ImGui.TextDisabled(note);
+                ImGui.Unindent();
+            }
+        }
+
+        if (edit.NewFile is { } item)
+        {
+            ImGui.Separator();
+            if (ImGui.Selectable(NewFileItem.Label))
+            {
+                newFile.Open(item);
+            }
+
+            ImGui.SetItemTooltip(item.Tooltip);
         }
 
         EditorTheme.PopMenuColors();

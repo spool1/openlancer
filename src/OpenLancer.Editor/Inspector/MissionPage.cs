@@ -134,6 +134,7 @@ internal sealed partial class MissionPage(EditorWindow window, PropertyGrid grid
             ImGui.Indent(padding);
             AddAction(model);
             ImGui.Unindent(padding);
+            newFile.Draw(Run);
             Ini(result, analysis, model, wholeScript: item.Kind == MissionItemKind.Mission);
             PrefabFile(model);
         }
@@ -262,6 +263,9 @@ internal sealed partial class MissionPage(EditorWindow window, PropertyGrid grid
             ChangedOf = session.Edits.Missions.ChangedLines,
             BaseOf = session.Edits.Missions.ChangedBase,
             SharedBuildFile = session.Edits.Missions.IsSharedBuildFile,
+            ShipBuildFiles = session.Edits.Missions.ShipBuildFiles,
+            NewShipFileRefusal = session.Edits.Missions.NewShipFileRefusal,
+            FreeShipFileName = session.Edits.Missions.FreeShipFileName,
             Run = run,
             RunNow = run?.Live == true ? window.Missions.Live.Now : 0,
         };
@@ -546,9 +550,9 @@ internal sealed partial class MissionPage(EditorWindow window, PropertyGrid grid
     /// <summary>True while the user edits the INI block or drags a field.</summary>
     public bool IsEditing => ini.IsEditing || gesture != null;
 
-    /// <summary>True while the rename popup or quick add of the page is open. An agent call waits for it (section 5.5,
-    /// item 3 of the MCP1 design).</summary>
-    public bool InGesture => rename.IsOpen || quickAdd.IsOpen;
+    /// <summary>True while the rename popup, quick add or the popup "New file..." of the page is open. An agent call
+    /// waits for it (section 5.5, item 3 of the MCP1 design).</summary>
+    public bool InGesture => rename.IsOpen || quickAdd.IsOpen || newFile.IsOpen;
 
     /// <summary>Ends an open edit of the INI block and an open drag of a field, for example before a save.</summary>
     public void EndEdit()

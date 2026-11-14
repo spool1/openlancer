@@ -199,6 +199,16 @@ public sealed class MissionPageEditTests
         Assert.DoesNotContain("label = ol_wing", m.Lines(Item("MsnShip", "ol_ship_1")));
     }
 
+    /// <summary>The Mission page with the ship build files, the rule of a new file and the marks of the session.</summary>
+    private static MissionPageModel MissionPage(MissionEdits m) =>
+        MissionPageModel.For(new PageContext(MissionRun.Execute(m.Missions.RunInputs()), m.Missions.Model(Script).Analysis,
+            false, false)
+        {
+            ReadOnlyOf = m.Missions.ReadOnlyReason, ChangedOf = m.Missions.ChangedLines,
+            ShipBuildFiles = m.Missions.ShipBuildFiles, NewShipFileRefusal = m.Missions.NewShipFileRefusal,
+            FreeShipFileName = m.Missions.FreeShipFileName,
+        }, MissionRef.Of(Script));
+
     [Fact]
     public void TheMissionPageSetsTheShipBuildFile()
     {
@@ -209,6 +219,90 @@ public sealed class MissionPageEditTests
         Assert.Equal(@"missions\ol_test\npcships.ini", file.Value);
         Run(m, file.Make!(@"missions\ol_test\ships_b.ini"));
         Assert.Equal([@"npc_ship_file = missions\ol_test\ships_b.ini"], m.Lines(Item("Mission", null)));
+    }
+
+    /// <summary>The field "Ship build file" is a dropdown of the files that the line can name (#18). The shared file has a
+    /// note, a pick sets the line, and a pick of the file of the line does nothing.</summary>
+    [Fact]
+    public void TheShipBuildFileFieldListsTheFilesAndAPickSetsTheLine()
+    {
+        using var m = Create(setup: ws =>
+        {
+            ws.WriteBase(@"DATA\MISSIONS\OL_OTHER\npcships.ini", ShipsText.Replace("ol_build_1", "ol_other_build"));
+            ws.WriteBase(@"DATA\MISSIONS\ENCOUNTERS\ol_enc.ini", ShipsText.Replace("ol_build_1", "ol_enc_build"));
+        });
+
+        var field = Field(MissionPage(m), "files", "Ship build file");
+        var edit = field.Edit!;
+
+        Assert.Equal(EditWidget.Words, edit.Widget);
+        Assert.Equal([@"MISSIONS\npcships.ini", @"MISSIONS\OL_OTHER\npcships.ini", @"MISSIONS\OL_TEST\npcships.ini"],
+            edit.Choices.Select(c => c.Value));
+        Assert.Equal(edit.Choices.Select(c => c.Value), edit.Choices.Select(c => c.Label));
+        Assert.Equal(MissionPageModel.SharedShipFileNote, Assert.Single(edit.ChoiceNotes).Value);
+        Assert.Equal(@"MISSIONS\npcships.ini", edit.ChoiceNotes.Single().Key);
+        // The value of the line names the own file, so the dropdown shows that choice, without a note.
+        Assert.Equal(@"MISSIONS\OL_TEST\npcships.ini", edit.Value);
+        Assert.Null(edit.Note);
+        Assert.False(field.Changed);
+        Assert.EndsWith(MissionPageModel.KeepsBuildsNote, field.Help);
+        Assert.Null(edit.Make!(@"MISSIONS\OL_TEST\NPCSHIPS.ini"));
+
+        var pick = edit.Make!(@"MISSIONS\OL_OTHER\npcships.ini")!;
+        var set = Assert.IsType<SetItemKey>(Assert.Single(pick.Commands));
+        Assert.Equal((Item("Mission", null), "npc_ship_file"), (set.Item, set.Key));
+        Assert.Equal([@"MISSIONS\OL_OTHER\npcships.ini"], Assert.Single(set.Lines).Texts!);
+        Run(m, pick);
+        Assert.Equal([@"npc_ship_file = MISSIONS\OL_OTHER\npcships.ini"], m.Lines(Item("Mission", null)));
+        var picked = Field(MissionPage(m), "files", "Ship build file");
+        Assert.True(picked.Changed);
+        Run(m, picked.Edit!.Make!(@"MISSIONS\npcships.ini"));
+        Assert.Equal(MissionPageModel.SharedShipFileNote, Field(MissionPage(m), "files", "Ship build file").Edit!.Note);
+    }
+
+    /// <summary>"New file..." of the field "Ship build file" gives a free name, the install path, the refusal of the
+    /// command and the batch of Create (#18).</summary>
+    [Fact]
+    public void NewFileOfTheShipBuildFileFieldMakesTheFileWithTheRuleOfTheCommand()
+    {
+        using var m = Create();
+
+        var item = Field(MissionPage(m), "files", "Ship build file").Edit!.NewFile!;
+
+        Assert.Equal("npcships_2", item.DefaultName);
+        Assert.Equal(@"DATA\MISSIONS\OL_TEST\npcships_2.ini", item.PathOf(item.DefaultName));
+        Assert.Null(item.Refusal(item.DefaultName));
+        Assert.Equal(@"A file exists at DATA\MISSIONS\OL_TEST\npcships.ini. Use another name.", item.Refusal("npcships"));
+        Assert.Equal(Data.Thn.ThnEdits.BadName, item.Refusal("my ships"));
+        Assert.Equal("Type a name for the ship build file.", item.Refusal(""));
+        Assert.Equal(new NewShipBuildFile(TestScript, @"DATA\MISSIONS\OL_TEST\npcships_2.ini"),
+            Assert.Single(item.Make(item.DefaultName).Commands));
+        Run(m, item.Make(item.DefaultName));
+        Assert.Equal([@"npc_ship_file = MISSIONS\OL_TEST\npcships_2.ini"], m.Lines(Item("Mission", null)));
+        var edit = Field(MissionPage(m), "files", "Ship build file").Edit!;
+        Assert.Equal(@"MISSIONS\OL_TEST\npcships_2.ini", edit.Value);
+        Assert.Contains(@"MISSIONS\OL_TEST\npcships_2.ini", edit.Choices.Select(c => c.Value));
+        Assert.Equal("npcships_3", edit.NewFile!.DefaultName);
+    }
+
+    /// <summary>A value of the field "Ship build file" that names no file shows the problem of the checks at the line,
+    /// or the note that the editor makes the file with the first build.</summary>
+    [Fact]
+    public void AShipBuildFileValueWithoutAFileGivesItsNote()
+    {
+        using var m = Create(Text.Replace(@"missions\ol_test\npcships.ini", @"missions\ol_test\later.ini"));
+
+        var base_ = Field(MissionPage(m), "files", "Ship build file").Edit!;
+        Run(m, base_.Make!(@"missions\ol_test\later_2.ini"));
+        var mod = Field(MissionPage(m), "files", "Ship build file").Edit!;
+
+        // The line of the base data has no shown problem, so the field tells that the editor makes the file.
+        Assert.Equal(@"missions\ol_test\later.ini", base_.Value);
+        Assert.Equal(MissionPageModel.NoShipFileNote, base_.Note);
+        Assert.Null(base_.NoteSeverity);
+        var problem = m.Missions.Model(Script).Analysis.Problems
+            .Single(p => p.Message.Contains("later_2.ini", System.StringComparison.Ordinal));
+        Assert.Equal((problem.Message, (Data.DiagnosticSeverity?)problem.Severity), (mod.Note, mod.NoteSeverity));
     }
 
     [Fact]

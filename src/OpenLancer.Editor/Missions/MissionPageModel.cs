@@ -5,6 +5,7 @@ using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Fields;
+using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Editor.Ui;
@@ -130,6 +131,38 @@ internal sealed record FieldEdit(EditWidget Widget, string Label)
 
     /// <summary>Why the field cannot change, or null. The widget then has its read-only state.</summary>
     public string? ReadOnly { get; init; }
+
+    /// <summary>A note under the widget, for example why the value names no file, or null.</summary>
+    public string? Note { get; init; }
+
+    /// <summary>The severity of <see cref="Note"/> when the note is a problem of the checks, or null for a plain
+    /// note.</summary>
+    public DiagnosticSeverity? NoteSeverity { get; init; }
+
+    /// <summary>The notes of the choices of a dropdown by their value, for example the note of the shared ship build
+    /// file. The dropdown shows a note under its choice and in the tooltip of the choice.</summary>
+    public IReadOnlyDictionary<string, string> ChoiceNotes { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>The item "New file..." at the end of a dropdown, or null.</summary>
+    public NewFileItem? NewFile { get; init; }
+}
+
+/// <summary>
+/// The item "New file..." of a dropdown (#18). A popup asks for a name, and shows the install path and the live refusal
+/// of the name. "Create" runs the batch. The functions make no change, so the tests check them.
+/// </summary>
+/// <param name="Title">The title of the popup, for example "New ship build file".</param>
+/// <param name="Tooltip">The tooltip of the item in the dropdown.</param>
+/// <param name="Note">A dim note of the popup, for example what happens to the old file.</param>
+/// <param name="DefaultName">The name in the field when the popup opens.</param>
+/// <param name="PathOf">Gives the install path of a name.</param>
+/// <param name="Refusal">Gives why "Create" cannot make the file of a name, or null.</param>
+/// <param name="Make">Makes the batch of "Create" for a name.</param>
+internal sealed record NewFileItem(string Title, string Tooltip, string Note, string DefaultName, Func<string, string> PathOf,
+    Func<string, string?> Refusal, Func<string, MissionBatch> Make)
+{
+    /// <summary>The label of the item in the dropdown.</summary>
+    public const string Label = "New file...";
 }
 
 /// <summary>An item of a row menu or a page menu, for example "Move up". It runs a batch, or goes to a link. An item
@@ -287,19 +320,11 @@ internal sealed partial record MissionPageModel(string Title, string Kind, char 
     /// design).</summary>
     public BaseChange? Base { get; init; }
 
-    /// <summary>The Mission page (section 10.2 of the M6a design).</summary>
-    /// <param name="text">Gives the text of a text id, or an empty text.</param>
-    /// <param name="commFile">Gives the voices file of a comm line, or null when no voices file has it.</param>
-    /// <param name="showBaseGame">True while the base-game messages show.</param>
-    /// <param name="hidesOpenLancer">True when the active mod has a targets list without OpenLancer (UI rule 4).</param>
-    /// <param name="systemName">Gives the name of a system of the game data, or null when the game data has no such
-    /// system. Null when the page knows no system names.</param>
-    /// <param name="readOnlyOf">Gives why a section cannot change, or null when the user can edit it. Null for a page
-    /// without edits.</param>
-    public static MissionPageModel Mission(MissionRunResult result, MissionAnalysis analysis, Func<int, string> text,
-        Func<string, string?> commFile, bool showBaseGame, bool hidesOpenLancer, Func<string, string?>? systemName = null,
-        Func<SectionRef, string?>? readOnlyOf = null)
+    /// <summary>The Mission page (section 10.2 of the M6a design). The context gives the texts, the voices files, the
+    /// names of the systems, the read-only reasons, the marks of the active mod and the ship build files.</summary>
+    public static MissionPageModel Mission(PageContext context)
     {
+        var (result, analysis, text, showBaseGame) = (context.Result, context.Analysis, context.Text, context.ShowBaseGame);
         var schema = MissionSchema.Retail;
         var index = analysis.Index;
         var slot = analysis.Script.Slot;
@@ -324,17 +349,17 @@ internal sealed partial record MissionPageModel(string Title, string Kind, char 
             ], slot.Notes.Select(n => schema.SlotNotes.GetValueOrDefault(n) ?? n).ToList()));
         }
 
-        sections.Add(Overview(analysis, systemName));
+        sections.Add(Overview(analysis, context.SystemName));
         sections.Add(Problems(analysis, analysis.Problems, showBaseGame));
-        if (!hidesOpenLancer)
+        if (!context.HidesOpenLancer)
             sections.Add(OpenLancer(index));
-        sections.Add(VoiceLines(index, commFile));
+        sections.Add(VoiceLines(index, context.CommFile));
         sections.Add(Texts(index, text));
         var header = analysis.Document.OfKind(MissionSectionKind.Mission).FirstOrDefault();
         var files = MissionSummary.Bundle(result, analysis).Select(b => new PageField(b.Name, b.Value, FileTooltip(b),
             b.ActionPhrase != null ? new BundleLink(analysis.Script.Path, b) : null)).ToList();
-        if (header != null && readOnlyOf != null && readOnlyOf(header.Ref) == null)
-            files.Insert(0, ShipBuildFileField(analysis, header));
+        if (header != null && context.Editable(header.Ref))
+            files.Insert(0, ShipBuildFileField(context, header));
         sections.Add(new PageSection("files", "Files", EditorIcons.Folder, schema.Help["missionFiles"], files, []));
         var advanced = new List<PageField>();
         // The keys that the game does not use (decision D426). Their help text says where the titles come from.
@@ -350,29 +375,67 @@ internal sealed partial record MissionPageModel(string Title, string Kind, char 
             MissionCompleteness.OfMission(analysis), sections, header?.Ref);
     }
 
+    /// <summary>The note of the shared ship build file in the field "Ship build file".</summary>
+    internal const string SharedShipFileNote = "Encounters and bases use the builds of this file too.";
+
+    /// <summary>The note of a value of the field "Ship build file" that names no file.</summary>
+    internal const string NoShipFileNote =
+        "No file has this path. The editor makes the file when you add the first ship build of this mission.";
+
+    /// <summary>The end of the tooltip of the field "Ship build file", and the note of its popup "New file...".</summary>
+    internal const string KeepsBuildsNote =
+        "A pick or a new file changes only this line. The builds of the old file do not move.";
+
     /// <summary>
-    /// The field "Ship build file" of the Mission page (section 8.4 of the M6b design): the <c>npc_ship_file</c> line of
-    /// <c>[Mission]</c>. A new ship build of the script goes into this file, so a new build needs it.
+    /// The field "Ship build file" of the Mission page (section 8.4 of the M6b design, #18): the <c>npc_ship_file</c>
+    /// line of <c>[Mission]</c>. A new ship build of the script goes into this file, so a new build needs it. The
+    /// dropdown lists the files that the line can name, and "New file..." makes an empty file in the folder of the
+    /// script. The note under the field gives the problem of the checks at the line. Else it tells about a value without
+    /// a file or about the shared file.
     /// </summary>
-    private static PageField ShipBuildFileField(MissionAnalysis analysis, MissionSection header)
+    private static PageField ShipBuildFileField(PageContext context, MissionSection header)
     {
+        var script = context.Analysis.Script.Path;
         var key = MissionSchema.Retail.Section("Mission")?.Key("npc_ship_file");
-        var value = header.Section.FirstOrDefault(e => MissionIndex.Is(e.Name, "npc_ship_file") && e.Count > 0) is { } line
-            ? MissionIndex.Text(line[0])
-            : "";
+        var row = header.Section.ToList().FindIndex(e => MissionIndex.Is(e.Name, "npc_ship_file") && e.Count > 0);
+        var value = row >= 0 ? MissionIndex.Text(header.Section[row][0]) : "";
+        var files = context.ShipBuildFiles();
+        var current = files.FirstOrDefault(f => SameFile(f.Value, value));
+        var problem = row < 0 ? null
+            : BaseGameMessages.Shown(context.Analysis.Problems, context.ShowBaseGame)
+                .FirstOrDefault(p => Equals(p.Target, header.Ref) && p.EntryIndex == row);
         const string label = "Ship build file";
-        return new PageField(label, value.Length > 0 ? value : NotSet, key?.Help)
+        string PathOf(string name) => MissionEditor.NewShipFilePath(script, name);
+        return new PageField(label, value.Length > 0 ? value : NotSet, $"{key?.Help} {KeepsBuildsNote}".TrimStart())
         {
-            Edit = new FieldEdit(EditWidget.Text, $"Set {label}")
+            Changed = context.Changed(header, "npc_ship_file"),
+            Edit = new FieldEdit(EditWidget.Words, $"Set {label}")
             {
-                Value = value,
-                Make = text => text.Scalar is { Length: > 0 } path
+                Value = current?.Value ?? value,
+                Choices = files.Select(f => (f.Value, f.Value, (string?)null)).ToList(),
+                ChoiceNotes = files.Where(f => f.Shared)
+                    .ToDictionary(f => f.Value, _ => SharedShipFileNote, StringComparer.OrdinalIgnoreCase),
+                Note = problem?.Message ?? (value.Length == 0 ? null
+                    : current == null ? NoShipFileNote
+                    : current.Shared ? SharedShipFileNote
+                    : null),
+                NoteSeverity = problem?.Severity,
+                Make = picked => picked.Scalar is { Length: > 0 } path && !SameFile(path, value)
                     ? new MissionBatch($"Set {label}", [new SetItemKey(ItemOf(header), "npc_ship_file",
                         [LineSpec.Raw("npc_ship_file", path)])])
                     : null,
+                NewFile = new NewFileItem("New ship build file",
+                    "Make a new empty ship build file in the folder of the script, and name it in this line.",
+                    KeepsBuildsNote, context.FreeShipFileName(script), PathOf,
+                    name => context.NewShipFileRefusal(script, PathOf(name)),
+                    name => new MissionBatch("New ship build file", [new NewShipBuildFile(new ScriptRef(script), PathOf(name))])),
             },
         };
     }
+
+    /// <summary>True when two values of an <c>npc_ship_file</c> line name the same file below the data folder.</summary>
+    private static bool SameFile(string a, string b) =>
+        MissionFiles.RelativeOf(a) is { } left && MissionFiles.RelativeOf(b) is { } right && VfsPath.Comparer.Equals(left, right);
 
     /// <summary>The tooltip of a row of the Files section: what it holds, and what a click does.</summary>
     private static string FileTooltip(MissionBundleRow row) =>

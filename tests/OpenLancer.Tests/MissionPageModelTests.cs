@@ -39,6 +39,16 @@ public sealed class MissionPageModelTests
         return (result, result.Of(Script)!);
     }
 
+    /// <summary>The Mission page of a run with the texts of <see cref="TextOf"/>.</summary>
+    private static MissionPageModel MissionPage(MissionRunResult result, MissionAnalysis analysis, bool showBaseGame = false,
+        bool hidesOpenLancer = false, Func<string, string?>? commFile = null, Func<string, string?>? systemName = null) =>
+        MissionPageModel.Mission(new PageContext(result, analysis, showBaseGame, hidesOpenLancer)
+        {
+            Text = TextOf,
+            CommFile = commFile ?? (_ => null),
+            SystemName = systemName,
+        });
+
     private static string TextOf(int id) => id switch
     {
         1234 => "Invented title",
@@ -51,7 +61,7 @@ public sealed class MissionPageModelTests
     {
         var (result, analysis) = Run(Full.Replace("[Mission]", "[Mission]\nmission_title = 5"));
 
-        var page = MissionPageModel.Mission(result, analysis, TextOf, _ => null, showBaseGame: false, hidesOpenLancer: false);
+        var page = MissionPage(result, analysis);
 
         Assert.Equal(["slot", "overview", "problems", "openlancer", "voice", "text", "files", "advanced"],
             page.Sections.Select(s => s.Id));
@@ -76,8 +86,7 @@ public sealed class MissionPageModelTests
         var (result, analysis) = Run(Full + "\n[MsnShip]\nnickname = s2\nsystem = sys_b\n\n[MsnSolar]\nnickname = sol1\n" +
                                      "system = sys_a\n");
 
-        var page = MissionPageModel.Mission(result, analysis, TextOf, _ => null, false, false,
-            system => system == "sys_a" ? "Invented System" : null);
+        var page = MissionPage(result, analysis, systemName: system => system == "sys_a" ? "Invented System" : null);
 
         var systems = page.Section("overview")!.Fields.Single(f => f.Label == "Systems");
         Assert.Equal(["Invented System", "sys_b"], systems.Chips.Select(c => c.Text));
@@ -92,7 +101,7 @@ public sealed class MissionPageModelTests
     public void EachKindHasItsGlyphAndTheFilesRowsAreLinks()
     {
         var (result, analysis) = Run(Full);
-        var page = MissionPageModel.Mission(result, analysis, TextOf, _ => null, false, false);
+        var page = MissionPage(result, analysis);
         var schema = MissionSchema.Retail;
 
         Assert.Equal(Editor.Ui.EditorIcons.Route, page.Glyph);
@@ -113,7 +122,7 @@ public sealed class MissionPageModelTests
     {
         var (result, analysis) = Run(Full);
 
-        var section = MissionPageModel.Mission(result, analysis, TextOf, _ => null, false, false).Section("openlancer")!;
+        var section = MissionPage(result, analysis).Section("openlancer")!;
 
         Assert.Equal(MissionSummary.OpenLancer(analysis.Index).Gaps.Select(g => (g.Name, g.Text)),
             section.Fields.Select(f => (f.Label, f.Value)));
@@ -124,7 +133,7 @@ public sealed class MissionPageModelTests
     {
         var (result, analysis) = Run(Full);
 
-        var page = MissionPageModel.Mission(result, analysis, TextOf, _ => null, false, hidesOpenLancer: true);
+        var page = MissionPage(result, analysis, hidesOpenLancer: true);
 
         Assert.Null(page.Section("openlancer"));
     }
@@ -134,8 +143,8 @@ public sealed class MissionPageModelTests
     {
         var (result, analysis) = Run(Story + "\n[Trigger]\nnickname = t_x\nCnd_True = no_params\n");
 
-        var hidden = MissionPageModel.Mission(result, analysis, TextOf, _ => null, false, false).Section("problems")!;
-        var shown = MissionPageModel.Mission(result, analysis, TextOf, _ => null, true, false).Section("problems")!;
+        var hidden = MissionPage(result, analysis).Section("problems")!;
+        var shown = MissionPage(result, analysis, showBaseGame: true).Section("problems")!;
 
         Assert.Empty(hidden.Fields);
         Assert.Equal(["1 base-game message is hidden."], hidden.Notes);
@@ -193,8 +202,8 @@ public sealed class MissionPageModelTests
                                      "Act_SendComm = s1, Player, comm_known\nAct_SendComm = s1, Player, comm_gone\n");
         string? CommFile(string name) => name == "comm_known" ? @"AUDIO\invented_voice.utf" : null;
 
-        var voice = MissionPageModel.Mission(result, analysis, TextOf, CommFile, false, false).Section("voice")!;
-        var empty = MissionPageModel.Mission(Run(Full).Result, Run(Full).Analysis, TextOf, CommFile, false, false)
+        var voice = MissionPage(result, analysis, commFile: CommFile).Section("voice")!;
+        var empty = MissionPage(Run(Full).Result, Run(Full).Analysis, commFile: CommFile)
             .Section("voice")!;
 
         Assert.Equal(["comm_known", "comm_gone"], voice.Fields.Select(f => f.Label));

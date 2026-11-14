@@ -59,6 +59,18 @@ internal sealed record PageContext(MissionRunResult Result, MissionAnalysis Anal
     /// <summary>True for a shared ship build file of the missions. Random encounters can use its builds too.</summary>
     public Func<string, bool> SharedBuildFile { get; init; } = _ => false;
 
+    /// <summary>Gives the files that the <c>npc_ship_file</c> line of a script can name (#18). Without a function, the
+    /// field "Ship build file" lists no file.</summary>
+    public Func<IReadOnlyList<ShipBuildFileChoice>> ShipBuildFiles { get; init; } = () => [];
+
+    /// <summary>Gives why a script cannot get a new ship build file at an install path, or null (#18). Without a
+    /// function, each path refuses, as in a view without an edit session.</summary>
+    public Func<string, string, string?> NewShipFileRefusal { get; init; } = (_, _) => MissionPageModel.FieldNote;
+
+    /// <summary>Gives the default name of a new ship build file of a script. Without a function, the name is
+    /// <see cref="MissionEditor.DefaultShipFileName"/>.</summary>
+    public Func<string, string> FreeShipFileName { get; init; } = _ => MissionEditor.DefaultShipFileName;
+
     /// <summary>Gives why the user cannot change the prefab instances of a script, or null. Without a function, no
     /// instance can change, as in a view without an edit session.</summary>
     public Func<string, string?> ScriptReadOnly { get; init; } = _ => MissionPageModel.FieldNote;
@@ -116,8 +128,7 @@ internal sealed partial record MissionPageModel
             case MissionItemKind.Mission when context.Prefab is { } prefab:
                 return PrefabPage(context, prefab, item.Key);
             case MissionItemKind.Mission:
-                return Mission(context.Result, analysis, context.Text, context.CommFile, context.ShowBaseGame,
-                    context.HidesOpenLancer, context.SystemName, context.ReadOnlyOf);
+                return Mission(context);
             case MissionItemKind.Trigger when trigger != null:
                 return Trigger(context, trigger, -1);
             case MissionItemKind.Row when trigger != null:
