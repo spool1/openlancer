@@ -199,15 +199,17 @@ public sealed class MissionPageEditTests
         Assert.DoesNotContain("label = ol_wing", m.Lines(Item("MsnShip", "ol_ship_1")));
     }
 
-    /// <summary>The Mission page with the ship build files, the rule of a new file and the marks of the session.</summary>
-    private static MissionPageModel MissionPage(MissionEdits m) =>
-        MissionPageModel.For(new PageContext(MissionRun.Execute(m.Missions.RunInputs()), m.Missions.Model(Script).Analysis,
+    /// <summary>The Mission page of a script with the ship build files, the rule of a new file and the marks of the
+    /// session.</summary>
+    private static MissionPageModel MissionPage(MissionEdits m, string script = Script) =>
+        MissionPageModel.For(new PageContext(MissionRun.Execute(m.Missions.RunInputs()), m.Missions.Model(script).Analysis,
             false, false)
         {
             ReadOnlyOf = m.Missions.ReadOnlyReason, ChangedOf = m.Missions.ChangedLines,
             ShipBuildFiles = m.Missions.ShipBuildFiles, NewShipFileRefusal = m.Missions.NewShipFileRefusal,
-            FreeShipFileName = m.Missions.FreeShipFileName,
-        }, MissionRef.Of(Script));
+            FreeShipFileName = m.Missions.FreeShipFileName, LostBuilds = m.Missions.LostBuilds,
+            NamesFile = m.Missions.NamesFile,
+        }, MissionRef.Of(script));
 
     [Fact]
     public void TheMissionPageSetsTheShipBuildFile()
@@ -241,6 +243,12 @@ public sealed class MissionPageEditTests
         Assert.Equal(edit.Choices.Select(c => c.Value), edit.Choices.Select(c => c.Label));
         Assert.Equal(MissionPageModel.SharedShipFileNote, Assert.Single(edit.ChoiceNotes).Value);
         Assert.Equal(@"MISSIONS\npcships.ini", edit.ChoiceNotes.Single().Key);
+        // The build of ol_npc_1 is only in the own file, so each other file has the warning. The build of ol_npc_shared
+        // is in the shared file, so the game finds it with each file.
+        const string lost = @"With this file, the game cannot find the ship build ol_build_1 of this mission. This build " +
+                            @"is only in MISSIONS\OL_TEST\npcships.ini. The game does not spawn the ships that use it.";
+        Assert.Equal(new Dictionary<string, string> { [@"MISSIONS\npcships.ini"] = lost, [@"MISSIONS\OL_OTHER\npcships.ini"] = lost },
+            edit.ChoiceWarnings);
         // The value of the line names the own file, so the dropdown shows that choice, without a note.
         Assert.Equal(@"MISSIONS\OL_TEST\npcships.ini", edit.Value);
         Assert.Null(edit.Note);
@@ -277,6 +285,8 @@ public sealed class MissionPageEditTests
         Assert.Equal("Type a name for the ship build file.", item.Refusal(""));
         Assert.Equal(new NewShipBuildFile(TestScript, @"DATA\MISSIONS\OL_TEST\npcships_2.ini"),
             Assert.Single(item.Make(item.DefaultName).Commands));
+        Assert.Equal(@"With the new file, the game cannot find the ship build ol_build_1 of this mission. This build is " +
+                     @"only in MISSIONS\OL_TEST\npcships.ini. The game does not spawn the ships that use it.", item.Warning);
         Run(m, item.Make(item.DefaultName));
         Assert.Equal([@"npc_ship_file = MISSIONS\OL_TEST\npcships_2.ini"], m.Lines(Item("Mission", null)));
         var edit = Field(MissionPage(m), "files", "Ship build file").Edit!;
@@ -303,6 +313,32 @@ public sealed class MissionPageEditTests
         var problem = m.Missions.Model(Script).Analysis.Problems
             .Single(p => p.Message.Contains("later_2.ini", System.StringComparison.Ordinal));
         Assert.Equal((problem.Message, (Data.DiagnosticSeverity?)problem.Severity), (mod.Note, mod.NoteSeverity));
+        // The line names no file, so the game finds no build in it now, and no choice and no new file warns.
+        Assert.Empty(mod.ChoiceWarnings);
+        Assert.Null(mod.NewFile!.Warning);
+    }
+
+    /// <summary>A value of the field "Ship build file" that names a file that exists and that cannot be a ship build file
+    /// gets its own note, not the note of a value without a file (review of #18). The checks give no problem at these
+    /// lines.</summary>
+    [Fact]
+    public void AShipBuildFileValueOfAWorldFileGivesItsNote()
+    {
+        const string mixed = @"DATA\MISSIONS\OL_MIXED\ol_mixed.ini";
+        const string encounter = @"DATA\MISSIONS\OL_ENC\ol_enc.ini";
+        using var m = Create(setup: ws =>
+        {
+            ws.WriteBase(mixed, "[Mission]\nnpc_ship_file = missions\\ol_mixed\\mixed.ini\n");
+            ws.WriteBase(@"DATA\MISSIONS\OL_MIXED\mixed.ini", ShipsText + "\n[Pilot]\nnickname = ol_pilot\n");
+            ws.WriteBase(encounter, "[Mission]\nnpc_ship_file = missions\\encounters\\ol_enc.ini\n");
+            ws.WriteBase(@"DATA\MISSIONS\ENCOUNTERS\ol_enc.ini", ShipsText);
+        });
+
+        foreach (var script in new[] { mixed, encounter })
+        {
+            var edit = Field(MissionPage(m, script), "files", "Ship build file").Edit!;
+            Assert.Equal((MissionPageModel.NotShipFileNote, (Data.DiagnosticSeverity?)null), (edit.Note, edit.NoteSeverity));
+        }
     }
 
     [Fact]

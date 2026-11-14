@@ -143,6 +143,11 @@ internal sealed record FieldEdit(EditWidget Widget, string Label)
     /// file. The dropdown shows a note under its choice and in the tooltip of the choice.</summary>
     public IReadOnlyDictionary<string, string> ChoiceNotes { get; init; } = new Dictionary<string, string>();
 
+    /// <summary>The warnings of the choices of a dropdown by their value: what goes wrong in the game after a pick of
+    /// the choice. The dropdown shows a warning under its choice, in the warning color, and in the tooltip of the
+    /// choice.</summary>
+    public IReadOnlyDictionary<string, string> ChoiceWarnings { get; init; } = new Dictionary<string, string>();
+
     /// <summary>The item "New file..." at the end of a dropdown, or null.</summary>
     public NewFileItem? NewFile { get; init; }
 }
@@ -163,6 +168,9 @@ internal sealed record NewFileItem(string Title, string Tooltip, string Note, st
 {
     /// <summary>The label of the item in the dropdown.</summary>
     public const string Label = "New file...";
+
+    /// <summary>What goes wrong in the game after "Create", or null. The popup shows it in the warning color.</summary>
+    public string? Warning { get; init; }
 }
 
 /// <summary>An item of a row menu or a page menu, for example "Move up". It runs a batch, or goes to a link. An item
@@ -382,16 +390,25 @@ internal sealed partial record MissionPageModel(string Title, string Kind, char 
     internal const string NoShipFileNote =
         "No file has this path. The editor makes the file when you add the first ship build of this mission.";
 
+    /// <summary>The note of a value of the field "Ship build file" that names a file that cannot be a ship build
+    /// file.</summary>
+    internal const string NotShipFileNote =
+        @"The editor cannot add ship builds to this file. The file has sections that are not ship builds, or it is " +
+        @"not in a folder under DATA\MISSIONS outside the encounters folder. Pick a file of the list, or make a new file.";
+
     /// <summary>The end of the tooltip of the field "Ship build file", and the note of its popup "New file...".</summary>
     internal const string KeepsBuildsNote =
-        "A pick or a new file changes only this line. The builds of the old file do not move.";
+        "A pick or a new file changes only this line. The builds of the old file do not move. The game finds the " +
+        "build of a ship only in this file or in a shared file. So it does not spawn a ship whose build is only in the " +
+        "old file.";
 
     /// <summary>
     /// The field "Ship build file" of the Mission page (section 8.4 of the M6b design, #18): the <c>npc_ship_file</c>
     /// line of <c>[Mission]</c>. A new ship build of the script goes into this file, so a new build needs it. The
     /// dropdown lists the files that the line can name, and "New file..." makes an empty file in the folder of the
-    /// script. The note under the field gives the problem of the checks at the line. Else it tells about a value without
-    /// a file or about the shared file.
+    /// script. A choice and "New file..." warn about the builds that the game then does not find. The note under the
+    /// field gives the problem of the checks at the line. Else it tells about a value without a file, a file that cannot
+    /// be a ship build file, or the shared file.
     /// </summary>
     private static PageField ShipBuildFileField(PageContext context, MissionSection header)
     {
@@ -401,6 +418,8 @@ internal sealed partial record MissionPageModel(string Title, string Kind, char 
         var value = row >= 0 ? MissionIndex.Text(header.Section[row][0]) : "";
         var files = context.ShipBuildFiles();
         var current = files.FirstOrDefault(f => SameFile(f.Value, value));
+        // The value of a file of the list has the letter case of the file.
+        var shown = current?.Value ?? value;
         var problem = row < 0 ? null
             : BaseGameMessages.Shown(context.Analysis.Problems, context.ShowBaseGame)
                 .FirstOrDefault(p => Equals(p.Target, header.Ref) && p.EntryIndex == row);
@@ -411,12 +430,16 @@ internal sealed partial record MissionPageModel(string Title, string Kind, char 
             Changed = context.Changed(header, "npc_ship_file"),
             Edit = new FieldEdit(EditWidget.Words, $"Set {label}")
             {
-                Value = current?.Value ?? value,
+                Value = shown,
                 Choices = files.Select(f => (f.Value, f.Value, (string?)null)).ToList(),
                 ChoiceNotes = files.Where(f => f.Shared)
                     .ToDictionary(f => f.Value, _ => SharedShipFileNote, StringComparer.OrdinalIgnoreCase),
+                ChoiceWarnings = files.Select(f => (f.Value, Lost: context.LostBuilds(script, f.Path)))
+                    .Where(c => c.Lost.Count > 0)
+                    .ToDictionary(c => c.Value, c => MissionErrors.LostBuildsText("this file", shown, c.Lost),
+                        StringComparer.OrdinalIgnoreCase),
                 Note = problem?.Message ?? (value.Length == 0 ? null
-                    : current == null ? NoShipFileNote
+                    : current == null ? context.NamesFile(value) ? NotShipFileNote : NoShipFileNote
                     : current.Shared ? SharedShipFileNote
                     : null),
                 NoteSeverity = problem?.Severity,
@@ -428,7 +451,12 @@ internal sealed partial record MissionPageModel(string Title, string Kind, char 
                     "Make a new empty ship build file in the folder of the script, and name it in this line.",
                     KeepsBuildsNote, context.FreeShipFileName(script), PathOf,
                     name => context.NewShipFileRefusal(script, PathOf(name)),
-                    name => new MissionBatch("New ship build file", [new NewShipBuildFile(new ScriptRef(script), PathOf(name))])),
+                    name => new MissionBatch("New ship build file", [new NewShipBuildFile(new ScriptRef(script), PathOf(name))]))
+                {
+                    Warning = context.LostBuilds(script, null) is { Count: > 0 } lost
+                        ? MissionErrors.LostBuildsText("the new file", shown, lost)
+                        : null,
+                },
             },
         };
     }

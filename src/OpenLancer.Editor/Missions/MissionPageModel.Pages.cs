@@ -71,6 +71,15 @@ internal sealed record PageContext(MissionRunResult Result, MissionAnalysis Anal
     /// <see cref="MissionEditor.DefaultShipFileName"/>.</summary>
     public Func<string, string> FreeShipFileName { get; init; } = _ => MissionEditor.DefaultShipFileName;
 
+    /// <summary>Gives the ship builds of a script that the game does not find when the <c>npc_ship_file</c> line names
+    /// another file, or a new empty file for null (see <see cref="MissionEditor.LostBuilds"/>). Without a function, no
+    /// build is lost.</summary>
+    public Func<string, string?, IReadOnlyList<string>> LostBuilds { get; init; } = (_, _) => [];
+
+    /// <summary>Gives true when W has a file at the path that a value of an <c>npc_ship_file</c> line names. Without a
+    /// function, no value names a file.</summary>
+    public Func<string, bool> NamesFile { get; init; } = _ => false;
+
     /// <summary>Gives why the user cannot change the prefab instances of a script, or null. Without a function, no
     /// instance can change, as in a view without an edit session.</summary>
     public Func<string, string?> ScriptReadOnly { get; init; } = _ => MissionPageModel.FieldNote;

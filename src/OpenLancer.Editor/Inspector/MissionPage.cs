@@ -266,6 +266,8 @@ internal sealed partial class MissionPage(EditorWindow window, PropertyGrid grid
             ShipBuildFiles = session.Edits.Missions.ShipBuildFiles,
             NewShipFileRefusal = session.Edits.Missions.NewShipFileRefusal,
             FreeShipFileName = session.Edits.Missions.FreeShipFileName,
+            LostBuilds = session.Edits.Missions.LostBuilds,
+            NamesFile = session.Edits.Missions.NamesFile,
             Run = run,
             RunNow = run?.Live == true ? window.Missions.Live.Now : 0,
         };

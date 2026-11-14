@@ -328,7 +328,7 @@ internal sealed partial class MissionPage
     }
 
     /// <summary>A dropdown of the words of a set, or of the conditions of the field "Event" by event group. A choice
-    /// with a note shows the note under it. The item "New file..." at the end opens its popup.</summary>
+    /// with a note or a warning shows it under the choice. The item "New file..." at the end opens its popup.</summary>
     private void Words(PageField field, FieldEdit edit)
     {
         var current = edit.Choices.FirstOrDefault(c => string.Equals(c.Value, edit.Value, StringComparison.OrdinalIgnoreCase));
@@ -354,15 +354,27 @@ internal sealed partial class MissionPage
             }
 
             var note = edit.ChoiceNotes.GetValueOrDefault(value);
-            if (!string.Equals(label, value, StringComparison.Ordinal) || note != null)
+            var warning = edit.ChoiceWarnings.GetValueOrDefault(value);
+            if (!string.Equals(label, value, StringComparison.Ordinal) || note != null || warning != null)
             {
-                ImGui.SetItemTooltip(string.Join("\n", new[] { label != value ? value : null, note }.OfType<string>()));
+                ImGui.SetItemTooltip(string.Join("\n", new[] { label != value ? value : null, note, warning }.OfType<string>()));
             }
 
-            if (note != null)
+            if (note != null || warning != null)
             {
                 ImGui.Indent();
-                ImGui.TextDisabled(note);
+                ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + 360 * ImGuiHelper.Scale);
+                if (note != null)
+                {
+                    ImGui.TextDisabled(note);
+                }
+
+                if (warning != null)
+                {
+                    ImGui.TextColored(EditorTheme.Warning, warning);
+                }
+
+                ImGui.PopTextWrapPos();
                 ImGui.Unindent();
             }
         }

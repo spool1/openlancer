@@ -9,8 +9,9 @@ namespace OpenLancer.Editor.Missions;
 
 /// <summary>
 /// The popup of the item "New file..." of a dropdown of a mission page (#18), in the form of New cutscene: the field
-/// "Name", the install path under it, the note of the item, the live refusal, and Create and Cancel. Create is disabled
-/// while the name has a refusal, and its tooltip gives the refusal. Create runs the batch of the item.
+/// "Name", the install path under it, the note and the warning of the item, the live refusal, and Create and Cancel.
+/// Create is disabled while the name has a refusal, and its tooltip gives the refusal. Create runs the batch of the
+/// item.
 /// </summary>
 /// <param name="id">The id of the popup in its window.</param>
 internal sealed class NewFilePopup(string id)
@@ -83,6 +84,11 @@ internal sealed class NewFilePopup(string id)
                              "of the active mod.");
         ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + 360 * scale);
         ImGui.TextDisabled(current.Note);
+        if (current.Warning is { } warning)
+        {
+            ImGui.TextColored(EditorTheme.Warning, warning);
+        }
+
         var refusal = current.Refusal(name);
         if (refusal != null)
         {

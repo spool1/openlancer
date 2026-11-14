@@ -386,21 +386,26 @@ An agent of the agent server edits a mission with the same commands. `mission_ed
 
 The `npc_ship_file` line of the `[Mission]` section names the file of the ship builds of a mission. A new ship build of the mission goes into this file. The field "Ship build file" in the Files section of the Mission page sets the line:
 
-- The dropdown lists each ship build file that the line can name. Such a file is in a folder under `DATA\MISSIONS`, outside the encounters folder, and has only `[NPCShipArch]` sections. A new file that you did not save is in the list too.
-- The list also has the shared file `DATA\MISSIONS\npcships.ini`, with a note: encounters and bases use its builds too.
+- The dropdown lists each ship build file that the line can name. Such a file is in a folder under `DATA\MISSIONS`, outside the encounters folder, and has only `[NPCShipArch]` sections. A new file that you did not save is in the list too. The list keeps a new file when the line names another file again.
+- The list also has the shared files directly in `DATA\MISSIONS`, for example `npcships.ini` and `npcships_test.ini`, with a note: encounters and bases use their builds too.
 - A pick changes only the line. The builds of the old file do not move.
-- A value that names no file has a note: the editor makes the file when you add the first ship build of the mission. When the checks find a problem at the line, the note shows the problem.
+- A value that names no file has a note: the editor makes the file when you add the first ship build of the mission.
+- A value that names a file that cannot be a ship build file has a note too. Examples are a file with other sections and an encounter file. Pick a file of the list, or make a new file.
+- When the checks find a problem at the line, the note shows the problem.
+
+The game finds the build of a mission ship only in the ship build file of the mission, then in the shared files `DATA\MISSIONS\npcships.ini` and `DATA\MISSIONS\npcships_test.ini`. It does not spawn a ship whose build it does not find. So a choice of the dropdown and "New file..." show a warning when builds of the mission are only in the old file. The warning names these builds. The mission checks do not find this problem, so a save does not stop for it.
 
 To make a new ship build file for the mission:
 
 1. Open the dropdown of the field "Ship build file".
 2. Click "New file...".
-3. Type a name. Use only letters, digits, `_` and `-`, with at most 64 characters. The popup starts with a free name, for example `npcships_2`.
+3. Type a name. Use only letters, digits, `_` and `-`, with at most 64 characters. Do not use a name that Windows uses for a device, for example `nul` or `com1`. The popup starts with a free name, for example `npcships_2`.
 4. Read the install path under the name. The file goes into the folder of the script.
 5. If the popup shows a refusal, type another name.
-6. Click "Create".
+6. If the popup shows a warning about builds of the old file, read it. The game does not spawn the ships that use these builds. To keep the old file, click "Cancel".
+7. Click "Create".
 
-The editor makes an empty file in the active mod and sets the line. This is one entry of the edit history. A save writes the file. A script directly in `DATA\MISSIONS` cannot get its own file, because encounters and bases use the files of that folder. For such a script, pick a file of the list.
+The editor makes an empty file in the active mod and sets the line. This is one entry of the edit history. A save writes the file. To remove a new file that you do not use, undo "New ship build file" before the save. A script directly in `DATA\MISSIONS` cannot get its own file, because encounters and bases use the files of that folder. For such a script, pick a file of the list.
 
 ## Behavior prefabs
 
