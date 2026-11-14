@@ -1176,7 +1176,8 @@ internal static class StartWorld
         index.Item(MissionSectionKind.Ship, name) ?? index.Item(MissionSectionKind.Formation, name) ??
         index.Item(MissionSectionKind.Solar, name) ?? index.Item(MissionSectionKind.Loot, name);
 
-    private static bool IsTrue(string? text) => text != null && (MissionIndex.Is(text, "true") || text.Trim() == "1");
+    /// <summary>True for a flag value of a line or a record: true or 1.</summary>
+    internal static bool IsTrue(string? text) => text != null && (MissionIndex.Is(text, "true") || text.Trim() == "1");
 
     /// <summary>The first value of a key of a section, or null.</summary>
     private static string? Text(MissionSection? section, string key) =>

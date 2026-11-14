@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Run;
 using Xunit;
@@ -13,8 +14,23 @@ namespace OpenLancer.Tests;
 /// </summary>
 public sealed class StartReplayRulesTests
 {
-    private static StartReplay Replay(string text, string chosen) =>
-        StartReplay.Run(Index(text), MissionStartPoint.At(chosen));
+    private static StartReplay Replay(string text, string chosen, MissionWorld? world = null) =>
+        StartReplay.Run(Index(text, world), MissionStartPoint.At(chosen));
+
+    /// <summary>A world with some objects of the system files and the system of each base. It knows the systems of the
+    /// objects and of the bases, and the bases.</summary>
+    private static MissionWorld World(IReadOnlyList<WorldObject> objects, params (string Base, string System)[] bases) =>
+        new(new Dictionary<MissionValueKind, IEnumerable<string>>
+        {
+            [MissionValueKind.System] =
+                objects.Select(o => o.System).Concat(bases.Select(b => b.System)).Distinct().ToList(),
+            [MissionValueKind.Base] = bases.Select(b => b.Base).ToList(),
+        }, null, bases.ToDictionary(b => b.Base, b => b.System), objects);
+
+    /// <summary>An object of the system files at a point on the x axis, with the system that its jump leads to or
+    /// null.</summary>
+    private static WorldObject Thing(string name, string system, float x, string? jumpTo = null) =>
+        new(name, system, new Vector3(x, 0, 0), Quaternion.Identity, jumpTo);
 
     private static List<string> Ran(StartReplay replay) =>
         replay.Changes.Where(c => c.Kind == MachineChangeKind.Ran).Select(c => c.Trigger.Nickname).ToList();
@@ -973,5 +989,378 @@ public sealed class StartReplayRulesTests
         Run("l_first");
         Assert.True(timeline.Started(trigger("l_second"), out start));
         Assert.Equal((program.SlotOf("l_first"), 1), timeline.SourceOf(start));
+    }
+
+    /// <summary>
+    /// The game tests a distance condition of the player at each heartbeat (issue #50). The path docks the player at
+    /// w_base. When its dock object is far outside the sphere of w_poll, the player left that sphere before the dock, so
+    /// w_poll ran before it. Each point within 3,000 units of the dock object counts. So a dock object 3,500 units from
+    /// the center does not show the player outside 1,000 units, and w_poll waits. The poll w_held waits in both cases,
+    /// because one place does not show how long the player stayed outside.
+    /// </summary>
+    [Theory]
+    [InlineData(20000, true)]
+    [InlineData(3500, false)]
+    public void APathDockFarOutsideTheSphereOfAPollRunsThePoll(float dock, bool runs)
+    {
+        const string text = """
+            [Trigger]
+            nickname = w_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = w_poll
+            Act_ActTrig = w_held
+            Act_ActTrig = w_dock
+
+            [Trigger]
+            nickname = w_poll
+            Cnd_DistVec = outside, Player, 0, 0, 0, 1000
+
+            [Trigger]
+            nickname = w_held
+            Cnd_DistVec = outside, Player, 0, 0, 0, 1000, 5
+
+            [Trigger]
+            nickname = w_dock
+            Cnd_BaseEnter = w_base
+            Act_ActTrig = w_chosen
+
+            [Trigger]
+            nickname = w_chosen
+            Cnd_Timer = 5
+            """;
+        var world = World([Thing("w_station", "w_sys", dock) with { DockWith = "w_base" }], ("w_base", "w_sys"));
+
+        var replay = Replay(text, "w_chosen", world);
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(runs ? ["w_start", "w_poll", "w_dock"] : ["w_start", "w_dock"], Ran(replay));
+        Assert.Equal(!runs, Waiting(replay).Contains("w_poll"));
+        Assert.Contains("w_held", Waiting(replay));
+    }
+
+    /// <summary>
+    /// The game tests the point of Cnd_DistVec in each system, but Cnd_DistShip needs the player and the object in one
+    /// system. The path docks the player at b_base in b_sys_a. So the point poll b_vec ran, although its system key names
+    /// another system. The object poll b_same ran, with the player as the other ship. The object poll b_other waits,
+    /// because its object is in b_sys_b. The object poll b_script waits, because b_rock_s is also an object of the
+    /// script. The replay does not know where the script puts such an object.
+    /// </summary>
+    [Fact]
+    public void AnObjectPollNeedsTheSameSystemAndAPointPollCountsInEachSystem()
+    {
+        const string text = """
+            [MsnSolar]
+            nickname = b_rock_s
+
+            [Trigger]
+            nickname = b_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = b_vec
+            Act_ActTrig = b_same
+            Act_ActTrig = b_other
+            Act_ActTrig = b_script
+            Act_ActTrig = b_dock
+
+            [Trigger]
+            nickname = b_vec
+            system = b_sys_b
+            Cnd_DistVec = outside, Player, 50000, 0, 0, 1000
+
+            [Trigger]
+            nickname = b_same
+            Cnd_DistShip = outside, b_rock_a, Player, 1000
+
+            [Trigger]
+            nickname = b_other
+            Cnd_DistShip = outside, Player, b_rock_b, 1000
+
+            [Trigger]
+            nickname = b_script
+            Cnd_DistShip = outside, Player, b_rock_s, 1000
+
+            [Trigger]
+            nickname = b_dock
+            Cnd_BaseEnter = b_base
+            Act_ActTrig = b_chosen
+
+            [Trigger]
+            nickname = b_chosen
+            Cnd_Timer = 5
+            """;
+        var world = World(
+        [
+            Thing("b_station", "b_sys_a", 0) with { DockWith = "b_base" }, Thing("b_rock_a", "b_sys_a", 50000),
+            Thing("b_rock_b", "b_sys_b", 50000), Thing("b_rock_s", "b_sys_a", 50000),
+        ], ("b_base", "b_sys_a"));
+
+        var replay = Replay(text, "b_chosen", world);
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        // The polls run in the order of the active list of the machine, before the dock.
+        Assert.Equal("b_dock", Ran(replay)[^1]);
+        Assert.Equal(["b_dock", "b_same", "b_start", "b_vec"], Ran(replay).Order().ToList());
+        Assert.Contains("b_other", Waiting(replay));
+        Assert.Contains("b_script", Waiting(replay));
+    }
+
+    /// <summary>
+    /// A jump of the path from c_sys_a to c_sys_b. Before the exit, the player was at the jump object of c_sys_a that
+    /// leads to c_sys_b. The system c_sys_a has two such objects: the gate at 0 and the hole at 40,000. The dock rules
+    /// of the replay must allow exactly one of them. The hole shows the player inside the sphere of c_poll, and the gate
+    /// does not. When the dock rules allow both objects or neither object, the place is not known, and c_poll waits.
+    /// </summary>
+    [Theory]
+    [InlineData("Act_PlayerCanDock = false, c_hole", true)]
+    [InlineData("Act_LockDock = Player, c_gate, lock", true)]
+    [InlineData("Act_PlayerCanDock = false, c_gate", false)]
+    [InlineData("Act_PlayerCanDock = true", false)]
+    [InlineData("Act_PlayerCanDock = false, c_hole\nAct_LockDock = Player, c_hole, lock", false)]
+    [InlineData("Act_LockDock = Player, c_gate, lock\nAct_LockDock = Player, c_gate, unlock", false)]
+    public void TheDockRulesPickTheJumpObjectOfADeparture(string rules, bool runs)
+    {
+        var text = """
+            [Trigger]
+            nickname = c_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = c_poll
+            Act_ActTrig = c_launch
+
+            [Trigger]
+            nickname = c_poll
+            Cnd_DistVec = inside, Player, 40000, 0, 0, 2000
+
+            [Trigger]
+            nickname = c_launch
+            Cnd_SpaceEnter = c_sys_a
+            {RULES}
+            Act_ActTrig = c_arrive
+
+            [Trigger]
+            nickname = c_arrive
+            Cnd_SystemEnter = c_sys_b
+            Act_ActTrig = c_chosen
+
+            [Trigger]
+            nickname = c_chosen
+            Cnd_Timer = 5
+            """.Replace("{RULES}", rules);
+        var world = World(
+        [
+            Thing("c_gate", "c_sys_a", 0, "c_sys_b"), Thing("c_hole", "c_sys_a", 40000, "c_sys_b"),
+            Thing("c_back", "c_sys_b", -90000, "c_sys_a"),
+        ]);
+
+        var replay = Replay(text, "c_chosen", world);
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(!runs, Waiting(replay).Contains("c_poll"));
+    }
+
+    /// <summary>
+    /// The jump places of a jump of the path from h_sys_a to h_sys_b. Before the exit, the player was at h_out, the only
+    /// object of h_sys_a that leads to h_sys_b. So h_leave ran before the exit watcher h_exit. After the entry, the
+    /// player was at h_in, the only object of h_sys_b that leads back. So h_come ran after the entry watcher h_entry.
+    /// When h_sys_b has a second object that leads back, the arrival place is not known, and h_come waits.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AJumpGivesAPlaceBeforeTheExitAndAPlaceAfterTheEntry(bool twoWaysBack)
+    {
+        const string text = """
+            [Trigger]
+            nickname = h_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = h_leave
+            Act_ActTrig = h_come
+            Act_ActTrig = h_exit
+            Act_ActTrig = h_entry
+            Act_ActTrig = h_launch
+
+            [Trigger]
+            nickname = h_leave
+            Cnd_DistVec = inside, Player, 50000, 0, 0, 2000
+
+            [Trigger]
+            nickname = h_come
+            Cnd_DistVec = inside, Player, 0, 0, 0, 2000
+
+            [Trigger]
+            nickname = h_exit
+            Cnd_SystemExit = h_sys_a
+
+            [Trigger]
+            nickname = h_entry
+            Cnd_SystemEnter = h_sys_b
+
+            [Trigger]
+            nickname = h_launch
+            Cnd_SpaceEnter = h_sys_a
+            Act_ActTrig = h_arrive
+
+            [Trigger]
+            nickname = h_arrive
+            Cnd_SystemEnter = h_sys_b
+            Act_ActTrig = h_chosen
+
+            [Trigger]
+            nickname = h_chosen
+            Cnd_Timer = 5
+            """;
+        List<WorldObject> objects = [Thing("h_out", "h_sys_a", 50000, "h_sys_b"), Thing("h_in", "h_sys_b", 0, "h_sys_a")];
+        if (twoWaysBack)
+            objects.Add(Thing("h_in_2", "h_sys_b", -90000, "h_sys_a"));
+
+        var replay = Replay(text, "h_chosen", World(objects));
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(twoWaysBack
+            ? ["h_start", "h_launch", "h_leave", "h_exit", "h_entry", "h_arrive"]
+            : ["h_start", "h_launch", "h_leave", "h_exit", "h_entry", "h_come", "h_arrive"], Ran(replay));
+    }
+
+    /// <summary>
+    /// A path condition of an entry into g_sys_b from g_sys_a shows the player at g_back, the only object of g_sys_b
+    /// that leads to g_sys_a. So the poll g_poll near g_back ran. An entry from ANY or from no named system does not tell
+    /// the object. When g_sys_b has two objects that lead to g_sys_a, the place is not known either.
+    /// </summary>
+    [Theory]
+    [InlineData(", g_sys_a", false, true)]
+    [InlineData(", ANY", false, false)]
+    [InlineData("", false, false)]
+    [InlineData(", g_sys_a", true, false)]
+    public void AnEntryFromANamedSystemShowsTheJumpObjectThatLeadsBack(string from, bool twoWaysBack, bool runs)
+    {
+        var text = """
+            [Trigger]
+            nickname = g_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = g_poll
+            Act_ActTrig = g_in
+
+            [Trigger]
+            nickname = g_poll
+            Cnd_DistVec = inside, Player, 0, 0, 0, 2000
+
+            [Trigger]
+            nickname = g_in
+            Cnd_SystemEnter = g_sys_b{FROM}
+            Act_ActTrig = g_chosen
+
+            [Trigger]
+            nickname = g_chosen
+            Cnd_Timer = 5
+            """.Replace("{FROM}", from);
+        List<WorldObject> objects = [Thing("g_back", "g_sys_b", 0, "g_sys_a"), Thing("g_far", "g_sys_a", 0, "g_sys_b")];
+        if (twoWaysBack)
+            objects.Add(Thing("g_back_2", "g_sys_b", -90000, "g_sys_a"));
+
+        var replay = Replay(text, "g_chosen", World(objects));
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(!runs, Waiting(replay).Contains("g_poll"));
+    }
+
+    /// <summary>
+    /// A path condition that waits for the player inside a sphere shows the player within its radius of its center. The
+    /// sphere of d_near has a radius of 500. So the inside poll d_in ran: its center is 100 units away, and 100 + 500 is
+    /// less than its radius of 1,000. The inside poll d_edge waits: 600 + 500 is more than 1,000. The outside poll d_out
+    /// ran: 5,000 - 500 is more than 1,000. A Cnd_DistShip of the player and an object of the system files gives the
+    /// same place.
+    /// </summary>
+    [Theory]
+    [InlineData("Cnd_DistVec = inside, Player, 0, 0, 0, 500")]
+    [InlineData("Cnd_DistShip = inside, d_buoy, Player, 500")]
+    public void AnInsideConditionOfThePathShowsThePlayerWithinItsRadius(string near)
+    {
+        var text = """
+            [Trigger]
+            nickname = d_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = d_in
+            Act_ActTrig = d_edge
+            Act_ActTrig = d_out
+            Act_ActTrig = d_near
+
+            [Trigger]
+            nickname = d_in
+            Cnd_DistVec = inside, Player, 100, 0, 0, 1000
+
+            [Trigger]
+            nickname = d_edge
+            Cnd_DistVec = inside, Player, 600, 0, 0, 1000
+
+            [Trigger]
+            nickname = d_out
+            Cnd_DistVec = outside, Player, 5000, 0, 0, 1000
+
+            [Trigger]
+            nickname = d_near
+            {NEAR}
+            Act_ActTrig = d_chosen
+
+            [Trigger]
+            nickname = d_chosen
+            Cnd_Timer = 5
+            """.Replace("{NEAR}", near);
+
+        var replay = Replay(text, "d_chosen", World([Thing("d_buoy", "d_sys", 0)]));
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        // The polls run in the order of the active list of the machine, before d_near.
+        Assert.Equal("d_near", Ran(replay)[^1]);
+        Assert.Equal(["d_in", "d_near", "d_out", "d_start"], Ran(replay).Order().ToList());
+        Assert.Contains("d_edge", Waiting(replay));
+    }
+
+    /// <summary>
+    /// A lane entry of the player shows the player within 1,000 units of the ring. The outside poll f_far ran: its center
+    /// is 3,000 units from the ring, and 3,000 - 1,000 is more than its radius of 1,500. The outside poll f_edge waits:
+    /// 2,500 - 1,000 is not more than 1,500. A lane entry of another ship does not show the place of the player.
+    /// </summary>
+    [Theory]
+    [InlineData("Player", true)]
+    [InlineData("f_wing", false)]
+    public void ALaneEntryOfThePlayerShowsThePlayerNearTheRing(string ship, bool runs)
+    {
+        var text = """
+            [Trigger]
+            nickname = f_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = f_far
+            Act_ActTrig = f_edge
+            Act_ActTrig = f_lane
+
+            [Trigger]
+            nickname = f_far
+            Cnd_DistVec = outside, Player, 3000, 0, 0, 1500
+
+            [Trigger]
+            nickname = f_edge
+            Cnd_DistVec = outside, Player, 2500, 0, 0, 1500
+
+            [Trigger]
+            nickname = f_lane
+            Cnd_TLEntered = {SHIP}, f_ring_1, f_ring_2
+            Act_ActTrig = f_chosen
+
+            [Trigger]
+            nickname = f_chosen
+            Cnd_Timer = 5
+            """.Replace("{SHIP}", ship);
+        var world = World([Thing("f_ring_1", "f_sys", 0), Thing("f_ring_2", "f_sys", 20000)]);
+
+        var replay = Replay(text, "f_chosen", world);
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(!runs, Waiting(replay).Contains("f_far"));
+        Assert.Contains("f_edge", Waiting(replay));
     }
 }

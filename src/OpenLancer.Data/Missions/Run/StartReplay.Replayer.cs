@@ -11,8 +11,8 @@ internal sealed partial record StartReplay
     /// 2026-10-28, issue #46). The replay has no world and no time. So a trigger that waits for the world or for a time
     /// stays active, also when the game ran it long before the chosen trigger. These rules run such a trigger at the point
     /// where the path shows its event. The rules run in this order before each trigger of the path: timers, objectives,
-    /// the early space test, systems, launch, and timers again. Then the trigger of the path runs, and the space test
-    /// follows.
+    /// the early space test, systems, launch, polls, and timers again. Then the trigger of the path runs, and the space
+    /// test follows.
     /// <list type="bullet">
     /// <item>Timers (issue #46). A waiting timer ran when the path shows that at least its time passed since its start.
     /// All timers count on the same heartbeats.
@@ -65,11 +65,34 @@ internal sealed partial record StartReplay
     /// than the system where it runs. Before the first condition that names a system, the newest system key of the path
     /// gives the old system. The condition of the chosen trigger does not count, because the chosen trigger only
     /// starts.</item>
+    /// <item>Polls (issue #50). The game tests a distance condition of the player at each heartbeat. So a waiting poll
+    /// ran when the path shows the player on its true side.
+    /// <list type="bullet">
+    /// <item>The polls. A poll is Cnd_DistVec of the player, or Cnd_DistShip of the player and an object of the system
+    /// files. A poll with a hold time above 0 does not count, because one place does not show that the player stayed.
+    /// The game tests the point of Cnd_DistVec in each system. Cnd_DistShip needs the player and the object in one
+    /// system.</item>
+    /// <item>The places. The condition of a trigger of the path gives a place with a slack. A base entry, a launch from
+    /// a base or a room entry gives the dock object of the base, with 3,000 units. A lane entry or exit of the player
+    /// gives the ring, with 1,000 units. An inside distance condition of the player gives its point or its object,
+    /// with its radius. Cnd_SystemEnter from a named system gives the jump object that leads back, with 1,000
+    /// units.</item>
+    /// <item>The jump places. A jump of the system rule gives two places with 1,000 units. Before the exit, the player
+    /// was at the jump object of the old system that leads to the new system. When the old system has more such
+    /// objects, the dock rules of the replay must allow exactly one of them. These rules are the newest
+    /// Act_PlayerCanDock line and the Act_LockDock lines of the player. After the entry, the player was at the jump
+    /// object of the new system that leads back.</item>
+    /// <item>The run test. A jump object gives a place only when it is the only such object of its system, or the
+    /// object that the dock rules allow. Each point within the slack of the place must be on the true side of the poll.
+    /// So for an outside poll, the distance minus the slack is more than the radius. For an inside poll, the distance
+    /// plus the slack is less than the radius. A waiting trigger that can stop the poll does not keep it
+    /// waiting.</item>
+    /// </list></item>
     /// </list>
     /// Such a run must not stop the replay, end the mission, run or stop a trigger of the rest of the path, or start the
     /// chosen trigger. Else the replay goes back to the state before it. A repeatable trigger does not run in this way.
     /// </summary>
-    private sealed class Replayer
+    private sealed partial class Replayer
     {
         /// <summary>The least time between the arrival of the player and the arrival of the jumpers in the new
         /// system.</summary>
@@ -151,6 +174,7 @@ internal sealed partial record StartReplay
             if (early == null)
                 Arrival(position);
             Launch(trigger, rest);
+            Polls(position, rest);
             // Again after the other rules: their runs can show more time.
             Timers(position, rest);
         }
@@ -345,6 +369,9 @@ internal sealed partial record StartReplay
             if (old == null || MissionIndex.Is(old, next))
                 return;
             arrival = (next, position - 1);
+            // The player was at the jump object of the old system before the exit.
+            if (Departure(old, next) is { } departure)
+                RunPolls(departure, rest);
             // The triggers on the way to a trigger of the exit ran before the jump, for example near the jump gate.
             var tried = new HashSet<MissionTrigger>();
             while (Chain(t => !tried.Contains(t) && !Alive(t) && t.Condition is { } c && Exits(c, old, next), rest) is
@@ -357,6 +384,9 @@ internal sealed partial record StartReplay
             RunWaiting(c => Exits(c, old, next), rest);
             Jumps.Add(Changes.Count);
             RunWaiting(c => Enters(c, next, old), rest);
+            // The player arrived at the jump object of the new system that leads back.
+            if (OnlyJump(next, old) is { } entry)
+                RunPolls(entry, rest);
         }
 
         /// <summary>Runs each waiting trigger that a rule can run and whose condition matches, in the order of the
