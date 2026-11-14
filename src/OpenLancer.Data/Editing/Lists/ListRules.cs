@@ -228,9 +228,12 @@ internal sealed record SceneTemplateDefinition(string Id, string Label, IReadOnl
 /// <param name="FileClass">For a files list: the full name of a <c>[ParsedIni]</c> class of the engine, for example
 /// <c>LibreLancer.Data.Schema.Universe.Nebula</c> (milestone M22). A file is an entry only when it has a section and
 /// each of its section types is a section of the class. Null for a file of any content.</param>
+/// <param name="AnimationScripts">True for the list of the animation clips (source kind <c>animationScripts</c>,
+/// section 12.1 of the M8b design): the scripts of the animation files that the <c>[Animations]</c> lines of the files
+/// of the role name (see <see cref="AnimationList"/>). Such a source has a role and no sections.</param>
 internal sealed record ListSource(string? Role, IReadOnlyList<string> Sections, IReadOnlyList<string>? Keys,
     IReadOnlyDictionary<string, string> Where, (string Section, string Key, int Index)? Values, bool Scoped,
-    IReadOnlyList<string>? Files = null, string? Folder = null, string? FileClass = null)
+    IReadOnlyList<string>? Files = null, string? Folder = null, string? FileClass = null, bool AnimationScripts = false)
 {
     /// <summary>The engine class of <see cref="FileClass"/>, or null.</summary>
     public Type? FileClassType => FileClass == null ? null : typeof(FLHash).Assembly.GetType(FileClass);
@@ -442,7 +445,17 @@ internal sealed class ListRules
                 throw new FormatException($"The list {id} needs one or more extensions that start with a dot.");
             source = new ListSource(String(s, "role"), Strings(s, "sections"),
                 s.TryGetProperty("keys", out _) ? Strings(s, "keys") : null, where, values,
-                String(s, "scope") == "file", files, String(s, "folder"), String(s, "fileClass"));
+                String(s, "scope") == "file", files, String(s, "folder"), String(s, "fileClass"),
+                String(s, "kind") switch
+                {
+                    null => false,
+                    "animationScripts" => true,
+                    var other => throw new FormatException($"The source kind '{other}' of the list {id} is not known."),
+                });
+            if (source.AnimationScripts && (source.Role == null || source.Sections.Count > 0 || values != null ||
+                                            files != null || source.Scoped))
+                throw new FormatException($"The list {id} has the source kind animationScripts, which needs a role and " +
+                                          "no sections, values, files or scope.");
             if (source.Files == null && (source.Folder != null || source.FileClass != null))
                 throw new FormatException($"The list {id} has a folder or a file class, which needs 'files'.");
             if (source.FileClass != null && source.FileClassType?.IsDefined(typeof(ParsedIniAttribute), false) != true)

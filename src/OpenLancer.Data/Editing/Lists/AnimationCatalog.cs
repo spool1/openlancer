@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using LibreLancer.Data.Ini;
 using LibreLancer.Data.IO;
@@ -44,13 +45,41 @@ public static class AnimationCatalog
     /// letter case. So a clip has the spelling and the file of the last file, and it also keeps the earlier files with
     /// the name. The result is sorted by name.
     /// </summary>
-    public static IReadOnlyList<AnimationClip> Read(FileSystem files, IEnumerable<string> archives)
+    /// <exception cref="IOException">A file does not open.</exception>
+    /// <exception cref="InvalidDataException">A file is not an animation file.</exception>
+    public static IReadOnlyList<AnimationClip> Read(FileSystem files, IEnumerable<string> archives) =>
+        Merge(archives.Select(path => (path, Names(files, path))));
+
+    /// <summary>
+    /// Reads the animations as <see cref="Read(FileSystem, IEnumerable{string})"/> does, but a file that does not read
+    /// gives one warning in <paramref name="warnings"/>, and the other files keep their clips. <c>oltool validate</c>
+    /// reads the files of a view in this way.
+    /// </summary>
+    public static IReadOnlyList<AnimationClip> Read(FileSystem files, IEnumerable<string> archives,
+        ICollection<Diagnostic> warnings)
     {
-        var clips = new Dictionary<string, AnimationClip>(StringComparer.OrdinalIgnoreCase);
+        var read = new List<(string, IReadOnlyList<string>)>();
         foreach (var path in archives)
         {
-            using var stream = files.Open(path);
-            foreach (var name in AnimationNames.Scripts(stream, path))
+            if (TryNames(files, path, out var names, out var problem))
+                read.Add((path, names));
+            else
+                warnings.Add(Unreadable(path, problem));
+        }
+        return Merge(read);
+    }
+
+    /// <summary>
+    /// The clips of the names of each file, in load order. A later file replaces a name without letter case. So a clip
+    /// has the spelling and the file of the last file, and it also keeps the earlier files with the name. The result is
+    /// sorted by name.
+    /// </summary>
+    internal static IReadOnlyList<AnimationClip> Merge(IEnumerable<(string Archive, IReadOnlyList<string> Names)> files)
+    {
+        var clips = new Dictionary<string, AnimationClip>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (path, names) in files)
+        {
+            foreach (var name in names)
             {
                 IReadOnlyList<string> earlier = clips.TryGetValue(name, out var clip) ? clip.Archives : [];
                 clips[name] = new AnimationClip(name, path)
@@ -62,6 +91,36 @@ public static class AnimationCatalog
 
         return clips.Values.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
+
+    /// <summary>The script names of one animation file of a file system.</summary>
+    /// <exception cref="IOException">The file does not open.</exception>
+    /// <exception cref="InvalidDataException">The file is not an animation file.</exception>
+    internal static IReadOnlyList<string> Names(FileSystem files, string path)
+    {
+        using var stream = files.Open(path);
+        return AnimationNames.Scripts(stream, path);
+    }
+
+    /// <summary>The script names of one animation file, or false with the problem when the file does not read.</summary>
+    internal static bool TryNames(FileSystem files, string path, out IReadOnlyList<string> names, out string problem)
+    {
+        try
+        {
+            names = Names(files, path);
+            problem = "";
+            return true;
+        }
+        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            names = [];
+            problem = e.Message;
+            return false;
+        }
+    }
+
+    /// <summary>The warning of an animation file that does not read. Its clips are not in the list.</summary>
+    internal static Diagnostic Unreadable(string path, string problem) =>
+        Diagnostic.Warning(path, $"OpenLancer cannot read this animation file, so the clip list has no clips from it. {problem}");
 
     /// <summary>
     /// The skeletons of the sections of bodyparts.ini, in the order of the file. A body part belongs to the last

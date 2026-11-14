@@ -276,6 +276,7 @@ internal static class ObjectKinds
         "fuse" => Lists.Fuse,
         "enum" => Lists.Enum,
         "cutscene" => Thn.Script,
+        "animation" => Thn.Clip,
         "nebula" => Nebula,
         "asteroidfield" => AsteroidField,
         "asteroid" => Assets.Asteroid,

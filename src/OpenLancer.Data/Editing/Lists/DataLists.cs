@@ -45,6 +45,7 @@ public sealed class DataLists
     private readonly HashSet<SectionRef> unusableInProgress = [];
     private readonly Dictionary<string, (ModOverlay View, FileTable? Table)> wholeFiles = new(VfsPath.Comparer);
     private readonly Dictionary<string, RemovedPart> removedParts = new(VfsPath.Comparer);
+    private readonly AnimationList animations;
     private int checksRevision = int.MinValue;
 
     // The table and the index of the section that gives each entry of a sections list, as the lists read its file (see
@@ -67,6 +68,7 @@ public sealed class DataLists
     {
         this.session = session;
         this.rules = rules;
+        animations = new AnimationList(session);
     }
 
     internal ListRules RuleData => rules;
@@ -104,6 +106,19 @@ public sealed class DataLists
 
     /// <summary>A scoped list of the sections of one file, for example the objects of a system file.</summary>
     public ListView? List(string id, string scopeFile) => View([id], VfsPath.Normalize(scopeFile));
+
+    /// <summary>
+    /// The animation clips of W, with all their files, and the skeletons of bodyparts.ini, from the cache of the list
+    /// <c>animation</c> (see <see cref="AnimationList"/>). The clip picker of a START_MOTION event reads them. Null when
+    /// the edit view has no bodyparts.ini.
+    /// </summary>
+    public AnimationData? Animations() => animations.Get();
+
+    /// <summary>True when the lower layer has a clip with the name (see <see cref="AnimationList.LowerLayerHas"/>).</summary>
+    internal bool LowerLayerHasClip(string clip) => animations.LowerLayerHas(clip);
+
+    /// <summary>The number of animation files that the list <c>animation</c> read in the session.</summary>
+    internal int AnimationReads => animations.Reads;
 
     /// <summary>
     /// Each line value that names an entry of a list, in all referrer files of the list, also files that the session
@@ -363,7 +378,7 @@ public sealed class DataLists
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (!rules.Lists.TryGetValue(id, out var definition) ||
-            definition.Source is not { Files: null, Scoped: false, Role: { } role } source)
+            definition.Source is not { Files: null, Scoped: false, AnimationScripts: false, Role: { } role } source)
             return result;
         var current = List(id);
         foreach (var path in Files.Paths(role))
@@ -420,6 +435,9 @@ public sealed class DataLists
                 other.AddRange(session.NewCutsceneDocuments.Select(d => d.State));
                 continue;
             }
+            // The clips follow the [Animations] lines of bodyparts.ini and the files of the edit view.
+            if (source.AnimationScripts)
+                other.Add(session.EditView);
             paths.AddRange(source.Scoped ? ScopeFiles(scope) : Files.Paths(source.Role!));
         }
         var states = paths.Select(StateOf).Concat(other).ToArray();
@@ -481,6 +499,8 @@ public sealed class DataLists
             return null;
         if (source.Files != null)
             return (FileEntries(source), true, []);
+        if (source.AnimationScripts)
+            return animations.Get() is { } data ? (data.Entries, Files.Engine(source.Role!), []) : null;
         IReadOnlyList<string> paths = source.Scoped ? ScopeFiles(scope) : Files.Paths(source.Role!);
         var order = new List<string>();
         var byName = new Dictionary<string, (ListEntry Entry, int Count, bool AnyChanged)>(StringComparer.OrdinalIgnoreCase);
@@ -798,7 +818,8 @@ public sealed class DataLists
         foreach (var definition in rules.Lists.Values)
         {
             // A files list has no sections, so an INI file removes none of its entries.
-            if (definition.Source is not { Values: null, Files: null } source || !GivesEntries(source, roles, isSystem))
+            if (definition.Source is not { Values: null, Files: null, AnimationScripts: false } source ||
+                !GivesEntries(source, roles, isSystem))
                 continue;
             var current = NamesOf(now, source);
             foreach (var (name, index) in NamesWithIndex(lower, source))

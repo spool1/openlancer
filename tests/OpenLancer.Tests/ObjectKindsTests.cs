@@ -127,6 +127,8 @@ public sealed class ObjectKindsTests
         // The picker of a file list shows the glyph of the item kind.
         Assert.Same(ObjectKinds.Nebula, ObjectKinds.OfList("Nebula"));
         Assert.Same(ObjectKinds.AsteroidField, ObjectKinds.OfList("AsteroidField"));
+        // The list of the animation clips shows the glyph of the clip picker.
+        Assert.Same(ObjectKinds.Thn.Clip, ObjectKinds.OfList("Animation"));
     }
 
     [Fact]

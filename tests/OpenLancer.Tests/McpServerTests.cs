@@ -220,11 +220,11 @@ public sealed class McpServerTests
         Assert.Equal(["application/json", "application/json", "application/json", "application/json", "application/json",
             "application/json", "text/plain", "text/plain"], resources.Select(r => r.MimeType));
         var catalog = JsonNode.Parse(Assert.IsType<TextResourceContents>(Assert.Single(lists.Contents)).Text)!;
-        Assert.Equal(64, catalog["lists"]!.AsArray().Count);
+        Assert.Equal(65, catalog["lists"]!.AsArray().Count);
         Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "object_of_system" && (bool)l["one_system"]!);
         Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "costume");
-        // The lists of the templates of a cutscene (section 12.1 of the M8b design).
-        foreach (var id in new[] { "petal_room", "petal_prop", "petal_cart", "asteroid_mine" })
+        // The lists of the templates and the clips of a cutscene (section 12.1 of the M8b design).
+        foreach (var id in new[] { "petal_room", "petal_prop", "petal_cart", "asteroid_mine", "animation" })
             Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == id);
         var guide = Assert.IsType<TextResourceContents>(Assert.Single(refs.Contents)).Text;
         Assert.Contains("thn:<install path>#event/<index>", guide);

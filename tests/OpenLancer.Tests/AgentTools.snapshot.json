@@ -3015,6 +3015,7 @@
             "type": "string",
             "enum": [
               "accessory",
+              "animation",
               "asteroid",
               "asteroid_file",
               "asteroid_mine",

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing.Lists;
@@ -101,6 +102,20 @@ public sealed partial class EditSession
         if (!fs.FileExists(path))
             return null;
         return IniDocument.Parse(path, fs.ReadAllBytes(path)).Sections;
+    }
+
+    /// <summary>The sections of a file as the lower layer gives it, or null when the lower layer has no such INI file or
+    /// the file does not parse.</summary>
+    internal IReadOnlyList<Section>? LowerSections(string path)
+    {
+        try
+        {
+            return lowerView.Document(path)?.Sections;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            return null;
+        }
     }
 
     /// <summary>The INI files that the active mod changes: the files that a command changed, and the files of its

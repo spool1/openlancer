@@ -301,7 +301,7 @@ public sealed partial class EditSession
     internal IThnEvaluator ThnEvaluator => thn;
 
     /// <summary>The files of the lower layer, made at the first use.</summary>
-    private FileSystem LowerFiles => lowerFiles ??= lowerView.CreateFileSystem();
+    internal FileSystem LowerFiles => lowerFiles ??= lowerView.CreateFileSystem();
 
     /// <summary>Why the session cannot open a cutscene.</summary>
     internal string CutsceneProblem(string path) =>

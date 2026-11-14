@@ -1,5 +1,5 @@
 {
-  "// about": "The data lists of the editor (milestone M21). Roles tell how the engine finds its files. Lists tell which sections give the entries. Rules map one value of one key to a list. A rule is open unless it is closed with an evidence line of the engine (decision D109). Paths of roles are relative to the data folder of freelancer.ini. See docs/MOD_FORMAT.md, 'Data lists and the save gate'.",
+  "// about": "The data lists of the editor (milestone M21). Roles tell how the engine finds its files. Lists tell which sections give the entries. A list of the source kind animationScripts gives the clips of the animation files that the [Animations] lines of its role name. Rules map one value of one key to a list. A rule is open unless it is closed with an evidence line of the engine (decision D109). Paths of roles are relative to the data folder of freelancer.ini. See docs/MOD_FORMAT.md, 'Data lists and the save gate'.",
   "roles": {
     "solar":        { "data": "solar" },
     "asteroids":    { "data": "asteroids" },
@@ -105,6 +105,8 @@
       "source": { "role": "bodyparts", "sections": ["Accessory"] } },
     { "id": "costume", "label": "Costume", "kind": "Costume",
       "source": { "role": "costumes", "sections": ["Costume"] }, "detail": ["body", "head"] },
+    { "id": "animation", "label": "Animation", "kind": "Animation",
+      "source": { "role": "bodyparts", "kind": "animationScripts" } },
     { "id": "curve", "label": "Curve", "kind": "Curve", "unique": true, "requires": ["point"],
       "source": { "role": "igraph", "sections": ["IGraph"], "where": { "type": "FLOAT" } } },
     { "id": "gate_tunnel", "label": "Tunnel", "kind": "Effect",

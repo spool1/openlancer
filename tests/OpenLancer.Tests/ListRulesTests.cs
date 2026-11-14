@@ -139,6 +139,13 @@ public sealed class ListRulesTests
             // cutscenes are .thn files of any folder. The nebula and asteroid files are the INI files of one folder
             // whose sections are all sections of one [ParsedIni] class (milestone M22). The models are the model files
             // below the data folder (milestone M23).
+            // The clips are the scripts of the animation files that the [Animations] lines of bodyparts.ini name
+            // (section 12.1 of the M8b design, BodypartsIni.cs:30-36).
+            if (source.AnimationScripts)
+            {
+                Assert.Equal(("bodyparts", 0), (source.Role, source.Sections.Count));
+                continue;
+            }
             if (source.Files != null)
             {
                 Assert.True(source.Files switch
@@ -278,6 +285,23 @@ public sealed class ListRulesTests
         Assert.Equal("asteroids", Rules.Roles["asteroids"].Data);
         Assert.Equal([".cmp", ".3db", ".sph"], Rules.Lists["model"].Source!.Files!);
         Assert.Equal(".", Rules.Lists["model"].Source!.Folder);
+    }
+
+    /// <summary>The source kind animationScripts gives the clips of the animation files of a role (section 12.1 of the
+    /// M8b design). It needs a role and no sections, values, files or scope. Another source kind is an error.</summary>
+    [Fact]
+    public void TheAnimationSourceKindNeedsARoleAndNoSections()
+    {
+        Assert.True(Rules.Lists["animation"].Source!.AnimationScripts);
+        Assert.Equal(("Animation", "Animation"), (Rules.Lists["animation"].Label, Rules.Lists["animation"].Kind));
+        Assert.True(ListRules.Parse(FilesRules("""{ "role": "system", "kind": "animationScripts" }""", ""))
+            .Lists["nebula_file"].Source!.AnimationScripts);
+        Assert.Contains("needs a role", Assert.Throws<InvalidDataException>(() => ListRules.Parse(
+            FilesRules("""{ "kind": "animationScripts" }""", ""))).Message);
+        Assert.Contains("needs a role", Assert.Throws<InvalidDataException>(() => ListRules.Parse(
+            FilesRules("""{ "role": "system", "kind": "animationScripts", "sections": ["Animations"] }""", ""))).Message);
+        Assert.Contains("is not known", Assert.Throws<InvalidDataException>(() => ListRules.Parse(
+            FilesRules("""{ "role": "system", "kind": "sounds" }""", ""))).Message);
     }
 
     /// <summary>Decision D267 of the M23 design: the categories of the Assets panel are rule data. Each category names
