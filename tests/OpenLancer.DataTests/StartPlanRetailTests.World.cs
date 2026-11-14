@@ -472,6 +472,36 @@ public sealed partial class StartPlanRetailTests
         }
     }
 
+    /// <summary>
+    /// The rows of the poll rule of the replay (issue #50) in both games. At M04 juni_mactan_tether, the path docks the
+    /// player at a base of Iw03, far outside the sphere of the old poll send_in_bounty_hunters. So that poll ran, and it
+    /// does not wait at the start. At M09 lce_deck_Ku07_02, the path docks the player at Ku07_02, so the player came
+    /// within the range of the object poll at_nebula_attack. In the base game, the path of M10
+    /// delay_switch_23840_to_23845 jumps from Bw05 through its only hole to Rh01. The player was within 1,000 units of
+    /// the hole, inside the sphere of distvec_sendcomm_dx_m10_1200_cobo.
+    /// </summary>
+    [Fact]
+    public void ThePollRuleRunsTheOldPollsOfThePath()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var tether = Plan(Slot(scripts, "M04"), "juni_mactan_tether");
+            Assert.True(tether.CanStart, $"{set}: {tether.Reason}");
+            Assert.DoesNotContain("send_in_bounty_hunters", tether.ActiveSet);
+
+            var deck = Plan(Slot(scripts, "M09"), "lce_deck_Ku07_02");
+            Assert.True(deck.CanStart, $"{set}: {deck.Reason}");
+            Assert.DoesNotContain("at_nebula_attack", deck.ActiveSet);
+
+            if (set == "vanilla")
+            {
+                var hole = Plan(Slot(scripts, "M10"), "delay_switch_23840_to_23845");
+                Assert.True(hole.CanStart, hole.Reason);
+                Assert.DoesNotContain("distvec_sendcomm_dx_m10_1200_cobo", hole.ActiveSet);
+            }
+        }
+    }
+
     /// <summary>The row of issue 45 in both games. M04 juni_mactan_tether starts in Iw03, after the jump from Li01. The
     /// game sent the exit from Li01 at the jump, so leaving_liberty_01 stopped the fail watcher too_far_from_magellan_dock
     /// of a point in Li01. arrive_at_jumpgate starts leaving_liberty_01, so it ran before the jump. A start at
