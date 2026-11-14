@@ -336,8 +336,12 @@ internal static class ItemQueries
         if (file != null)
         {
             var normal = InstallPaths.Parse(file);
-            path = session.OpenDocument(normal)?.Path ?? throw new EditException(new EditError(EditErrorKind.NotFound,
-                ItemRefs.NotFound, AgentTexts.Error("file_none", ("file", normal))) { Field = "file" });
+            // A new file after the undo of its create is not in W, as a file that never existed.
+            path = session.OpenDocument(normal) is { State.Exists: true } found ? found.Path : throw new EditException(
+                new EditError(EditErrorKind.NotFound, ItemRefs.NotFound, AgentTexts.Error("file_none", ("file", normal)))
+                {
+                    Field = "file",
+                });
             sections = session.Sections(path);
         }
         else
@@ -349,8 +353,9 @@ internal static class ItemQueries
         var document = session.OpenDocument(path)!;
         var raw = RawText.Canonical(path, sections.Select(s => document.Working[document.IndexOf(s.Id)]).ToList(),
             ids: sections.Select(s => s.Id).ToList());
-        var diagnostics = session.Missions.IsMissionFile(path)
-            ? session.Missions.Model(path).Problems
+        // A mission file is a script or the ship build file of a script, and each kind has its own problems.
+        var diagnostics = document.HoldsScript ? session.Missions.Model(path).Problems
+            : session.Missions.IsMissionFile(path) ? session.Missions.ShipFile(document).Problems
             : sections.SelectMany(s => AgentRows.DiagnosticsOf(session, s));
         var marks = IniLint.Marks(raw, diagnostics.Where(d => one == null || one.Equals(d.Target)), showBaseGame: false);
         return ToolResult.Of(new RawIniView(path, one == null ? null : ItemRefs.Canonical(session, one), raw.Text,

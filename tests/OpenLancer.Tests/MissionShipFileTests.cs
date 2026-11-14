@@ -240,6 +240,31 @@ public sealed class MissionShipFileTests
         Assert.True(again.Missions.IsMissionFile(NewShips));
     }
 
+    /// <summary>
+    /// get_raw_ini reads the ship build file of a script, with the problems of a ship build file, and the file that
+    /// new_ship_build_file makes. After the undo of the command, W has no such file, so the tool gives not_found, as for
+    /// a file that never existed.
+    /// </summary>
+    [Fact]
+    public void GetRawIniReadsAShipBuildFileAndNoFileAfterTheUndoOfItsCreate()
+    {
+        using var m = Create();
+        var host = new TestAgentHost(m.Session);
+        string Args(string path) => $$"""{ "file": {{AgentCalls.Json(path)}} }""";
+
+        var own = AgentCalls.Ok(host, "get_raw_ini", Args(Ships));
+        m.Apply(new NewShipBuildFile(TestScript, NewShips));
+        var made = AgentCalls.Ok(host, "get_raw_ini", Args(NewShips));
+        m.Session.Undo();
+        var (code, _, _) = AgentCalls.Error(host, "get_raw_ini", Args(NewShips));
+
+        Assert.Contains("ol_build_1", (string?)own["text"], System.StringComparison.Ordinal);
+        Assert.Equal(Ships, (string?)own["file"], ignoreCase: true);
+        Assert.Equal("", ((string?)made["text"])!.Trim());
+        Assert.Equal("not_found", code);
+        Assert.Equal("not_found", AgentCalls.Error(host, "get_raw_ini", Args(@"DATA\MISSIONS\OL_TEST\never.ini")).Code);
+    }
+
     [Fact]
     public void TheCommandGivesTheRefusalOfThePopup()
     {
