@@ -15,15 +15,22 @@ internal sealed partial record StartReplay
     /// follows.
     /// <list type="bullet">
     /// <item>Timers (issue #46). A waiting timer ran when the path shows that at least its time passed since its start.
-    /// All timers count on the same heartbeats. A run comes at or after the run that started it. A timer comes at least
-    /// its shortest time after its start. A trigger of the path comes after the trigger of the path before it, and after
-    /// each run with a known time since then. When the player jumps, retail brings each jumper into the new system 3 s
-    /// after the player. So a trigger of the path that waits for jumpers to arrive comes at least 3 s after the arrival
-    /// of the player. The arrival of the player comes after the trigger of the path before it. A waiting timer runs when
-    /// its longest time from its start is at or below the least time of the next trigger of the path. A tie counts,
-    /// because one heartbeat runs both timers. The timers run in the order of their starts, then in the order of their
+    /// All timers count on the same heartbeats.
+    /// <list type="bullet">
+    /// <item>The least time. A run comes at or after the run that started it. A timer comes at least its shortest time
+    /// after its start. A trigger of the path comes after the trigger of the path before it. It also comes after each
+    /// run with a known time since that trigger.</item>
+    /// <item>The arrival. When the player jumps, retail brings each jumper into the new system 3 s after the player. So
+    /// a trigger of the path that waits for jumpers to arrive comes at least 3 s after the arrival of the player. Each
+    /// ship of its condition must be a jumper. The arrival of the player comes after the trigger of the path before
+    /// it.</item>
+    /// <item>The run test. A waiting timer runs when its longest time from its start is at or below the least time of
+    /// the next trigger of the path. A tie counts, because one heartbeat runs both timers. When the path shows no time,
+    /// no timer runs. A timer of 0 s runs at its start, so it never waits.</item>
+    /// <item>The order and the exceptions. The timers run in the order of their starts, then in the order of their
     /// times. A timer that counts only in space does not run when the path showed the player docked after its start. A
     /// waiting trigger that can stop the timer does not keep it waiting.</item>
+    /// </list></item>
     /// <item>A launch of the path ran each trigger that waited for that launch: Cnd_PlayerLaunch, Cnd_SpaceEnter without
     /// a system or with the system of the launch, Cnd_LaunchComplete of the player, and Cnd_BaseExit without a base or
     /// with the base of the launch.</item>
@@ -190,8 +197,9 @@ internal sealed partial record StartReplay
                         continue;
                     if (program.InSpaceOnly[slot] && docked > timeline.ChangeOf(start))
                         continue;
-                    var bound = timeline.Bound(start, position, next);
-                    if (bound > 0 && time <= bound)
+                    // A timer of 0 s runs at its start. So a waiting timer has a time of at least one heartbeat, and a
+                    // bound of 0 runs no timer.
+                    if (time <= timeline.Bound(start, position, next))
                         (due, dueStart, dueTime) = (waiting, start, time);
                 }
                 if (due == null)
