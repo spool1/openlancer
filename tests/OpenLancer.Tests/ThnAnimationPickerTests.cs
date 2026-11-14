@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using LibreLancer.Data.Schema;
 using LibreLancer.Thn;
+using LibreLancer.Utf.Anm;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Thn;
@@ -438,6 +439,44 @@ public sealed class ThnAnimationPickerTests
         Assert.Equal(FLGender.unset, clips.SexOf(null));
         Assert.Equal(FLGender.unset, clips.SexOf(new CostumeParts("body_x", Set("body_x"))));
         Assert.Null(ThnAnimationPicker.CostumeOf(session, ThnSessions.W(session), "Ship"));
+    }
+
+    /// <summary>
+    /// The clip preview plays the scripts of the table of the game data of the last save. A clip of the list that the
+    /// table does not have gives the text that tells the user to save. A table that does not read gives the reason, and
+    /// the editor does not stop. The engine then keeps a part of the table, so the error stays for that game data. Other
+    /// game data reads its own table.
+    /// </summary>
+    [Fact]
+    public void TheClipPreviewGivesTheReasonForAClipThatTheSavedDataDoesNotPlay()
+    {
+        var saved = new SavedClips();
+        var data = new object();
+        var table = new AnmFile();
+        table.Scripts[MaleNod] = new Script(MaleNod);
+        table.Scripts[MaleIdle] = new Script(MaleIdle);
+        var broken = new object();
+        var reads = 0;
+
+        AnmFile Unreadable()
+        {
+            reads++;
+            throw new Exception("Anm Header malformed");
+        }
+
+        Assert.Same(table.Scripts[MaleNod], saved.Find(data, () => table, MaleNod, MaleIdle, out var idle, out var problem));
+        Assert.Same(table.Scripts[MaleIdle], idle);
+        Assert.Null(problem);
+        Assert.Null(saved.Find(data, () => table, ModClip, MaleIdle, out idle, out problem));
+        Assert.Null(idle);
+        Assert.Equal(SavedClips.NotSaved, problem);
+        Assert.Null(saved.Find(broken, Unreadable, MaleNod, null, out _, out problem));
+        Assert.Equal($"{SavedClips.Unreadable} Anm Header malformed", problem);
+        Assert.Null(saved.Find(broken, () => table, MaleNod, null, out _, out problem));
+        Assert.Equal($"{SavedClips.Unreadable} Anm Header malformed", problem);
+        Assert.Equal(1, reads);
+        Assert.NotNull(saved.Find(new object(), () => table, MaleNod, null, out _, out problem));
+        Assert.Null(problem);
     }
 
     /// <summary>The clip preview keeps its character while the side pane draws in each frame. It frees the character at

@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using ImGuiNET;
 using LibreLancer;
 using LibreLancer.Graphics;
@@ -10,7 +12,6 @@ using LibreLancer.Render.Cameras;
 using LibreLancer.Thn;
 using LibreLancer.Utf.Anm;
 using LibreLancer.World;
-using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Assets;
 using OpenLancer.Runtime.Thn;
 
@@ -51,6 +52,77 @@ internal readonly record struct PreviewView(float Zoom, float Yaw, float Pitch, 
 internal readonly record struct PreviewClip(object Data, CharacterModels Models, string Clip, string? Idle);
 
 /// <summary>
+/// The animation table of the game data of the last save, for the clip preview, without ImGui. The engine reads the
+/// files of the <c>[Animations]</c> lines once for each game data, and it does not catch a file that does not read
+/// (GameDataManager.cs:65-85). After such an error, the engine keeps a part of the table. So this class keeps the read
+/// error of each game data, and the clip preview shows it for each clip of that data. The editor does not stop, and the
+/// clip preview does not play the clips of a part of the table.
+/// </summary>
+internal sealed class SavedClips
+{
+    /// <summary>The text of the clip preview for a clip that the list has and the game data of the last save does not
+    /// have, for example a clip of an unsaved <c>[Animations]</c> line.</summary>
+    public const string NotSaved = "The clip preview plays the clips of the game data of the last save. That data does " +
+                                   "not have this clip. Save the mod, then the clip preview can play it.";
+
+    /// <summary>The start of the text of the clip preview when an animation file of the game data of the last save does
+    /// not read. The message of the error follows it.</summary>
+    public const string Unreadable = "The clip preview cannot read the animation files of the game data of the last " +
+                                     "save, so it plays no clip.";
+
+    // The read error of each game data whose table did not read. The entries do not keep the game data alive.
+    private readonly ConditionalWeakTable<object, string> failures = new();
+
+    /// <summary>
+    /// The script of a clip of the list in the table of a game data, and the script of its idle. Null with the reason
+    /// when the table does not read, or when the table does not have the clip. The list of W has the clip, so then the
+    /// game data of the last save does not have it (see <see cref="NotSaved"/>).
+    /// </summary>
+    /// <param name="data">The game data of the last save.</param>
+    /// <param name="read">Reads the table of the data, for example <c>GameDataManager.GetCharacterAnimations</c>.</param>
+    /// <param name="clip">The name of a clip of the list.</param>
+    /// <param name="idle">The name of the idle below the clip, or null.</param>
+    /// <param name="idleScript">The script of the idle, or null when the table does not have it.</param>
+    /// <param name="problem">The reason when the result is null, else null.</param>
+    public Script? Find(object data, Func<AnmFile> read, string clip, string? idle, out Script? idleScript,
+        out string? problem)
+    {
+        idleScript = null;
+        if (failures.TryGetValue(data, out problem))
+        {
+            return null;
+        }
+
+        Dictionary<string, Script> scripts;
+        try
+        {
+            scripts = read().Scripts;
+        }
+        catch (Exception e)
+        {
+            // The engine throws plain exceptions for some errors of a file, so each exception of the read counts.
+            problem = $"{Unreadable} {e.Message.Trim()}";
+            failures.AddOrUpdate(data, problem);
+            FLLog.Warning("Clip preview", e.ToString());
+            return null;
+        }
+
+        if (!scripts.TryGetValue(clip, out var script))
+        {
+            problem = NotSaved;
+            return null;
+        }
+
+        if (idle != null)
+        {
+            scripts.TryGetValue(idle, out idleScript);
+        }
+
+        return script;
+    }
+}
+
+/// <summary>
 /// The clip preview of the animation picker. It plays a clip in a loop on a copy of a character of the scene. The copy
 /// is in its own world, with the lights of the asset thumbnails. The controls follow the Unity animation preview (see
 /// <see cref="Controls"/>).
@@ -86,6 +158,7 @@ internal sealed class ThnAnimationPreview(EditorWindow window) : IDisposable
     private sealed record Scene(GameWorld World, ThnSceneObject Character, DfmSkeletonManager Skeleton, float Duration);
 
     private readonly LookAtCamera camera = new();
+    private readonly SavedClips saved = new();
     private EditorSession? owner;
     private SystemRenderer? renderer;
     private RenderTarget2D? target;
@@ -102,7 +175,7 @@ internal sealed class ThnAnimationPreview(EditorWindow window) : IDisposable
     /// <summary>Plays a clip on a copy of a character and draws the view and its controls.</summary>
     /// <param name="models">The models of the character of the scene, or null when the scene has no such
     /// character.</param>
-    /// <param name="clip">The name of the clip.</param>
+    /// <param name="clip">The name of a clip of the list (see <see cref="AnimationClips"/>).</param>
     /// <param name="idle">The name of the idle that plays below the clip, or null (see
     /// <see cref="AnimationClips.IdleFor"/>).</param>
     public void Draw(CharacterModels? models, string clip, string? idle)
@@ -322,7 +395,8 @@ internal sealed class ThnAnimationPreview(EditorWindow window) : IDisposable
     }
 
     /// <summary>Makes a new copy of the character and starts the clip on it. The script comes from the animation table of
-    /// the engine, so it is the script that the game plays.</summary>
+    /// the engine, so it is the script that the game plays. A table that does not read, or a table without the clip,
+    /// gives the reason (see <see cref="SavedClips"/>).</summary>
     private void Start(EditorSession session, GameDataManager data, CharacterModels models, string clip, string? idle)
     {
         if (!ReferenceEquals(owner, session))
@@ -336,15 +410,13 @@ internal sealed class ThnAnimationPreview(EditorWindow window) : IDisposable
         current = new PreviewClip(data, models, clip, idle);
         lastFrame = 0;
         playTime = 0;
-        var scripts = data.GetCharacterAnimations().Scripts;
-        if (!scripts.TryGetValue(clip, out var script))
+        if (saved.Find(data, data.GetCharacterAnimations, clip, idle, out var idleScript, out problem) is not { } script)
         {
-            problem = ThnTemplateRules.ClipProblem(clip);
             return;
         }
 
         var skeleton = new DfmSkeletonManager(models.Body, models.Head, models.LeftHand, models.RightHand);
-        if (idle != null && scripts.TryGetValue(idle, out var idleScript))
+        if (idleScript != null)
         {
             skeleton.StartScript(idleScript, 0, 1, 0, true);
         }

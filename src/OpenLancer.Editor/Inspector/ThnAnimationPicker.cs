@@ -20,8 +20,8 @@ namespace OpenLancer.Editor.Inspector;
 /// of the M8b design plans it. The field opens the list picker with the clips of the data list <c>animation</c> of the
 /// session, grouped by the skeletons of the costume of the target. The list and the costume come from W, so an unsaved
 /// INI edit shows. The side pane plays the hovered clip on a character of the scene: the clip preview. The clip preview
-/// plays the clips of the game data of the last save. The <b>Preview</b> button plays the cutscene preview from the
-/// time of the event.
+/// plays the clips of the game data of the last save (see <see cref="SavedClips"/>). The <b>Preview</b> button plays the
+/// cutscene preview from the time of the event.
 /// </summary>
 /// <remarks>A COMPOUND plays the scripts of its own model, not the clips of the <c>.anm</c> files (GameObject.cs:602-605),
 /// so the row of another target keeps its text field (risk R5 of the M8b design). The save gate checks the clip with
@@ -42,11 +42,6 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
     /// <summary>The reason of a disabled <b>Preview</b> button when the cutscene has no preview and gives no
     /// reason.</summary>
     public const string NoPreview = "The cutscene has no preview.";
-
-    /// <summary>The text of the clip preview for a clip that the list has and the game data of the last save does not
-    /// have, for example a clip of an unsaved <c>[Animations]</c> line.</summary>
-    public const string NotSaved = "The clip preview plays the clips of the game data of the last save. That data does " +
-                                   "not have this clip. Save the mod, then the clip preview can play it.";
 
     private const string NotSet = "Not set";
 
@@ -358,13 +353,6 @@ internal sealed class ThnAnimationPicker(EditorWindow window, PropertyGrid grid)
         if (on == null)
         {
             ImGui.TextWrapped("The script has no character for the clip preview.");
-            return;
-        }
-
-        // The clip preview plays the scripts of the game data of the last save, which can lack a clip of W.
-        if (session.GameData?.GetCharacterAnimations().Scripts.ContainsKey(clip.Name) == false)
-        {
-            ImGui.TextWrapped(NotSaved);
             return;
         }
 
