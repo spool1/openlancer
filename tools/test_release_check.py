@@ -727,6 +727,21 @@ class ReadmeFirstTests(unittest.TestCase):
         self.assertIn("A Play start at a checkpoint restores only the triggers of the checkpoint.", limits)
         self.assertIn("You can make a new cutscene, but nobody checked yet that the retail games play it.", limits)
 
+    def test_play_in_the_game_works_and_each_limit_of_play_names_f5(self):
+        """SUPPORTED GAMES gives the Play support of Ctrl+F5 (#61). So the text names Ctrl+F5 as a feature that works,
+        and each limit of Play names F5. Ctrl+F5 starts the program of your own game, so these limits are not true for
+        it."""
+        text = self.filled("1.0.0")
+        works = " ".join(self.section(text, "WHAT WORKS IN THIS VERSION").split())
+        self.assertIn("Play the mod in your own game with Ctrl+F5. The editor installs the mods into a play copy next "
+                      "to the game. Your game folder does not change.", works)
+        limits = self.section(text, "WHAT DOES NOT WORK YET")
+        items = [" ".join(item.split()) for item in limits.removeprefix("- ").split("\n- ")]
+        play = [item for item in items if item.startswith("Play ")]
+        self.assertGreaterEqual(len(play), 2, items)
+        for item in play:
+            self.assertTrue(item.startswith("Play (F5) "), item)
+
     def test_what_works_names_the_export_the_mission_editor_and_the_database(self):
         works = " ".join(self.section(self.filled("1.0.0"), "WHAT WORKS IN THIS VERSION").split())
         self.assertIn("as a drop-in zip and as an FLMM package, with Mod > Export mod...", works)

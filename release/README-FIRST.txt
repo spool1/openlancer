@@ -133,6 +133,9 @@ WHAT WORKS IN THIS VERSION
   crashes the game, it stops the save and tells you why. It does not find
   all such values.
 - Test your mod with F5 (Play). A save reloads the running game.
+- Play the mod in your own game with Ctrl+F5. The editor installs the
+  mods into a play copy next to the game. Your game folder does not
+  change.
 - Change the missions of the game in the Mission tab. The mission editor
   shows a mission as a graph of triggers. It adds and changes triggers,
   checks the script and runs a dry run. Play from a trigger starts Play,
@@ -160,12 +163,12 @@ new folder has another version of the game, the editor asks you first.
 
 WHAT DOES NOT WORK YET
 ----------------------
-- Play is a test run of the editor, not a release of a game. It uses the
-  OpenLancer runtime, a fork of the Librelancer engine. It is not the
+- Play (F5) is a test run of the editor, not a release of a game. It uses
+  the OpenLancer runtime, a fork of the Librelancer engine. It is not the
   original game program. It does not play the whole story. Some missions
   stop, ships have fewer AI behaviors, and some effects and cutscenes look
   different.
-- Play does not run the HD Edition plugins.
+- Play (F5) does not run the HD Edition plugins.
 - OpenLancer does not support total conversions such as Discovery. The
   editor can open their data, with a warning.
 - You cannot create or delete jump gates, jump holes and trade lane
