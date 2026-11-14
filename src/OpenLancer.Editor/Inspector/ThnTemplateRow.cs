@@ -144,8 +144,8 @@ internal sealed record ThnTemplateRow(ThnTemplateRule? Rule, string? Label, bool
     /// The look of the value of the row in a cutscene of a session, as the Inspector shows it. The text below the field
     /// comes from all problems of W at the template (see <see cref="EditSession.CutsceneChecks"/>). The error state
     /// comes from the problems that the save gate refuses (see <see cref="EditSession.CutsceneErrors"/>). So a retail
-    /// value with a problem has the warning color, and a value of the active mod that the save gate refuses has the
-    /// error color.
+    /// value with a problem has the warning color. A value of the active mod that the save gate refuses has the error
+    /// color.
     /// </summary>
     /// <param name="path">The install path of the cutscene.</param>
     /// <param name="script">The version of W of the cutscene.</param>

@@ -53,8 +53,8 @@ internal readonly record struct PreviewClip(object Data, CharacterModels Models,
 
 /// <summary>
 /// The animation table of the game data of the last save, for the clip preview, without ImGui. The engine reads the
-/// files of the <c>[Animations]</c> lines once for each game data, and it does not catch a file that does not read
-/// (GameDataManager.cs:65-85). After such an error, the engine keeps a part of the table. So this class keeps the read
+/// files of the <c>[Animations]</c> lines once for each game data. It does not catch a file that does not read
+/// (GameDataManager.cs:65-85), and after such an error it keeps a part of the table. So this class keeps the read
 /// error of each game data, and the clip preview shows it for each clip of that data. The editor does not stop, and the
 /// clip preview does not play the clips of a part of the table.
 /// </summary>
