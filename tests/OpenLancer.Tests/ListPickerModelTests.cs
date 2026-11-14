@@ -129,8 +129,8 @@ public sealed class ListPickerModelTests
 
         var footer = ListPickerModel.Footer(row, "Loadout", e => e.Value == "li_new" ? 3 : 0);
 
-        Assert.Equal(["New one (li_new)", "Loadout", "The active mod 'act' adds it. It is not saved.", "Used by 3 lines",
-            "type = STATION"], footer);
+        Assert.Equal(["New one (li_new)", "Loadout", "The active mod 'act' adds it. It is not saved.",
+            "Used by 3 INI lines", "type = STATION"], footer);
         Assert.Equal(["li_typo: no loadout has this name."], ListPickerModel.Footer(model.Rows[1], "Loadout", _ => 0));
     }
 

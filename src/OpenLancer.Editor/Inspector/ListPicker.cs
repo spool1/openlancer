@@ -146,12 +146,12 @@ internal sealed class ListPickerModel
         IndexOf(visible, selected) >= 0 ? selected : visible.Count > 0 ? visible[0] : -1;
 
     /// <summary>
-    /// The footer lines of a row: the name and the nickname, the kind, the file, the layer, the number of lines that
-    /// name it and the detail keys of the list. A row of a list that the caller makes has no entry, so it gets only the
-    /// name and the kind.
+    /// The footer lines of a row: the name and the nickname, the kind, the file, the layer, the number of INI lines
+    /// that name it and the detail keys of the list. A row of a list that the caller makes has no entry, so it gets
+    /// only the name and the kind.
     /// </summary>
     /// <param name="kind">The label of the kind, for example "Loadout".</param>
-    /// <param name="usedBy">The number of lines that name an entry.</param>
+    /// <param name="usedBy">The number of INI lines that name an entry.</param>
     public static IReadOnlyList<string> Footer(ListPickerRow row, string kind, Func<ListEntry, int> usedBy)
     {
         switch (row.Kind)
@@ -179,7 +179,7 @@ internal sealed class ListPickerModel
                 ValueOrigin.LowerMod => $"Mod '{entry.ModId}' gives it.",
                 _ => "The base data gives it.",
             },
-            $"Used by {usedBy(entry)} lines",
+            $"Used by {usedBy(entry)} INI lines",
         };
         if (entry.Detail.Length > 0)
             lines.Add(entry.Detail);
@@ -284,7 +284,7 @@ internal sealed class ListPicker
     /// <param name="open">Opens the popup in this frame, for example after a click on the field.</param>
     /// <param name="makeModel">Makes the rows when the popup opens.</param>
     /// <param name="kind">The kind of the entries.</param>
-    /// <param name="usedBy">The number of lines that name an entry, for the footer.</param>
+    /// <param name="usedBy">The number of INI lines that name an entry, for the footer.</param>
     /// <param name="owns">True when the open field edit belongs to the popup with an ImGui id.</param>
     /// <param name="route">Gives the events of the popup and the value of the selected row to the field edits.</param>
     /// <param name="pane">The side pane in place of the footer, or null.</param>

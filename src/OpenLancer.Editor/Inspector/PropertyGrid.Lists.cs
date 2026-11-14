@@ -296,7 +296,8 @@ internal sealed partial class PropertyGrid
             new ListPickerRow(ListRowKind.Entry, entry.Value, EntryName(entry), entry), list.Label, UsedBy(list)));
     }
 
-    /// <summary>The number of lines that name an entry of a list, for the footer and the tooltip.</summary>
+    /// <summary>The number of INI lines that name an entry of a list, for the footer and the tooltip. The templates of
+    /// the cutscenes are not in the count.</summary>
     private Func<ListEntry, int> UsedBy(ListView list) => entry =>
         window.Session is { } session && !list.IsEnum
             ? list.Id.Split('+').Sum(id => session.Edits.Lists.CountReferences(id, entry.Value, entry.Section?.Path))
