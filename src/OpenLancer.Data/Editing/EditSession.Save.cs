@@ -197,6 +197,8 @@ public sealed partial class EditSession
     /// <item>Each FLHash collision of a hash list that the active mod adds a name to.</item>
     /// <item>The errors of the component checks (layer 3, milestone M3): a zone of the active mod whose nickname another
     /// zone of any system has, also by FLHash. Retail drops one of the two zones.</item>
+    /// <item>A warning for each animation file of the active mod that the list <c>animation</c> cannot read (see
+    /// <see cref="AnimationWarnings"/>). It does not block the save.</item>
     /// <item>The problems of the checks of each cutscene that the active mod changes, that the lower cutscene does not
     /// have, and each whole cutscene file of the active mod that does not evaluate (decision D137 and section 12.1 of
     /// the M8b design, see <see cref="CutsceneErrors"/>). The game crashes when it plays a cutscene with an error. A
@@ -305,7 +307,28 @@ public sealed partial class EditSession
 
         foreach (var problem in CutsceneGateErrors(active))
             Add(problem);
+
+        foreach (var warning in AnimationWarnings(active))
+        {
+            if (seen.Add((null, null, warning.Message, null)))
+                problems.Add(warning);
+        }
         return problems;
+    }
+
+    /// <summary>
+    /// The warnings of the animation files of the active mod that the list <c>animation</c> cannot read (see
+    /// <see cref="DataLists.Animations"/>). The game reads each file of the <c>[Animations]</c> lines when it loads, and
+    /// it closes when it cannot read one. The list reads the files only when the active mod has an animation file.
+    /// </summary>
+    private IEnumerable<Diagnostic> AnimationWarnings(Mod active)
+    {
+        if (!active.Files.Keys.Any(k => k.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) ||
+            Lists.Animations() is not { } data)
+            return [];
+        var origin = MessageOrigin.Mod(active.Id, ModEvidence.ActiveMod);
+        return data.Warnings.Where(w => FileOrigin(w.Source).Origin == ValueOrigin.ActiveMod)
+            .Select(w => w with { Origin = origin });
     }
 
     /// <summary>

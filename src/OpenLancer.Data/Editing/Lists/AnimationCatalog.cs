@@ -52,8 +52,9 @@ public static class AnimationCatalog
 
     /// <summary>
     /// Reads the animations as <see cref="Read(FileSystem, IEnumerable{string})"/> does, but a file that does not read
-    /// gives one warning in <paramref name="warnings"/>, and the other files keep their clips. <c>oltool validate</c>
-    /// reads the files of a view in this way.
+    /// gives one warning in <paramref name="warnings"/>, and the clips of the other files stay in the result.
+    /// <c>oltool validate</c> reads the files of a view in this way. The game does not: it closes at a file that it
+    /// cannot read (see <see cref="GameStops"/>).
     /// </summary>
     public static IReadOnlyList<AnimationClip> Read(FileSystem files, IEnumerable<string> archives,
         ICollection<Diagnostic> warnings)
@@ -120,7 +121,12 @@ public static class AnimationCatalog
 
     /// <summary>The warning of an animation file that does not read. Its clips are not in the list.</summary>
     internal static Diagnostic Unreadable(string path, string problem) =>
-        Diagnostic.Warning(path, $"OpenLancer cannot read this animation file, so the clip list has no clips from it. {problem}");
+        Diagnostic.Warning(path, $"OpenLancer cannot read this animation file, so the clip list has no clips from it. " +
+                                 $"{problem} {GameStops}");
+
+    /// <summary>What the game does with an animation file that it cannot read: the engine reads the files of the
+    /// <c>[Animations]</c> lines when it loads, and no code catches the error (GameDataManager.cs:58-85).</summary>
+    internal const string GameStops = "If the game cannot read the file either, the game closes during its load.";
 
     /// <summary>
     /// The skeletons of the sections of bodyparts.ini, in the order of the file. A body part belongs to the last

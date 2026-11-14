@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Thn;
 using Xunit;
 using static OpenLancer.Tests.ThnSessions;
@@ -174,7 +175,8 @@ public sealed class AnimationListTests
 
     /// <summary>
     /// A line that names a file that does not exist gives no warning, as the engine skips such a file. A file that does
-    /// not read gives one warning of the list, with the file as its source, and the other files keep their clips.
+    /// not read gives one warning of the list, with the file as its source, and the list keeps the clips of the other
+    /// files. The warning tells that the game closes at such a file.
     /// </summary>
     [Fact]
     public void AFileThatDoesNotReadGivesOneWarningAndTheOtherFilesKeepTheirClips()
@@ -190,7 +192,39 @@ public sealed class AnimationListTests
         Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
         Assert.Equal(AnimationWorkspace.Broken, warning.Source, ignoreCase: true);
         Assert.StartsWith("OpenLancer cannot read this animation file, so the clip list has no clips from it. ", warning.Message);
+        Assert.EndsWith(AnimationCatalog.GameStops, warning.Message);
         Assert.Equal(["Sc_Run", "Sc_Sit", "SC_WALK"], session.Lists.List("animation")!.Entries.Select(e => e.Value));
+    }
+
+    /// <summary>
+    /// The game closes during its load at an animation file that it cannot read. So an animation file of the active mod
+    /// that does not read gives a warning of the save, with the origin of the active mod, and the save continues. A file
+    /// of the base data that does not read gives no warning of the save.
+    /// </summary>
+    [Fact]
+    public void AnAnimationFileOfTheActiveModThatDoesNotReadGivesASaveWarning()
+    {
+        using var ws = AnimationWorkspace.Create();
+        ws.WriteBase(ThnDataWorkspace.BodypartsPath, """
+            [Animations]
+            anim = characters\animations\body.anm
+            anim = characters\animations\broken.anm
+            anim = characters\animations\more.anm
+            """);
+        var modFile = Path.Combine(ws.ModFolder("act"), "files", AnimationWorkspace.More);
+        Directory.CreateDirectory(Path.GetDirectoryName(modFile)!);
+        File.WriteAllText(modFile, "not an animation file");
+        var session = ws.Session("act");
+        Assert.Equal(2, session.Lists.Animations()!.Warnings.Count);
+
+        var result = session.Save();
+
+        Assert.True(result.Saved);
+        var warning = Assert.Single(result.Problems);
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Equal(AnimationWorkspace.More, warning.Source, ignoreCase: true);
+        Assert.EndsWith(AnimationCatalog.GameStops, warning.Message);
+        Assert.Equal(MessageOrigin.Mod("act", ModEvidence.ActiveMod), warning.Origin);
     }
 
     /// <summary>A profile without bodyparts.ini has no clip list, so no check uses it.</summary>

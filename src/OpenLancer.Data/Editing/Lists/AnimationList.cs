@@ -14,8 +14,9 @@ namespace OpenLancer.Data.Editing.Lists;
 /// </summary>
 /// <param name="Clips">The clips, sorted by name. Each clip has all its files in load order.</param>
 /// <param name="Skeletons">The skeletons of bodyparts.ini (see <see cref="AnimationCatalog.Skeletons"/>).</param>
-/// <param name="Warnings">One warning for each animation file that does not read. The other files keep their
-/// clips.</param>
+/// <param name="Warnings">One warning for each animation file that does not read. The clips of the other files stay
+/// in the list, but the game closes at such a file (see <see cref="AnimationCatalog.GameStops"/>). The save gives the
+/// warnings of the files of the active mod.</param>
 public sealed record AnimationData(IReadOnlyList<AnimationClip> Clips, IReadOnlyList<AnimationSkeleton> Skeletons,
     IReadOnlyList<Diagnostic> Warnings)
 {

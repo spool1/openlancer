@@ -30,8 +30,8 @@ namespace OpenLancer.Runtime.Validation;
 /// problem.</para>
 /// <para>A clip of a START_MOTION event on a character must be a clip of the animation files that the
 /// <c>[Animations]</c> lines of the loaded data name. The check reads these files once for each view, and only for a
-/// cutscene with such an event. An animation file that does not read gives one warning, and the other files keep their
-/// clips.</para>
+/// cutscene with such an event. An animation file that does not read gives one warning, and the clips of the other
+/// files stay in the check. The game closes at such a file when it loads.</para>
 /// <para>The check reads only the listed paths. A check of every cutscene of both views adds about 2.5 s to each
 /// validation.</para>
 /// </remarks>
