@@ -46,8 +46,9 @@ internal static class ThnFieldProblems
 /// <param name="Dim">The dim text at the right of the field, for example the nickname of an entry with a name.</param>
 /// <param name="Error">True for the red frame of a value that the save gate refuses.</param>
 /// <param name="Below">The text below the field, or null.</param>
+/// <param name="Entry">The entry of the list with the value, or null.</param>
 internal sealed record ThnTemplateLook(string Text, string Dim, Vector4 Color, bool Error, string? Below,
-    Vector4 BelowColor);
+    Vector4 BelowColor, ListEntry? Entry);
 
 /// <summary>
 /// The <c>template_name</c> row of an entity of a cutscene (section 12.1 of the M8b design), without ImGui. A DEFORMABLE
@@ -140,6 +141,28 @@ internal sealed record ThnTemplateRow(ThnTemplateRule? Rule, string? Label, bool
     public string ClickToPick => $"Click to pick the {Label?.ToLowerInvariant()}.";
 
     /// <summary>
+    /// The look of the value of the row in a cutscene of a session, as the Inspector shows it. The text below the field
+    /// comes from all problems of W at the template (see <see cref="EditSession.CutsceneChecks"/>). The error state
+    /// comes from the problems that the save gate refuses (see <see cref="EditSession.CutsceneErrors"/>). So a retail
+    /// value with a problem has the warning color, and a value of the active mod that the save gate refuses has the
+    /// error color.
+    /// </summary>
+    /// <param name="path">The install path of the cutscene.</param>
+    /// <param name="script">The version of W of the cutscene.</param>
+    /// <param name="entity">The entity of the row.</param>
+    /// <param name="list">The data list of the row (see <see cref="Lists"/>).</param>
+    /// <param name="current">The value of the field.</param>
+    /// <param name="name">Gives the display name of an entry of the list.</param>
+    public ThnTemplateLook LookIn(EditSession edits, string path, ThnScriptModel script, ThnRef entity, ListView list,
+        string current, Func<ListEntry, string> name)
+    {
+        var entry = current.Length == 0 ? null : list.Find(current);
+        var problem = ThnFieldProblems.At(edits.CutsceneChecks(path), script, entity, Path);
+        var blocked = ThnFieldProblems.At(edits.CutsceneErrors(path), script, entity, Path) != null;
+        return Look(current, entry, entry == null ? null : name(entry), problem, blocked);
+    }
+
+    /// <summary>
     /// The closed field and the text below it for a value, as <c>PropertyGrid.Lists</c> shows a listed value. A value
     /// outside a closed list shows "Missing (Label): value". It has the error color and the red frame when the save
     /// gate refuses it (a value of the active mod), and else the warning color, for example for a retail value. The
@@ -161,21 +184,21 @@ internal sealed record ThnTemplateRow(ThnTemplateRule? Rule, string? Label, bool
         if (current.Length == 0)
         {
             return new ThnTemplateLook($"None ({Label})", "", problem == null ? EditorTheme.TextDim : color, blocked,
-                check, below);
+                check, below, null);
         }
 
         if (entry != null)
         {
             var shown = string.IsNullOrWhiteSpace(name) ? entry.Value : name;
             var dim = shown.Equals(entry.Value, StringComparison.OrdinalIgnoreCase) ? "" : entry.Value;
-            return new ThnTemplateLook(shown, dim, color, blocked, check, below);
+            return new ThnTemplateLook(shown, dim, color, blocked, check, below, entry);
         }
 
         return Closed
             ? new ThnTemplateLook($"Missing ({Label}): {current}", "", blocked ? EditorTheme.Error : EditorTheme.Warning,
-                blocked, check ?? NotChecked, below)
+                blocked, check ?? NotChecked, below, null)
             : new ThnTemplateLook($"Not listed ({Label}): {current}", "", EditorTheme.Warning, false,
-                check ?? OpenNote, EditorTheme.TextDim);
+                check ?? OpenNote, EditorTheme.TextDim, null);
     }
 
     /// <summary>The note below the field of a value outside an open list.</summary>

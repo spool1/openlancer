@@ -230,8 +230,8 @@ public sealed class ThnTemplateRowTests
             e => ThnTemplateRow.Of(e.Table, ThnScripts.Evaluator.Symbols));
     }
 
-    /// <summary>The look of the template row of an entity, as the Inspector makes it, and the problem of the save gate
-    /// at the template, or null.</summary>
+    /// <summary>The look of the template row of an entity from <see cref="ThnTemplateRow.LookIn"/>, which the Inspector
+    /// calls, and the problem of the save gate at the template, or null.</summary>
     /// <param name="name">The display name of the entry, or null for the nickname.</param>
     private static (ThnTemplateLook Look, OpenLancer.Data.Diagnostic? Gate) LookOf(EditSession session, string entity,
         string path = ScriptPath, string? name = null)
@@ -241,9 +241,9 @@ public sealed class ThnTemplateRowTests
         var target = new ThnRef(session.CutscenePath(path)!, ThnElementKind.Entity, element.Id);
         var row = ThnTemplateRow.Of(element.Table, ThnScripts.Evaluator.Symbols)!;
         var current = element.Table[ThnTemplateRow.Path] is ThnText text ? text.Value : "";
-        var entry = current.Length == 0 ? null : session.Lists.List(row.Lists)!.Find(current);
-        var gate = ThnFieldProblems.At(session.CutsceneErrors(path), script, target, ThnTemplateRow.Path);
-        var problem = ThnFieldProblems.At(session.CutsceneChecks(path), script, target, ThnTemplateRow.Path);
-        return (row.Look(current, entry, entry == null ? null : name ?? entry.Value, problem, gate != null), gate);
+        var list = session.Lists.List(row.Lists)!;
+        var look = row.LookIn(session, path, script, target, list, current, entry => name ?? entry.Value);
+        Assert.Same(current.Length == 0 ? null : list.Find(current), look.Entry);
+        return (look, ThnFieldProblems.At(session.CutsceneErrors(path), script, target, ThnTemplateRow.Path));
     }
 }

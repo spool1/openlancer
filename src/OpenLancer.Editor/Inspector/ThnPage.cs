@@ -687,10 +687,8 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         }
 
         var current = ThnFieldEdit.Format(field.Kind, field.Value);
-        var entry = current.Length == 0 ? null : list.Find(current);
-        var problem = ThnFieldProblems.At(edits.CutsceneChecks(path), script, entity, ThnTemplateRow.Path);
-        var blocked = ThnFieldProblems.At(edits.CutsceneErrors(path), script, entity, ThnTemplateRow.Path) != null;
-        var look = template.Look(current, entry, entry == null ? null : grid.EntryName(entry), problem, blocked);
+        var look = template.LookIn(edits, path, script, entity, list, current, grid.EntryName);
+        var entry = look.Entry;
         grid.ThnRow(template.Label!, field, note == null ? template.Note : $"{template.Note}\n\n{note}", () =>
         {
             ImGui.BeginDisabled(field.ReadOnly != null);
