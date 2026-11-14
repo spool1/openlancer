@@ -304,7 +304,9 @@ Each command sees the result of the commands before it. So a later command can n
 
 A name has only letters, digits, `_` and `-`, with at most 64 characters. A name that Windows uses for a device, for example `nul` or `com1`, is not correct in any letter case. A bad name gives `invalid_value` with the detail `NameInvalid`, as the other names of the mission commands do. A path with a file gives `name_taken` with the detail `PathInUse`. A script directly in `DATA\MISSIONS` cannot get its own file, so the command gives `BadPath`.
 
-The builds of the old file do not move. The game looks for the build of a mission ship in the ship build file of its script first. Then it looks in the shared files `DATA\MISSIONS\npcships.ini` and `DATA\MISSIONS\npcships_test.ini`. It does not spawn a ship whose build it does not find. So each batch that points the line at another file gives a warning, also with `set_item_key`. The warning names the builds that are only in the old file, and the two files. The mission checks do not find this problem, so strict mode does not refuse the batch.
+The builds of the old file do not move. The game looks for the build of a mission ship in the ship build file of its script first. Then it looks in the shared files `DATA\MISSIONS\npcships.ini` and `DATA\MISSIONS\npcships_test.ini`. It does not spawn a ship whose build it does not find.
+
+So each batch that points the line at another file gives a warning, also with `set_item_key`. The warning names the builds that are only in the old file, and the two files. The mission checks do not find this problem, so strict mode does not refuse the batch.
 
 The commands do not change the world files of the missions, for example the pilot files and the encounter files, because encounters and bases use them too. The `npc_ship_file` line of a script can name only a ship build file or a new file. A ship build file is in a folder under `DATA\MISSIONS` outside the encounters folder, and it has only `[NPCShipArch]` sections. The shared ship build file `DATA\MISSIONS\npcships.ini` is also correct. A command that sets the line to another file gives `invalid_value` with the detail `NotShipBuildFile`, and nothing changes. A command in a `command_group` gets the same check.
 
@@ -565,7 +567,7 @@ The result also gives the problems of the cutscene checks that the call adds and
 
 A template that names no item of the data lists is a problem too. An example is a costume or an effect that the game data does not have. The message of a template that does not crash the game tells what the scene does without the item. When the lists have the name but the game cannot use the item, the message tells why.
 
-The check reads the data lists with the unsaved edits. So an INI edit of the active mod that deletes, renames or breaks the item also gives the problem. The result of such an edit gives the problem of each cutscene that the save gate checks, also when the call does not change the cutscene. `list_values` gives the names of these lists:
+The check reads the data lists with the unsaved edits. So an INI edit of the active mod that deletes, renames or breaks the item also gives the problem. The result of such an edit gives the problems of each cutscene that the save gate checks. The call does not have to change the cutscene. `list_values` gives the names of these lists:
 
 | Template | Lists |
 |---|---|

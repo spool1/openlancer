@@ -24,10 +24,12 @@ OpenLancer has no installer. "WHERE OPENLANCER KEEPS FILES" in `README-FIRST.txt
 2. If Windows shows "Windows protected your PC", do the steps of [Windows protected your PC](TROUBLESHOOTING.md#windows-protected-your-pc).
 3. On the card "Link your Freelancer game", click **Select game folder...**.
 4. Select the folder of your game. This folder contains the `EXE` and `DATA` folders.
-5. Make sure that the editor shows "Game found" and the name of your game, for example "Freelancer 1.1".
+5. Make sure that the editor shows "Game found" or "Game found, with warnings", and the name of your game.
 6. Click **Create profile and open**.
 
 Instead of steps 3 and 4, you can drag the game folder to the editor window.
+
+The card names your game, for example "Freelancer 1.1". A warning, for example about changed INI files, does not stop the profile. [GAME_LINK.md](GAME_LINK.md) tells what each warning means.
 
 The editor makes a profile for your game and an empty mod, `my-mod`, in `Documents\OpenLancer`. Then it opens the profile, and the Scene shows a star system in 3D. Your edits go into `my-mod`.
 

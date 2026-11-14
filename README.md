@@ -94,7 +94,7 @@ To report a bug, click **Help > Report a problem**. The editor copies a short te
 
 *Select an object in the Hierarchy or the Scene, change it in the Inspector, or drag an asset from the Assets panel into the Scene.*
 
-Start with the release zip and the editor (see [Players](#players)). At the first start, the editor makes a profile for your game and an empty mod, `my-mod`, and opens the profile. Your edits go into `my-mod`.
+Start with the release zip and the editor (see [Players](#players)). At the first start, the editor makes a profile for your game and an empty mod, `my-mod`, and opens the profile. Your edits go into `my-mod`. For Freelancer 1.0, patch the game to 1.1 before step 6 (see [Supported games](#supported-games)).
 
 1. Select an object in the Hierarchy or the Scene.
 2. Change the object in the Inspector, or drag an arrow of the gizmo in the Scene.
@@ -105,7 +105,7 @@ Start with the release zip and the editor (see [Players](#players)). At the firs
 7. In the editor window, click the **Stop** button.
 8. Click **Mod > Export mod...**. The export makes the packages that players install.
 
-[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) gives each step with more detail. For Freelancer 1.0, patch the game to 1.1 before you press Ctrl+F5 (see [Supported games](#supported-games)).
+[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) gives each step with more detail.
 
 See [docs/MOD_FORMAT.md](docs/MOD_FORMAT.md) for the files of a mod. `samples/mods/ol-sample` is a complete example: it changes a price, and it adds a new ship that Manhattan sells.
 

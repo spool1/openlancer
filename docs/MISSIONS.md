@@ -16,7 +16,7 @@ This version has these limits:
 
 ## Open a mission
 
-1. Start `OpenLancer.Editor.exe` in the folder that you extracted from the release zip. The editor opens the profile that you opened last. The first time, link your game as [Getting started](GETTING_STARTED.md#start-the-editor-and-link-your-game) tells.
+1. Start `OpenLancer.Editor.exe` in the folder that you extracted from the release zip. The editor opens the profile that you opened last. The first time, it asks for your game, as [Getting started](GETTING_STARTED.md#start-the-editor-and-link-your-game) tells.
 2. To open another profile, click File > Open profile, then click the profile.
 3. Click the Missions tab at the bottom of the window. The 14 story missions come first, in the order of the game. The other scripts of the game data and the mods follow.
 4. Type a name, a nickname or a value in the search field. For example, type `m04` or a trigger name.
@@ -393,7 +393,9 @@ The `npc_ship_file` line of the `[Mission]` section names the file of the ship b
 - A value that names a file that cannot be a ship build file has a note too. Examples are a file with other sections and an encounter file. Pick a file of the list, or make a new file.
 - When the checks find a problem at the line, the note shows the problem.
 
-The game looks for the build of a mission ship in the ship build file of the mission first, then in the shared files `DATA\MISSIONS\npcships.ini` and `DATA\MISSIONS\npcships_test.ini`. It does not spawn a ship whose build it does not find. So a choice of the dropdown and "New file..." show a warning when builds of the mission are only in the old file. The warning names these builds. The mission checks do not find this problem, so a save does not stop for it.
+The game looks for the build of a mission ship in the ship build file of the mission first. Then it looks in the shared files `DATA\MISSIONS\npcships.ini` and `DATA\MISSIONS\npcships_test.ini`. It does not spawn a ship whose build it does not find.
+
+So a file of the dropdown has a warning when builds of the mission are only in the old file. The choice of such a file shows the warning mark, and its tooltip gives the warning. The line at the top of the dropdown tells this. The popup of "New file..." shows the warning too. The warning names these builds. The mission checks do not find this problem, so a save does not stop for it.
 
 To make a new ship build file for the mission:
 
@@ -402,8 +404,9 @@ To make a new ship build file for the mission:
 3. Type a name. Use only letters, digits, `_` and `-`, with at most 64 characters. Do not use a name that Windows uses for a device, for example `nul` or `com1`. The popup starts with a free name, for example `npcships_2`.
 4. Read the install path under the name. The file goes into the folder of the script.
 5. If the popup shows a refusal, type another name.
-6. If the popup shows a warning about builds of the old file, read it. The game does not spawn the ships that use these builds. To keep the old file, click "Cancel".
-7. Click "Create".
+6. If the popup shows a warning about builds of the old file, read the warning. The game does not spawn the ships that use these builds.
+7. To keep the old file, click "Cancel".
+8. To make the new file, click "Create".
 
 The editor makes an empty file in the active mod and sets the line. This is one entry of the edit history. A save writes the file. To remove a new file that you do not use, undo "New ship build file" before the save. A script directly in `DATA\MISSIONS` cannot get its own file, because encounters and bases use the files of that folder. For such a script, pick a file of the list.
 

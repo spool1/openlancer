@@ -40,7 +40,7 @@ When the probe fails, the editor shows the question "OpenLancer cannot make the 
 
 OpenLancer makes hard links in that folder, so the folder must be on the same drive as the game. The editor keeps the folder that you selected for the game.
 
-When the probe fails in that folder too, the editor asks "Make a full copy?" with the size of the copy. A full copy holds real copies of all the game files. It needs the disk space of the whole game. A change in a full copy does not change your game.
+When the probe fails in that folder too, the editor tells that it cannot make hard links there. It asks "Make a full copy?" with the size of the copy. A full copy holds real copies of all the game files. It needs the disk space of the whole game. A change in a full copy does not change your game.
 
 To make a full copy, click **Copy**.
 

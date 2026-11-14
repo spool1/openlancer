@@ -1,5 +1,5 @@
 {
-  "// about": "The data lists of the editor (milestone M21). Roles tell how the engine finds its files. Lists tell which sections give the entries. A source with the sourceKind animationScripts gives the clips of the animation files that the [Animations] lines of its role name. Rules map one value of one key to a list. A rule is open unless it is closed with an evidence line of the engine (decision D109). Paths of roles are relative to the data folder of freelancer.ini. See docs/MOD_FORMAT.md, 'Data lists and the save gate'.",
+  "// about": "The data lists of the editor (milestone M21). Roles tell how the engine finds its files. Lists tell which sections give the entries. A source with the sourceKind animationScripts gives the clips of the animation files that the [Animations] lines of its role name. Rules map one value of one key to a list. A rule is open unless it is closed with an evidence line of the engine (decision D109). Paths of roles are relative to the data folder of freelancer.ini. See docs/MOD_FORMAT.md, 'Data lists and pickers' and 'The save gate'.",
   "roles": {
     "solar":        { "data": "solar" },
     "asteroids":    { "data": "asteroids" },

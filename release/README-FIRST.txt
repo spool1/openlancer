@@ -81,8 +81,9 @@ START THE EDITOR
    "Select game folder...".
 6. Select the folder of your game. This folder contains the EXE and DATA
    folders. You can also drag the folder to the editor window.
-7. Make sure that the editor shows "Game found" and the name of your game,
-   for example "Freelancer 1.1".
+7. Make sure that the editor shows "Game found" or "Game found, with
+   warnings", and the name of your game, for example "Freelancer 1.1".
+   A warning does not stop the profile.
 8. Click "Create profile and open". The editor makes a profile and an
    empty mod, my-mod, in Documents\OpenLancer. Then the Scene shows a star
    system in 3D.

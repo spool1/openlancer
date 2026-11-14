@@ -7,6 +7,7 @@ README table "Supported games" (the owner decided this on 2026-11-14). They name
 the words of the README row and of the README sentence. Each relative link of the pages names a file and a heading that
 exist.
 """
+import json
 import os
 import re
 import sys
@@ -343,6 +344,24 @@ class HelpPageTests(unittest.TestCase):
             text = read(path)
             self.assertEqual([], [line for line in text.split("\n") if WORD in line.lower()], path)
         self.assertIn("README table Supported games", read(GAME_TEXTS))
+
+    def test_the_link_steps_name_both_titles_of_the_card(self):
+        """The first-run card shows "Game found, with warnings" when the game check gives a warning, for example for
+        changed INI files. So the steps of the page and of README-FIRST.txt name both titles."""
+        both = '"Game found" or "Game found, with warnings"'
+        card = read("src/OpenLancer.Editor/Games/FirstRunCard.cs")
+        self.assertIn('"Game found"', card)
+        self.assertIn('"Game found, with warnings"', card)
+        self.assertIn(both, section(read("docs/GETTING_STARTED.md"), "## Start the editor and link your game"))
+        self.assertIn(both, " ".join(read("release/README-FIRST.txt").split()))
+
+    def test_the_about_text_of_the_list_rules_names_headings_that_exist(self):
+        """The about text of the rule file of the data lists sends the reader to sections of MOD_FORMAT.md."""
+        about = json.loads(read("src/OpenLancer.Data/Editing/Lists/list-rules.json"))["// about"]
+        names = re.findall(r"'([^']+)'", about.split("docs/MOD_FORMAT.md", 1)[1])
+        headings = {match.group(2) for match in HEADING.finditer(read("docs/MOD_FORMAT.md"))}
+        self.assertNotEqual([], names)
+        self.assertEqual([], [name for name in names if name not in headings])
 
     def test_getting_started_asks_for_a_retail_game_as_the_base_of_the_profile(self):
         """The first-run card refuses a source build as the base of the profile, with the first sentence of
