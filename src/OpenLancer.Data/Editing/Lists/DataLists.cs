@@ -1070,14 +1070,14 @@ public sealed class DataLists
         public Dictionary<(string? Scope, string Value), List<ListReference>> Map = [];
     }
 
+    /// <summary>The table and the index of the section that gives an entry of a list.</summary>
+    private sealed record EntrySource(FileTable Table, int Index);
+
     /// <param name="Now">The sections of the file for the lists when the part was built.</param>
     /// <param name="Base">B of the file when the part was built.</param>
     /// <param name="IsSystem">True when the file was a system file when the part was built.</param>
     /// <param name="Names">The names that B gives and <paramref name="Now"/> does not, with their lists and their
     /// sections in B.</param>
-    /// <summary>The table and the index of the section that gives an entry of a list.</summary>
-    private sealed record EntrySource(FileTable Table, int Index);
-
     private sealed record RemovedPart(FileTable Now, IReadOnlyList<Section> Base, bool IsSystem,
         IReadOnlyList<(ListDefinition Definition, string Name, SectionRef Lower)> Names);
 
