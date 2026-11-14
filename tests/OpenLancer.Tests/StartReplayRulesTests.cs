@@ -117,11 +117,13 @@ public sealed class StartReplayRulesTests
     /// A path that jumps from n_sys_a to n_sys_b, then waits for ships to arrive with the player. Retail brings each
     /// jumper into the new system 3 s after the player. So the arrival of jumpers on the path shows 3 s after the
     /// trigger before the jump, and the 3 s timer ran. The 4 s timer still waits. A ship that is not a jumper gives no
-    /// time, also when an Act_Jumper line of the path turns its flag off.
+    /// time, also when an Act_Jumper line of the path turns its flag off. A condition that also waits for a ship that is
+    /// not a jumper gives no time either, because that ship can arrive later.
     /// </summary>
     [Theory]
     [InlineData("n_wing", "", true)]
     [InlineData("n_slow", "", false)]
+    [InlineData("n_wing, n_slow", "", false)]
     [InlineData("n_wing", "Act_Jumper = n_wing, false", false)]
     [InlineData("n_slow", "Act_Jumper = n_slow, true", true)]
     public void AnArrivalOfJumpersOnThePathShowsThreeSeconds(string ships, string launch, bool runs)
@@ -176,6 +178,105 @@ public sealed class StartReplayRulesTests
         Assert.Equal(StartRefusal.None, replay.Refusal);
         Assert.Equal(!runs, Waiting(replay).Contains("n_three"));
         Assert.Contains("n_four", Waiting(replay));
+    }
+
+    /// <summary>
+    /// A run of a rule with a known time also shows time for the path. The path trigger k_done completes the objective
+    /// k_goal, so the objective rule runs k_activate (2 s) before it. So k_done comes at least 2 s after the start, and
+    /// the sibling timer k_sibling (2 s) ran too. Without the objective, the path shows no time, and both timers wait.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ARunOfARuleWithAKnownTimeShowsTimeToo(bool completes)
+    {
+        var text = """
+            [Trigger]
+            nickname = k_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = k_activate
+            Act_ActTrig = k_sibling
+            Act_ActTrig = k_done
+
+            [Trigger]
+            nickname = k_activate
+            Cnd_Timer = 2
+            Act_SetNNObj = k_goal
+
+            [Trigger]
+            nickname = k_sibling
+            Cnd_Timer = 2
+            Act_SpawnSolar = k_buoy
+
+            [Trigger]
+            nickname = k_done
+            Cnd_BaseEnter = k_base
+            {COMPLETE}
+            Act_ActTrig = k_chosen
+
+            [Trigger]
+            nickname = k_chosen
+            Cnd_Timer = 5
+            """.Replace("{COMPLETE}", completes ? "Act_SetNNState = k_goal, COMPLETE" : "");
+
+        var replay = Replay(text, "k_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(completes, Ran(replay).Contains("k_activate"));
+        Assert.Equal(!completes, Waiting(replay).Contains("k_sibling"));
+        if (completes)
+            Assert.Equal(["k_start", "k_activate", "k_sibling", "k_done"], Ran(replay));
+    }
+
+    /// <summary>
+    /// Two waiting timers are due before the same trigger of the path. p_early started first, so it runs first, and its
+    /// run stops p_late. In the game, p_early runs at 4 s and p_late at 5 s or later. The rule runs the timers in the
+    /// order of their starts, not in the order of their times.
+    /// </summary>
+    [Fact]
+    public void TheTimerOfTheEarlierStartRunsFirst()
+    {
+        const string text = """
+            [Trigger]
+            nickname = p_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = p_early
+            Act_ActTrig = p_first
+
+            [Trigger]
+            nickname = p_early
+            Cnd_Timer = 4
+            Act_DeactTrig = p_late
+
+            [Trigger]
+            nickname = p_first
+            Cnd_Timer = 3
+            Act_ActTrig = p_late
+            Act_ActTrig = p_second
+
+            [Trigger]
+            nickname = p_late
+            Cnd_Timer = 2
+            Act_DeactTrig = p_early
+
+            [Trigger]
+            nickname = p_second
+            Cnd_Timer = 5
+            Act_ActTrig = p_chosen
+
+            [Trigger]
+            nickname = p_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "p_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["p_start", "p_first", "p_early", "p_second"], Ran(replay));
+        Assert.DoesNotContain("p_late", Waiting(replay));
+        Assert.DoesNotContain("p_early", Waiting(replay));
     }
 
     /// <summary>

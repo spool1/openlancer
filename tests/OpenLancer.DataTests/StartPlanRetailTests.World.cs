@@ -408,8 +408,9 @@ public sealed partial class StartPlanRetailTests
     /// of the path show that the old timers start_final_setscene_cams, fighter_wing_chase_start, timer_for_wing and
     /// destroy_juni_hack ran. So they do not wait at the start. destroy_juni_hack removed the old Juni, so no line of the
     /// world makes juni. At M05 sye_br04_init, the arrival of jumpers on the path shows the time of
-    /// delay_head_to_battleship. In HD Edition, berlin_init on the path of M10 nse_jonnerpal_Rh04 shows the time of
-    /// timer_sendcomm_dx_m10_1000_hakkera.
+    /// delay_head_to_battleship. At M10 navpoint_13, the objective rule runs the 1 s timer save_send_in_wings. That run
+    /// shows 1 s, so its sibling save_set_ex_vibes (1 s) ran too. In HD Edition, berlin_init on the path of M10
+    /// nse_jonnerpal_Rh04 shows the time of timer_sendcomm_dx_m10_1000_hakkera.
     /// </summary>
     [Fact]
     public void TheTimerRuleRunsTheOldTimersOfThePath()
@@ -427,6 +428,11 @@ public sealed partial class StartPlanRetailTests
             var battleship = Plan(Slot(scripts, "M05"), "sye_br04_init");
             Assert.True(battleship.CanStart, $"{set}: {battleship.Reason}");
             Assert.DoesNotContain("delay_head_to_battleship", battleship.ActiveSet);
+
+            var navpoint = Plan(Slot(scripts, "M10"), "navpoint_13");
+            Assert.True(navpoint.CanStart, $"{set}: {navpoint.Reason}");
+            Assert.DoesNotContain("save_send_in_wings", navpoint.ActiveSet);
+            Assert.DoesNotContain("save_set_ex_vibes", navpoint.ActiveSet);
 
             if (set == "hd")
             {
