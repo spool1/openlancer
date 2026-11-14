@@ -188,6 +188,39 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
     }
 
     /// <summary>
+    /// The sweep of the replay rules (issue #46). The Play buttons of the graph offer a start at each trigger of a story
+    /// script, and they make the plan without the setup check. In both games, the only refused starts are the starts
+    /// whose path a stop on another branch breaks. So a rule of the replay that runs a waiting trigger never refuses a
+    /// start for a new reason. The test of the world of each approximate start makes the full plans. The test writes
+    /// the counts to its output.
+    /// </summary>
+    [Fact]
+    public void NoStartOfAStoryScriptIsRefusedForANewReason()
+    {
+        foreach (var (set, scripts, total) in new[] { ("vanilla", Scripts(), 2984), ("hd", Slots(Hde.Value), 2649) })
+        {
+            var counts = new SortedDictionary<string, int>(StringComparer.Ordinal);
+            foreach (var analysis in scripts)
+            {
+                foreach (var trigger in analysis.Index.Triggers.Where(t => !t.IsDuplicate))
+                {
+                    var plan = StartPlan.Make(analysis.Index, analysis.Script.Slot, MissionStartPoint.At(trigger.Nickname),
+                        checkSetup: false);
+                    Assert.True(plan.Refusal is StartRefusal.None or StartRefusal.NotActive,
+                        $"{set} {analysis.Script.Slot!.Slot} {trigger.Nickname}: {plan.Refusal}, {plan.Reason}");
+                    var key = $"{plan.Kind} {plan.Refusal}";
+                    counts[key] = counts.GetValueOrDefault(key) + 1;
+                }
+            }
+
+            output.WriteLine($"{set}: {counts.Values.Sum()} starts, " +
+                             string.Join(", ", counts.Select(c => $"{c.Key} {c.Value}")) + ".");
+            Assert.Equal(total, counts.Values.Sum());
+            Assert.Equal(251, counts.GetValueOrDefault($"{StartKind.Approximate} {StartRefusal.NotActive}"));
+        }
+    }
+
+    /// <summary>
     /// The suggested place of each story trigger of the base game starts where the player is in the retail game (fix
     /// of 2026-10-27). The bug was a base start after the path had left the base. A base or camera start is suspect when
     /// a later trigger of the story path has a launch, an arrival or a space condition. A suspect row must give one of
