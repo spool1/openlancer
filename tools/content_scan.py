@@ -70,8 +70,9 @@ CODE_EXTENSIONS = NATIVE_EXTENSIONS | {".cs"}
 # The Markdown files of the repo. A new file needs the approval of the owner (CONTRIBUTING.md).
 MARKDOWN_FILES = {
     "README.md", "CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md", "ROADMAP.md", ".github/pull_request_template.md",
-    "data-manifest/README.md", "docs/CUTSCENES.md", "docs/GAME_LINK.md", "docs/MCP.md", "docs/MISSIONS.md",
-    "docs/MOD_FORMAT.md", "docs/PLAY.md", "docs/UPSTREAM.md", "docs/VENDORED.md", "release/notes/v0.1.0-preview.md",
+    "data-manifest/README.md", "docs/CUTSCENES.md", "docs/GAME_LINK.md", "docs/GETTING_STARTED.md", "docs/MCP.md",
+    "docs/MISSIONS.md", "docs/MOD_FORMAT.md", "docs/PLAY.md", "docs/TROUBLESHOOTING.md", "docs/UPSTREAM.md",
+    "docs/VENDORED.md", "release/notes/v0.1.0-preview.md",
 }
 # Before and after an automatic name: no letter and no digit. "_" is allowed, as in PTR_FUN_005e1c40.
 NO_ALNUM_BEFORE = r"(?<![0-9A-Za-z])"
