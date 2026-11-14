@@ -8,10 +8,22 @@ internal sealed partial record StartReplay
 {
     /// <summary>
     /// The machine of an approximate replay, with the waiting triggers that the path shows ran in the game (fix of the
-    /// review of 2026-10-28). The replay has no world, so a trigger that waits for the world stays active, also when the
-    /// game ran it long before the chosen trigger. These rules run such a trigger at the point where the path shows its
-    /// event:
+    /// review of 2026-10-28, issue #46). The replay has no world and no time. So a trigger that waits for the world or for
+    /// a time stays active, also when the game ran it long before the chosen trigger. These rules run such a trigger at
+    /// the point where the path shows its event. Before each trigger of the path, the rules run in this order: timers,
+    /// objectives, the space test before the first place, systems, launch, and timers again. Then the trigger of the path
+    /// runs, and the space test follows.
     /// <list type="bullet">
+    /// <item>Timers (issue #46). A waiting timer ran when the path shows that at least its time passed since its start.
+    /// All timers count on the same heartbeats. A run comes at least at the time of the run that started it, and a timer
+    /// comes at least its shortest time after its start. A trigger of the path comes after the trigger of the path before
+    /// it, and after each run with a known time since then. When the player jumps, retail brings each jumper into the new
+    /// system 3 s after the player. So a trigger of the path that waits for jumpers to arrive comes at least 3 s after the
+    /// arrival of the player. The arrival of the player comes after the trigger of the path before it. A waiting timer
+    /// runs when its longest time from its start is at or below the least time of the next trigger of the path. A tie
+    /// counts, because one heartbeat runs both timers. The timers run in the order of their starts, then in the order of
+    /// their times. A timer that counts only in space does not run when the path showed the player docked after its
+    /// start. A waiting trigger that can stop the timer does not keep it waiting.</item>
     /// <item>A launch of the path ran each trigger that waited for that launch: Cnd_PlayerLaunch, Cnd_SpaceEnter without
     /// a system or with the system of the launch, Cnd_LaunchComplete of the player, and Cnd_BaseExit without a base or
     /// with the base of the launch.</item>
@@ -38,11 +50,25 @@ internal sealed partial record StartReplay
     /// </summary>
     private sealed class Replayer
     {
+        /// <summary>The least time between the arrival of the player and the arrival of the jumpers in the new
+        /// system.</summary>
+        private const int JumperDelay = 3 * MachineProgram.HeartbeatsPerSecond;
+
         private readonly MissionIndex index;
+        private readonly MachineProgram program;
         private readonly MissionTrigger chosen;
+        private readonly IReadOnlyList<MissionTrigger> path;
         private readonly ReplayWorld world = new();
         private readonly HashSet<string> activated = new(StringComparer.OrdinalIgnoreCase);
+        private readonly StartTimeline timeline;
         private int read;
+
+        /// <summary>The number of changes when the path last showed the player docked, or -1.</summary>
+        private int docked = -1;
+
+        /// <summary>The system of the last arrival of the player that the system rule found, and the position of the
+        /// trigger of the path before it, or null.</summary>
+        private (string System, int Before)? arrival;
 
         /// <summary>True while the path shows the player in space, false while docked, null when no line tells.</summary>
         private bool? inSpace;
@@ -54,13 +80,20 @@ internal sealed partial record StartReplay
         /// the old system of the first change.</summary>
         private string? hinted;
 
-        public Replayer(MissionIndex index, MissionTrigger chosen, MissionTrigger root)
+        /// <param name="path">The path from the root to the chosen trigger.</param>
+        public Replayer(MissionIndex index, MissionTrigger chosen, IReadOnlyList<MissionTrigger> path)
         {
             this.index = index;
             this.chosen = chosen;
+            this.path = path;
+            program = MachineProgram.Of(index);
+            var root = path[0];
             Machine = new TriggerMachine(index, world, new MachineOptions { StopBefore = chosen });
+            timeline = new StartTimeline(program, root.StartsActive ? program.StartSet : [program.SlotOf(root)]);
             Changes.AddRange(Kept((root.StartsActive ? Machine.StartMission() : Machine.Load([root])).Changes));
             inSpace = root.StartsActive ? null : StartPlaces.InSpaceAt(root.Condition);
+            if (inSpace == false)
+                docked = Changes.Count;
             system = StartPlaces.SystemAt(index, root.Condition);
         }
 
@@ -70,6 +103,35 @@ internal sealed partial record StartReplay
 
         /// <summary>The jumps that the system rule finds, as <see cref="StartReplay.Jumps"/> tells.</summary>
         public List<int> Jumps { get; } = [];
+
+        /// <summary>The rules before a trigger of the path runs, in the order of the summary of the class.</summary>
+        /// <param name="position">The position of the trigger in the path.</param>
+        public void Before(int position)
+        {
+            var trigger = path[position];
+            var rest = Rest(position);
+            Timers(position, rest);
+            Objectives(trigger, rest);
+            BeforeInSpace(trigger, rest);
+            Systems(position, rest);
+            Arrival(position);
+            Launch(trigger, rest);
+            // Again after the other rules: their runs can show more time.
+            Timers(position, rest);
+        }
+
+        /// <summary>The rules after a trigger of the path ran.</summary>
+        /// <param name="position">The position of the trigger in the path.</param>
+        public void After(int position)
+        {
+            var trigger = path[position];
+            timeline.Sync(Changes);
+            timeline.MarkPath(position, trigger);
+            InSpace(trigger, Rest(position + 1));
+        }
+
+        /// <summary>The triggers of the path from a position on, with the chosen trigger.</summary>
+        private List<MissionTrigger> Rest(int position) => path.Skip(position).Append(chosen).ToList();
 
         /// <summary>Runs one trigger: a pending trigger starts at the next heartbeat, and an active trigger runs as if its
         /// condition is met now. The chosen trigger only starts.</summary>
@@ -99,9 +161,75 @@ internal sealed partial record StartReplay
             }
         }
 
+        /// <summary>The timer rule, before a trigger of the path runs (see the summary of the class). One call tries each
+        /// waiting timer at most once.</summary>
+        /// <param name="position">The position of the next trigger of the path.</param>
+        /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
+        private void Timers(int position, IReadOnlyList<MissionTrigger> rest)
+        {
+            var next = path[position];
+            if (next == chosen)
+                return;
+            var tried = new HashSet<MissionTrigger>();
+            while (true)
+            {
+                timeline.Sync(Changes);
+                // The next trigger of the path ran in the pass of an earlier one, so no time passed before it.
+                if (!timeline.Started(next, out _))
+                    return;
+                MissionTrigger? due = null;
+                int dueStart = 0, dueTime = 0;
+                foreach (var waiting in Machine.Active.Concat(Machine.Pending).Distinct())
+                {
+                    var slot = program.SlotOf(waiting);
+                    if (slot < 0 || program.Kinds[slot] != ConditionKind.Timer || tried.Contains(waiting) ||
+                        !Free(waiting, rest) || !timeline.Started(waiting, out var start))
+                        continue;
+                    var time = program.TimerLongest[slot];
+                    if (due != null && (start > dueStart || start == dueStart && time >= dueTime))
+                        continue;
+                    if (program.InSpaceOnly[slot] && docked > timeline.ChangeOf(start))
+                        continue;
+                    var bound = timeline.Bound(start, position, next);
+                    if (bound > 0 && time <= bound)
+                        (due, dueStart, dueTime) = (waiting, start, time);
+                }
+                if (due == null)
+                    return;
+                tried.Add(due);
+                TryRun([due], rest);
+            }
+        }
+
+        /// <summary>The arrival part of the timer rule. A trigger of the path that waits for ships to arrive in the system
+        /// of the last arrival of the player comes at least 3 s after that arrival, when each ship is a jumper. An
+        /// <c>Act_Jumper</c> line of the replay changes the flag of its ship.</summary>
+        /// <param name="position">The position of the trigger in the path.</param>
+        private void Arrival(int position)
+        {
+            var trigger = path[position];
+            if (trigger == chosen || arrival is not { } last || !trigger.ConditionIs("Cnd_NPCSystemEnter") ||
+                !Names(trigger.Condition!.Value(0), last.System))
+                return;
+            var condition = trigger.Condition!;
+            var ships = Enumerable.Range(1, Math.Max(0, condition.Count - 1)).Select(condition.Value)
+                .Select(n => n?.Trim()).OfType<string>().Where(n => n.Length > 0 && !MissionIndex.Is(n, "Player"))
+                .ToList();
+            if (ships.Count == 0)
+                return;
+            var flags = new StartWorld.JumperFlags(index);
+            foreach (var change in Changes)
+            {
+                if (change is { Kind: MachineChangeKind.Effect, Line: { } line } && MissionIndex.Is(line.Key, "Act_Jumper"))
+                    flags.Apply(line);
+            }
+            if (ships.SelectMany(s => StartSetup.Members(index, s).DefaultIfEmpty(s)).All(flags.Of))
+                timeline.Delay(position, last.Before, JumperDelay);
+        }
+
         /// <summary>The objective rule, before a trigger of the path runs.</summary>
         /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
-        public void Objectives(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
+        private void Objectives(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
         {
             Note();
             var completed = trigger.Actions.Where(a => MissionIndex.Is(a.Key, "Act_SetNNState") &&
@@ -119,7 +247,7 @@ internal sealed partial record StartReplay
         /// <summary>The launch rule, before a trigger of the path with a launch condition runs. The game gives the launch
         /// to each trigger that waits for it in the same pass.</summary>
         /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
-        public void Launch(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
+        private void Launch(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
         {
             if (!StartPlaces.IsLaunch(trigger.Condition))
                 return;
@@ -131,8 +259,9 @@ internal sealed partial record StartReplay
         /// <summary>The system rule, before a trigger of the path runs. The chosen trigger only starts in the replay, so
         /// its condition does not show a new system.</summary>
         /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
-        public void Systems(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
+        private void Systems(int position, IReadOnlyList<MissionTrigger> rest)
         {
+            var trigger = path[position];
             if (trigger == chosen)
                 return;
             var next = StartPlaces.SystemAt(index, trigger.Condition);
@@ -145,6 +274,7 @@ internal sealed partial record StartReplay
             system = next;
             if (old == null || MissionIndex.Is(old, next))
                 return;
+            arrival = (next, position - 1);
             // The triggers on the way to a trigger of the exit ran before the jump, for example near the jump gate.
             var tried = new HashSet<MissionTrigger>();
             while (Chain(t => !tried.Contains(t) && !Alive(t) && t.Condition is { } c && Exits(c, old, next), rest) is
@@ -188,19 +318,26 @@ internal sealed partial record StartReplay
         /// yet, a dock shows that the player was in space before it, and a launch shows that the player was docked
         /// before it.</summary>
         /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
-        public void BeforeInSpace(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
+        private void BeforeInSpace(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
         {
             if (inSpace != null || StartPlaces.InSpaceAt(trigger.Condition) is not { } next)
                 return;
             inSpace = !next;
+            if (next)
+                docked = Changes.Count;
             RunInSpace(rest);
         }
 
         /// <summary>The Cnd_InSpace rule, after a trigger of the path ran.</summary>
         /// <param name="rest">The rest of the path, with the chosen trigger.</param>
-        public void InSpace(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
+        private void InSpace(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
         {
-            inSpace = StartPlaces.InSpaceAt(trigger.Condition) ?? inSpace;
+            if (StartPlaces.InSpaceAt(trigger.Condition) is { } next)
+            {
+                inSpace = next;
+                if (!next)
+                    docked = Changes.Count;
+            }
             RunInSpace(rest);
         }
 
@@ -308,6 +445,7 @@ internal sealed partial record StartReplay
                 return;
             Machine = TriggerMachine.From(state, index, world);
             Changes.RemoveRange(count, Changes.Count - count);
+            timeline.Cut(count);
             read = Math.Min(read, count);
         }
 

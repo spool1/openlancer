@@ -372,9 +372,10 @@ public sealed partial class StartPlanRetailTests
 
     /// <summary>The rows of the second review of 2026-10-28 in both games. M11 first_player_launch starts in space, and
     /// the world trigger waits for the launch, so the chosen trigger starts after the world and still gets the launch.
-    /// M04 juni_mactan_tether: destroy_juni_hack removes the old Juni soon after the start, so only Juni_mactan travels
-    /// with the player. M01a com_0420: an old timer leads to spawn_lsf_help, which ran at the restore of the
-    /// checkpoint, so the setup keeps the reinforcements.</summary>
+    /// M04 juni_mactan_tether: only Juni_mactan travels with the player. The timer rule of the replay runs
+    /// destroy_juni_hack, which removes the old Juni (issue #49, see <see cref="TheTimerRuleRunsTheOldTimersOfThePath"/>).
+    /// M01a com_0420: the old timer tm_o_attack_cam leads to spawn_lsf_help, which ran at the restore of the checkpoint.
+    /// The timer rule runs the old timer in the replay, and the setup keeps the reinforcements.</summary>
     [Fact]
     public void TheSecondReviewRowsGetTheirStart()
     {
@@ -390,16 +391,48 @@ public sealed partial class StartPlanRetailTests
             var tether = Plan(Slot(scripts, "M04"), "juni_mactan_tether");
             Assert.True(tether.CanStart, $"{set}: {tether.Reason}");
             Assert.Equal(["Juni_mactan"], tether.Companions.Select(c => c.Object));
-            Assert.Contains("destroy_juni_hack", tether.ActiveSet);
-            Assert.Contains(World(tether), l => l.Key == "Act_SpawnShip" && l.Values[0] == "juni");
 
             var help = Plan(Slot(scripts, "M01a"), "com_0420");
             Assert.True(help.CanStart, $"{set}: {help.Reason}");
-            Assert.Contains("tm_o_attack_cam", help.ActiveSet);
+            Assert.DoesNotContain("tm_o_attack_cam", help.ActiveSet);
             foreach (var ship in new[] { "lsf_reinforce1", "lsf_reinforce2", "lsf_reinforce3", "lsf_reinforce4" })
             {
                 Assert.DoesNotContain(help.LeftOut, l => l.Object == ship);
                 Assert.Contains(World(help), l => l.Key == "Act_SpawnShip" && l.Values[0] == ship);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The rows of the timer rule of the replay (issues #46 and #49) in both games. At M04 juni_mactan_tether, the timers
+    /// of the path show that the old timers start_final_setscene_cams, fighter_wing_chase_start, timer_for_wing and
+    /// destroy_juni_hack ran. So they do not wait at the start. destroy_juni_hack removed the old Juni, so no line of the
+    /// world makes juni. At M05 sye_br04_init, the arrival of jumpers on the path shows the time of
+    /// delay_head_to_battleship. In HD Edition, berlin_init on the path of M10 nse_jonnerpal_Rh04 shows the time of
+    /// timer_sendcomm_dx_m10_1000_hakkera.
+    /// </summary>
+    [Fact]
+    public void TheTimerRuleRunsTheOldTimersOfThePath()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var tether = Plan(Slot(scripts, "M04"), "juni_mactan_tether");
+            Assert.True(tether.CanStart, $"{set}: {tether.Reason}");
+            foreach (var timer in new[] { "start_final_setscene_cams", "fighter_wing_chase_start", "timer_for_wing", "destroy_juni_hack" })
+                Assert.DoesNotContain(timer, tether.ActiveSet);
+            Assert.DoesNotContain(World(tether), l => l.Values.Count > 0 && l.Values[0] == "juni" &&
+                                                      (SpawnKeys.Contains(l.Key) || l.Key.StartsWith("Act_Relocate", StringComparison.Ordinal)));
+            Assert.DoesNotContain(tether.Companions, c => c.Object == "juni");
+
+            var battleship = Plan(Slot(scripts, "M05"), "sye_br04_init");
+            Assert.True(battleship.CanStart, $"{set}: {battleship.Reason}");
+            Assert.DoesNotContain("delay_head_to_battleship", battleship.ActiveSet);
+
+            if (set == "hd")
+            {
+                var rh04 = Plan(Slot(scripts, "M10"), "nse_jonnerpal_Rh04");
+                Assert.True(rh04.CanStart, rh04.Reason);
+                Assert.DoesNotContain("timer_sendcomm_dx_m10_1000_hakkera", rh04.ActiveSet);
             }
         }
     }

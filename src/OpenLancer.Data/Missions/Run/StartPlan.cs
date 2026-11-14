@@ -466,9 +466,8 @@ internal sealed partial record StartReplay
     /// ran in the game (<see cref="Replayer"/>).</summary>
     private static StartReplay Approximate(MissionIndex index, MissionTrigger chosen, IReadOnlyList<MissionTrigger> path)
     {
-        var root = path[0];
-        var run = new Replayer(index, chosen, root);
-        var replay = new StartReplay { Kind = StartKind.Approximate, Chosen = chosen, Root = root, Path = path };
+        var run = new Replayer(index, chosen, path);
+        var replay = new StartReplay { Kind = StartKind.Approximate, Chosen = chosen, Root = path[0], Path = path };
         // Each trigger of the path runs in order: a trigger that ran goes on, a pending trigger starts at the next
         // heartbeat, and an active trigger runs as if its condition is met now.
         for (var k = 0; k < path.Count; k++)
@@ -476,11 +475,7 @@ internal sealed partial record StartReplay
             var trigger = path[k];
             if (run.Machine.Halt is { Kind: MachineHaltKind.StopPoint })
                 break;
-            var rest = path.Skip(k).Append(chosen).ToList();
-            run.Objectives(trigger, rest);
-            run.BeforeInSpace(trigger, rest);
-            run.Systems(trigger, rest);
-            run.Launch(trigger, rest);
+            run.Before(k);
             switch (run.Reach(trigger))
             {
                 case Reached.Halt:
@@ -497,7 +492,7 @@ internal sealed partial record StartReplay
             }
             if (run.Machine.Halt is { Kind: MachineHaltKind.StopPoint })
                 break;
-            run.InSpace(trigger, path.Skip(k + 1).Append(chosen).ToList());
+            run.After(k);
         }
         var machine = run.Machine;
         if (machine.Halt is not { Kind: MachineHaltKind.StopPoint })

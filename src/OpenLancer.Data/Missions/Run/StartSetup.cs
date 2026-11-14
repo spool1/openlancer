@@ -28,6 +28,10 @@ internal static class StartSetup
     private static readonly string[] Spawns =
         ["Act_SpawnShip", "Act_SpawnShipRel", "Act_SpawnFormation", "Act_SpawnSolar", "Act_SpawnLoot"];
 
+    /// <summary>The moves of a ship or a formation. The fork makes a mission ship that does not exist at the point of
+    /// the line.</summary>
+    private static readonly string[] Moves = ["Act_RelocateShip", "Act_RelocateForm"];
+
     /// <summary>The objective lines: only the last one counts. <c>Act_NNIds</c> adds a text to the log and does not
     /// change the objective, so it has its own last line.</summary>
     private static readonly string[] Objectives = ["Act_SetNNObj", "Act_NNPath"];
@@ -164,7 +168,9 @@ internal static class StartSetup
     /// <list type="bullet">
     /// <item><c>Act_RelocateShip</c> of the player. It is a place line of the start place.</item>
     /// <item>A spawn whose objects a later <c>Act_Destroy</c> of the replay removes, or a <c>Cnd_Destroyed</c> or a
-    /// <c>Cnd_LootAcquired</c> line of the path names. An <c>Act_Destroy</c> of only such objects goes too.</item>
+    /// <c>Cnd_LootAcquired</c> line of the path names. An <c>Act_Destroy</c> of only such objects goes too. A move of
+    /// only such objects goes when they do not exist after it. The fork makes a ship at a move, so else the setup makes
+    /// the object again.</item>
     /// <item>Each music line but the last.</item>
     /// <item>Each objective line but the last, and the changes of the objective before it. The log lines
     /// (<c>Act_NNIds</c>) keep their own last line.</item>
@@ -194,6 +200,13 @@ internal static class StartSetup
         var keep = lines.Select(l => l.Name?.Start is StartRole.World or StartRole.State or StartRole.Save &&
                                      !StartPlaces.IsPlayerMove(l)).ToArray();
         var dropped = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // True when each object is gone at the start: a line after the line i destroys it, or the path destroys it.
+        bool Gone(IReadOnlySet<string> objects, int i)
+        {
+            var later = lines.Skip(i + 1).Where(l => Is(l, "Act_Destroy") && l.Value(0) != null)
+                .SelectMany(l => Members(index, l.Value(0)!)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return objects.All(o => gone.Contains(o) || later.Contains(o));
+        }
         for (var i = 0; i < lines.Count; i++)
         {
             var line = lines[i];
@@ -202,15 +215,18 @@ internal static class StartSetup
             if (Spawns.Any(s => Is(line, s)) && line.Value(0) is { } spawned)
             {
                 var made = Members(index, spawned);
-                var later = lines.Skip(i + 1).Where(l => Is(l, "Act_Destroy") && l.Value(0) != null)
-                    .SelectMany(l => Members(index, l.Value(0)!)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                if (made.All(o => gone.Contains(o) || later.Contains(o)))
+                if (Gone(made, i))
                 {
                     keep[i] = false;
                     dropped.UnionWith(made);
                 }
             }
             else if (Is(line, "Act_Destroy") && line.Value(0) is { } destroyed && Members(index, destroyed).All(dropped.Contains))
+            {
+                keep[i] = false;
+            }
+            else if (Moves.Any(m => Is(line, m)) && line.Value(0) is { } moved && Members(index, moved) is var objects &&
+                     objects.All(dropped.Contains) && Gone(objects, i))
             {
                 keep[i] = false;
             }

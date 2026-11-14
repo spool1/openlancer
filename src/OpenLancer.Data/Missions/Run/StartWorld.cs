@@ -316,7 +316,7 @@ internal static class StartWorld
         private readonly List<Unit> units = [];
         private readonly Dictionary<Entry, Unit> spawned = [];
         private readonly Dictionary<string, Unit> byMember = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, bool> jumpers = new(StringComparer.OrdinalIgnoreCase);
+        private readonly JumperFlags jumpers = new(index);
         private readonly List<(string List, int At)> playerLists = [];
         private readonly Dictionary<Entry, List<Unit>> orderLines = [];
         private readonly HashSet<string> leftOutMembers = new(StringComparer.OrdinalIgnoreCase);
@@ -478,11 +478,7 @@ internal static class StartWorld
                 else if (entry.IsAny(MoveKeys))
                     Move(entry, name);
                 else if (entry.Is("Act_Jumper"))
-                {
-                    var on = line.Value(1) is { } flag && (MissionIndex.Is(flag, "true") || flag == "1");
-                    foreach (var member in Members(name))
-                        jumpers[member] = on;
-                }
+                    jumpers.Apply(line);
                 else if (entry.Is("Act_GiveObjList") && line.Value(1) is { } list)
                 {
                     if (MissionIndex.Is(name, "Player"))
@@ -644,7 +640,7 @@ internal static class StartWorld
 
         private bool IsJumper(Unit unit) =>
             unit.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&
-            unit.Members.Append(unit.Name).Any(m => jumpers.TryGetValue(m, out var on) ? on : IsTrue(Text(ItemOf(m), "jumper")));
+            unit.Members.Append(unit.Name).Any(jumpers.Of);
 
         /// <summary>
         /// The rules of the triggers of the start. These are the triggers of the active set that run at the start or soon
@@ -1122,9 +1118,7 @@ internal static class StartWorld
             : index.Item(MissionSectionKind.Loot, name) != null ? StartObjectKind.Loot
             : null;
 
-        private MissionSection? ItemOf(string name) =>
-            index.Item(MissionSectionKind.Ship, name) ?? index.Item(MissionSectionKind.Formation, name) ??
-            index.Item(MissionSectionKind.Solar, name) ?? index.Item(MissionSectionKind.Loot, name);
+        private MissionSection? ItemOf(string name) => StartWorld.ItemOf(index, name);
 
         /// <summary>A system name, or null for an empty name or a name that the world does not have.</summary>
         private string? Known(string? name) =>
@@ -1151,6 +1145,36 @@ internal static class StartWorld
         }
         return null;
     }
+
+    /// <summary>
+    /// The jumper flags of the objects of a script. A jumper jumps with the player, and retail brings it into the new
+    /// system 3 s after the player. The newest <c>Act_Jumper</c> line that names an object gives its flag. Else the
+    /// <c>jumper</c> key of its record gives the flag. The world of the setup and the timer rule of the replay read the
+    /// flags in this way.
+    /// </summary>
+    internal sealed class JumperFlags(MissionIndex index)
+    {
+        private readonly Dictionary<string, bool> set = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Reads an <c>Act_Jumper</c> line: it sets the flag of each member of its object.</summary>
+        public void Apply(MissionLine line)
+        {
+            if (line.Value(0) is not { } name)
+                return;
+            var on = IsTrue(line.Value(1));
+            foreach (var member in StartSetup.Members(index, name))
+                set[member] = on;
+        }
+
+        /// <summary>True when the flag of an object is on.</summary>
+        public bool Of(string name) =>
+            set.TryGetValue(name.Trim(), out var on) ? on : IsTrue(Text(ItemOf(index, name), "jumper"));
+    }
+
+    /// <summary>The record of a ship, a formation, a solar or a loot of the script, or null.</summary>
+    private static MissionSection? ItemOf(MissionIndex index, string name) =>
+        index.Item(MissionSectionKind.Ship, name) ?? index.Item(MissionSectionKind.Formation, name) ??
+        index.Item(MissionSectionKind.Solar, name) ?? index.Item(MissionSectionKind.Loot, name);
 
     private static bool IsTrue(string? text) => text != null && (MissionIndex.Is(text, "true") || text.Trim() == "1");
 

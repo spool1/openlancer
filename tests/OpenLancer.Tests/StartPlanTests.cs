@@ -287,6 +287,59 @@ public sealed class StartPlanTests
         Assert.DoesNotContain(plan.Setup.SelectMany(t => t.Lines), l => l.Values.Contains("r_ship"));
     }
 
+    /// <summary>The path spawns two ships, moves them and destroys them, so they do not exist at the start. Their spawn
+    /// lines, the moves and the destroy lines go. The fork makes a ship at a move when the ship does not exist, so a kept
+    /// move would make the ship again. A move after the destroy stays, because it makes the ship again in the game
+    /// too.</summary>
+    [Fact]
+    public void AMoveOfAShipThatThePathDestroysLaterGoes()
+    {
+        const string text = """
+            [MsnShip]
+            nickname = m_ship
+            position = 100, 0, 100
+
+            [MsnShip]
+            nickname = m_back
+            position = 300, 0, 300
+
+            [Trigger]
+            nickname = m_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_SpawnShip = m_ship
+            Act_SpawnShip = m_back
+            Act_ActTrig = m_move
+
+            [Trigger]
+            nickname = m_move
+            Cnd_SpaceEnter = m_sys
+            Act_RelocateShip = m_ship, 500, 0, 500
+            Act_RelocateShip = m_back, 600, 0, 600
+            Act_ActTrig = m_kill
+
+            [Trigger]
+            nickname = m_kill
+            Cnd_True = no_params
+            Act_Destroy = m_ship, SILENT
+            Act_Destroy = m_back, SILENT
+            Act_RelocateShip = m_back, 700, 0, 700
+            Act_ActTrig = m_chosen
+
+            [Trigger]
+            nickname = m_chosen
+            Cnd_Timer = 5
+            """;
+
+        var plan = Plan(text, "m_chosen");
+
+        Assert.True(plan.CanStart, plan.Reason);
+        var lines = plan.Setup.SelectMany(t => t.Lines).Where(l => l.Values.Count > 0).ToList();
+        Assert.DoesNotContain(lines, l => l.Values[0] == "m_ship");
+        Assert.Equal(["Act_RelocateShip = m_back, 700, 0, 700"],
+            lines.Where(l => l.Values[0] == "m_back").Select(l => $"{l.Key} = {string.Join(", ", l.Values)}"));
+    }
+
     /// <summary>A waiting trigger whose run would stop a trigger of the rest of the path does not run. The replay goes
     /// back to the state before it, and the trigger waits at the start. A line of the replay that already made the
     /// objective active means that no waiting trigger has to run for it.</summary>
