@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using LibreLancer.Data.Ini;
 using LibreLancer.Data.IO;
 using LibreLancer.Data.Schema;
 using LibreLancer.Thn;
+using OpenLancer.Data.Editing;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Cutscene;
@@ -16,9 +18,9 @@ using Xunit;
 namespace OpenLancer.DataTests;
 
 /// <summary>
-/// The clip list of the animation picker on the retail data (section 12.1 of the M8b design). The list has the names of
-/// the animation table of the engine, and the last file wins for a name in two files. Each START_MOTION value on a
-/// character is in the list.
+/// The clip list of the animation picker and the data list <c>animation</c> on the retail data (section 12.1 of the M8b
+/// design). The lists have the names of the animation table of the engine, and the last file wins for a name in two
+/// files. Each START_MOTION value on a character is in the data list, so the save gate gives no retail clip problem.
 /// </summary>
 public sealed class AnimationCatalogRetailTests(ITestOutputHelper output)
 {
@@ -55,16 +57,56 @@ public sealed class AnimationCatalogRetailTests(ITestOutputHelper output)
     }
 
     /// <summary>
-    /// Each START_MOTION value of the retail cutscenes whose first target is a character (DEFORMABLE) is in the list. The
-    /// test chooses the row as the Inspector does: from the targets of the Timeline event and the entities of the
-    /// script. A value on a COMPOUND names a script of its model, so the row of such an event keeps its text field (risk
-    /// R5).
+    /// The data list <c>animation</c> of a retail session has the clips of the engine table, without letter case, each
+    /// with the file of the engine: the last file with the name. The skeletons come with the clips. The test writes the
+    /// time of the first read and of a second build whose files are all in the cache. A new <c>[Animations]</c> line
+    /// that names a file of the cache reads no file.
+    /// </summary>
+    [Fact]
+    public void TheSessionListHasTheClipsOfTheEngineTable()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "m8clist");
+        var session = workspace.Open();
+        var engine = AnimationClips.Read(RetailGame.Instance.Data).Clips;
+
+        var clock = Stopwatch.StartNew();
+        var list = session.Lists.List("animation")!;
+        var first = clock.Elapsed;
+        var reads = session.Lists.AnimationReads;
+        var data = session.Lists.Animations()!;
+        var archive = ThnReferences.IniValueOf(data.Clips[0].Archive)!;
+        session.Execute(EditCommand.AddSection(session.DataFiles.Paths("bodyparts")[0], "Animations",
+            [new EntryView("anim", [new StringValue(archive)])]));
+        clock.Restart();
+        var again = session.Lists.List("animation")!;
+        var cached = clock.Elapsed;
+
+        Assert.True(list.Closed);
+        Assert.Equal(engine.Select(c => (c.Name.ToLowerInvariant(), FileName(c.Archive).ToLowerInvariant())),
+            data.Clips.Select(c => (c.Name.ToLowerInvariant(), FileName(c.Archive).ToLowerInvariant())));
+        Assert.True(list.Entries.Select(e => e.Value).ToHashSet(StringComparer.OrdinalIgnoreCase)
+            .SetEquals(RetailGame.Instance.Data.GetCharacterAnimations().Scripts.Keys));
+        Assert.NotEmpty(data.Skeletons);
+        Assert.Empty(data.Warnings);
+        Assert.NotSame(list, again);
+        Assert.Equal(list.Entries.Count, again.Entries.Count);
+        Assert.Equal(reads, session.Lists.AnimationReads);
+        output.WriteLine($"{list.Entries.Count} clips from {reads} files. First read {first.TotalMilliseconds:0.0} ms, " +
+                         $"build with the cached names {cached.TotalMilliseconds:0.0} ms.");
+    }
+
+    /// <summary>
+    /// Each START_MOTION value of the retail cutscenes whose first target is a character (DEFORMABLE) is in the data list
+    /// <c>animation</c> of a retail session, by the name as it is. The test chooses the row as the Inspector does: from
+    /// the targets of the Timeline event and the entities of the script. A value on a COMPOUND names a script of its
+    /// model, so the row of such an event keeps its text field (risk R5), and the save gate does not check it.
     /// </summary>
     [Fact]
     public void EachRetailAnimationOfACharacterIsInTheList()
     {
         var view = FileSystem.FromPath(GameDataPaths.RequireBase());
-        var clips = AnimationClips.Read(RetailGame.Instance.Data);
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "m8clist");
+        var clips = workspace.Open().Lists.List("animation")!;
         var evaluator = ThornEvaluator.Instance;
         var path = new ThnPath(ThnTemplateRules.AnimationPath);
         var (characters, others) = (0, 0);
@@ -90,7 +132,8 @@ public sealed class AnimationCatalogRetailTests(ITestOutputHelper output)
                 }
 
                 characters++;
-                if (!clips.Contains(value.Value))
+                if (clips.Find(value.Value) is not { } clip ||
+                    !clip.Value.Equals(value.Value, StringComparison.OrdinalIgnoreCase))
                 {
                     missing.Add($"{file}: {value.Value}");
                 }
