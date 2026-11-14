@@ -518,11 +518,25 @@ class ZipPageTests(unittest.TestCase):
             self.assertIn("](GETTING_STARTED.md#", first, page)
 
     def test_make_a_mod_starts_from_the_release_zip(self):
+        """The steps save, play in OpenLancer, play in the game and export, in this order. A Stop step follows each
+        Play step."""
         text = section(read(README), "## Make a mod")
         players = text.split("\n### ")[0]
         self.assertIn("](docs/GETTING_STARTED.md)", players)
-        for part in ("release zip", "`my-mod`", "Ctrl+S", "F5", "Ctrl+F5", "**Mod > Export mod...**"):
+        for part in ("release zip", "`my-mod`"):
             self.assertIn(part, players)
+        steps = numbered_steps(players)
+
+        def step(start):
+            found = [number for number, text in enumerate(steps) if text.startswith(start)]
+            self.assertEqual(1, len(found), f"{start} {steps}")
+            return found[0]
+
+        order = [step(start) for start in ("Press Ctrl+S.", "Press F5.", "Press Ctrl+F5.",
+                                           "Click **Mod > Export mod...**.")]
+        self.assertEqual(sorted(order), order, steps)
+        for play in order[1:3]:
+            self.assertIn("**Stop**", steps[play + 1])
         self.assertNotIn("oltool validate", players)
         self.assertIn("oltool deploy", section(text, "### For developers: the command line"))
 
