@@ -40,8 +40,10 @@ internal sealed partial record StartReplay
     /// started the timer and the number of that run, or the first starts of the replay. So when a trigger starts the
     /// timer again, pass 2 does not run it for the old start.</item>
     /// <item>Known to come first. A trigger of the path can be known to come before the time of a timer. Then a trigger
-    /// of the path started the timer, and only Cnd_Timer and Cnd_True triggers of the path come after that start. The
-    /// longest times of these timers add up to less than the shortest time of the timer.</item>
+    /// of the path or the first starts of the replay started the timer. The first starts also start the root, so the
+    /// time of the root counts too. Only Cnd_Timer and Cnd_True triggers of the path come after that start. The longest
+    /// times of these timers add up to less than the shortest time of the timer. A run of another rule does not show
+    /// where the time starts, because the game can run that trigger earlier.</item>
     /// </list></item>
     /// <item>A launch of the path ran each trigger that waited for that launch: Cnd_PlayerLaunch, Cnd_SpaceEnter without
     /// a system or with the system of the launch, Cnd_LaunchComplete of the player, and Cnd_BaseExit without a base or
@@ -249,13 +251,13 @@ internal sealed partial record StartReplay
         }
 
         /// <summary>True when the next trigger of the path is known to come before the time of a waiting timer. A run of
-        /// the path started the timer. After that run, each trigger of the path up to the next trigger has Cnd_Timer or
-        /// Cnd_True. The longest times of these timers add up to less than the shortest time of the waiting timer.</summary>
+        /// the path or the first starts of the replay started the timer (<see cref="StartTimeline.PositionOf"/>). After
+        /// that position, each trigger of the path up to the next trigger has Cnd_Timer or Cnd_True. The longest times of
+        /// these timers add up to less than the shortest time of the waiting timer.</summary>
         /// <param name="position">The position of the next trigger of the path.</param>
         private bool KnownBefore(int position, int slot, int start)
         {
-            var from = timeline.PositionOf(start);
-            if (from < 0)
+            if (timeline.PositionOf(start) is not { } from)
                 return false;
             var sum = 0;
             for (var k = from + 1; k <= position; k++)

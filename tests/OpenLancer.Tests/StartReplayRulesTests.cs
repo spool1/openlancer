@@ -570,6 +570,44 @@ public sealed class StartReplayRulesTests
     }
 
     /// <summary>
+    /// The first starts of the replay also start the time of the root. s_root (5 s) and s_old (12 s) are both in the
+    /// start set, and s_root is the root of the path. So s_root is known to come before the time of s_old, and s_old
+    /// runs after it, before s_next. So the objective line of s_old comes last, as in the game.
+    /// </summary>
+    [Fact]
+    public void TheRootIsKnownToComeBeforeALongerTimerOfTheStartSet()
+    {
+        const string text = """
+            [Trigger]
+            nickname = s_root
+            InitState = ACTIVE
+            Cnd_Timer = 5
+            Act_SetNNObj = s_obj_root
+            Act_ActTrig = s_next
+
+            [Trigger]
+            nickname = s_old
+            InitState = ACTIVE
+            Cnd_Timer = 12
+            Act_SetNNObj = s_obj_old
+
+            [Trigger]
+            nickname = s_next
+            Cnd_Timer = 10
+            Act_ActTrig = s_chosen
+
+            [Trigger]
+            nickname = s_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "s_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["s_root", "s_old", "s_next"], Ran(replay));
+    }
+
+    /// <summary>
     /// The path timer q_done takes at most 2 s, so its own time is known to come before the 10 s of q_old. But q_done
     /// completes the objective q_goal, so the objective rule runs q_activate (10 s) before it. So q_done comes at least
     /// 10 s after the start, and pass 1 runs q_old before q_done. Pass 2 never runs a timer at a later trigger of the
@@ -691,8 +729,11 @@ public sealed class StartReplayRulesTests
         // The source of a start names the trigger of the run and the number of that run, not the index of the run.
         Assert.Equal((program.SlotOf("l_restart"), 1), timeline.SourceOf(start));
         Assert.Equal((-1, 0), timeline.SourceOf(StartTimeline.First));
+        // The time of a start begins at a run of the path, or before the root for the first starts. A run of another
+        // trigger gives no position.
         Assert.Equal(0, timeline.PositionOf(0));
-        Assert.Equal(-1, timeline.PositionOf(start));
+        Assert.Equal(-1, timeline.PositionOf(StartTimeline.First));
+        Assert.Null(timeline.PositionOf(start));
         Run("l_cancel");
         Assert.False(timeline.Started(trigger("l_other"), out _));
 

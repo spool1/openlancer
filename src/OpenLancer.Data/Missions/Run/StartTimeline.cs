@@ -133,9 +133,11 @@ internal sealed class StartTimeline
     /// 0).</summary>
     public (int Starter, int Run) SourceOf(int start) => start == First ? (-1, 0) : (runs[start].Slot, runs[start].Number);
 
-    /// <summary>The position of the path of the run that made a start, or -1 when a run of the path did not make
-    /// it.</summary>
-    public int PositionOf(int start) => positions.GetValueOrDefault(start, -1);
+    /// <summary>The position of the path where the time of a start begins: the position of the run of the path that made
+    /// it. <see cref="First"/> gives -1, because the first starts also start the root, at position 0. Null when a run of
+    /// a rule made the start, because the game can run such a trigger earlier than the replay does.</summary>
+    public int? PositionOf(int start) =>
+        start == First ? -1 : positions.TryGetValue(start, out var position) ? position : null;
 
     /// <summary>
     /// The least time of the next run of the path from an anchor. It is the largest known time since the last run of the
