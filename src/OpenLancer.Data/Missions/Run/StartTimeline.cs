@@ -89,7 +89,8 @@ internal sealed class StartTimeline
         read = Math.Min(read, count);
     }
 
-    /// <summary>Marks the newest run of a trigger as the run of a position of the path.</summary>
+    /// <summary>Marks the newest run of a trigger as the run of a position of the path. The replay marks each position
+    /// once, after its trigger ran.</summary>
     public void MarkPath(int position, MissionTrigger trigger)
     {
         var slot = program.SlotOf(trigger);
@@ -97,8 +98,6 @@ internal sealed class StartTimeline
         {
             if (runs[at].Slot != slot)
                 continue;
-            if (positions.TryGetValue(at, out var old))
-                pathRuns.Remove(old);
             pathRuns[position] = at;
             positions[at] = position;
             cache.Clear();
