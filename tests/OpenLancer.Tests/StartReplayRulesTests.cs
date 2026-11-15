@@ -1904,13 +1904,15 @@ public sealed class StartReplayRulesTests
     /// The path trigger s_grab waits for the pick-up of the loot s_cell. The game counts only a loot that the mission
     /// made, so s_cell existed before s_grab. When only the waiting trigger s_drop spawns it, s_drop ran before s_grab,
     /// and it does not wait at the start (issue #51). When two waiting triggers can spawn it, the path does not show
-    /// which one ran, so both wait. When the path made the loot, s_drop waits too.
+    /// which one ran, so both wait. When the path made the loot, s_drop waits too. A count of 0 never runs in the game,
+    /// but the path shows that s_grab ran. So it also needs the loot, and s_drop ran.
     /// </summary>
     [Theory]
-    [InlineData(false, false, true)]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    public void APathPickUpOfALootRunsItsOnlySpawner(bool twoSpawners, bool pathMakes, bool runs)
+    [InlineData(false, false, "", true)]
+    [InlineData(true, false, "", false)]
+    [InlineData(false, true, "", false)]
+    [InlineData(false, false, ", 0", true)]
+    public void APathPickUpOfALootRunsItsOnlySpawner(bool twoSpawners, bool pathMakes, string count, bool runs)
     {
         var text = """
             [MsnLoot]
@@ -1937,14 +1939,15 @@ public sealed class StartReplayRulesTests
 
             [Trigger]
             nickname = s_grab
-            Cnd_LootAcquired = s_cell, Player
+            Cnd_LootAcquired = s_cell, Player{COUNT}
             Act_ActTrig = s_chosen
 
             [Trigger]
             nickname = s_chosen
             Cnd_Timer = 5
             """.Replace("{MAKE}", pathMakes ? "Act_SpawnLoot = s_cell" : "")
-            .Replace("{SECOND}", twoSpawners ? "Act_SpawnLoot = s_cell" : "Act_SpawnSolar = s_buoy");
+            .Replace("{SECOND}", twoSpawners ? "Act_SpawnLoot = s_cell" : "Act_SpawnSolar = s_buoy")
+            .Replace("{COUNT}", count);
 
         var replay = Replay(text, "s_chosen");
 
@@ -1957,9 +1960,9 @@ public sealed class StartReplayRulesTests
     /// <summary>
     /// The path trigger k_kill waits for ships of the label k_group to be destroyed, and the path made only k_a. The count
     /// of the condition tells how many ships the mission made at least. A count of 2 or more needs a second ship, so the
-    /// only waiting trigger that spawns one, k_more, ran before k_kill. A count above the number of ships needs each
-    /// ship. A count of -1 waits for the last ship, and no count does the same. They need only one ship, so k_more
-    /// waits.
+    /// only waiting trigger that spawns one, k_more, ran before k_kill. k_again spawns only k_a, which the path made, so
+    /// it is not a second spawner. A count above the number of ships needs each ship. A count of -1 waits for the last
+    /// ship, and no count does the same. They need only one ship, so k_more waits.
     /// </summary>
     [Theory]
     [InlineData(", 2", true)]
@@ -1988,12 +1991,18 @@ public sealed class StartReplayRulesTests
             Cnd_True = no_params
             Act_SpawnShip = k_a
             Act_ActTrig = k_more
+            Act_ActTrig = k_again
             Act_ActTrig = k_kill
 
             [Trigger]
             nickname = k_more
             Cnd_CommComplete = k_line
             Act_SpawnShip = k_b
+
+            [Trigger]
+            nickname = k_again
+            Cnd_CommComplete = k_other_line
+            Act_SpawnShip = k_a
 
             [Trigger]
             nickname = k_kill
@@ -2009,6 +2018,7 @@ public sealed class StartReplayRulesTests
 
         Assert.Equal(StartRefusal.None, replay.Refusal);
         Assert.Equal(runs ? ["k_start", "k_more", "k_kill"] : ["k_start", "k_kill"], Ran(replay));
+        Assert.Contains("k_again", Waiting(replay));
     }
 
     /// <summary>
@@ -2308,5 +2318,180 @@ public sealed class StartReplayRulesTests
 
         Assert.Equal(StartRefusal.None, replay.Refusal);
         Assert.Equal(["r_start", "r_launch", "r_arrive", "r_gate", "r_done"], Ran(replay));
+    }
+
+    /// <summary>
+    /// The exit chain of the jump runs m_gate, m_mid and the exit trigger m_exit. m_mid waits for no event, so it runs
+    /// together with m_gate. m_mid completes the objective m_obj, which no line made active. The objective rule runs only
+    /// before a link that did not run yet, because a later run of the activator does not come before m_mid. So the timer
+    /// m_activate still waits.
+    /// </summary>
+    [Fact]
+    public void ALinkThatRanWithTheLinkBeforeItDoesNotGetTheObjectiveRule()
+    {
+        const string text = """
+            [Trigger]
+            nickname = m_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = m_gate
+            Act_ActTrig = m_activate
+            Act_ActTrig = m_launch
+
+            [Trigger]
+            nickname = m_gate
+            Cnd_CommComplete = m_line
+            Act_ActTrig = m_mid
+
+            [Trigger]
+            nickname = m_mid
+            Cnd_True = no_params
+            Act_SetNNState = m_obj, COMPLETE
+            Act_ActTrig = m_exit
+
+            [Trigger]
+            nickname = m_exit
+            Cnd_SystemExit = m_sys_a
+
+            [Trigger]
+            nickname = m_activate
+            Cnd_Timer = 15
+            Act_SetNNObj = m_obj
+
+            [Trigger]
+            nickname = m_launch
+            Cnd_SpaceEnter = m_sys_a
+            Act_ActTrig = m_arrive
+
+            [Trigger]
+            nickname = m_arrive
+            Cnd_SystemEnter = m_sys_b
+            Act_ActTrig = m_chosen
+
+            [Trigger]
+            nickname = m_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "m_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["m_start", "m_launch", "m_gate", "m_mid", "m_exit", "m_arrive"], Ran(replay));
+        Assert.Contains("m_activate", Waiting(replay));
+    }
+
+    /// <summary>
+    /// The path trigger u_first completes the objective u_obj_a, so the objective rule first runs its activator u_act_a.
+    /// Later the exit chain of the jump runs u_gate, then u_exit. u_exit completes u_obj_b, which no line made active. A
+    /// chain of the objective rule does not keep the rule off for the later runs. So the timer u_act_b, which makes
+    /// u_obj_b active, runs before u_exit.
+    /// </summary>
+    [Fact]
+    public void ALinkOfALaterRunGetsTheObjectiveRuleAfterAnObjectiveChain()
+    {
+        const string text = """
+            [Trigger]
+            nickname = u_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = u_act_a
+            Act_ActTrig = u_gate
+            Act_ActTrig = u_act_b
+            Act_ActTrig = u_first
+
+            [Trigger]
+            nickname = u_act_a
+            Cnd_CommComplete = u_line_a
+            Act_SetNNObj = u_obj_a
+
+            [Trigger]
+            nickname = u_first
+            Cnd_Timer = 2
+            Act_SetNNState = u_obj_a, COMPLETE
+            Act_ActTrig = u_launch
+
+            [Trigger]
+            nickname = u_gate
+            Cnd_CommComplete = u_line_b
+            Act_ActTrig = u_exit
+
+            [Trigger]
+            nickname = u_exit
+            Cnd_SystemExit = u_sys_a
+            Act_SetNNState = u_obj_b, COMPLETE
+
+            [Trigger]
+            nickname = u_act_b
+            Cnd_Timer = 15
+            Act_SetNNObj = u_obj_b
+
+            [Trigger]
+            nickname = u_launch
+            Cnd_SpaceEnter = u_sys_a
+            Act_ActTrig = u_arrive
+
+            [Trigger]
+            nickname = u_arrive
+            Cnd_SystemEnter = u_sys_b
+            Act_ActTrig = u_chosen
+
+            [Trigger]
+            nickname = u_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "u_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["u_start", "u_act_a", "u_first", "u_launch", "u_gate", "u_act_b", "u_exit", "u_arrive"],
+            Ran(replay));
+    }
+
+    /// <summary>
+    /// The path jumps from j_sys_a to j_sys_b, then from j_sys_b to j_sys_c. The fail guard j_guard started in j_sys_b,
+    /// after the first jump. It started before the last jump, so the replay stops it.
+    /// </summary>
+    [Fact]
+    public void AFailGuardThatStartedBeforeTheLastJumpStops()
+    {
+        const string text = """
+            [Trigger]
+            nickname = j_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = j_launch
+
+            [Trigger]
+            nickname = j_launch
+            Cnd_SpaceEnter = j_sys_a
+            Act_ActTrig = j_arrive_b
+
+            [Trigger]
+            nickname = j_arrive_b
+            Cnd_SystemEnter = j_sys_b
+            Act_ActTrig = j_guard
+            Act_ActTrig = j_arrive_c
+
+            [Trigger]
+            nickname = j_guard
+            Cnd_Timer = 100
+            Act_ChangeState = FAIL
+
+            [Trigger]
+            nickname = j_arrive_c
+            Cnd_SystemEnter = j_sys_c
+            Act_ActTrig = j_chosen
+
+            [Trigger]
+            nickname = j_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "j_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["j_start", "j_launch", "j_arrive_b", "j_arrive_c"], Ran(replay));
+        Assert.Equal(2, replay.Jumps.Count);
+        Assert.DoesNotContain("j_guard", Waiting(replay));
     }
 }
