@@ -1484,4 +1484,351 @@ public sealed class StartReplayRulesTests
         Assert.Equal(!runs, Waiting(replay).Contains("f_far"));
         Assert.Contains("f_edge", Waiting(replay));
     }
+
+    /// <summary>
+    /// The game gives one event to each trigger that waits for it (issue #75). The path docks the player at p_base_a in
+    /// p_sys_a. A dock removes the ship of the player from space first, so the game sent the space exit, then the base
+    /// entry. So the waiting space exits p_exit and p_exit_sys ran first, then the waiting base entries p_base and p_any.
+    /// The exit p_exit_other of another system and the entry p_other of another base wait. The timer rule runs p_t2, and
+    /// that run starts p_late. The path does not show when that run came in the game, so p_late waits.
+    /// </summary>
+    [Fact]
+    public void APathBaseEntryRunsTheWaitingTriggersOfItsEventAndTheSpaceExitFirst()
+    {
+        const string text = """
+            [Trigger]
+            nickname = p_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = p_t2
+            Act_ActTrig = p_wait
+            Act_ActTrig = p_base
+            Act_ActTrig = p_any
+            Act_ActTrig = p_other
+            Act_ActTrig = p_exit
+            Act_ActTrig = p_exit_sys
+            Act_ActTrig = p_exit_other
+
+            [Trigger]
+            nickname = p_t2
+            Cnd_Timer = 2
+            Act_ActTrig = p_late
+
+            [Trigger]
+            nickname = p_late
+            Cnd_BaseEnter = p_base_a
+
+            [Trigger]
+            nickname = p_base
+            Cnd_BaseEnter = p_base_a
+
+            [Trigger]
+            nickname = p_any
+            Cnd_BaseEnter = ANY
+
+            [Trigger]
+            nickname = p_other
+            Cnd_BaseEnter = p_base_b
+
+            [Trigger]
+            nickname = p_exit
+            Cnd_SpaceExit = no_params
+
+            [Trigger]
+            nickname = p_exit_sys
+            Cnd_SpaceExit = p_sys_a
+
+            [Trigger]
+            nickname = p_exit_other
+            Cnd_SpaceExit = p_sys_b
+
+            [Trigger]
+            nickname = p_wait
+            Cnd_Timer = 3
+            Act_ActTrig = p_dock
+
+            [Trigger]
+            nickname = p_dock
+            Cnd_BaseEnter = p_base_a
+            Act_ActTrig = p_chosen
+
+            [Trigger]
+            nickname = p_chosen
+            Cnd_Timer = 5
+            """;
+        var world = World([], ("p_base_a", "p_sys_a"), ("p_base_b", "p_sys_b"));
+
+        var replay = Replay(text, "p_chosen", world);
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["p_start", "p_t2", "p_wait", "p_exit", "p_exit_sys", "p_base", "p_any", "p_dock"], Ran(replay));
+        foreach (var waits in new[] { "p_late", "p_other", "p_exit_other" })
+            Assert.Contains(waits, Waiting(replay));
+    }
+
+    /// <summary>
+    /// The path shows the player docked at q_base before the base entry q_dock: the room entry q_bar comes first. So
+    /// q_dock does not remove the ship of the player from space, and the waiting space exit q_exit waits. The waiting base
+    /// entry q_peer still ran.
+    /// </summary>
+    [Fact]
+    public void ABaseEntryOfADockedPlayerSendsNoSpaceExit()
+    {
+        const string text = """
+            [Trigger]
+            nickname = q_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = q_exit
+            Act_ActTrig = q_peer
+            Act_ActTrig = q_bar
+
+            [Trigger]
+            nickname = q_exit
+            Cnd_SpaceExit = no_params
+
+            [Trigger]
+            nickname = q_peer
+            Cnd_BaseEnter = q_base
+
+            [Trigger]
+            nickname = q_bar
+            Cnd_LocEnter = q_room, q_base
+            Act_ActTrig = q_dock
+
+            [Trigger]
+            nickname = q_dock
+            Cnd_BaseEnter = q_base
+            Act_ActTrig = q_chosen
+
+            [Trigger]
+            nickname = q_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "q_chosen", World([], ("q_base", "q_sys")));
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["q_start", "q_bar", "q_peer", "q_dock"], Ran(replay));
+        Assert.Contains("q_exit", Waiting(replay));
+    }
+
+    /// <summary>
+    /// The events and the values that each event matches. A path trigger with the condition of the first value runs. The
+    /// waiting trigger v_peer with the condition of the second value ran too only for the same event. A base entry of the
+    /// path must name a base. A lane exit at ANY ring or with no second ring matches each ring. A comm line without a
+    /// sender matches each sender.
+    /// </summary>
+    [Theory]
+    [InlineData("Cnd_BaseEnter = v_base", "Cnd_BaseEnter = v_base", true)]
+    [InlineData("Cnd_BaseEnter = v_base", "Cnd_BaseEnter = ANY", true)]
+    [InlineData("Cnd_BaseEnter = v_base", "Cnd_BaseEnter = v_base_b", false)]
+    [InlineData("Cnd_BaseEnter = ANY", "Cnd_BaseEnter = ANY", false)]
+    [InlineData("Cnd_BaseEnter = ANY", "Cnd_SpaceExit = no_params", false)]
+    [InlineData("Cnd_BaseEnter = v_base", "Cnd_SpaceExit = v_sys", true)]
+    [InlineData("Cnd_BaseEnter = v_base", "Cnd_SpaceExit = v_sys_b", false)]
+    [InlineData("Cnd_SpaceExit = v_sys", "Cnd_SpaceExit = no_params", true)]
+    [InlineData("Cnd_SpaceExit = v_sys", "Cnd_SpaceExit = v_sys", true)]
+    [InlineData("Cnd_SpaceExit = v_sys", "Cnd_SpaceExit = v_sys_b", false)]
+    [InlineData("Cnd_SpaceExit = no_params", "Cnd_SpaceExit = v_sys", false)]
+    [InlineData("Cnd_LocEnter = v_bar, v_base", "Cnd_LocEnter = v_bar, v_base", true)]
+    [InlineData("Cnd_LocEnter = v_bar, v_base", "Cnd_LocEnter = v_deck, v_base", false)]
+    [InlineData("Cnd_LocEnter = v_bar, v_base", "Cnd_BaseEnter = v_base", false)]
+    [InlineData("Cnd_TLEntered = Player, v_ring_a, v_ring_b", "Cnd_TLEntered = Player, v_ring_a, v_ring_b", true)]
+    [InlineData("Cnd_TLEntered = Player, v_ring_a, v_ring_b", "Cnd_TLEntered = Player, v_ring_b, v_ring_a", false)]
+    [InlineData("Cnd_TLEntered = Player, v_ring_a, v_ring_b", "Cnd_TLEntered = Player, v_ring_a, v_ring_c", false)]
+    [InlineData("Cnd_TLEntered = Player, v_ring_a, v_ring_b", "Cnd_TLEntered = v_wing, v_ring_a, v_ring_b", false)]
+    [InlineData("Cnd_TLEntered = Player, v_ring_a, v_ring_b", "Cnd_TLExited = Player, ANY", false)]
+    [InlineData("Cnd_TLExited = Player, v_ring_a, v_ring_b", "Cnd_TLExited = Player, ANY", true)]
+    [InlineData("Cnd_TLExited = Player, v_ring_a, v_ring_b", "Cnd_TLExited = Player, v_ring_a", true)]
+    [InlineData("Cnd_TLExited = Player, v_ring_a, v_ring_b", "Cnd_TLExited = Player, v_ring_a, v_ring_b", true)]
+    [InlineData("Cnd_TLExited = Player, v_ring_a, v_ring_b", "Cnd_TLExited = Player, v_ring_a, v_ring_c", false)]
+    [InlineData("Cnd_TLExited = Player, v_ring_a", "Cnd_TLExited = Player, v_ring_a, v_ring_b", false)]
+    [InlineData("Cnd_TLExited = Player, ANY", "Cnd_TLExited = Player, ANY", true)]
+    [InlineData("Cnd_TLExited = Player, ANY", "Cnd_TLExited = Player, v_ring_a", false)]
+    [InlineData("Cnd_CommComplete = v_line", "Cnd_CommComplete = v_line", true)]
+    [InlineData("Cnd_CommComplete = v_line", "Cnd_CommComplete = v_line_b", false)]
+    [InlineData("Cnd_CommComplete = v_line", "Cnd_CommComplete = v_line, v_wing", false)]
+    [InlineData("Cnd_CommComplete = v_line, v_wing", "Cnd_CommComplete = v_line", true)]
+    [InlineData("Cnd_CommComplete = v_line, v_wing", "Cnd_CommComplete = v_line, v_wing", true)]
+    [InlineData("Cnd_CommComplete = v_line, v_wing", "Cnd_CommComplete = v_line, v_king", false)]
+    public void EachEventRunsOnlyTheWaitingTriggersOfTheSameEvent(string path, string waits, bool runs)
+    {
+        var text = """
+            [Trigger]
+            nickname = v_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = v_peer
+            Act_ActTrig = v_path
+
+            [Trigger]
+            nickname = v_peer
+            {WAITS}
+
+            [Trigger]
+            nickname = v_path
+            {PATH}
+            Act_ActTrig = v_chosen
+
+            [Trigger]
+            nickname = v_chosen
+            Cnd_Timer = 5
+            """.Replace("{WAITS}", waits).Replace("{PATH}", path);
+
+        var replay = Replay(text, "v_chosen", World([], ("v_base", "v_sys"), ("v_base_b", "v_sys_b")));
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(runs ? ["v_start", "v_peer", "v_path"] : ["v_start", "v_path"], Ran(replay));
+    }
+
+    /// <summary>
+    /// A waiting base entry o_peer of the dock o_dock ran, and its run starts the outside poll o_poll. The poll rule comes
+    /// after the peer-event rule. So the dock also shows the player at the dock object, 20,000 units from the center of
+    /// o_poll. So o_poll ran before the dock of the path.
+    /// </summary>
+    [Fact]
+    public void APollThatAPeerStartsRunsAtThePlaceOfTheSameEvent()
+    {
+        const string text = """
+            [Trigger]
+            nickname = o_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = o_peer
+            Act_ActTrig = o_dock
+
+            [Trigger]
+            nickname = o_peer
+            Cnd_BaseEnter = o_base
+            Act_ActTrig = o_poll
+
+            [Trigger]
+            nickname = o_poll
+            Cnd_DistVec = outside, Player, 0, 0, 0, 1000
+
+            [Trigger]
+            nickname = o_dock
+            Cnd_BaseEnter = o_base
+            Act_ActTrig = o_chosen
+
+            [Trigger]
+            nickname = o_chosen
+            Cnd_Timer = 5
+            """;
+        var world = World([Thing("o_station", "o_sys", 20000) with { DockWith = "o_base" }], ("o_base", "o_sys"));
+
+        var replay = Replay(text, "o_chosen", world);
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["o_start", "o_peer", "o_poll", "o_dock"], Ran(replay));
+    }
+
+    /// <summary>
+    /// The chosen trigger only starts in the replay, so the base entry that it waits for did not come yet. At the start of
+    /// h_land, the waiting base entry h_sibling and the waiting space exit h_exit still wait. At the start of h_after, the
+    /// base entry h_land is on the path, so h_sibling and h_exit ran before it.
+    /// </summary>
+    [Theory]
+    [InlineData("h_land", true)]
+    [InlineData("h_after", false)]
+    public void TheEventOfTheChosenTriggerDidNotComeYet(string chosen, bool waits)
+    {
+        const string text = """
+            [Trigger]
+            nickname = h_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = h_sibling
+            Act_ActTrig = h_exit
+            Act_ActTrig = h_land
+
+            [Trigger]
+            nickname = h_sibling
+            Cnd_BaseEnter = h_base
+
+            [Trigger]
+            nickname = h_exit
+            Cnd_SpaceExit = no_params
+
+            [Trigger]
+            nickname = h_land
+            Cnd_BaseEnter = h_base
+            Act_ActTrig = h_after
+
+            [Trigger]
+            nickname = h_after
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, chosen, World([], ("h_base", "h_sys")));
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(waits, Waiting(replay).Contains("h_sibling"));
+        Assert.Equal(waits, Waiting(replay).Contains("h_exit"));
+    }
+
+    /// <summary>
+    /// A waiting base entry e_scene of the dock e_dock starts the base scene e_intro, and it ran at the dock. The game plays
+    /// the scene at once, and the player acts again only after it. At the start of e_chosen, the room entry e_bar comes
+    /// after the dock. So the scene played to its end, the trigger e_done of its end ran, and the start save does not play
+    /// the scene again. At the start of e_bar, no trigger of the path comes after the dock. So the scene can still play,
+    /// and the start save keeps it. The other scene e_other of the run stays in both starts, because no trigger waits for
+    /// its end. The trigger e_later waits for the end of a scene that the run did not start, so it waits in both starts.
+    /// </summary>
+    [Theory]
+    [InlineData("e_chosen", false)]
+    [InlineData("e_bar", true)]
+    public void TheSceneOfARunAtADockPlayedWhenALaterTriggerOfThePathFollows(string chosen, bool keeps)
+    {
+        const string text = """
+            [Trigger]
+            nickname = e_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = e_scene
+            Act_ActTrig = e_later
+            Act_ActTrig = e_dock
+
+            [Trigger]
+            nickname = e_later
+            Cnd_RTCDone = missions\ol\e_later.ini
+
+            [Trigger]
+            nickname = e_scene
+            Cnd_BaseEnter = e_base
+            Act_AddRTC = missions\ol\e_intro.ini
+            Act_AddRTC = missions\ol\e_other.ini
+            Act_ActTrig = e_done
+
+            [Trigger]
+            nickname = e_done
+            Cnd_RTCDone = MISSIONS\OL\E_INTRO.INI
+            Act_SetNNObj = e_obj
+
+            [Trigger]
+            nickname = e_dock
+            Cnd_BaseEnter = e_base
+            Act_ActTrig = e_bar
+
+            [Trigger]
+            nickname = e_bar
+            Cnd_LocEnter = e_room, e_base
+            Act_ActTrig = e_chosen
+
+            [Trigger]
+            nickname = e_chosen
+            Cnd_Timer = 5
+            """;
+
+        var plan = StartPlan.Make(Index(text, World([], ("e_base", "e_sys"))), StartPlanTests.Slot,
+            MissionStartPoint.At(chosen));
+
+        Assert.True(plan.CanStart, plan.Reason);
+        Assert.DoesNotContain("e_scene", plan.ActiveSet);
+        Assert.Contains("e_later", plan.ActiveSet);
+        Assert.Equal(keeps, plan.ActiveSet.Contains("e_done"));
+        Assert.Equal(keeps ? [@"missions\ol\e_intro.ini", @"missions\ol\e_other.ini"] : [@"missions\ol\e_other.ini"],
+            plan.State.Scenes.Select(s => s.File));
+    }
 }

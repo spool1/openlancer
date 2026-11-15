@@ -11,8 +11,8 @@ internal sealed partial record StartReplay
     /// 2026-10-28, issue #46). The replay has no world and no time. So a trigger that waits for the world or for a time
     /// stays active, also when the game ran it long before the chosen trigger. These rules run such a trigger at the point
     /// where the path shows its event. The rules run in this order before each trigger of the path: timers, objectives,
-    /// the early space test, systems, launch, polls, and timers again. Then the trigger of the path runs, and the space
-    /// test follows.
+    /// the early space test, systems, launch, peer events, polls, and timers again. Then the trigger of the path runs, and
+    /// the space test follows.
     /// <list type="bullet">
     /// <item>Timers (issue #46). A waiting timer ran when the path shows that at least its time passed since its start.
     /// All timers count on the same heartbeats.
@@ -48,6 +48,28 @@ internal sealed partial record StartReplay
     /// <item>A launch of the path ran each trigger that waited for that launch: Cnd_PlayerLaunch, Cnd_SpaceEnter without
     /// a system or with the system of the launch, Cnd_LaunchComplete of the player, and Cnd_BaseExit without a base or
     /// with the base of the launch.</item>
+    /// <item>Peer events (issue #75). The game gives one event to each trigger that waits for it. So the condition of a
+    /// trigger of the path shows its event, and each waiting trigger of the same event ran.
+    /// <list type="bullet">
+    /// <item>The events. A base entry must name a base. It matches Cnd_BaseEnter of that base or of any base. A space
+    /// exit matches Cnd_SpaceExit of the same system or of any system. A room entry matches Cnd_LocEnter of the same room
+    /// and base. A lane entry matches Cnd_TLEntered of the same ship and the same two rings. The end of a comm line
+    /// matches Cnd_CommComplete of the same line.</item>
+    /// <item>The lane exit and the sender. A lane exit matches Cnd_TLExited of the same ship. Its first ring is ANY or
+    /// the first ring of the path. It has no second ring, or the second ring of the path. A sender of a waiting
+    /// Cnd_CommComplete must be the sender of the path.</item>
+    /// <item>The dock. A dock removes the ship of the player from space before the base entry. So a base entry of the
+    /// path also shows the space exit from the system of the base. This is not true when the path already showed the
+    /// player docked. The triggers of that exit run first.</item>
+    /// <item>The start. The waiting trigger must start before the event. It must start at the first starts of the
+    /// replay, or in a run of an earlier trigger of the path. A start by a run of a rule does not count, because the
+    /// path does not show when that run came in the game.</item>
+    /// <item>The scenes. A run at a base entry or a room entry can start a base scene. The game plays the scene at once,
+    /// and the player acts again only after its end. So when a later trigger of the path follows, other than the chosen
+    /// trigger, each trigger that waits for the end of that scene ran.</item>
+    /// <item>The limits. Only the conditions of the path show events, not the runs of the rules. The chosen trigger only
+    /// starts, so its condition shows no event.</item>
+    /// </list></item>
     /// <item>The game tests Cnd_InSpace at each heartbeat. When the path shows the player in space, each trigger that
     /// waits for Cnd_InSpace = true ran. When the path shows the player docked, each trigger that waits for
     /// Cnd_InSpace = false ran. Before the first such line, a dock shows that the player was in space, and a launch
@@ -175,6 +197,7 @@ internal sealed partial record StartReplay
             if (early == null)
                 Arrival(position);
             Launch(trigger, rest);
+            Peers(position, rest);
             Polls(position, rest);
             // Again after the other rules: their runs can show more time.
             Timers(position, rest);
