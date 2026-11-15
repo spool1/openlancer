@@ -502,6 +502,43 @@ public sealed partial class StartPlanRetailTests
         }
     }
 
+    /// <summary>
+    /// The rows of the peer-event rule of the replay (issue #75) in both games. The path of M01a tm_o_attack lands the
+    /// player at Manhattan. The dock sent the space exit, then the base entry. So remove_playership and bse_play_2xe ran
+    /// before the base entry of the path, and they do not wait. The run of bse_play_2xe starts the intro scene. A later
+    /// trigger of the path shows that the scene played, so the start save does not play it again. At lce_bar, right
+    /// after the dock, the scene can still play, so the start save keeps it. At M01a bse_initialize_init_li01 and at M04
+    /// land_on_depot, the chosen trigger waits for the same base entry as bse_play_2xe or play_M004_s020x_Li01_04_nrml.
+    /// The chosen trigger only starts, so the base entry did not come yet, and both still wait. The scene trigger of M04
+    /// is also repeatable, so no rule of the replay runs it.
+    /// </summary>
+    [Fact]
+    public void ThePeerEventRuleRunsTheWaitingTriggersOfTheEventsOfThePath()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var m01a = Slot(scripts, "M01a");
+            var attack = Plan(m01a, "tm_o_attack");
+            Assert.True(attack.CanStart, $"{set}: {attack.Reason}");
+            Assert.DoesNotContain("remove_playership", attack.ActiveSet);
+            Assert.DoesNotContain("bse_play_2xe", attack.ActiveSet);
+            Assert.DoesNotContain(attack.State.Scenes, s => s.File.Contains("M000_s002xe", StringComparison.OrdinalIgnoreCase));
+
+            var bar = Plan(m01a, "lce_bar");
+            Assert.True(bar.CanStart, $"{set}: {bar.Reason}");
+            Assert.Contains(bar.State.Scenes, s => s.File.Contains("M000_s002xe", StringComparison.OrdinalIgnoreCase));
+
+            var landing = Plan(m01a, "bse_initialize_init_li01");
+            Assert.True(landing.CanStart, $"{set}: {landing.Reason}");
+            Assert.Contains("bse_play_2xe", landing.ActiveSet);
+            Assert.Contains("remove_playership", landing.ActiveSet);
+
+            var depot = Plan(Slot(scripts, "M04"), "land_on_depot");
+            Assert.True(depot.CanStart, $"{set}: {depot.Reason}");
+            Assert.Contains("play_M004_s020x_Li01_04_nrml", depot.ActiveSet);
+        }
+    }
+
     /// <summary>The row of issue 45 in both games. M04 juni_mactan_tether starts in Iw03, after the jump from Li01. The
     /// game sent the exit from Li01 at the jump, so leaving_liberty_01 stopped the fail watcher too_far_from_magellan_dock
     /// of a point in Li01. arrive_at_jumpgate starts leaving_liberty_01, so it ran before the jump. A start at
