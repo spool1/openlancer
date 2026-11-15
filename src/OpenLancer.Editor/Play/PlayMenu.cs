@@ -272,15 +272,15 @@ internal sealed class PlayMenu(EditorWindow window)
         ? "Force stop (Shift+F5): the game does not respond, so this ends its process"
         : "Stop the game (Shift+F5)";
 
-    /// <summary>
-    /// The items of Play in the game (section 8.8 of the M11 design, decision D324). Each play target has an item. Host
-    /// test server has an item for each play target with FLServer.exe. Join test server and Stop test server follow.
-    /// </summary>
     /// <summary>The tooltip of a Play in the game item, with the note of the game (see <see cref="PlayTarget.Note"/>).</summary>
     internal static string GameTooltip(PlayTarget target) =>
         $"Save the active mod, install the mods of the profile into the play copy of {target.Root}, and start its " +
         "game. Your game folder does not change." + (target.Note is { } note ? $"\n\n{note}" : "");
 
+    /// <summary>
+    /// The items of Play in the game (section 8.8 of the M11 design, decision D324). Each play target has an item. Host
+    /// test server has an item for each play target with FLServer.exe. Join test server and Stop test server follow.
+    /// </summary>
     private void GameItems()
     {
         var games = window.GamePlay;
