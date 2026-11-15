@@ -152,10 +152,6 @@ internal sealed partial record StartReplay
 
         private int read;
 
-        /// <summary>True while the objective rule runs its chain. The links of that chain do not get the objective rule
-        /// again.</summary>
-        private bool inObjectiveChain;
-
         /// <summary>The number of changes when the path last showed the player docked, or -1.</summary>
         private int docked = -1;
 
@@ -387,11 +383,7 @@ internal sealed partial record StartReplay
             foreach (var objective in completed)
             {
                 if (Chain(t => Activates(t, objective), rest, trigger) is { } chain)
-                {
-                    inObjectiveChain = true;
-                    TryRun(chain, rest);
-                    inObjectiveChain = false;
-                }
+                    TryRun(chain, rest, objectives: false);
                 Note();
             }
         }
@@ -585,10 +577,12 @@ internal sealed partial record StartReplay
         }
 
         /// <summary>Runs a chain of waiting triggers in order. Before each link that did not run yet, the objective rule
-        /// runs, unless the chain is a chain of the objective rule. When a run breaks a rule of <see cref="Replayer"/>, the
-        /// replay goes back to the state before the chain.</summary>
+        /// runs. When a run breaks a rule of <see cref="Replayer"/>, the replay goes back to the state before the
+        /// chain.</summary>
+        /// <param name="objectives">False for a chain of the objective rule. Its links do not get the objective rule
+        /// again.</param>
         /// <returns>True when the chain ran, false when the replay went back.</returns>
-        private bool TryRun(IReadOnlyList<MissionTrigger> chain, IReadOnlyList<MissionTrigger> rest)
+        private bool TryRun(IReadOnlyList<MissionTrigger> chain, IReadOnlyList<MissionTrigger> rest, bool objectives = true)
         {
             var state = Machine.Snapshot();
             var count = Changes.Count;
@@ -598,7 +592,7 @@ internal sealed partial record StartReplay
             for (var i = 0; ok && i < chain.Count; i++)
             {
                 // A link that completes an objective shows that the objective was active before it.
-                if (!inObjectiveChain && Machine.StateOf(chain[i]).Runs == runs[i])
+                if (objectives && Machine.StateOf(chain[i]).Runs == runs[i])
                     Objectives(chain[i], rest);
                 // A link can run in the pass of the link before it, for example a link with Cnd_True. That run counts.
                 var ran = Machine.StateOf(chain[i]).Runs > runs[i] || Reach(chain[i], again: true) == Reached.Ran;
