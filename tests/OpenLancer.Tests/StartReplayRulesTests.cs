@@ -1616,8 +1616,8 @@ public sealed class StartReplayRulesTests
     /// <summary>
     /// The events and the values that each event matches. A path trigger with the condition of the first value runs. The
     /// waiting trigger v_peer with the condition of the second value ran too only for the same event. A base entry of the
-    /// path must name a base. A lane exit at ANY ring or with no second ring matches each ring. A comm line without a
-    /// sender matches each sender.
+    /// path must name a base. A dock at a base that the world does not know matches only Cnd_SpaceExit of any system. A
+    /// lane exit at ANY ring or with no second ring matches each ring. A comm line without a sender matches each sender.
     /// </summary>
     [Theory]
     [InlineData("Cnd_BaseEnter = v_base", "Cnd_BaseEnter = v_base", true)]
@@ -1627,12 +1627,15 @@ public sealed class StartReplayRulesTests
     [InlineData("Cnd_BaseEnter = ANY", "Cnd_SpaceExit = no_params", false)]
     [InlineData("Cnd_BaseEnter = v_base", "Cnd_SpaceExit = v_sys", true)]
     [InlineData("Cnd_BaseEnter = v_base", "Cnd_SpaceExit = v_sys_b", false)]
+    [InlineData("Cnd_BaseEnter = v_base_c", "Cnd_SpaceExit = no_params", true)]
+    [InlineData("Cnd_BaseEnter = v_base_c", "Cnd_SpaceExit = v_sys", false)]
     [InlineData("Cnd_SpaceExit = v_sys", "Cnd_SpaceExit = no_params", true)]
     [InlineData("Cnd_SpaceExit = v_sys", "Cnd_SpaceExit = v_sys", true)]
     [InlineData("Cnd_SpaceExit = v_sys", "Cnd_SpaceExit = v_sys_b", false)]
     [InlineData("Cnd_SpaceExit = no_params", "Cnd_SpaceExit = v_sys", false)]
     [InlineData("Cnd_LocEnter = v_bar, v_base", "Cnd_LocEnter = v_bar, v_base", true)]
     [InlineData("Cnd_LocEnter = v_bar, v_base", "Cnd_LocEnter = v_deck, v_base", false)]
+    [InlineData("Cnd_LocEnter = v_bar, v_base", "Cnd_LocEnter = v_bar, v_base_b", false)]
     [InlineData("Cnd_LocEnter = v_bar, v_base", "Cnd_BaseEnter = v_base", false)]
     [InlineData("Cnd_TLEntered = Player, v_ring_a, v_ring_b", "Cnd_TLEntered = Player, v_ring_a, v_ring_b", true)]
     [InlineData("Cnd_TLEntered = Player, v_ring_a, v_ring_b", "Cnd_TLEntered = Player, v_ring_b, v_ring_a", false)]
@@ -1643,6 +1646,7 @@ public sealed class StartReplayRulesTests
     [InlineData("Cnd_TLExited = Player, v_ring_a, v_ring_b", "Cnd_TLExited = Player, v_ring_a", true)]
     [InlineData("Cnd_TLExited = Player, v_ring_a, v_ring_b", "Cnd_TLExited = Player, v_ring_a, v_ring_b", true)]
     [InlineData("Cnd_TLExited = Player, v_ring_a, v_ring_b", "Cnd_TLExited = Player, v_ring_a, v_ring_c", false)]
+    [InlineData("Cnd_TLExited = Player, v_ring_a, v_ring_b", "Cnd_TLExited = v_wing, ANY", false)]
     [InlineData("Cnd_TLExited = Player, v_ring_a", "Cnd_TLExited = Player, v_ring_a, v_ring_b", false)]
     [InlineData("Cnd_TLExited = Player, ANY", "Cnd_TLExited = Player, ANY", true)]
     [InlineData("Cnd_TLExited = Player, ANY", "Cnd_TLExited = Player, v_ring_a", false)]
