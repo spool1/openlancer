@@ -257,6 +257,7 @@ internal static class StartWorld
     private sealed class Unit(string name, StartObjectKind kind, IReadOnlySet<string> members, Entry spawn)
     {
         private readonly HashSet<string> left = new(members, StringComparer.OrdinalIgnoreCase);
+        private readonly List<(Entry By, IReadOnlySet<string> Ships)> takes = [];
 
         public string Name { get; } = name;
 
@@ -311,21 +312,27 @@ internal static class StartWorld
         /// <summary>True when a destroy line names the object, or when the destroy lines name each of its members.</summary>
         public bool Destroyed => Lost.Contains(Name) || Members.Count > 0 && Members.All(Lost.Contains);
 
-        /// <summary>True when newer objects took each member of the object. Then the object does not exist.</summary>
-        public bool Gone { get; private set; }
+        /// <summary>Each take of a newer object (see <see cref="Take"/>): its spawn line and the members that it
+        /// took.</summary>
+        public IReadOnlyList<(Entry By, IReadOnlySet<string> Ships)> Takes => takes;
+
+        /// <summary>True when newer objects took members of the object, and no member that is left lives. Destroy lines
+        /// can name the other members before or after a take. Then the object does not exist.</summary>
+        public bool Gone => takes.Count > 0 && (left.Count == 0 || Destroyed);
 
         /// <summary>True when the object exists: it is not destroyed and not gone.</summary>
         public bool Live => !Destroyed && !Gone;
 
-        /// <summary>Takes a member from the object, because a newer object makes that ship again. This is not a destroy,
-        /// so <see cref="Lost"/> does not change.</summary>
-        /// <returns>True when the object had the member.</returns>
-        public bool Take(string member)
+        /// <summary>Takes the members that a newer object makes again: each member that the two objects share. The name
+        /// of a formation is not a ship, so a ship with that name stays. This is not a destroy, so <see cref="Lost"/> does
+        /// not change.</summary>
+        public void Take(Unit newer)
         {
-            if (!left.Remove(member))
-                return false;
-            Gone = left.Count == 0;
-            return true;
+            var ships = left.Where(newer.Members.Contains).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (ships.Count == 0)
+                return;
+            left.ExceptWith(ships);
+            takes.Add((newer.Spawn, ships));
         }
     }
 
@@ -354,6 +361,7 @@ internal static class StartWorld
             Steps();
             DoubleSpawns();
             Track();
+            RemoveGone();
             RemoveCancelledOrders();
             MadeAgain();
             var arrivals = ArrivalOrders();
@@ -442,8 +450,8 @@ internal static class StartWorld
         /// Rule 4: a second spawn line of an object makes a new object. The replay has no world, so it does not see that
         /// the first object left space. The earlier spawn line goes, with each line between the two spawn lines that
         /// names the object. A line that names it only through a label stays. A destroy line between that names the
-        /// object keeps the earlier spawn line here. When the destroy lines leave ships of the object, the track decides
-        /// later (see <see cref="Add"/>).
+        /// object keeps the earlier spawn line here. The track decides later if the object has a live ship (see <see
+        /// cref="RemoveGone"/>).
         /// </summary>
         private void DoubleSpawns()
         {
@@ -465,7 +473,7 @@ internal static class StartWorld
         }
 
         /// <summary>Removes an earlier spawn line of an object that a later line makes again (rule 4). Each line between
-        /// the two lines that names the object directly goes too.</summary>
+        /// the two lines that names the object or one of the members directly goes too.</summary>
         private void Replace(Entry earlier, Entry later, string name, IReadOnlySet<string> members)
         {
             earlier.Removed = true;
@@ -579,28 +587,36 @@ internal static class StartWorld
         /// <summary>
         /// Adds the object of a spawn line, or of a move that makes a ship. The new object takes each of its ships from
         /// the older object that has the ship, because the game makes that ship again. The scripts make a ship again only
-        /// after the first ship left space. An older object with no ship left is gone. Its spawn line goes too, as in rule
-        /// 4.
+        /// after the first ship left space. An older object with no live ship left is gone (see <see
+        /// cref="RemoveGone"/>).
         /// </summary>
         private void Add(Unit unit)
         {
             units.Add(unit);
             spawned[unit.Spawn] = unit;
+            foreach (var older in unit.Members.Select(m => byMember.GetValueOrDefault(m)).OfType<Unit>().Distinct().ToList())
+                older.Take(unit);
             var names = unit.Members.Append(unit.Name).ToList();
-            foreach (var older in names.Select(n => byMember.GetValueOrDefault(n)).OfType<Unit>().Distinct().ToList())
-            {
-                var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var name in names)
-                {
-                    if (older.Take(name))
-                        taken.Add(name);
-                }
-                if (older.Gone && taken.Count > 0)
-                    Replace(older.Spawn, unit.Spawn, older.Name, taken);
-            }
             foreach (var name in names)
                 byMember[name] = unit;
             madeMembers.UnionWith(names);
+        }
+
+        /// <summary>
+        /// Rule 3, the end of the takes. Newer objects took ships of an older object, and the older object has no live
+        /// ship left. Destroy lines can name its other ships before or after a take. So the older object does not exist
+        /// at the start, and its spawn line goes, as in rule 4. Some lines come between that spawn line and the spawn
+        /// line of a newer object. Such a line goes too when it names the older object or a ship that the newer object
+        /// took. Each other line on a destroyed ship then names an object that no kept line makes, so it goes too (see
+        /// <see cref="Remove"/>).
+        /// </summary>
+        private void RemoveGone()
+        {
+            foreach (var unit in units.Where(u => u.Gone))
+            {
+                foreach (var (by, ships) in unit.Takes)
+                    Replace(unit.Spawn, by, unit.Name, ships);
+            }
         }
 
         /// <summary>A jump of the player: each live object whose jumper flag is on goes with the player, from any system.

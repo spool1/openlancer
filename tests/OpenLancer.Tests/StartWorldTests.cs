@@ -467,6 +467,86 @@ public sealed class StartWorldTests
         Assert.DoesNotContain(formation.LeftOut, l => l.Object == "ol_form_a");
     }
 
+    /// <summary>A later spawn line takes one ship of an older formation, and a destroy line names the other ship. The
+    /// destroy can come before or after the take. So the older formation has no live ship at the start, and it does not
+    /// exist. Its spawn line goes, and the line on the destroyed ship goes too. The setup makes the taken ship one time.
+    /// This is true for a formation of the first system and for a formation of the start system.</summary>
+    [Theory]
+    [InlineData("Act_Destroy = ol_f2, SILENT", "Act_SpawnShip = ol_f1", "", "ol_form_a", "ol_f1", "ol_f2")]
+    [InlineData("", "Act_SpawnShip = ol_f1\nAct_Destroy = ol_f2, SILENT", "", "ol_form_a", "ol_f1", "ol_f2")]
+    [InlineData("", """
+        Act_SpawnFormation = ol_form_b
+        Act_GiveObjList = ol_form_b, ol_follow
+        Act_Destroy = ol_g2, SILENT
+        Act_SpawnShip = ol_g1
+        Act_GiveObjList = ol_g1, ol_follow
+        """, FormationB, "ol_form_b", "ol_g1", "ol_g2")]
+    public void AFormationWithNoLiveShipAfterATakeIsGone(string a, string jump, string records, string formation,
+        string taken, string destroyed)
+    {
+        var plan = Plan(Script(a: a, jump: jump, records: records));
+        var lines = WorldLines(plan);
+
+        Assert.Single(lines, l => l.StartsWith("Act_Spawn", StringComparison.Ordinal) && l.Contains(taken, StringComparison.Ordinal));
+        Assert.Contains($"Act_SpawnShip = {taken}", lines);
+        Assert.DoesNotContain(lines, l => l.Contains(formation, StringComparison.Ordinal) ||
+                                          l.Contains(destroyed, StringComparison.Ordinal));
+        Assert.DoesNotContain(plan.LeftOut, l => l.Object == formation || l.Object == destroyed);
+        Assert.DoesNotContain(plan.Companions, c => c.Object == formation);
+    }
+
+    /// <summary>A formation can have the name of a ship of an older formation. Its spawn line makes only its own ships,
+    /// so it takes no ship. The older formation keeps that ship after the loss of its other ship, so it stays.</summary>
+    [Fact]
+    public void AFormationWithTheNameOfAnOlderShipTakesNoShip()
+    {
+        var plan = Plan(Script(jump: """
+            Act_SpawnFormation = ol_form_b
+            Act_Destroy = ol_g1, SILENT
+            Act_SpawnFormation = ol_g2
+            """, records: FormationB + """
+
+            [MsnShip]
+            nickname = ol_h1
+            position = 0, 0, 0
+
+            [MsnShip]
+            nickname = ol_h2
+            position = 0, 0, 0
+
+            [MsnFormation]
+            nickname = ol_g2
+            position = 13000, 0, 13000
+            ship = ol_h1
+            ship = ol_h2
+            """));
+        var lines = WorldLines(plan);
+
+        Assert.Contains("Act_SpawnFormation = ol_form_b", lines);
+        Assert.Contains("Act_SpawnFormation = ol_g2", lines);
+    }
+
+    /// <summary>Two later spawn lines take the two ships of an older formation, one ship each. So the older formation is
+    /// gone. A line before the first take that names the first ship goes. A line on the new first ship after its spawn
+    /// line stays, also when it comes before the second take.</summary>
+    [Fact]
+    public void EachTakeRemovesTheEarlierLinesOfItsShips()
+    {
+        var plan = Plan(Script(a: "Act_GiveObjList = ol_f1, ol_patrol", jump: """
+            Act_SpawnShip = ol_f1
+            Act_GiveObjList = ol_f1, ol_follow
+            Act_SpawnShip = ol_f2
+            """));
+        var lines = WorldLines(plan);
+
+        Assert.DoesNotContain(lines, l => l.Contains("ol_form_a", StringComparison.Ordinal) ||
+                                          l.Contains("ol_patrol", StringComparison.Ordinal));
+        Assert.Single(lines, l => l == "Act_SpawnShip = ol_f1");
+        Assert.Single(lines, l => l == "Act_SpawnShip = ol_f2");
+        Assert.Contains("Act_GiveObjList = ol_f1, ol_follow", lines);
+        Assert.Equal(CompanionSigns.Orders, Companion(plan, "ol_f1").Signs);
+    }
+
     /// <summary>A label can have the name of a solar. A world line names the solar by its nickname. So the spawn line
     /// and the attitude line name only that solar, not the other solar of the label. The solar of the first system is
     /// left out with its lines, and the setup makes the other solar in the start system.</summary>
