@@ -1040,6 +1040,90 @@ public sealed class StartReplayRulesTests
     }
 
     /// <summary>
+    /// A launch from a base and a room entry also show the player at the dock object of the base, with 3,000 units. A
+    /// dock object 20,000 units from the center of the outside poll x_poll shows the player outside its 1,000 units, so
+    /// x_poll ran. At 4,000 units, the nearest point within the slack is exactly 1,000 units from the center. That point
+    /// is not outside the sphere, so x_poll waits.
+    /// </summary>
+    [Theory]
+    [InlineData("Cnd_BaseExit = x_base", 20000, true)]
+    [InlineData("Cnd_BaseExit = x_base", 4000, false)]
+    [InlineData("Cnd_LocEnter = x_bar, x_base", 20000, true)]
+    [InlineData("Cnd_LocEnter = x_bar, x_base", 4000, false)]
+    public void ALaunchOrARoomEntryShowsTheDockObjectOfTheBase(string place, float dock, bool runs)
+    {
+        var text = """
+            [Trigger]
+            nickname = x_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = x_poll
+            Act_ActTrig = x_place
+
+            [Trigger]
+            nickname = x_poll
+            Cnd_DistVec = outside, Player, 0, 0, 0, 1000
+
+            [Trigger]
+            nickname = x_place
+            {PLACE}
+            Act_ActTrig = x_chosen
+
+            [Trigger]
+            nickname = x_chosen
+            Cnd_Timer = 5
+            """.Replace("{PLACE}", place);
+        var world = World([Thing("x_station", "x_sys", dock) with { DockWith = "x_base" }], ("x_base", "x_sys"));
+
+        var replay = Replay(text, "x_chosen", world);
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(runs ? ["x_start", "x_poll", "x_place"] : ["x_start", "x_place"], Ran(replay));
+    }
+
+    /// <summary>
+    /// A launch of the path runs the waiting trigger l_peer, which waits for the same launch. The run of l_peer starts
+    /// the outside poll l_poll. The poll rule comes after the launch rule. So the launch also shows the player at the
+    /// dock object, 20,000 units from the center of l_poll, and l_poll ran before the launch of the path.
+    /// </summary>
+    [Fact]
+    public void APollThatTheLaunchRuleStartsRunsAtTheBaseOfTheLaunch()
+    {
+        const string text = """
+            [Trigger]
+            nickname = l_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = l_peer
+            Act_ActTrig = l_launch
+
+            [Trigger]
+            nickname = l_peer
+            Cnd_BaseExit = l_base
+            Act_ActTrig = l_poll
+
+            [Trigger]
+            nickname = l_poll
+            Cnd_DistVec = outside, Player, 0, 0, 0, 1000
+
+            [Trigger]
+            nickname = l_launch
+            Cnd_BaseExit = l_base
+            Act_ActTrig = l_chosen
+
+            [Trigger]
+            nickname = l_chosen
+            Cnd_Timer = 5
+            """;
+        var world = World([Thing("l_station", "l_sys", 20000) with { DockWith = "l_base" }], ("l_base", "l_sys"));
+
+        var replay = Replay(text, "l_chosen", world);
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["l_start", "l_peer", "l_poll", "l_launch"], Ran(replay));
+    }
+
+    /// <summary>
     /// The game tests the point of Cnd_DistVec in each system, but Cnd_DistShip needs the player and the object in one
     /// system. The path docks the player at b_base in b_sys_a. So the point poll b_vec ran, although its system key names
     /// another system. The object poll b_same ran, with the player as the other ship. The object poll b_other waits,
@@ -1109,7 +1193,8 @@ public sealed class StartReplayRulesTests
     /// A jump of the path from c_sys_a to c_sys_b. Before the exit, the player was at the jump object of c_sys_a that
     /// leads to c_sys_b. The system c_sys_a has two such objects: the gate at 0 and the hole at 40,000. The dock rules
     /// of the replay must allow exactly one of them. The hole shows the player inside the sphere of c_poll, and the gate
-    /// does not. When the dock rules allow both objects or neither object, the place is not known, and c_poll waits.
+    /// does not. When the dock rules allow both objects or neither object, the place is not known, and c_poll waits. Only
+    /// the newest Act_PlayerCanDock line counts.
     /// </summary>
     [Theory]
     [InlineData("Act_PlayerCanDock = false, c_hole", true)]
@@ -1118,46 +1203,71 @@ public sealed class StartReplayRulesTests
     [InlineData("Act_PlayerCanDock = true", false)]
     [InlineData("Act_PlayerCanDock = false, c_hole\nAct_LockDock = Player, c_hole, lock", false)]
     [InlineData("Act_LockDock = Player, c_gate, lock\nAct_LockDock = Player, c_gate, unlock", false)]
+    [InlineData("Act_PlayerCanDock = false, c_gate\nAct_PlayerCanDock = false, c_hole", true)]
+    [InlineData("Act_PlayerCanDock = false, c_hole\nAct_PlayerCanDock = false, c_gate", false)]
     public void TheDockRulesPickTheJumpObjectOfADeparture(string rules, bool runs)
     {
-        var text = """
-            [Trigger]
-            nickname = c_start
-            InitState = ACTIVE
-            Cnd_True = no_params
-            Act_ActTrig = c_poll
-            Act_ActTrig = c_launch
-
-            [Trigger]
-            nickname = c_poll
-            Cnd_DistVec = inside, Player, 40000, 0, 0, 2000
-
-            [Trigger]
-            nickname = c_launch
-            Cnd_SpaceEnter = c_sys_a
-            {RULES}
-            Act_ActTrig = c_arrive
-
-            [Trigger]
-            nickname = c_arrive
-            Cnd_SystemEnter = c_sys_b
-            Act_ActTrig = c_chosen
-
-            [Trigger]
-            nickname = c_chosen
-            Cnd_Timer = 5
-            """.Replace("{RULES}", rules);
         var world = World(
         [
             Thing("c_gate", "c_sys_a", 0, "c_sys_b"), Thing("c_hole", "c_sys_a", 40000, "c_sys_b"),
             Thing("c_back", "c_sys_b", -90000, "c_sys_a"),
         ]);
 
-        var replay = Replay(text, "c_chosen", world);
+        var replay = Replay(DepartureScript.Replace("{RULES}", rules), "c_chosen", world);
 
         Assert.Equal(StartRefusal.None, replay.Refusal);
         Assert.Equal(!runs, Waiting(replay).Contains("c_poll"));
     }
+
+    /// <summary>
+    /// The same jump, but c_sys_a has only one jump object to c_sys_b: the hole. So the player jumped through the hole,
+    /// also when the dock rules of the replay block it now. The hole shows the player inside the sphere of c_poll, and
+    /// c_poll ran.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("Act_PlayerCanDock = false")]
+    [InlineData("Act_PlayerCanDock = false, c_gate")]
+    [InlineData("Act_LockDock = Player, c_hole, lock")]
+    public void TheOnlyJumpObjectOfADepartureShowsThePlayerAlsoWhenTheDockRulesBlockIt(string rules)
+    {
+        var world = World([Thing("c_hole", "c_sys_a", 40000, "c_sys_b"), Thing("c_back", "c_sys_b", -90000, "c_sys_a")]);
+
+        var replay = Replay(DepartureScript.Replace("{RULES}", rules), "c_chosen", world);
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.DoesNotContain("c_poll", Waiting(replay));
+    }
+
+    /// <summary>A path with a jump from c_sys_a to c_sys_b. The text {RULES} marks the place of the dock rules before the
+    /// jump. The inside poll c_poll waits around the point 40,000 on the x axis.</summary>
+    private const string DepartureScript = """
+        [Trigger]
+        nickname = c_start
+        InitState = ACTIVE
+        Cnd_True = no_params
+        Act_ActTrig = c_poll
+        Act_ActTrig = c_launch
+
+        [Trigger]
+        nickname = c_poll
+        Cnd_DistVec = inside, Player, 40000, 0, 0, 2000
+
+        [Trigger]
+        nickname = c_launch
+        Cnd_SpaceEnter = c_sys_a
+        {RULES}
+        Act_ActTrig = c_arrive
+
+        [Trigger]
+        nickname = c_arrive
+        Cnd_SystemEnter = c_sys_b
+        Act_ActTrig = c_chosen
+
+        [Trigger]
+        nickname = c_chosen
+        Cnd_Timer = 5
+        """;
 
     /// <summary>
     /// The jump places of a jump of the path from h_sys_a to h_sys_b. Before the exit, the player was at h_out, the only
@@ -1269,9 +1379,10 @@ public sealed class StartReplayRulesTests
     /// <summary>
     /// A path condition that waits for the player inside a sphere shows the player within its radius of its center. The
     /// sphere of d_near has a radius of 500. So the inside poll d_in ran: its center is 100 units away, and 100 + 500 is
-    /// less than its radius of 1,000. The inside poll d_edge waits: 600 + 500 is more than 1,000. The outside poll d_out
-    /// ran: 5,000 - 500 is more than 1,000. A Cnd_DistShip of the player and an object of the system files gives the
-    /// same place.
+    /// less than its radius of 1,000. The inside poll d_edge waits: 600 + 500 is more than 1,000. The inside poll d_tie
+    /// also waits: 500 + 500 is exactly 1,000, and each point within the slack must be inside the sphere. The outside
+    /// poll d_out ran: 5,000 - 500 is more than 1,000. A Cnd_DistShip of the player and an object of the system files
+    /// gives the same place.
     /// </summary>
     [Theory]
     [InlineData("Cnd_DistVec = inside, Player, 0, 0, 0, 500")]
@@ -1285,6 +1396,7 @@ public sealed class StartReplayRulesTests
             Cnd_True = no_params
             Act_ActTrig = d_in
             Act_ActTrig = d_edge
+            Act_ActTrig = d_tie
             Act_ActTrig = d_out
             Act_ActTrig = d_near
 
@@ -1295,6 +1407,10 @@ public sealed class StartReplayRulesTests
             [Trigger]
             nickname = d_edge
             Cnd_DistVec = inside, Player, 600, 0, 0, 1000
+
+            [Trigger]
+            nickname = d_tie
+            Cnd_DistVec = inside, Player, 500, 0, 0, 1000
 
             [Trigger]
             nickname = d_out
@@ -1317,17 +1433,22 @@ public sealed class StartReplayRulesTests
         Assert.Equal("d_near", Ran(replay)[^1]);
         Assert.Equal(["d_in", "d_near", "d_out", "d_start"], Ran(replay).Order().ToList());
         Assert.Contains("d_edge", Waiting(replay));
+        Assert.Contains("d_tie", Waiting(replay));
     }
 
     /// <summary>
-    /// A lane entry of the player shows the player within 1,000 units of the ring. The outside poll f_far ran: its center
-    /// is 3,000 units from the ring, and 3,000 - 1,000 is more than its radius of 1,500. The outside poll f_edge waits:
-    /// 2,500 - 1,000 is not more than 1,500. A lane entry of another ship does not show the place of the player.
+    /// A lane entry or a lane exit of the player shows the player within 1,000 units of the ring. The outside poll f_far
+    /// ran: its center is 3,000 units from the ring, and 3,000 - 1,000 is more than its radius of 1,500. The outside poll
+    /// f_edge waits: 2,500 - 1,000 is not more than 1,500. A lane entry of another ship does not show the place of the
+    /// player. A lane exit at ANY ring does not tell the ring.
     /// </summary>
     [Theory]
-    [InlineData("Player", true)]
-    [InlineData("f_wing", false)]
-    public void ALaneEntryOfThePlayerShowsThePlayerNearTheRing(string ship, bool runs)
+    [InlineData("Cnd_TLEntered = Player, f_ring_1, f_ring_2", true)]
+    [InlineData("Cnd_TLExited = Player, f_ring_1, f_ring_2", true)]
+    [InlineData("Cnd_TLExited = Player, f_ring_1", true)]
+    [InlineData("Cnd_TLEntered = f_wing, f_ring_1, f_ring_2", false)]
+    [InlineData("Cnd_TLExited = Player, ANY", false)]
+    public void ALaneEntryOrExitOfThePlayerShowsThePlayerNearTheRing(string lane, bool runs)
     {
         var text = """
             [Trigger]
@@ -1348,13 +1469,13 @@ public sealed class StartReplayRulesTests
 
             [Trigger]
             nickname = f_lane
-            Cnd_TLEntered = {SHIP}, f_ring_1, f_ring_2
+            {LANE}
             Act_ActTrig = f_chosen
 
             [Trigger]
             nickname = f_chosen
             Cnd_Timer = 5
-            """.Replace("{SHIP}", ship);
+            """.Replace("{LANE}", lane);
         var world = World([Thing("f_ring_1", "f_sys", 0), Thing("f_ring_2", "f_sys", 20000)]);
 
         var replay = Replay(text, "f_chosen", world);
