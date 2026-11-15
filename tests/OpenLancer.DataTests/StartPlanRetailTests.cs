@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Run;
@@ -192,14 +194,19 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
     /// script, and they make the plan without the setup check. In both games, the only refused starts are the starts
     /// whose path a stop on another branch breaks. So a rule of the replay that runs a waiting trigger never refuses a
     /// start for a new reason. The test of the world of each approximate start makes the full plans. The test writes
-    /// the counts to its output.
+    /// the counts to its output. It also pins the set of the refused starts by a hash. So a rule that refuses one new
+    /// start and accepts one old refused start does not keep the counts and pass.
     /// </summary>
     [Fact]
     public void NoStartOfAStoryScriptIsRefusedForANewReason()
     {
-        foreach (var (set, scripts, total) in new[] { ("vanilla", Scripts(), 2984), ("hd", Slots(Hde.Value), 2649) })
+        foreach (var (set, scripts, total, refusedHash) in new[]
+                 {
+                     ("vanilla", Scripts(), 2984, "26A02B091370E92D"), ("hd", Slots(Hde.Value), 2649, "26A02B091370E92D"),
+                 })
         {
             var counts = new SortedDictionary<string, int>(StringComparer.Ordinal);
+            var refused = new List<string>();
             foreach (var analysis in scripts)
             {
                 foreach (var trigger in analysis.Index.Triggers.Where(t => !t.IsDuplicate))
@@ -210,13 +217,20 @@ public sealed partial class StartPlanRetailTests(ITestOutputHelper output)
                         $"{set} {analysis.Script.Slot!.Slot} {trigger.Nickname}: {plan.Refusal}, {plan.Reason}");
                     var key = $"{plan.Kind} {plan.Refusal}";
                     counts[key] = counts.GetValueOrDefault(key) + 1;
+                    if (plan.Refusal != StartRefusal.None)
+                        refused.Add($"{analysis.Script.Slot!.Slot} {trigger.Nickname}");
                 }
             }
+
+            refused.Sort(StringComparer.Ordinal);
+            var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", refused))))[..16];
+            output.WriteLine($"{set}: {refused.Count} refused starts, hash {hash}.");
 
             output.WriteLine($"{set}: {counts.Values.Sum()} starts, " +
                              string.Join(", ", counts.Select(c => $"{c.Key} {c.Value}")) + ".");
             Assert.Equal(total, counts.Values.Sum());
             Assert.Equal(251, counts.GetValueOrDefault($"{StartKind.Approximate} {StartRefusal.NotActive}"));
+            Assert.Equal(refusedHash, hash);
         }
     }
 
