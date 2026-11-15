@@ -1835,4 +1835,68 @@ public sealed class StartReplayRulesTests
         Assert.Equal(keeps ? [@"missions\ol\e_intro.ini", @"missions\ol\e_other.ini"] : [@"missions\ol\e_other.ini"],
             plan.State.Scenes.Select(s => s.File));
     }
+
+    /// <summary>
+    /// At the dock x_dock, the waiting space exit x_exit runs first, and it starts the base scene x_intro. The base entry
+    /// plays the scene after it reaches each trigger that waits for it. So the waiting base entry x_peer runs before
+    /// x_done, the trigger of the end of the scene, stops it. At the start of x_chosen, the room entry x_bar comes after
+    /// the dock. So the scene played to its end, x_done ran, and the start save does not play the scene again. At the
+    /// start of x_bar, the scene can still play. So x_done waits, and the start save keeps the scene.
+    /// </summary>
+    [Theory]
+    [InlineData("x_chosen", false)]
+    [InlineData("x_bar", true)]
+    public void TheSceneOfTheSpaceExitOfADockEndsAfterEachRunOfTheBaseEntry(string chosen, bool keeps)
+    {
+        const string text = """
+            [Trigger]
+            nickname = x_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = x_exit
+            Act_ActTrig = x_peer
+            Act_ActTrig = x_dock
+
+            [Trigger]
+            nickname = x_exit
+            Cnd_SpaceExit = no_params
+            Act_AddRTC = missions\ol\x_intro.ini
+            Act_ActTrig = x_done
+
+            [Trigger]
+            nickname = x_done
+            Cnd_RTCDone = missions\ol\x_intro.ini
+            Act_DeactTrig = x_peer
+
+            [Trigger]
+            nickname = x_peer
+            Cnd_BaseEnter = x_base
+
+            [Trigger]
+            nickname = x_dock
+            Cnd_BaseEnter = x_base
+            Act_ActTrig = x_bar
+
+            [Trigger]
+            nickname = x_bar
+            Cnd_LocEnter = x_room, x_base
+            Act_ActTrig = x_chosen
+
+            [Trigger]
+            nickname = x_chosen
+            Cnd_Timer = 5
+            """;
+        var world = World([], ("x_base", "x_sys"));
+
+        var replay = Replay(text, chosen, world);
+        var plan = StartPlan.Make(Index(text, world), StartPlanTests.Slot, MissionStartPoint.At(chosen));
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(keeps
+                ? ["x_start", "x_exit", "x_peer", "x_dock"]
+                : ["x_start", "x_exit", "x_peer", "x_done", "x_dock", "x_bar"],
+            Ran(replay));
+        Assert.True(plan.CanStart, plan.Reason);
+        Assert.Equal(keeps ? [@"missions\ol\x_intro.ini"] : [], plan.State.Scenes.Select(s => s.File));
+    }
 }

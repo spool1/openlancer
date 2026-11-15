@@ -64,9 +64,10 @@ internal sealed partial record StartReplay
     /// <item>The start. The waiting trigger must start before the event. It must start at the first starts of the
     /// replay, or in a run of an earlier trigger of the path. A start by a run of a rule does not count, because the
     /// path does not show when that run came in the game.</item>
-    /// <item>The scenes. A run at a base entry or a room entry can start a base scene. The game plays the scene at once,
-    /// and the player acts again only after its end. So when a later trigger of the path follows, other than the chosen
-    /// trigger, each trigger that waits for the end of that scene ran.</item>
+    /// <item>The scenes. A run at a base entry or a room entry can start a base scene, also a run of the space exit of a
+    /// dock. The game plays such a scene at the base, and the player acts again only after its end. So when a later
+    /// trigger of the path follows, other than the chosen trigger, each trigger that waits for the end of that scene ran.
+    /// These triggers run after all runs of the event.</item>
     /// <item>The limits. Only the conditions of the path show events, not the runs of the rules. The chosen trigger only
     /// starts, so its condition shows no event.</item>
     /// </list></item>

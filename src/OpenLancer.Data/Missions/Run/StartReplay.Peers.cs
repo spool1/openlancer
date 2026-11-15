@@ -19,32 +19,29 @@ internal sealed partial record StartReplay
             var trigger = path[position];
             if (trigger == chosen || trigger.Condition is not { } condition)
                 return;
+            var from = Changes.Count;
             // A dock removes the ship of the player from space before the base entry. So it sends the space exit first.
             if (inSpace != false && Docks(condition) is { } dock)
-                RunPeers(position, rest, waits => LeavesSpace(waits, index.World.SystemOfBase(dock)), false);
+                RunPeers(position, rest, waits => LeavesSpace(waits, index.World.SystemOfBase(dock)));
+            RunPeers(position, rest, waits => SameEvent(condition, waits));
             // The scene rule needs a later trigger of the path other than the chosen trigger, the last trigger of the path.
-            var scenes = (MissionIndex.Is(condition.Key, "Cnd_BaseEnter") || MissionIndex.Is(condition.Key, "Cnd_LocEnter")) &&
-                         position + 1 < path.Count - 1;
-            RunPeers(position, rest, waits => SameEvent(condition, waits), scenes);
+            if ((MissionIndex.Is(condition.Key, "Cnd_BaseEnter") || MissionIndex.Is(condition.Key, "Cnd_LocEnter")) &&
+                position + 1 < path.Count - 1)
+                EndScenes(from, rest);
         }
 
         /// <summary>Runs each waiting trigger that waits for an event and started before it, in the order of the
         /// game.</summary>
         /// <param name="position">The position of the trigger of the path that shows the event.</param>
         /// <param name="waitsFor">True for a condition that waits for the event.</param>
-        /// <param name="scenes">True when the scene rule applies to the runs.</param>
-        private void RunPeers(int position, IReadOnlyList<MissionTrigger> rest, Func<MissionLine, bool> waitsFor,
-            bool scenes)
+        private void RunPeers(int position, IReadOnlyList<MissionTrigger> rest, Func<MissionLine, bool> waitsFor)
         {
             foreach (var waiting in Machine.Active.Concat(Machine.Pending).Distinct().Where(t => Free(t, rest)).ToList())
             {
                 timeline.Sync(Changes);
                 // An earlier run of this loop can stop the trigger.
-                if (!Free(waiting, rest) || !waitsFor(waiting.Condition!) || !StartedBefore(waiting, position))
-                    continue;
-                var count = Changes.Count;
-                if (TryRun([waiting], rest) && scenes)
-                    EndScenes(count, rest);
+                if (Free(waiting, rest) && waitsFor(waiting.Condition!) && StartedBefore(waiting, position))
+                    TryRun([waiting], rest);
             }
         }
 
@@ -54,10 +51,11 @@ internal sealed partial record StartReplay
         private bool StartedBefore(MissionTrigger waiting, int position) =>
             timeline.Started(waiting, out var start) && timeline.PositionOf(start) is { } from && from < position;
 
-        /// <summary>The scene rule. The game plays a base scene at once, and the player acts again only after its end. So
-        /// a later trigger of the path shows that each base scene that the run started played to its end. Each waiting
-        /// trigger of the end of such a scene ran.</summary>
-        /// <param name="from">The number of changes before the run.</param>
+        /// <summary>The scene rule. A base entry plays each base scene that the runs of its event started, also the runs
+        /// of the space exit of the dock. The player acts again only after the end of the scene. So a later trigger of
+        /// the path shows that each such scene played to its end, after each run of the event. Each waiting trigger of
+        /// the end of such a scene ran.</summary>
+        /// <param name="from">The number of changes before the runs of the event.</param>
         private void EndScenes(int from, IReadOnlyList<MissionTrigger> rest)
         {
             var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
