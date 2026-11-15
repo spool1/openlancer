@@ -189,12 +189,10 @@ internal static class StartSetup
     internal static bool[] Keep(MissionIndex index, IReadOnlyList<MissionLine> lines, IReadOnlyList<MissionTrigger> forced)
     {
         var gone = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var condition in forced.Select(t => t.Condition).OfType<MissionLine>())
+        foreach (var trigger in forced)
         {
-            if (Is(condition, "Cnd_Destroyed") && condition.ValueOf("target") is { } target)
+            if (GoneObject(trigger.Condition) is { } target)
                 gone.UnionWith(Members(index, target));
-            else if (Is(condition, "Cnd_LootAcquired") && condition.ValueOf("loot") is { } loot)
-                gone.UnionWith(Members(index, loot));
         }
         // A move of the player is a place line: the start place has its result, so a later move must not undo the place.
         var keep = lines.Select(l => l.Name?.Start is StartRole.World or StartRole.State or StartRole.Save &&
@@ -212,7 +210,7 @@ internal static class StartSetup
             var line = lines[i];
             if (!keep[i])
                 continue;
-            if (Spawns.Any(s => Is(line, s)) && line.Value(0) is { } spawned)
+            if (IsSpawn(line) && line.Value(0) is { } spawned)
             {
                 var made = Members(index, spawned);
                 if (Gone(made, i))
@@ -361,6 +359,18 @@ internal static class StartSetup
                 return name;
         }
     }
+
+    /// <summary>True for a line that spawns an object: a ship, a formation, a solar or a loot. Its first value names the
+    /// object.</summary>
+    internal static bool IsSpawn(MissionLine line) => Spawns.Any(s => Is(line, s));
+
+    /// <summary>The object that a condition waits to leave space, or null: the target of <c>Cnd_Destroyed</c>, or the
+    /// loot of <c>Cnd_LootAcquired</c>.</summary>
+    internal static string? GoneObject(MissionLine? condition) =>
+        condition == null ? null
+        : Is(condition, "Cnd_Destroyed") ? condition.ValueOf("target")
+        : Is(condition, "Cnd_LootAcquired") ? condition.ValueOf("loot")
+        : null;
 
     /// <summary>
     /// The objects that a name of a spawn, a destroy or a condition stands for: the ships of a formation, the members of

@@ -169,7 +169,10 @@ public sealed partial class StartPlanRetailTests
             Assert.DoesNotContain(WorldText(decloak), l => l.Contains("St02c_lair_core", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(decloak.LeftOut, l => l is { Object: "St02c_lair_core", Kind: StartObjectKind.Fuse });
             Assert.Equal([CompanionPoint.Near, CompanionPoint.Near], decloak.Companions.Select(c => c.Point));
-            Assert.Equal(OldWorldText(m12, "decloak_R_wings").Where(l => !l.Contains("St02c_lair_core", StringComparison.Ordinal)),
+            // The spawn rule runs the trigger that spawns the power cell, because the path picks it up. So no line of the
+            // setup makes the power cell, and the lines that mark it or make it invulnerable go.
+            Assert.Equal(OldWorldText(m12, "decloak_R_wings").Where(l => !l.Contains("St02c_lair_core", StringComparison.Ordinal) &&
+                                                                         !l.Contains("power_cell", StringComparison.Ordinal)),
                 WorldText(decloak));
 
             var m13 = Slot(scripts, "M13");
@@ -536,6 +539,25 @@ public sealed partial class StartPlanRetailTests
             var depot = Plan(Slot(scripts, "M04"), "land_on_depot");
             Assert.True(depot.CanStart, $"{set}: {depot.Reason}");
             Assert.Contains("play_M004_s020x_Li01_04_nrml", depot.ActiveSet);
+        }
+    }
+
+    /// <summary>
+    /// The row of the spawn rule of the replay (issue #51) in both games. The path of M12 decloak_R_wings picks up the
+    /// power cell (got_powercell). The game counts only a loot that the mission made, and only
+    /// setNNObj_tractor_in_the_powercell spawns the power cell. So that trigger ran before the pick-up, and it does not
+    /// wait at the start. The play then does not spawn an old power cell.
+    /// </summary>
+    [Fact]
+    public void TheSpawnRuleRunsTheOnlySpawnerOfALootOfThePath()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var decloak = Plan(Slot(scripts, "M12"), "decloak_R_wings");
+            Assert.True(decloak.CanStart, $"{set}: {decloak.Reason}");
+            Assert.Contains("got_powercell", decloak.Path);
+            Assert.DoesNotContain("setNNObj_tractor_in_the_powercell", decloak.ActiveSet);
+            Assert.DoesNotContain(World(decloak), l => l.Values.Count > 0 && l.Values[0] == "power_cell");
         }
     }
 

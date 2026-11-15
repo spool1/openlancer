@@ -1899,4 +1899,115 @@ public sealed class StartReplayRulesTests
         Assert.True(plan.CanStart, plan.Reason);
         Assert.Equal(keeps ? [@"missions\ol\x_intro.ini"] : [], plan.State.Scenes.Select(s => s.File));
     }
+
+    /// <summary>
+    /// The path trigger s_grab waits for the pick-up of the loot s_cell. The game counts only a loot that the mission
+    /// made, so s_cell existed before s_grab. When only the waiting trigger s_drop spawns it, s_drop ran before s_grab,
+    /// and it does not wait at the start (issue #51). When two waiting triggers can spawn it, the path does not show
+    /// which one ran, so both wait. When the path made the loot, s_drop waits too.
+    /// </summary>
+    [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    public void APathPickUpOfALootRunsItsOnlySpawner(bool twoSpawners, bool pathMakes, bool runs)
+    {
+        var text = """
+            [MsnLoot]
+            nickname = s_cell
+
+            [Trigger]
+            nickname = s_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            {MAKE}
+            Act_ActTrig = s_drop
+            Act_ActTrig = s_drop_2
+            Act_ActTrig = s_grab
+
+            [Trigger]
+            nickname = s_drop
+            Cnd_CommComplete = s_line
+            Act_SpawnLoot = s_cell
+
+            [Trigger]
+            nickname = s_drop_2
+            Cnd_CommComplete = s_other_line
+            {SECOND}
+
+            [Trigger]
+            nickname = s_grab
+            Cnd_LootAcquired = s_cell, Player
+            Act_ActTrig = s_chosen
+
+            [Trigger]
+            nickname = s_chosen
+            Cnd_Timer = 5
+            """.Replace("{MAKE}", pathMakes ? "Act_SpawnLoot = s_cell" : "")
+            .Replace("{SECOND}", twoSpawners ? "Act_SpawnLoot = s_cell" : "Act_SpawnSolar = s_buoy");
+
+        var replay = Replay(text, "s_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(runs ? ["s_start", "s_drop", "s_grab"] : ["s_start", "s_grab"], Ran(replay));
+        Assert.Equal(!runs, Waiting(replay).Contains("s_drop"));
+        Assert.Contains("s_drop_2", Waiting(replay));
+    }
+
+    /// <summary>
+    /// The path trigger k_kill waits for ships of the label k_group to be destroyed, and the path made only k_a. The count
+    /// of the condition tells how many ships the mission made at least. A count of 2 or more needs a second ship, so the
+    /// only waiting trigger that spawns one, k_more, ran before k_kill. A count above the number of ships needs each
+    /// ship. A count of -1 waits for the last ship, and no count does the same. They need only one ship, so k_more
+    /// waits.
+    /// </summary>
+    [Theory]
+    [InlineData(", 2", true)]
+    [InlineData(", 5", true)]
+    [InlineData(", 1", false)]
+    [InlineData(", -1", false)]
+    [InlineData("", false)]
+    public void ACountOfAPathDestroyGivesTheNumberOfShipsThatItNeeds(string count, bool runs)
+    {
+        var text = """
+            [MsnShip]
+            nickname = k_a
+            label = k_group
+
+            [MsnShip]
+            nickname = k_b
+            label = k_group
+
+            [MsnShip]
+            nickname = k_c
+            label = k_group
+
+            [Trigger]
+            nickname = k_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_SpawnShip = k_a
+            Act_ActTrig = k_more
+            Act_ActTrig = k_kill
+
+            [Trigger]
+            nickname = k_more
+            Cnd_CommComplete = k_line
+            Act_SpawnShip = k_b
+
+            [Trigger]
+            nickname = k_kill
+            Cnd_Destroyed = k_group{COUNT}
+            Act_ActTrig = k_chosen
+
+            [Trigger]
+            nickname = k_chosen
+            Cnd_Timer = 5
+            """.Replace("{COUNT}", count);
+
+        var replay = Replay(text, "k_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(runs ? ["k_start", "k_more", "k_kill"] : ["k_start", "k_kill"], Ran(replay));
+    }
 }

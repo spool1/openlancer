@@ -11,8 +11,8 @@ internal sealed partial record StartReplay
     /// 2026-10-28, issue #46). The replay has no world and no time. So a trigger that waits for the world or for a time
     /// stays active, also when the game ran it long before the chosen trigger. These rules run such a trigger at the point
     /// where the path shows its event. The rules run in this order before each trigger of the path: timers, objectives,
-    /// the early space test, systems, launch, peer events, polls, and timers again. Then the trigger of the path runs, and
-    /// the space test follows.
+    /// the early space test, systems, launch, peer events, spawns, polls, and timers again. Then the trigger of the path
+    /// runs, and the space test follows.
     /// <list type="bullet">
     /// <item>Timers (issue #46). A waiting timer ran when the path shows that at least its time passed since its start.
     /// All timers count on the same heartbeats.
@@ -88,6 +88,11 @@ internal sealed partial record StartReplay
     /// than the system where it runs. Before the first condition that names a system, the newest system key of the path
     /// gives the old system. The condition of the chosen trigger does not count, because the chosen trigger only
     /// starts.</item>
+    /// <item>Spawns (issue #51). The game counts a destroyed object or a picked-up loot only for an object that the
+    /// mission made. So a trigger of the path that waits for Cnd_Destroyed or Cnd_LootAcquired shows that the mission
+    /// made the objects of its target. The count of the condition gives the number of objects that it needs. A count below
+    /// 1 or no count needs one object. When the replay made fewer of them, and only one waiting trigger has a spawn line
+    /// of a missing object, that trigger ran before.</item>
     /// <item>Polls (issue #50). The game tests a distance condition of the player at each heartbeat. So a waiting poll
     /// ran when the path shows the player on its true side.
     /// <list type="bullet">
@@ -199,6 +204,7 @@ internal sealed partial record StartReplay
                 Arrival(position);
             Launch(trigger, rest);
             Peers(position, rest);
+            Spawns(position, rest);
             Polls(position, rest);
             // Again after the other rules: their runs can show more time.
             Timers(position, rest);
