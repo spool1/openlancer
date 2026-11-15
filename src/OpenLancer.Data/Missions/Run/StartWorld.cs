@@ -922,9 +922,8 @@ internal static class StartWorld
                    !MissionIndex.Is(item.System, anchor.System);
         }
 
-        private bool IsLabel(string name) =>
-            index.Labels.ContainsKey(name) && index.Item(MissionSectionKind.Ship, name) == null &&
-            index.Item(MissionSectionKind.Formation, name) == null;
+        /// <summary>True for a label that no object of the script has as its name (see <see cref="Members"/>).</summary>
+        private bool IsLabel(string name) => index.Labels.ContainsKey(name) && ItemKindOf(name) == null;
 
         /// <summary>The names of the objects in a line, without the player. The target of <c>Act_NagDistTowards</c> with
         /// the form OBJ is an object too, but its spec cannot tell it.</summary>
@@ -1098,7 +1097,13 @@ internal static class StartWorld
             Members(name).Append(name.Trim()).Select(m => byMember.GetValueOrDefault(m)).OfType<Unit>()
                 .Where(u => !u.Destroyed).Distinct();
 
-        private IReadOnlySet<string> Members(string name) => StartSetup.Members(index, name);
+        /// <summary>The objects that a name of a world line stands for (see <see cref="StartSetup.Members"/>). A world line
+        /// names a solar or a loot by its nickname, so such a name is that object, also when a label has the same
+        /// name.</summary>
+        private IReadOnlySet<string> Members(string name) =>
+            ItemKindOf(name) is StartObjectKind.Solar or StartObjectKind.Loot
+                ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) { name.Trim() }
+                : StartSetup.Members(index, name);
 
         private StartObjectKind KindOf(Entry entry, string name) => entry switch
         {

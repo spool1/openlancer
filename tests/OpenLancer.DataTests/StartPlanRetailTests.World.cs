@@ -268,8 +268,11 @@ public sealed partial class StartPlanRetailTests
                         Assert.Equal(OldWorldText(analysis, trigger.Nickname), WorldText(plan));
                         continue;
                     }
+                    // A left-out solar or loot is only that object, also when a label has its name.
                     var outside = plan.LeftOut.Where(l => l.Kind != StartObjectKind.Fuse)
-                        .SelectMany(l => StartSetup.Members(index, l.Object).Append(l.Object))
+                        .SelectMany(l => l.Kind is StartObjectKind.Ship or StartObjectKind.Formation
+                            ? StartSetup.Members(index, l.Object).Append(l.Object)
+                            : new[] { l.Object })
                         .ToHashSet(StringComparer.OrdinalIgnoreCase);
                     foreach (var (key, values) in world)
                     {

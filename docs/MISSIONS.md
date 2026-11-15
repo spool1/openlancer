@@ -324,7 +324,7 @@ The editor follows each object along the path:
 - In the game, the arrival of such a ship then runs each trigger that waits for it (Cnd_NPCSystemEnter). Such a trigger can give the ship new orders. The play makes the ship in the start system, so a trigger of the start that waits for its arrival does not run. The setup gives the orders of that trigger to each ship that came with the player and got no orders after the arrival. These lines come after the other world lines.
 - An object whose system no line tells stays in the setup.
 
-The setup leaves out each object that is in another system at the trigger. It also removes each line that names such an object, for example orders, attitudes, marks and fuses. A label with a member in the start system keeps its lines. A line on an object that no line of the setup makes goes too, because it fails in the game.
+The setup leaves out each object that is in another system at the trigger. It also removes each line that names such an object, for example orders, attitudes, marks and fuses. A label with a member in the start system keeps its lines. A name of a solar or a loot is that object, also when a label has the same name. A line on an object that no line of the setup makes goes too, because it fails in the game.
 
 An object that the path destroys before the trigger of the start does not exist at the start. So its spawn line and its destroy line go. Each move of the object before the destroy goes too, because a move makes a ship that does not exist. When the path spawns an object two times, only the last spawn line stays. The lines between the two spawn lines that name the object go too.
 

@@ -384,6 +384,35 @@ public sealed class StartWorldTests
         Assert.DoesNotContain(destroyed, l => l.StartsWith("Act_Destroy", StringComparison.Ordinal));
     }
 
+    /// <summary>A label can have the name of a solar. A world line names the solar by its nickname, so the spawn line
+    /// and the attitude line name only that solar, not the other solar of the label. The solar of the first system is
+    /// left out with its lines, and the setup makes the other solar in the start system.</summary>
+    [Fact]
+    public void ASolarWithTheNameOfALabelIsOnlyThatSolar()
+    {
+        var plan = Plan(Script(a: """
+            Act_SpawnSolar = ol_plat
+            Act_SetVibe = ol_plat, Player, REP_HOSTILE_MAXIMUM
+            """, jump: "Act_SpawnSolar = ol_plat_b", records: """
+            [MsnSolar]
+            nickname = ol_plat
+            position = 2000, 0, 2000
+            label = ol_plat
+
+            [MsnSolar]
+            nickname = ol_plat_b
+            position = 11000, 0, 11000
+            label = ol_plat
+            """));
+        var lines = WorldLines(plan);
+
+        Assert.Contains("Act_SpawnSolar = ol_plat_b", lines);
+        Assert.DoesNotContain(lines, l => l.Contains("ol_plat,", StringComparison.Ordinal) ||
+                                          l.EndsWith("= ol_plat", StringComparison.Ordinal));
+        Assert.Contains(plan.LeftOut, l => l is { Object: "ol_plat", Kind: StartObjectKind.Solar, System: "ol_sys_a" });
+        Assert.DoesNotContain(plan.LeftOut, l => l.Object == "ol_plat_b");
+    }
+
     // Group 4: the signs of a companion (rule 7).
 
     /// <summary>Each sign alone makes a companion: orders that follow the player, the formation of the player, a jump
