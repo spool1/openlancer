@@ -134,15 +134,19 @@ public sealed class StartReplayRulesTests
     /// jumper into the new system 3 s after the player. So the arrival of jumpers on the path shows 3 s after the
     /// trigger before the jump, and the 3 s timer ran. The 4 s timer still waits. A ship that is not a jumper gives no
     /// time, also when an Act_Jumper line of the path turns its flag off. A condition that also waits for a ship that is
-    /// not a jumper gives no time either, because that ship can arrive later.
+    /// not a jumper gives no time either, because that ship can arrive later. The world knows only n_sys_a and n_sys_b.
+    /// So an entry of ships into n_sys_c does not show an arrival of the player, and it gives no time. ANY names each
+    /// system, so it gives the 3 s.
     /// </summary>
     [Theory]
-    [InlineData("n_wing", "", true)]
-    [InlineData("n_slow", "", false)]
-    [InlineData("n_wing, n_slow", "", false)]
-    [InlineData("n_wing", "Act_Jumper = n_wing, false", false)]
-    [InlineData("n_slow", "Act_Jumper = n_slow, true", true)]
-    public void AnArrivalOfJumpersOnThePathShowsThreeSeconds(string ships, string launch, bool runs)
+    [InlineData("n_sys_b, n_wing", "", true)]
+    [InlineData("n_sys_b, n_slow", "", false)]
+    [InlineData("n_sys_b, n_wing, n_slow", "", false)]
+    [InlineData("n_sys_b, n_wing", "Act_Jumper = n_wing, false", false)]
+    [InlineData("n_sys_b, n_slow", "Act_Jumper = n_slow, true", true)]
+    [InlineData("n_sys_c, n_wing", "", false)]
+    [InlineData("ANY, n_wing", "", true)]
+    public void AnArrivalOfJumpersOnThePathShowsThreeSeconds(string arrival, string launch, bool runs)
     {
         var text = """
             [MsnShip]
@@ -181,15 +185,15 @@ public sealed class StartReplayRulesTests
 
             [Trigger]
             nickname = n_ships_in
-            Cnd_NPCSystemEnter = n_sys_b, {SHIPS}
+            Cnd_NPCSystemEnter = {ARRIVAL}
             Act_ActTrig = n_chosen
 
             [Trigger]
             nickname = n_chosen
             Cnd_Timer = 5
-            """.Replace("{SHIPS}", ships).Replace("{LAUNCH}", launch);
+            """.Replace("{ARRIVAL}", arrival).Replace("{LAUNCH}", launch);
 
-        var replay = Replay(text, "n_chosen");
+        var replay = Replay(text, "n_chosen", World([], ("n_base_a", "n_sys_a"), ("n_base_b", "n_sys_b")));
 
         Assert.Equal(StartRefusal.None, replay.Refusal);
         Assert.Equal(!runs, Waiting(replay).Contains("n_three"));
@@ -2124,7 +2128,8 @@ public sealed class StartReplayRulesTests
     /// The fail guards of a path that jumps from g_sys_a to g_sys_b. g_guard started before the jump, and a chain of two
     /// starts leads from it to the mission fail. So the replay stops it without its actions, and its buoy does not
     /// spawn. g_long needs a chain of three starts, the repeatable g_repeat can run again, g_event is not a timer, and
-    /// g_here started after the jump. So they still wait. A path without a jump keeps each guard.
+    /// g_here started after the jump. A chain of one start leads from g_win to the mission success, not to a fail. So
+    /// they still wait. A path without a jump keeps each guard.
     /// </summary>
     [Theory]
     [InlineData("g_sys_b", false)]
@@ -2140,7 +2145,18 @@ public sealed class StartReplayRulesTests
             Act_ActTrig = g_long
             Act_ActTrig = g_repeat
             Act_ActTrig = g_event
+            Act_ActTrig = g_win
             Act_ActTrig = g_launch
+
+            [Trigger]
+            nickname = g_win
+            Cnd_Timer = 100
+            Act_ActTrig = g_won
+
+            [Trigger]
+            nickname = g_won
+            Cnd_True = no_params
+            Act_ChangeState = SUCCEED
 
             [Trigger]
             nickname = g_guard
@@ -2212,7 +2228,7 @@ public sealed class StartReplayRulesTests
         Assert.DoesNotContain(replay.Effects, e => e.Line.Value(0) == "g_buoy");
         Assert.Equal(keeps, Waiting(replay).Contains("g_guard"));
         Assert.Equal(keeps ? 0 : 1, replay.Jumps.Count);
-        foreach (var stays in new[] { "g_long", "g_repeat", "g_event", "g_here" })
+        foreach (var stays in new[] { "g_long", "g_repeat", "g_event", "g_win", "g_here" })
             Assert.Contains(stays, Waiting(replay));
     }
 
