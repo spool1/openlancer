@@ -461,8 +461,8 @@ internal static class StartWorld
             }
         }
 
-        /// <summary>Removes an earlier spawn line of an object that a later line makes again, with each line between the
-        /// two lines that names the object directly (rule 4).</summary>
+        /// <summary>Removes an earlier spawn line of an object that a later line makes again (rule 4). Each line between
+        /// the two lines that names the object directly goes too.</summary>
         private void Replace(Entry earlier, Entry later, string name, IReadOnlySet<string> members)
         {
             earlier.Removed = true;
@@ -1146,7 +1146,7 @@ internal static class StartWorld
                 .Where(u => u.Live).Distinct();
 
         /// <summary>The objects that a name of a world line stands for (see <see cref="StartSetup.Members"/>). A world line
-        /// names a solar or a loot by its nickname, so such a name is that object, also when a label has the same
+        /// names a solar or a loot by its nickname. So such a name is that object, also when a label has the same
         /// name.</summary>
         private IReadOnlySet<string> Members(string name) =>
             ItemKindOf(name) is StartObjectKind.Solar or StartObjectKind.Loot

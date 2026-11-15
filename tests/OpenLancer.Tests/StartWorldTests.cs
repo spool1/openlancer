@@ -443,8 +443,8 @@ public sealed class StartWorldTests
 
     /// <summary>A spawn line with another name can make ships of an older formation again. The new object takes these
     /// ships, and the older formation keeps the other ships. When it keeps a ship in the first system, the page lists it
-    /// as left out, and the setup still makes the new ship in the start system. When it keeps no ship, it is gone, so
-    /// the page does not list it.</summary>
+    /// as left out. The setup still makes the new ship in the start system. When the older formation keeps no ship, it
+    /// is gone, so the page does not list it.</summary>
     [Fact]
     public void ASpawnWithAnotherNameTakesTheShipsOfTheOlderFormation()
     {
@@ -467,7 +467,7 @@ public sealed class StartWorldTests
         Assert.DoesNotContain(formation.LeftOut, l => l.Object == "ol_form_a");
     }
 
-    /// <summary>A label can have the name of a solar. A world line names the solar by its nickname, so the spawn line
+    /// <summary>A label can have the name of a solar. A world line names the solar by its nickname. So the spawn line
     /// and the attitude line name only that solar, not the other solar of the label. The solar of the first system is
     /// left out with its lines, and the setup makes the other solar in the start system.</summary>
     [Fact]
