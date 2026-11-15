@@ -580,7 +580,8 @@ public sealed class ThnNameGateTests
     /// <summary>
     /// The first agent INI edit of a session can make the game build the COMPOUNDs of a script of space. An armor whose
     /// <c>DA_archetype</c> names the script is a use that is not <c>Act_CallThorn</c>. The commit checks run before the
-    /// batch adds its files to the edited files. So the checks also read the INI files of the open batch. The result
+    /// batch adds its files to the files that a command changed. So the checks also read the INI files of the open
+    /// batch. The result
     /// gives the problem in <c>new_problems</c>, as the save gate gives it after the commit. A preview gives the same
     /// problem, and the cutscene has no problem after it.
     /// </summary>
@@ -612,17 +613,22 @@ public sealed class ThnNameGateTests
     }
 
     /// <summary>
-    /// The check before an agent mission request also reads the mission script of the open batch. The request sets the
-    /// only <c>Act_CallThorn</c> line of a script of space to another script, so the game builds the COMPOUNDs of the
-    /// script. The session did not change the mission script before, and the result gives the problem in
-    /// <c>new_problems</c>.
+    /// The check before an agent mission request also reads the mission script of the open batch. An earlier session
+    /// saved the patch of the script of space. So this session changed neither the cutscene nor the mission script. The
+    /// request sets the only <c>Act_CallThorn</c> line of the script of space to another script, so the game builds the
+    /// COMPOUNDs of the script. The result gives the problem in <c>new_problems</c>.
     /// </summary>
     [Fact]
     public void AnAgentMissionRequestThatMovesTheTriggerOfSpaceGivesTheProblem()
     {
         using var ws = ThnDataWorkspace.Create();
+        using (var earlier = ws.Session("act"))
+        {
+            ThnDataWorkspace.SetTemplate(earlier, "Ship", "ghost_ship", ThnDataWorkspace.SpaceScript);
+            AssertSaved(earlier.Save());
+        }
         var session = ws.Session("act");
-        ThnDataWorkspace.SetTemplate(session, "Ship", "ghost_ship", ThnDataWorkspace.SpaceScript);
+        Assert.Empty(session.EditedPaths);
         Assert.Empty(Errors(session, ThnDataWorkspace.SpaceScript));
         var host = new TestAgentHost(session);
         var line = AgentCalls.Json($"line:{ThnDataWorkspace.MissionPath}#Trigger/t1/1");

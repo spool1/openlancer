@@ -276,8 +276,9 @@ public sealed partial class EditSession
 
     /// <summary>
     /// The INI files that a command changed, and their lines of W that name cutscenes. The files of the open transaction
-    /// or the open batch count too. They go into the edited files only at the commit, and the commit checks of a batch
-    /// run before it. So the result of the first agent INI edit of a session gives the same problems as the save gate.
+    /// or the open batch count too. A transaction or a batch adds its files to the files that a command changed only at
+    /// its commit. The commit checks of a batch run before the commit. So the result of the first agent INI edit of a
+    /// session gives the same problems as the save gate.
     /// A file that W does not have, for example after the undo of a new file, has no lines.
     /// </summary>
     private (HashSet<string> Files, ThnReferences References) ChangedIniReferences()
