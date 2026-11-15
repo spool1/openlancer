@@ -256,11 +256,15 @@ internal static class StartWorld
     /// <summary>One object of the setup: a ship, a formation, a solar or a loot, with its track.</summary>
     private sealed class Unit(string name, StartObjectKind kind, IReadOnlySet<string> members, Entry spawn)
     {
+        private readonly HashSet<string> left = new(members, StringComparer.OrdinalIgnoreCase);
+
         public string Name { get; } = name;
 
         public StartObjectKind Kind { get; } = kind;
 
-        public IReadOnlySet<string> Members { get; } = members;
+        /// <summary>The members that no newer object took (see <see cref="Take"/>): the ships of a formation, else the
+        /// object itself.</summary>
+        public IReadOnlySet<string> Members => left;
 
         public Entry Spawn { get; } = spawn;
 
@@ -306,6 +310,23 @@ internal static class StartWorld
 
         /// <summary>True when a destroy line names the object, or when the destroy lines name each of its members.</summary>
         public bool Destroyed => Lost.Contains(Name) || Members.Count > 0 && Members.All(Lost.Contains);
+
+        /// <summary>True when newer objects took each member of the object. Then the object does not exist.</summary>
+        public bool Gone { get; private set; }
+
+        /// <summary>True when the object exists: it is not destroyed and not gone.</summary>
+        public bool Live => !Destroyed && !Gone;
+
+        /// <summary>Takes a member from the object, because a newer object makes that ship again. This is not a destroy,
+        /// so <see cref="Lost"/> does not change.</summary>
+        /// <returns>True when the object had the member.</returns>
+        public bool Take(string member)
+        {
+            if (!left.Remove(member))
+                return false;
+            Gone = left.Count == 0;
+            return true;
+        }
     }
 
     private sealed class Builder(MissionIndex index, StartReplay replay, IReadOnlyList<bool> keep, StartAnchor anchor)
@@ -334,7 +355,7 @@ internal static class StartWorld
             MadeAgain();
             var arrivals = ArrivalOrders();
             var companions = Companions();
-            var leftOut = units.Where(u => !u.Destroyed && (!InStart(u.System) || u.Again != null)).ToList();
+            var leftOut = units.Where(u => u.Live && (!InStart(u.System) || u.Again != null)).ToList();
             foreach (var unit in leftOut)
                 leftOutMembers.UnionWith(unit.Members.Append(unit.Name));
             var rows = new List<LeftOutObject>();
@@ -365,7 +386,7 @@ internal static class StartWorld
         /// </summary>
         private bool Combat(IEnumerable<Unit> companions)
         {
-            var made = spawned.Where(p => !p.Key.Removed && !p.Value.Destroyed).Select(p => p.Value).Distinct().ToList();
+            var made = spawned.Where(p => !p.Key.Removed && p.Value.Live).Select(p => p.Value).Distinct().ToList();
             // Only the members that live count. A formation that lost one ship can still fight with its other ships.
             if (made.Any(u => u.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&
                               u.LiveMembers.Append(u.Name).Any(facts.Hostile.Contains)))
@@ -417,7 +438,9 @@ internal static class StartWorld
         /// <summary>
         /// Rule 4: a second spawn line of an object makes a new object. The replay has no world, so it does not see that
         /// the first object left space. The earlier spawn line goes, with each line between the two spawn lines that
-        /// names the object. A line that names it only through a label stays.
+        /// names the object. A line that names it only through a label stays. A destroy line between that names the
+        /// object keeps the earlier spawn line here. When the destroy lines leave ships of the object, the track decides
+        /// later (see <see cref="Add"/>).
         /// </summary>
         private void DoubleSpawns()
         {
@@ -429,17 +452,23 @@ internal static class StartWorld
                 if (last.TryGetValue(name, out var earlier) && !earlier.Removed)
                 {
                     var members = Members(name);
-                    var between = entries.Skip(earlier.At + 1).Take(entry.At - earlier.At - 1).ToList();
-                    if (!between.Any(e => !e.Removed && e.Is("Act_Destroy") && e.Line.Value(0) is { } target &&
-                                          Members(target).Overlaps(members)))
-                    {
-                        earlier.Removed = true;
-                        foreach (var line in between.Where(e => NamesDirectly(e.Line, name, members)))
-                            line.Removed = true;
-                    }
+                    if (!entries.Skip(earlier.At + 1).Take(entry.At - earlier.At - 1).Any(e =>
+                            !e.Removed && e.Is("Act_Destroy") && e.Line.Value(0) is { } target &&
+                            Members(target).Overlaps(members)))
+                        Replace(earlier, entry, name, members);
                 }
                 last[name] = entry;
             }
+        }
+
+        /// <summary>Removes an earlier spawn line of an object that a later line makes again, with each line between the
+        /// two lines that names the object directly (rule 4).</summary>
+        private void Replace(Entry earlier, Entry later, string name, IReadOnlySet<string> members)
+        {
+            earlier.Removed = true;
+            foreach (var line in entries.Skip(earlier.At + 1).Take(later.At - earlier.At - 1)
+                         .Where(e => NamesDirectly(e.Line, name, members)))
+                line.Removed = true;
         }
 
         /// <summary>True when a line names an object by its own name or by the name of a member, not through a
@@ -449,7 +478,8 @@ internal static class StartWorld
 
         /// <summary>
         /// Rule 3: the track of each object. A spawn line makes it in the system of its record, else in the system of the
-        /// player. A solar and a loot always go to the system of the player. <c>Act_RelocateShip</c> moves it into the
+        /// player. A solar and a loot always go to the system of the player. A spawn line that makes a ship of an older
+        /// object again takes the ship from that object (see <see cref="Add"/>). <c>Act_RelocateShip</c> moves it into the
         /// system of the player, and makes it when it does not exist, as the fork does. At a jump of the player, each
         /// object in the old system whose jumper flag is on goes to the new system without a point. At the arrival after a
         /// jump that a condition shows, each jumper loses its orders.
@@ -512,7 +542,7 @@ internal static class StartWorld
             // Act_SpawnShipRel can give the new ship a new nickname. Later lines name the ship by it.
             if (entry.Is("Act_SpawnShipRel") && line.ValueOf("newName")?.Trim() is { Length: > 0 } renamed)
                 (name, members) = (renamed, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { renamed });
-            var unit = new Unit(name, kind, members, entry)
+            Add(new Unit(name, kind, members, entry)
             {
                 System = kind is StartObjectKind.Ship or StartObjectKind.Formation
                     ? Known(Text(record, "system")) ?? entry.System
@@ -520,12 +550,7 @@ internal static class StartWorld
                 Point = entry.Is("Act_SpawnShipRel") ? null : Numbers(line, "position") ?? RecordPoint(record),
                 Turn = Turn(line),
                 Orders = orders,
-            };
-            units.Add(unit);
-            spawned[entry] = unit;
-            foreach (var member in members.Append(name))
-                byMember[member] = unit;
-            madeMembers.UnionWith(members.Append(name));
+            });
         }
 
         private void Move(Entry entry, string name)
@@ -535,11 +560,7 @@ internal static class StartWorld
             {
                 // The fork makes a mission ship that does not exist at the point of the line.
                 var unit = new Unit(name, StartObjectKind.Ship, Members(name), entry) { Orders = InitialOrders(Members(name)) };
-                units.Add(unit);
-                spawned[entry] = unit;
-                foreach (var member in unit.Members.Append(name))
-                    byMember[member] = unit;
-                madeMembers.UnionWith(unit.Members.Append(name));
+                Add(unit);
                 targets.Add(unit);
             }
             foreach (var unit in targets)
@@ -552,11 +573,38 @@ internal static class StartWorld
             }
         }
 
+        /// <summary>
+        /// Adds the object of a spawn line, or of a move that makes a ship. The new object takes each of its ships from
+        /// the older object that has the ship, because the game makes that ship again. The scripts make a ship again only
+        /// after the first ship left space. An older object with no ship left is gone. Its spawn line goes too, as in rule
+        /// 4.
+        /// </summary>
+        private void Add(Unit unit)
+        {
+            units.Add(unit);
+            spawned[unit.Spawn] = unit;
+            var names = unit.Members.Append(unit.Name).ToList();
+            foreach (var older in names.Select(n => byMember.GetValueOrDefault(n)).OfType<Unit>().Distinct().ToList())
+            {
+                var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var name in names)
+                {
+                    if (older.Take(name))
+                        taken.Add(name);
+                }
+                if (older.Gone && taken.Count > 0)
+                    Replace(older.Spawn, unit.Spawn, older.Name, taken);
+            }
+            foreach (var name in names)
+                byMember[name] = unit;
+            madeMembers.UnionWith(names);
+        }
+
         /// <summary>A jump of the player: each live object whose jumper flag is on goes with the player, from any system.
         /// Retail takes each such ship out of its system at the jump and puts it at the arrival gate.</summary>
         private void Jump(string from, string to)
         {
-            foreach (var unit in units.Where(u => !u.Destroyed && IsJumper(u)))
+            foreach (var unit in units.Where(u => u.Live && IsJumper(u)))
             {
                 unit.JumpedFrom = unit.System ?? from;
                 unit.System = to;
@@ -569,7 +617,7 @@ internal static class StartWorld
         /// <param name="before">The number of kept world lines before the arrival.</param>
         private void Arrive(int before)
         {
-            foreach (var unit in units.Where(u => !u.Destroyed && IsJumper(u)))
+            foreach (var unit in units.Where(u => u.Live && IsJumper(u)))
                 unit.CancelledBefore = before;
         }
 
@@ -671,7 +719,7 @@ internal static class StartWorld
                     if (action.Value(0) is not { } name)
                         continue;
                     var members = Members(name).Append(name.Trim()).ToList();
-                    var targets = units.Where(u => !u.Destroyed && u.Again == null && InStart(u.System) &&
+                    var targets = units.Where(u => u.Live && u.Again == null && InStart(u.System) &&
                                                    u.Members.Append(u.Name).Any(members.Contains)).ToList();
                     if (MissionIndex.Is(action.Key, "Act_Destroy"))
                     {
@@ -738,7 +786,7 @@ internal static class StartWorld
         /// </summary>
         private List<(Unit Unit, CompanionSigns Signs)> Companions()
         {
-            var candidates = units.Where(u => !u.Destroyed && u.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&
+            var candidates = units.Where(u => u.Live && u.Kind is StartObjectKind.Ship or StartObjectKind.Formation &&
                                               InStart(u.System) && u.Again == null && u.Leaves == null &&
                                               !u.Members.Append(u.Name).Any(facts.Hostile.Contains))
                 .ToList();
@@ -1095,7 +1143,7 @@ internal static class StartWorld
 
         private IEnumerable<Unit> UnitsOf(string name) =>
             Members(name).Append(name.Trim()).Select(m => byMember.GetValueOrDefault(m)).OfType<Unit>()
-                .Where(u => !u.Destroyed).Distinct();
+                .Where(u => u.Live).Distinct();
 
         /// <summary>The objects that a name of a world line stands for (see <see cref="StartSetup.Members"/>). A world line
         /// names a solar or a loot by its nickname, so such a name is that object, also when a label has the same

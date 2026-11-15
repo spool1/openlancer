@@ -328,6 +328,8 @@ The setup leaves out each object that is in another system at the trigger. It al
 
 An object that the path destroys before the trigger of the start does not exist at the start. So its spawn line and its destroy line go. Each move of the object before the destroy goes too, because a move makes a ship that does not exist. When the path spawns an object two times, only the last spawn line stays. The lines between the two spawn lines that name the object go too.
 
+A later spawn line can make ships of an older formation again, also when the formation lost one ship before. The new object takes these ships, and the older formation keeps only its other ships. When it keeps no ship, it does not exist at the start. Then its spawn line goes too, with the lines between that name it or its ships.
+
 A trigger that runs at the start can spawn an object of the setup again. Such triggers wait for nothing, for the launch, for the entry to space or for a timer. For a base start, they can also wait for the end of the launch or for the base. The scripts spawn an object again only after the first object left space. So the setup leaves out the old object, and the page names the trigger that makes it again.
 
 Such a trigger can also destroy an object of the setup and not spawn it again. That object does not travel with the player, because it leaves soon after the start. An old timer of the start does not make the objects of a trigger again when the path already ran that trigger. A timer whose time the path does not show still waits at the start, also when the game ran it long before.

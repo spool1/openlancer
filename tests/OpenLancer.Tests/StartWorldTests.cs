@@ -384,6 +384,89 @@ public sealed class StartWorldTests
         Assert.DoesNotContain(destroyed, l => l.StartsWith("Act_Destroy", StringComparison.Ordinal));
     }
 
+    /// <summary>Issue #78, first case: a formation of the first system loses one ship, and a trigger of the start system
+    /// spawns it again. The new formation takes both ships, so the old formation is gone. The setup makes the new
+    /// formation, it travels with the player one time, and the page does not list the old formation as left out. The
+    /// destroy line of the old ship goes, because the new formation makes that ship again.</summary>
+    [Fact]
+    public void AFormationThatSpawnsAgainAfterALossInAnotherSystemIsMade()
+    {
+        var plan = Plan(Script(a: "Act_Destroy = ol_f1, SILENT", jump: """
+            Act_SpawnFormation = ol_form_a
+            Act_GiveObjList = ol_form_a, ol_follow
+            """));
+        var lines = WorldLines(plan);
+
+        Assert.Single(lines, l => l.StartsWith("Act_SpawnFormation = ol_form_a", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, l => l.Contains("ol_f1", StringComparison.Ordinal));
+        Assert.Equal(CompanionSigns.Orders, Companion(plan, "ol_form_a").Signs);
+        Assert.DoesNotContain(plan.LeftOut, l => l.Object is "ol_form_a" or "ol_f1" or "ol_f2");
+    }
+
+    /// <summary>A formation of two ships for the second system.</summary>
+    private const string FormationB = """
+        [MsnShip]
+        nickname = ol_g1
+        position = 0, 0, 0
+
+        [MsnShip]
+        nickname = ol_g2
+        position = 0, 0, 0
+
+        [MsnFormation]
+        nickname = ol_form_b
+        position = 12000, 0, 12000
+        ship = ol_g1
+        ship = ol_g2
+        """;
+
+    /// <summary>Issue #78, second case: in one system, the path spawns a formation, destroys one ship and spawns the
+    /// formation again. The new formation takes both ships, so the formation travels with the player one time. As in
+    /// rule 4, the old spawn line goes with the lines between that name the formation or its ships.</summary>
+    [Fact]
+    public void AFormationThatSpawnsAgainAfterALossInTheStartSystemIsOneCompanion()
+    {
+        var plan = Plan(Script(jump: """
+            Act_SpawnFormation = ol_form_b
+            Act_GiveObjList = ol_form_b, ol_follow
+            Act_Destroy = ol_g1, SILENT
+            Act_SpawnFormation = ol_form_b
+            Act_GiveObjList = ol_form_b, ol_follow
+            """, records: FormationB));
+        var lines = WorldLines(plan);
+
+        Assert.Equal(CompanionSigns.Orders, Companion(plan, "ol_form_b").Signs);
+        Assert.Single(lines, l => l.StartsWith("Act_SpawnFormation = ol_form_b", StringComparison.Ordinal));
+        Assert.Single(lines, l => l == "Act_GiveObjList = ol_form_b, ol_follow");
+        Assert.DoesNotContain(lines, l => l.Contains("ol_g1", StringComparison.Ordinal));
+    }
+
+    /// <summary>A spawn line with another name can make ships of an older formation again. The new object takes these
+    /// ships, and the older formation keeps the other ships. When it keeps a ship in the first system, the page lists it
+    /// as left out, and the setup still makes the new ship in the start system. When it keeps no ship, it is gone, so
+    /// the page does not list it.</summary>
+    [Fact]
+    public void ASpawnWithAnotherNameTakesTheShipsOfTheOlderFormation()
+    {
+        var ship = Plan(Script(jump: "Act_SpawnShip = ol_f1"));
+
+        Assert.Contains("Act_SpawnShip = ol_f1", WorldLines(ship));
+        Assert.Contains(ship.LeftOut, l => l is { Object: "ol_form_a", System: "ol_sys_a" });
+
+        var formation = Plan(Script(jump: "Act_SpawnFormation = ol_form_c", records: """
+            [MsnFormation]
+            nickname = ol_form_c
+            position = 12000, 0, 12000
+            ship = ol_f1
+            ship = ol_f2
+            """));
+        var lines = WorldLines(formation);
+
+        Assert.Contains("Act_SpawnFormation = ol_form_c", lines);
+        Assert.DoesNotContain(lines, l => l.Contains("ol_form_a", StringComparison.Ordinal));
+        Assert.DoesNotContain(formation.LeftOut, l => l.Object == "ol_form_a");
+    }
+
     /// <summary>A label can have the name of a solar. A world line names the solar by its nickname, so the spawn line
     /// and the attitude line name only that solar, not the other solar of the label. The solar of the first system is
     /// left out with its lines, and the setup makes the other solar in the start system.</summary>
