@@ -100,7 +100,7 @@ internal sealed record PlayStartPageModel(string Script, PlayStartSetting Settin
     public const string SetupTip = "The setup triggers of an approximate start. They are in a test layer of the play. The mod " +
                                    "does not change.";
     public const string LeftOutTip = "The setup makes only the objects of the start system. At this trigger, these objects " +
-                                     "are in another system, or a trigger of the start makes them again. The setup also " +
+                                     "are in another system, or a trigger that runs at the start makes them again. The setup also " +
                                      "removes each line that names these objects.";
     public const string CompanionsTip = "These ships travel with the player at this trigger. The setup puts them next to the " +
                                         "player. Then their last orders continue.";
