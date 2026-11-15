@@ -2113,8 +2113,8 @@ public sealed class StartReplayRulesTests
     /// <summary>
     /// The fail guards of a path that jumps from g_sys_a to g_sys_b. g_guard started before the jump, and a chain of two
     /// starts leads from it to the mission fail. So the replay stops it without its actions, and its buoy does not
-    /// spawn. g_long needs a chain of three starts, the repeatable g_repeat can run again, and g_here started after the
-    /// jump. So they still wait. A path without a jump keeps each guard.
+    /// spawn. g_long needs a chain of three starts, the repeatable g_repeat can run again, g_event is not a timer, and
+    /// g_here started after the jump. So they still wait. A path without a jump keeps each guard.
     /// </summary>
     [Theory]
     [InlineData("g_sys_b", false)]
@@ -2129,6 +2129,7 @@ public sealed class StartReplayRulesTests
             Act_ActTrig = g_guard
             Act_ActTrig = g_long
             Act_ActTrig = g_repeat
+            Act_ActTrig = g_event
             Act_ActTrig = g_launch
 
             [Trigger]
@@ -2169,6 +2170,11 @@ public sealed class StartReplayRulesTests
             Act_ChangeState = FAIL
 
             [Trigger]
+            nickname = g_event
+            Cnd_CommComplete = g_line
+            Act_ChangeState = FAIL
+
+            [Trigger]
             nickname = g_launch
             Cnd_SpaceEnter = g_sys_a
             Act_ActTrig = g_arrive
@@ -2196,7 +2202,111 @@ public sealed class StartReplayRulesTests
         Assert.DoesNotContain(replay.Effects, e => e.Line.Value(0) == "g_buoy");
         Assert.Equal(keeps, Waiting(replay).Contains("g_guard"));
         Assert.Equal(keeps ? 0 : 1, replay.Jumps.Count);
-        foreach (var stays in new[] { "g_long", "g_repeat", "g_here" })
+        foreach (var stays in new[] { "g_long", "g_repeat", "g_event", "g_here" })
             Assert.Contains(stays, Waiting(replay));
+    }
+
+    /// <summary>
+    /// The exit trigger v_exit of the jump completes the objective v_obj, and only v_mark, which v_exit starts, makes it
+    /// active. A chain of the objective rule does not pass the link that completes the objective, because that link
+    /// runs after the chain. So no chain makes v_obj active, and v_mark waits after the run of v_exit.
+    /// </summary>
+    [Fact]
+    public void TheObjectiveChainOfALinkDoesNotPassTheLink()
+    {
+        const string text = """
+            [Trigger]
+            nickname = v_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = v_exit
+            Act_ActTrig = v_launch
+
+            [Trigger]
+            nickname = v_exit
+            Cnd_SystemExit = v_sys_a
+            Act_SetNNState = v_obj, COMPLETE
+            Act_ActTrig = v_mark
+
+            [Trigger]
+            nickname = v_mark
+            Cnd_CommComplete = v_line
+            Act_SetNNObj = v_obj
+
+            [Trigger]
+            nickname = v_launch
+            Cnd_SpaceEnter = v_sys_a
+            Act_ActTrig = v_arrive
+
+            [Trigger]
+            nickname = v_arrive
+            Cnd_SystemEnter = v_sys_b
+            Act_ActTrig = v_chosen
+
+            [Trigger]
+            nickname = v_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "v_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["v_start", "v_launch", "v_exit", "v_arrive"], Ran(replay));
+        Assert.Contains("v_mark", Waiting(replay));
+    }
+
+    /// <summary>
+    /// The exit chain of the jump runs r_gate, which makes the objective r_obj active, then r_exit. r_exit stops the
+    /// trigger of the path r_arrive, so the replay goes back from the chain. Then no line made r_obj active. So when the
+    /// later trigger of the path r_done completes r_obj, the objective rule runs r_gate before it.
+    /// </summary>
+    [Fact]
+    public void ARunThatGoesBackDoesNotLeaveItsObjectivesActive()
+    {
+        const string text = """
+            [Trigger]
+            nickname = r_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = r_gate
+            Act_ActTrig = r_launch
+
+            [Trigger]
+            nickname = r_gate
+            Cnd_CommComplete = r_line
+            Act_SetNNObj = r_obj
+            Act_ActTrig = r_exit
+
+            [Trigger]
+            nickname = r_exit
+            Cnd_SystemExit = r_sys_a
+            Act_SetNNState = r_obj_2, COMPLETE
+            Act_DeactTrig = r_arrive
+
+            [Trigger]
+            nickname = r_launch
+            Cnd_SpaceEnter = r_sys_a
+            Act_ActTrig = r_arrive
+
+            [Trigger]
+            nickname = r_arrive
+            Cnd_SystemEnter = r_sys_b
+            Act_ActTrig = r_done
+
+            [Trigger]
+            nickname = r_done
+            Cnd_Timer = 2
+            Act_SetNNState = r_obj, COMPLETE
+            Act_ActTrig = r_chosen
+
+            [Trigger]
+            nickname = r_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "r_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["r_start", "r_launch", "r_arrive", "r_gate", "r_done"], Ran(replay));
     }
 }
