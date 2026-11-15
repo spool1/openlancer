@@ -732,11 +732,11 @@ public sealed class StartReplayRulesTests
     /// <summary>
     /// The path timer q_done takes at most 2 s, so its own time is known to come before the 10 s of q_old. But q_done
     /// completes the objective q_goal, so the objective rule runs q_activate (10 s) before it. So q_done comes at least
-    /// 10 s after the start, and pass 1 runs q_old before q_done. Pass 2 never runs a timer at a later trigger of the
-    /// path than pass 1. So q_old does not wait at the start.
+    /// 10 s after the start, and pass 1 runs q_old before q_done. Pass 2 does not keep a timer waiting after the step
+    /// where pass 1 ran it. So q_old does not wait at the start.
     /// </summary>
     [Fact]
-    public void PassTwoNeverRunsATimerAtALaterTriggerThanPassOne()
+    public void PassTwoDoesNotKeepATimerWaitingAfterTheStepOfPassOne()
     {
         const string text = """
             [Trigger]

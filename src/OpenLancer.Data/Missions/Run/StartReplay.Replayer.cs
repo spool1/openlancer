@@ -33,8 +33,9 @@ internal sealed partial record StartReplay
     /// <item>The two passes. The run test can find a timer only at a later trigger of the path than in the game. So the
     /// replay makes two passes. Pass 1 uses the run test. It records each timer that it runs, with its start and the
     /// next trigger of the path. Pass 2 does not use the run test. It runs each recorded timer before the first trigger
-    /// of the path after its start, unless that trigger is known to come first. Pass 2 never runs a timer later in the
-    /// path than pass 1. When the replay goes back from such a run, pass 2 tries the timer again in the next timer call.
+    /// of the path after its start, unless that trigger is known to come first. Pass 2 does not keep a timer
+    /// waiting after the step where pass 1 ran it. When the replay goes back from such a run, pass 2 tries the timer
+    /// again in the next timer call.
     /// When pass 1 runs no timer, pass 2 gives the same result, so the replay skips it.</item>
     /// <item>The start of a timer. Pass 2 knows a timer by its name and its start. The start is the trigger whose run
     /// started the timer and the number of that run, or the first starts of the replay. So when a trigger starts the
@@ -45,15 +46,15 @@ internal sealed partial record StartReplay
     /// times of these timers add up to less than the shortest time of the timer. A run of another rule does not show
     /// where the time starts, because the game can run that trigger earlier.</item>
     /// </list></item>
-    /// <item>The game tests Cnd_InSpace at each heartbeat. When the path shows the player in space, each trigger that
-    /// waits for Cnd_InSpace = true ran. When the path shows the player docked, each trigger that waits for
-    /// Cnd_InSpace = false ran. Before the first such line, a dock shows that the player was in space, and a launch
-    /// shows that the player was docked.</item>
     /// <item>A trigger of the path that completes an objective shows that the objective was active. When no line of the
     /// replay made it active, the waiting trigger that makes it active ran before. The replay runs that trigger, and the
     /// triggers that it starts on the way to the objective. Each link of a run of a rule shows the same, for example a
     /// trigger on the way to the exit from a system. The links of a chain of this rule do not get this rule
     /// again.</item>
+    /// <item>The game tests Cnd_InSpace at each heartbeat. When the path shows the player in space, each trigger that
+    /// waits for Cnd_InSpace = true ran. When the path shows the player docked, each trigger that waits for
+    /// Cnd_InSpace = false ran. Before the first such line, a dock shows that the player was in space, and a launch
+    /// shows that the player was docked.</item>
     /// <item>A condition of the path can show the player in another system than the condition before it: an arrival,
     /// Cnd_SpaceEnter, or a base condition. Then the player left the old system. The game sends the exit from the old
     /// system, then the entry into the new system. So each trigger that waited for that exit (Cnd_SystemExit) ran. A

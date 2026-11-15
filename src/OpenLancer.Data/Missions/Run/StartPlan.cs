@@ -464,8 +464,9 @@ internal sealed partial record StartReplay
     /// <summary>The replay of an approximate start (D748): the start set or the load of the root, then each trigger of
     /// the path in order, until the chosen trigger starts. The replay also runs the waiting triggers that the path shows
     /// ran in the game (<see cref="Replayer"/>). Pass 1 finds the old timers that ran. Pass 2 runs each of them at its
-    /// early step, at the latest where pass 1 ran it. When pass 1 runs no old timer, pass 2 gives the same result, so the
-    /// replay skips it. The fail guard rule then looks at the end of the pass that gives the result.</summary>
+    /// early step. It does not keep a timer waiting after the step where pass 1 ran it. When pass 1 runs no old timer,
+    /// pass 2 gives the same result, so the replay skips it. The fail guard rule then looks at the end of the pass that
+    /// gives the result.</summary>
     private static StartReplay Approximate(MissionIndex index, MissionTrigger chosen, IReadOnlyList<MissionTrigger> path)
     {
         var replay = new StartReplay { Kind = StartKind.Approximate, Chosen = chosen, Root = path[0], Path = path };
