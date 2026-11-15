@@ -78,10 +78,11 @@ internal sealed partial record StartReplay
     /// with its radius. Cnd_SystemEnter from a named system gives the jump object that leads back, with 1,000
     /// units.</item>
     /// <item>The jump places. A jump of the system rule gives two places with 1,000 units. Before the exit, the player
-    /// was at the jump object of the old system that leads to the new system. When the old system has more such
+    /// was at the jump object of the old system that leads to the new system. When the old system has only one such
+    /// object, the player jumped through it, also when the dock rules block it now. When the old system has more such
     /// objects, the dock rules of the replay must allow exactly one of them. These rules are the newest
-    /// Act_PlayerCanDock line and the Act_LockDock lines of the player. After the entry, the player was at the jump
-    /// object of the new system that leads back.</item>
+    /// Act_PlayerCanDock line with its exceptions, and the Act_LockDock lines of the player. After the entry, the player
+    /// was at the jump object of the new system that leads back.</item>
     /// <item>The run test. A jump object gives a place only when it is the only such object of its system, or the
     /// object that the dock rules allow. Each point within the slack of the place must be on the true side of the poll.
     /// So for an outside poll, the distance minus the slack is more than the radius. For an inside poll, the distance

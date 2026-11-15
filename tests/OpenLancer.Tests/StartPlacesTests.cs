@@ -764,9 +764,9 @@ public sealed class StartPlacesTests
         Assert.Null(MissionWorld.Empty.ObjectOf("ol_buoy"));
     }
 
-    /// <summary>The world lists each jump object of a system that leads to another system, in file order and without
-    /// letter case. The first one is the arrival of a jump. An object of another system or to another system does not
-    /// count.</summary>
+    /// <summary>The world lists each jump object of a system that leads to one given system, in file order and without
+    /// letter case. The first one is the arrival of a jump from the given system. An object of another system, or an
+    /// object that leads to a different system, does not count.</summary>
     [Fact]
     public void TheWorldListsEachJumpObjectOfASystemToAnotherSystem()
     {

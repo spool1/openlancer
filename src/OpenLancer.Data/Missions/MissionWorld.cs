@@ -132,12 +132,12 @@ public sealed class MissionWorld
     /// it.</summary>
     public WorldObject? ObjectOf(string name) => places.Objects.GetValueOrDefault(name.Trim());
 
-    /// <summary>The first object of a system, in file order, whose jump gate or jump hole leads to another system, or
-    /// null. A ship that jumps from that other system arrives at this object.</summary>
+    /// <summary>The first object of a system, in file order, whose jump gate or jump hole leads to the system
+    /// <paramref name="from"/>, or null. A ship that jumps from that system arrives at this object.</summary>
     public WorldObject? JumpInto(string system, string from) => JumpsTo(system, from).FirstOrDefault();
 
-    /// <summary>Each object of a system, in file order, whose jump gate or jump hole leads to another system. Empty when
-    /// the world does not know such an object.</summary>
+    /// <summary>Each object of a system, in file order, whose jump gate or jump hole leads to the system
+    /// <paramref name="to"/>. Empty when the world does not know such an object.</summary>
     internal IReadOnlyList<WorldObject> JumpsTo(string system, string to) =>
         places.Jumps.Where(o => o.System.Equals(system.Trim(), StringComparison.OrdinalIgnoreCase) &&
                                 o.JumpTo!.Equals(to.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
