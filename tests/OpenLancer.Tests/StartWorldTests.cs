@@ -496,6 +496,48 @@ public sealed class StartWorldTests
         Assert.DoesNotContain(plan.LeftOut, l => l.Object == "ol_plat_b");
     }
 
+    /// <summary>The spawn line of a solar does not make a ship of the label with the name of the solar. So a line on
+    /// another label of that ship has no made member, and it goes.</summary>
+    [Fact]
+    public void TheSpawnOfASolarMakesNoShipOfItsLabel()
+    {
+        var plan = Plan(Script(jump: """
+            Act_SpawnSolar = ol_plat
+            Act_SetVibeLbl = ol_crew, Player, REP_FRIEND_THRESHOLD
+            """, records: """
+            [MsnSolar]
+            nickname = ol_plat
+            position = 11000, 0, 11000
+            label = ol_plat
+
+            [MsnShip]
+            nickname = ol_pilot
+            label = ol_plat
+            label = ol_crew
+            """));
+        var lines = WorldLines(plan);
+
+        Assert.Contains("Act_SpawnSolar = ol_plat", lines);
+        Assert.DoesNotContain(lines, l => l.Contains("ol_crew", StringComparison.Ordinal));
+    }
+
+    /// <summary>The game makes the mission solar of the base of a base start at the launch, so a line on that solar
+    /// stays. This is also true when a label has the name of the solar.</summary>
+    [Fact]
+    public void ALineOnTheDockSolarStaysWhenALabelHasItsName()
+    {
+        var plan = Plan(Script(jump: "Act_MarkObj = ol_depot, 1", records: """
+            [MsnSolar]
+            nickname = ol_depot
+            system = ol_sys_b
+            base = ol_base_c
+            position = 5000, 0, 0
+            label = ol_depot
+            """), choice: StartPlaceChoice.Base, dock: "ol_base_c");
+
+        Assert.Contains("Act_MarkObj = ol_depot, 1", WorldLines(plan));
+    }
+
     // Group 4: the signs of a companion (rule 7).
 
     /// <summary>Each sign alone makes a companion: orders that follow the player, the formation of the player, a jump
