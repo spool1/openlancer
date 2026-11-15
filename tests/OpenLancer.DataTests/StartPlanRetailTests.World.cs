@@ -723,6 +723,36 @@ public sealed partial class StartPlanRetailTests
         }
     }
 
+    /// <summary>The row of issue #78 in both games. At M04 west_point_init, the path spawned walkers_wing and destroyed
+    /// four of its ships, so the formation keeps King, Lambda4 and Lambda5. The formation travels with the player with
+    /// Juni. The setup spawns it next to the player and destroys only the four other ships, so the three ships start next
+    /// to the player.</summary>
+    [Fact]
+    public void TheRestOfWalkersWingStartsNextToThePlayerInM04()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var m04 = Slot(scripts, "M04");
+            var plan = Plan(m04, "west_point_init");
+            Assert.True(plan.CanStart, $"{set}: {plan.Reason}");
+            Assert.Equal(["juni", "walkers_wing"], plan.Companions.Select(c => c.Object));
+            Assert.DoesNotContain(plan.LeftOut, l => l.Object == "walkers_wing");
+            var wing = plan.Companions.Single(c => c.Object == "walkers_wing");
+            Within(StartWorld.NearDistance, plan.Place.Position, wing.Position, $"{set} west_point_init walkers_wing");
+            var world = World(plan);
+            var spawn = Assert.Single(world, l => l.Key == "Act_SpawnFormation" && l.Values[0] == "walkers_wing");
+            Within(0.05f, wing.Position!.Value, Point(spawn.Values, 1), $"{set} the spawn line of walkers_wing");
+            // The ships that no line of the setup destroys, and no later line spawns or moves elsewhere.
+            var three = new[] { "king", "Lambda4", "Lambda5" };
+            var destroyed = world.Where(l => l.Key == "Act_Destroy").Select(l => l.Values[0])
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            Assert.Equal(three, StartSetup.Members(m04.Index, "walkers_wing").Where(s => !destroyed.Contains(s))
+                .Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+            Assert.DoesNotContain(world, l => l.Key is "Act_SpawnShip" or "Act_RelocateShip" &&
+                                              three.Contains(l.Values[0], StringComparer.OrdinalIgnoreCase));
+        }
+    }
+
     /// <summary>The objective 3 seconds after the spawn of the play: the last objective line of the setup, then the
     /// objective lines of the triggers that the start runs in that time. These are the triggers of the active set with
     /// Cnd_True, Cnd_InSpace = true or a timer of at most 3 seconds, and the triggers that they start with such a
