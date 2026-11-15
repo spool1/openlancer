@@ -561,6 +561,25 @@ public sealed partial class StartPlanRetailTests
         }
     }
 
+    /// <summary>
+    /// The row of the objective rule for each run of a rule (issue #46) in both games. The path of M12 start_st01 jumps
+    /// from St02 back to St01. The exit chain runs a trigger that completes the objective of the jump back. Only the 15 s
+    /// timer making_a_break_for_st01 makes that objective active, so it ran before. Its time then shows that the 2 s
+    /// timer pause_for_sendcomm_dx_m12_0320_juni ran too. So the St01 play does not play the old St02 dialog or set the
+    /// old St02 objective.
+    /// </summary>
+    [Fact]
+    public void TheObjectiveRuleLooksAtEachLinkOfARunOfARule()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var st01 = Plan(Slot(scripts, "M12"), "start_st01");
+            Assert.True(st01.CanStart, $"{set}: {st01.Reason}");
+            Assert.DoesNotContain("making_a_break_for_st01", st01.ActiveSet);
+            Assert.DoesNotContain("pause_for_sendcomm_dx_m12_0320_juni", st01.ActiveSet);
+        }
+    }
+
     /// <summary>The row of issue 45 in both games. M04 juni_mactan_tether starts in Iw03, after the jump from Li01. The
     /// game sent the exit from Li01 at the jump, so leaving_liberty_01 stopped the fail watcher too_far_from_magellan_dock
     /// of a point in Li01. arrive_at_jumpgate starts leaving_liberty_01, so it ran before the jump. A start at

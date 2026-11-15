@@ -2010,4 +2010,103 @@ public sealed class StartReplayRulesTests
         Assert.Equal(StartRefusal.None, replay.Refusal);
         Assert.Equal(runs ? ["k_start", "k_more", "k_kill"] : ["k_start", "k_kill"], Ran(replay));
     }
+
+    /// <summary>
+    /// The path jumps from o_sys_a to o_sys_b. So the exit chain runs o_gate, then the exit trigger o_exit. o_exit
+    /// completes the objective o_obj, which no line made active. So the timer o_activate, which makes it active, ran
+    /// before o_exit. The objective rule also looks at each link of a run of a rule.
+    /// </summary>
+    [Fact]
+    public void ALinkOfTheExitChainThatCompletesAnObjectiveRunsItsActivatorFirst()
+    {
+        const string text = """
+            [Trigger]
+            nickname = o_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = o_gate
+            Act_ActTrig = o_activate
+            Act_ActTrig = o_launch
+
+            [Trigger]
+            nickname = o_gate
+            Cnd_CommComplete = o_line
+            Act_ActTrig = o_exit
+
+            [Trigger]
+            nickname = o_exit
+            Cnd_SystemExit = o_sys_a
+            Act_SetNNState = o_obj, COMPLETE
+
+            [Trigger]
+            nickname = o_activate
+            Cnd_Timer = 15
+            Act_SetNNObj = o_obj
+
+            [Trigger]
+            nickname = o_launch
+            Cnd_SpaceEnter = o_sys_a
+            Act_ActTrig = o_arrive
+
+            [Trigger]
+            nickname = o_arrive
+            Cnd_SystemEnter = o_sys_b
+            Act_ActTrig = o_chosen
+
+            [Trigger]
+            nickname = o_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "o_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["o_start", "o_launch", "o_gate", "o_activate", "o_exit", "o_arrive"], Ran(replay));
+    }
+
+    /// <summary>
+    /// The path trigger p_done completes the objective p_obj_a. So the objective rule runs p_first, which makes it
+    /// active. p_first also completes p_obj_b, and only p_second makes p_obj_b active. The links of a chain of the
+    /// objective rule do not get the rule again, so p_second still waits.
+    /// </summary>
+    [Fact]
+    public void ALinkOfAnObjectiveChainDoesNotGetTheObjectiveRuleAgain()
+    {
+        const string text = """
+            [Trigger]
+            nickname = p_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = p_first
+            Act_ActTrig = p_second
+            Act_ActTrig = p_done
+
+            [Trigger]
+            nickname = p_first
+            Cnd_CommComplete = p_line_a
+            Act_SetNNObj = p_obj_a
+            Act_SetNNState = p_obj_b, COMPLETE
+
+            [Trigger]
+            nickname = p_second
+            Cnd_CommComplete = p_line_b
+            Act_SetNNObj = p_obj_b
+
+            [Trigger]
+            nickname = p_done
+            Cnd_Timer = 2
+            Act_SetNNState = p_obj_a, COMPLETE
+            Act_ActTrig = p_chosen
+
+            [Trigger]
+            nickname = p_chosen
+            Cnd_Timer = 5
+            """;
+
+        var replay = Replay(text, "p_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["p_start", "p_first", "p_done"], Ran(replay));
+        Assert.Contains("p_second", Waiting(replay));
+    }
 }

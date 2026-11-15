@@ -77,7 +77,9 @@ internal sealed partial record StartReplay
     /// shows that the player was docked.</item>
     /// <item>A trigger of the path that completes an objective shows that the objective was active. When no line of the
     /// replay made it active, the waiting trigger that makes it active ran before. The replay runs that trigger, and the
-    /// triggers that it starts on the way to the objective.</item>
+    /// triggers that it starts on the way to the objective. Each link of a run of a rule shows the same, for example a
+    /// trigger on the way to the exit from a system. The links of a chain of this rule do not get this rule
+    /// again.</item>
     /// <item>A condition of the path can show the player in another system than the condition before it: an arrival,
     /// Cnd_SpaceEnter, or a base condition. Then the player left the old system. The game sends the exit from the old
     /// system, then the entry into the new system. So each trigger that waited for that exit (Cnd_SystemExit) ran. A
@@ -133,6 +135,10 @@ internal sealed partial record StartReplay
         private readonly IReadOnlyList<MissionTrigger> path;
         private readonly ReplayWorld world = new();
         private readonly HashSet<string> activated = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The objectives of <see cref="activated"/> in the order of their lines, each with the index of its
+        /// change. A run that goes back removes the objectives of its changes.</summary>
+        private readonly List<(string Name, int Change)> activations = [];
         private readonly StartTimeline timeline;
 
         /// <summary>The timers that pass 2 runs at their early steps, as <see cref="TimerRuns"/> of pass 1 gives them.
@@ -140,6 +146,10 @@ internal sealed partial record StartReplay
         private readonly IReadOnlyDictionary<TimerKey, int>? early;
 
         private int read;
+
+        /// <summary>True while the objective rule runs its chain. The links of that chain do not get the objective rule
+        /// again.</summary>
+        private bool inObjectiveChain;
 
         /// <summary>The number of changes when the path last showed the player docked, or -1.</summary>
         private int docked = -1;
@@ -352,8 +362,11 @@ internal sealed partial record StartReplay
                 timeline.Delay(position, last.Before, JumperDelay);
         }
 
-        /// <summary>The objective rule, before a trigger of the path runs.</summary>
-        /// <param name="rest">The trigger and the rest of the path, with the chosen trigger.</param>
+        /// <summary>The objective rule, before a trigger of the path runs, and before each link of a run of a rule.
+        /// The chain of the rule does not pass the trigger, because the trigger completes the objective after the chain.
+        /// The links of the chain do not get the objective rule again.</summary>
+        /// <param name="trigger">The trigger of the path or the link.</param>
+        /// <param name="rest">The next trigger and the rest of the path, with the chosen trigger.</param>
         private void Objectives(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
         {
             Note();
@@ -363,8 +376,12 @@ internal sealed partial record StartReplay
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             foreach (var objective in completed)
             {
-                if (Chain(t => Activates(t, objective), rest) is { } chain)
+                if (Chain(t => Activates(t, objective), rest, trigger) is { } chain)
+                {
+                    inObjectiveChain = true;
                     TryRun(chain, rest);
+                    inObjectiveChain = false;
+                }
                 Note();
             }
         }
@@ -505,13 +522,14 @@ internal sealed partial record StartReplay
         }
 
         /// <summary>The shortest chain of starts from a waiting trigger to a trigger of a goal, or null. The chain does not
-        /// pass the chosen trigger, a trigger of the rest of the path or a repeatable trigger.</summary>
-        private List<MissionTrigger>? Chain(Func<MissionTrigger, bool> goal, IReadOnlyList<MissionTrigger> rest)
+        /// pass the chosen trigger, a trigger of the rest of the path, a repeatable trigger or the trigger to skip.</summary>
+        private List<MissionTrigger>? Chain(Func<MissionTrigger, bool> goal, IReadOnlyList<MissionTrigger> rest,
+            MissionTrigger? skip = null)
         {
             var next = StartGraph.Of(index).Starts;
             var parent = new Dictionary<MissionTrigger, MissionTrigger?>();
             var queue = new Queue<MissionTrigger>();
-            foreach (var trigger in Machine.Active.Concat(Machine.Pending).Where(t => Free(t, rest)))
+            foreach (var trigger in Machine.Active.Concat(Machine.Pending).Where(t => t != skip && Free(t, rest)))
             {
                 if (parent.TryAdd(trigger, null))
                     queue.Enqueue(trigger);
@@ -527,7 +545,7 @@ internal sealed partial record StartReplay
                     chain.Reverse();
                     return chain;
                 }
-                foreach (var child in next[trigger].Where(c => c != chosen && !c.Repeats && !rest.Contains(c)))
+                foreach (var child in next[trigger].Where(c => c != chosen && c != skip && !c.Repeats && !rest.Contains(c)))
                 {
                     if (parent.TryAdd(child, trigger))
                         queue.Enqueue(child);
@@ -551,12 +569,13 @@ internal sealed partial record StartReplay
             for (; read < Changes.Count; read++)
             {
                 if (Changes[read] is { Kind: MachineChangeKind.Effect, Line: { } line } && MakesActive(line) &&
-                    line.Value(0)?.Trim() is { Length: > 0 } name)
-                    activated.Add(name);
+                    line.Value(0)?.Trim() is { Length: > 0 } name && activated.Add(name))
+                    activations.Add((name, read));
             }
         }
 
-        /// <summary>Runs a chain of waiting triggers in order. When a run breaks a rule of <see cref="Replayer"/>, the
+        /// <summary>Runs a chain of waiting triggers in order. Before each link that did not run yet, the objective rule
+        /// runs, unless the chain is a chain of the objective rule. When a run breaks a rule of <see cref="Replayer"/>, the
         /// replay goes back to the state before the chain.</summary>
         /// <returns>True when the chain ran, false when the replay went back.</returns>
         private bool TryRun(IReadOnlyList<MissionTrigger> chain, IReadOnlyList<MissionTrigger> rest)
@@ -568,6 +587,9 @@ internal sealed partial record StartReplay
             var ok = true;
             for (var i = 0; ok && i < chain.Count; i++)
             {
+                // A link that completes an objective shows that the objective was active before it.
+                if (!inObjectiveChain && Machine.StateOf(chain[i]).Runs == runs[i])
+                    Objectives(chain[i], rest);
                 // A link can run in the pass of the link before it, for example a link with Cnd_True. That run counts.
                 var ran = Machine.StateOf(chain[i]).Runs > runs[i] || Reach(chain[i], again: true) == Reached.Ran;
                 ok = ran && Machine.Halt == null && Machine.End == null;
@@ -579,6 +601,11 @@ internal sealed partial record StartReplay
             Changes.RemoveRange(count, Changes.Count - count);
             timeline.Cut(count);
             read = Math.Min(read, count);
+            while (activations.Count > 0 && activations[^1].Change >= count)
+            {
+                activated.Remove(activations[^1].Name);
+                activations.RemoveAt(activations.Count - 1);
+            }
             return false;
         }
 
