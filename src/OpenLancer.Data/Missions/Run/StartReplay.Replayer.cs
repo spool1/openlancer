@@ -375,10 +375,15 @@ internal sealed partial record StartReplay
         private void Objectives(MissionTrigger trigger, IReadOnlyList<MissionTrigger> rest)
         {
             Note();
-            var completed = trigger.Actions.Where(a => MissionIndex.Is(a.Key, "Act_SetNNState") &&
-                                                       MissionIndex.Is(a.Value(1), "COMPLETE"))
-                .Select(a => a.Value(0)?.Trim()).OfType<string>().Where(o => o.Length > 0 && !activated.Contains(o))
-                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            // The rule runs before each link of each run of a rule, so it reads the lines without a query.
+            var completed = new List<string>();
+            foreach (var action in trigger.Actions)
+            {
+                if (MissionIndex.Is(action.Key, "Act_SetNNState") && MissionIndex.Is(action.Value(1), "COMPLETE") &&
+                    action.Value(0)?.Trim() is { Length: > 0 } objective && !activated.Contains(objective) &&
+                    !completed.Contains(objective, StringComparer.OrdinalIgnoreCase))
+                    completed.Add(objective);
+            }
             foreach (var objective in completed)
             {
                 if (Chain(t => Activates(t, objective), rest, trigger) is { } chain)
