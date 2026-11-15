@@ -93,8 +93,8 @@ internal sealed partial record StartReplay
     /// <item>Spawns (issue #51). The game counts a destroyed object or a picked-up loot only for an object that the
     /// mission made. So a trigger of the path that waits for Cnd_Destroyed or Cnd_LootAcquired shows that the mission
     /// made the objects of its target. The count of the condition gives the number of objects that it needs. A count below
-    /// 1 or no count needs one object. When the replay made fewer of them, and only one waiting trigger has a spawn line
-    /// of a missing object, that trigger ran before.</item>
+    /// 1 or no count needs one object. The trigger never needs more objects than its target has. When the replay made
+    /// fewer of them, and only one waiting trigger has a spawn line of a missing object, that trigger ran before.</item>
     /// <item>Polls (issue #50). The game tests a distance condition of the player at each heartbeat. So a waiting poll
     /// ran when the path shows the player on its true side.
     /// <list type="bullet">

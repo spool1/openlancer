@@ -683,7 +683,7 @@ public sealed class TriggerMachineTests
     /// <summary>A stop without actions removes an active trigger, as Act_DeactTrig does. The trigger does not run, so
     /// its lines do nothing. A trigger that ran stays complete.</summary>
     [Fact]
-    public void AStopWithoutActionsStopsActiveAndPendingTriggers()
+    public void AStopWithoutActionsStopsAnActiveTriggerAndKeepsACompleteOne()
     {
         var world = new TestWorld();
         var machine = Machine(Start("t_go", "Cnd_True = no_params", "Act_ActTrig = t_wait", "Act_ActTrig = t_later") +
