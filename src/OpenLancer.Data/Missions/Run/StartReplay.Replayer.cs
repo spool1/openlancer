@@ -45,6 +45,25 @@ internal sealed partial record StartReplay
     /// times of these timers add up to less than the shortest time of the timer. A run of another rule does not show
     /// where the time starts, because the game can run that trigger earlier.</item>
     /// </list></item>
+    /// <item>The game tests Cnd_InSpace at each heartbeat. When the path shows the player in space, each trigger that
+    /// waits for Cnd_InSpace = true ran. When the path shows the player docked, each trigger that waits for
+    /// Cnd_InSpace = false ran. Before the first such line, a dock shows that the player was in space, and a launch
+    /// shows that the player was docked.</item>
+    /// <item>A trigger of the path that completes an objective shows that the objective was active. When no line of the
+    /// replay made it active, the waiting trigger that makes it active ran before. The replay runs that trigger, and the
+    /// triggers that it starts on the way to the objective. Each link of a run of a rule shows the same, for example a
+    /// trigger on the way to the exit from a system. The links of a chain of this rule do not get this rule
+    /// again.</item>
+    /// <item>A condition of the path can show the player in another system than the condition before it: an arrival,
+    /// Cnd_SpaceEnter, or a base condition. Then the player left the old system. The game sends the exit from the old
+    /// system, then the entry into the new system. So each trigger that waited for that exit (Cnd_SystemExit) ran. A
+    /// waiting trigger that starts such a trigger ran before it, for example a trigger near the jump gate. Each trigger
+    /// that waited for the entry (Cnd_SystemEnter) also ran. A trigger that waits for the end of the jump
+    /// (Cnd_JumpInComplete) does not run, because it can start a scene of the arrival, and the path does not show the
+    /// end of that scene. Only a condition shows a change, because the system key of a trigger can name another system
+    /// than the system where it runs. Before the first condition that names a system, the newest system key of the path
+    /// gives the old system. The condition of the chosen trigger does not count, because the chosen trigger only
+    /// starts.</item>
     /// <item>A launch of the path ran each trigger that waited for that launch: Cnd_PlayerLaunch, Cnd_SpaceEnter without
     /// a system or with the system of the launch, Cnd_LaunchComplete of the player, and Cnd_BaseExit without a base or
     /// with the base of the launch.</item>
@@ -71,25 +90,6 @@ internal sealed partial record StartReplay
     /// <item>The limits. Only the conditions of the path show events, not the runs of the rules. The chosen trigger only
     /// starts, so its condition shows no event.</item>
     /// </list></item>
-    /// <item>The game tests Cnd_InSpace at each heartbeat. When the path shows the player in space, each trigger that
-    /// waits for Cnd_InSpace = true ran. When the path shows the player docked, each trigger that waits for
-    /// Cnd_InSpace = false ran. Before the first such line, a dock shows that the player was in space, and a launch
-    /// shows that the player was docked.</item>
-    /// <item>A trigger of the path that completes an objective shows that the objective was active. When no line of the
-    /// replay made it active, the waiting trigger that makes it active ran before. The replay runs that trigger, and the
-    /// triggers that it starts on the way to the objective. Each link of a run of a rule shows the same, for example a
-    /// trigger on the way to the exit from a system. The links of a chain of this rule do not get this rule
-    /// again.</item>
-    /// <item>A condition of the path can show the player in another system than the condition before it: an arrival,
-    /// Cnd_SpaceEnter, or a base condition. Then the player left the old system. The game sends the exit from the old
-    /// system, then the entry into the new system. So each trigger that waited for that exit (Cnd_SystemExit) ran. A
-    /// waiting trigger that starts such a trigger ran before it, for example a trigger near the jump gate. Each trigger
-    /// that waited for the entry (Cnd_SystemEnter) also ran. A trigger that waits for the end of the jump
-    /// (Cnd_JumpInComplete) does not run, because it can start a scene of the arrival, and the path does not show the
-    /// end of that scene. Only a condition shows a change, because the system key of a trigger can name another system
-    /// than the system where it runs. Before the first condition that names a system, the newest system key of the path
-    /// gives the old system. The condition of the chosen trigger does not count, because the chosen trigger only
-    /// starts.</item>
     /// <item>Spawns (issue #51). The game counts a destroyed object or a picked-up loot only for an object that the
     /// mission made. So a trigger of the path that waits for Cnd_Destroyed or Cnd_LootAcquired shows that the mission
     /// made the objects of its target. The count of the condition gives the number of objects that it needs. A count below
