@@ -387,6 +387,23 @@ public sealed class TriggerMachine
         return Finish();
     }
 
+    /// <summary>
+    /// Stops triggers without their actions, as <c>Act_DeactTrig</c> stops them (TR9): each active trigger leaves the
+    /// active list and becomes inactive, and each pending start of the triggers goes. The start plan uses it at the end
+    /// of its replay, so it also works after the stop at the stop point. The machine refuses it after the end of the
+    /// mission or after another stop.
+    /// </summary>
+    /// <returns>The Stopped and the Cancelled changes.</returns>
+    internal MachinePass StopTriggers(IEnumerable<MissionTrigger> triggers)
+    {
+        if (End != null || Halt is { Kind: not MachineHaltKind.StopPoint })
+            return MachinePass.Refused;
+        Begin();
+        foreach (var slot in triggers.Select(program.SlotOf).Where(s => s >= 0).Distinct())
+            Deactivate(slot);
+        return Finish();
+    }
+
     /// <summary>A copy of the state, for the snapshots of the dry run.</summary>
     public MachineState Snapshot() => new(program, Options)
     {

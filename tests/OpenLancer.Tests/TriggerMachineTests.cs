@@ -680,6 +680,71 @@ public sealed class TriggerMachineTests
         Assert.Empty(machine.Pending);
     }
 
+    /// <summary>A stop without actions removes an active trigger, as Act_DeactTrig does. The trigger does not run, so
+    /// its lines do nothing. A trigger that ran stays complete.</summary>
+    [Fact]
+    public void AStopWithoutActionsStopsActiveAndPendingTriggers()
+    {
+        var world = new TestWorld();
+        var machine = Machine(Start("t_go", "Cnd_True = no_params", "Act_ActTrig = t_wait", "Act_ActTrig = t_later") +
+                              Trigger("t_wait", "Cnd_Timer = 100", "Act_SpawnSolar = ol_buoy", "Act_ActTrig = t_fail") +
+                              Trigger("t_later", "Cnd_CommComplete = line_a") +
+                              Trigger("t_fail", "Cnd_True = no_params", "Act_ChangeState = FAIL"), world);
+        machine.StartMission();
+        machine.Heartbeat();
+        machine.Force(T(machine, "t_later"));
+        world.Effects.Clear();
+
+        var pass = machine.StopTriggers([T(machine, "t_wait"), T(machine, "t_later")]);
+
+        Assert.False(pass.IsRefused);
+        Assert.Equal(["t_wait"], Of(pass, MachineChangeKind.Stopped));
+        Assert.Empty(Of(pass, MachineChangeKind.Ran));
+        Assert.Empty(world.Effects);
+        Assert.Equal(TriggerStatus.Inactive, Status(machine, "t_wait"));
+        Assert.Equal(TriggerStatus.Complete, Status(machine, "t_later"));
+        Assert.Empty(machine.Active);
+        Assert.Null(machine.End);
+    }
+
+    /// <summary>After the stop at the stop point, the machine refuses each pass. A stop without actions still works,
+    /// so the start plan can stop triggers at the end of its replay. It removes an active trigger and a start that the
+    /// stop kept. After another stop or after the end of the mission, the machine refuses it.</summary>
+    [Fact]
+    public void AStopWithoutActionsWorksAfterTheStopPointOnly()
+    {
+        var (p, q, r) = ById("ol_guard_p", "ol_guard_q", "ol_guard_r") is [var a, var b, var c] ? (a, b, c) : default;
+        var script = Start("t_go", "Cnd_True = no_params", $"Act_ActTrig = {r}", $"Act_ActTrig = {q}", $"Act_ActTrig = {p}") +
+                     Trigger(p, "Cnd_Timer = 100") + Trigger(q, "Cnd_True = no_params") + Trigger(r, "Cnd_Timer = 100");
+        var index = Index(script);
+        var machine = new TriggerMachine(index, new TestWorld(), new MachineOptions { StopBefore = index.Trigger(q) });
+        machine.StartMission();
+        machine.Heartbeat();
+        Assert.True(machine.IsOver);
+        Assert.Equal([p], machine.Active.Select(t => t.Nickname));
+        Assert.Equal([r], machine.Pending.Select(t => t.Nickname));
+
+        var pass = machine.StopTriggers([index.Trigger(p)!, index.Trigger(r)!]);
+
+        Assert.False(pass.IsRefused);
+        Assert.Equal([p], Of(pass, MachineChangeKind.Stopped));
+        Assert.Equal([r], Of(pass, MachineChangeKind.Cancelled));
+        Assert.Empty(machine.Active);
+        Assert.Empty(machine.Pending);
+        Assert.Equal(MachineHaltKind.StopPoint, machine.Halt!.Kind);
+
+        var ended = Machine(Start("t_end", "Cnd_True = no_params", "Act_ChangeState = SUCCEED") +
+                            Start("t_wait", "Cnd_Timer = 100"));
+        ended.StartMission();
+        Assert.True(ended.StopTriggers([T(ended, "t_wait")]).IsRefused);
+        var halted = Machine(Start("t_go", "Cnd_True = no_params", "Act_ActTrig = t_empty") + Trigger("t_empty", "") +
+                             Start("t_wait", "Cnd_Timer = 100"));
+        halted.StartMission();
+        halted.Heartbeat();
+        Assert.Equal(MachineHaltKind.NoCondition, halted.Halt!.Kind);
+        Assert.True(halted.StopTriggers([T(halted, "t_wait")]).IsRefused);
+    }
+
     [Fact]
     public void ForceRunsAnActiveTriggerAndRefusesAnInactiveOne()
     {
