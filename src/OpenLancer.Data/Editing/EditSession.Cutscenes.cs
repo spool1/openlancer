@@ -274,13 +274,18 @@ public sealed partial class EditSession
             .Concat(changed.UsedBy(path)));
     }
 
-    /// <summary>The INI files that a command changed, and their lines of W that name cutscenes. A file that W does not
-    /// have, for example after the undo of a new file, has no lines.</summary>
+    /// <summary>
+    /// The INI files that a command changed, and their lines of W that name cutscenes. The files of the open transaction
+    /// or the open batch count too. They go into the edited files only at the commit, and the commit checks of a batch
+    /// run before it. So the result of the first agent INI edit of a session gives the same problems as the save gate.
+    /// A file that W does not have, for example after the undo of a new file, has no lines.
+    /// </summary>
     private (HashSet<string> Files, ThnReferences References) ChangedIniReferences()
     {
         if (changedIniReferences is not { } known || known.Revision != CacheRevision)
         {
-            var files = touched.Where(p => p.EndsWith(".ini", StringComparison.OrdinalIgnoreCase))
+            IReadOnlyCollection<string> open = transaction?.Paths ?? batch?.Paths ?? [];
+            var files = touched.Concat(open).Where(p => p.EndsWith(".ini", StringComparison.OrdinalIgnoreCase))
                 .ToHashSet(VfsPath.Comparer);
             var references = ThnReferences.Read(files.Order(StringComparer.OrdinalIgnoreCase).Select(file =>
                 (file, documents.GetValueOrDefault(file) is { State.Exists: true } document

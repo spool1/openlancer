@@ -577,6 +577,88 @@ public sealed class ThnNameGateTests
         Assert.Empty(Errors(session));
     }
 
+    /// <summary>
+    /// The first agent INI edit of a session can make the game build the COMPOUNDs of a script of space. An armor whose
+    /// <c>DA_archetype</c> names the script is a use that is not <c>Act_CallThorn</c>. The commit checks run before the
+    /// batch adds its files to the edited files. So the checks also read the INI files of the open batch. The result
+    /// gives the problem in <c>new_problems</c>, as the save gate gives it after the commit. A preview gives the same
+    /// problem, and the cutscene has no problem after it.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TheFirstAgentIniEditOfASessionGivesTheProblemOfAScriptOfSpace(bool preview)
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        ThnDataWorkspace.SetTemplate(session, "Ship", "ghost_ship", ThnDataWorkspace.SpaceScript);
+        Assert.Empty(Errors(session, ThnDataWorkspace.SpaceScript));
+        var host = new TestAgentHost(session);
+        var armor = AgentCalls.Json($"sec:{ThnDataWorkspace.EquipmentPath}#Armor/armor1");
+
+        var result = AgentCalls.Ok(host, "set_fields",
+            $$"""{ "ref": {{armor}}, "fields": { "DA_archetype": "Missions\\M01A\\space.thn" }, "preview": {{(preview ? "true" : "false")}} }""");
+
+        Assert.Equal(preview ? "previewed" : "applied", (string?)result["status"]);
+        var problem = Assert.Single(result["new_problems"]!.AsArray(), p => (string?)p!["message"] == GhostShip)!;
+        Assert.Equal($"thn:{ThnDataWorkspace.SpaceScript}#entity/Ship", (string?)problem["ref"]);
+        if (preview)
+        {
+            Assert.Empty(Errors(session, ThnDataWorkspace.SpaceScript));
+            return;
+        }
+        Assert.Equal([GhostShip], Errors(session, ThnDataWorkspace.SpaceScript));
+        Assert.Contains(session.SaveProblems(), p => p.Message == GhostShip);
+    }
+
+    /// <summary>
+    /// The check before an agent mission request also reads the mission script of the open batch. The request sets the
+    /// only <c>Act_CallThorn</c> line of a script of space to another script, so the game builds the COMPOUNDs of the
+    /// script. The session did not change the mission script before, and the result gives the problem in
+    /// <c>new_problems</c>.
+    /// </summary>
+    [Fact]
+    public void AnAgentMissionRequestThatMovesTheTriggerOfSpaceGivesTheProblem()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        ThnDataWorkspace.SetTemplate(session, "Ship", "ghost_ship", ThnDataWorkspace.SpaceScript);
+        Assert.Empty(Errors(session, ThnDataWorkspace.SpaceScript));
+        var host = new TestAgentHost(session);
+        var line = AgentCalls.Json($"line:{ThnDataWorkspace.MissionPath}#Trigger/t1/1");
+
+        var result = AgentCalls.Ok(host, "mission_set_action",
+            $$"""{ "line": {{line}}, "values": { "file": "Scripts\\x.thn" }, "expect_key": "Act_CallThorn" }""");
+
+        Assert.Equal("applied", (string?)result["status"]);
+        var problem = Assert.Single(result["new_problems"]!.AsArray(), p => (string?)p!["message"] == GhostShip)!;
+        Assert.Equal($"thn:{ThnDataWorkspace.SpaceScript}#entity/Ship", (string?)problem["ref"]);
+        Assert.Equal([GhostShip], Errors(session, ThnDataWorkspace.SpaceScript));
+    }
+
+    /// <summary>
+    /// An open transaction counts too, for example a gesture of the Inspector. Its step removes the only
+    /// <c>Act_CallThorn</c> line of a script of space, so the cutscene gives the COMPOUND error at once, before the
+    /// commit. A cancel of the transaction heals it.
+    /// </summary>
+    [Fact]
+    public void AnOpenTransactionThatRemovesTheTriggerOfSpaceGivesTheProblemAtOnce()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        ThnDataWorkspace.SetTemplate(session, "Ship", "ghost_ship", ThnDataWorkspace.SpaceScript);
+        Assert.Empty(Errors(session, ThnDataWorkspace.SpaceScript));
+
+        using (var transaction = session.Begin("Remove the cutscene line"))
+        {
+            transaction.Apply(MissionTestData.Raw(EditCommand.RemoveName(ThnDataWorkspace.Trigger, "Act_CallThorn")));
+            Assert.Equal([GhostShip], Errors(session, ThnDataWorkspace.SpaceScript));
+            transaction.Cancel();
+        }
+
+        Assert.Empty(Errors(session, ThnDataWorkspace.SpaceScript));
+    }
+
     /// <summary>The Problems section of the Cutscene page shows an error with the label "Crash" and without its crash
     /// start. It shows a name problem whole, with the label "Name problem". So the row tells which problems crash the
     /// game.</summary>
