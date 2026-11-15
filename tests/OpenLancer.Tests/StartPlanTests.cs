@@ -1321,7 +1321,7 @@ public sealed class StartPlanTests
         Assert.Throws<ArgumentException>(() => MissionStartPoint.At(" "));
     }
 
-    // The combat start of issue #48. The plan tells it, and the Play start page warns about the starter ship.
+    // The combat start of issue #48. The plan tells it, and the Play start page warns about the default ship.
 
     /// <summary>The plan of a start of the two-system story of the world tests, at the place of a choice.</summary>
     private static StartPlan WorldPlan(string text, StartPlaceChoice choice = StartPlaceChoice.Suggested,
