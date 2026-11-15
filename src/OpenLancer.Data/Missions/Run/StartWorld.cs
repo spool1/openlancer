@@ -343,6 +343,9 @@ internal static class StartWorld
         private readonly HashSet<string> leftOutMembers = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> madeMembers = new(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>The results of <see cref="Members"/> by name.</summary>
+        private readonly Dictionary<string, IReadOnlySet<string>> named = new(StringComparer.OrdinalIgnoreCase);
+
         /// <summary>The order lines that the setup gives after the world lines (<see cref="ArrivalOrders"/>).</summary>
         private readonly List<(string Key, IReadOnlyList<string> Values)> arrivalLines = [];
 
@@ -1147,11 +1150,16 @@ internal static class StartWorld
 
         /// <summary>The objects that a name of a world line stands for (see <see cref="StartSetup.Members"/>). A world line
         /// names a solar or a loot by its nickname. So such a name is that object, also when a label has the same
-        /// name.</summary>
-        private IReadOnlySet<string> Members(string name) =>
-            ItemKindOf(name) is StartObjectKind.Solar or StartObjectKind.Loot
-                ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) { name.Trim() }
-                : StartSetup.Members(index, name);
+        /// name. The builder keeps each result, because the pass asks for the same names many times.</summary>
+        private IReadOnlySet<string> Members(string name)
+        {
+            name = name.Trim();
+            if (!named.TryGetValue(name, out var members))
+                named[name] = members = ItemKindOf(name) is StartObjectKind.Solar or StartObjectKind.Loot
+                    ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) { name }
+                    : StartSetup.Members(index, name);
+            return members;
+        }
 
         private StartObjectKind KindOf(Entry entry, string name) => entry switch
         {
