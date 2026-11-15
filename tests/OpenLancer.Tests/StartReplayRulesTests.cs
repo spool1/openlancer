@@ -2109,4 +2109,94 @@ public sealed class StartReplayRulesTests
         Assert.Equal(["p_start", "p_first", "p_done"], Ran(replay));
         Assert.Contains("p_second", Waiting(replay));
     }
+
+    /// <summary>
+    /// The fail guards of a path that jumps from g_sys_a to g_sys_b. g_guard started before the jump, and a chain of two
+    /// starts leads from it to the mission fail. So the replay stops it without its actions, and its buoy does not
+    /// spawn. g_long needs a chain of three starts, the repeatable g_repeat can run again, and g_here started after the
+    /// jump. So they still wait. A path without a jump keeps each guard.
+    /// </summary>
+    [Theory]
+    [InlineData("g_sys_b", false)]
+    [InlineData("g_sys_a", true)]
+    public void AFailGuardOfAnEarlierSystemStopsWithoutItsActions(string arrival, bool keeps)
+    {
+        var text = """
+            [Trigger]
+            nickname = g_start
+            InitState = ACTIVE
+            Cnd_True = no_params
+            Act_ActTrig = g_guard
+            Act_ActTrig = g_long
+            Act_ActTrig = g_repeat
+            Act_ActTrig = g_launch
+
+            [Trigger]
+            nickname = g_guard
+            Cnd_Timer = 100
+            Act_SpawnSolar = g_buoy
+            Act_ActTrig = g_nag
+
+            [Trigger]
+            nickname = g_nag
+            Cnd_Timer = 30
+            Act_ActTrig = g_fail
+
+            [Trigger]
+            nickname = g_fail
+            Cnd_True = no_params
+            Act_ChangeState = FAIL
+
+            [Trigger]
+            nickname = g_long
+            Cnd_Timer = 100
+            Act_ActTrig = g_long_1
+
+            [Trigger]
+            nickname = g_long_1
+            Cnd_Timer = 30
+            Act_ActTrig = g_long_2
+
+            [Trigger]
+            nickname = g_long_2
+            Cnd_Timer = 30
+            Act_ActTrig = g_fail
+
+            [Trigger]
+            nickname = g_repeat
+            repeatable = true
+            Cnd_Timer = 100
+            Act_ChangeState = FAIL
+
+            [Trigger]
+            nickname = g_launch
+            Cnd_SpaceEnter = g_sys_a
+            Act_ActTrig = g_arrive
+
+            [Trigger]
+            nickname = g_arrive
+            Cnd_SystemEnter = {ARRIVAL}
+            Act_ActTrig = g_here
+            Act_ActTrig = g_chosen
+
+            [Trigger]
+            nickname = g_here
+            Cnd_Timer = 100
+            Act_ChangeState = FAIL
+
+            [Trigger]
+            nickname = g_chosen
+            Cnd_Timer = 5
+            """.Replace("{ARRIVAL}", arrival);
+
+        var replay = Replay(text, "g_chosen");
+
+        Assert.Equal(StartRefusal.None, replay.Refusal);
+        Assert.Equal(["g_start", "g_launch", "g_arrive"], Ran(replay));
+        Assert.DoesNotContain(replay.Effects, e => e.Line.Value(0) == "g_buoy");
+        Assert.Equal(keeps, Waiting(replay).Contains("g_guard"));
+        Assert.Equal(keeps ? 0 : 1, replay.Jumps.Count);
+        foreach (var stays in new[] { "g_long", "g_repeat", "g_here" })
+            Assert.Contains(stays, Waiting(replay));
+    }
 }

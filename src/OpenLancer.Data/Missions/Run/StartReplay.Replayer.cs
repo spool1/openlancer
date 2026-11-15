@@ -12,7 +12,7 @@ internal sealed partial record StartReplay
     /// stays active, also when the game ran it long before the chosen trigger. These rules run such a trigger at the point
     /// where the path shows its event. The rules run in this order before each trigger of the path: timers, objectives,
     /// the early space test, systems, launch, peer events, spawns, polls, and timers again. Then the trigger of the path
-    /// runs, and the space test follows.
+    /// runs, and the space test follows. After the last trigger of the path, the fail guard rule follows.
     /// <list type="bullet">
     /// <item>Timers (issue #46). A waiting timer ran when the path shows that at least its time passed since its start.
     /// All timers count on the same heartbeats.
@@ -119,6 +119,11 @@ internal sealed partial record StartReplay
     /// plus the slack is less than the radius. A waiting trigger that can stop the poll does not keep it
     /// waiting.</item>
     /// </list></item>
+    /// <item>Fail guards (issue #46). After the last trigger of the path, a waiting timer can lead to a mission fail in
+    /// a chain of at most two starts. When such a timer started before the last jump of the path, it stops without its
+    /// actions. This is not a retail rule. It follows the intended play: the player left the system of the guard, and
+    /// the mission went on. The chosen trigger and a repeatable timer stay. The rule looks only at the pass that gives
+    /// the result.</item>
     /// </list>
     /// Such a run must not stop the replay, end the mission, run or stop a trigger of the rest of the path, or start the
     /// chosen trigger. Else the replay goes back to the state before it. A repeatable trigger does not run in this way.

@@ -580,6 +580,23 @@ public sealed partial class StartPlanRetailTests
         }
     }
 
+    /// <summary>
+    /// The row of the fail guard rule of the replay (issue #46) in both games. In M08, horsing_around_timer starts in
+    /// Ku04, and a short chain from it fails the mission. Only the destroy of a platform stops it. The path of ku06_init
+    /// jumps on to Ku06, and the mission went on. So the replay stops the old timer without its actions, and the Ku06
+    /// play does not fail.
+    /// </summary>
+    [Fact]
+    public void TheFailGuardRuleStopsAnOldFailTimerOfAnEarlierSystem()
+    {
+        foreach (var (set, scripts) in new[] { ("vanilla", Scripts()), ("hd", Slots(Hde.Value)) })
+        {
+            var ku06 = Plan(Slot(scripts, "M08"), "ku06_init");
+            Assert.True(ku06.CanStart, $"{set}: {ku06.Reason}");
+            Assert.DoesNotContain("horsing_around_timer", ku06.ActiveSet);
+        }
+    }
+
     /// <summary>The row of issue 45 in both games. M04 juni_mactan_tether starts in Iw03, after the jump from Li01. The
     /// game sent the exit from Li01 at the jump, so leaving_liberty_01 stopped the fail watcher too_far_from_magellan_dock
     /// of a point in Li01. arrive_at_jumpgate starts leaving_liberty_01, so it ran before the jump. A start at
