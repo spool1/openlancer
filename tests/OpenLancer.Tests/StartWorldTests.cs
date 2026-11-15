@@ -495,6 +495,23 @@ public sealed class StartWorldTests
         Assert.DoesNotContain(plan.Companions, c => c.Object == formation);
     }
 
+    /// <summary>The limit that the help page names. A later spawn line takes one ship of a formation of the start
+    /// system, and the formation keeps its other ship. The spawn line of the formation stays, and it makes both ships.
+    /// So the setup has two spawn lines that make the taken ship.</summary>
+    [Fact]
+    public void AFormationThatKeepsALiveShipKeepsItsSpawnLine()
+    {
+        var plan = Plan(Script(jump: """
+            Act_SpawnFormation = ol_form_b
+            Act_SpawnShip = ol_g1
+            """, records: FormationB));
+        var lines = WorldLines(plan);
+
+        Assert.Contains("Act_SpawnFormation = ol_form_b", lines);
+        Assert.Contains("Act_SpawnShip = ol_g1", lines);
+        Assert.DoesNotContain(plan.LeftOut, l => l.Object is "ol_form_b" or "ol_g1");
+    }
+
     /// <summary>A formation can have the name of a ship of an older formation. Its spawn line makes only its own ships,
     /// so it takes no ship. The older formation keeps that ship after the loss of its other ship, so it stays.</summary>
     [Fact]
@@ -574,6 +591,32 @@ public sealed class StartWorldTests
                                           l.EndsWith("= ol_plat", StringComparison.Ordinal));
         Assert.Contains(plan.LeftOut, l => l is { Object: "ol_plat", Kind: StartObjectKind.Solar, System: "ol_sys_a" });
         Assert.DoesNotContain(plan.LeftOut, l => l.Object == "ol_plat_b");
+    }
+
+    /// <summary>The limit that the help page names: a line that reads a label with the name of a solar also stands only
+    /// for that solar. The solar of the first system is left out, so the label line goes, also when the setup makes the
+    /// other solar of the label.</summary>
+    [Fact]
+    public void ALabelLineWithTheNameOfASolarStandsForTheSolar()
+    {
+        var plan = Plan(Script(a: "Act_SpawnSolar = ol_plat", jump: """
+            Act_SpawnSolar = ol_plat_b
+            Act_SetVibeLbl = ol_plat, ol_friends, REP_HOSTILE_MAXIMUM
+            """, records: """
+            [MsnSolar]
+            nickname = ol_plat
+            position = 2000, 0, 2000
+            label = ol_plat
+
+            [MsnSolar]
+            nickname = ol_plat_b
+            position = 11000, 0, 11000
+            label = ol_plat
+            """));
+        var lines = WorldLines(plan);
+
+        Assert.Contains("Act_SpawnSolar = ol_plat_b", lines);
+        Assert.DoesNotContain(lines, l => l.StartsWith("Act_SetVibeLbl = ol_plat,", StringComparison.Ordinal));
     }
 
     /// <summary>The spawn line of a solar does not make a ship of the label with the name of the solar. So a line on

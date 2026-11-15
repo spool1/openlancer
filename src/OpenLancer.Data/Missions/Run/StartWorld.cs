@@ -1164,9 +1164,15 @@ internal static class StartWorld
             Members(name).Append(name.Trim()).Select(m => byMember.GetValueOrDefault(m)).OfType<Unit>()
                 .Where(u => u.Live).Distinct();
 
-        /// <summary>The objects that a name of a world line stands for (see <see cref="StartSetup.Members"/>). A world line
-        /// names a solar or a loot by its nickname. So such a name is that object, also when a label has the same
-        /// name. The builder keeps each result, because the pass asks for the same names many times.</summary>
+        /// <summary>
+        /// The objects that a name of a world line stands for (see <see cref="StartSetup.Members"/>). A spawn line and a
+        /// line on an object, for example <c>Act_SetVibe</c>, name a solar or a loot by its nickname. So such a name is
+        /// that object, also when a label has the same name. The schema does not tell which values read a label first.
+        /// So a line that reads the label, for example <c>Act_SetVibeLbl</c> or <c>Cnd_Destroyed</c>, also stands only
+        /// for that object. The help page names this limit. The replay rules read the label (<see
+        /// cref="StartSetup.Members"/>). The builder keeps each result, because the pass asks for the same names many
+        /// times.
+        /// </summary>
         private IReadOnlySet<string> Members(string name)
         {
             name = name.Trim();

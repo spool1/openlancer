@@ -324,11 +324,15 @@ The editor follows each object along the path:
 - In the game, the arrival of such a ship then runs each trigger that waits for it (Cnd_NPCSystemEnter). Such a trigger can give the ship new orders. The play makes the ship in the start system, so a trigger of the start that waits for its arrival does not run. The setup gives the orders of that trigger to each ship that came with the player and got no orders after the arrival. These lines come after the other world lines.
 - An object whose system no line tells stays in the setup.
 
-The setup leaves out each object that is in another system at the trigger. It also removes each line that names such an object, for example orders, attitudes, marks and fuses. A label with a member in the start system keeps its lines. A name of a solar or a loot is that object, also when a label has the same name. A line on an object that no line of the setup makes goes too, because it fails in the game.
+The setup leaves out each object that is in another system at the trigger. It also removes each line that names such an object, for example orders, attitudes, marks and fuses. A label with a member in the start system keeps its lines. A line on an object that no line of the setup makes goes too, because it fails in the game.
+
+A label can have the name of a mission solar or loot. Then the setup reads that name as the object in each world line. This is correct for a spawn line and for a line that names the object, for example Act_SetVibe. A line that reads the label, for example Act_SetVibeLbl, then also stands only for the object. So such a line goes when the setup does not make the object, also when it makes other members of the label. This is a limit of this version.
 
 An object that the path destroys before the trigger of the start does not exist at the start. So its spawn line and its destroy line go. Each move of the object before the destroy goes too, because a move makes a ship that does not exist. When the path spawns an object two times, only the last spawn line stays. The lines between the two spawn lines that name the object go too.
 
-A later spawn line can make ships of an older formation again, also when the formation lost one ship before. The new object takes these ships, and the older formation keeps only its other ships. When it keeps no ship, it does not exist at the start. Then its spawn line goes too, with the lines between that name it or its ships.
+A later spawn line can make ships of an older formation again, also when the formation lost a ship before. The new object takes these ships. When the older formation has no live ship left, it does not exist at the start. Destroy lines can name its other ships before or after the take. Then its spawn line goes, with the lines between that name it or the taken ships. The lines on its destroyed ships go too.
+
+When the older formation keeps a live ship in the start system, its spawn line stays. That line makes all the ships of the formation. So the play can make a taken ship two times. This is a limit of this version.
 
 A trigger that runs at the start can spawn an object of the setup again. Such triggers wait for nothing, for the launch, for the entry to space or for a timer. For a base start, they can also wait for the end of the launch or for the base. The scripts spawn an object again only after the first object left space. So the setup leaves out the old object, and the page names the trigger that makes it again.
 
