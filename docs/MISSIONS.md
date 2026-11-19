@@ -335,6 +335,17 @@ The rules give a timer a time only from other timers and from the arrival of jum
 - An old timer whose time no timer of the path shows still runs in the play, also when the game ran it long before. For example, an old timer can set an old objective right after a jump. The fail guard rule stops such a timer only when it leads to a mission fail and started before the last jump.
 - A comm timer can start at a launch. In the game, it runs during the flight after the launch. The game data gives no time for that flight, so the timer can still wait when the play starts at a later trigger. The play then sends the old comm line again. At the end of the line, an old trigger can give the player an old order list.
 
+The replay has no game world. So it does not know where a ship flew before the trigger of the play start. A ship can then act differently in the play than in the game:
+
+- A trigger of the path gave the ship orders. In the game, the ship flew these orders before the trigger of the play start. In the play, the ship starts at the place of the setup. That place can be far from the place where its orders took it.
+- A trigger that waits at the start tests the place of a ship with a distance check. In the game, the ship got to that place soon after the trigger of the play start. In the play, the ship can start away from that place and never get there.
+
+M04 shows this at the trigger `juni_mactan_tether`, in both games. The start place of the player is about 24 km from the base where the player launches in the game. The setup also puts the escort `Juni_mactan` next to the player. The game keeps her undock flight, so she flies back toward the dock.
+
+Two waiting triggers test if she is near an exit of the dock. In the game, they give her the order to follow the player. In the play, she does not get near an exit, so she gets no follow order. She flies away from the player, and the mission fails after about one minute.
+
+To test such a part, start the play at an earlier trigger. Use a trigger before the trigger that gave the orders or that started the waiting trigger. You can also start at the mission start.
+
 #### The world of the start system
 
 The setup trigger of the world rebuilds the world of the path. In the game, the objects of an earlier system stay in that system when the player jumps. So the setup makes only the objects of the start system. That is the system of the start place. For a base start, it is the system of the base. For a start at the Scene camera, it is the system of the camera when the play starts.
