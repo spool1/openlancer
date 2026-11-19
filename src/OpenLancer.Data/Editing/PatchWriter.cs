@@ -836,8 +836,9 @@ internal static class PatchWriter
         /// M6b design).
         /// </summary>
         /// <param name="deleted">The sections that the loaded patch or an edit deleted.</param>
-        /// <param name="placed">The indexes in W of the new and moved sections that get <c>ol.before</c>. They do not
-        /// move the sections after them.</param>
+        /// <param name="placed">The indexes in W of the sections that the merge puts at their place: the new and moved
+        /// sections that get <c>ol.before</c>, or the run of <c>[Base]</c> sections of <c>universe.ini</c> directly
+        /// before the first <c>[system]</c>. A new or moved one of them does not move the sections after it.</param>
         private HashSet<SectionIdentity> Moved(IReadOnlySet<SectionIdentity> deleted, IReadOnlySet<int> placed)
         {
             var result = SectionKeys.IsMissionFile(path) ? MovedOfMissionFile(placed) : MovedInOrder(placed);
