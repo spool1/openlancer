@@ -573,7 +573,7 @@ The check reads the data lists with the unsaved edits. So an INI edit of the act
 
 `check` with the scope `all` lists each problem of these cutscenes. `save` refuses the save and gives the text of the save gate of the editor. A call that changes only cutscenes gives no problem of another cutscene.
 
-To find a cutscene that a change of the game data breaks, the save gate looks for the name of the item in the cutscene file. So it does not find a template that a text script makes from parts, for example with `..`.
+To find a cutscene that a change of the game data breaks, the save gate looks for the item name in the cutscene file. So it does not find a template that a text script makes from parts, for example with `..`.
 
 `list_values` gives the names of the data lists of the templates:
 
@@ -585,7 +585,7 @@ To find a cutscene that a change of the game data breaks, the save gate looks fo
 
 A clip of a START_MOTION event on a character that the game does not have is a problem too: the character does not move. An empty clip is such a problem, so give the clip in the `fields` of `cutscene_add_event`. The clip is the value of `props.animation`. Without this key, the event crashes the game. `save` refuses such a clip with the text of the save gate of the editor. A COMPOUND plays the scripts of its own model, so the check skips a clip on a COMPOUND.
 
-Get the clip names from `list_values` with the list `animation`. The detail of each row is the file of the clip. The list has the clips of the `.anm` files that the `[Animations]` lines of bodyparts.ini name, with the files of the mods. The tools cannot change these lines.
+Get the clip names from `list_values` with the list `animation`. The detail of each row is the file of the clip. The list has the clips of the `.anm` files that the `[Animations]` lines of bodyparts.ini name, with the files of the mods. The tools cannot change these lines. The active mod can remove a clip, for example with its own `.anm` file without the clip. `check` and `save` then give the problem of each cutscene that plays the clip, also a cutscene that the active mod does not change.
 
 Each such problem gives the reference of its element. It gives the reference of the script when the problem is about the whole script. It also does so when another entity has the same name, or another event has the same time, type and targets. The active mod causes these problems, so their origin is the active mod. `check` with the scope `all` and the error `save_blocked` name the same references.
 

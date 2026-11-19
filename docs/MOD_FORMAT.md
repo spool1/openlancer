@@ -658,6 +658,8 @@ The check does not know the objects of the other scripts of a room. So a target 
 
 A THN patch that does not apply is a merge error. Each problem of a cutscene has its place: the cutscene, the element with its key and the path of the value. A click on the problem in the Console of the editor opens the cutscene and selects the element. When an edit after the save moved the element, the key finds it. When the key names no element or more than one element, the click selects the cutscene.
 
+The save gate of the editor also checks the cutscenes that a change of the active mod breaks (see "The save gate"). Such a cutscene names an item that the change deletes, renames or breaks, for example a costume. It can be a retail cutscene that no mod changes. `oltool validate` does not check a cutscene that no mod adds or changes.
+
 ## Rules
 
 - INI content and THN content in a mod must be ASCII. Text in `strings.json` can use any characters.
