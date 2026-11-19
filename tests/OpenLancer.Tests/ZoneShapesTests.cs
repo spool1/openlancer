@@ -75,6 +75,52 @@ public sealed class ZoneShapesTests
         Assert.Equal(0, ZoneShapes.Immersion(zone, new Vector3(0, 0, 1100)));
     }
 
+    /// <summary>The rotation turns the axes of the zone as the engine turns them. A turn of 30 degrees about Y points
+    /// the Z axis of the zone to (sin 30°, 0, cos 30°) in the world, and the X axis to (cos 30°, 0, -sin 30°). A turn in
+    /// the other direction gives other values, because the angle is not symmetric for the shape.</summary>
+    [Fact]
+    public void ARotationOf30DegreesTurnsTheAxesOfTheZone()
+    {
+        var zone = Zone(Universe.ZoneShape.ELLIPSOID, new Vector3(1000, 500, 2000), pos: new Vector3(100, 0, 0),
+            rotate: new Vector3(0, 30, 0));
+
+        // 1800 m along the Z axis of the zone, and 900 m along its X axis: the scaled distance is 0.9.
+        Assert.Equal(0.4f, ZoneShapes.Immersion(zone, new Vector3(100 + 900, 0, 1558.846f)), 3);
+        Assert.Equal(0.4f, ZoneShapes.Immersion(zone, new Vector3(100 + 779.423f, 0, -450)), 3);
+        Assert.True(ZoneShapes.Contains(zone, new Vector3(100 + 950, 0, 1645.448f)));
+        // 1900 m along the Z axis of the world is outside.
+        Assert.False(ZoneShapes.Contains(zone, new Vector3(100, 0, 1900)));
+        Assert.Equal(0, ZoneShapes.Immersion(zone, new Vector3(100, 0, 1900)));
+    }
+
+    /// <summary>Without a fade band, the immersion is more than 0 exactly where the shape of the engine holds the
+    /// point, also after a rotation that is not symmetric for the shape. The grid has no point on an edge. A ring is
+    /// not in the list, because retail counts some points beyond the side of a flat ring as inside (see
+    /// <see cref="ZoneShapes"/>).</summary>
+    [Theory]
+    [InlineData(Universe.ZoneShape.ELLIPSOID, 1000f, 500f, 2000f, 0f, 30f, 0f)]
+    [InlineData(Universe.ZoneShape.BOX, 2000f, 1000f, 4000f, 20f, 30f, 0f)]
+    [InlineData(Universe.ZoneShape.CYLINDER, 1000f, 3000f, 0f, 30f, 0f, 10f)]
+    public void TheImmersionAgreesWithContainsForARotatedZone(Universe.ZoneShape shape, float x, float y, float z,
+        float pitch, float yaw, float roll)
+    {
+        var zone = Zone(shape, new Vector3(x, y, z), edge: null, pos: new Vector3(300, -200, 100),
+            rotate: new Vector3(pitch, yaw, roll));
+        var inside = 0;
+
+        for (var i = -2510f; i <= 2500; i += 250)
+        for (var j = -2510f; j <= 2500; j += 250)
+        for (var k = -2510f; k <= 2500; k += 250)
+        {
+            var point = new Vector3(i, j, k);
+            var contains = ZoneShapes.Contains(zone, point);
+            Assert.True(contains == ZoneShapes.Immersion(zone, point) > 0, $"{point}: inside {contains}");
+            inside += contains ? 1 : 0;
+        }
+
+        Assert.True(inside > 100, $"{inside} points inside");
+    }
+
     /// <summary>A box uses its full lengths. The retail scaled distance of a box is (s + r²) / r². Here s is the signed
     /// squared distance to the surface, and r is the radius of the bounding sphere. So even the center of a box is in
     /// a wide fade band.</summary>
