@@ -204,14 +204,8 @@ public static class ItemTemplates
     /// <summary>The lines of a copy of a section.</summary>
     /// <param name="rewrite">Gives value i of a line.</param>
     private static List<EntryView> Entries(Section section, bool binary, Func<Entry, int, ValueBase> rewrite) =>
-        section.Select(entry => new EntryView(entry.Name, entry.Select((_, i) =>
-        {
-            var copy = rewrite(entry, i);
-            // A binary file stores a new boolean as lowercase text (see BinaryValueTypes.Store).
-            return binary && copy is StringValue && bool.TryParse(copy.ToString(), out var truth)
-                ? new StringValue(truth ? "true" : "false")
-                : copy;
-        }).ToList())).ToList();
+        section.Select(entry => new EntryView(entry.Name,
+            entry.Select((_, i) => SectionCopies.Stored(rewrite(entry, i), binary)).ToList())).ToList();
 
     private static bool Is(string a, string b) => a.Equals(b, StringComparison.OrdinalIgnoreCase);
 
