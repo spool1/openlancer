@@ -1,0 +1,8 @@
+{
+  "id": "ol-format2",
+  "name": "Format 2 test mod",
+  "version": "1.0.0",
+  "formatVersion": 2,
+  "tier": 1,
+  "targets": [ "hde-0.7.1", "vanilla-1.1", "openlancer" ]
+}

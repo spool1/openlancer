@@ -1,0 +1,4 @@
+{
+  "strings": { "ol_fz_good_name": "Test cargo" },
+  "infocards": { "ol_fz_good_info": "<RDL><PUSH/><TEXT>A made-up good of the format 2 test.</TEXT><PARA/><POP/></RDL>" }
+}

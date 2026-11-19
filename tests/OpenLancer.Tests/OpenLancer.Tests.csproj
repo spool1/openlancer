@@ -17,6 +17,8 @@
     <!-- The snapshot of the JSON tool list of oltool mcp tools (section 13.1, item 1 of the MCP1 design). A change of a
          tool is a diff of this file. -->
     <Content Include="AgentTools.snapshot.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The frozen format 2 test mod of issue #63 (FrozenFormat2Tests): made-up data, and the expected packages. -->
+    <Content Include="FrozenMods\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

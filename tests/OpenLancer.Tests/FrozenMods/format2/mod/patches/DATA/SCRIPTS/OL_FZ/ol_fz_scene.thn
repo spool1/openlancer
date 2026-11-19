@@ -1,0 +1,8 @@
+-- The frozen format 2 test: a wider camera and a later cut.
+ol_thn_patch = 1
+entities = {
+	{ ol_match = "Cam_fz", ol_set = { ["cameraprops.fovh"] = 20 } }
+}
+events = {
+	{ ol_match = { 2, SET_CAMERA, { "Monitor_fz", "Cam_fz_wide" } }, ol_set = { time = 3 } }
+}

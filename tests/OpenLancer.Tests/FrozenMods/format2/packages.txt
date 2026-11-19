@@ -1,0 +1,43 @@
+# The expected packages of the frozen format 2 test mod (FrozenFormat2Tests).
+# Each line has three values with a tab between them: the package, the entry and the SHA-256 of the entry.
+# A text of a package, for example a README, has "text" in place of a hash. The hash of script.xml leaves out its
+# header element, because the header holds the texts of the package.
+# A planned change of the export updates this file in the same commit. Write the reason in the commit message.
+ol-format2-1.0.0-hde-0.7.1.zip	DATA/EQUIPMENT/goods.ini	15a1f585a3b7d072aa79995f7feffa3fa53decf9f916ba578881dd449b6da3e1
+ol-format2-1.0.0-hde-0.7.1.zip	DATA/EQUIPMENT/market_ships.ini	6c5799215d06ac2885c75d2064a24480ce030fe129d3a6f81ad8a703d918688d
+ol-format2-1.0.0-hde-0.7.1.zip	DATA/MISSIONS/OL_FZ/ol_fz.ini	4d6fe4d780724d76790889c02472d6c9d93c445dec62bd61dc4066acae631590
+ol-format2-1.0.0-hde-0.7.1.zip	DATA/MISSIONS/OL_FZ2/ol_fz2.ini	2345465b198e807dac5037a669d5689391936a75ea03a2374374059f73deba80
+ol-format2-1.0.0-hde-0.7.1.zip	DATA/MODS/ol-format2/CUTSCENES/ol_fz_new.thn	25e377ebd0e388b761749220fa291f766e69d4f464e8dbd86cf553e46c276fb9
+ol-format2-1.0.0-hde-0.7.1.zip	DATA/MODS/ol-format2/goods.ini	51739f71e6c6013847538ebb47bac16ac71833311c82dff4c3431e69d7c017c6
+ol-format2-1.0.0-hde-0.7.1.zip	DATA/OL_FZ/ol_fz_items.ini	9a2ebde16073a79b2ac67b8e8e21320335e3f259b4a05fb655082978360fa25c
+ol-format2-1.0.0-hde-0.7.1.zip	DATA/SCRIPTS/OL_FZ/ol_fz_scene.thn	053bbc96bd750b92d5666028430be66b36d4fca25dbfeec74f3978a586978160
+ol-format2-1.0.0-hde-0.7.1.zip	EXE/freelancer.ini	53ace5e79ddfdc8c9fb1c73261add8ea10389a915e3aaa83946448eddedd0ec2
+ol-format2-1.0.0-hde-0.7.1.zip	EXE/ol_ol-format2.dll	73c19fd7dbcf0fa186347b101f90e3450945bf951898a652141e26fb3a58be00
+ol-format2-1.0.0-hde-0.7.1.zip	ol-format2 README.txt	text
+ol-format2-1.0.0-hde-0.7.1-flmm.zip	ol-format2 README.txt	text
+ol-format2-1.0.0-hde-0.7.1-flmm.zip	ol-format2.flmod/DATA/MISSIONS/OL_FZ/ol_fz.ini	4d6fe4d780724d76790889c02472d6c9d93c445dec62bd61dc4066acae631590
+ol-format2-1.0.0-hde-0.7.1-flmm.zip	ol-format2.flmod/DATA/MISSIONS/OL_FZ2/ol_fz2.ini	2345465b198e807dac5037a669d5689391936a75ea03a2374374059f73deba80
+ol-format2-1.0.0-hde-0.7.1-flmm.zip	ol-format2.flmod/DATA/MODS/ol-format2/CUTSCENES/ol_fz_new.thn	25e377ebd0e388b761749220fa291f766e69d4f464e8dbd86cf553e46c276fb9
+ol-format2-1.0.0-hde-0.7.1-flmm.zip	ol-format2.flmod/DATA/MODS/ol-format2/goods.ini	51739f71e6c6013847538ebb47bac16ac71833311c82dff4c3431e69d7c017c6
+ol-format2-1.0.0-hde-0.7.1-flmm.zip	ol-format2.flmod/DATA/OL_FZ/ol_fz_items.ini	9a2ebde16073a79b2ac67b8e8e21320335e3f259b4a05fb655082978360fa25c
+ol-format2-1.0.0-hde-0.7.1-flmm.zip	ol-format2.flmod/DATA/SCRIPTS/OL_FZ/ol_fz_scene.thn	053bbc96bd750b92d5666028430be66b36d4fca25dbfeec74f3978a586978160
+ol-format2-1.0.0-hde-0.7.1-flmm.zip	ol-format2.flmod/script.xml	7d6326405092dae4330648de3a244e4336477296f974cf3485ddba1b19ec7337
+ol-format2-1.0.0-vanilla-1.1.zip	DATA/EQUIPMENT/goods.ini	32f7d21e680ced54f3272e33a8e9e11957e25fe4e0f358d321386b0bfecf0d8c
+ol-format2-1.0.0-vanilla-1.1.zip	DATA/EQUIPMENT/market_ships.ini	6c5799215d06ac2885c75d2064a24480ce030fe129d3a6f81ad8a703d918688d
+ol-format2-1.0.0-vanilla-1.1.zip	DATA/MISSIONS/OL_FZ/ol_fz.ini	4d6fe4d780724d76790889c02472d6c9d93c445dec62bd61dc4066acae631590
+ol-format2-1.0.0-vanilla-1.1.zip	DATA/MISSIONS/OL_FZ2/ol_fz2.ini	2345465b198e807dac5037a669d5689391936a75ea03a2374374059f73deba80
+ol-format2-1.0.0-vanilla-1.1.zip	DATA/MODS/ol-format2/CUTSCENES/ol_fz_new.thn	25e377ebd0e388b761749220fa291f766e69d4f464e8dbd86cf553e46c276fb9
+ol-format2-1.0.0-vanilla-1.1.zip	DATA/MODS/ol-format2/goods.ini	51739f71e6c6013847538ebb47bac16ac71833311c82dff4c3431e69d7c017c6
+ol-format2-1.0.0-vanilla-1.1.zip	DATA/OL_FZ/ol_fz_items.ini	9a2ebde16073a79b2ac67b8e8e21320335e3f259b4a05fb655082978360fa25c
+ol-format2-1.0.0-vanilla-1.1.zip	DATA/SCRIPTS/OL_FZ/ol_fz_scene.thn	053bbc96bd750b92d5666028430be66b36d4fca25dbfeec74f3978a586978160
+ol-format2-1.0.0-vanilla-1.1.zip	EXE/freelancer.ini	b5398706e92169f3bb565dc99fe912bf239576328a4aef00bb7568ab5221457c
+ol-format2-1.0.0-vanilla-1.1.zip	EXE/ol_ol-format2.dll	73c19fd7dbcf0fa186347b101f90e3450945bf951898a652141e26fb3a58be00
+ol-format2-1.0.0-vanilla-1.1.zip	ol-format2 README.txt	text
+ol-format2-1.0.0-vanilla-1.1-flmm.zip	ol-format2 README.txt	text
+ol-format2-1.0.0-vanilla-1.1-flmm.zip	ol-format2.flmod/DATA/MISSIONS/OL_FZ/ol_fz.ini	4d6fe4d780724d76790889c02472d6c9d93c445dec62bd61dc4066acae631590
+ol-format2-1.0.0-vanilla-1.1-flmm.zip	ol-format2.flmod/DATA/MISSIONS/OL_FZ2/ol_fz2.ini	2345465b198e807dac5037a669d5689391936a75ea03a2374374059f73deba80
+ol-format2-1.0.0-vanilla-1.1-flmm.zip	ol-format2.flmod/DATA/MODS/ol-format2/CUTSCENES/ol_fz_new.thn	25e377ebd0e388b761749220fa291f766e69d4f464e8dbd86cf553e46c276fb9
+ol-format2-1.0.0-vanilla-1.1-flmm.zip	ol-format2.flmod/DATA/MODS/ol-format2/goods.ini	51739f71e6c6013847538ebb47bac16ac71833311c82dff4c3431e69d7c017c6
+ol-format2-1.0.0-vanilla-1.1-flmm.zip	ol-format2.flmod/DATA/OL_FZ/ol_fz_items.ini	9a2ebde16073a79b2ac67b8e8e21320335e3f259b4a05fb655082978360fa25c
+ol-format2-1.0.0-vanilla-1.1-flmm.zip	ol-format2.flmod/DATA/SCRIPTS/OL_FZ/ol_fz_scene.thn	053bbc96bd750b92d5666028430be66b36d4fca25dbfeec74f3978a586978160
+ol-format2-1.0.0-vanilla-1.1-flmm.zip	ol-format2.flmod/script.xml	7d6326405092dae4330648de3a244e4336477296f974cf3485ddba1b19ec7337
