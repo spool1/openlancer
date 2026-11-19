@@ -15,7 +15,8 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// The place of a new <c>[Base]</c> in <c>universe.ini</c> (<see cref="UniverseOrder"/>): directly before the first
-/// <c>[system]</c>, in W, in the merge, in the patch that a save writes and in the export. The data is invented.
+/// <c>[system]</c>, in W, in the merge, in the patch that a save writes and in the export. The FLMM package refuses a
+/// new <c>[Base]</c>. The data is invented.
 /// </summary>
 public sealed class UniverseOrderTests
 {
@@ -297,6 +298,63 @@ public sealed class UniverseOrderTests
         using (var entry = zip.GetEntry("DATA/universe/universe.ini")!.Open())
             entry.CopyTo(stream);
         Assert.Equal(expected, Ids(IniDocument.Parse(Universe, stream.ToArray()).Sections));
+    }
+
+    [Fact]
+    public void TheFlmmPackageRefusesANewBaseAndNamesTheDropInZip()
+    {
+        using var game = new ExportGame();
+        game.Game.Write(@"DATA\universe\universe.ini", RetailOrder);
+        var mod = UniverseMod(game);
+
+        var script = FlmmScript.Build(game.Build(mod, keepPlaceholders: true), mod,
+            FlmmHeader.Of(PublishTexts.Of(mod.Manifest), game.Target), probe: false);
+
+        var error = Assert.Single(script.Problems);
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Equal($"The FLMM package cannot hold this change in {Universe}: the mod adds [Base] nickname = " +
+                     "Ol01_01_Base to universe.ini. The game links a base to its station only when the [Base] comes " +
+                     "before the [system] sections. The FLMM operation that puts a section there is not tested yet. " +
+                     "Use the drop-in zip, or change the mod.", error.Message);
+        Assert.DoesNotContain("<data", script.Xml);
+        Assert.Empty(script.Files);
+    }
+
+    /// <summary>A change of a line of a <c>[Base]</c> is no new <c>[Base]</c>, so the package holds it.</summary>
+    [Fact]
+    public void TheFlmmPackageHoldsAChangeOfABase()
+    {
+        using var game = new ExportGame();
+        game.Game.Write(@"DATA\universe\universe.ini", RetailOrder);
+        var mod = game.Mod("m", new() { [@"patches\" + Universe] = "[Base]\nnickname = Li01_02_Base\nsystem = Li02\n" });
+
+        var script = FlmmScript.Build(game.Build(mod, keepPlaceholders: true), mod,
+            FlmmHeader.Of(PublishTexts.Of(mod.Manifest), game.Target), probe: false);
+
+        Assert.Empty(script.Problems);
+        Assert.Contains("method=\"sectionreplace\"", script.Xml);
+    }
+
+    /// <summary>The refusal of a whole new file with mod text also names the drop-in zip (shared rule of the FLMM
+    /// package).</summary>
+    [Fact]
+    public void TheFlmmPackageRefusesAWholeFileWithModTextAndNamesTheDropInZip()
+    {
+        using var game = new ExportGame();
+        const string file = @"DATA\MODS\m\SYSTEMS\Ol01\Ol01.ini";
+        var mod = game.Mod("m", new()
+        {
+            ["strings.json"] = """{ "strings": { "sun": "Ol01 Sun" } }""",
+            [@"files\" + file] = "[Object]\nnickname = Ol01_sun\nids_name = $str:sun\n",
+        });
+
+        var script = FlmmScript.Build(game.Build(mod, keepPlaceholders: true), mod,
+            FlmmHeader.Of(PublishTexts.Of(mod.Manifest), game.Target), probe: false);
+
+        var error = Assert.Single(script.Problems);
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Equal($"The FLMM package cannot hold this change in {file}: the whole file holds mod text. FLMM reads " +
+                     "its text macros only in script operations. Use the drop-in zip, or change the mod.", error.Message);
     }
 
     /// <summary>A mod of the export tests with one new <c>[Base]</c> in its patch of <c>universe.ini</c>.</summary>
