@@ -129,6 +129,49 @@ public sealed class NicknamesTests
         Assert.Equal(SceneWorkspace.Li01("LightSource", "light1"), names.LightTaken(SceneWorkspace.Li01Path, "LIGHT1"));
     }
 
+    /// <summary>
+    /// The index reads the objects and zones of a new system file of W in the folder of the active mod, when a
+    /// <c>[system]</c> of W names it, before and after the first save. So a create takes no name of the new system, and
+    /// the <c>goto</c> line of a gate finds an exit object in the new system.
+    /// </summary>
+    [Fact]
+    public void TheIndexReadsANewSystemFileOfW()
+    {
+        using var ws = ListWorkspace.Create();
+        var session = ws.Session("act");
+        var gate = ListWorkspace.Li01("Li01_to_Li02");
+        session.Execute(EditCommand.SetLinesFromText(gate, "goto", ["Ol01, Ol01_sun, gate_tunnel_bretonia"]));
+        Assert.Null(session.Nicknames.Taken("Ol01_sun"));
+
+        session.Execute(EditCommand.Group("New system",
+        [
+            EditCommand.NewFile(NewModFileTests.NewPath, ContentPathsTests.Sections(NewModFileTests.SystemText)),
+            EditCommand.SetText(OpenLancer.Data.Strings.StringKind.String, "ol01_sun_name", "Ol01 Sun"),
+            EditCommand.AddSection(ListWorkspace.UniversePath, "system",
+            [
+                ListWorkspace.Line("nickname", "Ol01"),
+                ListWorkspace.Line("file", ContentPaths.UniverseValue(session, NewModFileTests.NewPath)!),
+            ]),
+        ]));
+
+        void AssertIndexed()
+        {
+            Assert.Equal(NewModFileTests.Sun, session.Nicknames.Taken("OL01_SUN")!.Section);
+            Assert.True(session.Nicknames.Find("zone_ol01_sun_death", zone: true)!.IsZone);
+            Assert.Contains(session.Nicknames.All, n => n.Section.Equals(NewModFileTests.Sun));
+            Assert.Equal("Ol01_sun_1", session.Nicknames.CopyName("Ol01_sun"));
+            Assert.DoesNotContain(session.CheckLists(gate), p => p.Key == "goto");
+        }
+
+        AssertIndexed();
+        var saved = session.Save();
+        Assert.True(saved.Saved, string.Join("\n", saved.Problems));
+        AssertIndexed();
+        session.Execute(EditCommand.DeleteFile(NewModFileTests.NewPath));
+        Assert.Null(session.Nicknames.Taken("Ol01_sun"));
+        Assert.Contains(session.CheckLists(gate), p => p.Key == "goto");
+    }
+
     [Fact]
     public void AFileOutsideUniverseIniDoesNotCount()
     {
