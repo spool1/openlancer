@@ -410,6 +410,8 @@ The editor edits two kinds of whole files of the active mod:
 - A file under `DATA/MISSIONS`, for example a test script, a replaced slot script or a file of ship builds.
 - An INI file below `DATA/MODS/<mod id>/` of the active mod, for example the file of a new star system. The editor also makes and deletes such a file, with undo. A new file cannot take the path of a file that the game, a mod or an unsaved edit has, in any letter case.
 
+A line of another file names such a file by its path. For example, the `file` line of a new `[system]` or a new `[Base]` in `universe.ini` names a file in the mod folder (see "universe.ini"). A `[Data]` line of `freelancer.ini` names a new data file (see "freelancer.ini").
+
 Each section of such a file is editable, also a section whose key another section has. The save writes the whole file as text into `files/`. A text file keeps its comments and the lines that do not change. A binary file becomes text, and the save tells it.
 
 A new file can use text placeholders, and the save checks that `strings.json` has their text. After a delete, the save deletes the file. An undo of the delete gives the file back, and the next save writes it again.

@@ -753,6 +753,7 @@ These cases give an error:
 
 - No game of Play in OpenLancer runs, or only the game of a play copy runs: `refused` with the detail `NoGame`. Start a game with `play` or `mission_play` first.
 - The game did not give the image in 10 s, the game closed, or the game could not write the file: `refused` with the detail `CaptureFailed` and the reason.
+- The editor cannot read the file as a PNG image: `refused` with the detail `CaptureFailed` and the reason.
 - A side above the image limit: `limit`.
 - You clear the group Play: `not_available`. The oltool host also gives `not_available`.
 
