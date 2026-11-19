@@ -224,8 +224,10 @@ public sealed class ThnReferenceGateTests
     public void TheProblemsSectionTellsTheCauseOnlyForACutsceneThatTheActiveModDoesNotChange()
     {
         Assert.Equal("The active mod does not change this cutscene. A change of the active mod in the game data, for " +
-                     "example an INI edit, removes or breaks an item of the cutscene. An animation file of the active " +
-                     "mod can also remove a clip. Undo that change, or pick another item.", ThnPage.LowerProblemsText);
+                     "example an INI edit, deletes, renames or breaks an item of the cutscene. An animation file of " +
+                     "the active mod can also remove a clip. Undo that change, or pick another item or clip.",
+            ThnPage.LowerProblemsText);
+        Assert.Empty(SteLint.Problems(ThnPage.LowerProblemsText));
         Assert.Equal(ThnPage.LowerProblemsText, ThnPage.LowerProblemsNote(new ThnFileSource(ThnFileKind.Lower, false), false));
         Assert.Equal(ThnPage.LowerProblemsText, ThnPage.LowerProblemsNote(new ThnFileSource(ThnFileKind.Lower, true), false));
         Assert.Null(ThnPage.LowerProblemsNote(new ThnFileSource(ThnFileKind.Lower, false), true));
@@ -242,6 +244,35 @@ public sealed class ThnReferenceGateTests
         session.Execute(ThnEdits.Set(Entity(session, "Cam"), new ThnPath("cameraprops.fovh"), new ThnNumber(20)));
         Assert.Equal(ThnFileKind.Lower, session.CutsceneSource(ScriptPath).Kind);
         Assert.Null(Note(session));
+    }
+
+    /// <summary>
+    /// The save gate does not check a cutscene that the editor cannot change. So the tooltip of each problem of such a
+    /// cutscene tells this with the reason. The tooltip of a problem of a cutscene that the gate checks tells that the
+    /// save stops. Here the active mod has a whole file and a THN patch for the script, and it deletes the costume.
+    /// </summary>
+    [Fact]
+    public void TheTooltipOfAProblemTellsWhenTheSaveGateDoesNotCheckTheCutscene()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        ThnBreaks.WriteModFile(ws, WholeFile, ThnDataWorkspace.Script);
+        ThnBreaks.WriteModFile(ws, PatchFile, "ol_thn_patch = 1\n");
+        var session = ws.Session("act");
+        var reason = session.CutsceneReadOnlyReason(ScriptPath);
+        Assert.NotNull(reason);
+
+        session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
+
+        var error = Assert.Single(session.CutsceneErrors(ScriptPath));
+        Assert.Equal(TrentMissing, error.Message);
+        Assert.DoesNotContain(ScriptPath, session.GateCutscenes());
+        Assert.Null(session.GateRefusal());
+        Assert.Equal($"{TrentMissing}\n\nThe save gate does not check this cutscene, because the editor cannot change " +
+                     $"it. {reason} Click to select the element.", ThnPage.ProblemTooltip(error, reason));
+        Assert.Equal($"{TrentMissing}\n\nThe save and Play stop until you correct this. Click to select the element.",
+            ThnPage.ProblemTooltip(error, null));
+        Assert.Empty(SteLint.Problems(ThnPage.ProblemTooltip(error, reason)));
+        Assert.Empty(SteLint.Problems(ThnPage.ProblemTooltip(error, null)));
     }
 
     /// <summary>The Console line of the refusal names the script as its source and the entity in its message. A click

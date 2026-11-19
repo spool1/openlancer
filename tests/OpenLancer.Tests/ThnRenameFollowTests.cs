@@ -268,14 +268,15 @@ public sealed class ThnRenameFollowTests
         Assert.Empty(plan.CutsceneChanges);
         Assert.Equal(
         [
-            $"The entity \"Hero\" of the cutscene {ScriptPath} keeps the template my_ship, because the editor cannot " +
-            $"change it. {reason} After the rename, the game data has no ship my_ship. The game crashes when it " +
-            "plays this cutscene. The save gate does not check a cutscene that the editor cannot change.",
-            $"The entity \"Wing\" of the cutscene {ScriptPath} keeps the template MY_SHIP, because the editor cannot " +
-            $"change it. {reason} After the rename, the game data has no ship MY_SHIP. The game crashes when it " +
-            "plays this cutscene. The save gate does not check a cutscene that the editor cannot change.",
+            $"The entity \"Hero\" of the cutscene {ScriptPath} keeps the template \"my_ship\". The editor cannot " +
+            $"change this cutscene. {reason} After the rename, the game data has no ship \"my_ship\". The game " +
+            "crashes when it plays this cutscene. The save gate does not check a cutscene that the editor cannot change.",
+            $"The entity \"Wing\" of the cutscene {ScriptPath} keeps the template \"MY_SHIP\". The editor cannot " +
+            $"change this cutscene. {reason} After the rename, the game data has no ship \"MY_SHIP\". The game " +
+            "crashes when it plays this cutscene. The save gate does not check a cutscene that the editor cannot change.",
         ], plan.Warnings.Select(w => w.Message));
         Assert.All(plan.Warnings, w => Assert.Equal(DiagnosticSeverity.Warning, w.Severity));
+        Assert.All(plan.Warnings, w => Assert.Empty(SteLint.Problems(w.Message)));
         Assert.True(plan.NeedsConfirmation);
         Assert.Contains(plan.Warnings[0].Message, EditTools.ConfirmationOf(session, plan));
         Assert.Equal(["my_ship", "MY_SHIP", "my_ship", null], Templates(session, ScriptPath));

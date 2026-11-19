@@ -192,7 +192,9 @@ The Inspector shows the selected entity or event, the selected events, or the cu
 
   A change of the active mod in the game data can delete, rename or break an item that a cutscene names. The save gate then checks that cutscene, also when the active mod does not change it. Examples are a retail cutscene, a cutscene of a lower mod and a cutscene that no INI line names. The game crashes or shows less when it plays such a cutscene.
 
-  The Problems section of such a cutscene shows the problems, with a note about the cause. To correct a problem, undo that change, or pick another item in the cutscene. The save then writes the new item into a THN patch of the active mod.
+  The Problems section of such a cutscene shows the problems. Until you edit the cutscene, a note tells the cause. To correct a problem, undo that change, or pick another item or clip in the cutscene. The save then writes the new item into a THN patch of the active mod.
+
+  The save gate does not check a cutscene that the editor cannot change. An example is a cutscene that has a whole file and a THN patch in the active mod. The Problems section of such a cutscene still shows its problems. The tooltip of each problem then tells that the save gate does not check the cutscene, and gives the reason.
 
   The check skips a template that the room fills in, for example `$terrain_dyna_01`, a DEFORMABLE with `userprops.Actor`, and a SOUND. It also skips the COMPOUNDs of a script that only `Act_CallThorn` lines name. It reads these lines with the unsaved edits, so you can save a new trigger line and the cutscene in one save.
 

@@ -230,11 +230,10 @@ public static class ItemEdits
     {
         var rule = ThnTemplateRules.Categories.Values.First(r => r.Kind == kind);
         var result = rule.MissingStops ? EditSession.CutsceneCrash : rule.Consequence;
-        var template = ((ThnText)entity[TemplateKey]!).Value;
-        return $"The entity \"{ThnScriptModel.NameOf(entity)}\" of the cutscene {path} keeps the template " +
-               $"{template}, because the editor cannot change it. {reason} After the rename, the game data has " +
-               $"no {rule.What} {template}. {result} The save gate does not check a cutscene that the editor cannot " +
-               "change.";
+        var template = ThnChecks.Shown(entity[TemplateKey]!);
+        return $"The entity \"{ThnScriptModel.NameOf(entity)}\" of the cutscene {path} keeps the template {template}. " +
+               $"The editor cannot change this cutscene. {reason} After the rename, the game data has no {rule.What} " +
+               $"{template}. {result} The save gate does not check a cutscene that the editor cannot change.";
     }
 
     /// <summary>The values of a line, with the new nickname in the first value when it names the old one.</summary>

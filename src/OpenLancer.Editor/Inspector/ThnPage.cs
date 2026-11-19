@@ -84,12 +84,33 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
     private static bool Crashes(Diagnostic problem) =>
         problem.Message.StartsWith(EditSession.CutsceneCrash, StringComparison.Ordinal);
 
+    /// <summary>What the save gate does with a problem of a cutscene that it checks (see
+    /// <see cref="ProblemTooltip"/>).</summary>
+    internal const string GateStopsText = "The save and Play stop until you correct this.";
+
+    /// <summary>What the save gate does with a problem of a cutscene that the editor cannot change (see
+    /// <see cref="ProblemTooltip"/>).</summary>
+    internal const string NotCheckedText =
+        "The save gate does not check this cutscene, because the editor cannot change it.";
+
+    /// <summary>
+    /// The tooltip of a problem in the Problems section: the message, what the save gate does with it, and the click.
+    /// The save gate does not check a cutscene that the editor cannot change. So for such a cutscene, the tooltip tells
+    /// this with the reason.
+    /// </summary>
+    /// <param name="problem">The problem.</param>
+    /// <param name="readOnlyReason">Why the editor cannot change the cutscene, or null (see
+    /// <see cref="EditSession.CutsceneReadOnlyReason(string)"/>).</param>
+    internal static string ProblemTooltip(Diagnostic problem, string? readOnlyReason) =>
+        $"{problem.Message}\n\n{(readOnlyReason == null ? GateStopsText : $"{NotCheckedText} {readOnlyReason}")} " +
+        "Click to select the element.";
+
     /// <summary>The note of the Problems section for a cutscene that the active mod does not change (see
     /// <see cref="LowerProblemsNote"/>).</summary>
     internal const string LowerProblemsText =
         "The active mod does not change this cutscene. A change of the active mod in the game data, for example an " +
-        "INI edit, removes or breaks an item of the cutscene. An animation file of the active mod can also remove a " +
-        "clip. Undo that change, or pick another item.";
+        "INI edit, deletes, renames or breaks an item of the cutscene. An animation file of the active mod can also " +
+        "remove a clip. Undo that change, or pick another item or clip.";
 
     /// <summary>
     /// The note of the Problems section, or null. A cutscene that the active mod does not change has the script of the
@@ -173,9 +194,11 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
 
         // The errors that crash the game when it plays the cutscene, and the templates that name no item of the game
         // data (decision D137 and section 12.1 of the M8b design). They block the save and Play, so the page shows them
-        // above the other sections. The save gate also checks a cutscene that the active mod does not change, when a
-        // change of the active mod in the game data breaks it. Then a note tells the cause.
+        // above the other sections. A change of the active mod in the game data can break a cutscene that the active
+        // mod does not change. The save gate also checks such a cutscene, and a note tells the cause. The gate does not
+        // check a cutscene that the editor cannot change, so the tooltip of each problem then tells this.
         var errors = edits.CutsceneErrors(path);
+        var notChecked = errors.Count > 0 ? edits.CutsceneReadOnlyReason(path) : null;
         if (errors.Count > 0 &&
             grid.BeginSection("Thn.Problems", EditorIcons.ExclamationTriangle, $"Problems ({errors.Count})"))
         {
@@ -186,8 +209,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
 
             foreach (var error in errors.Take(100))
             {
-                if (grid.Link(ProblemLabel(error), ProblemText(error),
-                        $"{error.Message}\n\nThe save and Play stop until you correct this. Click to select the element.") &&
+                if (grid.Link(ProblemLabel(error), ProblemText(error), ProblemTooltip(error, notChecked)) &&
                     error.Cutscene is { } place)
                 {
                     workspace.Show(place);
