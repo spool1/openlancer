@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Studio.Agent;
 using Xunit;
 
@@ -107,11 +108,19 @@ internal sealed class TestAgentHost(EditSession? session, AgentHostKind kind = A
         throw new InvalidOperationException("The test host has no target checks.");
 }
 
-/// <summary>The views of a test editor: they keep each request and give a fixed image.</summary>
+/// <summary>The views of a test editor: they keep each request and give a fixed image. A system that the loaded game data
+/// of the test does not have gives the error of the views of the editor.</summary>
 internal sealed class FakeAgentViews : IAgentViews
 {
     /// <summary>The image of each image call: the start of a PNG file.</summary>
     public static readonly ToolImage Image = new([0x89, 0x50, 0x4E, 0x47], 2, 1);
+
+    public AgentDataLoad DataLoad { get; set; }
+
+    /// <summary>The nicknames of the systems and the bases that the loaded game data of the test does not have.</summary>
+    public HashSet<string> Unloaded { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public bool Loaded(ItemRefKind kind, string nickname) => !Unloaded.Contains(nickname);
 
     public List<(ViewKind Kind, string Target)> Opened { get; } = [];
 
@@ -126,7 +135,12 @@ internal sealed class FakeAgentViews : IAgentViews
     /// <summary>The largest side of the last capture.</summary>
     public int? PanelSide { get; private set; }
 
-    public void Open(ViewKind kind, string target) => Opened.Add((kind, target));
+    public void Open(ViewKind kind, string target)
+    {
+        if (kind == ViewKind.System && Unloaded.Contains(target))
+            throw ViewTools.NotLoaded(target, "system");
+        Opened.Add((kind, target));
+    }
 
     public SelectionView Select(SelectTarget target, bool frame)
     {
@@ -137,6 +151,8 @@ internal sealed class FakeAgentViews : IAgentViews
 
     public Func<CancellationToken, Task<(SceneShotView View, ToolImage Image)>> RenderScene(SceneShotRequest request)
     {
+        if (Unloaded.Contains(request.System))
+            throw ViewTools.NotLoaded(request.System, "system");
         Scene = request;
         var camera = request.Camera ?? ShotCamera.Frame([], request.Width / (float)request.Height);
         var view = new SceneShotView("system:" + request.System, request.Width, request.Height, ShotView.Of(camera),

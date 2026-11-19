@@ -3,6 +3,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
+using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor.Agent;
@@ -510,5 +511,154 @@ public sealed class AgentViewToolTests
         Assert.Equal(1, views.Selected[2].Target.Row);
         Assert.True(views.Selected[2].Target.InMission);
         Assert.Equal(MissionEdits.Script, views.Opened.Single().Target);
+    }
+
+    /// <summary>The text of a view or a play that waits for the reload of the game data.</summary>
+    private const string ReloadingText =
+        "The editor reloads the game data now. Call the tool again when studio_status shows data_load ready.";
+
+    /// <summary>A new system of the active mod: its file in the folder of the mod, the text of its name and its
+    /// <c>[system]</c> in <c>universe.ini</c>, as one edit. With <paramref name="dock"/>, also a new base in it.</summary>
+    private static EditCommand NewSystem(EditSession session, bool dock = false) => EditCommand.Group("New system",
+    [
+        EditCommand.NewFile(NewModFileTests.NewPath, ContentPathsTests.Sections(NewModFileTests.SystemText)),
+        EditCommand.SetText(OpenLancer.Data.Strings.StringKind.String, "ol01_sun_name", "Ol01 Sun"),
+        EditCommand.AddSection(ListWorkspace.UniversePath, "system",
+        [
+            ListWorkspace.Line("nickname", "Ol01"),
+            ListWorkspace.Line("file", ContentPaths.UniverseValue(session, NewModFileTests.NewPath)!),
+        ]),
+        .. dock
+            ? new[]
+            {
+                EditCommand.AddSection(ListWorkspace.UniversePath, "Base",
+                [
+                    ListWorkspace.Line("nickname", "Ol01_01_Base"),
+                    ListWorkspace.Line("system", "Ol01"),
+                    ListWorkspace.Line("file", @"MODS\act\BASES\Ol01_01_Base.ini"),
+                ]),
+            }
+            : [],
+    ]);
+
+    private static void AssertSaved(EditSession session)
+    {
+        var saved = session.Save();
+        Assert.True(saved.Saved, string.Join("\n", saved.Problems));
+    }
+
+    /// <summary>
+    /// While the editor reloads the game data after a save, a view of a system that the save added waits for the reload.
+    /// open_view, render_scene and select_items with a frame give data_reloading, and the views of the editor get no
+    /// call. A selection without a frame opens no system, so it works. After the reload, the views show the
+    /// system.
+    /// </summary>
+    [Fact]
+    public void WhileTheDataReloadsAViewOfASavedNewSystemGivesDataReloading()
+    {
+        var (ws, host, views) = Editor();
+        using var _ = ws;
+        var session = host.Session!;
+        session.Execute(NewSystem(session));
+        AssertSaved(session);
+        views.Unloaded.Add("Ol01");
+        views.DataLoad = AgentDataLoad.Reloading;
+
+        var open = Call(host, "open_view", """{ "system": "ol01" }""");
+        var render = Error(host, "render_scene", """{ "system": "system:Ol01" }""");
+        var select = Call(host, "select_items", """{ "refs": ["obj:Ol01_sun"] }""");
+        Ok(host, "select_items", """{ "refs": ["obj:Ol01_sun"], "frame": false }""");
+        var calls = (views.Opened.Count, views.Scene, views.Selected.Count);
+        views.DataLoad = AgentDataLoad.Ready;
+        views.Unloaded.Clear();
+        Ok(host, "open_view", """{ "system": "Ol01" }""");
+        Ok(host, "render_scene", """{ "system": "Ol01" }""");
+
+        Assert.True(open.IsError, open.Text);
+        Assert.Equal(("refused", Studio.Agent.ViewTools.DataReloadingDetail, "system", ReloadingText),
+            ((string?)open.Content["code"], (string?)open.Content["detail"], (string?)open.Content["field"],
+                (string?)open.Content["message"]));
+        Assert.Equal(("refused", Studio.Agent.ViewTools.DataReloadingDetail, ReloadingText), render);
+        Assert.Equal(("refused", Studio.Agent.ViewTools.DataReloadingDetail, "refs"), ((string?)select.Content["code"],
+            (string?)select.Content["detail"], (string?)select.Content["field"]));
+        Assert.Equal((0, (SceneShotRequest?)null, 1), calls);
+        Assert.Equal([(ViewKind.System, "Ol01")], views.Opened);
+        Assert.Equal("Ol01", views.Scene!.System);
+    }
+
+    /// <summary>A new system that the mod did not save waits for the save, not for the reload. So it keeps
+    /// view_not_loaded of the views of the editor, before a reload and during one (decision O21).</summary>
+    [Fact]
+    public void AnUnsavedNewSystemKeepsViewNotLoadedAlsoDuringAReload()
+    {
+        var (ws, host, views) = Editor();
+        using var _ = ws;
+        var session = host.Session!;
+        session.Execute(NewSystem(session));
+        views.Unloaded.Add("Ol01");
+
+        var before = Error(host, "open_view", """{ "system": "Ol01" }""");
+        views.DataLoad = AgentDataLoad.Reloading;
+        var open = Error(host, "open_view", """{ "system": "Ol01" }""");
+        var render = Error(host, "render_scene", """{ "system": "Ol01" }""");
+
+        const string notLoaded = "The game data has no system Ol01. Ask the user to save the mod. The editor then loads the system.";
+        Assert.All(new[] { before, open, render }, e => Assert.Equal(("refused", "NotLoaded", notLoaded), e));
+        Assert.Empty(views.Opened);
+        Assert.Null(views.Scene);
+    }
+
+    /// <summary>A new object of a system that the loaded game data has shows at once, also while the game data reloads.
+    /// The Scene applies the edits of W, so the object needs no save.</summary>
+    [Fact]
+    public void ANewObjectOfALoadedSystemShowsAtOnceDuringAReload()
+    {
+        var (ws, host, views) = Editor();
+        using var _ = ws;
+        host.Session!.Execute(EditCommand.AddSection(SceneWorkspace.Li01Path, "Object",
+        [
+            ListWorkspace.Line("nickname", "ol_new_station"),
+            ListWorkspace.Line("pos", "0, 0, 5000"),
+            ListWorkspace.Line("archetype", "station1"),
+        ]));
+        views.DataLoad = AgentDataLoad.Reloading;
+
+        Ok(host, "open_view", """{ "system": "Li01" }""");
+        Ok(host, "render_scene", """{ "frame": ["obj:ol_new_station"] }""");
+        Ok(host, "select_items", """{ "refs": ["obj:ol_new_station"] }""");
+
+        Assert.Equal([(ViewKind.System, "Li01")], views.Opened);
+        Assert.Equal("ol_new_station", Assert.Single(views.Scene!.Frame).Section!.Id.Key);
+        Assert.Equal("ol_new_station", Assert.Single(views.Selected).Target.Section!.Id.Key);
+    }
+
+    /// <summary>The checks of the Play menu read the loaded game data. So a play at a system or a base that the last
+    /// save added waits for the reload too, and Play gets no request.</summary>
+    [Fact]
+    public void PlayAtASystemOrABaseOfTheLastSaveWaitsForTheReload()
+    {
+        var (ws, host, views) = Editor();
+        using var _ = ws;
+        var editor = new AgentPlayToolTests.FakePlayEditor();
+        host.TestPlay = new EditorAgentPlay(editor);
+        var session = host.Session!;
+        session.Execute(NewSystem(session, dock: true));
+        AssertSaved(session);
+        views.Unloaded.UnionWith(["Ol01", "Ol01_01_Base"]);
+        views.DataLoad = AgentDataLoad.Reloading;
+
+        var space = Call(host, "play", """{ "start": "space", "system": "Ol01", "position": [0, 0, 5000] }""");
+        var dock = Call(host, "play", """{ "start": "base", "base": "Ol01_01_Base" }""");
+        var requests = editor.Requests.Count;
+        views.DataLoad = AgentDataLoad.Ready;
+        views.Unloaded.Clear();
+        Ok(host, "play", """{ "start": "base", "base": "Ol01_01_Base" }""");
+
+        Assert.Equal(("refused", Studio.Agent.ViewTools.DataReloadingDetail, "system"), ((string?)space.Content["code"],
+            (string?)space.Content["detail"], (string?)space.Content["field"]));
+        Assert.Equal(("refused", Studio.Agent.ViewTools.DataReloadingDetail, "base", ReloadingText), ((string?)dock.Content["code"],
+            (string?)dock.Content["detail"], (string?)dock.Content["field"], (string?)dock.Content["message"]));
+        Assert.Equal(0, requests);
+        Assert.Single(editor.Requests);
     }
 }

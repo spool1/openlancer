@@ -1,10 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions.Editing;
+using OpenLancer.Editor;
+using OpenLancer.Editor.Agent;
 using OpenLancer.Studio.Agent;
 using Xunit;
 using static OpenLancer.Tests.AgentCalls;
@@ -814,4 +819,54 @@ public sealed class AgentQueryTests
         (page["rows"] ?? page["groups"])!.AsArray().Select(r => (string)r!["ref"]!).ToArray();
 
     private static (string?, string?) Code((string? Code, string? Detail, string? Message) error) => (error.Code, error.Detail);
+
+    /// <summary>
+    /// studio_status gives data_load (shared step SH8): reloading while the editor loads the game data, and ready
+    /// after the load. A reload of a save during the first load waits for that load, and it counts as reloading while it
+    /// waits. The host without a window has no reload, so it always gives ready.
+    /// </summary>
+    [Fact]
+    public async Task StudioStatusGivesTheStateOfTheDataLoad()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var views = new FakeAgentViews();
+        var host = new TestAgentHost(session, AgentHostKind.Editor) { TestViews = views };
+        var ui = new QueuedUIThread();
+        var loads = new DataLoads(ui);
+        using var firstLoad = new ManualResetEventSlim();
+        using var reload = new ManualResetEventSlim();
+        var states = new List<string?>();
+        void Note()
+        {
+            views.DataLoad = EditorAgentViews.DataLoadOf(loads);
+            states.Add((string?)Ok(host, "studio_status")["data_load"]);
+        }
+
+        Note();
+        loads.Load(() =>
+        {
+            Assert.True(firstLoad.Wait(TimeSpan.FromSeconds(30)));
+            return () => { };
+        });
+        Note();
+        loads.Reload(() => () =>
+        {
+            Assert.True(reload.Wait(TimeSpan.FromSeconds(30)));
+            return () => { };
+        });
+        var waits = loads.ReloadWaits;
+        Note();
+        firstLoad.Set();
+        await ui.RunUntilAsync(() => loads is { IsLoading: false, IsReloading: true }, "the start of the reload");
+        Note();
+        reload.Set();
+        await ui.RunUntilAsync(() => !loads.IsBusy, "the end of the reload");
+        Note();
+
+        Assert.True(waits);
+        Assert.Equal(["ready", "reloading", "reloading", "reloading", "ready"], states);
+        Assert.Equal(AgentDataLoad.Ready, EditorAgentViews.DataLoadOf(null));
+        Assert.Equal("ready", (string?)Ok(new TestAgentHost(session), "studio_status")["data_load"]);
+    }
 }

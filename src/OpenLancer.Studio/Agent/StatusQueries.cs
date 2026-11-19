@@ -54,6 +54,10 @@ internal sealed record StudioStatus(AgentHostKind Host)
     /// <summary>True while the user pauses the agent edits.</summary>
     public bool Paused { get; init; }
 
+    /// <summary>Ready, or reloading while the editor loads the game data. The host without a window always gives
+    /// ready.</summary>
+    public AgentDataLoad DataLoad { get; init; }
+
     /// <summary>The tool groups that the agent can use.</summary>
     public IReadOnlyList<ToolGroup> ToolGroups { get; init; } = [];
 
@@ -70,6 +74,7 @@ internal static class StatusQueries
         {
             View = host.View,
             Paused = host.Paused,
+            DataLoad = host.Views?.DataLoad ?? AgentDataLoad.Ready,
             ToolGroups = host.ShownGroups,
             Limits = host.Limits,
         };

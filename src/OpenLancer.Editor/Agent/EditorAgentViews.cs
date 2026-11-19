@@ -30,6 +30,23 @@ namespace OpenLancer.Editor.Agent;
 /// </summary>
 internal sealed class EditorAgentViews(EditorWindow window) : IAgentViews
 {
+    public AgentDataLoad DataLoad => DataLoadOf(window.Session?.Loads);
+
+    /// <summary>Reloading while the first load or a reload of the game data runs. A reload after a save that waits for
+    /// the running load counts too (see <see cref="DataLoads"/>). The views have no game data of the save until
+    /// then.</summary>
+    /// <param name="loads">The loads of the open profile, or null while no profile is open.</param>
+    internal static AgentDataLoad DataLoadOf(DataLoads? loads) => loads is { } open && (open.IsBusy || open.ReloadWaits)
+        ? AgentDataLoad.Reloading
+        : AgentDataLoad.Ready;
+
+    public bool Loaded(ItemRefKind kind, string nickname) => window.Session?.GameData?.Items is { } items && kind switch
+    {
+        ItemRefKind.System => items.Systems.Get(nickname) != null,
+        ItemRefKind.Base => items.Bases.Get(nickname) != null,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "The loaded game data has systems and bases."),
+    };
+
     public void Open(ViewKind kind, string target)
     {
         switch (kind)
@@ -170,7 +187,7 @@ internal sealed class EditorAgentViews(EditorWindow window) : IAgentViews
         var data = Data();
         if (window.Scene.Stage is { } open && IsOpen(nickname))
             return open;
-        var system = data.Items.Systems.Get(nickname) ?? throw NotLoaded(nickname, "system");
+        var system = data.Items.Systems.Get(nickname) ?? throw ViewTools.NotLoaded(nickname, "system");
         return window.AgentRender.StageOf(system);
     }
 
@@ -272,7 +289,7 @@ internal sealed class EditorAgentViews(EditorWindow window) : IAgentViews
         var data = Data();
         if (IsOpen(nickname))
             return;
-        var system = data.Items.Systems.Get(nickname) ?? throw NotLoaded(nickname, field);
+        var system = data.Items.Systems.Get(nickname) ?? throw ViewTools.NotLoaded(nickname, field);
         window.OpenSystem(system);
     }
 
@@ -313,11 +330,6 @@ internal sealed class EditorAgentViews(EditorWindow window) : IAgentViews
     /// <exception cref="EditException"><see cref="EditErrorKind.Refused"/> while no game data is loaded.</exception>
     private GameDataManager Data() => window.Session?.GameData ??
                                       throw Refused("NoGameData", AgentTexts.Error("render_no_game_data"));
-
-    /// <summary>The error of a system of W that the loaded game data does not have. An example is a new system of the
-    /// active mod before the save.</summary>
-    private static EditException NotLoaded(string nickname, string field) =>
-        Refused("NotLoaded", AgentTexts.Error("view_not_loaded", ("system", nickname)), field);
 
     /// <summary>The error of a selection without a frame of an item whose view is not open.</summary>
     private static EditException NotOpen(string reference) =>

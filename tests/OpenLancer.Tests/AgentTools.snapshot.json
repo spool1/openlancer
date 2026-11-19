@@ -157,6 +157,13 @@
             "type": "boolean",
             "description": "True while the user pauses the edits of the agent."
           },
+          "data_load": {
+            "enum": [
+              "ready",
+              "reloading"
+            ],
+            "description": "ready, or reloading while the editor loads the game data, for example after a save. While it is reloading, open_view, render_scene and play refuse a system or a base of the last save with data_reloading. The host without a window always gives ready."
+          },
           "tool_groups": {
             "type": "array",
             "items": {
