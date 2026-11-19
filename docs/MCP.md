@@ -155,7 +155,7 @@ These tools change the data of the active mod. They work in both hosts. The olto
 |---|---|
 | `set_fields` | Sets fields of one item by their INI keys, or of a cutscene entity or event by their THN paths. |
 | `set_text` | Sets the name, the infocard or another text of one item, or a text id of a mission line. The text goes into the `strings.json` of the active mod. It does not change cutscene items. Use `set_fields` for their texts. |
-| `rename_item` | Gives an item a new nickname, and changes each line that names it. A line that the active mod cannot change keeps the old nickname and shows "Missing". A data item must be an item that the active mod adds. A cutscene entity gets a new name, and the events of its script that name it change too. |
+| `rename_item` | Gives an item a new nickname, and changes each line that names it. A line that the active mod cannot change keeps the old nickname and shows "Missing". A data item must be an item that the active mod adds. A ship or equipment also changes the templates of the cutscene COMPOUNDs that name it. A cutscene entity gets a new name, and the events of its script that name it change too. |
 | `delete_items` | Deletes items of a system with their children, mission items, and cutscene entities and events. Other lines that name them show "Missing". A cutscene entity goes with the events that name it. |
 | `duplicate_items` | Copies items of a system with their children, mission items and cutscene events. With `offset`, the copies of a system move by the offset. A copy without a position, a mission copy and a copy of a cutscene event do not move, and the result warns about them. With `time_offset`, each copy of an event is at the time of its event plus the offset. |
 | `undo` | Undoes the last edit of the agent. |
@@ -167,6 +167,8 @@ Each edit is one Undo step. The Edit menu shows its label with "Agent: " before 
 The five tools `set_fields`, `set_text`, `rename_item`, `delete_items` and `duplicate_items` also change mission items. "The generic tools on mission items" tells which references each tool takes. Four of them also change cutscene items, as "The generic tools on cutscene items" tells. The other edit tools change only items of INI files that are not mission files. A reference of a mission item gives them `invalid_argument` with the detail `MissionItem`. A reference of a cutscene item gives them `invalid_argument` with the detail `CutsceneItem`, and the message names the tools that change cutscenes.
 
 A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. Of the items of a system, `delete_items` takes objects, zones, lights, nebulae and asteroid fields. `duplicate_items` takes objects, zones and lights of a system. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. Another section, for example a loadout, gives `refused`.
+
+A rename of a ship or equipment also changes the template of each cutscene COMPOUND that names it, as in the editor. The result gives these entities in `changes` as `thn:` references. Such a change alone needs no `confirm: true`. When the rename asks for another reason, the question also names their cutscenes. A cutscene that the editor cannot change keeps the old name, and the rename asks with a warning.
 
 #### Values of set_fields
 

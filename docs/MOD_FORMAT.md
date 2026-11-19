@@ -1099,7 +1099,7 @@ Each save runs the save gate first, also a save with nothing to write, and also 
 - An error of the mission checks in a mission script that the active mod changes. Examples are a trigger without a condition (rule M01) and two triggers whose names have one game id (rule M27). A line of any script that names a name that the active mod removes or renames is an error too. A mission problem that the base game or a lower mod also has is a warning, so it does not block the save.
 - A mission patch that does not merge on the game of a retail target of `mod.json` (rule T01). The check runs for each target with a linked game. It merges the lower mods of the profile on that game first, as Play in the game does. For example, the patch changes a trigger that the game of the target does not have. A section of the target that differs from the `ol.base` of the patch gives a warning (rule T02), because the changes of the target in the section go away. A target without a linked game gives one info line in the Console.
 - An error of the checks of a cutscene, when the lower cutscene does not have the error. For example, a LIGHT has no `spatialprops.pos`. The gate checks each cutscene that the active mod changes. It also checks each cutscene of the edit view that names an item that a change of the active mod deletes, renames or breaks. A whole cutscene file of the active mod that the engine cannot read is an error too. The game crashes when it plays such a cutscene, so the message starts with "The game crashes when it plays this cutscene."
-- A template of a cutscene that the gate checks, when the template names no entry of its data list (see "Data lists and pickers"). The check reads the lists with the unsaved edits, so an unsaved INI edit counts, for example a new costume. A template whose item the active mod deletes, renames or makes unusable blocks the save, also when the template does not change. A room, a prop or a cart that a petalDB file of the active mod removes counts too.
+- A template of a cutscene that the gate checks, when the template names no entry of its data list (see "Data lists and pickers"). The check reads the lists with the unsaved edits, so an unsaved INI edit counts, for example a new costume. A template whose item the active mod deletes, renames or makes unusable blocks the save, also when the template does not change. A rename of a ship or equipment with `rename_item` or the data API changes such a template too, so it gives no error (see "New items, renames and text"). A room, a prop or a cart that a petalDB file of the active mod removes counts too.
 
   A change of the active mod can delete, rename or break an item that a cutscene names. The gate then checks that cutscene, also when the active mod does not change it. Examples are a retail cutscene, a cutscene of a lower mod and a cutscene that no INI line names. The game crashes or shows less when it plays such a cutscene. To find such a cutscene, the gate looks for the name of the item in the cutscene file. So it does not find a template that a text script makes from parts, for example with `..`.
 
@@ -1246,6 +1246,18 @@ Copies of sections that share a text share the copy of the text.
 
 The Database has no menu item for Rename yet. Only the data API (`ItemEdits.Rename` in OpenLancer.Data) renames an item of the item files. It renames only an item that the mod adds. Equipment and its good keep the same nickname, because the engine finds the equipment of a good by that nickname. The editor changes each line that names the item in a section that the mod can change: the `ship`, `hull`, `equipment` and `addon` lines of goods, `projectile_archetype`, and `marketgood`. The new nickname must be a value that a patch line can hold, for example without `,` or `;`. The Scene renames the objects, zones and lights of the system files, also of the lower layers (see "Rename").
 
+A rename of a ship or equipment also changes the template of each cutscene COMPOUND that names the item. One undo puts back both. This follows the INI rename, which changes each line and each mission line that names the item. Unity also keeps the references to a renamed asset. A rename of a good also renames its equipment, so the COMPOUNDs that name that equipment change too.
+
+A COMPOUND names a ship with the category `ship` or `spaceship`, and equipment with the category `equipment`. The engine finds the item by the text of the template as it is, without letter case. So the rename changes only a template with that text. A template of another kind of entity, for example of a PSYS or a DEFORMABLE, does not change. The rename finds such a COMPOUND in these cutscenes:
+
+- each cutscene file that holds the old nickname as a word
+- each cutscene with unsaved edits
+- each cutscene that the active mod changes
+
+A save writes the change of a lower cutscene as a THN patch of the active mod, with only the changed templates. A cutscene that the editor cannot change keeps the old name, and the rename warns first. The warning tells what the game does with that cutscene, and that the save gate does not check it. A COMPOUND that a later entity with the same name hides keeps the old name with no warning, because the engine does not make it.
+
+The save gate blocks the save when a cutscene names an item of a lower layer that a change of the active mod deletes or renames (see "The save gate"). An example is an `ol.rename` of a lower item in a patch that you write by hand.
+
 When you change the text of a key that holds a text id (see "Text: strings.json"), the editor writes the text into `strings.json` and sets the line to its placeholder. The text of no other section changes:
 
 - A line with a placeholder of the right kind keeps its key, when no other section uses that key.
@@ -1253,7 +1265,7 @@ When you change the text of a key that holds a text id (see "Text: strings.json"
 
 A retail gun and its good have the same `ids_name`, but the Inspector shows the gun and a shop shows the good. So the editor offers to set the same placeholder on each section of the item that has the same id. The sections share one text only when you accept the offer. An infocard from plain text gets one paragraph for each line.
 
-A new item, a rename and a text edit read the data when you start them. When the data changes before the edit runs, the edit does not run, because it would undo the change.
+A new item, a rename and a text edit read the data when you start them. When the data changes before the edit runs, the edit does not run, because it would undo the change. A rename also does not run when a cutscene template that it changes no longer names the item.
 
 A boolean line without a value, for example `separable =` of a `[CollisionGroup]`, is true. The engine reads the value of such a line when it has one, so the editor writes `separable = false` to make the flag false.
 

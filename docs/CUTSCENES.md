@@ -248,6 +248,8 @@ When the editor cannot read an `.anm` file of the active mod, the save gives a w
 
 The patch holds only the values that the edits change. A save keeps the bytes of a patch that the edits do not change, and it deletes a patch that changes nothing after the edits. "What stays in a patch file" in [MOD_FORMAT.md](MOD_FORMAT.md) gives the rules. The game plays the patched cutscene after `oltool deploy`. Play shows it without a deploy (see [PLAY.md](PLAY.md)).
 
+A rename of a ship or equipment that the active mod adds also changes each COMPOUND template that names the item. One undo puts back both. This is also true for a retail cutscene, which gets a THN patch at the save. A cutscene that the editor cannot change keeps the old name, and the rename warns first. "New items, renames and text" in [MOD_FORMAT.md](MOD_FORMAT.md) gives the rules.
+
 An agent of the agent server edits a cutscene with the same commands. `cutscene_create` makes a script as **New cutscene** does. `cutscene_add_entity` and `cutscene_add_event` add entities and events, and the target of each event must fit its type. `cutscene_move_events`, `cutscene_set_duration` and `cutscene_set_flags` do the drags of the Timeline and the fields of the Inspector. `set_fields`, `rename_item`, `delete_items` and `duplicate_items` change the entities and the events too. Each agent edit is one entry of the history with "Agent: " before its label.
 
 An event reference has the index of the event, so the agent gives the type and the time that it read as a guard. [MCP.md](MCP.md) tells about the tools.
