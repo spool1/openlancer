@@ -90,7 +90,9 @@ internal sealed record PatchText(
 /// lines.</item>
 /// <item>Placed: a new or moved ship or formation section of a mission file before a kept section gets
 /// <c>ol.before</c> with that section (section 6.4 of the M6b design). It does not move the sections after it. The
-/// delete of a moved section of a mission file gets <c>ol.base</c>.</item>
+/// delete of a moved section of a mission file gets <c>ol.base</c>. A new or moved <c>[Base]</c> of
+/// <c>universe.ini</c> directly before the first <c>[system]</c> gets no directive, because the merge puts it there
+/// (see <see cref="UniverseOrder"/>). It does not move the sections after it either.</item>
 /// <item>Base: <c>ol.base</c> keeps the hash of the loaded section when it has one, also when B changed after the
 /// edit (rule P2 of section 6.3 of the M6b design). So the merge warns until the user accepts the new base. A
 /// section without a loaded hash gets the hash of B.</item>
@@ -738,14 +740,22 @@ internal static class PatchWriter
         }
 
         /// <summary>
-        /// The moved sections of B (see <see cref="Moved"/>), and the new and moved ship and formation sections of a
-        /// mission file that get <c>ol.before</c> (section 6.4 of the M6b design). Such a section goes directly before
-        /// the kept section after it in W, so it does not move the sections after it. A section whose next kept section
-        /// has no key that the merge can find goes to the end of the file, as another new section does.
+        /// The moved sections of B (see <see cref="Moved"/>), and the new and moved sections that the merge puts at
+        /// their place in W. So they do not move the sections after them:
+        /// <list type="bullet">
+        /// <item>A ship or formation section of a mission file gets <c>ol.before</c> (section 6.4 of the M6b design).
+        /// It goes directly before the kept section after it in W. A section whose next kept section has no key that
+        /// the merge can find goes to the end of the file, as another new section does.</item>
+        /// <item>A <c>[Base]</c> of <c>universe.ini</c> in the run of new and moved <c>[Base]</c> sections directly
+        /// before the first <c>[system]</c> of W gets no directive. The merge puts each new <c>[Base]</c> directly
+        /// before the first <c>[system]</c> (see <see cref="UniverseOrder"/>). A <c>[Base]</c> that a kept section
+        /// separates from the first <c>[system]</c> is a usual new section.</item>
+        /// </list>
         /// </summary>
         private HashSet<SectionIdentity> Placed(IReadOnlySet<SectionIdentity> deleted)
         {
             var placed = new HashSet<int>();
+            var firstSystem = UniverseOrder.IsUniverse(path) ? UniverseOrder.FirstSystem(w) : -1;
             if (SectionKeys.IsMissionFile(path))
             {
                 for (var j = 0; j < w.Count; j++)
@@ -754,6 +764,8 @@ internal static class PatchWriter
                         placed.Add(j);
                 }
             }
+            for (var j = firstSystem - 1; j >= 0 && UniverseOrder.IsBase(w[j]); j--)
+                placed.Add(j);
             while (true)
             {
                 var result = Moved(deleted, placed);
@@ -768,6 +780,8 @@ internal static class PatchWriter
                         placed.Remove(j);
                         continue;
                     }
+                    if (firstSystem >= 0)
+                        continue;
                     var next = j + 1;
                     while (next < w.Count && !(BIndexOfW(next) is >= 0 and var n && !result.Contains(bIds[n])))
                         next++;
@@ -780,6 +794,14 @@ internal static class PatchWriter
                         placed.Remove(j);
                         dropped = true;
                     }
+                }
+                // Only the run directly before the first [system] keeps its place in the merge.
+                if (firstSystem >= 0)
+                {
+                    var start = firstSystem - 1;
+                    while (start >= 0 && placed.Contains(start))
+                        start--;
+                    dropped = placed.RemoveWhere(j => j < start) > 0;
                 }
                 if (!dropped)
                     return result;

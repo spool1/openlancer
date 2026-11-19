@@ -76,7 +76,9 @@ public abstract class EditCommand
 
     /// <summary>
     /// Adds a section to the file at <paramref name="path"/>. A section goes at the end of the file. A child section
-    /// (see <c>docs/MOD_FORMAT.md</c>) goes after the child sections of its parent.
+    /// (see <c>docs/MOD_FORMAT.md</c>) goes after the child sections of its parent. A <c>[Base]</c> of
+    /// <c>universe.ini</c> goes directly before the first <c>[system]</c>, where the merge puts it too (see
+    /// <see cref="UniverseOrder"/>).
     /// </summary>
     /// <param name="parent">The parent of a child section. Only a child section has one.</param>
     public static EditCommand AddSection(string path, string type, IReadOnlyList<EntryView> entries,
@@ -390,7 +392,7 @@ public abstract class EditCommand
             {
                 if (parent != null)
                     throw new InvalidOperationException($"Only a child section has a parent. [{type}] is not a child section.");
-                at = document.Working.Count;
+                at = UniverseOrder.PlaceOf(document.Path, document.Working, type);
             }
             document.Insert(at, SectionEdits.Build(type, entries));
             scope.Changed(new SectionRef(document.Path, document.IdentityAt(at)), structural: true);

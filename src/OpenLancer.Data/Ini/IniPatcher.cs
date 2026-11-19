@@ -19,7 +19,9 @@ namespace OpenLancer.Data.Ini;
 /// that belong together, such as <c>encounter</c> and its <c>faction</c> lines, stay in order.</item>
 /// <item><c>ol.remove = name</c> removes all target entries with that name.</item>
 /// <item><c>ol.delete = true</c> removes the target section, and its child sections.</item>
-/// <item><c>ol.new = true</c> adds the section. No section with that key may exist.</item>
+/// <item><c>ol.new = true</c> adds the section at the end of the file. No section with that key may exist. A new
+/// <c>[Base]</c> of <c>universe.ini</c> goes directly before the first <c>[system]</c> (see
+/// <see cref="UniverseOrder"/>).</item>
 /// <item>A new child section (see <see cref="SectionKeys.IsChild"/>) needs <c>ol.parent = &lt;parent key&gt;</c>.
 /// Child sections that directly follow a new parent section in the patch belong to that parent.</item>
 /// <item><c>ol.rename = &lt;new key&gt;</c> gives the target a new key. The section keeps its place, and the other
@@ -281,7 +283,7 @@ internal static class IniPatcher
                 context.Error($"{label}: {DirectiveNew} is set, but the section already exists.");
                 return null;
             }
-            var place = target.Sections.Count;
+            var place = UniverseOrder.PlaceOf(context.TargetPath, target.Sections, patch.Name);
             if (p.Before is var (beforeType, beforeKey))
             {
                 var anchors = FindKeyed(target, beforeType, beforeKey, context.TargetPath);

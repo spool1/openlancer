@@ -265,16 +265,17 @@ public sealed class PatchRoundTripTests(ITestOutputHelper output)
             var removed = runs.SelectMany(r => Enumerable.Range(r.Key, r.Value)).ToHashSet();
             var without = sections.Where((_, k) => !removed.Contains(k)).ToList();
 
-            // The merge adds a new child after the other children of its parent, and any other new section at the end.
+            // The merge adds a new child after the other children of its parent, a new [Base] of universe.ini directly
+            // before the first [system] (UniverseOrder), and any other new section at the end.
             var edited = new List<Section>();
-            var at = new Dictionary<int, int>();
+            var copies = new Dictionary<int, Section>();
             var childrenOf = runs.Keys.Where(i => SectionKeys.IsChild(sections[i].Name)).ToLookup(i => ProofSections.Parent(sections, i));
             void AddChildren(int parentIndex)
             {
                 foreach (var child in childrenOf[parentIndex])
                 {
-                    at[child] = edited.Count;
-                    edited.Add(ProofSections.Copy(sections[child], document.IsBinary));
+                    copies[child] = ProofSections.Copy(sections[child], document.IsBinary);
+                    edited.Add(copies[child]);
                 }
             }
             AddChildren(-1);
@@ -293,9 +294,12 @@ public sealed class PatchRoundTripTests(ITestOutputHelper output)
             AddChildren(parent);
             foreach (var (start, count) in runs.Where(r => !SectionKeys.IsChild(sections[r.Key].Name)))
             {
-                at[start] = edited.Count;
-                edited.AddRange(sections.Skip(start).Take(count).Select(s => ProofSections.Copy(s, document.IsBinary)));
+                var run = sections.Skip(start).Take(count).Select(s => ProofSections.Copy(s, document.IsBinary)).ToList();
+                copies[start] = run[0];
+                edited.InsertRange(UniverseOrder.PlaceOf(file, edited, sections[start].Name), run);
             }
+            // A section that goes before the first [system] moves the sections after it, so the places come last.
+            var at = copies.ToDictionary(c => c.Key, c => edited.FindIndex(e => ReferenceEquals(e, c.Value)));
 
             var patch = PatchWriter.Write(file, document.WithSections(without), edited, _ => []);
             if (!patch.Succeeded)
