@@ -1,11 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Numerics;
 using System.Runtime;
 using System.Threading;
+using System.Threading.Tasks;
 using LibreLancer;
 using LibreLancer.Client;
 using LibreLancer.Data.IO;
+using LibreLancer.ImageLib;
 using LibreLancer.Net;
 using LibreLancer.Server;
 using OpenLancer.Data.Mods;
@@ -23,9 +27,11 @@ namespace OpenLancer.Play;
 /// M6c design).
 /// </summary>
 /// <remarks>
-/// A thread reads the commands of the editor from the standard input and gives each one to the UI thread. The end of
-/// the input exits the game, as stop does. The events go to the standard output. A timer takes the trigger changes of
-/// the mission observer at most each 100 ms and writes them as mission events (section 6.2 of the M6c design).
+/// <para>A thread reads the commands of the editor from the standard input and gives each one to the UI thread. The end
+/// of the input exits the game, as stop does. The events go to the standard output. A timer takes the trigger changes of
+/// the mission observer at most each 100 ms and writes them as mission events (section 6.2 of the M6c design).</para>
+/// <para>A capture takes the next frame from the back buffer of the game (shared step SH9). A task writes the PNG file
+/// in the capture folder of the play folder and then sends captured.</para>
 /// </remarks>
 internal sealed class PlayHost
 {
@@ -56,6 +62,17 @@ internal sealed class PlayHost
     /// play.</summary>
     private PlayStart place;
     private int exitCode = PlayExitCodes.Ok;
+
+    /// <summary>The capture requests that wait for the next frame, oldest first.</summary>
+    private readonly List<int> captures = [];
+
+    /// <summary>The screenshot handler of the engine. It saves the screenshots of the player (see
+    /// <see cref="OnScreenshot"/>).</summary>
+    private readonly ScreenshotSaveHandler? screenshots;
+
+    /// <summary>The file name of the screenshot requests of the captures. It marks a frame of a capture, and no file gets
+    /// this name.</summary>
+    private readonly string captureMark;
 
     /// <summary>The server of the current play: null before the start and during a reload.</summary>
     private EmbeddedServer? server;
@@ -97,11 +114,17 @@ internal sealed class PlayHost
                 ? $"OpenLancer Play - {profile.Name}"
                 : $"OpenLancer Play - {profile.Name} [{args.ActiveMod}]",
         };
+        // The engine writes each screenshot through this one handler on a task of its own, so the host cannot know when
+        // that file is complete. The host takes the handler, writes the frames of the captures itself and gives the
+        // other screenshots to the handler of the engine.
+        screenshots = game.ScreenshotSave;
+        game.ScreenshotSave = OnScreenshot;
+        captureMark = Path.Combine(PlayFolder.CapturesPath(args.Profile), "next-frame");
     }
 
-    /// <summary>Writes an event for the editor on the standard output. <see cref="Console.Out"/> writes the line in
-    /// one call, so an event line does not mix with a line of the engine log. An error event ends the mission lines
-    /// first, because the game exits after it.</summary>
+    /// <summary>Writes an event for the editor on the standard output. <see cref="Console.Out"/> is synchronized and
+    /// writes the line in one call. So each thread can send an event, and an event line does not mix with another line.
+    /// An error event ends the mission lines first, because the game exits after it.</summary>
     public static void Send(PlayEvent e)
     {
         if (e is PlayEvent.Error)
@@ -178,8 +201,88 @@ internal sealed class PlayHost
             case PlayCommandKind.Restart:
                 Restart(command.Save);
                 break;
+            case PlayCommandKind.Capture:
+                Capture(command.Request);
+                break;
         }
     }
+
+    /// <summary>Asks the engine for the next frame of the game, from its back buffer. More requests before that frame
+    /// get the same frame.</summary>
+    private void Capture(int request)
+    {
+        if (captures.Count == 0)
+            game.Screenshot(captureMark);
+        captures.Add(request);
+    }
+
+    /// <summary>
+    /// Gets each screenshot of the engine on the UI thread, at the end of a frame. A frame of a capture goes to a task
+    /// that writes the images. Each other screenshot goes to the handler of the engine. The engine keeps one request
+    /// for each frame, so a screenshot of the player can take the place of a capture. The capture then asks for the next
+    /// frame. The engine clears its request after this handler, so the new request waits for the next turn of the UI
+    /// thread.
+    /// </summary>
+    private void OnScreenshot(string? filename, int width, int height, Bgra8[] data)
+    {
+        if (filename != captureMark)
+        {
+            screenshots?.Invoke(filename, width, height, data);
+            if (captures.Count > 0)
+                game.QueueUIThread(() => game.Screenshot(captureMark));
+            return;
+        }
+
+        var requests = captures.ToArray();
+        captures.Clear();
+        var folder = PlayFolder.CapturesPath(args.Profile);
+        Task.Run(() => WriteCaptures(folder, requests, width, height, data));
+    }
+
+    /// <summary>
+    /// Writes the image of a frame for each capture request and sends its event. Each file gets another name first and
+    /// then its final name, so the file is complete when the editor reads it. A request whose file the task cannot write
+    /// gets capture-failed. The task has no caller, so without the event the editor waits until its time limit.
+    /// </summary>
+    /// <param name="data">The pixels of the frame, with the bottom row first, as the back buffer has them.</param>
+    private static void WriteCaptures(string folder, int[] requests, int width, int height, Bgra8[] data)
+    {
+        byte[] png;
+        try
+        {
+            using var stream = new MemoryStream();
+            PNG.Save(stream, width, height, data, true);
+            png = stream.ToArray();
+            Directory.CreateDirectory(folder);
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            foreach (var request in requests)
+                Send(CaptureFailed(request, e));
+            return;
+        }
+
+        foreach (var request in requests)
+        {
+            var name = PlayFolder.CaptureName(request);
+            var path = Path.Combine(folder, name);
+            try
+            {
+                File.WriteAllBytes(path + ".part", png);
+                File.Move(path + ".part", path, overwrite: true);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                Send(CaptureFailed(request, e));
+                continue;
+            }
+
+            Send(new PlayEvent.Captured(request, name, width, height));
+        }
+    }
+
+    private static PlayEvent.CaptureFailed CaptureFailed(int request, Exception e) =>
+        new(request, $"The game could not write the image: {e.Message}");
 
     /// <summary>
     /// The first state after the load (<see cref="GameConfig.CustomState"/>). It does what <c>LuaMenu</c> does at its

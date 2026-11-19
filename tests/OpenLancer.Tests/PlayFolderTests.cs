@@ -20,6 +20,9 @@ public sealed class PlayFolderTests
         // The start save and the test layer of a mission play (sections 5.4 and 5.6 of the M6c design).
         Assert.Equal(Path.Combine(folder, "start", "start.fl"), PlayFolder.StartSavePath(profile));
         Assert.Equal(Path.Combine(folder, "start", "layer"), PlayFolder.TestLayerPath(profile));
+        // The images of the agent tool play_capture.
+        Assert.Equal(Path.Combine(folder, "captures"), PlayFolder.CapturesPath(profile));
+        Assert.Equal("capture-3.png", PlayFolder.CaptureName(3));
         Assert.Equal(folder, PlayFolder.Of(Path.Combine(ws.Root, "my profiles", "..", "my profiles", "my.sample v2.json")));
     }
 

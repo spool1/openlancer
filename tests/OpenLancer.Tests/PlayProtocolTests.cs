@@ -23,6 +23,20 @@ public sealed class PlayProtocolTests
         Assert.Equal(command, PlayProtocol.ReadCommand(line + "\r"));
     }
 
+    /// <summary>A capture command has the number of its request, not a save (the agent tool play_capture).</summary>
+    [Fact]
+    public void TheCaptureCommandHasTheNumberOfItsRequest()
+    {
+        var command = new PlayCommand(PlayCommandKind.Capture, Request: 12);
+
+        Assert.Equal("capture 12", PlayProtocol.Write(command));
+        Assert.Equal(command, PlayProtocol.ReadCommand("capture 12"));
+        Assert.Equal(command, PlayProtocol.ReadCommand("capture 12\r"));
+        Assert.Equal(0, PlayProtocol.ReadCommand("capture 12")!.Save);
+        // A reload keeps its save in the save field.
+        Assert.Equal(new PlayCommand(PlayCommandKind.Reload, 12), PlayProtocol.ReadCommand("reload 12"));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("go")]
@@ -34,6 +48,10 @@ public sealed class PlayProtocolTests
     [InlineData("reload 1 2")]
     [InlineData("restart")]
     [InlineData("restart x")]
+    [InlineData("capture")]
+    [InlineData("capture x")]
+    [InlineData("capture -1")]
+    [InlineData("capture 1 2")]
     public void AnUnknownLineIsNoCommand(string line)
     {
         Assert.Null(PlayProtocol.ReadCommand(line));
@@ -50,6 +68,8 @@ public sealed class PlayProtocolTests
         { "restart-failed", """@ol {"event":"restart-failed","save":6,"message":"The new data cannot start the mission."}""" },
         { "error with crash", """@ol {"event":"error","message":"No hull \u0027no_such_hull\u0027.","crash":true}""" },
         { "error", """@ol {"event":"error","message":"No package \u0027x\u0027.","crash":false}""" },
+        { "captured", """@ol {"event":"captured","request":3,"file":"capture-3.png","width":1280,"height":720}""" },
+        { "capture-failed", """@ol {"event":"capture-failed","request":4,"message":"The game could not write the image: disk full."}""" },
     };
 
     private static PlayEvent Event(string name) => name switch
@@ -64,6 +84,8 @@ public sealed class PlayProtocolTests
         "restart-failed" => new PlayEvent.RestartFailed(6, "The new data cannot start the mission."),
         "error with crash" => new PlayEvent.Error("No hull 'no_such_hull'.", true),
         "error" => new PlayEvent.Error("No package 'x'.", false),
+        "captured" => new PlayEvent.Captured(3, "capture-3.png", 1280, 720),
+        "capture-failed" => new PlayEvent.CaptureFailed(4, "The game could not write the image: disk full."),
         _ => throw new System.ArgumentException(name),
     };
 

@@ -22,11 +22,17 @@ public enum PlayCommandKind
     /// <summary>The game loads the files of a save again and starts the mission play again from its start save (section
     /// 5.8 of the M6c design).</summary>
     Restart,
+
+    /// <summary>The game writes an image of its next frame as a PNG file, then sends captured (the agent tool
+    /// <c>play_capture</c>, shared step SH9).</summary>
+    Capture,
 }
 
 /// <param name="Save">For <see cref="PlayCommandKind.Reload"/> and <see cref="PlayCommandKind.Restart"/>: the number of
 /// the save. The other commands ignore it.</param>
-public sealed record PlayCommand(PlayCommandKind Kind, int Save = 0);
+/// <param name="Request">For <see cref="PlayCommandKind.Capture"/>: the number of the request. The event of the capture
+/// gives it back. The other commands ignore it.</param>
+public sealed record PlayCommand(PlayCommandKind Kind, int Save = 0, int Request = 0);
 
 /// <summary>An event of the play process to the editor.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "event")]
@@ -37,6 +43,8 @@ public sealed record PlayCommand(PlayCommandKind Kind, int Save = 0);
 [JsonDerivedType(typeof(PlayEvent.Restarted), "restarted")]
 [JsonDerivedType(typeof(PlayEvent.RestartFailed), "restart-failed")]
 [JsonDerivedType(typeof(PlayEvent.MissionChanges), "mission")]
+[JsonDerivedType(typeof(PlayEvent.Captured), "captured")]
+[JsonDerivedType(typeof(PlayEvent.CaptureFailed), "capture-failed")]
 [JsonDerivedType(typeof(PlayEvent.Error), "error")]
 public abstract record PlayEvent
 {
@@ -88,6 +96,19 @@ public abstract record PlayEvent
     public sealed record MissionChanges(string Mission, bool Reset, int Dropped, IReadOnlyList<MissionChange> Changes)
         : PlayEvent;
 
+    /// <summary>The game wrote the image of a capture request. The file is complete when this event comes, because the
+    /// game writes it under another name first and then moves it.</summary>
+    /// <param name="Request">The number of the request.</param>
+    /// <param name="File">The name of the PNG file in the capture folder of the play folder
+    /// (<see cref="PlayFolder.CaptureName"/>).</param>
+    /// <param name="Width">The width of the image in pixels: the width of the game window.</param>
+    /// <param name="Height">The height of the image in pixels.</param>
+    public sealed record Captured(int Request, string File, int Width, int Height) : PlayEvent;
+
+    /// <summary>The game could not write the image of a capture request.</summary>
+    /// <param name="Request">The number of the request.</param>
+    public sealed record CaptureFailed(int Request, string Message) : PlayEvent;
+
     /// <summary>The play cannot continue. The game exits after this event.</summary>
     /// <param name="Crash">True when an unhandled exception ended the game.</param>
     public sealed record Error(string Message, bool Crash) : PlayEvent;
@@ -124,6 +145,7 @@ public static class PlayProtocol
     private const string StopText = "stop";
     private const string ReloadText = "reload";
     private const string RestartText = "restart";
+    private const string CaptureText = "capture";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -141,6 +163,7 @@ public static class PlayProtocol
         PlayCommandKind.Stop => StopText,
         PlayCommandKind.Reload => $"{ReloadText} {command.Save.ToString(CultureInfo.InvariantCulture)}",
         PlayCommandKind.Restart => $"{RestartText} {command.Save.ToString(CultureInfo.InvariantCulture)}",
+        PlayCommandKind.Capture => $"{CaptureText} {command.Request.ToString(CultureInfo.InvariantCulture)}",
         _ => throw new ArgumentOutOfRangeException(nameof(command), command.Kind, null),
     };
 
@@ -156,6 +179,8 @@ public static class PlayProtocol
                 new PlayCommand(PlayCommandKind.Reload, n),
             [RestartText, var save] when int.TryParse(save, NumberStyles.None, CultureInfo.InvariantCulture, out var n) =>
                 new PlayCommand(PlayCommandKind.Restart, n),
+            [CaptureText, var request] when int.TryParse(request, NumberStyles.None, CultureInfo.InvariantCulture,
+                out var n) => new PlayCommand(PlayCommandKind.Capture, Request: n),
             _ => null,
         };
     }
