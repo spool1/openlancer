@@ -95,10 +95,10 @@ public sealed partial class EditSession
     }
 
     /// <summary>
-    /// The documents of the INI files below the folder of the active mod that the session has (decision O2): the new
-    /// files of W, the files that the session opened, and the files that W deleted. The files lists and the file check
-    /// read them, so a new file is in a list before its save, and a file that W deleted is not (see
-    /// <see cref="DataLists"/>). Empty without an active mod.
+    /// The documents of the INI files below the folder of the active mod that the session has (decision O2). These are
+    /// the new files of W, the files that the session opened, and the files that W deleted. The files lists and the
+    /// file check read them (see <see cref="DataLists"/>). So a new file is in a list before its save, and a file that W
+    /// deleted is not. Empty without an active mod.
     /// </summary>
     /// <remarks>Each such document is a whole file (see <see cref="EditDocument.EditsWholeFile"/>). A file of the folder
     /// that the session did not open is as the edit view gives it.</remarks>

@@ -312,8 +312,8 @@ public sealed class DataListsTests
     private const string NewCloudValue = @"MODS\act\SOLAR\NEBULA\new_cloud.ini";
 
     /// <summary>
-    /// A files list holds a new INI file of the folder of the active mod before the save, when the file passes the
-    /// filters of the list (decision O2). The save does not change the entry or its place. A delete takes the entry
+    /// A files list holds a new INI file of the folder of the active mod before the save (decision O2). The file must
+    /// pass the filters of the list. The save does not change the entry or its place. A delete takes the entry
     /// away before the save. <see cref="DataLists.FileExists"/> follows the list, so a check of a <c>file</c> line
     /// agrees with the list.
     /// </summary>
@@ -365,8 +365,8 @@ public sealed class DataListsTests
     }
 
     /// <summary>
-    /// A <c>[Nebula] file</c> line that names a new nebula file of the folder of the active mod has no "does not exist"
-    /// error before the first save. So the save gate lets the first save of a new volume file through. The line gets
+    /// A <c>[Nebula] file</c> line can name a new nebula file of the folder of the active mod. Before the first save,
+    /// the line has no "does not exist" error. So the save gate lets the first save of a new volume file through. The line gets
     /// the error again when W deletes the file.
     /// </summary>
     [Fact]

@@ -90,13 +90,13 @@ public abstract class EditCommand
     }
 
     /// <summary>
-    /// Adds a section directly before another section of a whole file of the active mod, for example to keep the order
-    /// of sections that the game reads in order. The save writes a whole file in the order of W.
+    /// Adds a section directly before another section of a whole file of the active mod. A plan uses it to keep the
+    /// order of the sections that the game reads in order. The save writes a whole file in the order of W.
     /// </summary>
     /// <remarks>When it runs, the command throws an <see cref="InvalidOperationException"/> for a patch file. A patch
-    /// adds a new section at the end of the file (<see cref="AddSection"/>), because a section in the middle moves each
-    /// later section of the lower file. It also throws for a child section, for a section before a child section, and
-    /// for a section of another file. <see cref="AddSection"/> adds a child section with its parent.</remarks>
+    /// adds a new section at the end of the file (<see cref="AddSection"/>). A section in the middle moves each later
+    /// section of the lower file. The command also throws for a child section, for a section before a child section,
+    /// and for a section of another file. <see cref="AddSection"/> adds a child section with its parent.</remarks>
     /// <param name="before">The section that the new section goes before.</param>
     public static EditCommand InsertSection(string path, string type, IReadOnlyList<EntryView> entries, SectionRef before)
     {

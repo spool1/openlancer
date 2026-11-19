@@ -662,10 +662,10 @@ public sealed class DataLists
     /// extension.
     /// </summary>
     /// <remarks>W decides for each new cutscene and for each INI file below the folder of the active mod that the
-    /// session has (see <see cref="EditSession.ModFolderDocuments"/>). Such a file is an entry when it exists in W and
-    /// passes the same filters as a file of the edit view, with the sections of W. So a new file is an entry before its
-    /// save, and a file that W deleted, or whose New cutscene an undo took back, is not an entry. The next save writes
-    /// or deletes the file, and the list stays the same, in the same order.</remarks>
+    /// session has (see <see cref="EditSession.ModFolderDocuments"/>). Such a file is an entry when it exists in W. It
+    /// must also pass the filters of a file of the edit view, with the sections of W. So a new file is an entry before
+    /// its save. A file that W deleted is not an entry, and neither is a new cutscene after an undo of New cutscene. The
+    /// next save writes or deletes the file, and the list stays the same, in the same order.</remarks>
     private IReadOnlyList<ListEntry> FileEntries(ListSource source)
     {
         var extensions = source.Files!;
@@ -745,8 +745,8 @@ public sealed class DataLists
     private static string FolderOf(ListSource source) =>
         source.Folder == null ? "" : ThnReferences.PathOf(source.Folder) ?? "";
 
-    /// <summary>True when an install path has an extension of a files list source and is below its folder, as
-    /// <see cref="FindFiles"/> finds the files of the edit view.</summary>
+    /// <summary>True when an install path has an extension of a files list source and is below its folder.
+    /// <see cref="FindFiles"/> finds the files of the edit view with the same rule.</summary>
     private static bool InSource(ListSource source, string path)
     {
         var folder = FolderOf(source);
@@ -754,7 +754,7 @@ public sealed class DataLists
                (folder.Length == 0 || path.StartsWith(folder + "\\", StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>True when the sections of a file make it a file of the class of a files list source: a source without
+    /// <summary>True when the sections of a file make it a file of the class of a files list source. A source without
     /// a class takes each file. With a class, the file has a section, and each section is a section of the class. So
     /// the texture files of <c>SOLAR\NEBULA</c> are not nebula files.</summary>
     private static bool OfFileClass(ListSource source, IReadOnlyList<Section> sections) =>

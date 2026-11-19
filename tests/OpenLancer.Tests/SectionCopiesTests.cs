@@ -24,9 +24,9 @@ public sealed class SectionCopiesTests
         Data.Ini.IniDocument.Parse("template.ini", System.Text.Encoding.ASCII.GetBytes(text)).Sections;
 
     /// <summary>
-    /// A copy into a new file of the mod: the copies get their keys, the <c>parent</c> of the child names the copy of
-    /// its parent, and a light keeps its key, because a light name is unique only in its file. The text of the active
-    /// mod gets a copy with a key from the new nickname, and the id of a text of the base game stays. One undo takes
+    /// A copy into a new file of the mod. The copies get their keys, and the <c>parent</c> of the child names the copy
+    /// of its parent. A light keeps its key, because a light name is unique only in its file. The text of the active
+    /// mod gets a copy with a key from the new nickname. The id of a text of the base game stays. One undo takes
     /// the file and the copied text back.
     /// </summary>
     [Fact]

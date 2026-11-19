@@ -8,8 +8,9 @@ using Universe = LibreLancer.Data.Schema.Universe;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The zone math of <see cref="ZoneShapes"/> (shared step SH6) for each shape: the points inside, the immersion with
-/// the retail rule, the size in meters and the size line for a size in meters. The zones are invented.
+/// The zone math of <see cref="ZoneShapes"/> (shared step SH6) for each shape. The tests cover the points inside, the
+/// immersion with the retail rule, the size in meters and the size line for a size in meters. The zones are
+/// invented.
 /// </summary>
 public sealed class ZoneShapesTests
 {
@@ -74,9 +75,9 @@ public sealed class ZoneShapesTests
         Assert.Equal(0, ZoneShapes.Immersion(zone, new Vector3(0, 0, 1100)));
     }
 
-    /// <summary>A box uses its full lengths. The retail scaled distance of a box is (s + r²) / r², with the signed
-    /// squared distance s to the surface and the radius r of the bounding sphere. So even the center of a box is in a
-    /// wide fade band.</summary>
+    /// <summary>A box uses its full lengths. The retail scaled distance of a box is (s + r²) / r². Here s is the signed
+    /// squared distance to the surface, and r is the radius of the bounding sphere. So even the center of a box is in
+    /// a wide fade band.</summary>
     [Fact]
     public void ABoxUsesItsLengthsAndTheRetailScaledDistance()
     {

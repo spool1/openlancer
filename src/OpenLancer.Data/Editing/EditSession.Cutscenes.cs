@@ -490,9 +490,9 @@ public sealed partial class EditSession
     internal IEnumerable<ThnDocument> NewCutsceneDocuments => cutscenes.Values.Where(d => d.Kind == ThnFileKind.NewHere);
 
     /// <summary>
-    /// The layer that gives a file of the edit view or a new file of W, for an entry of a files list: the active mod
-    /// for its whole file, for a new cutscene and for a new INI file of its folder that is not saved yet, else the last
-    /// lower mod with a whole file at the path, else the base data. A patch does not give the file.
+    /// The layer that gives a file of the edit view or a new file of W, for an entry of a files list. The active mod
+    /// gives its whole file, and a new cutscene or a new INI file of its folder that is not saved yet. Else the last
+    /// lower mod with a whole file at the path gives the file, else the base data. A patch does not give the file.
     /// </summary>
     internal (ValueOrigin Origin, string? ModId, bool Unsaved) FileOrigin(string path)
     {

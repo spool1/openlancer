@@ -8,16 +8,17 @@ using Universe = LibreLancer.Data.Schema.Universe;
 namespace OpenLancer.Data.Editing.Scene;
 
 /// <summary>
-/// The math of the shape of a zone (shared step SH6): whether a point is inside, the immersion of a point, the size of
-/// the shape in meters, and the size line for a size in meters. The zone is a <c>[zone]</c> of W as the engine reads its
-/// lines (see <see cref="Read"/>), so the math needs no file and no game load.
+/// The math of the shape of a zone (shared step SH6). It tells whether a point is inside and how deep the point is.
+/// It also gives the size of the shape in meters, and the size line for a size in meters. The zone is a
+/// <c>[zone]</c> of W as the engine reads its lines (see <see cref="Read"/>). So the math needs no file and no game
+/// load.
 /// </summary>
 /// <remarks>
 /// <para>The engine reads the <c>size</c> line in the order of the line. A sphere uses the radius. An ellipsoid uses
 /// the three half axes, and a box the three full lengths. A cylinder uses the radius and the height. A ring uses the
 /// outer radius, the inner radius and the height. One value v reads as (v, v, v), two values give 0 as the third
-/// value, and no line reads as (1, 1, 1). The X, Y and Z axes are the axes of the zone after its rotation, and Y is
-/// the height of a cylinder and of a ring.</para>
+/// value, and no line reads as (1, 1, 1). The X, Y and Z axes are the axes of the zone after its rotation. Y is the
+/// height of a cylinder and of a ring.</para>
 /// <para><see cref="Contains"/> uses the shape code of the engine (<see cref="Zone.ContainsPoint"/>), as OpenLancer Play
 /// does. <see cref="Immersion"/> follows the retail rule, because a nebula hole uses it in the retail games.</para>
 /// </remarks>
@@ -50,16 +51,16 @@ internal static class ZoneShapes
     }
 
     /// <summary>
-    /// How deep a point is in the zone, with the retail rule: 1 from the start of the fade band inward, 0 on the edge and
-    /// outside, and a value between 0 and 1 in the fade band. The fade band is the outer part of the zone, of the
-    /// <c>edge_fraction</c> of the scaled distance (see <see cref="ScaledDistance"/>).
+    /// How deep a point is in the zone, with the retail rule. The value is 1 from the start of the fade band inward,
+    /// and 0 on the edge and outside. In the fade band, it goes from 1 to 0. The fade band is the outer part of the
+    /// zone, of the <c>edge_fraction</c> of the scaled distance (see <see cref="ScaledDistance"/>).
     /// </summary>
     /// <remarks>
     /// <para>A point outside the bounding sphere of the zone gets 0. Retail clamps <c>edge_fraction</c> to 0 to 1. A
     /// zone without the line, or with an edge fraction below 0.0001, has no fade band, so each point inside gets 1.
     /// OpenLancer Play gives the fog of a nebula without the line the edge fraction 0.25.</para>
-    /// <para>Retail logs a data error for a nebula hole whose center has an immersion of the nebula zone below 1, and it
-    /// skips the hole at 0.</para>
+    /// <para>Retail logs a data error for a nebula hole when the immersion of the nebula zone at the hole center is
+    /// below 1. At 0, retail skips the hole.</para>
     /// </remarks>
     public static float Immersion(Universe.Zone zone, Vector3 point)
     {
@@ -94,8 +95,8 @@ internal static class ZoneShapes
 
     /// <summary>
     /// The values of the <c>size</c> line of the smallest shape whose extent is at least the extent on each axis (see
-    /// <see cref="Extent"/>), in the order of the line. A sphere takes the largest of the three values. A cylinder and a
-    /// ring take the larger of the width and the depth. A ring gets the inner radius 0.
+    /// <see cref="Extent"/>). The values are in the order of the line. A sphere takes the largest of the three values.
+    /// A cylinder and a ring take the larger of the width and the depth. A ring gets the inner radius 0.
     /// </summary>
     /// <param name="extent">The width, the height and the depth in meters.</param>
     public static IReadOnlyList<float> SizeFor(Universe.ZoneShape shape, Vector3 extent) => shape switch
@@ -109,9 +110,8 @@ internal static class ZoneShapes
 
     /// <summary>
     /// The scaled distance of a point with the retail rule: 0 at the center, 1 on the edge and more than 1 outside.
-    /// A sphere, an ellipsoid and a cylinder divide the distance from the center by the distance from the center to the
-    /// edge in the same direction. A ring does the same from the middle circle of its ring, in the cross section of the
-    /// ring. A box uses its signed squared distance to the surface s, negative inside, and the radius r of its bounding
+    /// A sphere, an ellipsoid and a cylinder divide the distance from the center by the distance to the edge in the
+    /// same direction. A ring does the same from the middle circle of its ring, in the cross section of the ring. A box uses its signed squared distance to the surface s, negative inside, and the radius r of its bounding
     /// sphere: (s + r²) / r².
     /// </summary>
     private static float ScaledDistance(Universe.Zone zone, Vector3 point)
@@ -148,8 +148,8 @@ internal static class ZoneShapes
         }
     }
 
-    /// <summary>The distance from the center of a sphere, an ellipsoid or a cylinder to its edge in a direction of
-    /// length 1, along the axes of the zone.</summary>
+    /// <summary>The distance from the center of a sphere, an ellipsoid or a cylinder to its edge in a direction. The
+    /// direction has the length 1, along the axes of the zone.</summary>
     private static float EdgeAlong(ShapeKind shape, Vector3 size, Vector3 direction)
     {
         switch (shape)
@@ -189,7 +189,8 @@ internal static class ZoneShapes
     }
 
     /// <summary>The squared distance from a point to the surface of a box with the half lengths, along the axes of the
-    /// box: positive outside and on the surface, negative inside, with the distance to the nearest face.</summary>
+    /// box. It is positive outside and on the surface. Inside, it is negative, with the distance to the nearest
+    /// face.</summary>
     private static float SignedSquaredDistance(Vector3 half, Vector3 point)
     {
         var over = Vector3.Abs(point) - half;

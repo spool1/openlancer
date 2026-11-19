@@ -14,16 +14,16 @@ internal sealed record CopiedText(StringKind Kind, string Text, string Source);
 /// <summary>One section that <see cref="SectionCopies.CopyTo"/> copies.</summary>
 /// <param name="Source">The section to copy, for example a section of W or of a template file. The copy does not change
 /// it.</param>
-/// <param name="Key">The key of the copy, or null to keep the key of the source. A section without a key, and a name
-/// that is unique only in its file, such as a light of a system file, can keep the key.</param>
+/// <param name="Key">The key of the copy, or null to keep the key of the source. A section without a key can keep the
+/// key. So can a name that is unique only in its file, such as a light of a system file.</param>
 /// <param name="Keep">The names of the lines that the copy keeps, without letter case, or null for each line. The copy
 /// always keeps the line of the key.</param>
 internal sealed record SectionCopy(Section Source, string? Key = null, IReadOnlyCollection<string>? Keep = null);
 
 /// <summary>
 /// The texts of a mod that the copies of sections get, and the commands that add them to the text of the active mod.
-/// New from template (<see cref="ItemTemplates"/>), Duplicate in the Scene (milestone M3), the draft and the
-/// placement of a prop group (milestone M23) and the copies of <see cref="CopyTo"/> use it, so a copy of a section gets
+/// New from template (<see cref="ItemTemplates"/>) and Duplicate in the Scene (milestone M3) use it. So do the draft and
+/// the placement of a prop group (milestone M23), and the copies of <see cref="CopyTo"/>. So a copy of a section gets
 /// its text in one way.
 /// </summary>
 /// <param name="problem">Gets why a line of a copy cannot get its text.</param>
@@ -110,7 +110,7 @@ internal sealed class SectionCopies(EditSession session, Action<string> problem)
     /// </summary>
     /// <remarks>
     /// <para>Each line of a copy keeps its values, with three changes. The line of the key gets the key of the copy. A
-    /// value that is the old key of another copy of the call names the new key of that copy, for example the
+    /// value that is the old key of another copy of the call names the new key of that copy. An example is the
     /// <c>parent</c> of a copied child object. A text of a mod gets a copy with a new key (see
     /// <see cref="Copy(string, string, int, ValueBase, SectionIdentity)"/>), and <see cref="Commands"/> gets the command
     /// of the text. A text id of the base game stays.</para>
@@ -118,8 +118,8 @@ internal sealed class SectionCopies(EditSession session, Action<string> problem)
     /// </remarks>
     /// <param name="path">The install path of the file.</param>
     /// <param name="parent">The parent of the child copies at the start of the list, in the existing file.</param>
-    /// <exception cref="ArgumentException">A copy gives a key to a section type without a key, two copies give one old
-    /// key two new keys, or a child copy of an existing file has no parent.</exception>
+    /// <exception cref="ArgumentException">A copy gives a key to a section type without a key. Or two copies give one
+    /// old key two new keys, or a child copy of an existing file has no parent.</exception>
     public EditCommand CopyTo(string path, IReadOnlyList<SectionCopy> copies, bool newFile, SectionRef? parent = null)
     {
         var renames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -196,7 +196,7 @@ internal sealed class SectionCopies(EditSession session, Action<string> problem)
 
     /// <summary>
     /// A value of a new line as a file stores it. A binary file stores a new boolean as lowercase text (see
-    /// <c>BinaryValueTypes.Store</c>), so each bool string of a copy in a binary file becomes <c>true</c> or
+    /// <c>BinaryValueTypes.Store</c>). So each bool string of a copy in a binary file becomes <c>true</c> or
     /// <c>false</c>. The engine reads both forms as the same boolean. Each other value stays.
     /// </summary>
     /// <param name="binary">True for a value of a binary file.</param>
