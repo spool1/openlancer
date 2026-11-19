@@ -382,11 +382,13 @@ The editor edits two kinds of whole files of the active mod:
 - A file under `DATA/MISSIONS`, for example a test script, a replaced slot script or a file of ship builds.
 - An INI file below `DATA/MODS/<mod id>/` of the active mod, for example the file of a new star system. The editor also makes and deletes such a file, with undo. A new file cannot take the path of a file that the game, a mod or an unsaved edit has, in any letter case.
 
-Each section of such a file is editable, also a section whose key another section has. The save writes the whole file as text into `files/`. A text file keeps its comments and the lines that do not change. A binary file becomes text, and the save tells it. A new file can use text placeholders, and the save checks that `strings.json` has their text. After a delete, the save deletes the file. An undo of the delete gives the file back, and the next save writes it again.
+Each section of such a file is editable, also a section whose key another section has. The save writes the whole file as text into `files/`. A text file keeps its comments and the lines that do not change. A binary file becomes text, and the save tells it.
 
-A whole file that replaces a file of the game or of a lower mod stays read-only, except under `DATA/MISSIONS`. The editor shows the other whole files of the active mod, but it does not change them.
+A new file can use text placeholders, and the save checks that `strings.json` has their text. After a delete, the save deletes the file. An undo of the delete gives the file back, and the next save writes it again.
 
-When the active mod is in the OpenLancer repo, the save refuses a whole mission file and a whole INI file below `DATA/MODS/<mod id>/`. The editor also makes no new INI file in that folder. The content scan cannot tell such a file from a copy of a retail file. The save of a delete is allowed.
+An INI file below `DATA/MODS/<mod id>/` stays editable also when the game or a lower mod has a file at the same path. The editor does not delete such a file, because the game then uses the other file again. A whole file outside `DATA/MODS/<mod id>/` that replaces a file of the game or of a lower mod stays read-only, except under `DATA/MISSIONS`. The editor shows the other whole files of the active mod, but it does not change them.
+
+When the active mod is in the OpenLancer repo, the save refuses a whole mission file and a whole INI file below `DATA/MODS/<mod id>/`. The editor also makes no new INI file in that folder. The content scan cannot tell a whole mission file or a whole INI file from a copy of a retail file. The save can still delete such a file.
 
 When the active mod has a whole mission file and a patch for the same path, the merge applies the patch to the whole file. The editor shows the file as the game gets it, but it does not change it. Move the lines of the patch into the whole file, then delete the patch.
 
@@ -1221,7 +1223,7 @@ A save also stops in these cases:
 - A patch line of a key that holds a text id holds the id of a text of a mod as a number. The id comes from the position of the text in the generated DLL, so it changes when a mod adds text. Copy this text into the mod and use its placeholder.
 - A file that the save writes is a folder now, a folder of its path is a file, or the file is read-only.
 - The active mod is in the OpenLancer repo, and the save would write a whole cutscene file into it. The content scan cannot tell such a file from a copy of a retail script. A THN patch is allowed.
-- The save would write a whole mission file, or a whole INI file below `DATA/MODS/<mod id>/`, into a mod in the OpenLancer repo. The content scan cannot tell such a file from a copy of a retail file. The save of a delete is allowed (see "Whole files").
+- The save would write a whole mission file, or a whole INI file below `DATA/MODS/<mod id>/`, into a mod in the OpenLancer repo. The content scan cannot tell such a file from a copy of a retail file. The save can still delete such a file (see "Whole files").
 - The save gate finds an error (see "The save gate"). For example, a light names an attenuation curve (`atten_curve`) that the engine cannot load: no FLOAT graph of `igraph.ini` has the name, more than one graph has it, or the graph has no points. The light can be a light of the active mod, or a light of any layer when the active mod removed the points of the curve. The game stops loading with such a light, so each later load of the profile would fail. The Console names the light, the curve and the file. The gate reads the curves from the edit view, so it needs no loaded game data.
 
 While the editor has unsaved edits, it keeps them in `.olsave/recovery.json`, a moment after each edit. When no unsaved edits remain, for example after an undo, the editor deletes the file. A close of the profile and a change of the active mod ask first: Save, Discard or Cancel. After a save, the action continues, also when the save needed your confirmation to overwrite a file.

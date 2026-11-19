@@ -292,8 +292,43 @@ public sealed class NewModFileTests
         Assert.False(session.IsDirty);
     }
 
-    /// <summary>A whole file of the active mod that replaces a file of the lower layer stays read-only, except a mission
-    /// file. A whole file in the folder of another mod stays read-only too.</summary>
+    /// <summary>An INI file of the folder of the active mod stays an editable whole file also when the base data or a
+    /// lower mod has a file at the same path, because the rule of the whole files has no test of the lower layer. The
+    /// save writes the whole file. The editor does not delete it, because the game then uses the lower file
+    /// again.</summary>
+    [Fact]
+    public void AnIniFileOfTheFolderOfTheModStaysEditableWhenTheLowerLayerHasIt()
+    {
+        const string inLower = @"DATA\MODS\act\shared.ini";
+        const string inBase = @"DATA\MODS\act\inbase.ini";
+        using var ws = ListWorkspace.Create(
+            lowerFiles: new() { [@"files\" + inLower] = "[Thing]\nnickname = a\nprice = 1\n" },
+            activeFiles: new()
+            {
+                [@"files\" + inLower] = "[Thing]\nnickname = b\nprice = 1\n",
+                [@"files\" + inBase] = "[Thing]\nnickname = c\nprice = 1\n",
+            });
+        ws.WriteBase(inBase, "[Thing]\nnickname = d\nprice = 1\n");
+        var session = ws.Session("act");
+
+        foreach (var (path, key) in new[] { (inLower, "b"), (inBase, "c") })
+        {
+            var document = session.OpenDocument(path)!;
+            Assert.True(document.IsWholeFile);
+            Assert.Null(document.ReadOnlyReason);
+            session.Execute(EditCommand.SetLinesFromText(new SectionRef(path, new SectionIdentity("Thing", key)), "price",
+                ["5"]));
+            Assert.StartsWith($"The game data or a lower mod has the file {path} too.",
+                Assert.Throws<InvalidOperationException>(() => session.Execute(EditCommand.DeleteFile(path))).Message);
+        }
+        AssertSaved(session.Save());
+
+        Assert.Equal("[Thing]\nnickname = b\nprice = 5\n", ws.ReadModFile(@"files\" + inLower).ReplaceLineEndings("\n"));
+        Assert.Equal("[Thing]\nnickname = c\nprice = 5\n", ws.ReadModFile(@"files\" + inBase).ReplaceLineEndings("\n"));
+    }
+
+    /// <summary>A whole file of the active mod outside its folder that replaces a file of the lower layer stays
+    /// read-only, except a mission file. A whole file in the folder of another mod stays read-only too.</summary>
     [Fact]
     public void AWholeFileOutsideTheFolderOfTheModStaysReadOnly()
     {
