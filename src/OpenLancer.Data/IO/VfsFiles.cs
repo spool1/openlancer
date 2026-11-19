@@ -38,5 +38,28 @@ public static class VfsFiles
         }
     }
 
+    /// <summary>
+    /// Compares two install paths in the order of <see cref="Find(FileSystem, IReadOnlyList{string}, string)"/>: in
+    /// each folder the files first, then the subfolders, each by name without case. A list can thus put a file that
+    /// is not on disk yet at the place where the find gives it after the save.
+    /// </summary>
+    public static int CompareInFindOrder(string? a, string? b)
+    {
+        if (a == null || b == null)
+            return a == null ? b == null ? 0 : -1 : 1;
+        var x = a.Split('\\');
+        var y = b.Split('\\');
+        for (var i = 0; i < x.Length && i < y.Length; i++)
+        {
+            var xFile = i == x.Length - 1;
+            if (xFile != (i == y.Length - 1))
+                return xFile ? -1 : 1;
+            var names = VfsPath.Comparer.Compare(x[i], y[i]);
+            if (names != 0)
+                return names;
+        }
+        return x.Length.CompareTo(y.Length);
+    }
+
     private static string Join(string folder, string name) => folder.Length == 0 ? name : folder + "\\" + name;
 }

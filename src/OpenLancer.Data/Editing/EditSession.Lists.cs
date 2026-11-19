@@ -94,6 +94,19 @@ public sealed partial class EditSession
         return owner == null ? (ValueOrigin.Base, null, true, false) : (ValueOrigin.LowerMod, owner, true, false);
     }
 
+    /// <summary>
+    /// The documents of the INI files below the folder of the active mod that the session has (decision O2): the new
+    /// files of W, the files that the session opened, and the files that W deleted. The files lists and the file check
+    /// read them, so a new file is in a list before its save, and a file that W deleted is not (see
+    /// <see cref="DataLists"/>). Empty without an active mod.
+    /// </summary>
+    /// <remarks>Each such document is a whole file (see <see cref="EditDocument.EditsWholeFile"/>). A file of the folder
+    /// that the session did not open is as the edit view gives it.</remarks>
+    internal IEnumerable<EditDocument> ModFolderDocuments() =>
+        ActiveMod is { } mod
+            ? documents.Values.Where(d => d.IsWholeFile && ContentPaths.IsOwnFile(d.Path, mod.Id))
+            : [];
+
     /// <summary>The sections of a file as the edit view gives it, or null when it has no such INI file. For a whole
     /// file of the active mod, this is the only view of its content: W has the lower data.</summary>
     internal IReadOnlyList<Section>? EditViewSections(string path)

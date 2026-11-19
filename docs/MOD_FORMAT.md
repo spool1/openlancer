@@ -1050,6 +1050,8 @@ A `scene` line names its script by its place: value 2 when value 0 is `all`, els
 
 The `file` key of a `[Nebula]` and of an `[Asteroids]` section uses the list of the nebula files or of the asteroid files. The list holds the INI files below `SOLAR\NEBULA` or `SOLAR\ASTEROIDS` whose sections all belong to a nebula file or to an asteroid file. So the texture files of these folders, for example `edge_shapes.ini`, are not in the list. The engine reads a file of any folder. So a value outside the list is valid when its file exists, and the picker shows it as "value (other folder)". A file that does not exist is an error: the game crashes when it loads the data.
 
+A list of files also holds each new INI file of the active mod below `DATA/MODS/<mod id>/` (see "Whole files"), also before its save. The file must fit the list: the extension, the folder and, for a list with a file class, the sections of the file. The list leaves out a file that the active mod deletes, also before the save. So the save does not change the list. A check of a `file` line accepts a new file of the active mod before the save, and refuses a file that the active mod deletes.
+
 The `zone` key uses the list of the zones of the system file. A zone that the system does not have is an error: the game drops the nebula or the field. A section without a `file` line is an error of a section that the active mod changes: the game drops the item.
 
 The Inspector page of a nebula or a field shows the zone and the file with its picker. It also shows the area of the zone, the holes and the sections of the file. The sections of a nebula or asteroid file are read-only in this version. The Scene shows another file when you open the system again after the save.

@@ -295,6 +295,100 @@ public sealed class DataListsTests
         Assert.Equal("5", sun.First(e => e.Name == "pos")[0].ToString());
     }
 
+    /// <summary>The rule data of an invented files list whose folder is in the folder of the mod "act": the nebula files
+    /// of <c>DATA\MODS\act\SOLAR</c>.</summary>
+    private const string ModNebulaRules = """
+        {
+          "roles": { "system": { "systemFiles": true } },
+          "lists": [
+            { "id": "mod_nebula_file", "label": "Nebula file", "kind": "Nebula",
+              "source": { "files": ".ini", "folder": "MODS\\act\\SOLAR", "fileClass": "LibreLancer.Data.Schema.Universe.Nebula" } }
+          ],
+          "rules": []
+        }
+        """;
+
+    private const string NewCloudPath = @"DATA\MODS\act\SOLAR\NEBULA\new_cloud.ini";
+    private const string NewCloudValue = @"MODS\act\SOLAR\NEBULA\new_cloud.ini";
+
+    /// <summary>
+    /// A files list holds a new INI file of the folder of the active mod before the save, when the file passes the
+    /// filters of the list (decision O2). The save does not change the entry or its place. A delete takes the entry
+    /// away before the save. <see cref="DataLists.FileExists"/> follows the list, so a check of a <c>file</c> line
+    /// agrees with the list.
+    /// </summary>
+    [Fact]
+    public void AFilesListHoldsANewFileOfTheFolderOfTheModBeforeTheSave()
+    {
+        using var ws = NebulaFiles.Create(activeFiles: new()
+        {
+            [@"files\DATA\MODS\act\SOLAR\NEBULA\a_cloud.ini"] = "[Fog]\nfog_enabled = 1\n",
+            [@"files\DATA\MODS\act\SOLAR\z_cloud.ini"] = "[Fog]\nfog_enabled = 1\n",
+        });
+        var session = ws.Session("act");
+        session.UseRules(ListRules.Parse(ModNebulaRules));
+        IReadOnlyList<ListEntry> Entries() => session.Lists.List("mod_nebula_file")!.Entries;
+        Assert.Equal([@"MODS\act\SOLAR\z_cloud.ini", @"MODS\act\SOLAR\NEBULA\a_cloud.ini"], Entries().Select(e => e.Value));
+        Assert.False(session.Lists.FileExists(NewCloudValue));
+
+        session.Execute(EditCommand.NewFile(NewCloudPath, ContentPathsTests.Sections("[Fog]\nfog_enabled = 1\n")));
+        // A new file of another class, and a new file outside the folder of the list, are no entries.
+        session.Execute(EditCommand.NewFile(@"DATA\MODS\act\SOLAR\NEBULA\shapes.ini",
+            ContentPathsTests.Sections("[Texture]\nfile = a.txm\n")));
+        session.Execute(EditCommand.NewFile(@"DATA\MODS\act\BASES\other.ini", ContentPathsTests.Sections("[Fog]\n")));
+
+        var before = Entries();
+        Assert.Equal([@"MODS\act\SOLAR\z_cloud.ini", @"MODS\act\SOLAR\NEBULA\a_cloud.ini", NewCloudValue],
+            before.Select(e => e.Value));
+        var added = before[^1];
+        Assert.Equal(("new_cloud", ValueOrigin.ActiveMod, "act", true), (added.Name, added.Origin, added.ModId, added.Unsaved));
+        Assert.True(session.Lists.FileExists(NewCloudValue));
+        Assert.True(session.Lists.FileExists(NewCloudValue.ToLowerInvariant()));
+
+        Assert.True(session.Save().Saved);
+        var after = Entries();
+        Assert.Equal(before.Select(e => (e.Value, e.Name, e.Origin, e.ModId, e.Detail)),
+            after.Select(e => (e.Value, e.Name, e.Origin, e.ModId, e.Detail)));
+        Assert.False(after[^1].Unsaved);
+        Assert.True(session.Lists.FileExists(NewCloudValue));
+
+        session.Execute(EditCommand.DeleteFile(NewCloudPath));
+        Assert.Equal([@"MODS\act\SOLAR\z_cloud.ini", @"MODS\act\SOLAR\NEBULA\a_cloud.ini"], Entries().Select(e => e.Value));
+        Assert.False(session.Lists.FileExists(NewCloudValue));
+        session.Undo();
+        Assert.Equal(NewCloudValue, Entries()[^1].Value);
+        Assert.True(session.Lists.FileExists(NewCloudValue));
+        session.Redo();
+        Assert.True(session.Save().Saved);
+        Assert.Equal([@"MODS\act\SOLAR\z_cloud.ini", @"MODS\act\SOLAR\NEBULA\a_cloud.ini"], Entries().Select(e => e.Value));
+        Assert.False(session.Lists.FileExists(NewCloudValue));
+    }
+
+    /// <summary>
+    /// A <c>[Nebula] file</c> line that names a new nebula file of the folder of the active mod has no "does not exist"
+    /// error before the first save. So the save gate lets the first save of a new volume file through. The line gets
+    /// the error again when W deletes the file.
+    /// </summary>
+    [Fact]
+    public void AFileCheckAcceptsANewFileOfTheFolderOfTheModBeforeTheSave()
+    {
+        using var ws = NebulaFiles.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.SetLinesFromText(NebulaFiles.Nebula, "file", [NewCloudValue]));
+        Assert.Contains(session.CheckLists(NebulaFiles.Nebula), p => p.Message.Contains("does not exist"));
+
+        session.Execute(EditCommand.NewFile(NewCloudPath, ContentPathsTests.Sections("[Fog]\nfog_enabled = 1\n")));
+
+        Assert.DoesNotContain(session.CheckLists(NebulaFiles.Nebula), p => p.Message.Contains("does not exist"));
+        var saved = session.Save();
+        Assert.True(saved.Saved, string.Join("\n", saved.Problems));
+        Assert.DoesNotContain(session.CheckLists(NebulaFiles.Nebula), p => p.Message.Contains("does not exist"));
+
+        session.Execute(EditCommand.DeleteFile(NewCloudPath));
+        Assert.Contains(session.CheckLists(NebulaFiles.Nebula),
+            p => p.Severity == DiagnosticSeverity.Error && p.Message.Contains("does not exist"));
+    }
+
     /// <summary>A files list with a folder holds only the files below its folder (section 11 of the M22 design). A value
     /// is a path below the data folder, in the letter case of the file.</summary>
     [Fact]

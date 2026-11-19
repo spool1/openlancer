@@ -522,9 +522,11 @@ public sealed class DataLists
                 continue;
             if (source.Files != null)
             {
-                // The files of the edit view change only with a save. The new cutscenes of W change with each edit.
+                // The files of the edit view change only with a save. The new cutscenes of W and the files of the folder
+                // of the active mod in W change with each edit.
                 other.Add(session.EditView);
                 other.AddRange(session.NewCutsceneDocuments.Select(d => d.State));
+                other.AddRange(session.ModFolderDocuments().Select(d => d.State));
                 continue;
             }
             // The clips follow the [Animations] lines of bodyparts.ini and the files of the edit view.
@@ -655,11 +657,15 @@ public sealed class DataLists
 
     /// <summary>
     /// The entries of a files list (section 5.6 of the M8b design). They are the files of the edit view with the
-    /// extension, in the folder and of the class of the list (milestone M22). Each new cutscene of W is an entry too. The
-    /// value of an entry is its path below the data folder, in the letter case of the file, as an INI line names it. The
-    /// name is the file name without the extension. A new cutscene whose New cutscene an undo took back is not an entry,
-    /// because the next save deletes its file.
+    /// extension, in the folder and of the class of the list (milestone M22). The value of an entry is its path below
+    /// the data folder, in the letter case of the file, as an INI line names it. The name is the file name without the
+    /// extension.
     /// </summary>
+    /// <remarks>W decides for each new cutscene and for each INI file below the folder of the active mod that the
+    /// session has (see <see cref="EditSession.ModFolderDocuments"/>). Such a file is an entry when it exists in W and
+    /// passes the same filters as a file of the edit view, with the sections of W. So a new file is an entry before its
+    /// save, and a file that W deleted, or whose New cutscene an undo took back, is not an entry. The next save writes
+    /// or deletes the file, and the list stays the same, in the same order.</remarks>
     private IReadOnlyList<ListEntry> FileEntries(ListSource source)
     {
         var extensions = source.Files!;
@@ -671,15 +677,23 @@ public sealed class DataLists
             editViewFiles[key] = known;
         }
 
-        var cutscenes = extensions.Contains(".thn", StringComparer.OrdinalIgnoreCase);
-        var absent = cutscenes
-            ? session.NewCutsceneDocuments.Where(d => !d.State.Exists).Select(d => d.Path).ToHashSet(VfsPath.Comparer)
-            : [];
-        var paths = known.Paths.Where(p => !absent.Contains(p)).ToList();
-        if (cutscenes)
+        // True for each file of W that is an entry, false for each other file of W.
+        var inW = new Dictionary<string, bool>(VfsPath.Comparer);
+        if (extensions.Contains(".thn", StringComparer.OrdinalIgnoreCase))
         {
-            var inView = known.Paths.ToHashSet(VfsPath.Comparer);
-            paths.AddRange(session.NewCutscenes.Where(p => !inView.Contains(p)));
+            foreach (var cutscene in session.NewCutsceneDocuments)
+                inW[cutscene.Path] = cutscene.State.Exists && InSource(source, cutscene.Path);
+        }
+        foreach (var document in session.ModFolderDocuments())
+        {
+            inW[document.Path] = document.State.Exists && InSource(source, document.Path) &&
+                                 OfFileClass(source, document.Working);
+        }
+        var paths = known.Paths.Where(p => !inW.ContainsKey(p)).ToList();
+        if (inW.Count > 0)
+        {
+            paths.AddRange(inW.Where(p => p.Value).Select(p => p.Key));
+            paths.Sort(VfsFiles.CompareInFindOrder);
         }
 
         var entries = new List<ListEntry>(paths.Count);
@@ -700,16 +714,13 @@ public sealed class DataLists
     /// <summary>
     /// The install paths of the files of a files list source in a view. These are the files with an extension of the
     /// source below the folder of the source, or below the install root without a folder. With a file class, only the
-    /// files that have a section and whose section types are all sections of the class. So the texture files of
-    /// <c>SOLAR\NEBULA</c> are not nebula files.
+    /// files of the class (see <see cref="OfFileClass"/>).
     /// </summary>
     private IEnumerable<string> FindFiles(FileSystem view, ListSource source)
     {
-        var folder = source.Folder == null ? "" : ThnReferences.PathOf(source.Folder) ?? "";
-        var type = source.FileClassType;
-        foreach (var path in VfsFiles.Find(view, source.Files!, folder))
+        foreach (var path in VfsFiles.Find(view, source.Files!, FolderOf(source)))
         {
-            if (type == null)
+            if (source.FileClassType == null)
             {
                 yield return path;
                 continue;
@@ -724,20 +735,45 @@ public sealed class DataLists
                 // A file that the parser cannot read is no entry. The engine cannot read it either.
                 continue;
             }
-            if (sections is { Count: > 0 } && sections.All(s => SchemaCatalog.Section(type, s.Name) != null))
+            if (sections != null && OfFileClass(source, sections))
                 yield return path;
         }
     }
 
+    /// <summary>The install path of the folder of a files list source, or an empty string for the install
+    /// root.</summary>
+    private static string FolderOf(ListSource source) =>
+        source.Folder == null ? "" : ThnReferences.PathOf(source.Folder) ?? "";
+
+    /// <summary>True when an install path has an extension of a files list source and is below its folder, as
+    /// <see cref="FindFiles"/> finds the files of the edit view.</summary>
+    private static bool InSource(ListSource source, string path)
+    {
+        var folder = FolderOf(source);
+        return source.Files!.Any(e => path.EndsWith(e, StringComparison.OrdinalIgnoreCase)) &&
+               (folder.Length == 0 || path.StartsWith(folder + "\\", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>True when the sections of a file make it a file of the class of a files list source: a source without
+    /// a class takes each file. With a class, the file has a section, and each section is a section of the class. So
+    /// the texture files of <c>SOLAR\NEBULA</c> are not nebula files.</summary>
+    private static bool OfFileClass(ListSource source, IReadOnlyList<Section> sections) =>
+        source.FileClassType is not { } type ||
+        sections.Count > 0 && sections.All(s => SchemaCatalog.Section(type, s.Name) != null);
+
     /// <summary>
-    /// True when the file that a value names exists in the edit view. The value is a path below the data folder, as a
-    /// <c>file</c> line of a <c>[Nebula]</c> names it. A rule with the flag exists accepts such a value outside its list
-    /// (see <see cref="ListRule.Exists"/>).
+    /// True when the file that a value names exists. The value is a path below the data folder, as a <c>file</c> line
+    /// of a <c>[Nebula]</c> names it. A rule with the flag exists accepts such a value outside its list (see
+    /// <see cref="ListRule.Exists"/>). W decides for an INI file below the folder of the active mod that the session
+    /// has, as in the files lists (see <see cref="FileEntries"/>). So a check accepts a new file of the mod before its
+    /// save, and refuses a file that W deleted. The edit view decides for each other file.
     /// </summary>
     public bool FileExists(string value)
     {
         if (value.Trim() is not { Length: > 0 } text || ThnReferences.PathOf(text) is not { } path)
             return false;
+        if (session.ModFolderDocuments().FirstOrDefault(d => VfsPath.Comparer.Equals(d.Path, path)) is { } document)
+            return document.State.Exists;
         var view = session.EditView;
         if (editViewSystem is not { } known || !ReferenceEquals(known.View, view))
         {

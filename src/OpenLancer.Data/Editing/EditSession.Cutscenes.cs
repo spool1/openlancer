@@ -490,9 +490,9 @@ public sealed partial class EditSession
     internal IEnumerable<ThnDocument> NewCutsceneDocuments => cutscenes.Values.Where(d => d.Kind == ThnFileKind.NewHere);
 
     /// <summary>
-    /// The layer that gives a file of the edit view or a new cutscene of W, for an entry of a files list: the active mod
-    /// for its whole file and for a new cutscene that is not saved yet, else the last lower mod with a whole file at the
-    /// path, else the base data. A patch does not give the file.
+    /// The layer that gives a file of the edit view or a new file of W, for an entry of a files list: the active mod
+    /// for its whole file, for a new cutscene and for a new INI file of its folder that is not saved yet, else the last
+    /// lower mod with a whole file at the path, else the base data. A patch does not give the file.
     /// </summary>
     internal (ValueOrigin Origin, string? ModId, bool Unsaved) FileOrigin(string path)
     {
@@ -501,7 +501,9 @@ public sealed partial class EditSession
         {
             if (active.Files.ContainsKey(normal))
                 return (ValueOrigin.ActiveMod, active.Id, false);
-            if (cutscenes.GetValueOrDefault(normal) is { Kind: ThnFileKind.NewHere, State.Exists: true })
+            if (cutscenes.GetValueOrDefault(normal) is { Kind: ThnFileKind.NewHere, State.Exists: true } ||
+                documents.GetValueOrDefault(normal) is { IsWholeFile: true, State.Exists: true } &&
+                ContentPaths.IsOwnFile(normal, active.Id))
                 return (ValueOrigin.ActiveMod, active.Id, true);
         }
         return lower.LastOrDefault(m => m.Files.ContainsKey(normal)) is { } mod
