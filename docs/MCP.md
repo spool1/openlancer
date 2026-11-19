@@ -573,7 +573,7 @@ The check reads the data lists with the unsaved edits. So a change of the active
 
 `check` with the scope `all` lists each problem of these cutscenes. `save` refuses the save and gives the text of the save gate of the editor. A call that changes only cutscenes gives no problem of another cutscene.
 
-A change of the active mod in the game data can break a cutscene. To find such a cutscene, the save gate looks for the item name in the cutscene file. So it does not find a template that a text script makes from parts, for example with `..`.
+A change of the active mod in the game data can break a cutscene. To find such a cutscene, the save gate looks for the item name in the cutscene file. So it does not find a template that the Lua text of a script joins from parts, for example with `..`. The save then passes, and the game can crash when it plays that cutscene.
 
 `list_values` gives the names of the data lists of the templates:
 
@@ -635,6 +635,7 @@ Some keys have their own rules, as in the Inspector:
 
 - `time` and `props.duration` move the event, as the time and length fields do. They round to the 1 ms grid, and a time below 0 gives `invalid_value`. A SET_CAMERA event has no length, so `props.duration` gives `invalid_value` there.
 - `targets` takes one entity name for each target of the event, for example `["Monitor", "Camera_01"]`. Another number of names gives `invalid_argument` with the detail `TargetCount`, as in `cutscene_add_event`. Each entity must fit the role of its target. A target of the wrong type gives `refused`, and the message names the types that fit. A name that no entity of the script has gives `not_found`.
+- `template_name` sets the template of an entity, as the template field of the Inspector does, for example `"template_name": "li_manhattan_shipdealer"`. Get the names from `list_values` with the list of the template (see the table of the lists of the templates above).
 - `entity_name` and `type` give `refused`. Use `rename_item` for the name. To change the type, delete the element and add another one.
 - The `flags` of an entity give `refused`. Use `cutscene_set_flags`.
 
