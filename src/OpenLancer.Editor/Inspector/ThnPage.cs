@@ -87,7 +87,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
     /// <summary>The note of the Problems section for a cutscene that the active mod does not change (see
     /// <see cref="LowerProblemsNote"/>).</summary>
     internal const string LowerProblemsText =
-        "The active mod does not change this cutscene. A change of the game data in the active mod, for example an " +
+        "The active mod does not change this cutscene. A change of the active mod in the game data, for example an " +
         "INI edit, removes or breaks an item of the cutscene. An animation file of the active mod can also remove a " +
         "clip. Undo that change, or pick another item.";
 
@@ -174,7 +174,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         // The errors that crash the game when it plays the cutscene, and the templates that name no item of the game
         // data (decision D137 and section 12.1 of the M8b design). They block the save and Play, so the page shows them
         // above the other sections. The save gate also checks a cutscene that the active mod does not change, when a
-        // change of the game data breaks it. Then a note tells the cause.
+        // change of the active mod in the game data breaks it. Then a note tells the cause.
         var errors = edits.CutsceneErrors(path);
         if (errors.Count > 0 &&
             grid.BeginSection("Thn.Problems", EditorIcons.ExclamationTriangle, $"Problems ({errors.Count})"))

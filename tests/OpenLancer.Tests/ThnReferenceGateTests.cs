@@ -222,7 +222,7 @@ public sealed class ThnReferenceGateTests
     [Fact]
     public void TheProblemsSectionTellsTheCauseOnlyForACutsceneThatTheActiveModDoesNotChange()
     {
-        Assert.Equal("The active mod does not change this cutscene. A change of the game data in the active mod, for " +
+        Assert.Equal("The active mod does not change this cutscene. A change of the active mod in the game data, for " +
                      "example an INI edit, removes or breaks an item of the cutscene. An animation file of the active " +
                      "mod can also remove a clip. Undo that change, or pick another item.", ThnPage.LowerProblemsText);
         Assert.Equal(ThnPage.LowerProblemsText, ThnPage.LowerProblemsNote(new ThnFileSource(ThnFileKind.Lower, false), false));

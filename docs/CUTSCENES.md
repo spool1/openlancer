@@ -10,7 +10,7 @@ This version has these limits:
 - A new cutscene is a text file. Nobody checked a new cutscene in the retail games yet, so the editor marks it "not checked in the retail games".
 - The editor cannot change a whole cutscene file of a mod into a patch.
 - The validation reports only the errors that stop a cutscene, the templates that name no item and the clips that the game does not have. It does not report warnings, for example an event after the end of the script.
-- To find a cutscene that a change of the game data breaks, the save gate looks for the item name in the cutscene file. So it does not find a template that a text script makes from parts, for example with `..`.
+- A change of the active mod in the game data can break a cutscene. To find such a cutscene, the save gate looks for the item name in the cutscene file. So it does not find a template that a text script makes from parts, for example with `..`.
 
 ## Browse and preview the retail cutscenes
 
@@ -188,11 +188,11 @@ The Inspector shows the selected entity or event, the selected events, or the cu
 
   The check reads the data lists of the edit view with the unsaved edits. So a costume that you add in `costumes.ini` is known before the save. When the lists have the name but the game cannot use the item, the text tells why. An example is a costume whose body names no body part.
 
-  A template that the lower cutscene has with the same problem in the lower game data stays out of the section. This is also true after a rename of its entity. When an INI edit of the active mod deletes, renames or breaks the item of a template, the problem stays in the section.
+  A template that the lower cutscene has with the same problem in the lower game data stays out of the section. This is also true after a rename of its entity. The problem stays when a change of the active mod in the game data deletes, renames or breaks the item of the template.
 
   A change of the active mod in the game data can delete, rename or break an item that a cutscene names. The save gate then checks that cutscene, also when the active mod does not change it. Examples are a retail cutscene, a cutscene of a lower mod and a cutscene that no INI line names. The game crashes or shows less when it plays such a cutscene.
 
-  The Problems section of such a cutscene shows the problems, with a note about the cause. To correct a problem, undo the change of the game data, or pick another item in the cutscene. The save then writes the new item into a THN patch of the active mod.
+  The Problems section of such a cutscene shows the problems, with a note about the cause. To correct a problem, undo that change, or pick another item in the cutscene. The save then writes the new item into a THN patch of the active mod.
 
   The check skips a template that the room fills in, for example `$terrain_dyna_01`, a DEFORMABLE with `userprops.Actor`, and a SOUND. It also skips the COMPOUNDs of a script that only `Act_CallThorn` lines name. It reads these lines with the unsaved edits, so you can save a new trigger line and the cutscene in one save.
 
@@ -241,9 +241,9 @@ When the editor cannot read an `.anm` file of the active mod, the save gives a w
 3. Change the cutscene: drag an event on the Timeline, type a new value in the Inspector, or move an entity with the gizmo in Free mode. Each change is one entry of the edit history.
 4. Press Ctrl+S. The Console shows the save, for example "Saved mod 'my-mod' (save 1): 1 file written, 0 files deleted." and "Wrote patches\DATA\Scripts\Story\s002xe_nrml_sinclair_li_01_Cityscape_01.thn".
    - If an edit gives an error that crashes the game, the save writes nothing. The Console line starts with "The game crashes when it plays this cutscene." and names the element and the key. Click the line to select the element. Correct the value or undo the edit, then save again.
-   - If a template names no item of the game data, the save also writes nothing. The Console line names the element and the template, and tells what the scene does without the item. This is also true after an INI edit that deletes, renames or breaks the item. Pick an item of the list or undo the edit, then save again.
+   - If a template names no item of the game data, the save also writes nothing. The Console line names the element and the template, and tells what the scene does without the item. This is also true when a change of the active mod in the game data deletes, renames or breaks the item. Pick an item of the list or undo the edit, then save again.
    - If a character gets a clip that the game does not have, or no clip, the save also writes nothing. The Console line names the event and the clip. Pick a clip of the list or undo the edit, then save again.
-   - If an INI edit deletes, renames or breaks an item that another cutscene names, the save also writes nothing. This is also true for a retail cutscene that you did not change. The Console line has that cutscene as its source, and names the element and the item. Undo the INI edit, or click the line and pick another item in that cutscene. Then save again.
+   - If a change of the active mod in the game data breaks another cutscene, the save also writes nothing. For example, an INI edit deletes a costume that a retail cutscene names, and you did not change that cutscene. The Console line has that cutscene as its source, and names the element and the item. Undo the change, or click the line and pick another item in that cutscene. Then save again.
 5. Wait for the validation. The Console shows "Validation OK for save 1: no errors, 0 warnings that the mod adds.", or the errors of the save.
 
 The patch holds only the values that the edits change. A save keeps the bytes of a patch that the edits do not change, and it deletes a patch that changes nothing after the edits. "What stays in a patch file" in [MOD_FORMAT.md](MOD_FORMAT.md) gives the rules. The game plays the patched cutscene after `oltool deploy`. Play shows it without a deploy (see [PLAY.md](PLAY.md)).

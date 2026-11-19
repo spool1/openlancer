@@ -569,11 +569,11 @@ The result also gives the problems of the cutscene checks that the call adds and
 
 A template that names no item of the data lists is a problem too. An example is a costume or an effect that the game data does not have. The message of a template that does not crash the game tells what the scene does without the item. When the lists have the name but the game cannot use the item, the message tells why.
 
-The check reads the data lists with the unsaved edits. So an INI edit of the active mod that deletes, renames or breaks the item also gives the problem. The result of such an edit gives the problems of each cutscene that the save gate checks. These are the cutscenes that the active mod changes. They are also the cutscenes of the edit view that name an item that a change of the active mod deletes, renames or breaks. An example is a retail cutscene that the call and the active mod do not change.
+The check reads the data lists with the unsaved edits. So a change of the active mod in the game data that deletes, renames or breaks the item also gives the problem. The result of a call with such a change, for example an INI edit, gives the problems of each cutscene that the save gate checks. These are the cutscenes that the active mod changes. They are also the cutscenes of the edit view that name an item that such a change deletes, renames or breaks. An example is a retail cutscene that the call and the active mod do not change.
 
 `check` with the scope `all` lists each problem of these cutscenes. `save` refuses the save and gives the text of the save gate of the editor. A call that changes only cutscenes gives no problem of another cutscene.
 
-To find a cutscene that a change of the game data breaks, the save gate looks for the item name in the cutscene file. So it does not find a template that a text script makes from parts, for example with `..`.
+A change of the active mod in the game data can break a cutscene. To find such a cutscene, the save gate looks for the item name in the cutscene file. So it does not find a template that a text script makes from parts, for example with `..`.
 
 `list_values` gives the names of the data lists of the templates:
 
