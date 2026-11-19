@@ -367,7 +367,7 @@ public sealed class EditSessionThnSaveTests
         var error = Assert.Single(result.Problems);
         Assert.Equal(ScriptPath, error.Source);
         Assert.Equal($"The mod 'act' is in the OpenLancer repo {ws.Root}. The editor writes no whole cutscene file into " +
-                     "it, because the content scan cannot tell such a file from a copy of a retail script (decision D70).",
+                     "it, because the content scan cannot tell such a file from a copy of a retail script.",
             error.Message);
         Assert.Equal(bytes, File.ReadAllBytes(whole));
 

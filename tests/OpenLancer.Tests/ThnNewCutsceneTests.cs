@@ -167,8 +167,8 @@ public sealed class ThnNewCutsceneTests
         var session = ws.Session("act");
 
         Assert.Equal($"The mod 'act' is in the OpenLancer repo {ws.Root}. The editor writes no whole cutscene file " +
-                     "into it, because the content scan cannot tell such a file from a copy of a retail script " +
-                     "(decision D70).", ThnEdits.NewCutsceneRefusal(session, NewPath));
+                     "into it, because the content scan cannot tell such a file from a copy of a retail script.",
+                     ThnEdits.NewCutsceneRefusal(session, NewPath));
     }
 
     /// <summary>The recovery file keeps an unsaved new cutscene. The next session restores it while it has the

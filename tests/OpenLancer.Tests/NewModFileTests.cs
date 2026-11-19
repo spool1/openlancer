@@ -518,5 +518,5 @@ public sealed class NewModFileTests
 
     private static string RepoMessage(TestWorkspace ws) =>
         $"The mod 'act' is in the OpenLancer repo {ws.Root}. The editor writes no whole INI file into it, because the " +
-        "content scan cannot tell such a file from a copy of a retail file (decision D70).";
+        "content scan cannot tell such a file from a copy of a retail file.";
 }

@@ -517,7 +517,7 @@ public sealed partial class EditSession
     /// <param name="copy">What a file of the kind can be a copy of, for example <c>a copy of a retail script</c>.</param>
     private static string? WholeFileInRepo(Mod mod, string kind, string copy) => RepoCheck.RepoRoot(mod.Folder) is { } repo
         ? $"The mod '{mod.Id}' is in the OpenLancer repo {repo}. The editor writes no whole {kind} file into it, " +
-          $"because the content scan cannot tell such a file from {copy} (decision D70)."
+          $"because the content scan cannot tell such a file from {copy}."
         : null;
 
     /// <summary>

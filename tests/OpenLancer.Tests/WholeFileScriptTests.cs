@@ -143,7 +143,7 @@ public sealed class WholeFileScriptTests
         Assert.False(result.Saved);
         var error = Assert.Single(result.Problems);
         Assert.Equal($"The mod 'act' is in the OpenLancer repo {ws.Root}. The editor writes no whole mission file into " +
-                     "it, because the content scan cannot tell such a file from a copy of a retail script (decision D70).",
+                     "it, because the content scan cannot tell such a file from a copy of a retail script.",
             error.Message);
         Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(ws.ModFolder("act"), WholeFile)));
     }
