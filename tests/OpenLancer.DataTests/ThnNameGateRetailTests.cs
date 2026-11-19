@@ -361,10 +361,10 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
         IReadOnlyDictionary<string, SortedSet<string>> Equipment, IReadOnlyDictionary<string, SortedSet<string>> Ships);
 
     /// <summary>
-    /// The costume of each DEFORMABLE that loads one, the equipment of each COMPOUND of the category equipment, and the
-    /// ship of each COMPOUND of the category ship or spaceship, in each cutscene of a game. The scan reads the scripts
-    /// with the engine evaluator, without a session, so it does not use the search of the save gate. The names compare
-    /// without letter case.
+    /// The items of the templates in each cutscene of a game. These are the costume of each DEFORMABLE that loads one,
+    /// the equipment of each equipment COMPOUND, and the ship of each ship or spaceship COMPOUND. The scan reads the
+    /// scripts with the engine evaluator, without a session, so it does not use the search of the save gate. The names
+    /// compare without letter case.
     /// </summary>
     private static ThnTemplateScan Templates(string game) => Scans.GetOrAdd(game, g => new Lazy<ThnTemplateScan>(() =>
     {

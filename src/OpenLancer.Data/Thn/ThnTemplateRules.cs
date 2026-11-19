@@ -128,8 +128,8 @@ public static class ThnTemplateRules
             ? props.Record.LastOrDefault(f => f.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value
             : null;
 
-    /// <summary>The kind of the item that the template of a COMPOUND names, or null when the entity is no COMPOUND or
-    /// its <c>userprops.category</c> is not a text of <see cref="Categories"/>. The checks and the engine read the
+    /// <summary>The kind of the item that the template of a COMPOUND names. Null when the entity is no COMPOUND, or
+    /// when its <c>userprops.category</c> is not a text of <see cref="Categories"/>. The checks and the engine read the
     /// category in the same way (ThnScriptInstance.cs:113-122).</summary>
     public static ThnItemKind? CompoundKind(ThnTable entity, IReadOnlyDictionary<string, ThnSymbolInfo> symbols) =>
         ThnSchema.TypeOf(ThnElementKind.Entity, entity, symbols) == "COMPOUND" &&

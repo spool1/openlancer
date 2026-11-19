@@ -17,8 +17,9 @@ namespace OpenLancer.Tests;
 /// </summary>
 public sealed class ThnReferrerTests
 {
-    /// <summary>A change that keeps each answer of the game data gives no item and no cutscene, and does not start the
-    /// word index: no edit, a new value of the ship, and a new ship from the template of the ship.</summary>
+    /// <summary>A change that keeps each answer of the game data gives no item and no cutscene. It does not start the
+    /// word index. The changes are no edit, a new value of the ship, and a new ship from the template of the
+    /// ship.</summary>
     [Fact]
     public void AChangeThatKeepsEachAnswerGivesNoCutsceneAndDoesNotStartTheIndex()
     {
@@ -41,8 +42,8 @@ public sealed class ThnReferrerTests
     /// <summary>
     /// Each change of the active mod that removes or breaks an item of the script gives the item and the script. The
     /// script of space does not name the item, so it is not in the result. The changes are unsaved edits, a saved
-    /// patch, a whole file of the active mod, an animation file of the active mod and a bodyparts.ini of the active mod
-    /// without the <c>[Animations]</c> line of a file. A cascade of the search of the referrer errors counts too: the
+    /// patch and files of the active mod. The files are a whole file, an animation file, and a bodyparts.ini without
+    /// the <c>[Animations]</c> line of a file. A cascade of the search of the referrer errors counts too: the
     /// delete of a body part makes the costume that names it unusable. The script gets one error, on the entity or the
     /// event that names the item. A missing effect or clip is a name problem, not a crash.
     /// </summary>
@@ -141,11 +142,11 @@ public sealed class ThnReferrerTests
     }
 
     /// <summary>
-    /// The engine stops for a room of petalDB that does not exist. The lists of the removed names do not have the values
-    /// of petalDB, so the lists read the lower petalDB files when the active mod changes one. So a petalDB file of the
-    /// active mod without the room gives the error in a cutscene that the active mod changes too. Another room heals it,
-    /// and an undo brings it back. A room that the lower layer does not have either stays out of the errors and of the
-    /// items.
+    /// The engine stops for a room of petalDB that does not exist. The lists of the removed names do not have the
+    /// values of petalDB. So the lists read the lower petalDB files when the active mod changes one. Thus a petalDB
+    /// file of the active mod without the room gives the error in a cutscene that the active mod changes too. Another
+    /// room heals it, and an undo brings it back. A room that the lower layer does not have either stays out of the
+    /// errors and of the items.
     /// </summary>
     [Fact]
     public void ARoomThatTheActiveModRemovesBlocksAChangedCutscene()
@@ -303,7 +304,7 @@ public sealed class ThnReferrerTests
     }
 
     /// <summary>The Problems section of the Cutscene page reads the errors of a cutscene in each frame. So the errors
-    /// of an unchanged script come without the search: the delete of the costume gives the error, and the word index
+    /// of an unchanged script come without the search. The delete of the costume gives the error, and the word index
     /// does not start.</summary>
     [Fact]
     public void TheErrorsOfACutsceneDoNotStartTheSearch()

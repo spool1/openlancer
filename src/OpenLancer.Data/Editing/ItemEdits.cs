@@ -27,13 +27,13 @@ public static class ItemEdits
     /// <para>The mission lines that name the item change in the same entry (decision D668). So does the template of
     /// each cutscene COMPOUND that names a renamed ship or equipment, as Unity keeps the references to a renamed asset
     /// (#81). A COMPOUND names a ship with the category <c>ship</c> or <c>spaceship</c>, and equipment with the
-    /// category <c>equipment</c>. The engine finds the item by the text of the template as it is, without letter case,
-    /// so the edit changes only a template with that text. A save writes the change of a lower cutscene as a THN patch
+    /// category <c>equipment</c>. The engine finds the item by the text of the template as it is, without letter case.
+    /// So the edit changes only a template with that text. A save writes the change of a lower cutscene as a THN patch
     /// of the active mod. A cutscene that the editor cannot change keeps the old name and gives a warning. The save
     /// gate does not check such a cutscene. An entity that a later entity with the same name hides keeps the old name
     /// with no warning, because the engine does not make it.</para>
-    /// <para>The edit is one entry of the edit history. Run it at once: it holds the lines and the cutscene entities
-    /// that it changes, so it fails when it runs after the edit view or such an entity changed.</para>
+    /// <para>The edit is one entry of the edit history. Run it at once. It holds the lines and the cutscene entities
+    /// that it changes. So it fails when it runs after the edit view or such an entity changed.</para>
     /// </remarks>
     /// <param name="item">A section of an item file with a nickname. The active mod adds it, and also each section
     /// that the edit renames with it, for example the good of equipment (see
@@ -172,8 +172,8 @@ public static class ItemEdits
     private static readonly ThnPath TemplatePath = new(TemplateKey);
 
     /// <summary>
-    /// The COMPOUNDs of the cutscenes of W whose template names an item of one of the kinds, and that the edit can
-    /// change (see the remarks of <see cref="Rename(EditSession, SectionRef, string, List{Diagnostic})"/>). The
+    /// The COMPOUNDs of the cutscenes of W whose template names an item of one of the kinds. The edit can change each
+    /// of them (see the remarks of <see cref="Rename(EditSession, SectionRef, string, List{Diagnostic})"/>). The
     /// candidates are the cutscenes that can hold the name as a word (see
     /// <see cref="EditSession.CutscenesThatCanName"/>).
     /// </summary>

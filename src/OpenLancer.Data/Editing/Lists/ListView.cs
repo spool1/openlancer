@@ -25,9 +25,9 @@ public sealed record ListEntry(string Value, SectionRef? Section, ValueOrigin Or
     /// not saved.</summary>
     public bool Unsaved { get; init; }
 
-    /// <summary>True when the entry is not <see cref="Usable"/> and the active mod made it so: the active mod adds or
-    /// changes the section of the entry and the lower section has each required line, or for a repeated name of a
-    /// unique list, the active mod adds or changes one of the sections with the name. A section of a whole file of the
+    /// <summary>True when the entry is not <see cref="Usable"/> and the active mod made it so. The active mod adds or
+    /// changes the section of the entry, and the lower section has each required line. For a repeated name of a unique
+    /// list, the active mod adds or changes one of the sections with the name. A section of a whole file of the
     /// active mod counts too.</summary>
     public bool UnusableByActiveMod { get; init; }
 

@@ -14,11 +14,11 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// The save gate checks each cutscene of the edit view that names an item that a change of the active mod removes or
-/// breaks (#81). This is also true when the active mod does not change the cutscene, because the game crashes or shows
-/// less when it plays it. The fixture script names a costume, equipment, an effect, a room and a clip. The active mod
-/// does not change it, and no INI line names it. Each error has the text, the place, the source and the origin of the
-/// Problems section of the Cutscene page. So Save, Play and the Console give one text. The results of the agent
-/// tools, <c>check</c> and <c>save</c> give the same problems and the same refusal.
+/// breaks (#81). This is also true when the active mod does not change the cutscene. When the game plays it, the game
+/// crashes, or the scene does not show the item or play the clip. The fixture script names a costume, equipment, an
+/// effect, a room and a clip. The active mod does not change it, and no INI line names it. Each error has the text, the
+/// place, the source and the origin of the Problems section of the Cutscene page. So Save, Play and the Console give
+/// one text. The results of the agent tools, <c>check</c> and <c>save</c> give the same problems and the same refusal.
 /// </summary>
 public sealed class ThnReferenceGateTests
 {
@@ -292,11 +292,11 @@ public sealed class ThnReferenceGateTests
     }
 
     /// <summary>
-    /// An agent INI edit that removes the <c>DA_archetype</c> line of the equipment gives the error of the unchanged
-    /// script in <c>new_problems</c>, as the save gate gives it. It is the first INI edit of the session, so no earlier
-    /// edit touched a file. A preview gives the same problem, and the script has no problem after it. Without a preview,
-    /// <c>check</c> lists the problem, and <c>save</c> refuses with the text of the save gate of the editor. The edit
-    /// that puts back the line gives the problem in <c>fixed_problems</c>, and the save then passes.
+    /// An agent INI edit removes the <c>DA_archetype</c> line of the equipment. Its result gives the error of the
+    /// unchanged script in <c>new_problems</c>, as the save gate gives it. It is the first INI edit of the session, so
+    /// no earlier edit touched a file. A preview gives the same problem, and the script has no problem after it.
+    /// Without a preview, <c>check</c> lists the problem, and <c>save</c> refuses with the text of the save gate of the
+    /// editor. The edit that puts back the line gives the problem in <c>fixed_problems</c>, and the save then passes.
     /// </summary>
     [Theory]
     [InlineData(false)]
@@ -340,7 +340,7 @@ public sealed class ThnReferenceGateTests
 
     /// <summary>
     /// An agent edit that removes the <c>DA_archetype</c> line of the ship gives the error of the entity "Ship" of the
-    /// unchanged script. The script of space names the ship too, but the game makes no COMPOUND of it, so it gives no
+    /// unchanged script. The script of space names the ship too. The game makes no COMPOUND of it, so it gives no
     /// problem. <c>check</c> lists the error, and <c>save</c> refuses with the text of the save gate. The undo of the
     /// agent gives no problem, and the save then passes and writes nothing.
     /// </summary>
@@ -376,7 +376,7 @@ public sealed class ThnReferenceGateTests
     /// <summary>
     /// A call that changes only a cutscene reads no other cutscene. The user deleted the costume, so the base script and
     /// the script of a lower mod both have the costume error. An agent edit of the camera of the base script gives no
-    /// problem: the base script had the error before the call, and the call does not read the script of the lower mod.
+    /// problem. The base script had the error before the call. The call does not read the script of the lower mod.
     /// So the call does not start the word index.
     /// </summary>
     [Fact]

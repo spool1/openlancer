@@ -370,8 +370,8 @@ public sealed partial class EditSession
     /// The cutscenes of the edit view that hold the name of an item of <see cref="BrokenCutsceneItems"/> as a word. They
     /// are install paths in normal form, in path order. A cutscene that the active mod does not change has the same
     /// script in W and in B. So only an answer that the active mod causes can give it an error (see
-    /// <see cref="CutsceneErrors"/>), and the result holds each such cutscene with an error. A match is not always a use
-    /// of the item, so the caller checks each cutscene.
+    /// <see cref="CutsceneErrors"/>). The result holds each such cutscene with an error. A match is not always a use of
+    /// the item, so the caller checks each cutscene.
     /// </summary>
     /// <remarks>
     /// <para>The search uses the word index of the story mentions: one build for each edit view, in a worker task. The
@@ -406,10 +406,11 @@ public sealed partial class EditSession
 
     /// <summary>
     /// The cutscenes of W that can hold a name as a word, as install paths in normal form, each one time, in path
-    /// order. These are the cutscenes of the edit view that hold the name (see <see cref="StoryMentions.Cutscenes"/>),
-    /// the cutscenes with unsaved edits, and the cutscenes that the active mod changes. The word index reads only the
-    /// edit view, so the cutscenes with unsaved edits come in addition, also a new cutscene and an edit of an open
-    /// batch. A rename of an item reads them to find the templates that name the item (see <see cref="ItemEdits"/>).
+    /// order. These are the cutscenes of the edit view that hold the name (see <see cref="StoryMentions.Cutscenes"/>).
+    /// The cutscenes with unsaved edits and the cutscenes that the active mod changes are in the result too. The word
+    /// index reads only the edit view. So the cutscenes with unsaved edits come in addition, also a new cutscene and an
+    /// edit of an open batch. A rename of an item reads them to find the templates that name the item (see
+    /// <see cref="ItemEdits"/>).
     /// </summary>
     /// <remarks>The call waits for the word index, as <see cref="StoryMentions.Of"/> does.</remarks>
     internal IReadOnlyList<string> CutscenesThatCanName(string name) =>

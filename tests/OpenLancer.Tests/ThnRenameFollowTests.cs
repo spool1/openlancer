@@ -16,10 +16,10 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// A rename of a ship or equipment that the active mod adds also changes the template of each cutscene COMPOUND that
-/// names it, in the same entry of the edit history (#81, option 1). The INI rename changes each line that names the
-/// item (decision D668), and Unity keeps the references to a renamed asset. A COMPOUND names a ship with the category
-/// ship or spaceship, and equipment with the category equipment. A lower cutscene gets the change as a THN patch at the
-/// save. A cutscene that the editor cannot change keeps the old name, and the rename warns.
+/// names it. Both changes are one entry of the edit history (#81, option 1). The INI rename changes each line that
+/// names the item (decision D668), and Unity keeps the references to a renamed asset. A COMPOUND names a ship with the
+/// category ship or spaceship, and equipment with the category equipment. A lower cutscene gets the change as a THN
+/// patch at the save. A cutscene that the editor cannot change keeps the old name, and the rename warns.
 /// </summary>
 public sealed class ThnRenameFollowTests
 {
@@ -28,8 +28,8 @@ public sealed class ThnRenameFollowTests
     private const string LowerScript = @"DATA\SCRIPTS\lower_hero.thn";
     private const string OtherScript = @"DATA\SCRIPTS\other_uses.thn";
 
-    /// <summary>A lower script that names the new ship of the active mod in two COMPOUNDs, with other letter cases in
-    /// the template and in the category. The lower data does not have the ship.</summary>
+    /// <summary>A lower script that names the new ship of the active mod in two COMPOUNDs. The template and the
+    /// category have other letter cases. The lower data does not have the ship.</summary>
     private const string LowerHero = """
         duration = 5
         entities = {
@@ -54,10 +54,10 @@ public sealed class ThnRenameFollowTests
         """;
 
     /// <summary>
-    /// A lower script that names the new ship as a word only in templates that do not name a ship: a solar COMPOUND, a
-    /// COMPOUND without a category, a PSYS, a DEFORMABLE and a SOUND. A ship COMPOUND has the name with a space before
-    /// it, so the engine finds no ship. The first entity "Twin" is a ship COMPOUND, but the later entity with the same
-    /// name hides it, so the engine does not make it.
+    /// A lower script that names the new ship as a word only in templates that do not name a ship. These are a solar
+    /// COMPOUND, a COMPOUND without a category, a PSYS, a DEFORMABLE and a SOUND. A ship COMPOUND has the name with a
+    /// space before it, so the engine finds no ship. The first entity "Twin" is a ship COMPOUND, but the later entity
+    /// with the same name hides it, so the engine does not make it.
     /// </summary>
     private const string OtherUses = """
         duration = 5
@@ -112,7 +112,7 @@ public sealed class ThnRenameFollowTests
     /// The active mod adds my_ship. A new cutscene names it with the category Spaceship, and an unsaved edit of the
     /// lower script names it with the category ship. The rename changes both templates, and needs no confirmation. One
     /// undo puts back the INI and both cutscenes, and a redo changes them again. The save writes the INI patch, the
-    /// whole file of the new cutscene and the THN patch of the lower script, and the save gate gives no error.
+    /// whole file of the new cutscene and the THN patch of the lower script. The save gate gives no error.
     /// </summary>
     [Fact]
     public void ARenameChangesTheTemplatesOfANewAndAnEditedCutsceneInOneEntry()
@@ -222,10 +222,11 @@ public sealed class ThnRenameFollowTests
     }
 
     /// <summary>
-    /// The same text in a template that does not name a ship does not change: a solar COMPOUND, a COMPOUND without a
-    /// category, a PSYS, a DEFORMABLE, a SOUND, and a ship COMPOUND whose text has a space before the name. A ship
-    /// COMPOUND that a later entity with the same name hides keeps the name with no warning, because the engine does
-    /// not make it. The script stays a mention, so the rename asks for a confirmation.
+    /// The same text in a template that does not name a ship does not change. These templates are in a solar COMPOUND,
+    /// a COMPOUND without a category, a PSYS, a DEFORMABLE and a SOUND. A ship COMPOUND whose text has a space before
+    /// the name does not change either. A ship COMPOUND that a later entity with the same name hides keeps the name
+    /// with no warning, because the engine does not make it. The script stays a mention, so the rename asks for a
+    /// confirmation.
     /// </summary>
     [Fact]
     public void TheSameTextInATemplateOfAnotherKindDoesNotChange()

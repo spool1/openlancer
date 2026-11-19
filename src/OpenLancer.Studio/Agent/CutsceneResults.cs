@@ -79,9 +79,9 @@ internal sealed class CutsceneResults(EditSession session)
     /// and in the step. W cannot change, so a reference keeps it.</summary>
     public void Before(CutscenePlan plan) => planBefore = Note(plan.Path);
 
-    /// <summary>Notes W of each script of the cutscene entities that a plan that is not a cutscene plan changes (see
-    /// <see cref="EditPlan.CutsceneChanges"/>), before the plan runs, as <see cref="Before(CutscenePlan)"/>
-    /// does.</summary>
+    /// <summary>Notes W of each script of the cutscene entities that another plan changes (see
+    /// <see cref="EditPlan.CutsceneChanges"/>). Call it before the plan runs, as <see cref="Before(CutscenePlan)"/>
+    /// for a cutscene plan.</summary>
     public void Before(EditPlan plan)
     {
         foreach (var path in plan.CutsceneChanges.Select(c => c.Path).Distinct(VfsPath.Comparer))

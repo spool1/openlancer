@@ -152,8 +152,8 @@ public sealed class DataLists
             ? lower.Where(v => now.Find(v) == null).Order(StringComparer.OrdinalIgnoreCase).ToList()
             : [];
 
-    /// <summary>The values that the lower layer gives to a values list without a scope, or null when the list is not
-    /// such a list or the active mod changes no file of its role.</summary>
+    /// <summary>The values that the lower layer gives to a values list without a scope. Null when the list is not such
+    /// a list, or when the active mod changes no file of its role.</summary>
     private HashSet<string>? LowerValues(string list)
     {
         if (!rules.Lists.TryGetValue(list, out var definition) ||
@@ -797,10 +797,10 @@ public sealed class DataLists
         ChangedByActiveMod(table, index) && (LowerSectionOf(table, index) is not { } lower || !hasProblem(lower));
 
     /// <summary>
-    /// The section of the lower layer with the identity of the section at an index of a table, or null when the lower
+    /// The section of the lower layer with the identity of the section at an index of a table. Null when the lower
     /// layer has no such section, for example a section that the active mod adds. B of a patch is the lower layer. B of
-    /// a document of the kind "whole file" is the file of the active mod, and a whole file that the editor shows
-    /// read-only has no document. So the method reads the lower layer of such a file, once for each session.
+    /// a document of the kind "whole file" is the file of the active mod. A whole file that the editor shows read-only
+    /// has no document. So the method reads the lower layer of such a file, once for each session.
     /// </summary>
     private Section? LowerSectionOf(FileTable table, int index)
     {
