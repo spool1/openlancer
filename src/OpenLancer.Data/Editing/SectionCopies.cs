@@ -172,7 +172,8 @@ internal sealed class SectionCopies(EditSession session, Action<string> problem)
         if (newFile)
             return EditCommand.NewFile(path, sections);
         var adds = sections.Select((s, i) => EditCommand.AddSection(path, s.Type, s.Entries, parents[i])).ToList();
-        return EditCommand.Group($"Copy {copies.Count} sections to {Scene.SceneSections.FileName(path)}", adds);
+        return EditCommand.Group(
+            $"Copy {Plural.Count(copies.Count, "section")} to {Scene.SceneSections.FileName(path)}", adds);
     }
 
     /// <summary>Value i of a line of a copy of <see cref="CopyTo"/>.</summary>

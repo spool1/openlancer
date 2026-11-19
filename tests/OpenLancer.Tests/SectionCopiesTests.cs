@@ -129,6 +129,7 @@ public sealed class SectionCopiesTests
         Assert.Equal(["Zone_Li02_copy"], EditSessionTests.Values(session, copied, "nickname"));
         Assert.Equal(["1, 2, 3"], EditSessionTests.Values(session, copied, "pos"));
         Assert.True(session.Get(copied)!.IsNew);
+        Assert.Equal("Copy 1 section to li02.ini", session.UndoLabel);
     }
 
     [Fact]
