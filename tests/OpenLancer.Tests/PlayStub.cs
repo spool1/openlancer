@@ -22,6 +22,9 @@ namespace OpenLancer.Tests;
 /// <param name="RestartLines">The lines that the stub writes when it reads <c>restart n</c> (section 5.8 of the M6c
 /// design), in the same way as <paramref name="ReloadLines"/>. Without them, the stub does not answer a
 /// restart.</param>
+/// <param name="CaptureLines">The lines that the stub writes when it reads <c>capture n</c> (the agent tool
+/// <c>play_capture</c>), in the same way as <paramref name="ReloadLines"/>. Without them, the stub does not answer a
+/// capture.</param>
 internal sealed record StubPlan(
     string[] Lines,
     string[]? StartLines = null,
@@ -29,7 +32,8 @@ internal sealed record StubPlan(
     bool IgnoreStop = false,
     int Sleep = 0,
     string[]? ReloadLines = null,
-    string[]? RestartLines = null)
+    string[]? RestartLines = null,
+    string[]? CaptureLines = null)
 {
     /// <summary>The character between two lines of one reload in <see cref="ReloadLines"/>.</summary>
     public const char NextLine = '\u001f';
@@ -38,8 +42,8 @@ internal sealed record StubPlan(
 /// <summary>
 /// A stub of the play program (section 16.1 of the M4 design): the stub program in play mode (see
 /// <see cref="StubProgram"/>). It writes its process id and each input line to a record file, and <c>&lt;eof&gt;</c> at
-/// the end of its input. It answers <c>start</c>, each <c>reload n</c> and each <c>restart n</c> with the lines of its
-/// plan. It ends at <c>stop</c> or at the end of its input.
+/// the end of its input. It answers <c>start</c>, each <c>reload n</c>, each <c>restart n</c> and each
+/// <c>capture n</c> with the lines of its plan. It ends at <c>stop</c> or at the end of its input.
 /// </summary>
 internal sealed class PlayStub
 {
@@ -101,6 +105,12 @@ internal sealed class PlayStub
         {
             info.ArgumentList.Add("--restart-lines");
             info.ArgumentList.Add(LinesFile($"restart{n}.txt", restartLines));
+        }
+
+        if (plan.CaptureLines is { Length: > 0 } captureLines)
+        {
+            info.ArgumentList.Add("--capture-lines");
+            info.ArgumentList.Add(LinesFile($"capture{n}.txt", captureLines));
         }
 
         return info;

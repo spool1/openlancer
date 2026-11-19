@@ -16,8 +16,8 @@ namespace OpenLancer.TestStub;
 /// <c>--lines</c> at its start, and the lines of <c>--start-lines</c> when it reads <c>start</c>. A line that starts
 /// with <c>!err </c> goes to the error output without the prefix.</para>
 /// <para>The play stub answers each <c>reload n</c> with the lines of <c>--reload-lines</c>, and each
-/// <c>restart n</c> with the lines of <c>--restart-lines</c>. The first command gets the first line, and the second
-/// command gets the second line. Each later command gets the last line. The character U+001F separates the output lines
+/// <c>restart n</c> with the lines of <c>--restart-lines</c>. It answers each <c>capture n</c> with the lines of
+/// <c>--capture-lines</c>. The first command gets the first line, and the second command gets the second line. Each later command gets the last line. The character U+001F separates the output lines
 /// of one answer.</para>
 /// <para>The play stub ends at <c>stop</c> or at the end of its input. <c>--ignore-stop</c> makes it end only at the
 /// end of its input. <c>--exit &lt;code&gt;</c> makes it exit with the code after the lines of <c>--lines</c>.
@@ -63,6 +63,7 @@ internal static class Program
         var startLines = options.Lines("--start-lines");
         var reloads = new Answers(options.Lines("--reload-lines"));
         var restarts = new Answers(options.Lines("--restart-lines"));
+        var captures = new Answers(options.Lines("--capture-lines"));
         var ignoreStop = options.Has("--ignore-stop");
         while (Console.In.ReadLine() is { } line)
         {
@@ -78,6 +79,10 @@ internal static class Program
             else if (line.StartsWith("restart ", StringComparison.Ordinal))
             {
                 WriteLines(restarts.Next());
+            }
+            else if (line.StartsWith("capture ", StringComparison.Ordinal))
+            {
+                WriteLines(captures.Next());
             }
             else if (line == "stop" && !ignoreStop)
             {

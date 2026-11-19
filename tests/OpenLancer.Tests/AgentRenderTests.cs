@@ -386,8 +386,8 @@ public sealed class AgentRenderTests
             bgra[4 * i + 3] = 255;
         }
 
-        var (same, sameWidth, sameHeight) = AgentImages.Fit(bgra, w, h, 5);
-        var (small, width, height) = AgentImages.Fit(bgra, w, h, 3);
+        var (same, sameWidth, sameHeight) = AgentImages.Fit(bgra, w, h, 5, 5);
+        var (small, width, height) = AgentImages.Fit(bgra, w, h, 3, 3);
 
         Assert.Same(bgra, same);
         Assert.Equal((5, 3), (sameWidth, sameHeight));
@@ -397,7 +397,49 @@ public sealed class AgentRenderTests
         Assert.Equal([40, 0, 200, 255], small[8..12]);
         Assert.Equal([5, 2, 200, 255], small[12..16]);
         Assert.Equal([40, 2, 200, 255], small[20..24]);
-        Assert.Throws<ArgumentOutOfRangeException>(() => AgentImages.Fit(bgra, w, h, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => AgentImages.Fit(bgra, w, h, 0, 5));
+        Assert.Throws<ArgumentOutOfRangeException>(() => AgentImages.Fit(bgra, w, h, 5, 0));
+    }
+
+    /// <summary>The width and the height each have their own limit. The side that is farthest above its limit gives the
+    /// factor, so the image keeps its shape and fits both limits.</summary>
+    [Theory]
+    [InlineData(1280, 720, 1024, 640, 640, 360)]
+    [InlineData(1280, 720, 2048, 300, 427, 240)]
+    [InlineData(1280, 720, 1280, 720, 1280, 720)]
+    [InlineData(1280, 720, 100, 2048, 99, 56)]
+    public void EachSideOfAnImageHasItsOwnLimit(int width, int height, int maxWidth, int maxHeight, int fitWidth,
+        int fitHeight)
+    {
+        var (bgra, w, h) = AgentImages.Fit(new byte[4 * width * height], width, height, maxWidth, maxHeight);
+
+        Assert.Equal((fitWidth, fitHeight), (w, h));
+        Assert.Equal(4 * w * h, bgra.Length);
+        Assert.True(w <= maxWidth && h <= maxHeight);
+    }
+
+    /// <summary>A PNG image that fits its limits keeps its data. A larger one becomes smaller by a whole factor and keeps
+    /// the top row first.</summary>
+    [Fact]
+    public void APngLargerThanItsLimitsBecomesSmaller()
+    {
+        // Four by two pixels, the bottom row first: the bottom row is black and the top row is white.
+        var bottomUp = new byte[4 * 4 * 2];
+        for (var i = 16; i < 32; i++)
+            bottomUp[i] = 255;
+        var png = AgentImages.Png(4, 2, bottomUp);
+
+        var same = AgentImages.FitPng(png.Png, 4, 2, 4, 2);
+        var small = AgentImages.FitPng(png.Png, 4, 2, 2, 2);
+        using var stream = new MemoryStream(small.Png);
+        var decoded = Generic.ImageFromStream(stream);
+
+        Assert.Same(png.Png, same.Png);
+        Assert.Equal((4, 2), (same.Width, same.Height));
+        Assert.Equal((2, 1), (small.Width, small.Height));
+        // Each pixel of the result is the mean of a white pixel and a black pixel of one column pair.
+        Assert.Equal([127, 127, 127, 255], decoded.Data[..4]);
+        Assert.ThrowsAny<Exception>(() => AgentImages.FitPng([1, 2, 3], 4, 2, 2, 2));
     }
 
     /// <summary>The jobs of the render service run one at a time, the first job with the whole budget of a frame. So many

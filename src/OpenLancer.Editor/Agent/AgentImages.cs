@@ -34,15 +34,35 @@ internal static class AgentImages
     }
 
     /// <summary>
-    /// The pixels of an image with each side at most a number of pixels. An image that fits stays as it is. A larger
+    /// A PNG image with at most a number of pixels on each side. An image that fits stays as it is. A larger image
+    /// becomes smaller as <see cref="Fit"/> makes it, so it keeps its shape.
+    /// </summary>
+    /// <param name="png">The PNG data, with the top row first.</param>
+    /// <param name="width">The width of the image in pixels.</param>
+    /// <param name="height">The height of the image in pixels.</param>
+    /// <exception cref="Exception">The data is not an image that the decoder reads.</exception>
+    public static ToolImage FitPng(byte[] png, int width, int height, int maxWidth, int maxHeight)
+    {
+        if (width <= maxWidth && height <= maxHeight)
+            return new ToolImage(png, width, height);
+        using var stream = new MemoryStream(png);
+        var image = Generic.ImageFromStream(stream, flip: true);
+        var (bgra, w, h) = Fit(image.Data, image.Width, image.Height, maxWidth, maxHeight);
+        return Png(w, h, bgra);
+    }
+
+    /// <summary>
+    /// The pixels of an image with at most a number of pixels on each side. An image that fits stays as it is. A larger
     /// image becomes smaller by a whole factor: each pixel of the result is the mean of a square of pixels of the image.
     /// The rows keep their order.
     /// </summary>
-    /// <param name="maxSide">The most pixels on each side of the result, from 1.</param>
-    public static (byte[] Bgra, int Width, int Height) Fit(byte[] bgra, int width, int height, int maxSide)
+    /// <param name="maxWidth">The most pixels of the width of the result, from 1.</param>
+    /// <param name="maxHeight">The most pixels of the height of the result, from 1.</param>
+    public static (byte[] Bgra, int Width, int Height) Fit(byte[] bgra, int width, int height, int maxWidth, int maxHeight)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(maxSide, 1);
-        var factor = (Math.Max(width, height) + maxSide - 1) / maxSide;
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxWidth, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxHeight, 1);
+        var factor = Math.Max((width + maxWidth - 1) / maxWidth, (height + maxHeight - 1) / maxHeight);
         if (factor <= 1)
             return (bgra, width, height);
         // The last square of a row or a column can be smaller, so the result keeps each edge of the image.

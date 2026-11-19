@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using LibreLancer;
@@ -42,6 +43,26 @@ internal enum PlayStatus
     Stopping,
 }
 
+/// <summary>The result of a capture of the game of Play (<see cref="PlayController.Capture"/>): the PNG image of a frame,
+/// or the reason why the game gave none.</summary>
+/// <param name="Play">The Play status when the capture ended.</param>
+internal sealed record PlayCaptureResult(PlayStatus Play)
+{
+    /// <summary>The PNG data of the frame, with the top row first, or null when the game gave no image.</summary>
+    public byte[]? Png { get; init; }
+
+    /// <summary>The width of the image in pixels: the width of the game window.</summary>
+    public int Width { get; init; }
+
+    /// <summary>The height of the image in pixels.</summary>
+    public int Height { get; init; }
+
+    /// <summary>Why the game gave no image, or null.</summary>
+    public string? Problem { get; init; }
+
+    public static PlayCaptureResult Failed(PlayStatus play, string problem) => new(play) { Problem = problem };
+}
+
 /// <summary>
 /// Play in the editor (section 9 of the M4 design). Play saves the active mod, starts the game process at once, and
 /// lets the player in when the validation of the save passes. Stop ends the game, and the game ends with the session.
@@ -67,6 +88,9 @@ internal enum PlayStatus
 /// at the new start. The game gives the trigger changes of its mission to the editor (section 6.2).</para>
 /// <para>Each request gives its result when it ends: the play started, or the reason why it did not (section 7.2 of the
 /// M6c design). The agent tools read it. The keys and the menus do not need it.</para>
+/// <para>A capture of the agent (shared step SH9) waits for its delay, then asks the running game for an image of its
+/// next frame. The game writes the image as a file of the capture folder of the play folder. The controller reads the
+/// file from there only, and deletes it after the read.</para>
 /// <para>The controller talks to the editor only through <see cref="IPlayEditor"/> (D50), and it reads the time from a
 /// clock that the tests replace.</para>
 /// </remarks>
@@ -85,6 +109,18 @@ internal sealed class PlayController : IDisposable
 
     /// <summary>The time that the game has to end a reload with reloaded or reload-failed (section 9.10).</summary>
     internal static readonly TimeSpan ReloadLimit = TimeSpan.FromSeconds(30);
+
+    /// <summary>The time that the game has to answer a capture command with captured or capture-failed.</summary>
+    internal static readonly TimeSpan CaptureLimit = TimeSpan.FromSeconds(10);
+
+    /// <summary>The reason of a capture without a game of Play.</summary>
+    internal const string NoGameText = "No game of Play runs.";
+
+    /// <summary>The reason of a capture that the game did not answer in time.</summary>
+    internal const string CaptureLateText = "The game did not give the image in 10 s.";
+
+    /// <summary>The reason of a capture whose game closed before the image.</summary>
+    internal const string CaptureClosedText = "The game closed before it gave the image.";
 
     private readonly IPlayEditor editor;
     private readonly Func<PlayArgs, ProcessStartInfo> command;
@@ -229,6 +265,25 @@ internal sealed class PlayController : IDisposable
         EditOrigin origin = EditOrigin.User) =>
         Replace(new PlayRequest(start, package, clock()) { Save = save, Origin = origin });
 
+    /// <summary>
+    /// Asks the game for an image of a frame after a delay (the agent tool <c>play_capture</c>, shared step SH9).
+    /// <see cref="Update"/> sends the capture command when the delay ends. The game writes the image and sends
+    /// captured, and the controller then reads the file and deletes it.
+    /// </summary>
+    /// <returns>The image, or the reason why the game gave none. Examples are a game that stops, closes or does not
+    /// answer in <see cref="CaptureLimit"/>, and an image file that the game or the editor cannot use.</returns>
+    public Task<PlayCaptureResult> Capture(TimeSpan delay)
+    {
+        if (game is not { Ending: false } run)
+        {
+            return Task.FromResult(PlayCaptureResult.Failed(Status, NoGameText));
+        }
+
+        var capture = new CaptureRun(clock() + delay);
+        run.Captures.Add(capture);
+        return capture.Result.Task;
+    }
+
     /// <summary>Stops the game, or ends its process at once when <see cref="ForceStop"/> is true. A request that waits
     /// is dropped.</summary>
     public void Stop()
@@ -276,6 +331,7 @@ internal sealed class PlayController : IDisposable
             // A save stops a running validation and gives no event, so the gate and the reload trigger look each frame.
             CheckGate(game);
             CheckReload(game);
+            UpdateCaptures(game);
         }
 
         // A later save can stop the validation that a crash report waits for, with no result.
@@ -386,6 +442,7 @@ internal sealed class PlayController : IDisposable
         }
 
         game = null;
+        EndCaptures(run);
         run.Process.CloseInput();
         run.Process.WaitForExit(CloseLimit);
         run.Process.Dispose();
@@ -396,7 +453,12 @@ internal sealed class PlayController : IDisposable
     {
         DropRequests("The editor closed, so the play did not start.");
         editor.Validated -= OnValidated;
-        game?.Process.Dispose();
+        if (game is { } run)
+        {
+            EndCaptures(run);
+            run.Process.Dispose();
+        }
+
         game = null;
     }
 
@@ -1055,6 +1117,12 @@ internal sealed class PlayController : IDisposable
             case PlayEvent.MissionChanges changes:
                 editor.MissionChanged(changes);
                 break;
+            case PlayEvent.Captured captured:
+                OnCaptured(run, captured);
+                break;
+            case PlayEvent.CaptureFailed failed when Sent(run, failed.Request) is { } capture:
+                EndCapture(run, capture, PlayCaptureResult.Failed(Status, failed.Message));
+                break;
             case PlayEvent.Error error:
                 run.Error = error;
                 run.ErrorAt = clock();
@@ -1112,6 +1180,7 @@ internal sealed class PlayController : IDisposable
 
         game = null;
         run.Process.Dispose();
+        EndCaptures(run);
         editor.PlayEnded();
         if (run.Wanted is { } wanted)
         {
@@ -1260,6 +1329,106 @@ internal sealed class PlayController : IDisposable
         }
     }
 
+    /// <summary>Sends each capture whose delay ended, and ends each capture that the game did not answer in
+    /// <see cref="CaptureLimit"/>. A game that stops gets no capture command, and its exit ends the capture.</summary>
+    private void UpdateCaptures(GameRun run)
+    {
+        var now = clock();
+        foreach (var capture in run.Captures.ToList())
+        {
+            if (capture.Sent is { } sent)
+            {
+                if (now - sent >= CaptureLimit)
+                {
+                    EndCapture(run, capture, PlayCaptureResult.Failed(Status, CaptureLateText));
+                }
+            }
+            else if (now >= capture.Due && !run.Ending)
+            {
+                capture.Request = ++run.LastCapture;
+                capture.Sent = now;
+                run.Process.Send(new PlayCommand(PlayCommandKind.Capture, Request: capture.Request));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Ends the capture of a captured event. The file has the name of its request in the capture folder of the play
+    /// folder, so the editor reads no file outside that folder. The editor deletes the file after the read, also when
+    /// no capture waits for it any more, for example after the time limit.
+    /// </summary>
+    private void OnCaptured(GameRun run, PlayEvent.Captured captured)
+    {
+        var capture = Sent(run, captured.Request);
+        var name = PlayFolder.CaptureName(captured.Request);
+        if (captured.File != name)
+        {
+            if (capture != null)
+            {
+                EndCapture(run, capture, PlayCaptureResult.Failed(Status,
+                    $"The game named the image '{captured.File}', not '{name}', so the editor did not read it."));
+            }
+
+            return;
+        }
+
+        var path = Path.Combine(PlayFolder.CapturesPath(run.Args.Profile), name);
+        try
+        {
+            if (capture != null)
+            {
+                EndCapture(run, capture, new PlayCaptureResult(Status)
+                {
+                    Png = File.ReadAllBytes(path),
+                    Width = captured.Width,
+                    Height = captured.Height,
+                });
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            EndCapture(run, capture!, PlayCaptureResult.Failed(Status,
+                $"The editor could not read the image of the game: {e.Message}"));
+        }
+        finally
+        {
+            DeleteCapture(path);
+        }
+    }
+
+    /// <summary>The capture of the run with the number of a capture command, or null.</summary>
+    private static CaptureRun? Sent(GameRun run, int request) =>
+        run.Captures.FirstOrDefault(c => c.Sent != null && c.Request == request);
+
+    private static void EndCapture(GameRun run, CaptureRun capture, PlayCaptureResult result)
+    {
+        run.Captures.Remove(capture);
+        capture.Result.TrySetResult(result);
+    }
+
+    /// <summary>Ends each capture of a game that closed.</summary>
+    private void EndCaptures(GameRun run)
+    {
+        foreach (var capture in run.Captures.ToList())
+        {
+            EndCapture(run, capture, PlayCaptureResult.Failed(Status, CaptureClosedText));
+        }
+    }
+
+    /// <summary>Deletes the file of a capture. A file that stays does no harm: the next capture with its number
+    /// replaces it.</summary>
+    private static void DeleteCapture(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // The file stays until a later capture replaces it.
+        }
+    }
+
     private void SendStart(GameRun run)
     {
         Send(run, PlayCommandKind.Start);
@@ -1385,6 +1554,24 @@ internal sealed class PlayController : IDisposable
     /// <param name="Save">The gate save, whose validation the report waits for.</param>
     private sealed record Crash(GameRun Run, int? Code, string ErrorOutput, int Save);
 
+    /// <summary>A capture that waits for its delay or for the image.</summary>
+    /// <param name="Due">The time when the delay ends and the command goes to the game.</param>
+    private sealed class CaptureRun(TimeSpan due)
+    {
+        public TimeSpan Due { get; } = due;
+
+        /// <summary>The number of the capture command, or 0 before the command.</summary>
+        public int Request { get; set; }
+
+        /// <summary>The time of the capture command, or null before the command.</summary>
+        public TimeSpan? Sent { get; set; }
+
+        /// <summary>The result of the capture. Its continuations run on the thread pool, not in the frame of the
+        /// editor.</summary>
+        public TaskCompletionSource<PlayCaptureResult> Result { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
     /// <summary>A reload that the game did not end yet.</summary>
     /// <param name="Sent">The time of the reload command, for the watchdog.</param>
     /// <param name="SavedAt">The time of the save, or null for Reload game.</param>
@@ -1476,5 +1663,12 @@ internal sealed class PlayController : IDisposable
         /// <summary>The wait of a restart until the Scene shows each edit, or null when no restart waits for the Scene
         /// (see <see cref="PlayController.WaitsForScene"/>).</summary>
         public SceneWait? SceneWait { get; set; }
+
+        /// <summary>The captures that wait for their delay or for the image, oldest first.</summary>
+        public List<CaptureRun> Captures { get; } = [];
+
+        /// <summary>The number of the last capture command. Each capture command of the run gets the next
+        /// number.</summary>
+        public int LastCapture { get; set; }
     }
 }

@@ -238,7 +238,7 @@ internal sealed class AgentRender : IDisposable
     private static async Task<ToolImage> Encode(Task<(byte[] Bgra, int Width, int Height)> pixels, int maxSide)
     {
         var (bgra, width, height) = await pixels.ConfigureAwait(false);
-        var (fit, w, h) = AgentImages.Fit(bgra, width, height, maxSide);
+        var (fit, w, h) = AgentImages.Fit(bgra, width, height, maxSide, maxSide);
         return AgentImages.Png(w, h, fit);
     }
 

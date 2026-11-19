@@ -2504,6 +2504,127 @@ public sealed class PlayControllerTests : IDisposable
     private static void Near(Vector3 expected, Vector3 actual) =>
         Assert.True(Vector3.Distance(expected, actual) <= 0.05f, $"Expected {expected}, but got {actual}.");
 
+    /// <summary>The image file of a capture request in the capture folder of the play folder of the test profile. The
+    /// profile of the test is in the workspace, so the test writes no file outside it.</summary>
+    private string CaptureFile(int request)
+    {
+        editor.Session = editor.Session! with { ProfilePath = Path.Combine(ws.Root, "p.json") };
+        var folder = PlayFolder.CapturesPath(editor.Session.ProfilePath);
+        Directory.CreateDirectory(folder);
+        return Path.Combine(folder, PlayFolder.CaptureName(request));
+    }
+
+    /// <summary>A game that runs, with the answers of the stub to the capture commands.</summary>
+    private async Task RunGameWithCapturesAsync(params PlayEvent[] answers)
+    {
+        plan = Game with { CaptureLines = [.. answers.Select(PlayProtocol.Write)] };
+        editor.Commit(1);
+        editor.Finish(1);
+        RequestPlay();
+        await RunUntilAsync(PlayStatus.Running);
+    }
+
+    /// <summary>
+    /// A capture of the agent (shared step SH9) waits for its delay, then sends the capture command with the next request
+    /// number. The game writes the image file and answers captured. The controller reads the file from the capture folder
+    /// of the play folder and deletes it.
+    /// </summary>
+    [Fact]
+    public async Task ACaptureWaitsForItsDelayThenReadsAndDeletesTheImage()
+    {
+        var file = CaptureFile(1);
+        File.WriteAllBytes(file, [0x89, 0x50, 0x4E, 0x47]);
+        await RunGameWithCapturesAsync(new PlayEvent.Captured(1, "capture-1.png", 1280, 720));
+
+        var capture = play.Capture(TimeSpan.FromSeconds(2));
+        play.Update(false, false);
+        now += TimeSpan.FromSeconds(1.9);
+        play.Update(false, false);
+        var early = stub.Input(0).ToList();
+        now += TimeSpan.FromSeconds(0.1);
+        play.Update(false, false);
+        await ui.RunUntilAsync(() => capture.IsCompleted, "the image");
+        var result = await capture;
+
+        Assert.Equal(["start"], early);
+        Assert.Equal(["start", "capture 1"], stub.Input(0));
+        Assert.Equal([0x89, 0x50, 0x4E, 0x47], result.Png);
+        Assert.Equal((1280, 720, PlayStatus.Running, null), (result.Width, result.Height, result.Play, result.Problem));
+        Assert.False(File.Exists(file));
+        await StopAndRunToIdleAsync();
+    }
+
+    /// <summary>A game that cannot write the image gives its reason. An event that names another file than the file of
+    /// its request makes the controller read no file. So the editor never reads a file outside the capture
+    /// folder.</summary>
+    [Fact]
+    public async Task ACaptureGivesTheReasonOfTheGameAndReadsNoOtherFile()
+    {
+        var outside = Path.Combine(ws.Root, "outside.png");
+        File.WriteAllBytes(outside, [1, 2, 3]);
+        CaptureFile(2);
+        await RunGameWithCapturesAsync(new PlayEvent.CaptureFailed(1, "The game could not write the image: disk full."),
+            new PlayEvent.Captured(2, @"..\..\outside.png", 4, 2));
+
+        var failed = play.Capture(TimeSpan.Zero);
+        play.Update(false, false);
+        await ui.RunUntilAsync(() => failed.IsCompleted, "the first answer");
+        var named = play.Capture(TimeSpan.Zero);
+        play.Update(false, false);
+        await ui.RunUntilAsync(() => named.IsCompleted, "the second answer");
+
+        Assert.Equal("The game could not write the image: disk full.", (await failed).Problem);
+        Assert.Null((await named).Png);
+        Assert.Equal(@"The game named the image '..\..\outside.png', not 'capture-2.png', so the editor did not read it.",
+            (await named).Problem);
+        Assert.True(File.Exists(outside));
+        Assert.Equal(["start", "capture 1", "capture 2"], stub.Input(0));
+        await StopAndRunToIdleAsync();
+    }
+
+    /// <summary>A capture that the game does not answer in 10 s ends with the reason. A late answer still deletes its
+    /// file.</summary>
+    [Fact]
+    public async Task ACaptureThatTheGameDoesNotAnswerEndsAfterItsLimit()
+    {
+        var file = CaptureFile(1);
+        File.WriteAllBytes(file, [1]);
+        await RunGameWithCapturesAsync(new PlayEvent.Captured(1, "capture-1.png", 4, 2));
+
+        var capture = play.Capture(TimeSpan.Zero);
+        play.Update(false, false);
+        await stub.WaitForInputAsync(0, 2);
+        now += PlayController.CaptureLimit;
+        play.Update(false, false);
+        var result = await capture.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        await ui.RunUntilAsync(() => !File.Exists(file), "the delete of the late image");
+
+        Assert.Equal((null, PlayController.CaptureLateText), (result.Png, result.Problem));
+        await StopAndRunToIdleAsync();
+    }
+
+    /// <summary>Without a game, a capture ends at once. A game that stops gets no capture command, and its exit ends each
+    /// capture.</summary>
+    [Fact]
+    public async Task TheExitOfTheGameEndsEachCapture()
+    {
+        var none = await play.Capture(TimeSpan.Zero);
+        await RunGameWithCapturesAsync();
+
+        var waiting = play.Capture(TimeSpan.FromSeconds(5));
+        var sent = play.Capture(TimeSpan.Zero);
+        play.Update(false, false);
+        play.Stop();
+        now += TimeSpan.FromSeconds(5);
+        play.Update(false, false);
+        await RunUntilAsync(PlayStatus.Idle);
+
+        Assert.Equal((PlayStatus.Idle, PlayController.NoGameText), (none.Play, none.Problem));
+        Assert.Equal(PlayController.CaptureClosedText, (await waiting).Problem);
+        Assert.Equal(PlayController.CaptureClosedText, (await sent).Problem);
+        Assert.Equal(["start", "capture 1", "stop"], stub.Input(0));
+    }
+
     private void RequestPlay(PlayStart? start = null)
     {
         play.Request(start ?? Space, null);
