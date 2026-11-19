@@ -7,6 +7,7 @@ using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Strings;
+using OpenLancer.Data.Thn;
 
 namespace OpenLancer.Data.Editing;
 
@@ -22,21 +23,32 @@ public static class ItemEdits
     /// Equipment and its good keep the same nickname, because the engine finds the equipment of a good by that
     /// nickname.
     /// </summary>
-    /// <remarks>The edit is one entry of the edit history. Run it at once: it holds the lines that it changes, so it
-    /// fails when it runs after the edit view changed.</remarks>
+    /// <remarks>
+    /// <para>The mission lines that name the item change in the same entry (decision D668). So does the template of
+    /// each cutscene COMPOUND that names a renamed ship or equipment, as Unity keeps the references to a renamed asset
+    /// (#81). A COMPOUND names a ship with the category <c>ship</c> or <c>spaceship</c>, and equipment with the
+    /// category <c>equipment</c>. The engine finds the item by the text of the template as it is, without letter case,
+    /// so the edit changes only a template with that text. A save writes the change of a lower cutscene as a THN patch
+    /// of the active mod. A cutscene that the editor cannot change keeps the old name and gives a warning. The save
+    /// gate does not check such a cutscene. An entity that a later entity with the same name hides keeps the old name
+    /// with no warning, because the engine does not make it.</para>
+    /// <para>The edit is one entry of the edit history. Run it at once: it holds the lines and the cutscene entities
+    /// that it changes, so it fails when it runs after the edit view or such an entity changed.</para>
+    /// </remarks>
     /// <param name="item">A section of an item file with a nickname. The active mod adds it, and also each section
     /// that the edit renames with it, for example the good of equipment (see
     /// <see cref="EditCommand.RenameAdded"/>).</param>
     /// <param name="warnings">Gets a warning for each mission line that names the item and that the edit cannot change,
     /// for example a line of a section that the active mod cannot patch. The save stops at such a line (rule M23), so
-    /// the caller shows the warnings at once. Null drops them.</param>
+    /// the caller shows the warnings at once. It also gets a warning for each cutscene template that names the item and
+    /// that the edit cannot change. Null drops them.</param>
     /// <exception cref="ArgumentException">The section is not a section of an item file with a nickname. Or the lower
     /// layer has a section that the edit renames. Or the new nickname differs from the old one only in letter case, or
-    /// it cannot be the value of a patch line.</exception>
+    /// it cannot be the value of a patch line or of a cutscene template.</exception>
     /// <exception cref="InvalidOperationException">Another section of the same kind of file has the new
     /// nickname.</exception>
     public static EditCommand Rename(EditSession session, SectionRef item, string newNickname,
-        List<Diagnostic>? warnings = null) => Rename(session, item, newNickname, warnings, null, null);
+        List<Diagnostic>? warnings = null) => Rename(session, item, newNickname, warnings, null, null, null);
 
     /// <summary>
     /// Gives an item that the active mod adds a new nickname, as
@@ -47,8 +59,9 @@ public static class ItemEdits
     /// <param name="missing">Gets each line of the data lists that names the item and that the edit cannot change.
     /// An example is a line of a section that the active mod cannot patch. Such a line shows "Missing" after the
     /// edit. Null drops them.</param>
+    /// <param name="cutscenes">Gets each cutscene entity whose template the edit changes. Null drops them.</param>
     internal static EditCommand Rename(EditSession session, SectionRef item, string newNickname,
-        List<Diagnostic>? warnings, List<SectionRef>? changes, List<MissingReference>? missing)
+        List<Diagnostic>? warnings, List<SectionRef>? changes, List<MissingReference>? missing, List<ThnRef>? cutscenes)
     {
         var index = session.Items;
         var kind = index.KindOf(item.Path);
@@ -124,6 +137,17 @@ public static class ItemEdits
         if (missionKinds.Count > 0 &&
             session.Missions.References.Rename(missionKinds, oldNickname, newNickname, warnings ?? []) is { } mission)
             commands.Add(mission);
+        // The cutscene templates that name a renamed ship or equipment follow the rename in the same entry (#81).
+        var templateKinds = renamed.Select(r => r.Kind switch
+        {
+            ItemFileKind.Ships => (ThnItemKind?)ThnItemKind.Ship,
+            ItemFileKind.Equipment => ThnItemKind.Equipment,
+            _ => null,
+        }).OfType<ThnItemKind>().ToHashSet();
+        var followed = templateKinds.Count > 0
+            ? FollowedTemplates(session, templateKinds, oldNickname, warnings)
+            : [];
+        commands.AddRange(followed.Select(f => ThnEdits.Set(f, TemplatePath, new ThnText(newNickname))));
         // The new nickname goes into the key lines and the links, so each of their files must take it.
         foreach (var binary in renamed.Select(r => r.Section).Concat(relinked).Select(s => session.IsBinaryFile(s.Path))
                      .Distinct())
@@ -133,7 +157,85 @@ public static class ItemEdits
         }
         changes?.AddRange(renamed.Select(r => moved[r.Section])
             .Concat(relinked.Select(s => moved.GetValueOrDefault(s, s))).Distinct());
-        return EditCommand.Group($"Rename {oldNickname} to {newNickname}", commands, session.Snapshot());
+        cutscenes?.AddRange(followed);
+        // The snapshot does not see a cutscene edit, so the edit also checks that each entity still names the item.
+        var snapshot = session.Snapshot();
+        return EditCommand.Group($"Rename {oldNickname} to {newNickname}", commands,
+            () => snapshot() && followed.All(f => NamesTemplate(session.Cutscene(f.Path)?.Element(f.Kind, f.Id)?.Table,
+                oldNickname)));
+    }
+
+    /// <summary>The key of the template of a cutscene entity.</summary>
+    private const string TemplateKey = "template_name";
+
+    /// <summary>The path of the template of a cutscene entity.</summary>
+    private static readonly ThnPath TemplatePath = new(TemplateKey);
+
+    /// <summary>
+    /// The COMPOUNDs of the cutscenes of W whose template names an item of one of the kinds, and that the edit can
+    /// change (see the remarks of <see cref="Rename(EditSession, SectionRef, string, List{Diagnostic})"/>). The
+    /// candidates are the cutscenes that can hold the name as a word (see
+    /// <see cref="EditSession.CutscenesThatCanName"/>).
+    /// </summary>
+    /// <param name="warnings">Gets a warning for each such COMPOUND that the edit cannot change. Null drops
+    /// them.</param>
+    private static List<ThnRef> FollowedTemplates(EditSession session, IReadOnlySet<ThnItemKind> kinds, string nickname,
+        List<Diagnostic>? warnings)
+    {
+        var followed = new List<ThnRef>();
+        var symbols = session.ThnSymbols;
+        foreach (var path in session.CutscenesThatCanName(nickname))
+        {
+            if (session.CutsceneDocument(path) is not { } document)
+                continue;
+            var readOnly = session.CutsceneReadOnlyReason(path);
+            var entities = document.Working.Entities;
+            for (var i = 0; i < entities.Count; i++)
+            {
+                var entity = entities[i];
+                if (!NamesTemplate(entity.Table, nickname) ||
+                    ThnTemplateRules.CompoundKind(entity.Table, symbols) is not { } kind || !kinds.Contains(kind))
+                    continue;
+                // The engine does not make an entity that a later entity with the same name hides. So the template of
+                // such an entity has no effect in the game, and it keeps its name with no warning.
+                if (document.IsHidden(entity.Id))
+                    continue;
+                var reason = readOnly ?? document.PatchProblem(ThnElementKind.Entity, entity);
+                if (reason != null)
+                {
+                    warnings?.Add(Diagnostic.Warning(document.Path,
+                        KeptTemplate(document.Path, entity.Table, kind, reason, readOnly != null)) with
+                    {
+                        Cutscene = new ThnLocation(document.Path, ThnElementKind.Entity, i, TemplateKey),
+                    });
+                    continue;
+                }
+                followed.Add(new ThnRef(document.Path, ThnElementKind.Entity, entity.Id));
+            }
+        }
+        return followed;
+    }
+
+    /// <summary>True when the template of an entity is the nickname, as the engine finds the item: the text as it is,
+    /// without letter case.</summary>
+    private static bool NamesTemplate(ThnTable? entity, string nickname) =>
+        entity?[TemplateKey] is ThnText template &&
+        template.Value.Equals(nickname, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The warning of a COMPOUND whose template keeps the old nickname, because the edit cannot change it. It
+    /// tells what the game does with the cutscene after the rename.</summary>
+    /// <param name="entity">The COMPOUND. Its template names the old nickname.</param>
+    /// <param name="reason">Why the editor cannot change the cutscene or the entity, as a sentence.</param>
+    /// <param name="readOnly">True when the editor cannot change the cutscene. The save gate then skips it.</param>
+    private static string KeptTemplate(string path, ThnTable entity, ThnItemKind kind, string reason, bool readOnly)
+    {
+        var rule = ThnTemplateRules.Categories.Values.First(r => r.Kind == kind);
+        var result = rule.MissingStops ? EditSession.CutsceneCrash : rule.Consequence;
+        var template = ((ThnText)entity[TemplateKey]!).Value;
+        var text = $"The entity \"{ThnScriptModel.NameOf(entity)}\" of the cutscene {path} keeps the template " +
+                   $"{template}, because the editor cannot change it. {reason} After the rename, the game data has " +
+                   $"no {rule.What} {template}. {result}";
+        return readOnly ? $"{text} The save gate does not check a cutscene that the editor cannot change." : text;
     }
 
     /// <summary>The values of a line, with the new nickname in the first value when it names the old one.</summary>

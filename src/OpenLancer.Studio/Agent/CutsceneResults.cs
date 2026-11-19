@@ -12,7 +12,8 @@ namespace OpenLancer.Studio.Agent;
 /// <summary>
 /// The cutscene part of the result of an agent call, and of each step of <c>edit_batch</c> (section 5.6 of the MCP1
 /// design, decision D767). It gives the <c>thn:</c> references of the scripts and of the elements that the cutscene
-/// plans of the call add, change and delete.
+/// plans of the call add, change and delete. It also gives the cutscene entities that another plan changes, for
+/// example the templates that follow the rename of a ship (see <see cref="EditPlan.CutsceneChanges"/>).
 /// </summary>
 /// <remarks>
 /// <para>An event reference holds the index of the event, and each add, delete and reorder can change the index. So the
@@ -76,11 +77,24 @@ internal sealed class CutsceneResults(EditSession session)
 
     /// <summary>Notes W of the script of a plan before the plan runs, at the first touch of the script in the call
     /// and in the step. W cannot change, so a reference keeps it.</summary>
-    public void Before(CutscenePlan plan)
+    public void Before(CutscenePlan plan) => planBefore = Note(plan.Path);
+
+    /// <summary>Notes W of each script of the cutscene entities that a plan that is not a cutscene plan changes (see
+    /// <see cref="EditPlan.CutsceneChanges"/>), before the plan runs, as <see cref="Before(CutscenePlan)"/>
+    /// does.</summary>
+    public void Before(EditPlan plan)
     {
-        planBefore = session.Cutscene(plan.Path);
-        callScripts.TryAdd(plan.Path, planBefore);
-        stepScripts.TryAdd(plan.Path, planBefore);
+        foreach (var path in plan.CutsceneChanges.Select(c => c.Path).Distinct(VfsPath.Comparer))
+            Note(path);
+    }
+
+    /// <summary>Notes W of a script at the first touch in the call and in the step, and gives W now.</summary>
+    private ThnScriptModel? Note(string path)
+    {
+        var now = session.Cutscene(path);
+        callScripts.TryAdd(path, now);
+        stepScripts.TryAdd(path, now);
+        return now;
     }
 
     /// <summary>Notes the elements of a plan right after it ran. The new elements exist only now (see
@@ -94,6 +108,16 @@ internal sealed class CutsceneResults(EditSession session)
             ? plan.Changed
             : plan.Changed.Concat(Differ(plan.Path, planBefore, session.Cutscene(plan.Path))).Distinct().ToList();
         runs.Add(new Run(plan.Path, part, added, changed, plan.Deleted, namesScript));
+    }
+
+    /// <summary>Notes the cutscene entities that a plan that is not a cutscene plan changed, right after it ran. An
+    /// example is the template of a COMPOUND that follows the rename of a ship. The result gives each such entity in
+    /// its changes, as for a cutscene plan.</summary>
+    /// <param name="part">The index of the part of the plan in the parts of the batch.</param>
+    public void After(EditPlan plan, int part)
+    {
+        foreach (var script in plan.CutsceneChanges.GroupBy(c => c.Path, VfsPath.Comparer))
+            runs.Add(new Run(script.Key, part, [], script.Distinct().ToList(), [], false));
     }
 
     /// <summary>The elements of a script whose table differs between two versions of W. An element that one version

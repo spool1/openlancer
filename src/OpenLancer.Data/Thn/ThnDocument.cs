@@ -268,7 +268,11 @@ internal sealed class ThnDocument : IEditFile
 
     /// <summary>Why an edit other than a delete cannot change an element, or null.</summary>
     public string? ReadOnlyReasonOf(ThnElementKind kind, ThnElementId id) =>
-        ReadOnlyReason ?? (kind == ThnElementKind.Entity && Hidden().Contains(id) ? HiddenEntityMessage : null);
+        ReadOnlyReason ?? (kind == ThnElementKind.Entity && IsHidden(id) ? HiddenEntityMessage : null);
+
+    /// <summary>True when a later entity of W with the same name hides an entity, so the engine does not make
+    /// it.</summary>
+    internal bool IsHidden(ThnElementId entity) => Hidden().Contains(entity);
 
     /// <summary>
     /// Why a patch cannot change or delete an element, or null. A patch finds a lower element by its key, so a lower

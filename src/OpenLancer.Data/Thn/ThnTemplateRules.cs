@@ -128,6 +128,15 @@ public static class ThnTemplateRules
             ? props.Record.LastOrDefault(f => f.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value
             : null;
 
+    /// <summary>The kind of the item that the template of a COMPOUND names, or null when the entity is no COMPOUND or
+    /// its <c>userprops.category</c> is not a text of <see cref="Categories"/>. The checks and the engine read the
+    /// category in the same way (ThnScriptInstance.cs:113-122).</summary>
+    public static ThnItemKind? CompoundKind(ThnTable entity, IReadOnlyDictionary<string, ThnSymbolInfo> symbols) =>
+        ThnSchema.TypeOf(ThnElementKind.Entity, entity, symbols) == "COMPOUND" &&
+        UserProp(entity, "category") is ThnText category && Categories.TryGetValue(category.Value, out var rule)
+            ? rule.Kind
+            : null;
+
     /// <summary>True when a DEFORMABLE loads the costume of its template: it has no <c>userprops.Actor</c>, or an empty
     /// one. With an Actor, the costume loads only when no room NPC or RTC character plays the actor
     /// (ThnScriptInstance.cs:255-264). The engine reads an Actor with <c>ToString</c>, so only an empty text counts as

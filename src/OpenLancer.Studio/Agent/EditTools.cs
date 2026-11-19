@@ -252,7 +252,9 @@ internal sealed class EditScope
     /// the result that the plan gives. A plan that refuses throws its refusal, and the caller cancels the batch.
     /// </summary>
     /// <remarks>A cutscene plan also notes its script for the problems of the cutscene checks, and its elements for the
-    /// references of the result (see <see cref="CutsceneResults"/>).</remarks>
+    /// references of the result (see <see cref="CutsceneResults"/>). So does another plan that changes cutscene
+    /// entities, for example a rename of a ship that changes the templates that name it (see
+    /// <see cref="EditPlan.CutsceneChanges"/>).</remarks>
     /// <param name="targets">The sections that the request names, for the problems before and after the
     /// edit.</param>
     /// <param name="asks">False for a plan that the request needs and that the agent cannot confirm. An example is the
@@ -273,6 +275,9 @@ internal sealed class EditScope
         else
         {
             checks.BeforeIniEdit();
+            foreach (var path in plan.CutsceneChanges.Select(c => c.Path).Distinct(OpenLancer.Data.IO.VfsPath.Comparer))
+                checks.BeforeCutscene(path);
+            cutscenes.Before(plan);
         }
         checks.Before(plan, targets ?? []);
         Batch.Label ??= plan.Label;
@@ -293,9 +298,12 @@ internal sealed class EditScope
             if (asks && cutscene.NeedsConfirmation)
                 stepCutsceneAsks.Add(cutscene);
         }
-        else if (asks && EditTools.ConfirmationOf(Session, plan) is { } reason)
+        else
         {
-            stepConfirmations.Add(reason);
+            if (plan.CutsceneChanges.Count > 0)
+                cutscenes.After(plan, Batch.Parts.Count - 1);
+            if (asks && EditTools.ConfirmationOf(Session, plan) is { } reason)
+                stepConfirmations.Add(reason);
         }
     }
 
@@ -606,6 +614,15 @@ internal static class EditTools
             var files = Shown(missions.Select(m => m.Path).Distinct(OpenLancer.Data.IO.VfsPath.Comparer).ToList());
             parts.Add(AgentTexts.Error(missions.Count == 1 ? "confirm_mission" : "confirm_missions",
                 ("count", missions.Count), ("files", files)));
+        }
+        // A rename of a ship or equipment also changes the cutscene templates that name it. The question names their
+        // scripts.
+        if (plan.CutsceneChanges.Count is > 0 and var templates)
+        {
+            var files = Shown(plan.CutsceneChanges.Select(c => c.Path).Distinct(OpenLancer.Data.IO.VfsPath.Comparer)
+                .ToList());
+            parts.Add(AgentTexts.Error(templates == 1 ? "confirm_cutscene" : "confirm_cutscenes",
+                ("count", templates), ("files", files)));
         }
         var missing = plan.Missing.Select(m => Ref(m.Reference.Section)).Concat(plan.MissionMissing.Select(m => m.Ref))
             .Distinct().ToList();

@@ -7,6 +7,7 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions.Editing;
+using OpenLancer.Data.Thn;
 
 namespace OpenLancer.Studio.Commands;
 
@@ -48,10 +49,13 @@ public static class DatabaseCommands
     /// <para>The plan warns about each mission line that names the item and that the edit cannot change. The save stops
     /// at such a line (rule M23). Each other line that names the item and that the edit cannot change is a "Missing"
     /// line of the plan. An example is a line of a section that the active mod cannot patch.</para>
+    /// <para>The template of each cutscene COMPOUND that names a renamed ship or equipment changes too (#81). The plan
+    /// gives these entities in <see cref="EditPlan.CutsceneChanges"/>. It warns about each such template that the edit
+    /// cannot change, for example in a cutscene that the editor cannot change.</para>
     /// <para>The mentions are the files that name the old nickname as text and that the rename does not change, for
     /// example a file that no rule of the data lists reads (see <see cref="EditSession.StoryMentions"/>). A warning, a
     /// "Missing" line or a mention makes the plan need a confirmation, as a rename in the Scene does (decision
-    /// D242).</para>
+    /// D242). A change of a mission line or of a cutscene template alone needs no confirmation.</para>
     /// </remarks>
     public static EditPlan Rename(EditSession session, SectionRef item, string newNickname) =>
         new RenamePlan(session, item, newNickname);
@@ -91,9 +95,10 @@ public static class DatabaseCommands
             var warnings = new List<Diagnostic>();
             var changes = new List<SectionRef>();
             var missing = new List<MissingReference>();
+            var cutscenes = new List<ThnRef>();
             try
             {
-                Command = ItemEdits.Rename(session, item, newNickname, warnings, changes, missing);
+                Command = ItemEdits.Rename(session, item, newNickname, warnings, changes, missing, cutscenes);
             }
             catch (Exception e) when (e is ArgumentException or InvalidOperationException)
             {
@@ -112,8 +117,11 @@ public static class DatabaseCommands
             Changes = changes;
             Warnings = warnings;
             Missing = missing;
-            // The scan also finds the lines that the rename changes, so a file that it changes is no mention.
-            var changed = changes.Select(c => VfsPath.Normalize(c.Path) ?? c.Path).ToHashSet(VfsPath.Comparer);
+            CutsceneChanges = cutscenes;
+            // The scan also finds the lines and the templates that the rename changes, so a file that it changes is no
+            // mention.
+            var changed = changes.Select(c => c.Path).Concat(cutscenes.Select(c => c.Path))
+                .Select(p => VfsPath.Normalize(p) ?? p).ToHashSet(VfsPath.Comparer);
             var old = item.Id.Key!;
             Mentions = session.StoryMentions(old)
                 .Where(m => !changed.Contains(VfsPath.Normalize(m.Path) ?? m.Path))

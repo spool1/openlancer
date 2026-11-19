@@ -404,6 +404,23 @@ public sealed partial class EditSession
     /// the cache.</summary>
     internal int ReferrerLookups { get; private set; }
 
+    /// <summary>
+    /// The cutscenes of W that can hold a name as a word, as install paths in normal form, each one time, in path
+    /// order. These are the cutscenes of the edit view that hold the name (see <see cref="StoryMentions.Cutscenes"/>),
+    /// the cutscenes with unsaved edits, and the cutscenes that the active mod changes. The word index reads only the
+    /// edit view, so the cutscenes with unsaved edits come in addition, also a new cutscene and an edit of an open
+    /// batch. A rename of an item reads them to find the templates that name the item (see <see cref="ItemEdits"/>).
+    /// </summary>
+    /// <remarks>The call waits for the word index, as <see cref="StoryMentions.Of"/> does.</remarks>
+    internal IReadOnlyList<string> CutscenesThatCanName(string name) =>
+        Mentions.Cutscenes(name)
+            .Concat(cutscenes.Values.Where(d => d.State.Exists && d.State != d.Initial).Select(d => d.Path))
+            .Concat(ActiveMod is { } active ? ChangedCutscenePaths(active) : [])
+            .Select(p => VfsPath.Normalize(p) ?? p)
+            .Distinct(VfsPath.Comparer)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
     /// <summary>The install paths of the cutscenes that the active mod changes, in normal form: the files that a
     /// command changed, and the patches and the whole files of the mod.</summary>
     private IEnumerable<string> ChangedCutscenePaths(Mod active) =>

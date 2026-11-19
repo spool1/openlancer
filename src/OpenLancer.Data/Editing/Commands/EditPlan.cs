@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.Thn;
 
 namespace OpenLancer.Data.Editing.Commands;
 
@@ -54,6 +55,11 @@ public abstract class EditPlan
 
     /// <summary>The files that name an old nickname of a rename, or a nickname of a delete, as text.</summary>
     public IReadOnlyList<NamedMention> Mentions { get; protected internal set; } = [];
+
+    /// <summary>The cutscene entities that the command changes, for a plan that is not a cutscene plan. An
+    /// example is the template of a COMPOUND that follows the rename of a ship. The agent results give them as
+    /// <c>thn:</c> references, and the checks of the agent compare the errors of their cutscenes.</summary>
+    internal IReadOnlyList<ThnRef> CutsceneChanges { get; set; } = [];
 
     /// <summary>The section to select after the command, or null to clear the selection (decision D249).</summary>
     public SectionRef? SelectAfter { get; protected internal set; }

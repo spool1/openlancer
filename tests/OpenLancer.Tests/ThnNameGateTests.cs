@@ -48,7 +48,9 @@ internal static class ThnDataWorkspace
 
     /// <summary>A workspace with the game data files in the base folder, the script, a script that the game plays
     /// only in space, the empty active mod "act" and the profile.</summary>
-    public static TestWorkspace Create()
+    /// <param name="moreData">More lines of the <c>[Data]</c> section of <c>freelancer.ini</c>, for example a goods
+    /// file.</param>
+    public static TestWorkspace Create(string moreData = "")
     {
         var ws = ThnSessions.Workspace(script: Script);
         ws.WriteBase(@"EXE\freelancer.ini", $"""
@@ -68,6 +70,7 @@ internal static class ThnDataWorkspace
             sounds = audio\sounds.ini
             PetalDB = petaldb.ini
             PetalDB = petaldb_more.ini
+            {moreData}
             """);
         ws.WriteBase(@"DATA\SOLAR\solararch.ini", """
             [Solar]

@@ -16,6 +16,7 @@ using OpenLancer.Data.Mods;
 using OpenLancer.Data.Thn;
 using OpenLancer.Data.Validation;
 using OpenLancer.Runtime.Thn;
+using OpenLancer.Studio.Commands;
 using Xunit;
 
 namespace OpenLancer.DataTests;
@@ -160,6 +161,21 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
     public void ARemovedModelLineOfAnHdEditionEquipmentBlocksEachCutsceneThatBuildsIt() =>
         CheckARemovedModelLine(GameDataPaths.RequireHde(), "m8dgearhde");
 
+    /// <summary>
+    /// A rename of a ship that the active mod adds changes the template of a retail cutscene COMPOUND that names it
+    /// (#81). The active mod copies the retail ship that the most COMPOUNDs of the category ship or spaceship name,
+    /// without the template PlayerShip. A saved THN patch points one such COMPOUND to the copy. After the rename and a
+    /// save, the THN patch names the new nickname, and the save gate gives no error.
+    /// </summary>
+    [Fact]
+    public void ARenameOfANewShipChangesTheTemplateOfARetailCutscene() =>
+        CheckARenamedShip(GameDataPaths.RequireBase(), "m8drename");
+
+    /// <inheritdoc cref="ARenameOfANewShipChangesTheTemplateOfARetailCutscene"/>
+    [Fact]
+    public void ARenameOfANewShipChangesTheTemplateOfAnHdEditionCutscene() =>
+        CheckARenamedShip(GameDataPaths.RequireHde(), "m8drenamehde");
+
     /// <summary>A patch that changes a value of each retail ship and each costume keeps each answer of the game data. So
     /// the save gate adds no cutscene error, opens no cutscene and does not start the word index.</summary>
     [Fact]
@@ -215,6 +231,52 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
         Assert.Equal(Oracle(session), gate.Order());
         Assert.NotEmpty(gate);
         Assert.All(gate, e => Assert.Contains($"\"{equipment}\" has no model", e.Message));
+    }
+
+    private void CheckARenamedShip(string game, string modId)
+    {
+        using var workspace = new RetailWorkspace(game, modId);
+        var session = workspace.Open();
+        var ships = Templates(game).Ships;
+        // The engine gives the player ship to the template PlayerShip, so the template names no ship of the lists.
+        var (ship, section, scripts) = MostNamed(session, ships, "ship",
+            n => !n.Equals(ThnTemplateRules.PlayerShip, StringComparison.OrdinalIgnoreCase));
+        // The first COMPOUND of the ship in path order that the editor can change.
+        var target = ships[ship]
+            .Select(file => session.CutscenePath(file))
+            .OfType<string>()
+            .Where(path => session.CutsceneReadOnlyReason(path) == null)
+            .SelectMany(path => session.Cutscene(path)!.Entities
+                .Where(e => ThnTemplateRules.CompoundKind(e.Table, session.ThnSymbols) == ThnItemKind.Ship &&
+                            e.Table["template_name"] is ThnText t &&
+                            t.Value.Equals(ship, StringComparison.OrdinalIgnoreCase))
+                .Select(e => new ThnRef(path, ThnElementKind.Entity, e.Id)))
+            .First(e => session.CutsceneReadOnlyReason(e) == null);
+        var name = ThnScriptModel.NameOf(session.Cutscene(target.Path)!.Element(target.Kind, target.Id)!.Table);
+        var plan = ItemTemplates.Plan(session, section, "ol_follow_ship");
+        session.Execute(ItemTemplates.Build(plan));
+        var copy = plan.Copies.First(c => c.Source.Equals(section)).Copy;
+        session.Execute(ThnEdits.Set(target, new ThnPath("template_name"), new ThnText(copy.Id.Key!)));
+        var first = session.Save();
+        Assert.True(first.Saved, string.Join("\n", first.Problems));
+
+        var rename = DatabaseCommands.Rename(session, copy, "ol_follow_ship2");
+        Assert.True(rename.CanRun, string.Join("\n", rename.Refusals));
+        var changed = rename.CutsceneChanges
+            .Select(e => (e.Path, ThnScriptModel.NameOf(session.Cutscene(e.Path)!.Element(e.Kind, e.Id)!.Table)))
+            .ToList();
+        session.Execute(rename.Command!);
+        var second = session.Save();
+        output.WriteLine($"The ship \"{ship}\" of {scripts} scripts: entity \"{name}\" of {target.Path}.");
+
+        Assert.Equal([(target.Path, name)], changed);
+        Assert.Empty(rename.Warnings);
+        Assert.True(second.Saved, string.Join("\n", second.Problems));
+        Assert.DoesNotContain(second.Problems, p => p.Severity == DiagnosticSeverity.Error);
+        var patch = File.ReadAllText(Path.Combine(workspace.ModFolder, Mod.PatchesFolder, target.Path));
+        Assert.Contains("\"ol_follow_ship2\"", patch);
+        Assert.DoesNotContain("\"ol_follow_ship\"", patch);
+        Assert.Null(session.GateRefusal());
     }
 
     private void CheckAPatchThatKeepsEachAnswer(string game, string modId)
@@ -296,18 +358,20 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
 
     /// <summary>The templates of the cutscenes of a game, with the cutscenes that name each template.</summary>
     private sealed record ThnTemplateScan(IReadOnlyDictionary<string, SortedSet<string>> Costumes,
-        IReadOnlyDictionary<string, SortedSet<string>> Equipment);
+        IReadOnlyDictionary<string, SortedSet<string>> Equipment, IReadOnlyDictionary<string, SortedSet<string>> Ships);
 
     /// <summary>
-    /// The costume of each DEFORMABLE that loads one, and the equipment of each COMPOUND of the category equipment, in
-    /// each cutscene of a game. The scan reads the scripts with the engine evaluator, without a session, so it does not
-    /// use the search of the save gate. The names compare without letter case.
+    /// The costume of each DEFORMABLE that loads one, the equipment of each COMPOUND of the category equipment, and the
+    /// ship of each COMPOUND of the category ship or spaceship, in each cutscene of a game. The scan reads the scripts
+    /// with the engine evaluator, without a session, so it does not use the search of the save gate. The names compare
+    /// without letter case.
     /// </summary>
     private static ThnTemplateScan Templates(string game) => Scans.GetOrAdd(game, g => new Lazy<ThnTemplateScan>(() =>
     {
         var view = FileSystem.FromPath(g);
         var costumes = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
         var equipment = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var ships = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in VfsFiles.Find(view, ".thn"))
         {
             var script = ThnScriptModel.From(ThornEvaluator.Instance.Evaluate(view.ReadAllBytes(file), file),
@@ -316,13 +380,14 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
             {
                 if (entity["template_name"] is not ThnText { Value.Length: > 0 } template)
                     continue;
-                var found = IsType(entity, "DEFORMABLE") && ThnTemplateRules.LoadsCostume(entity)
-                    ? costumes
-                    : IsType(entity, "COMPOUND") &&
-                      ThnTemplateRules.UserProp(entity, "category") is ThnText { Value: var category } &&
-                      category.Equals("equipment", StringComparison.OrdinalIgnoreCase)
-                        ? equipment
-                        : null;
+                var category = IsType(entity, "COMPOUND") &&
+                               ThnTemplateRules.UserProp(entity, "category") is ThnText { Value: var text }
+                    ? text.ToLowerInvariant()
+                    : null;
+                var found = IsType(entity, "DEFORMABLE") && ThnTemplateRules.LoadsCostume(entity) ? costumes
+                    : category == "equipment" ? equipment
+                    : category is "ship" or "spaceship" ? ships
+                    : null;
                 if (found == null)
                     continue;
                 if (!found.TryGetValue(template.Value, out var files))
@@ -330,7 +395,7 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
                 files.Add(VfsPath.Normalize(file) ?? file);
             }
         }
-        return new ThnTemplateScan(costumes, equipment);
+        return new ThnTemplateScan(costumes, equipment, ships);
     })).Value;
 
     /// <summary>True when an entity has a type. A script can give the type as a name, for example <c>COMPOUND</c>, or
