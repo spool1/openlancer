@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using OpenLancer.Data;
@@ -102,6 +103,48 @@ public sealed class NewModFileTests
         Assert.True(session.IsDirty);
     }
 
+    /// <summary>A new file and the delete of a file are structural changes that list each section of the file. A new
+    /// file without sections is a structural change too. So the Scene and the marks of the agent edits see each added
+    /// and each removed section: the delete of an agent removes the marks of the sections of its file.</summary>
+    [Fact]
+    public void NewFileAndDeleteFileAreStructuralChangesThatListTheSectionsOfTheFile()
+    {
+        using var ws = ListWorkspace.Create();
+        var session = ws.Session("act");
+        var changes = new List<EditChange>();
+        session.Changed += changes.Add;
+
+        RunAsAgent(session, EditCommand.NewFile(NewPath, ContentPathsTests.Sections(SystemText)));
+        var sections = session.Sections(NewPath);
+        Assert.Equal(3, sections.Count);
+        Assert.True(changes[^1].Structural);
+        Assert.Equal(sections, changes[^1].Sections);
+        Assert.True(session.AgentSections.SetEquals(sections));
+
+        session.Execute(EditCommand.NewFile(@"DATA\MODS\act\empty.ini", []));
+        Assert.True(changes[^1].Structural);
+        Assert.Empty(changes[^1].Sections);
+
+        RunAsAgent(session, EditCommand.DeleteFile(NewPath));
+        Assert.True(changes[^1].Structural);
+        Assert.Equal(sections, changes[^1].Sections);
+        Assert.Empty(session.AgentSections);
+        session.Undo();
+        Assert.True(session.AgentSections.SetEquals(sections));
+        session.Redo();
+        Assert.True(changes[^1].Structural);
+        Assert.Equal(sections, changes[^1].Sections);
+        Assert.Empty(session.AgentSections);
+    }
+
+    /// <summary>Runs a command as one entry of an agent, as the agent tools do.</summary>
+    private static void RunAsAgent(EditSession session, EditCommand command)
+    {
+        using var batch = session.BeginBatch(command.Label, EditOrigin.Agent);
+        batch.Run(command);
+        batch.Commit();
+    }
+
     /// <summary>A save writes the new file into the files folder of the mod as text. Its text placeholders stay, and the
     /// text goes into strings.json. After the save, and after the profile opens again, the file is an editable whole
     /// file.</summary>
@@ -156,8 +199,8 @@ public sealed class NewModFileTests
         Assert.False(File.Exists(FileOf(ws)));
     }
 
-    /// <summary>A delete saves a removal of the file. An undo gives the file back, and the next save writes it again.
-    /// After a delete, the path is free for a new file before the save.</summary>
+    /// <summary>A delete saves a removal of the file. An undo gives the file back, a redo deletes it again, and the save
+    /// after an undo writes the file again. After a delete, the path is free for a new file before the save.</summary>
     [Fact]
     public void DeleteFileSavesARemovalAndUndoGivesTheFileBack()
     {
@@ -170,6 +213,14 @@ public sealed class NewModFileTests
         Assert.Equal("Delete file Ol01.ini", session.UndoLabel);
         Assert.Null(session.Get(Sun));
         Assert.False(ContentPaths.Taken(session, NewPath));
+        session.Undo();
+        Assert.NotNull(session.Get(Sun));
+        Assert.True(ContentPaths.Taken(session, NewPath));
+        Assert.Equal("Delete file Ol01.ini", session.RedoLabel);
+        session.Redo();
+        Assert.Null(session.Get(Sun));
+        Assert.False(ContentPaths.Taken(session, NewPath));
+        Assert.Equal("Delete file Ol01.ini", session.UndoLabel);
         var deleted = session.Save();
         AssertSaved(deleted);
         Assert.Equal([FileOf(ws)], deleted.Deleted);
