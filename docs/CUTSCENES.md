@@ -10,7 +10,7 @@ This version has these limits:
 - A new cutscene is a text file. Nobody checked a new cutscene in the retail games yet, so the editor marks it "not checked in the retail games".
 - The editor cannot change a whole cutscene file of a mod into a patch.
 - The validation reports only the errors that stop a cutscene, the templates that name no item and the clips that the game does not have. It does not report warnings, for example an event after the end of the script.
-- The save gate finds a cutscene that a change of the game data breaks by the name of the item in the cutscene file. So it does not find a template that a text script makes from parts, for example with `..`.
+- To find a cutscene that a change of the game data breaks, the save gate looks for the name of the item in the cutscene file. So it does not find a template that a text script makes from parts, for example with `..`.
 
 ## Browse and preview the retail cutscenes
 
