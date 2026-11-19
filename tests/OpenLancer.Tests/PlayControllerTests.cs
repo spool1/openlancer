@@ -2603,8 +2603,8 @@ public sealed class PlayControllerTests : IDisposable
         await StopAndRunToIdleAsync();
     }
 
-    /// <summary>Without a game, a capture ends at once. A game that stops gets no capture command, and its exit ends each
-    /// capture.</summary>
+    /// <summary>Without a game, a capture ends at once without a game, also while the game stops. A game that stops gets
+    /// no capture command, and its exit ends each capture.</summary>
     [Fact]
     public async Task TheExitOfTheGameEndsEachCapture()
     {
@@ -2615,14 +2615,39 @@ public sealed class PlayControllerTests : IDisposable
         var sent = play.Capture(TimeSpan.Zero);
         play.Update(false, false);
         play.Stop();
+        var stopping = play.Capture(TimeSpan.Zero);
         now += TimeSpan.FromSeconds(5);
         play.Update(false, false);
         await RunUntilAsync(PlayStatus.Idle);
 
-        Assert.Equal((PlayStatus.Idle, PlayController.NoGameText), (none.Play, none.Problem));
-        Assert.Equal(PlayController.CaptureClosedText, (await waiting).Problem);
+        Assert.Equal((PlayStatus.Idle, true, PlayController.NoGameText), (none.Play, none.NoGame, none.Problem));
+        Assert.True(stopping.IsCompletedSuccessfully);
+        var stopped = await stopping;
+        Assert.Equal((PlayStatus.Stopping, true), (stopped.Play, stopped.NoGame));
+        Assert.Equal((false, PlayController.CaptureClosedText), ((await waiting).NoGame, (await waiting).Problem));
         Assert.Equal(PlayController.CaptureClosedText, (await sent).Problem);
         Assert.Equal(["start", "capture 1", "stop"], stub.Input(0));
+    }
+
+    /// <summary>While the report of a crash waits for the validation of its save, the status is validating, but no game
+    /// runs. So a capture ends at once without a game, as in idle.</summary>
+    [Fact]
+    public async Task ACaptureWhileACrashReportWaitsEndsWithoutAGame()
+    {
+        plan = new StubPlan([Error("The engine load stops.", crash: true)], Exit: 1);
+        editor.SaveResult = new SaveOutcome(true, 2, false);
+        RequestPlay();
+        await ui.RunAsync(2);
+        play.Update(false, false);
+        Assert.Equal(PlayStatus.Validating, play.Status);
+
+        var capture = play.Capture(TimeSpan.Zero);
+
+        Assert.True(capture.IsCompletedSuccessfully);
+        var result = await capture;
+        Assert.Equal((PlayStatus.Validating, true, PlayController.NoGameText), (result.Play, result.NoGame, result.Problem));
+        play.Stop();
+        Assert.Equal(PlayStatus.Idle, play.Status);
     }
 
     private void RequestPlay(PlayStart? start = null)

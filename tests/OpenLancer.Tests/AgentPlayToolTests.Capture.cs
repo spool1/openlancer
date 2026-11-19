@@ -72,23 +72,27 @@ public sealed partial class AgentPlayToolTests
     private static PlayCaptureResult BlackFrame(int width, int height, PlayStatus play = PlayStatus.Running) =>
         new(play) { Png = AgentImages.Png(width, height, new byte[4 * width * height]).Png, Width = width, Height = height };
 
-    /// <summary>Only the game of Play in OpenLancer gives an image. Without it, and while only the game of a play copy
-    /// runs, the tool gives refused and asks Play for nothing. A game that stops gives no image either.</summary>
+    /// <summary>Only the game of Play in OpenLancer gives an image. Play answers at once when no such game runs: in idle,
+    /// while only the game of a play copy runs, while the game stops, and while the report of a crash waits for a
+    /// validation. The tool then gives refused with NoGame, not CaptureFailed.</summary>
     [Theory]
     [InlineData("Idle", false)]
     [InlineData("Idle", true)]
     [InlineData("Stopping", false)]
+    [InlineData("Validating", false)]
     public void WithoutAGameOfPlayTheToolGivesNoGame(string status, bool playCopy)
     {
         var (host, editor) = Editor();
-        editor.PlayStatus = Enum.Parse<PlayStatus>(status);
+        var play = Enum.Parse<PlayStatus>(status);
+        editor.PlayStatus = play;
         editor.GameRuns = playCopy;
+        editor.Captured = PlayCaptureResult.WithoutGame(play);
 
         var error = Error(host, "play_capture");
 
         Assert.Equal(("refused", EditorAgentPlay.NoGameDetail,
             "No OpenLancer game runs. Start one with play or mission_play."), error);
-        Assert.Empty(editor.Captures);
+        Assert.Single(editor.Captures);
     }
 
     /// <summary>A game that gives no image, for example because it closed or did not answer in time, gives refused with

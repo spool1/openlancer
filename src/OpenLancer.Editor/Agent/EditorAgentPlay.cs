@@ -41,7 +41,8 @@ internal interface IAgentPlayEditor : IAgentPlayHost
     /// <summary>The live trace query of the shared command layer (<see cref="MissionWorkspace.LiveTrace"/>).</summary>
     LiveTraceResult LiveTrace(int play, long since);
 
-    /// <summary>An image of a frame of the game of Play after a delay (<see cref="PlayController.Capture"/>).</summary>
+    /// <summary>An image of a frame of the game of Play after a delay (<see cref="PlayController.Capture"/>). Without a
+    /// game, the task ends at once with <see cref="PlayCaptureResult.NoGame"/>.</summary>
     Task<PlayCaptureResult> Capture(TimeSpan delay);
 }
 
@@ -129,9 +130,11 @@ internal sealed class EditorAgentPlay(IAgentPlayEditor editor) : IAgentPlay
     public Func<CancellationToken, Task<(PlayCaptureView View, ToolImage Image)>> Capture(TimeSpan delay, int maxWidth,
         int maxHeight)
     {
-        if (editor.PlayStatus is PlayStatus.Idle or PlayStatus.Stopping)
-            throw new EditException(new EditError(EditErrorKind.Refused, NoGameDetail, AgentTexts.Error("capture_no_game")));
         var result = editor.Capture(delay);
+        // Play decides if a game can give an image, and it answers at once when none can. The session part gives that
+        // refusal, so the agent gets NoGame and not a failed capture.
+        if (result.IsCompletedSuccessfully && result.Result.NoGame)
+            throw new EditException(new EditError(EditErrorKind.Refused, NoGameDetail, AgentTexts.Error("capture_no_game")));
         return async cancel =>
         {
             var done = await result.WaitAsync(cancel).ConfigureAwait(false);

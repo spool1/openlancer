@@ -508,7 +508,7 @@ public sealed partial class AgentPlayToolTests : IDisposable
             return Stopping;
         }
 
-        /// <summary>The delay of each capture that reached Play.</summary>
+        /// <summary>The delay of each capture that reached Play, also of a capture without a game.</summary>
         public List<TimeSpan> Captures { get; } = [];
 
         /// <summary>The result of the next captures, or null for a capture whose image does not come.</summary>

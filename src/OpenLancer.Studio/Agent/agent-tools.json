@@ -2136,7 +2136,7 @@
     "CutsceneShotView.context": "The preview context of the image, as the Cutscene tab names it.",
     "CutsceneShotView.without_system": "True when the image shows a space script without its system.",
     "PanelShotView.panel": "The panel of the image.",
-    "PlayCaptureView.play": "The state of Play in OpenLancer when the game gave the image: starting, validating, running, reloading or not_responding. Before running, the image can show the load of the game.",
+    "PlayCaptureView.play": "The state of Play in OpenLancer when the game gave the image: starting, validating, running, reloading, not_responding or stopping. Before running, the image can show the load of the game.",
     "DryRunView.script": "The msn: reference of the script.",
     "DryRunView.version": "The version of the script that the run read. It changes at each change of the script.",
     "DryRunView.total_steps": "The number of all steps of the run: one step for each input that the run keeps.",

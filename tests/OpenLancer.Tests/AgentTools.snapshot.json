@@ -40061,7 +40061,7 @@
               "not_responding",
               "stopping"
             ],
-            "description": "The state of Play in OpenLancer when the game gave the image: starting, validating, running, reloading or not_responding. Before running, the image can show the load of the game."
+            "description": "The state of Play in OpenLancer when the game gave the image: starting, validating, running, reloading, not_responding or stopping. Before running, the image can show the load of the game."
           },
           "rev": {
             "type": "string",

@@ -60,7 +60,15 @@ internal sealed record PlayCaptureResult(PlayStatus Play)
     /// <summary>Why the game gave no image, or null.</summary>
     public string? Problem { get; init; }
 
+    /// <summary>True when no game of Play ran at the request, so Play asked no game for an image. An example is a game
+    /// that crashed while the validation of its save runs: the status is then validating, but no game runs.</summary>
+    public bool NoGame { get; init; }
+
     public static PlayCaptureResult Failed(PlayStatus play, string problem) => new(play) { Problem = problem };
+
+    /// <summary>The result of a capture while no game of Play runs, or while the game stops.</summary>
+    public static PlayCaptureResult WithoutGame(PlayStatus play) =>
+        new(play) { Problem = PlayController.NoGameText, NoGame = true };
 }
 
 /// <summary>
@@ -271,12 +279,14 @@ internal sealed class PlayController : IDisposable
     /// captured, and the controller then reads the file and deletes it.
     /// </summary>
     /// <returns>The image, or the reason why the game gave none. Examples are a game that stops, closes or does not
-    /// answer in <see cref="CaptureLimit"/>, and an image file that the game or the editor cannot use.</returns>
+    /// answer in <see cref="CaptureLimit"/>, and an image file that the game or the editor cannot use. Without a game
+    /// that runs, the task ends at once with <see cref="PlayCaptureResult.NoGame"/>, also while a crash report waits
+    /// for a validation.</returns>
     public Task<PlayCaptureResult> Capture(TimeSpan delay)
     {
         if (game is not { Ending: false } run)
         {
-            return Task.FromResult(PlayCaptureResult.Failed(Status, NoGameText));
+            return Task.FromResult(PlayCaptureResult.WithoutGame(Status));
         }
 
         var capture = new CaptureRun(clock() + delay);
