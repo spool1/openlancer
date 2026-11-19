@@ -237,7 +237,7 @@ Directives start with `ol.`. Do not use `@`: the INI parser ignores lines that s
 
 | Directive | Effect |
 |---|---|
-| `ol.new = true` | Add this section to the file. A section with the same key must not exist. |
+| `ol.new = true` | Add this section at the end of the file. A section with the same key must not exist. A new `[Base]` of `universe.ini` goes before the first `[system]` (see "universe.ini"). |
 | `ol.delete = true` | Remove the target section and its child sections. The patch section has only the key and this directive. |
 | `ol.remove = name1, name2` | Remove all target entries with these names. |
 | `ol.parent = <key>` | With `ol.new`, add a child section to the parent section with this key (see below). |
@@ -351,6 +351,33 @@ goods = MODS\my-mod\goods.ini
 - Each other section or directive in a patch of `freelancer.ini` is an error. A mod of format version 1 cannot patch `freelancer.ini`.
 
 For other changes, a mod can replace `freelancer.ini` as a whole file in `files/`. A whole file cannot use text placeholders. The export refuses it for a retail game (see "Export"). OpenLancer adds its text DLL to `[Resources]` of the file that results.
+
+### universe.ini
+
+The game reads `DATA/UNIVERSE/universe.ini` from the start. It links a station of a system file to its base only when it read the `[Base]` before the `[system]` of that system. The files of the game have each `[Base]` before the first `[system]`. A `[Base]` at the end of the file has no station in the game.
+
+So the merge puts a new `[Base]` of a patch of `universe.ini` directly before the first `[system]` of the file. A new section of another type, for example a new `[system]`, goes at the end of the file:
+
+```ini
+[Base]
+ol.new = true
+nickname = ol01_01_base
+system = Ol01
+strid_name = $str:ol01_01_base_name
+file = MODS\my-mod\BASES\ol01_01_base.ini
+
+[system]
+ol.new = true
+nickname = Ol01
+file = ..\MODS\my-mod\SYSTEMS\Ol01\Ol01.ini
+```
+
+- The place needs no directive. `ol.new = true` is enough, so the mod format does not change.
+- Two new bases go before the first `[system]` in the order of the patch.
+- When a lower mod has a whole `universe.ini` with a `[Base]` after a `[system]`, the new base still goes before every system.
+- When the file has no `[system]`, the new base goes at the end.
+- The editor uses the same rule. A new `[Base]` goes before the first `[system]` in the edit and in the drop-in zip. OpenLancer Play (F5) and Play in the game (Ctrl+F5) use the same place. The save writes the base with `ol.new`, and a later edit of the patch keeps the place.
+- The FLMM package refuses a new `[Base]` (see "FLMM package (preview)"). Use the drop-in zip.
 
 ## Text: strings.json
 
@@ -1394,6 +1421,9 @@ When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod
 - A new `[BaseGood]` adds its lines to the `[BaseGood]` of the same base. A new `[Data]` line goes after the last line of its key.
 - The text of the mod becomes `GENERATESTRRES("<text>")` and `GENERATEXMLRES("<text>")`. FLMM makes its own text DLL. A text with `"` or with a character outside ASCII refuses the change, because no known FLMM rule can hold it.
 - A change that the operations cannot express puts the whole merged file into the package, with a warning. Examples are a removed line or section, and an anchor that is not unique in the file. A whole file cannot hold the text of the mod, so such a change with text refuses the package.
+- A new whole INI file of the mod with mod text refuses the package, because FLMM reads its text macros only in script operations.
+- A new `[Base]` of `universe.ini` refuses the package. The game needs each `[Base]` before the `[system]` sections (see "universe.ini"), and an `append` puts the section at the end of the file. FLMM has no tested operation that puts a section before the first `[system]` yet.
+- Each refusal names the drop-in zip. The drop-in zip always carries the new content.
 - `oltool export --flmm-probe` writes the text of the mod as it is. The probe is for the FLMM check only. It writes only its package.
 
 ### Package of the target OpenLancer
