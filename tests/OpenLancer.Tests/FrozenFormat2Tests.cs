@@ -23,8 +23,9 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// The frozen format 2 test mod (issue #63): the promise that each 1.x editor loads, validates and exports a format 2
-/// mod of 1.0. The mod in <c>FrozenMods/format2/mod</c> holds each patch directive, text placeholders, a THN patch, a
-/// whole mission file, a whole file in the folder of the mod and the editor files of missions. All data is made up.
+/// mod of 1.0. The mod in <c>FrozenMods/format2/mod</c> holds each patch directive, text placeholders and a THN patch.
+/// It also holds a whole mission file, a whole file in the folder of the mod and the editor files of missions. All
+/// data is made up.
 /// </summary>
 /// <remarks>
 /// <para>The mod loads over the fake games of the export tests (<see cref="ExportGame"/>) with the files of
@@ -120,9 +121,9 @@ public sealed partial class FrozenFormat2Tests
     }
 
     /// <summary>
-    /// The validation of each retail target finds no problem: the merge of the editor, the checks of the cutscenes that
-    /// the mod adds or changes, and the target checks of <c>oltool validate --target</c> (the merge with the retail
-    /// rules, the format checks and the content checks).
+    /// The validation of each retail target finds no problem. It has three parts: the merge of the editor, the checks
+    /// of the cutscenes that the mod adds or changes, and the target checks of <c>oltool validate --target</c>. The
+    /// target checks are the merge with the retail rules, the format checks and the content checks.
     /// </summary>
     /// <remarks>The INI reference checks and the engine load of <c>oltool validate</c> need the data of a game. The
     /// retail tests run them.</remarks>
@@ -246,8 +247,8 @@ public sealed partial class FrozenFormat2Tests
         return game;
     }
 
-    /// <summary>The text that the fixture hash covers: each file of the mod and base folders with its path and the
-    /// SHA-256 of its bytes, then the two cutscene constants.</summary>
+    /// <summary>The text that the fixture hash covers. It has a line for each file of the mod and base folders, with
+    /// the path and the SHA-256 of the file. The two cutscene constants follow.</summary>
     private static string FixtureText()
     {
         var text = new StringBuilder();
