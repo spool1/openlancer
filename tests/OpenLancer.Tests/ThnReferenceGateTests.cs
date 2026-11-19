@@ -173,17 +173,26 @@ public sealed class ThnReferenceGateTests
         Assert.Null(Note(session));
     }
 
-    /// <summary>A save after an edit that keeps each answer of the game data does not start the word index. So the
-    /// save gate stays cheap when no change of the active mod breaks an item.</summary>
+    /// <summary>
+    /// The save gate does not start the word index after an edit that keeps each answer of the game data. So the gate
+    /// stays cheap when no change of the active mod breaks an item. The index belongs to one edit view, and a save that
+    /// writes a file makes a new edit view. So the test reads the index after a gate call before the save, and after a
+    /// gate call on the new edit view. The saved patch is then a file of the active mod.
+    /// </summary>
     [Fact]
-    public void ASaveWithoutABrokenItemDoesNotStartTheWordIndex()
+    public void TheSaveGateDoesNotStartTheWordIndexWithoutABrokenItem()
     {
         using var ws = ThnDataWorkspace.Create();
         var session = ws.Session("act");
 
         session.Execute(EditCommand.SetLinesFromText(Ship1, "hit_pts", ["900"]));
 
+        Assert.Null(session.GateRefusal());
+        Assert.False(session.Mentions.IsStarted);
+        var view = session.EditView;
         AssertSaved(session.Save());
+        Assert.NotSame(view, session.EditView);
+        Assert.Null(session.GateRefusal());
         Assert.False(session.Mentions.IsStarted);
     }
 
