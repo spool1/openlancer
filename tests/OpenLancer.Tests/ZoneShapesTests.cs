@@ -76,8 +76,8 @@ public sealed class ZoneShapesTests
     }
 
     /// <summary>The rotation turns the axes of the zone as the engine turns them. A turn of 30 degrees about Y points
-    /// the Z axis of the zone to (sin 30°, 0, cos 30°) in the world, and the X axis to (cos 30°, 0, -sin 30°). A turn in
-    /// the other direction gives other values, because the angle is not symmetric for the shape.</summary>
+    /// the Z axis of the zone to (sin 30°, 0, cos 30°) in the world. It points the X axis to (cos 30°, 0, -sin 30°). A
+    /// turn in the other direction gives other values, because the angle is not symmetric for the shape.</summary>
     [Fact]
     public void ARotationOf30DegreesTurnsTheAxesOfTheZone()
     {
@@ -94,9 +94,9 @@ public sealed class ZoneShapesTests
     }
 
     /// <summary>Without a fade band, the immersion is more than 0 exactly where the shape of the engine holds the
-    /// point, also after a rotation that is not symmetric for the shape. The grid has no point on an edge. A ring is
-    /// not in the list, because retail counts some points beyond the side of a flat ring as inside (see
-    /// <see cref="ZoneShapes"/>).</summary>
+    /// point. This is also true after a rotation that is not symmetric for the shape. The grid has no point on an
+    /// edge. A ring is not in the list, because retail counts some points beyond the side of a flat ring as inside
+    /// (see <see cref="ZoneShapes"/>).</summary>
     [Theory]
     [InlineData(Universe.ZoneShape.ELLIPSOID, 1000f, 500f, 2000f, 0f, 30f, 0f)]
     [InlineData(Universe.ZoneShape.BOX, 2000f, 1000f, 4000f, 20f, 30f, 0f)]
@@ -138,6 +138,9 @@ public sealed class ZoneShapesTests
         Assert.Equal(1, ZoneShapes.Immersion(Zone(Universe.ZoneShape.BOX, new Vector3(2000, 1000, 4000), 0.04f), Vector3.Zero));
         // Outside the box, and inside its bounding sphere.
         Assert.Equal(0, ZoneShapes.Immersion(zone, new Vector3(1100, 0, 0)));
+        // 0.1 m inside a face. The value (s + r²) / r² is below 1 only with double precision.
+        Assert.Equal(1, ZoneShapes.Immersion(Zone(Universe.ZoneShape.BOX, new Vector3(2000, 1000, 4000), null),
+            new Vector3(999.9f, 0, 0)));
     }
 
     /// <summary>A cylinder uses its radius and its height. A size line with two values reads as (radius, height,
