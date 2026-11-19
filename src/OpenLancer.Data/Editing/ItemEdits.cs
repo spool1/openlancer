@@ -200,11 +200,10 @@ public static class ItemEdits
                 // such an entity has no effect in the game, and it keeps its name with no warning.
                 if (document.IsHidden(entity.Id))
                     continue;
-                var reason = readOnly ?? document.PatchProblem(ThnElementKind.Entity, entity);
-                if (reason != null)
+                if (readOnly != null)
                 {
                     warnings?.Add(Diagnostic.Warning(document.Path,
-                        KeptTemplate(document.Path, entity.Table, kind, reason, readOnly != null)) with
+                        KeptTemplate(document.Path, entity.Table, kind, readOnly)) with
                     {
                         Cutscene = new ThnLocation(document.Path, ThnElementKind.Entity, i, TemplateKey),
                     });
@@ -225,17 +224,17 @@ public static class ItemEdits
     /// <summary>The warning of a COMPOUND whose template keeps the old nickname, because the edit cannot change it. It
     /// tells what the game does with the cutscene after the rename.</summary>
     /// <param name="entity">The COMPOUND. Its template names the old nickname.</param>
-    /// <param name="reason">Why the editor cannot change the cutscene or the entity, as a sentence.</param>
-    /// <param name="readOnly">True when the editor cannot change the cutscene. The save gate then skips it.</param>
-    private static string KeptTemplate(string path, ThnTable entity, ThnItemKind kind, string reason, bool readOnly)
+    /// <param name="reason">Why the editor cannot change the cutscene, as a sentence. The save gate skips such a
+    /// cutscene.</param>
+    private static string KeptTemplate(string path, ThnTable entity, ThnItemKind kind, string reason)
     {
         var rule = ThnTemplateRules.Categories.Values.First(r => r.Kind == kind);
         var result = rule.MissingStops ? EditSession.CutsceneCrash : rule.Consequence;
         var template = ((ThnText)entity[TemplateKey]!).Value;
-        var text = $"The entity \"{ThnScriptModel.NameOf(entity)}\" of the cutscene {path} keeps the template " +
-                   $"{template}, because the editor cannot change it. {reason} After the rename, the game data has " +
-                   $"no {rule.What} {template}. {result}";
-        return readOnly ? $"{text} The save gate does not check a cutscene that the editor cannot change." : text;
+        return $"The entity \"{ThnScriptModel.NameOf(entity)}\" of the cutscene {path} keeps the template " +
+               $"{template}, because the editor cannot change it. {reason} After the rename, the game data has " +
+               $"no {rule.What} {template}. {result} The save gate does not check a cutscene that the editor cannot " +
+               "change.";
     }
 
     /// <summary>The values of a line, with the new nickname in the first value when it names the old one.</summary>
