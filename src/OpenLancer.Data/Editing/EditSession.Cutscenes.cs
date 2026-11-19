@@ -160,6 +160,9 @@ public sealed partial class EditSession
     /// problem has the origin of the active mod.</para>
     /// <para>The errors of W and B compare by their messages (<see cref="Diagnostic.NewIn"/>). The retail data has a
     /// name problem, so the name problems compare by their elements (see <see cref="NewNameProblems"/>).</para>
+    /// <para>A cutscene that the active mod does not change has the same script in W and in B. So it has errors only
+    /// when a change of the active mod in the game data removes or breaks an item that it names. The save gate also
+    /// checks such a cutscene (see <see cref="CutsceneGateErrors"/>).</para>
     /// <para>The result is cached. The cache checks W or B again when it changes, and both when the game data gives
     /// another answer. The Problems section of the Cutscene page reads the result in each frame.</para>
     /// <para>Empty when the session has no W of the cutscene.</para>
@@ -408,27 +411,45 @@ public sealed partial class EditSession
             .Where(p => p.EndsWith(".thn", StringComparison.OrdinalIgnoreCase)).Distinct(VfsPath.Comparer);
 
     /// <summary>
-    /// The cutscenes whose errors the save gate gives (see <see cref="CutsceneGateErrors"/>): each cutscene that the
-    /// active mod changes and that the editor can change, as install paths in normal form. Empty without an active mod.
-    /// An agent batch that changes an INI file compares their errors before and after the batch.
+    /// The install paths of the cutscenes that the save gate reads, in normal form. Each path comes one time. The
+    /// cutscenes that the active mod changes come first (see <see cref="ChangedCutscenePaths"/>), then the other
+    /// cutscenes of <see cref="ReferrerCutscenes"/>.
+    /// </summary>
+    private IEnumerable<string> GatePaths(Mod active) =>
+        ChangedCutscenePaths(active).Concat(ReferrerCutscenes()).Distinct(VfsPath.Comparer);
+
+    /// <summary>
+    /// The cutscenes whose errors the save gate gives (see <see cref="CutsceneGateErrors"/>), as install paths in
+    /// normal form. These are the cutscenes that the active mod changes. They are also the cutscenes of the edit view
+    /// that name an item that a change of the active mod removes or breaks (see <see cref="ReferrerCutscenes"/>). The
+    /// editor can change each cutscene of the result. Empty without an active mod. An agent batch that changes an INI
+    /// file compares their errors before and after the batch.
     /// </summary>
     internal IReadOnlyList<string> GateCutscenes() =>
         ActiveMod is { } active
-            ? ChangedCutscenePaths(active)
+            ? GatePaths(active)
                 .Where(p => TryCutscene(p, out var document) && document is { ReadOnlyReason: null, State.Exists: true })
                 .ToList()
             : [];
 
     /// <summary>
-    /// The cutscene errors of the save gate: the errors of each cutscene that the active mod changes (see
-    /// <see cref="CutsceneErrors"/>), in the files that a command changed and in the patches and whole files of the
-    /// mod. A cutscene that the editor cannot change, or a new cutscene that does not exist now, is not checked. A whole
-    /// file of the active mod that does not evaluate is an error too: the engine reads it with the same Thorn VM and
-    /// throws (ResourceLoadExtensions.cs:48-49, RoomGameplay.cs:851).
+    /// The cutscene errors of the save gate: the errors of each cutscene of <see cref="GateCutscenes"/> (see
+    /// <see cref="CutsceneErrors"/>). The gate reads the cutscenes that the active mod changes: the files that a
+    /// command changed, and the patches and whole files of the mod. It also reads the cutscenes of the edit view that
+    /// name an item that a change of the active mod removes or breaks. Examples are a retail cutscene, a cutscene of a
+    /// lower mod and a cutscene that no INI line names. The game crashes or shows less when it plays such a cutscene,
+    /// also when the active mod does not change its script.
     /// </summary>
+    /// <remarks>
+    /// <para>A cutscene that the editor cannot change, or a new cutscene that does not exist now, is not checked. A
+    /// whole file of the active mod that does not evaluate is an error too. The engine reads it with the same Thorn VM
+    /// and throws (ResourceLoadExtensions.cs:48-49, RoomGameplay.cs:851).</para>
+    /// <para>The gate and the Problems section of the Cutscene page both read <see cref="CutsceneErrors"/>. So each
+    /// error has the same text, place, source and origin in both.</para>
+    /// </remarks>
     private IEnumerable<Diagnostic> CutsceneGateErrors(Mod active)
     {
-        foreach (var path in ChangedCutscenePaths(active))
+        foreach (var path in GatePaths(active))
         {
             if (TryCutscene(path, out var document))
             {

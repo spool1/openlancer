@@ -17,13 +17,6 @@ namespace OpenLancer.Tests;
 /// </summary>
 public sealed class ThnReferrerTests
 {
-    private const string PetalPath = @"DATA\petaldb.ini";
-
-    /// <summary>A whole petalDB file of the active mod without the room "bar1". The editor cannot change an
-    /// <c>[ObjectTable]</c> section, because it has no nickname, so only such a file removes a room.</summary>
-    private const string PetalWithoutBar = "[ObjectTable]\nroom = bar2, rooms\\bar2.cmp\nprop = cup, props\\cup.3db\n" +
-                                           "cart = cart1, carts\\cart1.cmp\n";
-
     /// <summary>A change that keeps each answer of the game data gives no item and no cutscene, and does not start the
     /// word index: no edit, a new value of the ship, and a new ship from the template of the ship.</summary>
     [Fact]
@@ -66,65 +59,20 @@ public sealed class ThnReferrerTests
     [InlineData("remove a clip", false)]
     public void EachBreakGivesTheItemAndTheScriptThatNamesIt(string change, bool crashes)
     {
-        using var ws = change == "remove a clip" ? ClipWorkspace() : ThnDataWorkspace.Create();
-        (ThnItemKind, string) expected = change switch
-        {
-            "equipment without a model" => (ThnItemKind.Equipment, "thruster1"),
-            "delete effect" => (ThnItemKind.Effect, "fx1"),
-            "remove the room line" => (ThnItemKind.Room, "bar1"),
-            "remove a clip" => (ThnItemKind.Animation, "Sc_Sit"),
-            _ => (ThnItemKind.Costume, "trent"),
-        };
-        var entity = change switch
-        {
-            "equipment without a model" => "Gear",
-            "delete effect" => "Fx",
-            "remove the room line" => "Bar",
-            _ => "Man",
-        };
-        switch (change)
-        {
-            case "saved delete patch":
-                WriteModFile(ws, @"patches\" + ThnDataWorkspace.CostumesPath, "[Costume]\nnickname = trent\nol.delete = true\n");
-                break;
-            case "whole file without the costume":
-                WriteModFile(ws, @"files\" + ThnDataWorkspace.CostumesPath, "[Costume]\nnickname = other\nbody = body1\n");
-                break;
-            case "remove the room line":
-                WriteModFile(ws, @"files\" + PetalPath, PetalWithoutBar);
-                break;
-        }
+        using var ws = ThnBreaks.Workspace(change);
         var session = ws.Session("act");
-        switch (change)
-        {
-            case "delete costume":
-                session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
-                break;
-            case "rename costume":
-                session.Execute(EditCommand.Rename(ThnDataWorkspace.Costume("trent"), "trent_new"));
-                break;
-            case "body without a body part":
-                session.Execute(EditCommand.SetLinesFromText(ThnDataWorkspace.Costume("trent"), "body", ["no_body"]));
-                break;
-            case "delete body part":
-                session.Execute(EditCommand.DeleteSection(
-                    new SectionRef(ThnDataWorkspace.BodypartsPath, new SectionIdentity("Body", "body1"))));
-                break;
-            case "equipment without a model":
-                session.Execute(EditCommand.RemoveName(ThnDataWorkspace.Equipment("Thruster", "thruster1"), "DA_archetype"));
-                break;
-            case "delete effect":
-                session.Execute(EditCommand.DeleteSection(new SectionRef(@"DATA\FX\effects.ini",
-                    new SectionIdentity("Effect", "fx1"))));
-                break;
-        }
+        var item = ThnBreaks.Item(change);
 
-        Assert.Empty(session.GateCutscenes());
-        Assert.Equal([expected], session.BrokenCutsceneItems());
+        ThnBreaks.Apply(session, change);
+
+        // The active mod does not change the script, but the save gate reads it (#81).
+        Assert.True(ThnBreaks.IsUnchanged(session, ScriptPath));
+        Assert.Equal([ScriptPath], session.GateCutscenes());
+        Assert.Equal([item], session.BrokenCutsceneItems());
         Assert.Equal([ScriptPath], session.ReferrerCutscenes());
         var error = Assert.Single(session.CutsceneErrors(ScriptPath)).Message;
-        Assert.Contains($"\"{entity}\"", error);
-        Assert.Contains($"\"{expected.Item2}\"", error);
+        Assert.Contains($"\"{ThnBreaks.Entity(change)}\"", error);
+        Assert.Contains($"\"{item.Name}\"", error);
         Assert.Equal(crashes, error.StartsWith(EditSession.CutsceneCrash, System.StringComparison.Ordinal));
         AssertInvariant(session);
     }
@@ -174,7 +122,7 @@ public sealed class ThnReferrerTests
             "{ entity_name = \"Cam\"",
             "{ entity_name = \"Lost\", type = COMPOUND, template_name = \"lost_room\", userprops = { category = \"room\" } },\n" +
             "    { entity_name = \"Cam\"", System.StringComparison.Ordinal));
-        WriteModFile(ws, @"files\" + PetalPath, PetalWithoutBar);
+        ThnBreaks.WriteModFile(ws, @"files\" + ThnBreaks.PetalPath, ThnBreaks.PetalWithoutBar);
         var session = ws.Session("act");
         const string barMissing = "The game crashes when it plays this cutscene. entity \"Bar\", template_name: The game " +
                                   "data has no room of petalDB \"bar1\".";
@@ -215,7 +163,7 @@ public sealed class ThnReferrerTests
             Assert.False(session.Lists.LowerLayerHasValue("petal_room", "bar1"));
         }
 
-        WriteModFile(ws, @"files\" + PetalPath, PetalWithoutBar);
+        ThnBreaks.WriteModFile(ws, @"files\" + ThnBreaks.PetalPath, ThnBreaks.PetalWithoutBar);
         var changed = ws.Session("act");
         Assert.True(changed.Lists.LowerLayerHasValue("petal_room", "BAR1"));
         Assert.False(changed.Lists.LowerLayerHasValue("petal_room", "bar2"));
@@ -316,9 +264,111 @@ public sealed class ThnReferrerTests
         Assert.Equal(0, session.ReferrerLookups);
     }
 
+    /// <summary>
+    /// The rule of the search and of the save gate: each cutscene of the edit view with an error is a cutscene of the
+    /// gate. Such a cutscene is a cutscene that the active mod changes, or a cutscene of the search.
+    /// </summary>
+    internal static void AssertInvariant(EditSession session)
+    {
+        var found = session.GateCutscenes().ToHashSet(VfsPath.Comparer);
+        foreach (var path in VfsFiles.Find(session.EditView.CreateFileSystem(), ".thn"))
+        {
+            var normal = VfsPath.Normalize(path) ?? path;
+            if (session.CutsceneErrors(normal).Count > 0)
+                Assert.Contains(normal, found);
+        }
+    }
+}
+
+/// <summary>
+/// The changes of the active mod that remove or break an item of the script of <see cref="ThnDataWorkspace"/>. The
+/// tests of the search and of the save gate use them (#81). The active mod does not change the script, and the script
+/// of space does not name the item. Some changes are files of the active mod, and the others are edits of the session.
+/// </summary>
+internal static class ThnBreaks
+{
+    public const string PetalPath = @"DATA\petaldb.ini";
+
+    /// <summary>A whole petalDB file of the active mod without the room "bar1". The editor cannot change an
+    /// <c>[ObjectTable]</c> section, because it has no nickname, so only such a file removes a room.</summary>
+    public const string PetalWithoutBar = "[ObjectTable]\nroom = bar2, rooms\\bar2.cmp\nprop = cup, props\\cup.3db\n" +
+                                          "cart = cart1, carts\\cart1.cmp\n";
+
+    /// <summary>A workspace for a change, with the files of the active mod that the change needs.</summary>
+    public static TestWorkspace Workspace(string change)
+    {
+        var ws = change == "remove a clip" ? ClipWorkspace() : ThnDataWorkspace.Create();
+        switch (change)
+        {
+            case "saved delete patch":
+                WriteModFile(ws, @"patches\" + ThnDataWorkspace.CostumesPath, "[Costume]\nnickname = trent\nol.delete = true\n");
+                break;
+            case "whole file without the costume":
+                WriteModFile(ws, @"files\" + ThnDataWorkspace.CostumesPath, "[Costume]\nnickname = other\nbody = body1\n");
+                break;
+            case "remove the room line":
+                WriteModFile(ws, @"files\" + PetalPath, PetalWithoutBar);
+                break;
+        }
+        return ws;
+    }
+
+    /// <summary>Runs the command of a change that is an edit of the session. A change that is a file of the active mod
+    /// runs no command.</summary>
+    public static void Apply(EditSession session, string change)
+    {
+        switch (change)
+        {
+            case "delete costume":
+                session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
+                break;
+            case "rename costume":
+                session.Execute(EditCommand.Rename(ThnDataWorkspace.Costume("trent"), "trent_new"));
+                break;
+            case "body without a body part":
+                session.Execute(EditCommand.SetLinesFromText(ThnDataWorkspace.Costume("trent"), "body", ["no_body"]));
+                break;
+            case "delete body part":
+                session.Execute(EditCommand.DeleteSection(
+                    new SectionRef(ThnDataWorkspace.BodypartsPath, new SectionIdentity("Body", "body1"))));
+                break;
+            case "equipment without a model":
+                session.Execute(EditCommand.RemoveName(ThnDataWorkspace.Equipment("Thruster", "thruster1"), "DA_archetype"));
+                break;
+            case "delete effect":
+                session.Execute(EditCommand.DeleteSection(new SectionRef(@"DATA\FX\effects.ini",
+                    new SectionIdentity("Effect", "fx1"))));
+                break;
+        }
+    }
+
+    /// <summary>The item that a change removes or breaks.</summary>
+    public static (ThnItemKind Kind, string Name) Item(string change) => change switch
+    {
+        "equipment without a model" => (ThnItemKind.Equipment, "thruster1"),
+        "delete effect" => (ThnItemKind.Effect, "fx1"),
+        "remove the room line" => (ThnItemKind.Room, "bar1"),
+        "remove a clip" => (ThnItemKind.Animation, "Sc_Sit"),
+        _ => (ThnItemKind.Costume, "trent"),
+    };
+
+    /// <summary>The entity of the script that names the item, or the target of the event that names the clip.</summary>
+    public static string Entity(string change) => change switch
+    {
+        "equipment without a model" => "Gear",
+        "delete effect" => "Fx",
+        "remove the room line" => "Bar",
+        _ => "Man",
+    };
+
+    /// <summary>True when the active mod does not change a cutscene. The edit view then gets it from the lower layer,
+    /// and the session has no unsaved edit of it.</summary>
+    public static bool IsUnchanged(EditSession session, string path) =>
+        session.CutsceneSource(path).Kind == ThnFileKind.Lower && !session.HasUnsavedCutsceneEdits(path);
+
     /// <summary>The fixture of the clip gate: an animation file of the active mod replaces the file of the clip
     /// "Sc_Sit". The script plays "Sc_Sit" and "Sc_Lost", which the lower layer does not have either.</summary>
-    private static TestWorkspace ClipWorkspace()
+    public static TestWorkspace ClipWorkspace()
     {
         var ws = AnimationWorkspace.Create((AnimationWorkspace.More, ["Sc_ModSit"]));
         ws.WriteBase(ScriptPath, """
@@ -336,25 +386,10 @@ public sealed class ThnReferrerTests
     }
 
     /// <summary>Writes a file into the folder of the active mod, by its path relative to the mod folder.</summary>
-    private static void WriteModFile(TestWorkspace ws, string relativePath, string text)
+    public static void WriteModFile(TestWorkspace ws, string relativePath, string text)
     {
         var file = Path.Combine(ws.ModFolder("act"), relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         File.WriteAllText(file, text);
-    }
-
-    /// <summary>
-    /// The rule of the search: each cutscene of the edit view with an error is a cutscene that the active mod changes,
-    /// or a cutscene of the result.
-    /// </summary>
-    private static void AssertInvariant(EditSession session)
-    {
-        var found = session.ReferrerCutscenes().Concat(session.GateCutscenes()).ToHashSet(VfsPath.Comparer);
-        foreach (var path in VfsFiles.Find(session.EditView.CreateFileSystem(), ".thn"))
-        {
-            var normal = VfsPath.Normalize(path) ?? path;
-            if (session.CutsceneErrors(normal).Count > 0)
-                Assert.Contains(normal, found);
-        }
     }
 }
