@@ -181,6 +181,10 @@ public sealed class DataLists
     /// <summary>The number of animation files that the list <c>animation</c> read in the session.</summary>
     internal int AnimationReads => animations.Reads;
 
+    /// <summary>The number of times that the list <c>animation</c> read the clips of the lower layer in the
+    /// session.</summary>
+    internal int LowerClipReads => animations.LowerReads;
+
     /// <summary>
     /// Each line value that names an entry of a list, in all referrer files of the list, also files that the session
     /// did not open yet. A scoped list needs <paramref name="scopeFile"/>, the file of the entry, to tell the entries of

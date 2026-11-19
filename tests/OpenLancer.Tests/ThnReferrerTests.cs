@@ -41,10 +41,10 @@ public sealed class ThnReferrerTests
     /// <summary>
     /// Each change of the active mod that removes or breaks an item of the script gives the item and the script. The
     /// script of space does not name the item, so it is not in the result. The changes are unsaved edits, a saved
-    /// patch, a whole file of the active mod and an animation file of the active mod. A cascade of the search of the
-    /// referrer errors counts too: the delete of a body part makes the costume that names it unusable. The script gets
-    /// one error, on the entity or the event that names the item. A missing effect or clip is a name problem, not a
-    /// crash.
+    /// patch, a whole file of the active mod, an animation file of the active mod and a bodyparts.ini of the active mod
+    /// without the <c>[Animations]</c> line of a file. A cascade of the search of the referrer errors counts too: the
+    /// delete of a body part makes the costume that names it unusable. The script gets one error, on the entity or the
+    /// event that names the item. A missing effect or clip is a name problem, not a crash.
     /// </summary>
     [Theory]
     [InlineData("delete costume", true)]
@@ -57,6 +57,7 @@ public sealed class ThnReferrerTests
     [InlineData("whole file without the costume", true)]
     [InlineData("remove the room line", true)]
     [InlineData("remove a clip", false)]
+    [InlineData("bodyparts without the clip file", false)]
     public void EachBreakGivesTheItemAndTheScriptThatNamesIt(string change, bool crashes)
     {
         using var ws = ThnBreaks.Workspace(change);
@@ -70,6 +71,8 @@ public sealed class ThnReferrerTests
         Assert.Equal([ScriptPath], session.GateCutscenes());
         Assert.Equal([item], session.BrokenCutsceneItems());
         Assert.Equal([ScriptPath], session.ReferrerCutscenes());
+        string[] clips = item.Kind == ThnItemKind.Animation ? [item.Name] : [];
+        Assert.Equal(clips, session.Lists.RemovedClips());
         var error = Assert.Single(session.CutsceneErrors(ScriptPath)).Message;
         Assert.Contains($"\"{ThnBreaks.Entity(change)}\"", error);
         Assert.Contains($"\"{item.Name}\"", error);
@@ -101,6 +104,36 @@ public sealed class ThnReferrerTests
         Assert.Empty(session.BrokenCutsceneItems());
         Assert.Empty(session.ReferrerCutscenes());
         Assert.Empty(session.CutsceneErrors(ScriptPath));
+        session.Execute(ThnEdits.Set(Entity(session, "Cam"), new ThnPath("cameraprops.fovh"), new ThnNumber(20)));
+        Assert.Empty(session.CutsceneErrors(ScriptPath));
+        Assert.Empty(session.SaveProblems());
+        AssertInvariant(session);
+    }
+
+    /// <summary>
+    /// A whole file of the active mod keeps an item without a model, and changes only another line of it. The lists
+    /// read the lower section by its identity. The lower section has the same model problem, so the active mod does not
+    /// cause it. Thus the change gives no item and no error, also in a cutscene that the active mod changes.
+    /// </summary>
+    [Theory]
+    [InlineData("station1", @"DATA\SOLAR\solararch.ini", "no_model")]
+    [InlineData("thruster1", ThnDataWorkspace.EquipmentPath, "light1")]
+    public void AWholeFileThatKeepsAnItemWithoutAModelGivesNoItem(string replaced, string file, string template)
+    {
+        using var ws = ThnDataWorkspace.Create();
+        ws.WriteBase(ScriptPath, ThnDataWorkspace.Script.Replace($"\"{replaced}\"", $"\"{template}\"",
+            System.StringComparison.Ordinal));
+        var lower = File.ReadAllText(Path.Combine(ws.Base, file)).ReplaceLineEndings("\n");
+        var nickname = $"nickname = {template}\n";
+        Assert.Contains(nickname, lower);
+        ThnBreaks.WriteModFile(ws, @"files\" + file, lower.Replace(nickname, nickname + "mass = 10\n",
+            System.StringComparison.Ordinal));
+        var session = ws.Session("act");
+
+        Assert.Empty(session.BrokenCutsceneItems());
+        Assert.Empty(session.ReferrerCutscenes());
+        Assert.Empty(session.CutsceneErrors(ScriptPath));
+        Assert.Null(session.GateRefusal());
         session.Execute(ThnEdits.Set(Entity(session, "Cam"), new ThnPath("cameraprops.fovh"), new ThnNumber(20)));
         Assert.Empty(session.CutsceneErrors(ScriptPath));
         Assert.Empty(session.SaveProblems());
@@ -169,6 +202,30 @@ public sealed class ThnReferrerTests
         Assert.False(changed.Lists.LowerLayerHasValue("petal_room", "bar2"));
         Assert.False(changed.Lists.LowerLayerHasValue("costume", "trent"));
         Assert.Equal(["bar1"], changed.Lists.RemovedValues("petal_room"));
+    }
+
+    /// <summary>
+    /// The lists read the clips of the lower layer only when the active mod has an animation file or changes
+    /// bodyparts.ini. The retail animation files hold about 100 MB. So the delete of a costume reads no lower clip, and
+    /// a change of bodyparts.ini reads them one time for the session.
+    /// </summary>
+    [Fact]
+    public void TheLowerClipsNeedAnAnimationFileOrAChangeOfBodyparts()
+    {
+        using var ws = AnimationWorkspace.Create();
+        var session = ws.Session("act");
+
+        session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
+
+        Assert.Equal([(ThnItemKind.Costume, "trent")], session.BrokenCutsceneItems());
+        Assert.Empty(session.Lists.RemovedClips());
+        Assert.Equal(0, session.Lists.LowerClipReads);
+        session.Execute(AnimationWorkspace.AddLine(@"characters\animations\extra.anm"));
+        Assert.Empty(session.Lists.RemovedClips());
+        Assert.Equal(1, session.Lists.LowerClipReads);
+        session.Undo();
+        Assert.Empty(session.Lists.RemovedClips());
+        Assert.Equal(1, session.Lists.LowerClipReads);
     }
 
     /// <summary>
@@ -294,10 +351,23 @@ internal static class ThnBreaks
     public const string PetalWithoutBar = "[ObjectTable]\nroom = bar2, rooms\\bar2.cmp\nprop = cup, props\\cup.3db\n" +
                                           "cart = cart1, carts\\cart1.cmp\n";
 
+    /// <summary>A whole bodyparts.ini of the active mod without the <c>[Animations]</c> line of more.anm. The script
+    /// plays the clip "Sc_Sit" of that file. The editor cannot change an <c>[Animations]</c> line, so only such a file
+    /// removes the clip.</summary>
+    public const string BodypartsWithoutMore = "[Animations]\nanim = characters\\animations\\body.anm\n" +
+                                               "anim = characters\\animations\\gone.anm\n[PetalAnimations]\n" +
+                                               "anim = characters\\animations\\body.anm\n[Skeleton]\nsex = male\n" +
+                                               "[Body]\nnickname = body1\nmesh = characters\\body1.dfm\n";
+
     /// <summary>A workspace for a change, with the files of the active mod that the change needs.</summary>
     public static TestWorkspace Workspace(string change)
     {
-        var ws = change == "remove a clip" ? ClipWorkspace() : ThnDataWorkspace.Create();
+        var ws = change switch
+        {
+            "remove a clip" => ClipWorkspace((AnimationWorkspace.More, ["Sc_ModSit"])),
+            "bodyparts without the clip file" => ClipWorkspace(),
+            _ => ThnDataWorkspace.Create(),
+        };
         switch (change)
         {
             case "saved delete patch":
@@ -308,6 +378,9 @@ internal static class ThnBreaks
                 break;
             case "remove the room line":
                 WriteModFile(ws, @"files\" + PetalPath, PetalWithoutBar);
+                break;
+            case "bodyparts without the clip file":
+                WriteModFile(ws, @"files\" + ThnDataWorkspace.BodypartsPath, BodypartsWithoutMore);
                 break;
         }
         return ws;
@@ -348,7 +421,7 @@ internal static class ThnBreaks
         "equipment without a model" => (ThnItemKind.Equipment, "thruster1"),
         "delete effect" => (ThnItemKind.Effect, "fx1"),
         "remove the room line" => (ThnItemKind.Room, "bar1"),
-        "remove a clip" => (ThnItemKind.Animation, "Sc_Sit"),
+        "remove a clip" or "bodyparts without the clip file" => (ThnItemKind.Animation, "Sc_Sit"),
         _ => (ThnItemKind.Costume, "trent"),
     };
 
@@ -366,11 +439,13 @@ internal static class ThnBreaks
     public static bool IsUnchanged(EditSession session, string path) =>
         session.CutsceneSource(path).Kind == ThnFileKind.Lower && !session.HasUnsavedCutsceneEdits(path);
 
-    /// <summary>The fixture of the clip gate: an animation file of the active mod replaces the file of the clip
-    /// "Sc_Sit". The script plays "Sc_Sit" and "Sc_Lost", which the lower layer does not have either.</summary>
-    public static TestWorkspace ClipWorkspace()
+    /// <summary>The fixture of the clip gate. The script plays "Sc_Sit" of more.anm, and "Sc_Lost", which the lower
+    /// layer does not have either.</summary>
+    /// <param name="modFiles">The animation files of the active mod (see <see cref="AnimationWorkspace.Create"/>).
+    /// A file of the active mod at the path of more.anm without "Sc_Sit" removes the clip.</param>
+    public static TestWorkspace ClipWorkspace(params (string Path, string[] Names)[] modFiles)
     {
-        var ws = AnimationWorkspace.Create((AnimationWorkspace.More, ["Sc_ModSit"]));
+        var ws = AnimationWorkspace.Create(modFiles);
         ws.WriteBase(ScriptPath, """
             duration = 10
             entities = {

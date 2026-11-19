@@ -103,6 +103,7 @@ public sealed class ThnReferenceGateTests
     [InlineData("delete effect")]
     [InlineData("remove the room line")]
     [InlineData("remove a clip")]
+    [InlineData("bodyparts without the clip file")]
     [InlineData("saved delete patch")]
     [InlineData("whole file without the costume")]
     public void EachBreakOfAnUnchangedCutsceneBlocksTheSave(string change)

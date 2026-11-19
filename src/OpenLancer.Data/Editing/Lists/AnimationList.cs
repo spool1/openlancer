@@ -53,6 +53,10 @@ internal sealed class AnimationList(EditSession session)
     /// <summary>The number of animation files that the list read. A test reads it to check the cache.</summary>
     public int Reads { get; private set; }
 
+    /// <summary>The number of times that the list read the clips of the lower layer: at most one time for each
+    /// session. A test reads it to check the cost rule of <see cref="RemovedClips"/>.</summary>
+    public int LowerReads { get; private set; }
+
     /// <summary>The bodyparts.ini of the engine: the last <c>bodyparts</c> line of <c>freelancer.ini</c>, or null.</summary>
     public string? BodypartsPath => session.DataFiles.Paths(Role) is [.., var path] ? path : null;
 
@@ -105,6 +109,7 @@ internal sealed class AnimationList(EditSession session)
     {
         if (lowerClips == null)
         {
+            LowerReads++;
             var files = session.LowerFiles;
             var sections = BodypartsPath is { } path ? session.LowerSections(path) : null;
             lowerClips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
