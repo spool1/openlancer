@@ -153,10 +153,10 @@ public sealed partial class EditSession
                         cutscene.Restore(reopened.State);
                     continue;
                 }
-                // A new script of the mod that the earlier session did not save has no file, so the session makes its
-                // document first (decision D680).
+                // A new script or a new file of the mod folder that the earlier session did not save has no file, so the
+                // session makes its document first (decision D680).
                 if (recovered is { Kind: RecoveredKind.WholeFile, KnownHash: null } && OpenDocument(recovered.Path) == null &&
-                    EditDocument.EditsWholeFile(recovered.Path))
+                    EditDocument.EditsWholeFile(recovered.Path, ActiveMod.Id))
                     NewWholeDocument(recovered.Path);
                 var document = scope.Document(recovered.Path);
                 if (document.SourceHash != recovered.KnownHash ||

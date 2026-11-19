@@ -30,8 +30,9 @@ namespace OpenLancer.Data.Editing.Lists;
 /// (decision D81). "Unusable" is a pure function of W too, so one undo of the edit that made an entry unusable heals
 /// each line that names it.</para>
 /// <para>A file that the active mod replaces with a whole file has its lower data in W. The lists read such a file as
-/// the edit view gives it, so they hold its entries. A whole mission file of the active mod is a document of the kind
-/// "whole file" whose W has the data of the mod, so the lists read its W.</para>
+/// the edit view gives it, so they hold its entries. A whole file of the active mod that the editor edits (see
+/// <see cref="EditDocument.EditsWholeFile"/>) is a document of the kind "whole file" whose W has the data of the mod, so
+/// the lists read its W. This is also true for a saved new file of the folder of the mod.</para>
 /// </remarks>
 public sealed class DataLists
 {
@@ -881,7 +882,7 @@ public sealed class DataLists
     /// editor shows read-only. Null when the edit view has no such INI file.</summary>
     internal FileTable? TableOf(string path)
     {
-        if (session.ActiveMod is { } active && active.Files.ContainsKey(path) && !EditDocument.EditsWholeFile(path))
+        if (session.ActiveMod is { } active && active.Files.ContainsKey(path) && !EditDocument.EditsWholeFile(path, active.Id))
             return WholeFile(path);
         return session.Table.File(path);
     }

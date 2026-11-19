@@ -84,9 +84,10 @@ internal static class ListChecks
     {
         if (session.OpenDocument(target.Path) is not { } document || document.IndexOf(target.Id) is not (>= 0 and var index))
             return [];
-        // The editor cannot change a whole file of the active mod outside the mission files, so its results never stop
-        // the save (review finding R22). W of such a file has the lower data. A whole mission file is a document of the
-        // kind "whole file", and its edits are checked as the edits of a patch.
+        // The editor cannot change a whole file of the active mod outside the files of EditDocument.EditsWholeFile, so
+        // its results never stop the save (review finding R22). W of such a file has the lower data. A whole mission
+        // file and an INI file of the folder of the mod are documents of the kind "whole file", and their edits are
+        // checked as the edits of a patch.
         var wholeFile = session.ActiveMod is { } mod && mod.Files.ContainsKey(document.Path) && !document.IsWholeFile;
         if (unusableOnly && wholeFile)
             return [];

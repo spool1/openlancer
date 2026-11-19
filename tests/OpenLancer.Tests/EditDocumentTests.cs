@@ -410,6 +410,49 @@ public sealed class EditDocumentTests
         Assert.Equal(new SectionRef(FilePath, new SectionIdentity("Trigger", "t1")), problem.Target);
     }
 
+    /// <summary>The editor edits a whole file of the active mod under <c>DATA\MISSIONS</c>, and an INI file in the
+    /// folder of the active mod, in any letter case (decision O2). Each other whole file stays read-only.</summary>
+    [Fact]
+    public void TheEditorEditsAMissionFileAndAnIniFileOfTheFolderOfTheActiveMod()
+    {
+        Assert.True(EditDocument.EditsWholeFile(@"DATA\MISSIONS\M01A\m01a.ini", "m"));
+        Assert.True(EditDocument.EditsWholeFile(@"DATA\MISSIONS\npcships.ini", "m"));
+        Assert.True(EditDocument.EditsWholeFile(@"DATA\MODS\m\SYSTEMS\Ol01\Ol01.ini", "m"));
+        Assert.True(EditDocument.EditsWholeFile(@"data/mods/M/x.INI", "m"));
+        Assert.False(EditDocument.EditsWholeFile(@"DATA\MODS\other\x.ini", "m"));
+        Assert.False(EditDocument.EditsWholeFile(@"DATA\MODS\m\CUTSCENES\shot.thn", "m"));
+        Assert.False(EditDocument.EditsWholeFile(@"DATA\UNIVERSE\SYSTEMS\Li01\li01.ini", "m"));
+        Assert.False(EditDocument.EditsWholeFile(FilePath, "m"));
+    }
+
+    /// <summary>A whole INI file in the folder of the active mod opens as an editable document of the kind "whole file",
+    /// also without a file of the lower layer. The same file of a mod with another id replaces a lower file, so it gives
+    /// no patch.</summary>
+    [Fact]
+    public void AWholeFileOfTheFolderOfTheActiveModOpensAsAnEditableWholeFile()
+    {
+        const string own = @"DATA\MODS\m\x.ini";
+        using var ws = new TestWorkspace();
+        var mod = ws.Mod("m", new() { [@"files\" + own] = "; A test file.\n[Thing]\nnickname = a\ncount = 1\n" });
+        var other = ws.Mod("other", new() { [@"files\" + own] = "[Thing]\nnickname = a\n" });
+        var diagnostics = new List<Diagnostic>();
+
+        var document = EditDocument.Open(own, null, mod, diagnostics);
+        var replaced = EditDocument.Open(own, PatchWriterTests.Text("[Thing]\nnickname = lower"), other, diagnostics);
+
+        Assert.True(document.IsWholeFile);
+        Assert.Null(document.ReadOnlyReason);
+        Assert.Null(document.ReadOnlyReasonAt(0));
+        Edit(document, 0, "count", 2);
+        var text = Encoding.ASCII.GetString(document.ChangedWholeFile()!.Bytes!);
+        Assert.StartsWith("; A test file.", text);
+        Assert.Contains("count = 2", text);
+        Assert.False(replaced.IsWholeFile);
+        Assert.Equal($"The active mod 'other' replaces {own} with this file. The editor cannot write a patch for a file " +
+                     "that the active mod replaces.", replaced.ReadOnlyReason);
+        Assert.Equal(replaced.ReadOnlyReason, Assert.Single(diagnostics).Message);
+    }
+
     /// <summary>Opens <see cref="Goods"/> with a patch file that holds exactly <paramref name="patch"/>.</summary>
     private static EditDocument Open(TestWorkspace ws, byte[] patch)
     {

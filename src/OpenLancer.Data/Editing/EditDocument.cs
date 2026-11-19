@@ -114,17 +114,17 @@ internal sealed record DocumentState(
 /// <para>The document gives no patch, and is read-only, in these cases:</para>
 /// <list type="bullet">
 /// <item>The loaded patch has an error. Then some of its lines are not in W, and a save would lose them.</item>
-/// <item>The active mod replaces the file with its own file, outside the mission files. The merge then applies the
-/// patch of the mod to that file, not to B. W is then B, and the document only shows it.</item>
+/// <item>The active mod replaces the file with its own file, outside the files of <see cref="EditsWholeFile"/>. The
+/// merge then applies the patch of the mod to that file, not to B. W is then B, and the document only shows it.</item>
 /// <item>The file is <c>EXE\freelancer.ini</c>, which a patch cannot change.</item>
 /// <item>The active mod has a whole mission file and a patch for the same path. The merge applies the patch to the
 /// whole file, so an edit of the whole file cannot reach the game. W is the whole file with the patch, as the game
 /// gets it, and the document only shows it.</item>
 /// </list>
-/// <para>A whole mission file of the active mod (see <see cref="EditsWholeFile"/>) is a document of the kind "whole
-/// file" (section 6.7 of the M6b design). B is the file of the mod as it is on disk, and W gets the edits. A save
-/// writes the whole file as text (see <see cref="ChangedWholeFile"/>), not a patch. Each section is editable, also a
-/// section whose key repeats.</para>
+/// <para>A whole file of the active mod that the editor edits (see <see cref="EditsWholeFile"/>) is a document of the
+/// kind "whole file" (section 6.7 of the M6b design). B is the file of the mod as it is on disk, and W gets the edits.
+/// A save writes the whole file as text (see <see cref="ChangedWholeFile"/>), not a patch. Each section is editable,
+/// also a section whose key repeats.</para>
 /// <para>Edits never change a section or an entry in place. They put new sections into the list, so an old
 /// <see cref="DocumentState"/> stays valid.</para>
 /// </remarks>
@@ -216,14 +216,24 @@ internal sealed class EditDocument : IEditFile
     private bool? baseHoldsScript;
 
     /// <summary>
-    /// True when the editor edits a whole file of the active mod at an install path (decision D680, section 6.7 of the
-    /// M6b design): a file under <c>DATA\MISSIONS</c>, for example a test script, a replaced slot script or a ship build
-    /// file. The editor shows the other whole files of the active mod read-only.
+    /// True when the editor edits a whole file of the active mod at an install path. The rule takes two kinds of file:
+    /// <list type="bullet">
+    /// <item>A file under <c>DATA\MISSIONS</c> (decision D680, section 6.7 of the M6b design), for example a test
+    /// script, a replaced slot script or a ship build file.</item>
+    /// <item>An INI file below the folder of the active mod, <c>DATA\MODS\&lt;mod id&gt;</c> (see
+    /// <see cref="ContentPaths"/>), for example the file of a new star system. Two mods have two ids, so such a file
+    /// is a new file of the active mod.</item>
+    /// </list>
+    /// The editor shows the other whole files of the active mod read-only.
     /// </summary>
     /// <remarks>The rule also takes the shared world files under <c>DATA\MISSIONS</c>, for example
     /// <c>npcships.ini</c>. They are world data, so the mission guard does not cover them (section 4.1 of the M6b
     /// design). Their edits get the checks of the edits of a patch, and their errors stop the save.</remarks>
-    public static bool EditsWholeFile(string path) => SectionKeys.IsMissionFile(path);
+    /// <param name="path">An install path in any form.</param>
+    /// <param name="modId">The id of the active mod.</param>
+    public static bool EditsWholeFile(string path, string modId) =>
+        SectionKeys.IsMissionFile(path) ||
+        path.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) && ContentPaths.IsOwnFile(path, modId);
 
     /// <summary>
     /// Opens a file for editing. W is B with the patch of <paramref name="activeMod"/> for this path applied.
@@ -239,7 +249,7 @@ internal sealed class EditDocument : IEditFile
     {
         if (activeMod != null && activeMod.Files.TryGetValue(path, out var file))
         {
-            if (EditsWholeFile(path))
+            if (EditsWholeFile(path, activeMod.Id))
             {
                 return activeMod.Patches.TryGetValue(path, out var patchOfWhole)
                     ? WholeWithPatch(path, file, patchOfWhole, b, activeMod.Id, diagnostics)
@@ -287,7 +297,8 @@ internal sealed class EditDocument : IEditFile
 
     /// <summary>
     /// The document of a new whole file of the active mod at an install path (section 6.7 of the M6b design, decision
-    /// D680): B has no sections, and the file does not exist until a command makes it. <c>CreateScript</c> uses it.
+    /// D680): B has no sections, and the file does not exist until a command makes it. <c>CreateScript</c> and
+    /// <see cref="EditCommand.NewFile"/> use it.
     /// </summary>
     public static EditDocument NewWhole(string path) =>
         new(path, IniDocument.Parse(path, []), new DocumentState(ImmutableList<Section>.Empty,

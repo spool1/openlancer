@@ -771,7 +771,8 @@ public sealed partial class EditSession : IDisposable
         inputs.Remember(normal, lower);
         var b = lowerView.Document(normal);
         // A whole file of the active mod that the editor edits opens also when the lower layer does not have it.
-        if (b == null && !(ActiveMod != null && ActiveMod.Files.ContainsKey(normal) && EditDocument.EditsWholeFile(normal)))
+        if (b == null && !(ActiveMod != null && ActiveMod.Files.ContainsKey(normal) &&
+                           EditDocument.EditsWholeFile(normal, ActiveMod.Id)))
             return false;
         document = EditDocument.Open(normal, b, ActiveMod, []);
         documents[normal] = document;
@@ -796,11 +797,14 @@ public sealed partial class EditSession : IDisposable
         }
     }
 
-    /// <summary>True when W or the edit view has a file at an install path, in any letter case. It opens no document,
-    /// so the live check of a typed file name records no file for the save.</summary>
+    /// <summary>True when W has a file at an install path, in any letter case: the document of the file when the
+    /// session has one, else the edit view. So a whole file that W deleted is free again, also before the save. It
+    /// opens no document, so the live check of a typed file name records no file for the save.</summary>
+    /// <remarks>A delete takes only a whole file that the active mod adds (see <see cref="EditCommand.DeleteFile"/> and
+    /// <c>DeleteScript</c>), so the lower layer has no file at the path of a deleted document.</remarks>
     /// <param name="normal">An install path in normal form.</param>
     internal bool HasFile(string normal) =>
-        documents.TryGetValue(normal, out var document) && document.State.Exists || EditViewFiles.FileExists(normal);
+        documents.TryGetValue(normal, out var document) ? document.State.Exists : EditViewFiles.FileExists(normal);
 
     /// <summary>
     /// An install path with the letter case of the folders and the file of the edit view. A part that the edit view does
@@ -944,6 +948,59 @@ public sealed partial class EditSession : IDisposable
                 throw new InvalidOperationException(ThnEdits.PathInUse);
             return Captured(document);
         }
+
+        /// <summary>
+        /// The document of a new INI file in the folder of the active mod, to give it its sections (see
+        /// <see cref="EditCommand.NewFile"/>). The session makes the document of the new whole file (decision D680).
+        /// </summary>
+        /// <exception cref="ArgumentException">The path is not the path of an INI file in the folder of the active
+        /// mod.</exception>
+        /// <exception cref="InvalidOperationException">The session is read-only or has no active mod, W or the lower
+        /// layer has a file at the path, or the active mod is in the OpenLancer repo.</exception>
+        public EditDocument NewFile(string path)
+        {
+            session.ThrowIfReadOnly();
+            var mod = session.ActiveMod ?? throw new InvalidOperationException(NoActiveModForFile);
+            var normal = InstallPaths.TryParse(path) ?? throw new ArgumentException(InstallPaths.Problem(path), nameof(path));
+            if (!normal.EndsWith(".ini", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"{normal} is not an INI file. A new file of the mod is an INI file.", nameof(path));
+            if (!ContentPaths.IsOwnFile(normal, mod.Id))
+                throw new ArgumentException(
+                    $"A new INI file goes into the folder {ContentPaths.OwnFolder(mod.Id)} of the active mod.", nameof(path));
+            if (ContentPaths.Taken(session, normal))
+                throw new InvalidOperationException(
+                    $"The game data, a mod or an unsaved edit has a file at {normal}. Use another path.");
+            if (WholeIniFileInRepo(mod, normal) is { } inRepo)
+                throw new InvalidOperationException(inRepo);
+            return Editable(session.NewWholeDocument(normal));
+        }
+
+        /// <summary>
+        /// The document of a whole INI file that the active mod adds in its folder, to delete it (see
+        /// <see cref="EditCommand.DeleteFile"/>, decision O5).
+        /// </summary>
+        /// <exception cref="ArgumentException">W has no such INI file.</exception>
+        /// <exception cref="InvalidOperationException">The file is not a whole file of the folder of the active mod, the
+        /// lower layer has the file too, or the session or the file is read-only.</exception>
+        public EditDocument DeleteFile(string path)
+        {
+            session.ThrowIfReadOnly();
+            var mod = session.ActiveMod ?? throw new InvalidOperationException(NoActiveModForFile);
+            if (!session.TryDocument(path, out var document) || !document!.State.Exists)
+                throw new ArgumentException($"The edit view has no INI file {path}.", nameof(path));
+            if (!document.IsWholeFile || !ContentPaths.IsOwnFile(document.Path, mod.Id))
+                throw new InvalidOperationException(
+                    "The editor deletes only an INI file that the active mod adds in its folder " +
+                    $"{ContentPaths.OwnFolder(mod.Id)}. {document.Path} is not such a file.");
+            if (session.LowerLayerHas(document.Path))
+                throw new InvalidOperationException(
+                    $"The game data or a lower mod has the file {document.Path} too. Without the file of the active mod, " +
+                    "the game uses that file again, so the editor cannot delete it.");
+            return Editable(document);
+        }
+
+        private const string NoActiveModForFile =
+            "Make a mod active first. The editor changes only the files of the active mod.";
 
         private ThnDocument Captured(ThnDocument document)
         {

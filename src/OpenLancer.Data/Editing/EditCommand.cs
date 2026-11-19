@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Ini;
@@ -90,6 +91,46 @@ public abstract class EditCommand
 
     /// <summary>Deletes a section, and its child sections.</summary>
     public static EditCommand DeleteSection(SectionRef target) => new DeleteSectionCommand($"Delete {target.Id}", target);
+
+    /// <summary>
+    /// Makes a new INI file of the active mod in the folder of the mod, <c>DATA\MODS\&lt;mod id&gt;</c>, with the
+    /// sections in their order (see <see cref="ContentPaths"/>). The editor edits the file as a whole file, and a save
+    /// writes it into the <c>files</c> folder of the mod. An undo takes the file back, and a save after the undo deletes
+    /// its file.
+    /// </summary>
+    /// <remarks>When it runs, the command throws an <see cref="ArgumentException"/> for a path that is not the path of
+    /// an INI file in the folder of the active mod. It throws an <see cref="InvalidOperationException"/> when the session
+    /// is read-only, when W or the lower layer has a file at the path in any letter case (see
+    /// <see cref="ContentPaths.Taken"/>), or when the active mod is in the OpenLancer repo (decision D70).</remarks>
+    /// <param name="path">The install path of the new file.</param>
+    /// <param name="sections">The sections of the file. A key can repeat, because a whole file needs no patch.</param>
+    public static EditCommand NewFile(string path, IReadOnlyList<SectionEntries> sections)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(sections);
+        foreach (var section in sections)
+        {
+            if (!PatchFormatter.TryFormatHeader(section.Type, out _, out var error))
+                throw new ArgumentException(error, nameof(sections));
+            foreach (var entry in section.Entries)
+                CheckName(entry.Name);
+        }
+        return new NewFileCommand($"New file {Scene.SceneSections.FileName(path)}", path, sections);
+    }
+
+    /// <summary>
+    /// Deletes a whole INI file that the active mod adds in its folder, <c>DATA\MODS\&lt;mod id&gt;</c> (see
+    /// <see cref="NewFile"/>), with its sections. A save deletes the file. An undo gives the file back.
+    /// </summary>
+    /// <remarks>When it runs, the command throws an <see cref="ArgumentException"/> when W has no such file. It throws
+    /// an <see cref="InvalidOperationException"/> for another file, for a file that the lower layer has too, and for a
+    /// read-only session or file.</remarks>
+    /// <param name="path">The install path of the file.</param>
+    public static EditCommand DeleteFile(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        return new DeleteFileCommand($"Delete file {Scene.SceneSections.FileName(path)}", path);
+    }
 
     /// <summary>
     /// Gives a section a new key. The new key must differ from the old key in more than letter case, and no other
@@ -347,6 +388,34 @@ public abstract class EditCommand
                 : SectionKeys.ChildCount(document.Working, index);
             document.Remove(index, 1 + children);
             scope.Changed(target, structural: true);
+        }
+    }
+
+    private sealed class NewFileCommand(string label, string path, IReadOnlyList<SectionEntries> sections) : EditCommand(label)
+    {
+        internal override void Run(EditSession.CommandScope scope)
+        {
+            var document = scope.NewFile(path);
+            document.Restore(document.State with
+            {
+                Working = sections.Select(s => SectionEdits.Build(s.Type, s.Entries)).ToImmutableList(),
+                Exists = true,
+            });
+            for (var i = 0; i < document.Working.Count; i++)
+                scope.Changed(new SectionRef(document.Path, document.IdentityAt(i)), structural: true);
+            scope.NoteStructural();
+        }
+    }
+
+    private sealed class DeleteFileCommand(string label, string path) : EditCommand(label)
+    {
+        internal override void Run(EditSession.CommandScope scope)
+        {
+            var document = scope.DeleteFile(path);
+            for (var i = 0; i < document.Working.Count; i++)
+                scope.Changed(new SectionRef(document.Path, document.IdentityAt(i)), structural: true);
+            document.Restore(document.State with { Working = ImmutableList<Section>.Empty, Exists = false });
+            scope.NoteStructural();
         }
     }
 

@@ -50,6 +50,10 @@ internal sealed class SystemFiles
     /// <summary>The install path of <c>universe.ini</c>, or null.</summary>
     public string? UniversePath { get; }
 
+    /// <summary>The folder of <c>universe.ini</c>, as an install path, or null. A <c>[system] file</c> line names its
+    /// file relative to this folder (see <see cref="ContentPaths.UniverseValue"/>).</summary>
+    public string? Folder => UniversePath == null ? null : VfsPath.Parent(UniversePath);
+
     /// <summary>The install path of <c>universe.ini</c> that <c>freelancer.ini</c> names, or null.</summary>
     public static string? ReadUniversePath(IReadOnlyList<Section> freelancerIni) =>
         DataPaths.Entries(freelancerIni)
@@ -122,6 +126,7 @@ internal sealed class SystemFiles
         ordered = [];
         if (document == null)
             return;
+        // The folder of Folder, in the letter case of the files.
         var folder = VfsPath.Parent(document.Path);
         for (var i = 0; i < document.Working.Count; i++)
         {

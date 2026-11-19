@@ -39,10 +39,11 @@ public sealed partial class EditSession
     /// <summary>The view of the target checks of a session: B of each file without the active mod, and W with
     /// it.</summary>
     /// <remarks>A whole file of the active mod has no B. Without the active mod, the view gives the file of the lower
-    /// layer. With it, the view gives W of a document of the kind "whole file" (section 6.7 of the M6b design), so the
-    /// checks see the unsaved edits. For another whole file of the active mod, W has the lower data, so the view gives
-    /// the file of the edit view.</remarks>
-    private sealed class SessionCheckView(EditSession session, Mod active) : CheckView
+    /// layer, or no sections for a new file. With it, the view gives W of a document of the kind "whole file" (section
+    /// 6.7 of the M6b design), so the checks see the unsaved edits. This includes a new file of the folder of the mod
+    /// before its save. A file that W deleted has no sections. For another whole file of the active mod, W has the lower
+    /// data, so the view gives the file of the edit view.</remarks>
+    internal sealed class SessionCheckView(EditSession session, Mod active) : CheckView
     {
         private readonly Dictionary<(string, bool), IReadOnlyList<Section>?> wholeFiles = new();
         private FileSystem? editView;
@@ -53,10 +54,10 @@ public sealed partial class EditSession
         {
             if (VfsPath.Normalize(path) is not { } normal)
                 return null;
-            if (active.Files.ContainsKey(normal))
+            if (active.Files.ContainsKey(normal) || session.OpenedDocument(normal) is { IsWholeFile: true })
             {
                 if (withMods && session.OpenDocument(normal) is { IsWholeFile: true } whole)
-                    return whole.Working;
+                    return whole.State.Exists ? whole.Working : null;
                 var key = (normal.ToLowerInvariant(), withMods);
                 if (!wholeFiles.TryGetValue(key, out var sections))
                 {

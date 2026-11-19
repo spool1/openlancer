@@ -275,6 +275,26 @@ internal static class NebulaFiles
 /// <summary>The data lists of a session (section 20.1 item 4 of the M21 design).</summary>
 public sealed class DataListsTests
 {
+    /// <summary>A saved new file of the folder of the active mod is a whole file that the editor edits, so the lists read
+    /// its W, also after an edit that the session did not save. Without this, a gate in a saved new system file would
+    /// be missing from the lists until the next save.</summary>
+    [Fact]
+    public void TheListsReadWOfASavedNewFileOfTheFolderOfTheMod()
+    {
+        using var ws = ListWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(NewModFileTests.New());
+        Assert.True(session.Save().Saved);
+        Assert.True(session.ActiveMod!.Files.ContainsKey(NewModFileTests.NewPath));
+
+        session.Execute(EditCommand.SetLinesFromText(NewModFileTests.Sun, "pos", ["5, 5, 5"]));
+        var table = session.Lists.TableOf(NewModFileTests.NewPath)!;
+
+        Assert.Same(session.OpenDocument(NewModFileTests.NewPath), table.Document);
+        var sun = table.Working[table.Ids.ToList().IndexOf(NewModFileTests.Sun.Id)];
+        Assert.Equal("5", sun.First(e => e.Name == "pos")[0].ToString());
+    }
+
     /// <summary>A files list with a folder holds only the files below its folder (section 11 of the M22 design). A value
     /// is a path below the data folder, in the letter case of the file.</summary>
     [Fact]

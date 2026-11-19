@@ -56,16 +56,16 @@ public sealed partial class EditSession
     /// <item>For each file that a command changed, the writer makes the patch and checks it. A file whose patch
     /// does not change keeps its text (rule P2). A patch without sections deletes its file (P4). A cutscene gives a
     /// THN patch, or its whole file when the active mod has one. The save evaluates the text of each cutscene and
-    /// checks that it gives W. It writes no whole cutscene file into a mod in the OpenLancer repo (decision
-    /// D70).</item>
+    /// checks that it gives W. A whole file that the editor edits gives its whole text. The save writes no whole
+    /// cutscene file and no whole INI file into a mod in the OpenLancer repo (decision D70).</item>
     /// <item>Any problem stops the save: a patch that the writer cannot write, a text placeholder that the text of
     /// the mod does not have (S8), a patch line of a text key that holds the id of a text of a mod as a number (S8),
     /// a strings.json with comments (F13). When the text changes, the save checks the
     /// placeholders of all patches and whole INI files of the mod, because strings.json gives the text of each.</item>
     /// <item>A change of the lower layer since the open stops the save (F11): the base data, a lower mod, or the mod
-    /// list of the profile. The session writes the recovery file, and the profile must open again. A whole mission file
-    /// and an editor file of the mod do not depend on the lower layer, so a change of their path in a lower mod does
-    /// not stop the save.</item>
+    /// list of the profile. The session writes the recovery file, and the profile must open again. A whole file that
+    /// the editor edits and an editor file of the mod do not depend on the lower layer, so a change of their path in a
+    /// lower mod does not stop the save.</item>
     /// <item>A file of the active mod that changed outside the editor stops the save, unless
     /// <paramref name="overwrite"/> is true (P7).</item>
     /// <item><see cref="SaveTransaction"/> writes the files (P5, P6). Then W becomes what the saved files give
@@ -131,7 +131,8 @@ public sealed partial class EditSession
         var writes = plan.Where(p => !p.SameAsDisk).ToList();
         if (writes.Count > 0)
         {
-            // An editor file of the mod and a whole mission file of the mod do not depend on the lower layer.
+            // An editor file of the mod and a whole file of the mod that the editor edits do not depend on the lower
+            // layer.
             var stale = inputs.Changed(plan.Where(p => p.Source is EditDocument { IsWholeFile: false } or ThnDocument)
                 .Select(p => p.Source!.Path), profileNow, active);
             if (stale.Count > 0)
@@ -460,7 +461,7 @@ public sealed partial class EditSession
     /// <summary>
     /// The whole file that the edits of a document of the kind "whole file" give (section 6.7 of the M6b design), or
     /// null when the file does not change or the save cannot write it. A problem then tells why. The save writes no
-    /// whole mission file into a mod in the OpenLancer repo (decision D70).
+    /// whole INI file into a mod in the OpenLancer repo (decision D70), but it deletes one.
     /// </summary>
     /// <param name="activeNow">The active mod as it is on disk now.</param>
     private PlannedFile? PlanWholeFile(EditDocument document, Mod active, Mod activeNow, List<Diagnostic> problems)
@@ -468,7 +469,7 @@ public sealed partial class EditSession
         var path = document.Path;
         if (document.ChangedWholeFile() is not { } file)
             return null;
-        if (file.Bytes != null && WholeMissionFileInRepo(active) is { } inRepo)
+        if (file.Bytes != null && WholeIniFileInRepo(active, path) is { } inRepo)
         {
             problems.Add(Diagnostic.Error(path, inRepo));
             return null;
@@ -476,7 +477,8 @@ public sealed partial class EditSession
         if (file.Bytes != null)
             problems.AddRange(MissingText(document));
         var root = Path.Combine(active.Folder, Mod.FilesFolder);
-        // A new script of the mod (CreateScript) has no file yet (decision D680).
+        // A new script of the mod (CreateScript) and a new file of the folder of the mod (EditCommand.NewFile) have no
+        // file yet (decision D680).
         if (!activeNow.Files.TryGetValue(path, out var target) && !document.Initial.Exists && file.Bytes != null &&
             !activeNow.Patches.ContainsKey(path))
             target = Path.Combine(root, LocalPath(path));
@@ -496,17 +498,26 @@ public sealed partial class EditSession
         return new PlannedFile(new FileChange(target, file.Bytes), document.SourceHash, document);
     }
 
-    /// <summary>Why the editor writes no whole mission file into a mod, or null: the mod is in the OpenLancer repo
-    /// (decision D70, section 6.7 of the M6b design).</summary>
-    internal static string? WholeMissionFileInRepo(Mod mod) => WholeFileInRepo(mod, "mission");
+    /// <summary>
+    /// Why the editor writes no whole INI file at an install path into a mod, or null: the mod is in the OpenLancer repo
+    /// (decision D70, section 6.7 of the M6b design). The content scan cannot tell a whole mission file from a copy of
+    /// a retail script, and an INI file of the folder of the mod from a copy of a retail file.
+    /// </summary>
+    /// <param name="path">The install path of a whole file that the editor edits (see
+    /// <see cref="EditDocument.EditsWholeFile"/>).</param>
+    internal static string? WholeIniFileInRepo(Mod mod, string path) => SectionKeys.IsMissionFile(path)
+        ? WholeFileInRepo(mod, "mission", "a copy of a retail script")
+        : WholeFileInRepo(mod, "INI", "a copy of a retail file");
 
     /// <summary>Why the editor writes no whole cutscene file into a mod, or null: the mod is in the OpenLancer repo
     /// (decision D70).</summary>
-    internal static string? WholeCutsceneInRepo(Mod mod) => WholeFileInRepo(mod, "cutscene");
+    internal static string? WholeCutsceneInRepo(Mod mod) => WholeFileInRepo(mod, "cutscene", "a copy of a retail script");
 
-    private static string? WholeFileInRepo(Mod mod, string kind) => RepoCheck.RepoRoot(mod.Folder) is { } repo
+    /// <param name="kind">The kind of the file, for example <c>mission</c>.</param>
+    /// <param name="copy">What a file of the kind can be a copy of, for example <c>a copy of a retail script</c>.</param>
+    private static string? WholeFileInRepo(Mod mod, string kind, string copy) => RepoCheck.RepoRoot(mod.Folder) is { } repo
         ? $"The mod '{mod.Id}' is in the OpenLancer repo {repo}. The editor writes no whole {kind} file into it, " +
-          "because the content scan cannot tell such a file from a copy of a retail script (decision D70)."
+          $"because the content scan cannot tell such a file from {copy} (decision D70)."
         : null;
 
     /// <summary>

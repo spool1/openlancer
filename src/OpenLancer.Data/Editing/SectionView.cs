@@ -23,6 +23,11 @@ public enum ValueOrigin
 /// <summary>One line of a section: the entry name and its values.</summary>
 public sealed record EntryView(string Name, IReadOnlyList<ValueBase> Values);
 
+/// <summary>One section of a new file: the section name and its lines in file order (see
+/// <see cref="EditCommand.NewFile"/>).</summary>
+/// <param name="Type">The section name, for example <c>SystemInfo</c>.</param>
+public sealed record SectionEntries(string Type, IReadOnlyList<EntryView> Entries);
+
 /// <summary>What the engine reads from the lines of one key of a section type.</summary>
 /// <param name="Name">The entry name, for example <c>hit_pts</c>.</param>
 /// <param name="ClrType">The type that the engine makes from one line, for example <see cref="float"/>,
