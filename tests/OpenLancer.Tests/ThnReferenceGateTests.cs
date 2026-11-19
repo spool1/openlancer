@@ -373,4 +373,61 @@ public sealed class ThnReferenceGateTests
         Assert.False(session.Mentions.IsStarted);
         Assert.Equal([ScriptPath, LowScript], session.GateCutscenes());
     }
+
+    /// <summary>
+    /// One <c>edit_batch</c> removes the <c>DA_archetype</c> line of the equipment and edits the camera of the unchanged
+    /// script. The script had no error before the call. So each order of the steps gives the error of the entity "Gear"
+    /// in <c>new_problems</c>. A cutscene step after the INI step does not take the error of the INI step as an error
+    /// before the call.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ABatchThatBreaksAndEditsACutsceneGivesTheProblemInEachOrder(bool iniFirst)
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        var gear = AgentCalls.Json($"sec:{ThnDataWorkspace.EquipmentPath}#Thruster/thruster1");
+        var cam = AgentCalls.Json($"thn:{ScriptPath}#entity/Cam");
+        var breakStep = $$"""{ "tool": "set_fields", "arguments": { "ref": {{gear}}, "fields": { "DA_archetype": null } } }""";
+        var camStep = $$"""{ "tool": "set_fields", "arguments": { "ref": {{cam}}, "fields": { "cameraprops.fovh": 20 } } }""";
+        Assert.Empty(session.CutsceneErrors(ScriptPath));
+
+        var result = AgentCalls.Ok(host, "edit_batch",
+            $$"""{ "steps": [ {{(iniFirst ? breakStep : camStep)}}, {{(iniFirst ? camStep : breakStep)}} ] }""");
+
+        Assert.Equal("applied", (string?)result["status"]);
+        Assert.Equal([($"thn:{ScriptPath}#entity/Gear", NoModel)], CutsceneProblems(result, "new_problems"));
+        Assert.Empty(CutsceneProblems(result, "fixed_problems"));
+        Assert.Equal([NoModel], session.CutsceneErrors(ScriptPath).Select(e => e.Message));
+    }
+
+    /// <summary>
+    /// One <c>edit_batch</c> removes the <c>DA_archetype</c> line of the equipment, and then points the entity "Gear" of
+    /// the unchanged script to a ship with a model. The script has no error before and after the call. So the result
+    /// gives no cutscene problem. The error between the steps is not a fixed problem.
+    /// </summary>
+    [Fact]
+    public void ABatchThatBreaksAndThenMendsACutsceneGivesNoProblem()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        var gear = AgentCalls.Json($"sec:{ThnDataWorkspace.EquipmentPath}#Thruster/thruster1");
+        var gearEntity = AgentCalls.Json($"thn:{ScriptPath}#entity/Gear");
+        Assert.Empty(session.CutsceneErrors(ScriptPath));
+
+        var result = AgentCalls.Ok(host, "edit_batch", $$"""
+            { "steps": [
+              { "tool": "set_fields", "arguments": { "ref": {{gear}}, "fields": { "DA_archetype": null } } },
+              { "tool": "set_fields", "arguments": { "ref": {{gearEntity}},
+                "fields": { "template_name": "ship1", "userprops.category": "ship" } } } ] }
+            """);
+
+        Assert.Equal("applied", (string?)result["status"]);
+        Assert.Empty(CutsceneProblems(result, "new_problems"));
+        Assert.Empty(CutsceneProblems(result, "fixed_problems"));
+        Assert.Empty(session.CutsceneErrors(ScriptPath));
+    }
 }

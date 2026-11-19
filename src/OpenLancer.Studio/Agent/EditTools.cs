@@ -766,11 +766,11 @@ internal static class EditTools
 /// that the batch adds and removes (section 4.0.5 of the M6b design, item 2). The problems are the field checks and the
 /// list checks of the sections that the commands name, before and after the batch. A cutscene that a command changes
 /// gives the errors of its cutscene checks before and after the batch (see <see cref="EditSession.CutsceneErrors"/>,
-/// section 12.6 of the MCP1 design). A batch that changes an INI file also gives the errors of each cutscene that the
-/// save gate checks before or after the batch, because an INI edit can break a template. These cutscenes include each
-/// cutscene of the edit view that names an item that the batch removes or breaks, also a retail cutscene that the
-/// batch and the active mod do not change (#81). A batch that changes only cutscenes reads no other cutscene. The
-/// problems are data, not errors. So the edit applies, as an edit of the user applies.
+/// section 12.6 of the MCP1 design). An INI edit can break a template. So a batch that changes an INI file also gives
+/// the errors of each cutscene that the save gate checks before or after the batch. These cutscenes include each
+/// cutscene of the edit view that names an item that the batch removes or breaks (#81). An example is a retail
+/// cutscene that the batch and the active mod do not change. A batch that changes only cutscenes reads no other
+/// cutscene. The problems are data, not errors. So the edit applies, as an edit of the user applies.
 /// </summary>
 /// <remarks>
 /// <para>The problems of a section that the batch removes do not count as fixed. A renamed section compares its
@@ -793,32 +793,38 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
     /// touch. A new cutscene of the batch had no errors.</summary>
     private readonly List<(string Path, IReadOnlyList<Diagnostic> Errors)> cutscenesBefore = [];
 
-    /// <summary>True after the first plan of the batch that changes an INI file.</summary>
+    /// <summary>True after <see cref="BeforeIniEdit"/> noted the cutscenes of the save gate, before the first plan of
+    /// the batch that changes an INI file. Each plan after it runs after an INI edit of the batch.</summary>
     private bool gateCutscenesNoted;
 
-    /// <summary>Notes a cutscene that a plan changes, and the errors of its cutscene checks now, at the first
-    /// touch.</summary>
+    /// <summary>
+    /// Notes a cutscene that a plan changes at the first touch, with its errors before the batch. Before the first INI
+    /// edit of the batch, these are the errors of its cutscene checks now. After it, an INI edit of the batch can
+    /// already have changed them. So a cutscene that <see cref="BeforeIniEdit"/> did not note gets no errors, as in
+    /// <see cref="NewGateCutscenes"/>.
+    /// </summary>
     public void BeforeCutscene(string path)
     {
         if (!cutscenesBefore.Any(c => OpenLancer.Data.IO.VfsPath.Comparer.Equals(c.Path, path)))
-            cutscenesBefore.Add((path, session.CutsceneErrors(path)));
+            cutscenesBefore.Add((path, gateCutscenesNoted ? [] : session.CutsceneErrors(path)));
     }
 
     /// <summary>
     /// Notes each cutscene that the save gate checks, and its errors now, before the first plan of the batch that
     /// changes an INI file. An INI edit can break the template of a cutscene that the batch does not change, for example
     /// with the removal of the <c>DA_archetype</c> line of an equipment. So the result gives such a problem at once, as
-    /// the save gate does. The edit that mends the problem gives it as fixed. A cutscene that the gate checks only after
-    /// the batch had no errors before it (see <see cref="NewGateCutscenes"/>). A batch that changes only cutscenes
-    /// reads no other cutscene.
+    /// the save gate does. The edit that mends the problem gives it as fixed. A cutscene that the gate did not check
+    /// before the batch had no errors before it (see <see cref="NewGateCutscenes"/>). A batch that changes only
+    /// cutscenes reads no other cutscene.
     /// </summary>
     public void BeforeIniEdit()
     {
         if (gateCutscenesNoted)
             return;
-        gateCutscenesNoted = true;
         foreach (var path in session.GateCutscenes())
             BeforeCutscene(path);
+        // Set after the loop, so that BeforeCutscene notes the errors of these cutscenes now.
+        gateCutscenesNoted = true;
     }
 
     /// <summary>Notes the sections of a plan before its command runs, and their problems now.</summary>
@@ -915,13 +921,16 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
     }
 
     /// <summary>
-    /// The cutscenes that the save gate checks after the batch and that <see cref="BeforeIniEdit"/> did not note, each
-    /// with no errors before the batch. Only a change of the active mod in the game data gives errors to a cutscene that
-    /// the active mod does not change, and the save gate then checks that cutscene (see
-    /// <see cref="EditSession.ReferrerCutscenes"/>). So a cutscene that the gate did not check before the batch had no
-    /// errors. An example is an unchanged retail cutscene that names the item that the batch breaks. Empty for a batch
-    /// that changes no INI file, so such a batch reads no other cutscene.
+    /// The cutscenes that the save gate checks after the batch and that the batch did not note, each with no errors
+    /// before the batch. An example is an unchanged retail cutscene that names the item that the batch breaks. Empty
+    /// for a batch that changes no INI file, so such a batch reads no other cutscene.
     /// </summary>
+    /// <remarks>
+    /// A cutscene that the active mod does not change has errors only when a change of the active mod breaks an item
+    /// that it names. The save gate then checks that cutscene (see <see cref="EditSession.ReferrerCutscenes"/>). So a
+    /// cutscene that the gate did not check before the batch had no errors. <see cref="BeforeCutscene"/> uses the same
+    /// rule after the first INI edit of the batch.
+    /// </remarks>
     private IEnumerable<(string Path, IReadOnlyList<Diagnostic> Errors)> NewGateCutscenes() =>
         gateCutscenesNoted
             ? session.GateCutscenes()
