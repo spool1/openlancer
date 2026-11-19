@@ -41,6 +41,10 @@ Each milestone goes through four steps: design, adversarial review, build and ve
 | M8c | Cutscene editor, part 3 | 1 | in progress | Pick the animation of a character event from a list of the game clips, with a preview of each clip on the character (done). An unknown animation, template or costume name blocks Save (done). A change of the active mod in the game data can break an item of a cutscene. It then blocks Save and Play, also when the active mod does not change that cutscene (done). The warnings for cutscene problems and Convert to patch come after 1.0. |
 | M6c | Play from a trigger | editor | in progress | A dry run runs the triggers of a mission in the editor without the game (M6c-1, done). "Play from here" starts the game at a trigger, and a live view in the graph shows which triggers ran and which wait (M6c-2, done). The replay of the setup runs the old timers, distance checks, spawners and event triggers that the path shows (done). A start save that HD Edition and vanilla 1.1 load (M6c-3) comes after 1.0. |
 | MCP1-4 | Agent cutscene edits | editor | done | Agents make cutscenes and edit their entities, events, flags and timing with the commands of the Cutscene tab. Guards refuse a stale event reference. A prompt helps an agent make a short cutscene. See docs/MCP.md. |
+| M27 | Connections and network map | 1 | next | Agent tools make new star systems, jump gates, jump holes and trade lanes. The editor shows each result. The agent tools are in 1.0. A universe map and the hand tools come after 1.0 (#84). |
+| M26 | Nebula and asteroid field areas | 1 | next | Agent tools change the shape of a nebula or a field, cut holes, edit mining zones, and add and duplicate nebulae and fields. The editor shows each result. The agent tools are in 1.0. The hand tools come after 1.0 (#84). |
+| M7 | Dialogue | 1 | next | Agent tools edit mission dialogue and add voice lines. The editor shows each result. The agent tools are in 1.0. The hand tools come after 1.0 (#84). |
+| M30 | Space cutscene authoring | 1 | next | Agent tools make new in-space cutscenes. The editor shows each result. The agent tools are in 1.0. The hand tools come after 1.0 (#84). |
 | R2 | 1.0 beta, v1.0.0-beta.1 (pre-release) | none | next | The zip of the second play test round. It adds the agent edits of the Scene, the data, the missions and the cutscenes. It also has the fixes of Play from a trigger and of the first round. GitHub shows it as a pre-release. |
 | R3 | OpenLancer 1.0, v1.0.0 | none | next | The first full release. A new modder makes a tier-1 mod for HD Edition 0.7.1 and vanilla 1.1 with no help from the developer. |
 | M3b | Scene editing, part 2 | 1 | after 1.0 | Multi-selection, move with children, the encounter group editor, new factions and a Problems panel. |
@@ -48,11 +52,7 @@ Each milestone goes through four steps: design, adversarial review, build and ve
 | M24 | Game tab | editor | later | The game window docks in a tab of the editor. The game stays a separate process. |
 | M28 | Prefab viewer | 1 | later | One page for each asset: archetype, model parts, hardpoints and loadout. |
 | M29 | Space cutscene clips | 1 | later | The in-space cutscenes show as clips in the system view, with their markers and nav points. |
-| M26 | Nebula and asteroid field areas | 1 | later | Change the shape of a nebula or a field, cut holes, edit mining zones, add new nebulae and fields, and duplicate them. |
-| M27 | Connections and network map | 1 | later | A universe map. Create jump gates, jump holes, trade lanes and new systems. |
 | GA2 | Gap audit, retail comparisons | engine | later | Compare each GA1 row with the retail game. |
-| M7 | Dialogue | 1 | later | Edit mission dialogue and add voice lines. |
-| M30 | Space cutscene authoring | 1 | later | Make new in-space cutscenes. |
 | M31 | Model writing | 1 or 2 | later | Merge and split meshes, edit hardpoints, and publish a built model as a new prop. |
 | M32 | Vertex editing | 1 or 2 | later | Edit a model in Blender and import it again. An editor mode can follow. |
 | M33 | First original campaign | 1 | later | One system, two ships, three missions and one cutscene, all new, made with the editor. |
