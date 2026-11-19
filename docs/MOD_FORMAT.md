@@ -377,6 +377,7 @@ file = ..\MODS\my-mod\SYSTEMS\Ol01\Ol01.ini
 - When a lower mod has a whole `universe.ini` with a `[Base]` after a `[system]`, the new base still goes before every system.
 - When the file has no `[system]`, the new base goes at the end.
 - The editor uses the same rule. A new `[Base]` goes before the first `[system]` in the edit and in the drop-in zip. OpenLancer Play (F5) and Play in the game (Ctrl+F5) use the same place. The save writes the base with `ol.new`, and a later edit of the patch keeps the place.
+- In the edit, a base of the lower layers can come after a new base, for example when you delete it and add it again. The save then writes `ol.delete` and `ol.new` for that base, so the merge puts it after the new base. The save writes no line for the systems.
 - The FLMM package refuses a new `[Base]` (see "FLMM package (preview)"). Use the drop-in zip.
 
 ## Text: strings.json
