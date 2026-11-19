@@ -364,10 +364,53 @@ public sealed class DataListsTests
         Assert.False(session.Lists.FileExists(NewCloudValue));
     }
 
+    /// <summary>The rule data of an invented files list without a file class: each INI file of
+    /// <c>DATA\MODS\act\SOLAR</c>.</summary>
+    private const string ModIniRules = """
+        {
+          "roles": { "system": { "systemFiles": true } },
+          "lists": [
+            { "id": "mod_ini_file", "label": "INI file", "kind": "File",
+              "source": { "files": ".ini", "folder": "MODS\\act\\SOLAR" } }
+          ],
+          "rules": []
+        }
+        """;
+
+    /// <summary>
+    /// A files list without a file class leaves out each file of the folder of the active mod that W deleted, before
+    /// the save. This holds for a new file and for a file of the mod on disk. An undo gives each entry back.
+    /// </summary>
+    [Fact]
+    public void AFilesListWithoutAFileClassLeavesOutAFileThatWDeleted()
+    {
+        const string onDisk = @"MODS\act\SOLAR\z_cloud.ini";
+        using var ws = NebulaFiles.Create(activeFiles: new()
+        {
+            [@"files\DATA\MODS\act\SOLAR\z_cloud.ini"] = "[Fog]\nfog_enabled = 1\n",
+        });
+        var session = ws.Session("act");
+        session.UseRules(ListRules.Parse(ModIniRules));
+        IEnumerable<string> Values() => session.Lists.List("mod_ini_file")!.Entries.Select(e => e.Value);
+        session.Execute(EditCommand.NewFile(NewCloudPath, ContentPathsTests.Sections("[Fog]\nfog_enabled = 1\n")));
+        Assert.Equal([onDisk, NewCloudValue], Values());
+
+        session.Execute(EditCommand.DeleteFile(NewCloudPath));
+        Assert.Equal([onDisk], Values());
+        session.Execute(EditCommand.DeleteFile(@"DATA\" + onDisk));
+        Assert.Empty(Values());
+        Assert.False(session.Lists.FileExists(onDisk));
+
+        session.Undo();
+        Assert.Equal([onDisk], Values());
+        session.Undo();
+        Assert.Equal([onDisk, NewCloudValue], Values());
+    }
+
     /// <summary>
     /// A <c>[Nebula] file</c> line can name a new nebula file of the folder of the active mod. Before the first save,
-    /// the line has no "does not exist" error. So the save gate lets the first save of a new volume file through. The line gets
-    /// the error again when W deletes the file.
+    /// the line has no "does not exist" error. So the save gate lets the first save of a new volume file through. The
+    /// line gets the error again when W deletes the file.
     /// </summary>
     [Fact]
     public void AFileCheckAcceptsANewFileOfTheFolderOfTheModBeforeTheSave()

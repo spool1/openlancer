@@ -131,8 +131,8 @@ public sealed class NicknamesTests
 
     /// <summary>
     /// The index reads the objects and zones of a new system file of W in the folder of the active mod. A
-    /// <c>[system]</c> of W names the file. The index reads it before and after the first save. So a create takes no name of the new system, and
-    /// the <c>goto</c> line of a gate finds an exit object in the new system.
+    /// <c>[system]</c> of W names the file. The index reads it before and after the first save. So a create takes no
+    /// name of the new system, and the <c>goto</c> line of a gate finds an exit object in the new system.
     /// </summary>
     [Fact]
     public void TheIndexReadsANewSystemFileOfW()
