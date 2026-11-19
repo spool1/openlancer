@@ -4,5 +4,6 @@
   "version": "1.0.0",
   "formatVersion": 2,
   "tier": 1,
-  "targets": [ "hde-0.7.1", "vanilla-1.1", "openlancer" ]
+  "targets": [ "hde-0.7.1", "vanilla-1.1", "openlancer" ],
+  "loadAfter": [ "ol-format2-before" ]
 }

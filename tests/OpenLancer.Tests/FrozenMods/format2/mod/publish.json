@@ -1,0 +1,13 @@
+{
+  "formatVersion": 1,
+  "summary": "The frozen test mod of format 2. All of its data is made up.",
+  "description": "# What it changes\n- A new good with its own text.\n- A new mission and a changed cutscene.",
+  "authors": [ "OpenLancer tests" ],
+  "credits": [ { "name": "OpenLancer tests", "for": "The made-up data" } ],
+  "permissions": "Use the files of this mod in other free mods.",
+  "category": "Miscellaneous",
+  "tags": [ "Tests" ],
+  "requirements": [ { "name": "OpenLancer", "url": "https://example.org/openlancer", "note": "Only for the tests" } ],
+  "pageUrl": "https://example.org/ol-format2",
+  "changelog": [ { "version": "1.0.0", "changes": [ "First release." ] } ]
+}

@@ -1,8 +1,15 @@
--- The frozen format 2 test: a wider camera and a later cut.
+-- The frozen format 2 test: a narrower camera, a later cut, a new close camera and a longer script.
 ol_thn_patch = 1
+duration = 7
 entities = {
-	{ ol_match = "Cam_fz", ol_set = { ["cameraprops.fovh"] = 20 } }
+	{ ol_match = "Cam_fz", ol_set = { ["cameraprops.fovh"] = 20 } },
+	{ ol_match = "Cam_fz_wide", ol_remove = { "spatialprops.orient" } },
+	{ ol_match = "Cam_fz_old", ol_delete = Y },
+	{ ol_new = { entity_name = "Cam_fz_close", type = CAMERA, cameraprops = { fovh = 15, hvaspect = 1.5 } } }
 }
 events = {
-	{ ol_match = { 2, SET_CAMERA, { "Monitor_fz", "Cam_fz_wide" } }, ol_set = { time = 3 } }
+	{ ol_match = { 2, SET_CAMERA, { "Monitor_fz", "Cam_fz_wide" } }, ol_set = { time = 3 } },
+	{ ol_match = { 4, SET_CAMERA, { "Monitor_fz", "Cam_fz" } }, ol_nth = 1, ol_count = 2, ol_delete = Y },
+	{ ol_match = { 4, SET_CAMERA, { "Monitor_fz", "Cam_fz" } }, ol_nth = 2, ol_count = 2, ol_set = { time = 5 } },
+	{ ol_new = { 6, SET_CAMERA, { "Monitor_fz", "Cam_fz_close" } } }
 }
