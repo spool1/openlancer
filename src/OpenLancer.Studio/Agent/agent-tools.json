@@ -219,7 +219,7 @@
     },
     "rename_item": {
       "title": "Rename an item",
-      "description": "Gives an item a new nickname and changes each line that names it. A ship or equipment also changes the templates of the cutscene COMPOUNDs that name it. A cutscene entity gets a new name, and the events of its script that name it change too. The tool makes one Undo step. When the rename warns, cannot change a line that names the item, or other files name it, the tool asks for confirm: true.",
+      "description": "Gives an item a new nickname and changes each line that names it. A rename of a ship or equipment also changes the templates of the cutscene COMPOUNDs that name it. A cutscene entity gets a new name, and the events of its script that name it change too. The tool makes one Undo step. When the rename warns, cannot change a line that names the item, or other files name it, the tool asks for confirm: true.",
       "fields": {
         "ref": "The reference of the item, for example obj:my_station_1. A data item must be an item that the active mod adds. A trigger takes its trg: reference, and another mission item its sec: reference. A cutscene entity takes its thn: reference, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#entity/Camera_01.",
         "new_name": "The new nickname, or the new name of a cutscene entity. A refusal tells why a name is not valid."
