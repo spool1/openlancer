@@ -11,6 +11,7 @@ using LibreLancer.Data.Ini;
 using LibreLancer.Data.Schema;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Scene;
 using Universe = LibreLancer.Data.Schema.Universe;
 
 namespace OpenLancer.Runtime.Scene;
@@ -78,16 +79,18 @@ public static class SceneBuild
 
     /// <summary>The shape of a zone from its <c>shape</c> line (GameItemDb.cs:1663).</summary>
     public static ShapeKind ZoneShape(IReadOnlyList<ValueBase>? shape) =>
-        ShapeOf(shape is { Count: > 0 } && Enum.TryParse<Universe.ZoneShape>(shape[0].ToString(), true, out var value)
-            ? value
-            : null);
+        ZoneShapes.ShapeOf(
+            shape is { Count: > 0 } && Enum.TryParse<Universe.ZoneShape>(shape[0].ToString(), true, out var value)
+                ? value
+                : null);
 
     /// <summary>
     /// The size of a zone from its <c>size</c> line (GameItemDb.cs:1664-1673). One value <c>v</c> gives (v, v, v), two
     /// values give (a, b, 0), and no line gives (1, 1, 1). A ring has the size (outer, height, inner), from the line
     /// (outer, inner, height).
     /// </summary>
-    public static Vector3 ZoneSize(IReadOnlyList<ValueBase>? size, ShapeKind shape) => SizeOf(ReadVector(size, true), shape);
+    public static Vector3 ZoneSize(IReadOnlyList<ValueBase>? size, ShapeKind shape) =>
+        ZoneShapes.SizeOf(ReadVector(size, true), shape);
 
     /// <summary>
     /// Builds an object with <see cref="GameItemDb.GetSystemObject"/>. Null when the archetype does not exist, because
@@ -151,33 +154,20 @@ public static class SceneBuild
         };
         zone.RotationMatrix = RotationOf(ini.Rotate, out var radians);
         zone.RotationAngles = radians;
-        zone.Shape = ShapeOf(ini.Shape);
-        zone.Size = SizeOf(ini.Size, zone.Shape);
+        zone.Shape = ZoneShapes.ShapeOf(ini.Shape);
+        zone.Size = ZoneShapes.SizeOf(ini.Size, zone.Shape);
         return zone;
     }
 
-    /// <summary>The rotation of a zone from its angles in degrees, or no rotation (GameItemDb.cs:1647-1661).</summary>
+    /// <summary>The rotation of a zone (see <see cref="ZoneShapes.RotationOf"/>), with its angles in radians. No
+    /// rotation gives the angles zero.</summary>
     private static Matrix4x4 RotationOf(Vector3? degrees, out Vector3 radians)
     {
-        if (degrees is not { } angles)
-        {
-            radians = Vector3.Zero;
-            return Matrix4x4.Identity;
-        }
-        radians = new Vector3(MathHelper.DegreesToRadians(angles.X), MathHelper.DegreesToRadians(angles.Y),
-            MathHelper.DegreesToRadians(angles.Z));
-        return MathHelper.MatrixFromEulerDegrees(angles);
-    }
-
-    /// <summary>The shape of a zone. A zone without a shape is a sphere (GameItemDb.cs:1663).</summary>
-    private static ShapeKind ShapeOf(Universe.ZoneShape? shape) => (ShapeKind)(int)(shape ?? Universe.ZoneShape.SPHERE);
-
-    /// <summary>The size of a zone: (1, 1, 1) without a value, and a ring in the order (outer, height, inner) from the
-    /// line order (outer, inner, height) (GameItemDb.cs:1664-1673).</summary>
-    private static Vector3 SizeOf(Vector3? size, ShapeKind shape)
-    {
-        var values = size ?? Vector3.One;
-        return shape == ShapeKind.Ring ? new Vector3(values.X, values.Z, values.Y) : values;
+        radians = degrees is { } angles
+            ? new Vector3(MathHelper.DegreesToRadians(angles.X), MathHelper.DegreesToRadians(angles.Y),
+                MathHelper.DegreesToRadians(angles.Z))
+            : Vector3.Zero;
+        return ZoneShapes.RotationOf(degrees);
     }
 
     /// <summary>
