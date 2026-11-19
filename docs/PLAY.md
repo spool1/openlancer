@@ -195,6 +195,7 @@ Each profile has a play folder next to the profile file: `<profile folder>\<prof
 | `saves\` | The saves of the player, `AutoSave.fl` of the reloads, and the files of the scripts. |
 | `start\start.fl` | The start save of the last mission play (see "Play a mission"). |
 | `start\layer\` | The test layer of the last mission play: a mod folder with the setup triggers of an approximate start. It is not a mod of the profile, and an export never holds it. |
+| `captures\` | The images of the game that an agent asks for with the tool `play_capture`. The editor deletes each image after it reads it. |
 
 The main menu of the game is not part of a play. When you quit to the menu, the menu lists the saves of `Documents\SavedGames\OpenLancer`, and New Game saves there. The key map is in that folder too.
 
@@ -244,7 +245,7 @@ When you rename the trigger of the start, the start of the running play follows 
 
 ### Agent Play
 
-An agent of the agent server can start Play with the tool `play`, at a point in space or at a base. The tool `mission_play` starts a mission play from a start of a mission script, and it never changes your play start. The tool `play_stop` stops each kind of play, as Shift+F5 does. [MCP.md](MCP.md) tells about the tools. A request of an agent never saves on its own:
+An agent of the agent server can start Play with the tool `play`, at a point in space or at a base. The tool `mission_play` starts a mission play from a start of a mission script, and it never changes your play start. The tool `play_stop` stops each kind of play, as Shift+F5 does. The tool `play_capture` gives an image of the running game. [MCP.md](MCP.md) tells about the tools. A request of an agent never saves on its own:
 
 | Case | What the editor does |
 |---|---|

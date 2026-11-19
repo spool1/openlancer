@@ -2,7 +2,7 @@
 
 OpenLancer has an agent server. An agent program, for example Claude Code, connects to it and reads the data of a profile. The server uses the Model Context Protocol (MCP), so each agent program with MCP support can use it.
 
-The agent reads the data as the editor shows it. It reads the systems and their items, the data lists, the assets, the missions and the cutscenes. It also reads the raw INI text and the problems of the checks. In the editor, the agent can also open views, select items, and get images of a system, of a cutscene and of a panel.
+The agent reads the data as the editor shows it. It reads the systems and their items, the data lists, the assets, the missions and the cutscenes. It also reads the raw INI text and the problems of the checks. In the editor, the agent can also open views and select items. It gets images of a system, a cutscene, a panel and the running game.
 
 The agent can also edit the items of the active mod. It sets fields and texts, renames, deletes and copies items, and undoes its own edits. It creates objects, zones and lights, places assets and prop groups, moves items and makes items from templates. It also changes the mission scripts with the commands of the mission studio. Each agent edit goes through the same commands, checks and Undo history as an edit of the user. An edit changes the edit view of the editor. It is not saved until you or the agent save the mod. See "The edit tools", "The Scene and data tools", "The mission tools" and "Save". In the editor, the agent can also start and stop Play, also a play of a mission from a trigger. See "Play". The editor marks each agent edit, and you can pause the agent edits. See "What you see in the editor".
 
@@ -84,7 +84,7 @@ When another program uses the port, the server does not start. The status bar th
 |---|---|---|
 | Agent server port | 47815 | The port of the server on this computer. Stop the server to change it. |
 | Auto-save and continue when an MCP agent starts Play | Off | When an agent starts Play and the active mod has unsaved edits, the editor saves them and plays. Off: the editor asks you first. See "Agent Play" in [PLAY.md](PLAY.md). The setting applies to the tools `play` and `mission_play`. |
-| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions, Cutscenes and Play. The `scene_` tools, the `prop_group_` tools and `render_scene` are in the group Scene. The `cutscene_` tools, `list_cutscenes`, `get_cutscene` and `render_cutscene` are in the group Cutscenes. `play`, `play_stop` and `mission_play` are in the group Play. The other `mission_` tools and the read tools of the missions are in the group Missions. `mission_play` plays a mission script, so it also refuses when you clear the group Missions. These read tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check` and `get_console`. The edit tools of "The edit tools" are always available too, and so are `save`, `export_mod`, `publish_checklist`, `create_loadout`, `create_from_template`, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene, or a cutscene event when you clear the group Cutscenes. |
+| Agent tool groups | All groups | The agent can use the tools of the selected groups: Scene, Missions, Cutscenes and Play. The `scene_` tools, the `prop_group_` tools and `render_scene` are in the group Scene. The `cutscene_` tools, `list_cutscenes`, `get_cutscene` and `render_cutscene` are in the group Cutscenes. `play`, `play_stop`, `mission_play` and `play_capture` are in the group Play. The other `mission_` tools and the read tools of the missions are in the group Missions. `mission_play` plays a mission script, so it also refuses when you clear the group Missions. These read tools are always available: `studio_status`, `get_item`, `find_references`, `list_values`, `get_raw_ini`, `check` and `get_console`. The edit tools of "The edit tools" are always available too, and so are `save`, `export_mod`, `publish_checklist`, `create_loadout`, `create_from_template`, `open_view`, `select_items` and `capture_panel`. A tool of a cleared group tells the agent that you cleared the group. An edit tool also refuses an item of a cleared group, for example an object of a system when you clear the group Scene, or a cutscene event when you clear the group Cutscenes. |
 | Rows of a page without a limit | 50 | The rows of a list result when the agent gives no limit. |
 | Largest page limit | 200 | The largest limit that the agent can ask for in one list result. |
 | Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
@@ -109,7 +109,7 @@ These tools work in both hosts. They change nothing.
 
 | Tool | What it gives |
 |---|---|
-| `studio_status` | The profile, the active mod, the revision, the tool groups and the limits. The agent calls it first. |
+| `studio_status` | The profile, the active mod, the revision, the tool groups, the limits and the state of the game data (`data_load`). The agent calls it first. See "Save". |
 | `list_systems`, `get_system` | The star systems, and one system with its counts, bases, connections and problems. |
 | `list_items`, `get_item` | The items of a system, and one item with its fields, their origins and their problems. A cutscene entity or event gives its fields by their THN paths. |
 | `find_references` | Each line and each file that names an item, also in the mission scripts. |
@@ -134,12 +134,13 @@ These tools work only in the editor host.
 - `capture_panel` gives an image of a panel as you see it, with its marks and labels.
 - `play` and `play_stop` start and stop Play in OpenLancer. See "Play".
 - `mission_play` plays a mission script from a start in OpenLancer, and `mission_play_trace` gives the trigger changes of that play. See "Mission play".
+- `play_capture` gives an image of the running game of Play in OpenLancer. See "Images of the game".
 
 `open_view` and `select_items` change what the editor shows. They do not change the data. The image tools change nothing.
 
 ### Images
 
-An image has at most 2048 pixels on each side, and a larger panel gives a smaller image. A `render_scene` or `render_cutscene` call with a larger `width` or `height` gives the error `limit`. **Agent > Agent settings > Advanced** can set a smaller limit. The editor does not draw a frame while it renders an image. An image of a system that the Scene does not show also loads that system first.
+An image has at most 2048 pixels on each side. A larger panel or game window gives a smaller image. A `render_scene`, `render_cutscene` or `play_capture` call with a larger `width` or `height` gives the error `limit`. **Agent > Agent settings > Advanced** can set a smaller limit. The editor does not draw a frame while it renders an image. An image of a system that the Scene does not show also loads that system first.
 
 The agent program can send each image to its model service. A capture of a panel can show the names of your folders.
 
@@ -212,7 +213,7 @@ When one step fails, the error `step_failed` gives its index and its error, and 
 
 One call names at most 200 items or cutscene events, changes at most 2000 sections and sets at most 2000 fields of cutscene items. One batch has at most 100 steps, one `mission_edit` call has at most 100 commands, and one route has at most 50 legs. **Agent > Agent settings > Advanced** changes these limits. One call also runs at most 1000 mission commands, and no setting changes this budget (see "The mission tools"). A call above a limit gives the error `limit` and changes nothing. The size limit of a result applies to an edit too. The edit checks the size of its result before it applies, so a larger edit also changes nothing.
 
-While you pause the agent edits, each tool that changes data, writes files or starts a play gives the error `paused`. Examples are the edit tools, `undo`, `redo`, `save`, `export_mod`, `play` and `mission_play`. The read tools still work, also `publish_checklist` and `mission_play_trace`. `play_stop` also works. It stops each game of Play, also a game that you started. Pick **Agent > Pause agent edits** to pause the agent edits, and **Resume agent edits** to let the agent edit again.
+While you pause the agent edits, each tool that changes data, writes files or starts a play gives the error `paused`. Examples are the edit tools, `undo`, `redo`, `save`, `export_mod`, `play` and `mission_play`. The read tools still work, also `publish_checklist`, `mission_play_trace` and `play_capture`. `play_stop` also works. It stops each game of Play, also a game that you started. Pick **Agent > Pause agent edits** to pause the agent edits, and **Resume agent edits** to let the agent edit again.
 
 The edit tools refuse with `read_only` when the editor takes no edits, and the message tells the reason. For example, another editor has the mod open, or the profile or the active mod is in the game folder. A mod in the OpenLancer repo also refuses until you allow its edits.
 
@@ -653,6 +654,10 @@ A delete of an entity that events name needs `confirm: true`, as the editor asks
 
 `save` saves the edits of the active mod into its patch files, as **File > Save** does. In the editor, the save writes its report to the Console, loads the game data again and validates the saved files. The result of `save` then also gives the result of the validation. The oltool host does not validate.
 
+After a save that changed files, the editor loads the game data again. `studio_status` gives `data_load: reloading` until the load ends, and `ready` after it. The first load of a profile also gives `reloading`. The oltool host loads no game data, so it always gives `ready`.
+
+While the game data loads, `open_view`, `render_scene`, `select_items` with a frame and `play` refuse a system or a base that the last save added. They give `refused` with the detail `DataReloading`. Call the tool again when `data_load` is `ready`. A system that the mod did not save gives `refused` with the detail `NotLoaded`, also during a load. The load reads only the saved files, so save the mod first. A new object, zone or light of a system that the game data has shows at once, without a save.
+
 The save gate runs first, as in the editor. When the checks find errors, the save stops and writes nothing. `save` then gives the error `save_blocked` with the messages of the first errors. Call `check` to read each error. When a file of the mod changed outside OpenLancer, `save` gives `changed_on_disk` and writes nothing. In the editor, a dialog then asks you to replace the file or to keep it. The agent never replaces such a file. While an export runs, `save` gives `busy` and writes nothing, because the export reads the saved files.
 
 The result gives the written and the deleted files, relative to the folder of the mod. A save does not change the revision `rev`, and it is not an Undo step. The server instructions tell the agent to call `check` before `save`, and to save only when you ask for it.
@@ -731,6 +736,35 @@ The reference gives the name of the trigger now. When you rename a trigger after
 
 The result also gives the state of Play, the mission and its script. `dropped` gives the number of changes that the game dropped because its queue was full. While only the game of a play copy runs, the result has no changes, because that game sends no changes to the editor. `game_runs` is then true.
 
+#### Images of the game
+
+`play_capture` gives an image of the running game of Play in OpenLancer, as the player sees it. It works only in the editor host, and it changes nothing. So it also works while you pause the agent edits. The previews of the editor do not run the mission orders. So an image of the game is the only true image of a mission shot, a comm window or a base room.
+
+| Argument | What it does |
+|---|---|
+| `delay` | The seconds to wait before the game takes its next frame, from 0 to 60. The default is 0. |
+| `width`, `height` | The most pixels of the image on each side. The default is the image limit. A larger game window gives a smaller image with the same shape. |
+
+The result gives the size of the image and the state of Play when the game took the frame. Before the state `running`, the image can show the load of the game. The game writes each image as a PNG file in the folder `captures` of the play folder (see "The play folder" in [PLAY.md](PLAY.md)). The editor reads the file from that folder only, and deletes it after the read.
+
+These cases give an error:
+
+- No game of Play in OpenLancer runs, or only the game of a play copy runs: `refused` with the detail `NoGame`. Start a game with `play` or `mission_play` first.
+- The game did not give the image in 10 s, the game closed, or the game could not write the file: `refused` with the detail `CaptureFailed` and the reason.
+- A side above the image limit: `limit`.
+- You clear the group Play: `not_available`. The oltool host also gives `not_available`.
+
+#### Example: see the game
+
+These steps check the data reload and the images of the game with a new base of a mod.
+
+1. Ask the user to save the mod, or call `save` when the user allows it.
+2. Call `studio_status`.
+3. If `data_load` is `reloading`, wait 5 seconds. Then do step 2 again.
+4. Call `play` with `start: base` and the new base.
+5. Call `play_capture` with `delay: 5`. The image shows the room of the base.
+6. Call `play_stop`.
+
 ### What you see in the editor
 
 The editor shows each agent edit in the Console, in the Scene, in the Hierarchy and in the status bar.
@@ -768,7 +802,7 @@ When you move the camera of the Scene, pan or zoom the graph of the Mission tab,
 
 #### Pause
 
-**Agent > Pause agent edits** stops each agent edit until you pick **Resume agent edits**. A click on the agent segment of the status bar opens the same menu. While you pause, each tool that changes data, writes files or starts a play gives the error `paused`. The read tools, the view tools, `publish_checklist` and `play_stop` still work. The pause stays when you stop and start the server again.
+**Agent > Pause agent edits** stops each agent edit until you pick **Resume agent edits**. A click on the agent segment of the status bar opens the same menu. While you pause, each tool that changes data, writes files or starts a play gives the error `paused`. The read tools, the view tools, `publish_checklist`, `play_capture` and `play_stop` still work. The pause stays when you stop and start the server again.
 
 ## Resources and prompts
 
@@ -821,11 +855,12 @@ The image tools also change nothing, but their names do not match these prefixes
 ```
 mcp__openlancer__render_*
 mcp__openlancer__capture_panel
+mcp__openlancer__play_capture
 ```
 
 `open_view` and `select_items` change what the editor shows. Without a rule, the agent program asks you before each call. For the oltool host, the names start with `mcp__openlancer-headless__` (the name of the server in the example below).
 
-The rules above do not allow an edit tool, `save` or a play tool. So the agent program asks you before each edit, each save and each play, unless you add a rule for it. Each edit is one Undo step, so you can undo an edit that you allowed. A save is not an Undo step.
+The rules above do not allow an edit tool, `save`, `play`, `mission_play` or `play_stop`. So the agent program asks you before each edit, each save and each play, unless you add a rule for it. Each edit is one Undo step, so you can undo an edit that you allowed. A save is not an Undo step.
 
 ## The oltool host
 
@@ -884,6 +919,6 @@ The agent works on the open profile with its active mod, as you do in the editor
 
 ### Data that goes to the agent
 
-The agent reads the game data and the mod data of the profile, the Console messages and images of the editor panels. The agent program can send all of it to its model service. The Console messages and the images can show the names of your folders.
+The agent reads the game data and the mod data of the profile and the Console messages. It also gets images of the editor panels and of the game. The agent program can send all of it to its model service. The Console messages and the images can show the names of your folders.
 
 Names and texts in the data can hold text that looks like an instruction. The tools give such text as a value in a field of the result, never as an instruction. The agent can only call the fixed tools.
