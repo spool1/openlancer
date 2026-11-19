@@ -124,10 +124,30 @@ public sealed partial class EditSession
     {
         if (ActiveMod is not { } active)
             return [];
-        return touched.Concat(active.Patches.Keys).Concat(active.Files.Keys)
-            .Select(p => VfsPath.Normalize(p) ?? p)
-            .Where(p => p.EndsWith(".ini", StringComparison.OrdinalIgnoreCase))
-            .Distinct(VfsPath.Comparer)
-            .ToList();
+        return IniPaths(touched.Concat(active.Patches.Keys).Concat(active.Files.Keys)).ToList();
     }
+
+    /// <summary>
+    /// The INI files that the active mod changes (see <see cref="ActiveChangedPaths"/>), then the other INI files of the
+    /// open transaction or the open batch. A transaction or a batch adds its files to the files that a command changed
+    /// only at its commit. So a check that runs before the commit, for example the commit checks of an agent batch,
+    /// reads this list.
+    /// </summary>
+    internal IReadOnlyList<string> ActiveChangedPathsWithOpen()
+    {
+        var changed = ActiveChangedPaths();
+        var open = OpenPaths;
+        return ActiveMod == null || open.Count == 0 ? changed : IniPaths(changed.Concat(open)).ToList();
+    }
+
+    /// <summary>The files of the open transaction or the open batch, without the editor files of the mod. Empty when
+    /// neither is open.</summary>
+    private IReadOnlyCollection<string> OpenPaths =>
+        (transaction?.Paths ?? batch?.Paths)?.Where(p => !ModFileDocument.IsKey(p)).ToList() ?? [];
+
+    /// <summary>The INI files of some paths, in normal form, each one time, in the order of the paths.</summary>
+    private static IEnumerable<string> IniPaths(IEnumerable<string> paths) =>
+        paths.Select(p => VfsPath.Normalize(p) ?? p)
+            .Where(p => p.EndsWith(".ini", StringComparison.OrdinalIgnoreCase))
+            .Distinct(VfsPath.Comparer);
 }

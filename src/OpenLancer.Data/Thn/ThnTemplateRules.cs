@@ -89,6 +89,12 @@ public static class ThnTemplateRules
     /// outside the list is valid.</summary>
     public static ThnTemplateRule Sound { get; } = new(ThnItemKind.Sound, "sound", MissingStops: false, null, Closed: false);
 
+    /// <summary>The kinds of item whose answer the checks can refuse: the kinds of the closed rules and the clip. A
+    /// SOUND can name a voice line, so a sound gives no problem.</summary>
+    internal static IReadOnlyList<ThnItemKind> CheckedKinds { get; } =
+        Categories.Values.Append(Costume).Append(Effect).Append(Sound).Where(r => r.Closed).Select(r => r.Kind)
+            .Append(ThnItemKind.Animation).Distinct().ToArray();
+
     /// <summary>The data lists of a kind of item, in order. The first list with the name gives the item, as the engine
     /// first reads the effects and then the visual effects (ThnScriptInstance.cs:194-196). The engine puts the asteroids
     /// and the mines in one collection (AsteroidArchIni.cs).</summary>

@@ -33,6 +33,14 @@ public sealed partial class EditSession
     /// <see cref="CacheRevision"/> that gave them.</summary>
     private (int Revision, HashSet<string> Files, ThnReferences References)? changedIniReferences;
 
+    /// <summary>The items of <see cref="BrokenCutsceneItems"/>, for the <see cref="CacheRevision"/> that gave
+    /// them.</summary>
+    private (int Revision, IReadOnlyList<(ThnItemKind Kind, string Name)> Items)? brokenCutsceneItems;
+
+    /// <summary>The cutscenes of <see cref="ReferrerCutscenes"/>, for the <see cref="CacheRevision"/> that gave
+    /// them.</summary>
+    private (int Revision, IReadOnlyList<string> Paths)? referrerCutscenes;
+
     /// <summary>The install paths of the cutscene scripts that the session opened, in normal form. A new cutscene that
     /// does not exist now, before New cutscene or after an undo of it, is not in the list.</summary>
     public IReadOnlyCollection<string> OpenCutscenes =>
@@ -285,8 +293,7 @@ public sealed partial class EditSession
     {
         if (changedIniReferences is not { } known || known.Revision != CacheRevision)
         {
-            IReadOnlyCollection<string> open = transaction?.Paths ?? batch?.Paths ?? [];
-            var files = touched.Concat(open).Where(p => p.EndsWith(".ini", StringComparison.OrdinalIgnoreCase))
+            var files = touched.Concat(OpenPaths).Where(p => p.EndsWith(".ini", StringComparison.OrdinalIgnoreCase))
                 .ToHashSet(VfsPath.Comparer);
             var references = ThnReferences.Read(files.Order(StringComparer.OrdinalIgnoreCase).Select(file =>
                 (file, documents.GetValueOrDefault(file) is { State.Exists: true } document
@@ -297,6 +304,101 @@ public sealed partial class EditSession
         }
         return (known.Files, known.References);
     }
+
+    /// <summary>
+    /// The template and clip items whose answer the active mod makes other than Ready (see
+    /// <see cref="SessionThnData.AnswerOf"/>). The active mod removes such an item, makes it unusable or breaks its
+    /// model. Such an item can give an error in a cutscene that the active mod does not change.
+    /// </summary>
+    /// <remarks>
+    /// <para>Only a change of the active mod gives such an answer. So the candidates are these names:</para>
+    /// <list type="bullet">
+    /// <item>The names that the active mod removes from the lists of the templates (<see cref="DataLists.Removed"/>).</item>
+    /// <item>The entries of these lists that the search of the referrer errors visits
+    /// (<see cref="DataLists.WalkedEntries"/>).</item>
+    /// <item>The values of a values list, for example the rooms of petalDB, that the lower layer has and W does not
+    /// have.</item>
+    /// <item>The clips that the lower layer has and W does not have.</item>
+    /// </list>
+    /// <para>A candidate counts only when its answer for a kind of its list is not Ready and the active mod causes it.
+    /// So a change that keeps each answer gives no item, for example new hit points for each ship.</para>
+    /// <para>The session keeps the result for each <see cref="CacheRevision"/>. A save changes the number too. Empty
+    /// without an active mod.</para>
+    /// </remarks>
+    internal IReadOnlyList<(ThnItemKind Kind, string Name)> BrokenCutsceneItems()
+    {
+        if (brokenCutsceneItems is { } known && known.Revision == CacheRevision)
+            return known.Items;
+        var items = new List<(ThnItemKind Kind, string Name)>();
+        if (ActiveMod != null)
+        {
+            var seen = new HashSet<(ThnItemKind, string)>();
+            void Consider(string list, string name)
+            {
+                foreach (var kind in ThnTemplateRules.CheckedKinds)
+                {
+                    if (ThnTemplateRules.ListsOf(kind).Contains(list, StringComparer.OrdinalIgnoreCase) &&
+                        seen.Add((kind, name.ToLowerInvariant())) &&
+                        SessionThnData.AnswerOf(this, kind, name) is
+                            { State: not (null or ThnItemState.Ready), ByActiveMod: true })
+                        items.Add((kind, name));
+                }
+            }
+
+            foreach (var entry in Lists.Removed())
+                Consider(entry.List, entry.Value);
+            foreach (var (list, name) in Lists.WalkedEntries())
+                Consider(list, name);
+            foreach (var list in ThnTemplateRules.CheckedKinds.SelectMany(ThnTemplateRules.ListsOf)
+                         .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                foreach (var value in Lists.RemovedValues(list))
+                    Consider(list, value);
+            }
+            foreach (var clip in Lists.RemovedClips())
+                Consider(ThnTemplateRules.ListsOf(ThnItemKind.Animation)[0], clip);
+        }
+        brokenCutsceneItems = (CacheRevision, items);
+        return items;
+    }
+
+    /// <summary>
+    /// The cutscenes of the edit view that hold the name of an item of <see cref="BrokenCutsceneItems"/> as a word. They
+    /// are install paths in normal form, in path order. A cutscene that the active mod does not change has the same
+    /// script in W and in B. So only an answer that the active mod causes can give it an error (see
+    /// <see cref="CutsceneErrors"/>), and the result holds each such cutscene with an error. A match is not always a use
+    /// of the item, so the caller checks each cutscene.
+    /// </summary>
+    /// <remarks>
+    /// <para>The search uses the word index of the story mentions: one build for each edit view, in a worker task. The
+    /// call waits for the build. The session keeps the result for each <see cref="CacheRevision"/>. Without an active
+    /// mod or without a broken item, the result is empty and the call does not start the build.</para>
+    /// <para>The index finds a name only when a file holds it as one word. So it does not find a template that a text
+    /// script makes from parts.</para>
+    /// <para>The Problems section of the Cutscene page reads <see cref="CutsceneErrors"/> in each frame. So
+    /// <see cref="CutsceneErrors"/> and <see cref="CutsceneChecks"/> do not call this method.</para>
+    /// </remarks>
+    internal IReadOnlyList<string> ReferrerCutscenes()
+    {
+        if (referrerCutscenes is { } known && known.Revision == CacheRevision)
+            return known.Paths;
+        IReadOnlyList<string> paths = [];
+        if (BrokenCutsceneItems() is { Count: > 0 } items)
+        {
+            ReferrerLookups++;
+            paths = items.Select(i => i.Name).Distinct(StringComparer.OrdinalIgnoreCase)
+                .SelectMany(Mentions.Cutscenes)
+                .Distinct(VfsPath.Comparer)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        referrerCutscenes = (CacheRevision, paths);
+        return paths;
+    }
+
+    /// <summary>The number of searches of <see cref="ReferrerCutscenes"/> in the word index. A test reads it to check
+    /// the cache.</summary>
+    internal int ReferrerLookups { get; private set; }
 
     /// <summary>The install paths of the cutscenes that the active mod changes, in normal form: the files that a
     /// command changed, and the patches and the whole files of the mod.</summary>

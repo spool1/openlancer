@@ -64,6 +64,14 @@ public sealed class DataLists
     private (ModOverlay View, FileSystem Files)? editViewSystem;
     private (int Revision, IReadOnlyList<RemovedEntry> Entries, Dictionary<(string, string, string), RemovedEntry> Keys)? removed;
 
+    // The result of the search of the referrer errors, for the revision of W that gave it (see Walk).
+    private (int Revision, IReadOnlyList<ListProblem> Errors, IReadOnlyList<(string List, string Name)> Entries)? walk;
+
+    // The values that the lower layer gives to each values list, with the files of the list that gave them. The lower
+    // layer does not change in a session.
+    private readonly Dictionary<string, (IReadOnlyList<string> Paths, HashSet<string> Values)> lowerValues =
+        new(StringComparer.OrdinalIgnoreCase);
+
     internal DataLists(EditSession session, ListRules rules)
     {
         this.session = session;
@@ -116,6 +124,55 @@ public sealed class DataLists
 
     /// <summary>True when the lower layer has a clip with the name (see <see cref="AnimationList.LowerLayerHas"/>).</summary>
     internal bool LowerLayerHasClip(string clip) => animations.LowerLayerHas(clip);
+
+    /// <summary>The clips that the lower layer has and W does not have (see
+    /// <see cref="AnimationList.RemovedClips"/>).</summary>
+    internal IReadOnlyList<string> RemovedClips() => animations.RemovedClips();
+
+    /// <summary>
+    /// True when the lower layer gives a value to a values list, for example a room of petalDB, without letter case.
+    /// <see cref="Removed"/> does not give the names of a values list. So the method reads the lower sections of the
+    /// files of the role of the list, once for each session. It reads them only when the active mod changes a file of
+    /// the role, also in the open transaction or batch. Else W has the values of the lower layer, so the method gives
+    /// false and reads no file.
+    /// </summary>
+    internal bool LowerLayerHasValue(string list, string value) => LowerValues(list)?.Contains(value) == true;
+
+    /// <summary>
+    /// The values that the lower layer gives to a values list and W does not give, sorted by name (see
+    /// <see cref="LowerLayerHasValue"/>). Empty for a list that is not a values list, and when the active mod changes no
+    /// file of the role of the list.
+    /// </summary>
+    internal IReadOnlyList<string> RemovedValues(string list) =>
+        LowerValues(list) is { } lower && List(list) is { } now
+            ? lower.Where(v => now.Find(v) == null).Order(StringComparer.OrdinalIgnoreCase).ToList()
+            : [];
+
+    /// <summary>The values that the lower layer gives to a values list without a scope, or null when the list is not
+    /// such a list or the active mod changes no file of its role.</summary>
+    private HashSet<string>? LowerValues(string list)
+    {
+        if (!rules.Lists.TryGetValue(list, out var definition) ||
+            definition.Source is not { Values: { } values, Scoped: false, Role: { } role } source)
+            return null;
+        var paths = Files.Paths(role);
+        var changed = session.ActiveChangedPathsWithOpen();
+        if (!paths.Any(p => changed.Contains(p, VfsPath.Comparer)))
+            return null;
+        if (lowerValues.TryGetValue(definition.Id, out var known) && known.Paths.SequenceEqual(paths, VfsPath.Comparer))
+            return known.Values;
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths)
+        {
+            foreach (var section in session.LowerSections(path) ?? [])
+            {
+                if (Is(section.Name, values.Section) && Matches(section, source.Where))
+                    result.UnionWith(Names(section, source));
+            }
+        }
+        lowerValues[definition.Id] = (paths.ToList(), result);
+        return result;
+    }
 
     /// <summary>The number of animation files that the list <c>animation</c> read in the session.</summary>
     internal int AnimationReads => animations.Reads;
@@ -192,9 +249,31 @@ public sealed class DataLists
     /// follows it: a munition without its explosion makes each gun that fires it unusable, and so each loadout line
     /// that names such a gun is an error.
     /// </summary>
-    internal IReadOnlyList<ListProblem> ReferrerErrors()
+    /// <remarks>The search also starts from the sections of the open transaction or batch. The lists keep its result
+    /// for each <see cref="EditSession.CacheRevision"/>, and <see cref="WalkedEntries"/> shares it.</remarks>
+    internal IReadOnlyList<ListProblem> ReferrerErrors() => Walk().Errors;
+
+    /// <summary>
+    /// Each list entry that the search of <see cref="ReferrerErrors"/> visits, as the list id and the name. These are
+    /// the entries of the sections that the active mod adds or changes, also in the open transaction or batch. They are
+    /// also the entries of each section that names a removed or an unusable entry. The answer of such an entry can
+    /// change because of the active mod. So the save gate reads these entries to find the cutscenes that a change of
+    /// the active mod can break (see <see cref="EditSession.BrokenCutsceneItems"/>).
+    /// </summary>
+    internal IReadOnlyList<(string List, string Name)> WalkedEntries() => Walk().Entries;
+
+    /// <summary>The number of searches of <see cref="ReferrerErrors"/> in the session. A test reads it to check the
+    /// cache.</summary>
+    internal int Walks { get; private set; }
+
+    /// <summary>The search of <see cref="ReferrerErrors"/>, one time for each revision of W.</summary>
+    private (IReadOnlyList<ListProblem> Errors, IReadOnlyList<(string List, string Name)> Entries) Walk()
     {
+        if (walk is { } known && known.Revision == session.CacheRevision)
+            return (known.Errors, known.Entries);
+        Walks++;
         var result = new List<ListProblem>();
+        var visited = new List<(string List, string Name)>();
         var sections = new Queue<SectionRef>();
         var seenSections = new HashSet<SectionRef>();
         var seenEntries = new HashSet<(string List, string? Scope, string Value)>();
@@ -212,8 +291,8 @@ public sealed class DataLists
             Follow(ReferencesTo(entry.List, entry.Value, IsScoped(entry.List) ? entry.LowerSection.Path : null),
                 ListProblemKind.Removed);
         // Only a section that the active mod adds or changes, or a section that names an unusable entry, can make an
-        // entry unusable.
-        foreach (var path in session.ActiveChangedPaths())
+        // entry unusable. A section of the open transaction or batch counts too.
+        foreach (var path in session.ActiveChangedPathsWithOpen())
         {
             if (TableOf(path) is not { } table)
                 continue;
@@ -237,15 +316,18 @@ public sealed class DataLists
                 foreach (var name in Names(table.Working[index], source))
                 {
                     if (!seenEntries.Add((definition.Id.ToLowerInvariant(), scope?.ToLowerInvariant(),
-                            name.ToLowerInvariant())) ||
-                        View([definition.Id], scope)?.Find(name) is not { } entry ||
+                            name.ToLowerInvariant())))
+                        continue;
+                    visited.Add((definition.Id, name));
+                    if (View([definition.Id], scope)?.Find(name) is not { } entry ||
                         Unusable(entry) is not { ByActiveMod: true })
                         continue;
                     Follow(ReferencesTo(definition.Id, name, scope), ListProblemKind.Unusable);
                 }
             }
         }
-        return result;
+        walk = (session.CacheRevision, result, visited);
+        return (result, visited);
     }
 
     /// <summary>The first error of a section whose effect makes the section unusable, from the rules with such an

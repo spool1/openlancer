@@ -25,7 +25,8 @@ namespace OpenLancer.Data.Editing;
 /// a script with a START_MOTION event on a character.</para>
 /// <para>Each such answer also tells if the active mod causes it: the active mod removes the name, makes the entry
 /// unusable, or adds or changes the section of the item. A clip that W does not have and the lower layer has is a clip
-/// that the active mod removes. <see cref="Lower"/> gives no state for such an answer.</para>
+/// that the active mod removes. A value of a values list, for example a room of petalDB, is the same.
+/// <see cref="Lower"/> gives no state for such an answer.</para>
 /// <para>The checks of a script depend on the game data only through the answers of this class. So the class keeps
 /// each answer, and <see cref="Unchanged"/> tells if the lists give the same answers now. An unsaved INI edit that
 /// changes an answer then checks the cutscene again, and an edit of another file does not.</para>
@@ -62,19 +63,29 @@ internal sealed class SessionThnData : IThnGameData
 
     /// <summary>True when the game data of the session gives each kept answer again.</summary>
     public bool Unchanged() =>
-        answers.All(a => Compute(a.Key.Kind, a.Key.Template) == a.Value) &&
+        answers.All(a => AnswerOf(session, a.Key.Kind, a.Key.Template) == a.Value) &&
         (makesCompounds is not { } known || known == !OnlyInSpace());
 
     private Answer Get(ThnItemKind kind, string template)
     {
         if (!answers.TryGetValue((kind, template), out var answer))
-            answers[(kind, template)] = answer = Compute(kind, template);
+            answers[(kind, template)] = answer = AnswerOf(session, kind, template);
         return answer;
     }
 
     private bool OnlyInSpace() => session.PlaysOnlyInSpace(path);
 
-    private Answer Compute(ThnItemKind kind, string template)
+    /// <summary>
+    /// The answer of the data lists of W for one template of a kind. It has the state, the reason, and whether the
+    /// active mod causes a state other than Ready. The save gate also reads the answer of an item that a change of the
+    /// active mod can break. So it finds the cutscenes that name such an item (see
+    /// <see cref="EditSession.BrokenCutsceneItems"/>).
+    /// </summary>
+    /// <remarks>A name that W does not have can be missing because of the active mod. This is so when the active mod
+    /// removes it from a list, or when the lower layer has it as a clip. It is also so when the lower layer has it as a
+    /// value of a values list, for example a room of petalDB. The removed names of the lists do not have the values
+    /// lists, so the lower values come from the files of the list.</remarks>
+    internal static Answer AnswerOf(EditSession session, ThnItemKind kind, string template)
     {
         if (template.StartsWith('$') && ThnTemplateRules.RoomFillsIn(kind))
             return default;
@@ -86,19 +97,20 @@ internal sealed class SessionThnData : IThnGameData
         if (list.FindAsWritten(template) is not { } entry)
             return new Answer(ThnItemState.Missing, kind == ThnItemKind.Animation
                 ? lists.LowerLayerHasClip(template)
-                : ids.Any(id => lists.RemovedOf(id, null, template) != null), null);
+                : ids.Any(id => lists.RemovedOf(id, null, template) != null || lists.LowerLayerHasValue(id, template)),
+                null);
         if (lists.Unusable(entry) is { } unusable)
             return new Answer(ThnItemState.Missing, unusable.ByActiveMod, unusable.Reason);
         if (!ThnTemplateRules.NeedsModel(kind) || lists.SectionOf(entry) is not { } section)
             return new Answer(ThnItemState.Ready, false, null);
-        var (state, reason) = Model(kind, section);
+        var (state, reason) = Model(session, kind, section);
         return new Answer(state, state != ThnItemState.Ready && lists.ChangedByActiveMod(entry), reason);
     }
 
     /// <summary>The model of the section of an item, as the engine gives it: the file of the last <c>DA_archetype</c>
     /// line with a value, when the file exists in the edit view (GameItemDb.cs:122-138, :2088-2105). An equipment also
     /// needs a section type that gets a model.</summary>
-    private (ThnItemState State, string? Reason) Model(ThnItemKind kind, Section section)
+    private static (ThnItemState State, string? Reason) Model(EditSession session, ThnItemKind kind, Section section)
     {
         if (kind == ThnItemKind.Equipment)
         {
@@ -128,7 +140,7 @@ internal sealed class SessionThnData : IThnGameData
 
     /// <summary>The answer for one template: its state, or null when the data cannot tell, whether the active mod causes
     /// a state other than Ready, and the reason of that state.</summary>
-    private readonly record struct Answer(ThnItemState? State, bool ByActiveMod, string? Reason);
+    internal readonly record struct Answer(ThnItemState? State, bool ByActiveMod, string? Reason);
 
     /// <summary>The answers of the session data without the answers that the active mod causes (see
     /// <see cref="Lower"/>).</summary>

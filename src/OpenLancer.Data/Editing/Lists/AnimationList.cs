@@ -81,7 +81,27 @@ internal sealed class AnimationList(EditSession session)
     /// lower layer name a file with the clip. The lower layer does not change in a session, so the class reads it once.
     /// The save gate asks only for a clip that W does not have, to know if the active mod removed it.
     /// </summary>
-    public bool LowerLayerHas(string clip)
+    public bool LowerLayerHas(string clip) => LowerClips().Contains(clip);
+
+    /// <summary>
+    /// The clips that the lower layer has and W does not have, sorted by name. Only an animation file of the active mod,
+    /// or a change of bodyparts.ini by the active mod, can remove a clip. A change in the open transaction or batch
+    /// counts too. Else the result is empty, and the class reads no file. The save gate reads the result to find the
+    /// cutscenes that a change of the active mod can break.
+    /// </summary>
+    public IReadOnlyList<string> RemovedClips()
+    {
+        if (session.ActiveMod is not { } active || BodypartsPath is not { } path ||
+            !active.Files.Keys.Any(k => k.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) &&
+            !session.ActiveChangedPathsWithOpen().Contains(path, VfsPath.Comparer) ||
+            Get() is not { } data)
+            return [];
+        var now = data.Clips.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return LowerClips().Where(c => !now.Contains(c)).Order(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>The clips of the lower layer, without letter case. The class reads them once for each session.</summary>
+    private HashSet<string> LowerClips()
     {
         if (lowerClips == null)
         {
@@ -94,7 +114,7 @@ internal sealed class AnimationList(EditSession session)
                     lowerClips.UnionWith(list);
             }
         }
-        return lowerClips.Contains(clip);
+        return lowerClips;
     }
 
     private AnimationData Build(FileSystem files, IReadOnlyList<string> lines, IReadOnlyList<AnimationSkeleton> skeletons)
