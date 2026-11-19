@@ -104,6 +104,21 @@ public sealed class UniverseOrderTests
         Assert.Equal(expected, UniverseOrder.PlaceOf(path, sections, type));
     }
 
+    /// <summary>The game reads a section header in any letter case. So a file of a lower mod with <c>[SYSTEM]</c>
+    /// headers still gets the new <c>[Base]</c> before its first system.</summary>
+    [Theory]
+    [InlineData("SYSTEM", "Base", 2)]
+    [InlineData("System", "BASE", 2)]
+    [InlineData("System", "SYSTEM", 4)]
+    public void ThePlaceIgnoresTheLetterCaseOfTheHeaders(string systemHeader, string type, int expected)
+    {
+        var sections = IniDocument.Parse(Universe, Encoding.ASCII.GetBytes(
+            $"[Time]\n[BASE]\nnickname = a\n[{systemHeader}]\nnickname = s1\n[{systemHeader}]\nnickname = s2\n")).Sections;
+
+        Assert.Equal(2, UniverseOrder.FirstSystem(sections));
+        Assert.Equal(expected, UniverseOrder.PlaceOf(Universe, sections, type));
+    }
+
     [Fact]
     public void ANewBaseGoesDirectlyBeforeTheFirstSystemInW()
     {
