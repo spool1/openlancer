@@ -32,9 +32,9 @@ namespace OpenLancer.Data.Export;
 /// <para>A change that the operations cannot express puts the whole merged file into the package. A whole file
 /// cannot hold mod text, so such a change with mod text is a refusal.</para>
 /// <para>A new <c>[Base]</c> of <c>universe.ini</c> is a refusal too. It must go before the <c>[system]</c> sections
-/// (see <see cref="UniverseOrder"/>), and an <c>append</c> puts it at the end of the file. The FLMM check of an
-/// insert before the first <c>[system]</c> is not done yet. Each refusal names the drop-in zip, which always carries
-/// the new content.</para>
+/// (see <see cref="UniverseOrder"/>), and an <c>append</c> puts it at the end of the file. FLMM has no tested
+/// operation that puts a section before the first <c>[system]</c> yet. Each refusal names the drop-in zip, which
+/// always carries the new content.</para>
 /// </remarks>
 internal sealed partial class FlmmScript
 {
@@ -179,7 +179,7 @@ internal sealed partial class FlmmScript
         {
             Refuse(file.Path, $"the mod adds {string.Join(", ", bases.Select(m => SectionIdentity.Of(diff.MergedSections, m)))}" +
                               " to universe.ini. The game links a base to its station only when the [Base] comes before " +
-                              "the [system] sections. The FLMM operation that puts a section there is not tested yet");
+                              "the [system] sections. FLMM has no tested operation that puts a section there yet");
             return;
         }
         var binary = file.BaseDocument!.IsBinary;
