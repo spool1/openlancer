@@ -75,7 +75,8 @@ public sealed class UniverseOrderTests
 
     /// <summary>Saves, opens the profile again, and checks that W of the reopened session and the merged
     /// <c>universe.ini</c> of the edit view have the order of <paramref name="expected"/>.</summary>
-    private static void AssertSavedOrder(TestWorkspace ws, EditSession session, string[] expected)
+    /// <returns>The reopened session.</returns>
+    private static EditSession AssertSavedOrder(TestWorkspace ws, EditSession session, string[] expected)
     {
         Assert.Equal(expected, Ids(session));
         AssertSaved(session.Save());
@@ -85,6 +86,7 @@ public sealed class UniverseOrderTests
         Assert.Equal(expected, Ids(reopened));
         Assert.Equal(expected, Ids(reopened.EditViewSections(Universe)!));
         Assert.False(reopened.IsDirty);
+        return reopened;
     }
 
     [Theory]
@@ -200,11 +202,36 @@ public sealed class UniverseOrderTests
         Assert.DoesNotContain("[system]", patch);
     }
 
-    /// <summary>A new <c>[Base]</c> that a kept <c>[Base]</c> separates from the first <c>[system]</c> does not keep
-    /// its place in the merge. So the patch deletes and adds again each section after it, and the merge gives
-    /// W.</summary>
+    /// <summary>A base of B that W adds again after a new base, in its order of B. The patch deletes the base and adds
+    /// it again, so the merge puts it after the new base. No system moves, also when a later edit saves the reopened
+    /// patch again.</summary>
     [Fact]
-    public void ANewBaseThatAKeptBaseSeparatesFromTheSystemsMovesTheSectionsAfterIt()
+    public void ABaseThatWAddsAgainAfterANewBaseMovesNoSystem()
+    {
+        using var ws = Workspace();
+        var session = ws.Session("act");
+        var li0102 = new SectionRef(Universe, new SectionIdentity("Base", "Li01_02_Base"));
+
+        session.Execute(NewBase("Ol01_01_Base"));
+        session.Execute(EditCommand.DeleteSection(li0102));
+        session.Execute(NewBase("Li01_02_Base"));
+
+        string[] expected = ["Time", "Base Li01_01_Base", "Base Ol01_01_Base", "Base Li01_02_Base", "system Li01",
+            "system Li02"];
+        var reopened = AssertSavedOrder(ws, session, expected);
+        var patch = ws.ReadModPatch(Universe);
+        Assert.Contains("ol.delete = true", patch);
+        Assert.DoesNotContain("[system]", patch);
+
+        reopened.Execute(EditCommand.SetLinesFromText(li0102, "system", ["Li02"]));
+        AssertSavedOrder(ws, reopened, expected);
+        Assert.DoesNotContain("[system]", ws.ReadModPatch(Universe));
+    }
+
+    /// <summary>The merge puts a new <c>[Base]</c> after the kept bases. So a base of B after a new <c>[Base]</c> in W
+    /// is deleted and added again, and the merge gives W. The systems stay where they are.</summary>
+    [Fact]
+    public void ABaseOfBAfterANewBaseMovesAndNoSystemMoves()
     {
         var b = IniDocument.Parse(Universe, Ascii(RetailOrder));
         var w = IniDocument.Parse(Universe, Ascii(RetailOrder.Replace("[Base]\nnickname = Li01_02_Base",
@@ -215,7 +242,9 @@ public sealed class UniverseOrderTests
         Assert.True(patch.Succeeded, string.Join("\n", patch.Problems));
         Assert.Equal(["Time", "Base Li01_01_Base", "Base Ol01_01_Base", "Base Li01_02_Base", "system Li01", "system Li02"],
             Ids(Merge(Universe, RetailOrder, patch.Text).Sections));
-        Assert.Contains("[system]\r\nnickname = Li01\r\nol.delete = true", patch.Text);
+        Assert.Contains("[Base]\r\nnickname = Li01_02_Base\r\nol.delete = true", patch.Text);
+        Assert.DoesNotContain("[Base]\r\nnickname = Li01_01_Base", patch.Text);
+        Assert.DoesNotContain("[system]", patch.Text);
     }
 
     /// <summary>The rule is only for <c>universe.ini</c>. A <c>[Base]</c> of another file goes at the end, in W and in

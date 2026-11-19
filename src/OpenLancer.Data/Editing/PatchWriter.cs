@@ -92,7 +92,8 @@ internal sealed record PatchText(
 /// <c>ol.before</c> with that section (section 6.4 of the M6b design). It does not move the sections after it. The
 /// delete of a moved section of a mission file gets <c>ol.base</c>. A new or moved <c>[Base]</c> of
 /// <c>universe.ini</c> directly before the first <c>[system]</c> gets no directive, because the merge puts it there
-/// (see <see cref="UniverseOrder"/>). It does not move the sections after it either.</item>
+/// (see <see cref="UniverseOrder"/>). It does not move the systems after it either. A <c>[Base]</c> of B after it
+/// in that run of bases moves too.</item>
 /// <item>Base: <c>ol.base</c> keeps the hash of the loaded section when it has one, also when B changed after the
 /// edit (rule P2 of section 6.3 of the M6b design). So the merge warns until the user accepts the new base. A
 /// section without a loaded hash gets the hash of B.</item>
@@ -746,16 +747,22 @@ internal static class PatchWriter
         /// <item>A ship or formation section of a mission file gets <c>ol.before</c> (section 6.4 of the M6b design).
         /// It goes directly before the kept section after it in W. The merge can find the next kept section only by
         /// its key. When it has no such key, the section goes to the end of the file, as another new section does.</item>
-        /// <item>A <c>[Base]</c> of <c>universe.ini</c> in the run of new and moved <c>[Base]</c> sections directly
+        /// <item>A new or moved <c>[Base]</c> of <c>universe.ini</c> in the run of <c>[Base]</c> sections directly
         /// before the first <c>[system]</c> of W gets no directive. The merge puts each new <c>[Base]</c> directly
-        /// before the first <c>[system]</c> (see <see cref="UniverseOrder"/>). A <c>[Base]</c> that a kept section
-        /// separates from the first <c>[system]</c> is a usual new section.</item>
+        /// before the first <c>[system]</c>, after the kept bases (see <see cref="UniverseOrder"/>). So each
+        /// <c>[Base]</c> of B after a new or moved <c>[Base]</c> of the run moves too (see
+        /// <see cref="MovedInOrder"/>), and the systems stay.</item>
         /// </list>
         /// </summary>
         private HashSet<SectionIdentity> Placed(IReadOnlySet<SectionIdentity> deleted)
         {
             var placed = new HashSet<int>();
-            var firstSystem = UniverseOrder.IsUniverse(path) ? UniverseOrder.FirstSystem(w) : -1;
+            if (UniverseOrder.IsUniverse(path))
+            {
+                for (var j = UniverseOrder.FirstSystem(w) - 1; j >= 0 && UniverseOrder.IsBase(w[j]); j--)
+                    placed.Add(j);
+                return Moved(deleted, placed);
+            }
             if (SectionKeys.IsMissionFile(path))
             {
                 for (var j = 0; j < w.Count; j++)
@@ -764,8 +771,6 @@ internal static class PatchWriter
                         placed.Add(j);
                 }
             }
-            for (var j = firstSystem - 1; j >= 0 && UniverseOrder.IsBase(w[j]); j--)
-                placed.Add(j);
             while (true)
             {
                 var result = Moved(deleted, placed);
@@ -780,8 +785,6 @@ internal static class PatchWriter
                         placed.Remove(j);
                         continue;
                     }
-                    if (firstSystem >= 0)
-                        continue;
                     var next = j + 1;
                     while (next < w.Count && !(BIndexOfW(next) is >= 0 and var n && !result.Contains(bIds[n])))
                         next++;
@@ -794,14 +797,6 @@ internal static class PatchWriter
                         placed.Remove(j);
                         dropped = true;
                     }
-                }
-                // Only the run directly before the first [system] keeps its place in the merge.
-                if (firstSystem >= 0)
-                {
-                    var start = firstSystem - 1;
-                    while (start >= 0 && placed.Contains(start))
-                        start--;
-                    dropped = placed.RemoveWhere(j => j < start) > 0;
                 }
                 if (!dropped)
                     return result;
@@ -883,12 +878,14 @@ internal static class PatchWriter
 
         /// <summary>The sections of B that come out of their order: each section of B before a section that comes
         /// earlier in B, and each section after a new or moved section that is not placed. A child after a new or
-        /// moved child of its parent moves too.</summary>
+        /// moved child of its parent moves too. The merge puts the placed sections after the kept sections of their
+        /// run. So a placed section of B after a new or moved placed section moves too.</summary>
         private HashSet<SectionIdentity> MovedInOrder(IReadOnlySet<int> placed)
         {
             var result = new HashSet<SectionIdentity>();
             var lastKept = -1;
             var afterNew = false;
+            var afterPlaced = false;
             var childAfterNew = false;
             for (var j = 0; j < w.Count; j++)
             {
@@ -897,15 +894,19 @@ internal static class PatchWriter
                     childAfterNew = false;
                 var i = BIndexOfW(j);
                 var inB = i >= 0;
-                if (inB && !afterNew && !(isChild && childAfterNew) && i > lastKept)
+                var isPlaced = placed.Contains(j);
+                if (inB && !afterNew && !(isChild && childAfterNew) && !(isPlaced && afterPlaced) && i > lastKept)
                 {
                     lastKept = i;
                     continue;
                 }
                 if (inB)
                     result.Add(bIds[i]);
-                if (placed.Contains(j))
+                if (isPlaced)
+                {
+                    afterPlaced = true;
                     continue;
+                }
                 if (isChild)
                     childAfterNew = true;
                 else
