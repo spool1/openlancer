@@ -573,7 +573,7 @@ The check reads the data lists with the unsaved edits. So a change of the active
 
 `check` with the scope `all` lists each problem of these cutscenes. `save` refuses the save and gives the text of the save gate of the editor. A call that changes only cutscenes gives no problem of another cutscene.
 
-A change of the active mod in the game data can break a cutscene. To find such a cutscene, the save gate looks for the item name in the cutscene file. So it does not find a template that the Lua text of a script joins from parts, for example with `..`. The save then passes, and the game can crash when it plays that cutscene.
+A change of the active mod in the game data can break a cutscene. To find such a cutscene, the save gate looks for the item name in the cutscene file. So it does not find a template that the Lua text of a script joins from parts, for example with `..`. The save then passes, and the game can crash when it plays that cutscene. `get_cutscene` of such a cutscene can give the problem, but `save` does not stop for it.
 
 `list_values` gives the names of the data lists of the templates:
 
