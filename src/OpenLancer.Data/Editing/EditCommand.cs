@@ -89,6 +89,25 @@ public abstract class EditCommand
         return new AddSectionCommand($"Add [{type}]", path, type, entries, parent);
     }
 
+    /// <summary>
+    /// Adds a section directly before another section of a whole file of the active mod, for example to keep the order
+    /// of sections that the game reads in order. The save writes a whole file in the order of W.
+    /// </summary>
+    /// <remarks>When it runs, the command throws an <see cref="InvalidOperationException"/> for a patch file. A patch
+    /// adds a new section at the end of the file (<see cref="AddSection"/>), because a section in the middle moves each
+    /// later section of the lower file. It also throws for a child section, for a section before a child section, and
+    /// for a section of another file. <see cref="AddSection"/> adds a child section with its parent.</remarks>
+    /// <param name="before">The section that the new section goes before.</param>
+    public static EditCommand InsertSection(string path, string type, IReadOnlyList<EntryView> entries, SectionRef before)
+    {
+        ArgumentNullException.ThrowIfNull(before);
+        if (!PatchFormatter.TryFormatHeader(type, out _, out var error))
+            throw new ArgumentException(error, nameof(type));
+        foreach (var entry in entries)
+            CheckName(entry.Name);
+        return new InsertSectionCommand($"Add [{type}]", path, type, entries, before);
+    }
+
     /// <summary>Deletes a section, and its child sections.</summary>
     public static EditCommand DeleteSection(SectionRef target) => new DeleteSectionCommand($"Delete {target.Id}", target);
 
@@ -373,6 +392,33 @@ public abstract class EditCommand
                     throw new InvalidOperationException($"Only a child section has a parent. [{type}] is not a child section.");
                 at = document.Working.Count;
             }
+            document.Insert(at, SectionEdits.Build(type, entries));
+            scope.Changed(new SectionRef(document.Path, document.IdentityAt(at)), structural: true);
+        }
+    }
+
+    private sealed class InsertSectionCommand(string label, string path, string type, IReadOnlyList<EntryView> entries,
+        SectionRef before) : EditCommand(label)
+    {
+        internal override void Run(EditSession.CommandScope scope)
+        {
+            var document = scope.Document(path);
+            if (!document.IsWholeFile)
+                throw new InvalidOperationException(
+                    $"{document.Path} is a patch of a file of the game or of a lower mod. The editor puts a section before " +
+                    "another section only in a whole file of the active mod. In a patch, a new section goes at the end of " +
+                    "the file, because a section in the middle moves each later section of the lower file.");
+            if (SectionKeys.IsChild(type))
+                throw new InvalidOperationException(
+                    $"A [{type}] section belongs to the section before it. Add it with its parent section.");
+            var (target, at) = scope.Find(before);
+            if (!ReferenceEquals(target, document))
+                throw new InvalidOperationException(
+                    $"{before.Id} is not in {document.Path}. The new section goes before a section of the same file.");
+            if (SectionKeys.IsChild(document.Working[at].Name))
+                throw new InvalidOperationException(
+                    $"{before.Id} is a child section. A section before it takes the child sections after it from their " +
+                    "parent section.");
             document.Insert(at, SectionEdits.Build(type, entries));
             scope.Changed(new SectionRef(document.Path, document.IdentityAt(at)), structural: true);
         }
