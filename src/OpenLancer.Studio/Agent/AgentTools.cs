@@ -227,6 +227,12 @@ public static class AgentTools
         Query("mission_play_trace", ToolGroup.Missions,
             new ToolInput(new WholeParam("play", 0, 0), new WholeParam("since", 0, 0), Limit),
             typeof(MissionTraceView), PlayTools.MissionTrace, ToolHosts.Editor),
+        // The tail waits for the delay, then for the image.
+        PlayTool("play_capture", ToolHints.Query, new ToolInput(
+                new NumberParam("delay", false, 0, PlayTools.MaxCaptureDelay),
+                new WholeParam("width", ViewTools.MinSide), new WholeParam("height", ViewTools.MinSide)),
+            typeof(PlayCaptureView), PlayTools.Capture,
+            tail: limits => TimeSpan.FromSeconds(limits.TailSeconds + PlayTools.MaxCaptureDelay)),
         Edit("cutscene_create", ToolHints.Adding,
             EditTools.Input(false, Text("name", true), new NumberParam("duration", false, double.NegativeInfinity)),
             CutsceneEditTools.Create, ToolGroup.Cutscenes),
@@ -442,9 +448,14 @@ public static class AgentTools
     /// <summary>A play tool of sections 7.4 and 7.6 of the MCP1 design, in the group Play. Only the editor host can
     /// play (decision D739).</summary>
     /// <param name="runsInPause">True for a tool that Pause does not refuse (see <see cref="StudioTool.RunsInPause"/>).</param>
+    /// <param name="tail">The time limit of the tail of the tool, or null for the tail limit of the limits.</param>
     private static StudioTool PlayTool(string name, ToolHints hints, ToolInput input, Type output,
-        Func<ToolCall, ToolStep> run, bool runsInPause = false) =>
-        new(name, ToolKind.Play, ToolGroup.Play, ToolHosts.Editor, hints, input, output, run) { RunsInPause = runsInPause };
+        Func<ToolCall, ToolStep> run, bool runsInPause = false, Func<AgentLimits, TimeSpan>? tail = null) =>
+        new(name, ToolKind.Play, ToolGroup.Play, ToolHosts.Editor, hints, input, output, run)
+        {
+            RunsInPause = runsInPause,
+            TailLimit = tail ?? StudioTool.TailOfLimits,
+        };
 
     /// <summary>An edit tool (section 7.3 of the MCP1 design). Its result is the result of the command layer, and it
     /// can be a step of <c>edit_batch</c>. A data tool is in the group Studio.</summary>

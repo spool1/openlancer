@@ -24,7 +24,7 @@
       "Do not save until the user asks, unless the user told you to save."
     ],
     "play": [
-      "A play tool asks the user to save when the mod has unsaved edits. Do not play until the user asks. Use play_stop to stop each kind of play."
+      "A play tool asks the user to save when the mod has unsaved edits. Do not play until the user asks. Use play_stop to stop each kind of play. play_capture gives an image of the running OpenLancer game."
     ]
   },
   "fields": {
@@ -561,6 +561,15 @@
         "play": "The play number of the last result, or 0. Another play number than the current play gives all changes of the current play.",
         "since": "Give only the changes after this sequence number. Use the sequence of the last change of the previous result. A value above 0 needs play.",
         "limit": "The most changes of the result. studio_status gives the default and the largest value. When the play has more changes, more is true. Call the tool again with play and since."
+      }
+    },
+    "play_capture": {
+      "title": "Capture an image of the OpenLancer game",
+      "description": "Gives an image of the running game of Play in OpenLancer, as the player sees it. The tool waits for the delay, then the game takes its next frame. Use it after play or mission_play, for example to see a cutscene, a comm window or a base room. A game window larger than the size gives a smaller image with the same shape. This tool changes nothing. Only the editor host has this tool.",
+      "fields": {
+        "delay": "The seconds to wait before the game takes the frame, from 0 to 60. The default is 0.",
+        "width": "The most pixels of the width of the image. The default and the largest value are the image limit of studio_status.",
+        "height": "The most pixels of the height of the image. The default and the largest value are the image limit of studio_status."
       }
     },
     "cutscene_create": {
@@ -1379,6 +1388,8 @@
     "render_camera_type": "The entity {camera} is not a CAMERA entity. Give the name of a CAMERA entity in the argument camera.",
     "render_no_camera": "No camera of the cutscene is active at {time} s. Give the name of a CAMERA entity in the argument camera.",
     "capture_hidden": "The panel {panel} does not show now. Ask the user to show the panel, then call the tool again.",
+    "capture_no_game": "No OpenLancer game runs. Start one with play or mission_play.",
+    "capture_not_png": "The image of the game is not a PNG image that the editor can read. {reason}",
     "data_reloading": "The editor reloads the game data now. Call the tool again when studio_status shows data_load ready.",
     "open_view_one": "Give exactly one of the arguments system, mission and cutscene.",
     "select_one": "The editor selects one item at a time. Give one reference in refs.",
@@ -2126,6 +2137,7 @@
     "CutsceneShotView.context": "The preview context of the image, as the Cutscene tab names it.",
     "CutsceneShotView.without_system": "True when the image shows a space script without its system.",
     "PanelShotView.panel": "The panel of the image.",
+    "PlayCaptureView.play": "The state of Play in OpenLancer when the game gave the image: starting, validating, running, reloading or not_responding. Before running, the image can show the load of the game.",
     "DryRunView.script": "The msn: reference of the script.",
     "DryRunView.version": "The version of the script that the run read. It changes at each change of the script.",
     "DryRunView.total_steps": "The number of all steps of the run: one step for each input that the run keeps.",

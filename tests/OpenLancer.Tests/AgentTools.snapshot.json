@@ -40015,6 +40015,163 @@
       }
     },
     {
+      "name": "play_capture",
+      "title": "Capture an image of the OpenLancer game",
+      "description": "Gives an image of the running game of Play in OpenLancer, as the player sees it. The tool waits for the delay, then the game takes its next frame. Use it after play or mission_play, for example to see a cutscene, a comm window or a base room. A game window larger than the size gives a smaller image with the same shape. This tool changes nothing. Only the editor host has this tool.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "delay": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 60,
+            "description": "The seconds to wait before the game takes the frame, from 0 to 60. The default is 0."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 16,
+            "description": "The most pixels of the width of the image. The default and the largest value are the image limit of studio_status."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 16,
+            "description": "The most pixels of the height of the image. The default and the largest value are the image limit of studio_status."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "integer",
+            "description": "The width of the image in pixels."
+          },
+          "height": {
+            "type": "integer",
+            "description": "The height of the image in pixels."
+          },
+          "play": {
+            "enum": [
+              "idle",
+              "starting",
+              "validating",
+              "running",
+              "reloading",
+              "not_responding",
+              "stopping"
+            ],
+            "description": "The state of Play in OpenLancer when the game gave the image: starting, validating, running, reloading or not_responding. Before running, the image can show the load of the game."
+          },
+          "rev": {
+            "type": "string",
+            "description": "The revision of the edit view that the tool read, as text. A save does not change it."
+          },
+          "code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed"
+            ],
+            "description": "The kind of the error. Each kind has a fixed meaning, for example not_found or invalid_argument."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The detail code of the error, for example ReferenceNotFound or BadArgument."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to correct it."
+          },
+          "index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index of the step of a batch that failed, or none."
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference or the text that the error is about, or none."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The argument or the field that the error is about, or none."
+          },
+          "step_code": {
+            "enum": [
+              "not_found",
+              "read_only",
+              "invalid_argument",
+              "invalid_value",
+              "refused",
+              "new_errors",
+              "needs_confirmation",
+              "name_taken",
+              "stale_revision",
+              "busy",
+              "save_blocked",
+              "changed_on_disk",
+              "guard_conflict",
+              "paused",
+              "limit",
+              "not_available",
+              "not_agent_entry",
+              "step_failed",
+              null
+            ],
+            "description": "For the error step_failed: the code of the error of the step, for example not_found. Else none."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "width",
+              "height",
+              "play"
+            ],
+            "description": "A result of the tool. The structured content of a call is a result or a tool error."
+          },
+          {
+            "description": "A tool error. The call has isError true. Read the message, then correct the call.",
+            "required": [
+              "code",
+              "detail",
+              "message"
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "title": "Capture an image of the OpenLancer game",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
       "name": "cutscene_create",
       "title": "Make a new cutscene",
       "description": "Makes a new cutscene script in the active mod, as New cutscene does. The script has a camera, a monitor and a cut to the camera at 0. The tool makes one Undo step.",

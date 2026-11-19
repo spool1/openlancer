@@ -40,6 +40,9 @@ internal interface IAgentPlayEditor : IAgentPlayHost
 
     /// <summary>The live trace query of the shared command layer (<see cref="MissionWorkspace.LiveTrace"/>).</summary>
     LiveTraceResult LiveTrace(int play, long since);
+
+    /// <summary>An image of a frame of the game of Play after a delay (<see cref="PlayController.Capture"/>).</summary>
+    Task<PlayCaptureResult> Capture(TimeSpan delay);
 }
 
 /// <summary>
@@ -49,6 +52,7 @@ internal interface IAgentPlayEditor : IAgentPlayHost
 /// 2026-10-20: it never saves on its own, and with unsaved edits the editor asks the user first. While a game runs, the
 /// request gives <c>refused</c>, and the agent stops the game with <c>play_stop</c> first. The Play menu closes the
 /// running game instead. A mission play of an agent starts a running mission play again at its start, as F5 does.
+/// <c>play_capture</c> gives an image of the game of Play in OpenLancer (shared step SH9).
 /// </summary>
 internal sealed class EditorAgentPlay(IAgentPlayEditor editor) : IAgentPlay
 {
@@ -60,6 +64,12 @@ internal sealed class EditorAgentPlay(IAgentPlayEditor editor) : IAgentPlay
 
     /// <summary>The detail code of a start that the checks of the Play menu refuse.</summary>
     public const string StartBlockedDetail = "StartBlocked";
+
+    /// <summary>The detail code of a capture while no game of Play in OpenLancer runs.</summary>
+    public const string NoGameDetail = "NoGame";
+
+    /// <summary>The detail code of a capture that the game did not give.</summary>
+    public const string CaptureFailedDetail = "CaptureFailed";
 
     public Func<CancellationToken, Task<PlayRequestView>> Start(PlayStart start)
     {
@@ -108,6 +118,37 @@ internal sealed class EditorAgentPlay(IAgentPlayEditor editor) : IAgentPlay
             Script = script == null ? null : new ScriptRef(script).ToString(),
             Dropped = trace.Dropped,
             GameRuns = trace.GameRuns,
+        };
+    }
+
+    /// <summary>
+    /// An image of the game of Play in OpenLancer after a delay. A game that stops gives no image. The game of a play copy
+    /// has no channel to the editor, so it gives no image either. The tail makes a larger image smaller, as
+    /// <c>capture_panel</c> does, on the thread pool.
+    /// </summary>
+    public Func<CancellationToken, Task<(PlayCaptureView View, ToolImage Image)>> Capture(TimeSpan delay, int maxWidth,
+        int maxHeight)
+    {
+        if (editor.PlayStatus is PlayStatus.Idle or PlayStatus.Stopping)
+            throw new EditException(new EditError(EditErrorKind.Refused, NoGameDetail, AgentTexts.Error("capture_no_game")));
+        var result = editor.Capture(delay);
+        return async cancel =>
+        {
+            var done = await result.WaitAsync(cancel).ConfigureAwait(false);
+            if (done.Png is not { } png)
+                throw new EditException(new EditError(EditErrorKind.Refused, CaptureFailedDetail, done.Problem!));
+            ToolImage image;
+            try
+            {
+                image = AgentImages.FitPng(png, done.Width, done.Height, maxWidth, maxHeight);
+            }
+            catch (Exception e) when (e is not OutOfMemoryException)
+            {
+                // The decoder throws a plain exception for data that is not an image.
+                throw new EditException(new EditError(EditErrorKind.Refused, CaptureFailedDetail,
+                    AgentTexts.Error("capture_not_png", ("reason", e.Message))));
+            }
+            return (new PlayCaptureView(image.Width, image.Height, StatusOf(done.Play)), image);
         };
     }
 

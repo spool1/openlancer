@@ -74,6 +74,12 @@ public sealed record MissionPlayView(AgentPlayStatus Play, string Script, string
     public IReadOnlyList<string> Warnings { get; init; } = [];
 }
 
+/// <summary>The result of <c>play_capture</c>, beside its image.</summary>
+/// <param name="Width">The width of the image in pixels.</param>
+/// <param name="Height">The height of the image in pixels.</param>
+/// <param name="Play">The state of Play in OpenLancer when the game gave the image.</param>
+public sealed record PlayCaptureView(int Width, int Height, AgentPlayStatus Play);
+
 /// <summary>A change of a trigger in the live trace of a mission play.</summary>
 /// <param name="Sequence">The number of the change in its play, from 1.</param>
 /// <param name="Time">The time of the change since the game loaded the mission, in seconds.</param>
@@ -140,21 +146,35 @@ public interface IAgentPlay
     /// <param name="limit">The most changes of the page.</param>
     MissionTraceView Trace(int play, long since, int limit);
 
+    /// <summary>
+    /// Asks the game of Play in OpenLancer for an image of a frame after a delay (shared step SH9). The image has at most
+    /// the size of the arguments and keeps the shape of the game window.
+    /// </summary>
+    /// <returns>The wait for the image, as the tail of the call. It throws an <see cref="EditException"/> when the game
+    /// gives no image.</returns>
+    /// <exception cref="EditException"><see cref="EditErrorKind.Refused"/>: no game of Play in OpenLancer runs, also
+    /// while only the game of a play copy runs.</exception>
+    Func<CancellationToken, Task<(PlayCaptureView View, ToolImage Image)>> Capture(TimeSpan delay, int maxWidth,
+        int maxHeight);
+
     /// <summary>Stops the game of Play in OpenLancer when one runs, else the game of a play copy, as Shift+F5
     /// does.</summary>
     PlayStopView Stop();
 }
 
 /// <summary>
-/// The tools <c>play</c> and <c>play_stop</c> of section 7.6 of the MCP1 design, and <c>mission_play</c> and
-/// <c>mission_play_trace</c> of section 7.4. Only the editor host has them. The handler checks the arguments and makes
-/// the start. The Play of the editor then runs the checks of the Play menu or of the mission play request, and the
-/// agent play rule.
+/// The tools <c>play</c> and <c>play_stop</c> of section 7.6 of the MCP1 design, <c>mission_play</c> and
+/// <c>mission_play_trace</c> of section 7.4, and <c>play_capture</c> (shared step SH9). Only the editor host has them.
+/// The handler checks the arguments and makes the start. The Play of the editor then runs the checks of the Play menu or
+/// of the mission play request, and the agent play rule.
 /// </summary>
 internal static class PlayTools
 {
     /// <summary>The words of the argument <c>start</c>.</summary>
     public static readonly IReadOnlyList<string> Starts = ["space", "base"];
+
+    /// <summary>The most seconds of the delay of <c>play_capture</c>.</summary>
+    public const int MaxCaptureDelay = 60;
 
     /// <summary>The arguments of a start in space. A start at a base takes none of them.</summary>
     private static readonly string[] SpaceArguments = ["system", "position", "orientation"];
@@ -176,6 +196,16 @@ internal static class PlayTools
     }
 
     public static ToolStep Stop(ToolCall call) => ToolResult.Of(PlayOf(call).Stop());
+
+    /// <summary>An image of the game of Play in OpenLancer after <c>delay</c> seconds. The image has at most the size of
+    /// <c>width</c> and <c>height</c>, by default the render limit, and keeps the shape of the game window.</summary>
+    public static ToolStep Capture(ToolCall call)
+    {
+        var play = PlayOf(call);
+        var (width, height) = ViewTools.Size(call);
+        var delay = TimeSpan.FromSeconds(call.Args.Number("delay") ?? 0);
+        return ViewTools.Image(play.Capture(delay, width, height));
+    }
 
     /// <summary>
     /// The mission play of an agent. The reader of <c>mission_start_plan</c> reads the start, so one request plans and

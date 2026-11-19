@@ -273,4 +273,6 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
         Missions.Plays.Request(request, cancel);
 
     LiveTraceResult IAgentPlayEditor.LiveTrace(int play, long since) => Missions.LiveTrace(play, since);
+
+    Task<PlayCaptureResult> IAgentPlayEditor.Capture(TimeSpan delay) => Play.Capture(delay);
 }

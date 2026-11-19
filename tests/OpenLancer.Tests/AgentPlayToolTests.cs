@@ -507,5 +507,17 @@ public sealed partial class AgentPlayToolTests : IDisposable
             PlayStatus = AfterStop;
             return Stopping;
         }
+
+        /// <summary>The delay of each capture that reached Play.</summary>
+        public List<TimeSpan> Captures { get; } = [];
+
+        /// <summary>The result of the next captures, or null for a capture whose image does not come.</summary>
+        public PlayCaptureResult? Captured { get; set; }
+
+        public Task<PlayCaptureResult> Capture(TimeSpan delay)
+        {
+            Captures.Add(delay);
+            return Captured is { } result ? Task.FromResult(result) : new TaskCompletionSource<PlayCaptureResult>().Task;
+        }
     }
 }

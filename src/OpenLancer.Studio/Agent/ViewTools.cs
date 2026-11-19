@@ -386,7 +386,7 @@ internal static class ViewTools
             new SectionIdentity(kind == ItemRefKind.System ? "system" : "Base", nickname))) != null;
 
     /// <summary>The tail of an image call: it waits for the image, then gives the result with the image.</summary>
-    private static ToolStep Image<T>(Func<CancellationToken, Task<(T View, ToolImage Image)>> shot) where T : notnull =>
+    internal static ToolStep Image<T>(Func<CancellationToken, Task<(T View, ToolImage Image)>> shot) where T : notnull =>
         ToolStep.Then(async cancel =>
         {
             var (view, image) = await shot(cancel).ConfigureAwait(false);
@@ -421,10 +421,11 @@ internal static class ViewTools
         : target.System != null ? ToolGroup.Scene
         : null;
 
-    /// <summary>The size of the image of a call: the arguments <c>width</c> and <c>height</c>, or 1024 by 640.</summary>
+    /// <summary>The size of the image of a call: the arguments <c>width</c> and <c>height</c>. Without them, the size
+    /// is the default of the arguments of the tool, or the render limit for an argument without a default.</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.Limit"/> for a side above the render limit (section 8.4
     /// of the MCP1 design).</exception>
-    private static (int Width, int Height) Size(ToolCall call)
+    internal static (int Width, int Height) Size(ToolCall call)
     {
         var max = call.Limits.RenderPixels;
         foreach (var side in new[] { "width", "height" })
@@ -435,7 +436,7 @@ internal static class ViewTools
                     AgentTexts.Error("limit_render", ("max", max))) { Field = side });
             }
         }
-        return ((int)call.Args.Whole("width")!, (int)call.Args.Whole("height")!);
+        return ((int)(call.Args.Whole("width") ?? max), (int)(call.Args.Whole("height") ?? max));
     }
 
     /// <summary>The item of a reference of <c>select_items</c>.</summary>
