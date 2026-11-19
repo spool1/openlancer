@@ -47,23 +47,24 @@ public sealed class ThnReferrerTests
 
     /// <summary>
     /// Each change of the active mod that removes or breaks an item of the script gives the item and the script. The
-    /// script of space does not name the item, so it is not in the result. The changes are unsaved edits, a saved patch,
-    /// a whole file of the active mod and an animation file of the active mod. A cascade of the search of the referrer
-    /// errors counts too: the delete of a body part makes the costume that names it unusable.
+    /// script of space does not name the item, so it is not in the result. The changes are unsaved edits, a saved
+    /// patch, a whole file of the active mod and an animation file of the active mod. A cascade of the search of the
+    /// referrer errors counts too: the delete of a body part makes the costume that names it unusable. The script gets
+    /// one error, on the entity or the event that names the item. A missing effect or clip is a name problem, not a
+    /// crash.
     /// </summary>
     [Theory]
-    [InlineData("delete costume")]
-    [InlineData("rename costume")]
-    [InlineData("body without a body part")]
-    [InlineData("delete body part")]
-    [InlineData("equipment without a model")]
-    [InlineData("delete effect")]
-    [InlineData("saved delete patch")]
-    [InlineData("whole file without the costume")]
-    [InlineData("second costume without a body part")]
-    [InlineData("remove the room line")]
-    [InlineData("remove a clip")]
-    public void EachBreakGivesTheItemAndTheScriptThatNamesIt(string change)
+    [InlineData("delete costume", true)]
+    [InlineData("rename costume", true)]
+    [InlineData("body without a body part", true)]
+    [InlineData("delete body part", true)]
+    [InlineData("equipment without a model", true)]
+    [InlineData("delete effect", false)]
+    [InlineData("saved delete patch", true)]
+    [InlineData("whole file without the costume", true)]
+    [InlineData("remove the room line", true)]
+    [InlineData("remove a clip", false)]
+    public void EachBreakGivesTheItemAndTheScriptThatNamesIt(string change, bool crashes)
     {
         using var ws = change == "remove a clip" ? ClipWorkspace() : ThnDataWorkspace.Create();
         (ThnItemKind, string) expected = change switch
@@ -73,6 +74,13 @@ public sealed class ThnReferrerTests
             "remove the room line" => (ThnItemKind.Room, "bar1"),
             "remove a clip" => (ThnItemKind.Animation, "Sc_Sit"),
             _ => (ThnItemKind.Costume, "trent"),
+        };
+        var entity = change switch
+        {
+            "equipment without a model" => "Gear",
+            "delete effect" => "Fx",
+            "remove the room line" => "Bar",
+            _ => "Man",
         };
         switch (change)
         {
@@ -105,11 +113,6 @@ public sealed class ThnReferrerTests
             case "equipment without a model":
                 session.Execute(EditCommand.RemoveName(ThnDataWorkspace.Equipment("Thruster", "thruster1"), "DA_archetype"));
                 break;
-            case "second costume without a body part":
-                // The last section with the name gives the costume, as in the engine.
-                session.Execute(EditCommand.AddSection(ThnDataWorkspace.CostumesPath, "Costume",
-                    [ThnDataWorkspace.Line("nickname", "trent"), ThnDataWorkspace.Line("body", "no_body")]));
-                break;
             case "delete effect":
                 session.Execute(EditCommand.DeleteSection(new SectionRef(@"DATA\FX\effects.ini",
                     new SectionIdentity("Effect", "fx1"))));
@@ -119,6 +122,40 @@ public sealed class ThnReferrerTests
         Assert.Empty(session.GateCutscenes());
         Assert.Equal([expected], session.BrokenCutsceneItems());
         Assert.Equal([ScriptPath], session.ReferrerCutscenes());
+        var error = Assert.Single(session.CutsceneErrors(ScriptPath)).Message;
+        Assert.Contains($"\"{entity}\"", error);
+        Assert.Contains($"\"{expected.Item2}\"", error);
+        Assert.Equal(crashes, error.StartsWith(EditSession.CutsceneCrash, System.StringComparison.Ordinal));
+        AssertInvariant(session);
+    }
+
+    /// <summary>
+    /// The game crashes on an item without a model in the lower data, with or without the active mod. So an edit of
+    /// another line of its section gives no item and no error, also in a cutscene that the active mod changes. The
+    /// lower cutscene has the same problem in the lower data. The solar has no DA_archetype line, and the game makes
+    /// a [Light] without a model.
+    /// </summary>
+    [Theory]
+    [InlineData("station1", @"DATA\SOLAR\solararch.ini", "Solar", "no_model")]
+    [InlineData("thruster1", ThnDataWorkspace.EquipmentPath, "Light", "light1")]
+    public void AnEditOfAnotherLineOfAnItemWithoutAModelInTheLowerDataGivesNoItem(string replaced, string file,
+        string type, string template)
+    {
+        using var ws = ThnDataWorkspace.Create();
+        ws.WriteBase(ScriptPath, ThnDataWorkspace.Script.Replace($"\"{replaced}\"", $"\"{template}\"",
+            System.StringComparison.Ordinal));
+        var session = ws.Session("act");
+        Assert.Empty(session.CutsceneErrors(ScriptPath));
+
+        session.Execute(EditCommand.SetLinesFromText(new SectionRef(file, new SectionIdentity(type, template)), "mass",
+            ["10"]));
+
+        Assert.Empty(session.BrokenCutsceneItems());
+        Assert.Empty(session.ReferrerCutscenes());
+        Assert.Empty(session.CutsceneErrors(ScriptPath));
+        session.Execute(ThnEdits.Set(Entity(session, "Cam"), new ThnPath("cameraprops.fovh"), new ThnNumber(20)));
+        Assert.Empty(session.CutsceneErrors(ScriptPath));
+        Assert.Empty(session.SaveProblems());
         AssertInvariant(session);
     }
 
@@ -188,33 +225,55 @@ public sealed class ThnReferrerTests
 
     /// <summary>
     /// An open transaction and an open batch count too, for example a gesture of the Inspector and an agent call before
-    /// its commit checks. A body that names no body part makes the costume unusable at once. A cancel heals it.
+    /// its commit checks. A body that names no body part, a delete and a rename of the costume each break the script
+    /// at once. A cancel heals it.
     /// </summary>
-    [Fact]
-    public void AnOpenTransactionOrBatchGivesTheBrokenScriptAtOnce()
+    [Theory]
+    [InlineData("body without a body part")]
+    [InlineData("delete costume")]
+    [InlineData("rename costume")]
+    public void AnOpenTransactionOrBatchGivesTheBrokenScriptAtOnce(string change)
     {
         using var ws = ThnDataWorkspace.Create();
         var session = ws.Session("act");
-        var noBody = EditCommand.SetLinesFromText(ThnDataWorkspace.Costume("trent"), "body", ["no_body"]);
-
-        using (var transaction = session.Begin("Set the body"))
+        EditCommand Change() => change switch
         {
-            transaction.Apply(noBody);
-            Assert.Equal([ScriptPath], session.ReferrerCutscenes());
-            AssertInvariant(session);
+            "delete costume" => EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")),
+            "rename costume" => EditCommand.Rename(ThnDataWorkspace.Costume("trent"), "trent_new"),
+            _ => EditCommand.SetLinesFromText(ThnDataWorkspace.Costume("trent"), "body", ["no_body"]),
+        };
+
+        using (var transaction = session.Begin("Change the costume"))
+        {
+            transaction.Apply(Change());
+            AssertBroken(session);
             transaction.Cancel();
         }
-        Assert.Empty(session.ReferrerCutscenes());
+        AssertHealed(session);
 
-        using (var batch = session.BeginBatch("Set the body"))
+        using (var batch = session.BeginBatch("Change the costume"))
         {
-            batch.Run(noBody);
-            Assert.Equal([ScriptPath], session.ReferrerCutscenes());
-            AssertInvariant(session);
+            batch.Run(Change());
+            AssertBroken(session);
             batch.Cancel();
         }
-        Assert.Empty(session.ReferrerCutscenes());
-        AssertInvariant(session);
+        AssertHealed(session);
+
+        static void AssertBroken(EditSession session)
+        {
+            Assert.Equal([(ThnItemKind.Costume, "trent")], session.BrokenCutsceneItems());
+            Assert.Equal([ScriptPath], session.ReferrerCutscenes());
+            Assert.Contains("\"trent\"", Assert.Single(session.CutsceneErrors(ScriptPath)).Message);
+            AssertInvariant(session);
+        }
+
+        static void AssertHealed(EditSession session)
+        {
+            Assert.Empty(session.BrokenCutsceneItems());
+            Assert.Empty(session.ReferrerCutscenes());
+            Assert.Empty(session.CutsceneErrors(ScriptPath));
+            AssertInvariant(session);
+        }
     }
 
     /// <summary>Two calls at one revision search the referrer errors one time and look up the word index one time. A

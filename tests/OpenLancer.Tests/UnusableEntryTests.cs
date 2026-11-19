@@ -150,6 +150,28 @@ public sealed class UnusableEntryTests
         Assert.True(session.Save().Saved);
     }
 
+    /// <summary>A lower mod made the curve unusable, and the active mod changes another line of the curve. The lower
+    /// curve has no point either, so the active mod did not make the curve unusable. The light gives a warning, and the
+    /// save goes on.</summary>
+    [Fact]
+    public void AnEditOfAnotherLineOfACurveThatALowerModMadeUnusableGivesAWarningOnly()
+    {
+        using var ws = Create(lowerFiles: new()
+        {
+            [@"patches\DATA\igraph.ini"] = "[IGraph]\nnickname = curve1\nol.remove = point\n",
+        });
+        var session = ws.Session("act");
+
+        session.Execute(EditCommand.SetLinesFromText(Curve, "type", ["float"]));
+
+        var curve = session.Lists.List("curve")!.Find("curve1")!;
+        Assert.Equal((false, false), (curve.Usable, curve.UnusableByActiveMod));
+        var problem = Assert.Single(session.Lists.Problems(Light));
+        Assert.Equal((ListProblemKind.Unusable, false), (problem.Kind, problem.IsError));
+        Assert.Empty(session.SaveProblems());
+        Assert.True(session.Save().Saved);
+    }
+
     /// <summary>A missile without its explosion stops the load. Each gun that fires it is an error, and each gun is
     /// unusable in its turn, so each loadout line that names such a gun is an error too.</summary>
     [Fact]

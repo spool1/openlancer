@@ -1101,7 +1101,7 @@ Each save runs the save gate first, also a save with nothing to write, and also 
 - An error of the checks of a cutscene that the active mod changes, when the lower cutscene does not have the error. For example, a LIGHT has no `spatialprops.pos`. A whole cutscene file of the active mod that the engine cannot read is an error too. The game crashes when it plays such a cutscene, so the message starts with "The game crashes when it plays this cutscene."
 - A template of a cutscene that the active mod changes, when the template names no entry of its data list (see "Data lists and pickers"). The check reads the lists with the unsaved edits, so an unsaved INI edit counts, for example a new costume. A template whose item the active mod deletes, renames or makes unusable blocks the save, also when the template does not change. A room, a prop or a cart that a petalDB file of the active mod removes counts too. An INI edit that deletes an item that only an unchanged cutscene names does not block the save.
 
-  The check of the lower cutscene uses the lower game data. So a template that the lower cutscene has with the same problem in the lower data does not block the save. This is also true after a rename of its entity.
+  The check of the lower cutscene uses the lower game data. So a template that the lower cutscene has with the same problem in the lower data does not block the save. This is also true after a rename of its entity, and after an edit of another line of its item. For example, the active mod changes the `mass` of a solar that has no `DA_archetype` line in the lower data either.
 
   These templates crash the game, so their messages start with "The game crashes when it plays this cutscene.":
   - the costume of a DEFORMABLE without `userprops.Actor`. A costume of the active mod whose `body` names no body part is not usable either, because the game drops it. The message tells why.
@@ -1133,7 +1133,7 @@ An entry is unusable when the engine cannot use it. A curve without points is un
 
 An error that makes the game crash does not make its entry unusable, because the game loads the entry. The game crashes only when it uses the bad value. For example, a jump gate with a `dock_with` that names no base is an error on its `dock_with` line, and the error blocks Save. The `goto` line of the partner gate names a gate that the game loads, so that line is no error.
 
-A line that names an unusable entry can make its own section unusable. The gate follows such lines. For example, a missile without its explosion makes each gun that fires it an error. The game drops such a gun, so each loadout line that names the gun is an error too. When a lower mod or the base data made the entry unusable, the line gives a warning only.
+A line that names an unusable entry can make its own section unusable. The gate follows such lines. For example, a missile without its explosion makes each gun that fires it an error. The game drops such a gun, so each loadout line that names the gun is an error too. When a lower mod or the base data made the entry unusable, the line gives a warning only. This is also true when the active mod changes another line of the entry.
 
 Each error tells what the game does with the data, for example "The game stops loading with this value.", "The game crashes when the player docks here." or "The game drops this object." An error about an unusable entry tells why the entry is not usable, and how to correct the line:
 

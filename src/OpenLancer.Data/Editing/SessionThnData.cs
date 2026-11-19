@@ -24,9 +24,9 @@ namespace OpenLancer.Data.Editing;
 /// <para>A clip of a character comes from the list <c>animation</c>, so the session reads the animation files only for
 /// a script with a START_MOTION event on a character.</para>
 /// <para>Each such answer also tells if the active mod causes it: the active mod removes the name, makes the entry
-/// unusable, or adds or changes the section of the item. A clip that W does not have and the lower layer has is a clip
-/// that the active mod removes. A value of a values list, for example a room of petalDB, is the same.
-/// <see cref="Lower"/> gives no state for such an answer.</para>
+/// unusable, or adds or changes the section of the item when the lower section has a model. A clip that W does not have
+/// and the lower layer has is a clip that the active mod removes. A value of a values list, for example a room of
+/// petalDB, is the same. <see cref="Lower"/> gives no state for such an answer.</para>
 /// <para>The checks of a script depend on the game data only through the answers of this class. So the class keeps
 /// each answer, and <see cref="Unchanged"/> tells if the lists give the same answers now. An unsaved INI edit that
 /// changes an answer then checks the cutscene again, and an edit of another file does not.</para>
@@ -104,7 +104,11 @@ internal sealed class SessionThnData : IThnGameData
         if (!ThnTemplateRules.NeedsModel(kind) || lists.SectionOf(entry) is not { } section)
             return new Answer(ThnItemState.Ready, false, null);
         var (state, reason) = Model(session, kind, section);
-        return new Answer(state, state != ThnItemState.Ready && lists.ChangedByActiveMod(entry), reason);
+        // The active mod causes a model problem only when the lower section has a model. An edit of another line of a
+        // section without a model in the lower data does not cause it.
+        var byActiveMod = state != ThnItemState.Ready &&
+            lists.ProblemByActiveMod(entry, lower => Model(session, kind, lower).State != ThnItemState.Ready);
+        return new Answer(state, byActiveMod, reason);
     }
 
     /// <summary>The model of the section of an item, as the engine gives it: the file of the last <c>DA_archetype</c>

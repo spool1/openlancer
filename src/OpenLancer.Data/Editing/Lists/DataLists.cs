@@ -72,6 +72,10 @@ public sealed class DataLists
     private readonly Dictionary<string, (IReadOnlyList<string> Paths, HashSet<string> Values)> lowerValues =
         new(StringComparer.OrdinalIgnoreCase);
 
+    // The sections of the lower layer of a whole file by their identity (see LowerSectionOf). The lower layer does not
+    // change in a session.
+    private readonly Dictionary<string, Dictionary<SectionIdentity, Section>> lowerSections = new(VfsPath.Comparer);
+
     internal DataLists(EditSession session, ListRules rules)
     {
         this.session = session;
@@ -207,8 +211,9 @@ public sealed class DataLists
 
     /// <summary>
     /// The entries that the lower layer has and the active mod removes: a delete, an <c>ol.delete</c> patch, a whole
-    /// file without the entry, or a rename. Only files that the active mod changes can remove an entry. A name that
-    /// another file of the list still gives is not removed.
+    /// file without the entry, or a rename. Only files that the active mod changes can remove an entry. A delete or a
+    /// rename in the open transaction or batch counts too, so a check before the commit sees it. A name that another
+    /// file of the list still gives is not removed.
     /// </summary>
     public IReadOnlyList<RemovedEntry> Removed() => RemovedState().Entries;
 
@@ -744,17 +749,22 @@ public sealed class DataLists
         var id = table.Ids[index];
         var keyName = SectionKeys.For(section.Name).KeyEntry ?? SectionKeys.DefaultKey;
         var (origin, mod, inW, unsaved) = session.EntryOrigin(table, index, keyName);
-        var missing = definition.Requires.Where(k => !section.Any(e => Is(e.Name, k) && e.Count > 0)).ToList();
+        var missing = definition.Requires.Where(k => !HasLine(section, k)).ToList();
         var entry = new ListEntry(name, inW ? new SectionRef(table.Path, id) : null, origin, mod, Detail(section, definition))
         {
             Usable = missing.Count == 0,
             Problem = missing.Count == 0 ? null : $"The [{section.Name}] '{name}' has no '{missing[0]}' line.",
             Unsaved = unsaved,
-            UnusableByActiveMod = missing.Count > 0 && ChangedByActiveMod(table, index),
+            // A lower section without a required line made the entry unusable before the active mod.
+            UnusableByActiveMod = missing.Count > 0 &&
+                ProblemByActiveMod(table, index, lower => definition.Requires.Any(k => !HasLine(lower, k))),
         };
         entrySources.AddOrUpdate(entry, new EntrySource(table, index));
         return entry;
     }
+
+    /// <summary>True when a section has a line of the key with a value.</summary>
+    private static bool HasLine(Section section, string key) => section.Any(e => Is(e.Name, key) && e.Count > 0);
 
     /// <summary>
     /// The section that gives an entry of a list, as the lists read its file: W, or the edit view of a whole file of the
@@ -765,11 +775,44 @@ public sealed class DataLists
     internal Section? SectionOf(ListEntry entry) =>
         entrySources.TryGetValue(entry, out var source) ? source.Table.Working[source.Index] : null;
 
-    /// <summary>True when the active mod adds or changes the section that gives an entry of a list (see
-    /// <see cref="SectionOf"/> and <see cref="ChangedByActiveMod(FileTable, int)"/>). False for an entry without such a
-    /// section.</summary>
-    internal bool ChangedByActiveMod(ListEntry entry) =>
-        entrySources.TryGetValue(entry, out var source) && ChangedByActiveMod(source.Table, source.Index);
+    /// <summary>
+    /// True when the active mod causes a problem of the section that gives an entry of a list (see
+    /// <see cref="SectionOf"/>). The active mod must add or change the section (see
+    /// <see cref="ChangedByActiveMod(FileTable, int)"/>), and the lower section must not have the problem. So an edit
+    /// of another line does not make a problem of the lower data a problem of the active mod. False for an entry
+    /// without such a section.
+    /// </summary>
+    /// <param name="entry">The entry.</param>
+    /// <param name="hasProblem">True when a section has the problem.</param>
+    internal bool ProblemByActiveMod(ListEntry entry, Func<Section, bool> hasProblem) =>
+        entrySources.TryGetValue(entry, out var source) && ProblemByActiveMod(source.Table, source.Index, hasProblem);
+
+    /// <summary>True when the active mod causes a problem of the section at an index of a table (see
+    /// <see cref="ProblemByActiveMod(ListEntry, Func{Section, bool})"/>).</summary>
+    private bool ProblemByActiveMod(FileTable table, int index, Func<Section, bool> hasProblem) =>
+        ChangedByActiveMod(table, index) && (LowerSectionOf(table, index) is not { } lower || !hasProblem(lower));
+
+    /// <summary>
+    /// The section of the lower layer with the identity of the section at an index of a table, or null when the lower
+    /// layer has no such section, for example a section that the active mod adds. B of a patch is the lower layer. B of
+    /// a document of the kind "whole file" is the file of the active mod, and a whole file that the editor shows
+    /// read-only has no document. So the method reads the lower layer of such a file, once for each session.
+    /// </summary>
+    private Section? LowerSectionOf(FileTable table, int index)
+    {
+        if (table.Document is { IsWholeFile: false } document)
+            return document.BaseSection(table.Ids[index]);
+        if (!lowerSections.TryGetValue(table.Path, out var byId))
+        {
+            var sections = session.LowerSections(table.Path) ?? [];
+            var ids = SectionIdentity.Identify(sections);
+            byId = new Dictionary<SectionIdentity, Section>();
+            for (var i = 0; i < sections.Count; i++)
+                byId[ids[i]] = sections[i];
+            lowerSections[table.Path] = byId;
+        }
+        return byId.GetValueOrDefault(table.Ids[index]);
+    }
 
     /// <summary>The detail text of an entry: the first line of each detail key, as "key = values".</summary>
     private static string Detail(Section section, ListDefinition definition)
@@ -861,7 +904,7 @@ public sealed class DataLists
         var entries = new List<RemovedEntry>();
         if (session.ActiveMod is { } active)
         {
-            foreach (var path in session.ActiveChangedPaths())
+            foreach (var path in session.ActiveChangedPathsWithOpen())
             {
                 if (session.OpenDocument(path) is not { } document || TableOf(document.Path) is not { } now)
                     continue;

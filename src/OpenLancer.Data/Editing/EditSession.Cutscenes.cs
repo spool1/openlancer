@@ -313,7 +313,8 @@ public sealed partial class EditSession
     /// <remarks>
     /// <para>Only a change of the active mod gives such an answer. So the candidates are these names:</para>
     /// <list type="bullet">
-    /// <item>The names that the active mod removes from the lists of the templates (<see cref="DataLists.Removed"/>).</item>
+    /// <item>The names that the active mod removes from the lists of the templates
+    /// (<see cref="DataLists.Removed"/>).</item>
     /// <item>The entries of these lists that the search of the referrer errors visits
     /// (<see cref="DataLists.WalkedEntries"/>).</item>
     /// <item>The values of a values list, for example the rooms of petalDB, that the lower layer has and W does not
