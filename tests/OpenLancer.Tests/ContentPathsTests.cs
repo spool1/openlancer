@@ -10,9 +10,9 @@ using Xunit;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The places of the new files of a mod and the values that name them (decision O2): the folder of the mod, the place
-/// of each kind of new file, the value relative to the data folder, the value relative to the folder of
-/// <c>universe.ini</c>, and the test of a taken path. The names are invented.
+/// The places of the new files of a mod and the values that name them (decision O2). The tests cover the folder of the
+/// mod and the place of each kind of new file. They also cover the value relative to the data folder, the value
+/// relative to the folder of <c>universe.ini</c>, and the test of a taken path. The names are invented.
 /// </summary>
 public sealed class ContentPathsTests
 {

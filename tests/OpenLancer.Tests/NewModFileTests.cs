@@ -13,10 +13,10 @@ using static OpenLancer.Tests.AgentCalls;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The new files of the folder of the active mod (decision O2): the editor makes, edits and deletes each INI file below
-/// <c>DATA\MODS\&lt;mod id&gt;</c> of the active mod as a whole file, with undo, the save, the recovery file, the repo
-/// guard and the view of the target checks. A whole file outside that folder and outside <c>DATA\MISSIONS</c> stays
-/// read-only. The data is invented.
+/// The new files of the folder of the active mod (decision O2). The editor makes, edits and deletes each INI file below
+/// <c>DATA\MODS\&lt;mod id&gt;</c> of the active mod as a whole file. The tests cover the undo, the save, the recovery
+/// file, the repo guard and the view of the target checks. A whole file outside that folder and outside
+/// <c>DATA\MISSIONS</c> stays read-only. The data is invented.
 /// </summary>
 public sealed class NewModFileTests
 {
@@ -390,9 +390,10 @@ public sealed class NewModFileTests
         Assert.False(File.Exists(FileOf(ws)));
     }
 
-    /// <summary>The real flow in the host without a window: a new system file of the folder of the mod with its
-    /// <c>[system]</c>, the save tool, and a new host on the same profile. The file is editable after the profile opens
-    /// again, the agent tools read and change it, and the merged files of the edit view have it.</summary>
+    /// <summary>The real flow in the host without a window. The test makes a new system file of the folder of the mod
+    /// with its <c>[system]</c>, runs the save tool and opens a new host on the same profile. The file is editable after
+    /// the profile opens again. The agent tools read and change it, and the merged files of the edit view have
+    /// it.</summary>
     [Fact]
     public void ASavedNewFileIsEditableAfterTheProfileOpensAgainInTheHostWithoutAWindow()
     {

@@ -14,8 +14,8 @@ namespace OpenLancer.Data.Editing;
 /// <remarks>
 /// <para>A line names a file in one of two ways. A <c>[system]</c> of <c>universe.ini</c> names its file relative to
 /// the folder of <c>universe.ini</c> (see <see cref="UniverseValue"/>). The other lines name their file relative to the
-/// data folder, for example <c>[Base] file</c>, <c>[Room] file</c>, <c>[Nebula] file</c>, <c>[Asteroids] file</c> and
-/// a cutscene path (see <see cref="DataValue"/>).</para>
+/// data folder (see <see cref="DataValue"/>). Examples are <c>[Base] file</c>, <c>[Room] file</c>,
+/// <c>[Nebula] file</c>, <c>[Asteroids] file</c> and a cutscene path.</para>
 /// <para>The place members compose the path only. The caller checks the names first.</para>
 /// </remarks>
 public static class ContentPaths
@@ -59,7 +59,7 @@ public static class ContentPaths
 
     /// <summary>
     /// The file of a new nebula or asteroid field of a mod: <c>SOLAR\NEBULA\&lt;name&gt;.ini</c> or
-    /// <c>SOLAR\ASTEROIDS\&lt;name&gt;.ini</c> in the folder of the mod (decision O2), as the retail files have their
+    /// <c>SOLAR\ASTEROIDS\&lt;name&gt;.ini</c> in the folder of the mod (decision O2). The retail files have the same
     /// two folders. The <c>[Nebula]</c> or <c>[Asteroids]</c> section of a system file names it with
     /// <see cref="DataValue"/>.
     /// </summary>
@@ -87,9 +87,9 @@ public static class ContentPaths
     internal static string SoundsFile(string modId) => $@"{OwnFolder(modId)}\AUDIO\sounds.ini";
 
     /// <summary>
-    /// The value of a line that names a file relative to the data folder: the install path below the data folder, for
-    /// example <c>MODS\my_mod\BASES\my_base.ini</c> for <c>DATA\MODS\my_mod\BASES\my_base.ini</c>. The engine resolves
-    /// such a line through the data folder. Null for a path outside the data folder.
+    /// The value of a line that names a file relative to the data folder: the install path below the data folder. An
+    /// example is <c>MODS\my_mod\BASES\my_base.ini</c> for <c>DATA\MODS\my_mod\BASES\my_base.ini</c>. The engine
+    /// resolves such a line through the data folder. Null for a path outside the data folder.
     /// </summary>
     /// <param name="installPath">An install path in any form.</param>
     public static string? DataValue(string installPath) =>
@@ -100,7 +100,7 @@ public static class ContentPaths
 
     /// <summary>
     /// The value of a <c>[system] file</c> line of <c>universe.ini</c> that names a file: the install path relative to
-    /// the folder of the <c>universe.ini</c> of the edit view, for example
+    /// the folder of the <c>universe.ini</c> of the edit view. An example is
     /// <c>..\MODS\my_mod\SYSTEMS\Ol01\Ol01.ini</c>. The map of the system files resolves the value against the same
     /// folder (see <see cref="SystemFiles.Folder"/>). Null when <c>freelancer.ini</c> names no <c>universe.ini</c>, or
     /// the path is not an install path.

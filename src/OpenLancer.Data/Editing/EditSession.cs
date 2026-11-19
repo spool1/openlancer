@@ -797,11 +797,11 @@ public sealed partial class EditSession : IDisposable
         }
     }
 
-    /// <summary>True when W has a file at an install path, in any letter case: the document of the file when the
-    /// session has one, else the edit view. So a whole file that W deleted is free again, also before the save. It
+    /// <summary>True when W has a file at an install path, in any letter case. The document of the file tells when the
+    /// session has one, else the edit view tells. So a whole file that W deleted is free again, also before the save. It
     /// opens no document, so the live check of a typed file name records no file for the save.</summary>
     /// <remarks>A delete takes only a whole file that the active mod adds (see <see cref="EditCommand.DeleteFile"/> and
-    /// <c>DeleteScript</c>), so the lower layer has no file at the path of a deleted document.</remarks>
+    /// <c>DeleteScript</c>). So the lower layer has no file at the path of a deleted document.</remarks>
     /// <param name="normal">An install path in normal form.</param>
     internal bool HasFile(string normal) =>
         documents.TryGetValue(normal, out var document) ? document.State.Exists : EditViewFiles.FileExists(normal);

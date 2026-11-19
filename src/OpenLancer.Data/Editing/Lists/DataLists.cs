@@ -31,7 +31,7 @@ namespace OpenLancer.Data.Editing.Lists;
 /// each line that names it.</para>
 /// <para>A file that the active mod replaces with a whole file has its lower data in W. The lists read such a file as
 /// the edit view gives it, so they hold its entries. A whole file of the active mod that the editor edits (see
-/// <see cref="EditDocument.EditsWholeFile"/>) is a document of the kind "whole file" whose W has the data of the mod, so
+/// <see cref="EditDocument.EditsWholeFile"/>) is a document of the kind "whole file". Its W has the data of the mod, so
 /// the lists read its W. This is also true for a saved new file of the folder of the mod.</para>
 /// </remarks>
 public sealed class DataLists

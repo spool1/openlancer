@@ -64,7 +64,7 @@ public sealed partial class EditSession
     /// placeholders of all patches and whole INI files of the mod, because strings.json gives the text of each.</item>
     /// <item>A change of the lower layer since the open stops the save (F11): the base data, a lower mod, or the mod
     /// list of the profile. The session writes the recovery file, and the profile must open again. A whole file that
-    /// the editor edits and an editor file of the mod do not depend on the lower layer, so a change of their path in a
+    /// the editor edits and an editor file of the mod do not depend on the lower layer. So a change of their path in a
     /// lower mod does not stop the save.</item>
     /// <item>A file of the active mod that changed outside the editor stops the save, unless
     /// <paramref name="overwrite"/> is true (P7).</item>
@@ -499,9 +499,9 @@ public sealed partial class EditSession
     }
 
     /// <summary>
-    /// Why the editor writes no whole INI file at an install path into a mod, or null: the mod is in the OpenLancer repo
-    /// (decision D70, section 6.7 of the M6b design). The content scan cannot tell a whole mission file from a copy of
-    /// a retail script, and an INI file of the folder of the mod from a copy of a retail file.
+    /// Why the editor writes no whole INI file at an install path into a mod, or null. The editor writes none into a mod
+    /// in the OpenLancer repo (decision D70, section 6.7 of the M6b design). There, the content scan cannot tell a whole
+    /// mission file from a copy of a retail script. It cannot tell another INI file from a copy of a retail file either.
     /// </summary>
     /// <param name="path">The install path of a whole file that the editor edits (see
     /// <see cref="EditDocument.EditsWholeFile"/>).</param>

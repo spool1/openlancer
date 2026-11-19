@@ -275,9 +275,9 @@ internal static class NebulaFiles
 /// <summary>The data lists of a session (section 20.1 item 4 of the M21 design).</summary>
 public sealed class DataListsTests
 {
-    /// <summary>A saved new file of the folder of the active mod is a whole file that the editor edits, so the lists read
-    /// its W, also after an edit that the session did not save. Without this, a gate in a saved new system file would
-    /// be missing from the lists until the next save.</summary>
+    /// <summary>A saved new file of the folder of the active mod is a whole file that the editor edits. So the lists read
+    /// its W, also after an edit that the session did not save. Without this, the lists would not have a gate of a saved
+    /// new system file until the next save.</summary>
     [Fact]
     public void TheListsReadWOfASavedNewFileOfTheFolderOfTheMod()
     {
