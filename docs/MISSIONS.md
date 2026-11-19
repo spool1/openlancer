@@ -340,7 +340,7 @@ The replay has no game world. So it does not know where a ship flew before the t
 - A trigger of the path gave the ship orders. In the game, the ship flew these orders before the trigger of the play start. In the play, the ship starts at the place of the setup. That place can be far from the place where its orders took it.
 - A trigger that waits at the start tests the place of a ship with a distance check. In the game, the ship got to that place soon after the trigger of the play start. In the play, the ship can start away from that place and never get there.
 
-M04 shows this at the trigger `juni_mactan_tether`, in both games. The start place of the player is about 24 km from the base where the player launches in the game. The setup also puts the escort `Juni_mactan` next to the player. The game keeps her undock flight, so she flies back toward the dock.
+M04 shows this at the trigger `juni_mactan_tether`, in both games. The start place of the player is about 24 km from the base where the player launches in the game. The setup also puts the escort `Juni_mactan` next to the player. In the play, she keeps her undock flight, so she flies back toward the dock.
 
 Two waiting triggers test if she is near an exit of the dock. In the game, they give her the order to follow the player. In the play, she does not get near an exit, so she gets no follow order. She flies away from the player, and the mission fails after about one minute.
 
