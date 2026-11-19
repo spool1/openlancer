@@ -10,7 +10,7 @@ This version has these limits:
 - A new cutscene is a text file. Nobody checked a new cutscene in the retail games yet, so the editor marks it "not checked in the retail games".
 - The editor cannot change a whole cutscene file of a mod into a patch.
 - The validation reports only the errors that stop a cutscene, the templates that name no item and the clips that the game does not have. It does not report warnings, for example an event after the end of the script.
-- The save gate checks only the cutscenes that the active mod changes. So a delete or a rename of a costume or another item does not stop the save when only an unchanged cutscene names the item.
+- The save gate finds a cutscene that a change of the game data breaks by the name of the item in the cutscene file. So it does not find a template that a text script makes from parts, for example with `..`.
 
 ## Browse and preview the retail cutscenes
 
@@ -190,6 +190,10 @@ The Inspector shows the selected entity or event, the selected events, or the cu
 
   A template that the lower cutscene has with the same problem in the lower game data stays out of the section. This is also true after a rename of its entity. When an INI edit of the active mod deletes, renames or breaks the item of a template, the problem stays in the section.
 
+  A change of the active mod in the game data can delete, rename or break an item that a cutscene names. The save gate then checks that cutscene, also when the active mod does not change it. Examples are a retail cutscene, a cutscene of a lower mod and a cutscene that no INI line names. The game crashes or shows less when it plays such a cutscene.
+
+  The Problems section of such a cutscene shows the problems, with a note about the cause. To correct a problem, undo the change of the game data, or pick another item in the cutscene. The save then writes the new item into a THN patch of the active mod.
+
   The check skips a template that the room fills in, for example `$terrain_dyna_01`, a DEFORMABLE with `userprops.Actor`, and a SOUND. It also skips the COMPOUNDs of a script that only `Act_CallThorn` lines name. It reads these lines with the unsaved edits, so you can save a new trigger line and the cutscene in one save.
 
 ### The animation of a character
@@ -224,7 +228,7 @@ When the event names a clip that the game does not have, the field shows "Missin
 
 The save gate checks the clip of each START_MOTION event on a character with the same rule and the same text. A clip of the active mod that the game does not have stops Save and Play. No clip has an empty name, so a new START_MOTION event on a character stops the save until you pick a clip. The Problems section shows the problem, and a click on it selects the event. An event without the key `animation` crashes the game, so the gate gives it as an error.
 
-A clip that the lower cutscene has with the same problem in the lower game data stays out of the gate. A clip that the active mod removes, for example with its own `.anm` file without the clip, stops the save. A clip on a COMPOUND, and a clip on a target that names no entity of the script, get no check.
+A clip that the lower cutscene has with the same problem in the lower game data stays out of the gate. A clip that the active mod removes, for example with its own `.anm` file without the clip, stops the save. The gate checks each cutscene of the edit view that plays such a clip, also a retail cutscene that the active mod does not change. A clip on a COMPOUND, and a clip on a target that names no entity of the script, get no check.
 
 The gate reads the clips from the data list `animation`. The list has the clips of the `.anm` files that the `[Animations]` lines of bodyparts.ini name, with the files of the mods. The editor cannot add or change an `[Animations]` line yet. A file that does not exist adds no clip, as in the game. `oltool validate` reports a clip problem as an error. `list_values` with the list `animation` gives the clips to an agent (see [MCP.md](MCP.md)).
 
@@ -239,6 +243,7 @@ When the editor cannot read an `.anm` file of the active mod, the save gives a w
    - If an edit gives an error that crashes the game, the save writes nothing. The Console line starts with "The game crashes when it plays this cutscene." and names the element and the key. Click the line to select the element. Correct the value or undo the edit, then save again.
    - If a template names no item of the game data, the save also writes nothing. The Console line names the element and the template, and tells what the scene does without the item. This is also true after an INI edit that deletes, renames or breaks the item. Pick an item of the list or undo the edit, then save again.
    - If a character gets a clip that the game does not have, or no clip, the save also writes nothing. The Console line names the event and the clip. Pick a clip of the list or undo the edit, then save again.
+   - If an INI edit deletes, renames or breaks an item that another cutscene names, the save also writes nothing. This is also true for a retail cutscene that you did not change. The Console line has that cutscene as its source, and names the element and the item. Undo the INI edit, or click the line and pick another item in that cutscene. Then save again.
 5. Wait for the validation. The Console shows "Validation OK for save 1: no errors, 0 warnings that the mod adds.", or the errors of the save.
 
 The patch holds only the values that the edits change. A save keeps the bytes of a patch that the edits do not change, and it deletes a patch that changes nothing after the edits. "What stays in a patch file" in [MOD_FORMAT.md](MOD_FORMAT.md) gives the rules. The game plays the patched cutscene after `oltool deploy`. Play shows it without a deploy (see [PLAY.md](PLAY.md)).
