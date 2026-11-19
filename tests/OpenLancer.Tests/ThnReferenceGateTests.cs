@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Thn;
@@ -16,13 +17,20 @@ namespace OpenLancer.Tests;
 /// breaks (#81). This is also true when the active mod does not change the cutscene, because the game crashes or shows
 /// less when it plays it. The fixture script names a costume, equipment, an effect, a room and a clip. The active mod
 /// does not change it, and no INI line names it. Each error has the text, the place, the source and the origin of the
-/// Problems section of the Cutscene page. So Save, Play and the Console give one text.
+/// Problems section of the Cutscene page. So Save, Play and the Console give one text. The results of the agent
+/// tools, <c>check</c> and <c>save</c> give the same problems and the same refusal.
 /// </summary>
 public sealed class ThnReferenceGateTests
 {
     private const string TrentMissing = "The game crashes when it plays this cutscene. entity \"Man\", template_name: " +
                                         "The costume \"trent\" is not in the game data. A DEFORMABLE without " +
                                         "userprops.Actor needs it.";
+
+    private const string NoModel = "The game crashes when it plays this cutscene. entity \"Gear\", template_name: The " +
+                                   "equipment \"thruster1\" has no model: its [Thruster] section has no DA_archetype line.";
+
+    private const string ShipNoModel = "The game crashes when it plays this cutscene. entity \"Ship\", template_name: The " +
+                                       "ship \"ship1\" has no model: its [Ship] section has no DA_archetype line.";
 
     private const string LowScript = @"DATA\SCRIPTS\low_scene.thn";
 
@@ -31,6 +39,15 @@ public sealed class ThnReferenceGateTests
     /// <summary>The errors of a result of the save gate that a cutscene gives.</summary>
     private static List<Diagnostic> CutsceneErrors(SaveResult result) =>
         [.. result.Problems.Where(p => p is { Severity: DiagnosticSeverity.Error, Cutscene: not null })];
+
+    /// <summary>The references and the messages of the problems of an agent result that cutscenes give.</summary>
+    /// <param name="key">The list of the result, for example <c>new_problems</c>.</param>
+    private static List<(string? Ref, string? Message)> CutsceneProblems(JsonObject result, string key) =>
+    [
+        .. result[key]!.AsArray()
+            .Where(p => ((string?)p!["ref"])?.StartsWith("thn:", System.StringComparison.Ordinal) == true)
+            .Select(p => ((string?)p!["ref"], (string?)p!["message"])),
+    ];
 
     /// <summary>The note of the Problems section of the Cutscene page for the fixture script.</summary>
     private static string? Note(EditSession session, string path = ScriptPath) =>
@@ -240,5 +257,120 @@ public sealed class ThnReferenceGateTests
         Assert.Equal((ConsoleSeverity.Error, ScriptPath, TrentMissing), (line.Severity, line.Source, line.Message));
         Assert.Equal((ScriptPath, ThnElementKind.Entity), (line.Cutscene!.Path, line.Cutscene.Kind));
         Assert.Equal("act", line.Origin!.ModId);
+    }
+
+    /// <summary>
+    /// An agent INI edit that removes the <c>DA_archetype</c> line of the equipment gives the error of the unchanged
+    /// script in <c>new_problems</c>, as the save gate gives it. It is the first INI edit of the session, so no earlier
+    /// edit touched a file. A preview gives the same problem, and the script has no problem after it. Without a preview,
+    /// <c>check</c> lists the problem, and <c>save</c> refuses with the text of the save gate of the editor. The edit
+    /// that puts back the line gives the problem in <c>fixed_problems</c>, and the save then passes.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AnAgentIniEditThatBreaksAnUnchangedCutsceneGivesTheProblem(bool preview)
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        var gear = AgentCalls.Json($"sec:{ThnDataWorkspace.EquipmentPath}#Thruster/thruster1");
+        var problem = ($"thn:{ScriptPath}#entity/Gear", NoModel);
+        Assert.Empty(session.EditedPaths);
+
+        var broken = AgentCalls.Ok(host, "set_fields",
+            $$"""{ "ref": {{gear}}, "fields": { "DA_archetype": null }, "preview": {{(preview ? "true" : "false")}} }""");
+
+        Assert.Equal(preview ? "previewed" : "applied", (string?)broken["status"]);
+        Assert.Equal([problem], CutsceneProblems(broken, "new_problems"));
+        Assert.True(ThnBreaks.IsUnchanged(session, ScriptPath));
+        if (preview)
+        {
+            Assert.Empty(session.CutsceneErrors(ScriptPath));
+            Assert.Null(session.GateRefusal());
+            return;
+        }
+        var check = AgentCalls.Ok(host, "check", """{ "scope": "all" }""");
+        var (code, _, message) = AgentCalls.Error(host, "save");
+        Assert.Contains(problem, CutsceneProblems(check, "problems"));
+        Assert.Equal("save_blocked", code);
+        Assert.Equal($"The save stopped. 1 error blocks it. Correct it, then save again. {NoModel} The error is in " +
+                     $"thn:{ScriptPath}#entity/Gear.", message);
+
+        var mended = AgentCalls.Ok(host, "set_fields",
+            $$"""{ "ref": {{gear}}, "fields": { "DA_archetype": "equipment\\thruster1.3db" } }""");
+
+        Assert.Equal([problem], CutsceneProblems(mended, "fixed_problems"));
+        Assert.Empty(CutsceneProblems(mended, "new_problems"));
+        Assert.Empty(session.CutsceneErrors(ScriptPath));
+        Assert.True((bool)AgentCalls.Ok(host, "save")["saved"]!);
+    }
+
+    /// <summary>
+    /// An agent edit that removes the <c>DA_archetype</c> line of the ship gives the error of the entity "Ship" of the
+    /// unchanged script. The script of space names the ship too, but the game makes no COMPOUND of it, so it gives no
+    /// problem. <c>check</c> lists the error, and <c>save</c> refuses with the text of the save gate. The undo of the
+    /// agent gives no problem, and the save then passes and writes nothing.
+    /// </summary>
+    [Fact]
+    public void AnAgentShipEditGivesTheProblemOfTheUnchangedCutsceneAndAnUndoHealsIt()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        var ship = AgentCalls.Json($"sec:{Ship1.Path}#Ship/ship1");
+        var problem = ($"thn:{ScriptPath}#entity/Ship", ShipNoModel);
+
+        var broken = AgentCalls.Ok(host, "set_fields", $$"""{ "ref": {{ship}}, "fields": { "DA_archetype": null } }""");
+        var check = AgentCalls.Ok(host, "check", """{ "scope": "all" }""");
+        var gate = session.GateRefusal()!;
+        var (code, _, message) = AgentCalls.Error(host, "save");
+
+        Assert.Equal([problem], CutsceneProblems(broken, "new_problems"));
+        Assert.Equal([problem], CutsceneProblems(check, "problems"));
+        Assert.Equal([ThnDataWorkspace.SpaceScript, ScriptPath], session.GateCutscenes());
+        Assert.Contains(gate.Problems, p => p.Message == ShipNoModel && p.Source == ScriptPath);
+        Assert.Equal("save_blocked", code);
+        Assert.Contains($"{ShipNoModel} The error is in thn:{ScriptPath}#entity/Ship.", message);
+
+        AgentCalls.Ok(host, "undo");
+
+        Assert.Empty(AgentCalls.Ok(host, "check", """{ "scope": "all" }""")["problems"]!.AsArray());
+        var saved = AgentCalls.Ok(host, "save");
+        Assert.True((bool)saved["saved"]!);
+        Assert.Empty(saved["written"]!.AsArray());
+    }
+
+    /// <summary>
+    /// A call that changes only a cutscene reads no other cutscene. The user deleted the costume, so the base script and
+    /// the script of a lower mod both have the costume error. An agent edit of the camera of the base script gives no
+    /// problem: the base script had the error before the call, and the call does not read the script of the lower mod.
+    /// So the call does not start the word index.
+    /// </summary>
+    [Fact]
+    public void ACutsceneCallAfterABreakGivesNoProblemOfAnotherCutscene()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        ws.Mod("low", new()
+        {
+            [@"files\" + LowScript] = """
+                duration = 5
+                entities = { { entity_name = "Guard", type = DEFORMABLE, template_name = "trent" } }
+                events = {}
+                """,
+        });
+        ws.WriteProfile("low", "act");
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
+        var cam = AgentCalls.Json($"thn:{ScriptPath}#entity/Cam");
+
+        var result = AgentCalls.Ok(host, "set_fields", $$"""{ "ref": {{cam}}, "fields": { "cameraprops.fovh": 20 } }""");
+
+        Assert.Equal("applied", (string?)result["status"]);
+        Assert.Empty(result["new_problems"]!.AsArray());
+        Assert.Empty(result["fixed_problems"]!.AsArray());
+        Assert.False(session.Mentions.IsStarted);
+        Assert.Equal([ScriptPath, LowScript], session.GateCutscenes());
     }
 }
