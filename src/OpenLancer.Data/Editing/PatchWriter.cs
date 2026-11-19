@@ -744,8 +744,8 @@ internal static class PatchWriter
         /// their place in W. So they do not move the sections after them:
         /// <list type="bullet">
         /// <item>A ship or formation section of a mission file gets <c>ol.before</c> (section 6.4 of the M6b design).
-        /// It goes directly before the kept section after it in W. A section whose next kept section has no key that
-        /// the merge can find goes to the end of the file, as another new section does.</item>
+        /// It goes directly before the kept section after it in W. The merge can find the next kept section only by
+        /// its key. When it has no such key, the section goes to the end of the file, as another new section does.</item>
         /// <item>A <c>[Base]</c> of <c>universe.ini</c> in the run of new and moved <c>[Base]</c> sections directly
         /// before the first <c>[system]</c> of W gets no directive. The merge puts each new <c>[Base]</c> directly
         /// before the first <c>[system]</c> (see <see cref="UniverseOrder"/>). A <c>[Base]</c> that a kept section

@@ -15,9 +15,9 @@ namespace OpenLancer.Data.Ini;
 /// <c>[Base]</c> before the first <c>[system]</c>. A <c>[Base]</c> at the end of the file thus has no station in the
 /// game.</para>
 /// <para>The edit (<c>EditCommand.AddSection</c>), the merge (<see cref="IniPatcher"/>) and the patch writer use this
-/// one rule. So W and each merged file agree: the overlay of F5, the target build of Ctrl+F5, the play copies, the
-/// drop-in zip and the W of a patch that the editor opens again. The rule needs no directive, so a patch keeps
-/// <c>ol.new</c> and the mod format does not change.</para>
+/// one rule. So W and each merged file agree. The merged files are the overlay of F5, the target build of Ctrl+F5, the
+/// play copies, the drop-in zip and the W of a patch that the editor opens again. The rule needs no directive, so a
+/// patch keeps <c>ol.new</c> and the mod format does not change.</para>
 /// </remarks>
 internal static class UniverseOrder
 {
