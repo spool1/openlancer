@@ -152,21 +152,11 @@ public sealed class ThnReferences
 
     /// <summary>
     /// The install path of the script that an INI value names, in normal form: the value below the data folder, with
-    /// <c>/</c> as <c>\</c> and without empty parts. Null when the value leaves the install root.
+    /// <c>/</c> as <c>\</c> and without empty parts. Null when the value leaves the install root. The engine resolves a
+    /// room script through the data folder (GameItemDb.cs:122-138). <see cref="Editing.ContentPaths.DataValue"/> gives
+    /// the value of an install path.
     /// </summary>
     public static string? PathOf(string value) => VfsPath.Normalize(DataFolder + "\\" + value);
-
-    /// <summary>
-    /// The INI value that names the script of an install path: the path below the data folder, for example
-    /// <c>MODS\m8proof\CUTSCENES\bar_shot.thn</c> for <c>DATA\MODS\m8proof\CUTSCENES\bar_shot.thn</c>. The engine
-    /// resolves a room script through the data folder (GameItemDb.cs:122-138). Null for a path outside the data
-    /// folder. <see cref="PathOf"/> gives the path back.
-    /// </summary>
-    public static string? IniValueOf(string installPath) =>
-        VfsPath.Normalize(installPath) is { } normal && normal.Length > DataFolder.Length + 1 &&
-        normal.StartsWith(DataFolder + "\\", StringComparison.OrdinalIgnoreCase)
-            ? normal[(DataFolder.Length + 1)..]
-            : null;
 
     /// <summary>Reads each INI file of a view of the game data, in the order of the paths.</summary>
     public static ThnReferences Scan(FileSystem view)

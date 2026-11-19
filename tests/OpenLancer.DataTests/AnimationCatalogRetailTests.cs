@@ -112,7 +112,7 @@ public sealed class AnimationCatalogRetailTests(ITestOutputHelper output)
         var first = clock.Elapsed;
         var reads = session.Lists.AnimationReads;
         var data = session.Lists.Animations()!;
-        var archive = ThnReferences.IniValueOf(data.Clips[0].Archive)!;
+        var archive = ContentPaths.DataValue(data.Clips[0].Archive)!;
         session.Execute(EditCommand.AddSection(session.DataFiles.Paths("bodyparts")[0], "Animations",
             [new EntryView("anim", [new StringValue(archive)])]));
         clock.Restart();

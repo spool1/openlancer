@@ -160,13 +160,10 @@ public static class MissionFiles
         return result;
     }
 
-    /// <summary>The text of a path for the UI, for example <c>Missions\M01a\m01a.ini</c>: the path below the data
+    /// <summary>The text of a path for the UI and for a mission line, for example <c>Missions\M01a\m01a.ini</c>: the
+    /// path below the data folder (see <see cref="ContentPaths.DataValue"/>), or the path itself outside the data
     /// folder.</summary>
-    public static string Display(string path)
-    {
-        var at = path.IndexOf('\\');
-        return at > 0 && path[..at].Equals("DATA", StringComparison.OrdinalIgnoreCase) ? path[(at + 1)..] : path;
-    }
+    public static string Display(string path) => ContentPaths.DataValue(path) ?? path;
 
     /// <summary>The text of a relative path from a mission line, for example <c>missions\\m04\\npcships.ini</c> with
     /// doubled backslashes, in the normal form of a path below the data folder, or null.</summary>

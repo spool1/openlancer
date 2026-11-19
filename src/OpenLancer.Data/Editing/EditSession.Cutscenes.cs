@@ -126,10 +126,7 @@ public sealed partial class EditSession
     /// (decision D67). Null without an active mod. <see cref="ThnEdits.NewCutsceneRefusal"/> checks the name.
     /// </summary>
     public string? NewCutscenePath(string name) =>
-        ActiveMod is { } mod ? $@"{NewCutsceneFolder(mod.Id)}\{name}.thn" : null;
-
-    /// <summary>The folder of the new cutscenes of a mod, as an install path.</summary>
-    internal static string NewCutsceneFolder(string modId) => $@"DATA\MODS\{modId}\CUTSCENES";
+        ActiveMod is { } mod ? $@"{ContentPaths.NewCutsceneFolder(mod.Id)}\{name}.thn" : null;
 
     /// <summary>True when the edit view or W has a file at an install path, in any letter case.</summary>
     internal bool HasCutsceneFile(string normal) =>

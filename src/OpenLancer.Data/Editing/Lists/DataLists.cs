@@ -684,7 +684,7 @@ public sealed class DataLists
         var entries = new List<ListEntry>(paths.Count);
         foreach (var path in paths)
         {
-            if (ThnReferences.IniValueOf(path) is not { } value)
+            if (ContentPaths.DataValue(path) is not { } value)
                 continue;
             var (origin, mod, unsaved) = session.FileOrigin(path);
             entries.Add(new ListEntry(value, null, origin, mod, path)

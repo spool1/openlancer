@@ -124,7 +124,7 @@ public sealed class RoomFilesRetailTests(ITestOutputHelper output)
         var placement = session.Sections(bar).Single(s => s.Id.Type.Equals("CharacterPlacement", StringComparison.OrdinalIgnoreCase));
 
         session.Execute(ThnEdits.NewCutscene(path, ThnTemplates.NewScript()));
-        var value = session.Lists.List("cutscene")!.Find(ThnReferences.IniValueOf(path)!)!;
+        var value = session.Lists.List("cutscene")!.Find(ContentPaths.DataValue(path)!)!;
         Assert.True(value.Unsaved);
         session.Execute(EditCommand.SetLinesFromText(placement, "start_script", [value.Value]));
         Assert.Empty(session.Lists.Problems(placement));

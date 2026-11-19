@@ -6,6 +6,7 @@ using System.Numerics;
 using ImGuiNET;
 using LibreLancer;
 using LibreLancer.ImUI;
+using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Thn;
@@ -149,7 +150,7 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
         }
 
         ImGui.SameLine();
-        var value = row == null ? null : ThnReferences.IniValueOf(row);
+        var value = row == null ? null : ContentPaths.DataValue(row);
         if (ToolbarItems.Button("copy-ini", EditorIcons.Link, IniValueTip(value), value != null))
         {
             ImGui.SetClipboardText(value!);
@@ -662,7 +663,7 @@ internal sealed class CutsceneBrowser(EditorWindow window, CutsceneWorkspace wor
             ImGui.SetClipboardText(entry.Path);
         }
 
-        var value = ThnReferences.IniValueOf(entry.Path);
+        var value = ContentPaths.DataValue(entry.Path);
         if (MenuItems.Item(EditorIcons.Link, "Copy INI value",
                 value == null ? "Only a cutscene below the DATA folder has an INI value." : null, IniValueTip(value)))
         {

@@ -348,7 +348,7 @@ public static class ThnEdits
     /// <see cref="InstallPaths.Problem"/>).</remarks>
     internal static string? NewCutscenePathProblem(Mods.Mod mod, string path)
     {
-        var folder = EditSession.NewCutsceneFolder(mod.Id);
+        var folder = ContentPaths.NewCutsceneFolder(mod.Id);
         var prefix = folder + '\\';
         const string extension = ".thn";
         if (path.Length > prefix.Length + extension.Length && path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
