@@ -2,10 +2,14 @@ using System;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
 using ModelContextProtocol.Protocol;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
+using OpenLancer.Editor;
 using OpenLancer.Editor.Agent;
 using OpenLancer.Mcp;
 using OpenLancer.Studio.Agent;
@@ -513,10 +517,6 @@ public sealed class AgentViewToolTests
         Assert.Equal(MissionEdits.Script, views.Opened.Single().Target);
     }
 
-    /// <summary>The text of a view or a play that waits for the reload of the game data.</summary>
-    private const string ReloadingText =
-        "The editor reloads the game data now. Call the tool again when studio_status shows data_load ready.";
-
     /// <summary>A new system of the active mod: its file in the folder of the mod, the text of its name and its
     /// <c>[system]</c> in <c>universe.ini</c>, as one edit. With <paramref name="dock"/>, also a new base in it.</summary>
     private static EditCommand NewSystem(EditSession session, bool dock = false) => EditCommand.Group("New system",
@@ -548,70 +548,99 @@ public sealed class AgentViewToolTests
     }
 
     /// <summary>
-    /// While the editor reloads the game data after a save, a view of a system that the save added waits for the reload.
-    /// open_view, render_scene and select_items with a frame give data_reloading, and the views of the editor get no
-    /// call. A selection without a frame opens no system, so it works. After the reload, the views show the
-    /// system.
+    /// While the editor loads the game data again after a save, the dispatcher of the editor runs only studio_status, and
+    /// it gives data_load reloading (shared step SH8). A view of a system that the save added and a play at its base
+    /// wait for the load. After the load, they run in their order with the game data of the save. Without the wait,
+    /// the view would refuse the system because the loaded data does not have it yet.
     /// </summary>
     [Fact]
-    public void WhileTheDataReloadsAViewOfASavedNewSystemGivesDataReloading()
+    public async Task DuringALoadOnlyStudioStatusRunsAndAViewOfTheSaveWaitsForTheLoad()
     {
         var (ws, host, views) = Editor();
         using var _ = ws;
+        var editor = new AgentPlayToolTests.FakePlayEditor();
+        host.TestPlay = new EditorAgentPlay(editor);
         var session = host.Session!;
-        session.Execute(NewSystem(session));
+        session.Execute(NewSystem(session, dock: true));
         AssertSaved(session);
         views.Unloaded.Add("Ol01");
-        views.DataLoad = AgentDataLoad.Reloading;
+        var ui = new QueuedUIThread();
+        var loads = new DataLoads(ui);
+        using var reload = new ManualResetEventSlim();
+        // As the window does: the views read the state of the loads, and a call waits while a load runs.
+        using var dispatcher = new AgentDispatcher(host, () =>
+        {
+            views.DataLoad = EditorAgentViews.DataLoadOf(loads);
+            return new EditorActivity(false, false, loads.IsBusy, false);
+        }, null, new FakeClock());
+        // The end of the reload gives the game data of the save to the views.
+        loads.Reload(() => () =>
+        {
+            Assert.True(reload.Wait(TimeSpan.FromSeconds(30)));
+            return views.Unloaded.Clear;
+        });
 
-        var open = Call(host, "open_view", """{ "system": "ol01" }""");
-        var render = Error(host, "render_scene", """{ "system": "system:Ol01" }""");
-        var select = Call(host, "select_items", """{ "refs": ["obj:Ol01_sun"] }""");
-        Ok(host, "select_items", """{ "refs": ["obj:Ol01_sun"], "frame": false }""");
-        var calls = (views.Opened.Count, views.Scene, views.Selected.Count);
-        views.DataLoad = AgentDataLoad.Ready;
-        views.Unloaded.Clear();
-        Ok(host, "open_view", """{ "system": "Ol01" }""");
-        Ok(host, "render_scene", """{ "system": "Ol01" }""");
+        var open = Queue(dispatcher, "open_view", """{ "system": "Ol01" }""");
+        var play = Queue(dispatcher, "play", """{ "start": "base", "base": "Ol01_01_Base" }""");
+        var during = Queue(dispatcher, "studio_status");
+        var ranDuring = new[] { dispatcher.Frame(), dispatcher.Frame() };
+        var duringStatus = await Done(during);
+        var waited = (open.IsCompleted, play.IsCompleted, views.Opened.Count, editor.Requests.Count);
+        reload.Set();
+        await ui.RunUntilAsync(() => !loads.IsBusy, "the end of the reload");
+        var ranAfter = new[] { dispatcher.Frame(), dispatcher.Frame() };
+        var opened = await Done(open);
+        var played = await Done(play);
+        var after = Queue(dispatcher, "studio_status");
+        dispatcher.Frame();
 
-        Assert.True(open.IsError, open.Text);
-        Assert.Equal(("refused", Studio.Agent.ViewTools.DataReloadingDetail, "system", ReloadingText),
-            ((string?)open.Content["code"], (string?)open.Content["detail"], (string?)open.Content["field"],
-                (string?)open.Content["message"]));
-        Assert.Equal(("refused", Studio.Agent.ViewTools.DataReloadingDetail, ReloadingText), render);
-        Assert.Equal(("refused", Studio.Agent.ViewTools.DataReloadingDetail, "refs"), ((string?)select.Content["code"],
-            (string?)select.Content["detail"], (string?)select.Content["field"]));
-        Assert.Equal((0, (SceneShotRequest?)null, 1), calls);
+        Assert.Equal([true, false], ranDuring);
+        Assert.Equal("reloading", (string?)duringStatus.Content["data_load"]);
+        Assert.Equal((false, false, 0, 0), waited);
+        Assert.Equal([true, true], ranAfter);
+        Assert.False(opened.IsError, opened.Text);
+        Assert.False(played.IsError, played.Text);
         Assert.Equal([(ViewKind.System, "Ol01")], views.Opened);
-        Assert.Equal("Ol01", views.Scene!.System);
+        Assert.Single(editor.Requests);
+        Assert.Equal("ready", (string?)(await Done(after)).Content["data_load"]);
     }
 
-    /// <summary>A new system that the mod did not save waits for the save, not for the reload. So it keeps
-    /// view_not_loaded of the views of the editor, before a reload and during one (decision O21).</summary>
+    /// <summary>A call that waits for a load longer than the wait limit gives busy with the reason of the load. Another
+    /// reason to wait, for example a field edit of the user, holds studio_status too.</summary>
     [Fact]
-    public void AnUnsavedNewSystemKeepsViewNotLoadedAlsoDuringAReload()
+    public async Task ACallThatWaitsTooLongForALoadGivesBusyWithTheReasonOfTheLoad()
     {
-        var (ws, host, views) = Editor();
-        using var _ = ws;
-        var session = host.Session!;
-        session.Execute(NewSystem(session));
-        views.Unloaded.Add("Ol01");
+        var (ws, host, _) = Editor();
+        using var __ = ws;
+        var clock = new FakeClock();
+        var editing = true;
+        using var dispatcher = new AgentDispatcher(host, () => new EditorActivity(editing, false, true, false), null,
+            clock);
 
-        var before = Error(host, "open_view", """{ "system": "Ol01" }""");
-        views.DataLoad = AgentDataLoad.Reloading;
-        var open = Error(host, "open_view", """{ "system": "Ol01" }""");
-        var render = Error(host, "render_scene", """{ "system": "Ol01" }""");
+        var open = Queue(dispatcher, "open_view", """{ "system": "Li01" }""");
+        var status = Queue(dispatcher, "studio_status");
+        var ranWhileEditing = dispatcher.Frame();
+        var statusWaited = !status.IsCompleted;
+        editing = false;
+        var ranStatus = dispatcher.Frame();
+        clock.Advance(TimeSpan.FromSeconds(30));
+        var ranAtLimit = dispatcher.Frame();
+        var busy = await Done(open);
 
-        const string notLoaded = "The game data has no system Ol01. Ask the user to save the mod. The editor then loads the system.";
-        Assert.All(new[] { before, open, render }, e => Assert.Equal(("refused", "NotLoaded", notLoaded), e));
-        Assert.Empty(views.Opened);
-        Assert.Null(views.Scene);
+        Assert.False(ranWhileEditing);
+        Assert.True(statusWaited);
+        Assert.True(ranStatus);
+        Assert.False((await Done(status)).IsError);
+        Assert.False(ranAtLimit);
+        Assert.Equal(("busy", "Waited"), ((string?)busy.Content["code"], (string?)busy.Content["detail"]));
+        Assert.Equal("The editor loads the game data now. The call waited 30 seconds. Try again in a few seconds.",
+            (string?)busy.Content["message"]);
     }
 
-    /// <summary>A new object of a system that the loaded game data has shows at once, also while the game data reloads.
-    /// The Scene applies the edits of W, so the object needs no save.</summary>
+    /// <summary>A new object of a system that the loaded game data has shows at once. The Scene applies the edits of W,
+    /// so the object needs no save and no load.</summary>
     [Fact]
-    public void ANewObjectOfALoadedSystemShowsAtOnceDuringAReload()
+    public void ANewObjectOfALoadedSystemShowsAtOnceWithoutASave()
     {
         var (ws, host, views) = Editor();
         using var _ = ws;
@@ -621,7 +650,6 @@ public sealed class AgentViewToolTests
             ListWorkspace.Line("pos", "0, 0, 5000"),
             ListWorkspace.Line("archetype", "station1"),
         ]));
-        views.DataLoad = AgentDataLoad.Reloading;
 
         Ok(host, "open_view", """{ "system": "Li01" }""");
         Ok(host, "render_scene", """{ "frame": ["obj:ol_new_station"] }""");
@@ -632,33 +660,11 @@ public sealed class AgentViewToolTests
         Assert.Equal("ol_new_station", Assert.Single(views.Selected).Target.Section!.Id.Key);
     }
 
-    /// <summary>The checks of the Play menu read the loaded game data. So a play at a system or a base that the last
-    /// save added waits for the reload too, and Play gets no request.</summary>
-    [Fact]
-    public void PlayAtASystemOrABaseOfTheLastSaveWaitsForTheReload()
-    {
-        var (ws, host, views) = Editor();
-        using var _ = ws;
-        var editor = new AgentPlayToolTests.FakePlayEditor();
-        host.TestPlay = new EditorAgentPlay(editor);
-        var session = host.Session!;
-        session.Execute(NewSystem(session, dock: true));
-        AssertSaved(session);
-        views.Unloaded.UnionWith(["Ol01", "Ol01_01_Base"]);
-        views.DataLoad = AgentDataLoad.Reloading;
+    /// <summary>Puts a call into the queue of the dispatcher.</summary>
+    private static Task<ToolResult> Queue(AgentDispatcher dispatcher, string tool, string arguments = "{}") =>
+        dispatcher.Queue.CallAsync(tool, JsonNode.Parse(arguments)!.AsObject(), null, TestContext.Current.CancellationToken);
 
-        var space = Call(host, "play", """{ "start": "space", "system": "Ol01", "position": [0, 0, 5000] }""");
-        var dock = Call(host, "play", """{ "start": "base", "base": "Ol01_01_Base" }""");
-        var requests = editor.Requests.Count;
-        views.DataLoad = AgentDataLoad.Ready;
-        views.Unloaded.Clear();
-        Ok(host, "play", """{ "start": "base", "base": "Ol01_01_Base" }""");
-
-        Assert.Equal(("refused", Studio.Agent.ViewTools.DataReloadingDetail, "system"), ((string?)space.Content["code"],
-            (string?)space.Content["detail"], (string?)space.Content["field"]));
-        Assert.Equal(("refused", Studio.Agent.ViewTools.DataReloadingDetail, "base", ReloadingText), ((string?)dock.Content["code"],
-            (string?)dock.Content["detail"], (string?)dock.Content["field"], (string?)dock.Content["message"]));
-        Assert.Equal(0, requests);
-        Assert.Single(editor.Requests);
-    }
+    /// <summary>Waits for a call that must end soon.</summary>
+    private static Task<ToolResult> Done(Task<ToolResult> call) =>
+        call.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 }

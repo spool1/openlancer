@@ -89,7 +89,7 @@ When another program uses the port, the server does not start. The status bar th
 | Largest page limit | 200 | The largest limit that the agent can ask for in one list result. |
 | Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
 | Calls each second | 10 | The most calls that the server takes in one second. A read of the catalog of the prefabs counts as a call. |
-| Wait for the editor (s) | 30 | How long a call waits while you edit a field, rename an item, drag an item, or a dialog is open. A longer wait gives the error `busy`. A read of the catalog of the prefabs has the same wait. |
+| Wait for the editor (s) | 30 | How long a call waits while you edit a field, rename an item or drag an item, and while a dialog is open. A call also waits while the editor loads the game data. A longer wait gives the error `busy`. A read of the catalog of the prefabs has the same wait. |
 | Time of a check or an image (s) | 60 | How long a check of a retail target or an image can take. |
 | Size of a request (MB) | 4 | The largest request. The change applies at the next start of the server. |
 | Largest side of an image (pixels) | 2048 | The most pixels on each side of an image. A larger panel capture becomes smaller. A `render_scene` or `render_cutscene` call with a larger `width` or `height` gives the error `limit`. |
@@ -656,7 +656,9 @@ A delete of an entity that events name needs `confirm: true`, as the editor asks
 
 After a save that changed files, the editor loads the game data again. `studio_status` gives `data_load: reloading` until the load ends, and `ready` after it. The first load of a profile also gives `reloading`. The oltool host loads no game data, so it always gives `ready`.
 
-While the game data loads, `open_view`, `render_scene`, `select_items` with a frame and `play` refuse a system or a base that the last save added. They give `refused` with the detail `DataReloading`. Call the tool again when `data_load` is `ready`. A system that the mod did not save gives `refused` with the detail `NotLoaded`, also during a load. The load reads only the saved files, so save the mod first. A new object, zone or light of a system that the game data has shows at once, without a save.
+During a load, only `studio_status` runs. Each other call waits until the load ends, because the load fills the game data of the editor. The call then reads the game data of the save. So a view or a play of a system or a base that the save added works after the wait. When the load takes longer than the wait limit of the agent settings, the call gives `busy` with the reason. Call `studio_status` until `data_load` is `ready`, then call the tool again.
+
+A system that the mod did not save gives `refused` with the detail `NotLoaded`. The load reads only the saved files, so save the mod first. A new object, zone or light of a system that the game data has shows at once, without a save.
 
 The save gate runs first, as in the editor. When the checks find errors, the save stops and writes nothing. `save` then gives the error `save_blocked` with the messages of the first errors. Call `check` to read each error. When a file of the mod changed outside OpenLancer, `save` gives `changed_on_disk` and writes nothing. In the editor, a dialog then asks you to replace the file or to keep it. The agent never replaces such a file. While an export runs, `save` gives `busy` and writes nothing, because the export reads the saved files.
 
@@ -787,6 +789,8 @@ An agent call never runs during a gesture of your own. It waits while you edit a
 - The rename popup and quick add of the Mission page in the Inspector, and the rename popup of a prefab in the Assets panel.
 
 The call runs in the frame after the gesture ends. A gesture in a tab that you hide does not keep the call waiting. After the wait limit of the agent settings, the call gives the error `busy` with the reason.
+
+A call also waits while the editor loads the game data, for example after a save. Only `studio_status` runs during the load, so the agent can see the state of the load. See "Save".
 
 #### Follow mode
 

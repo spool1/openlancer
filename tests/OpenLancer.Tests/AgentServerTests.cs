@@ -688,6 +688,20 @@ public sealed class AgentControllerTests : IDisposable
             AgentDispatcher.WaitReason(new EditorActivity(false, false, false, false, Renaming: true)));
     }
 
+    /// <summary>A call of studio_status runs during a load of the game data only when the load is the only reason to
+    /// wait (shared step SH8).</summary>
+    [Fact]
+    public void OnlyALoadWithoutAnotherReasonLetsStudioStatusRun()
+    {
+        Assert.True(AgentDispatcher.OnlyLoad(new EditorActivity(false, false, true, false)));
+        Assert.False(AgentDispatcher.OnlyLoad(default));
+        Assert.False(AgentDispatcher.OnlyLoad(new EditorActivity(true, false, true, false)));
+        Assert.False(AgentDispatcher.OnlyLoad(new EditorActivity(false, true, true, false)));
+        Assert.False(AgentDispatcher.OnlyLoad(new EditorActivity(false, false, true, true)));
+        Assert.False(AgentDispatcher.OnlyLoad(new EditorActivity(false, false, true, false, Renaming: true)));
+        Assert.Equal(["studio_status"], AgentTools.All.Where(t => t.RunsDuringLoad).Select(t => t.Name));
+    }
+
     /// <summary>An agent call waits while the rename field of the Hierarchy is open. The rename of the field applies to
     /// the item of its start, so an agent edit must not change that item first (section 5.5, item 3 of the MCP1
     /// design).</summary>

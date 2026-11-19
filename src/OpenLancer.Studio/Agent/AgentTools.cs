@@ -35,7 +35,8 @@ public static class AgentTools
     /// <summary>The tools in the order of <c>tools/list</c>.</summary>
     public static IReadOnlyList<StudioTool> All { get; } =
     [
-        Query("studio_status", ToolGroup.Studio, ToolInput.None, typeof(StudioStatus), StatusQueries.Status),
+        Query("studio_status", ToolGroup.Studio, ToolInput.None, typeof(StudioStatus), StatusQueries.Status,
+            runsDuringLoad: true),
         Query("list_systems", ToolGroup.Scene, new ToolInput(TextFilter, Cursor, Limit), typeof(Page<SystemRow>),
             SceneQueries.ListSystems),
         Query("get_system", ToolGroup.Scene, new ToolInput(Text("system", true)), typeof(SystemView), SceneQueries.GetSystem),
@@ -428,8 +429,11 @@ public static class AgentTools
 
     private static TextParam Text(string name, bool required = false) => new(name, required, null, null);
 
+    /// <param name="runsDuringLoad">True for a tool whose call also runs while the editor loads the game data (see
+    /// <see cref="StudioTool.RunsDuringLoad"/>).</param>
     private static StudioTool Query(string name, ToolGroup group, ToolInput input, Type output, Func<ToolCall, ToolStep> run,
-        ToolHosts hosts = ToolHosts.Both) => new(name, ToolKind.Query, group, hosts, ToolHints.Query, input, output, run);
+        ToolHosts hosts = ToolHosts.Both, bool runsDuringLoad = false) =>
+        new(name, ToolKind.Query, group, hosts, ToolHints.Query, input, output, run) { RunsDuringLoad = runsDuringLoad };
 
     /// <summary>A view tool (section 7.7 of the MCP1 design). Only the editor host has the views.</summary>
     private static StudioTool View(string name, ToolGroup group, ToolHints hints, ToolInput input, Type output,

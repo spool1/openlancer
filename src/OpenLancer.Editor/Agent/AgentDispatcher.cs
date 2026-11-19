@@ -7,7 +7,9 @@ namespace OpenLancer.Editor.Agent;
 /// <param name="Editing">A field edit, a drag of the gizmo or a drag of the Timeline is open. So is a gesture of the
 /// mission studio, for example a rename of a graph node or a drag of a node.</param>
 /// <param name="Dialog">A dialog of the editor is open.</param>
-/// <param name="Loading">The game data loads, or loads again after a save.</param>
+/// <param name="Loading">The game data loads, or loads again after a save. The load fills the resources of the session,
+/// so a call waits for it. Only a call of <c>studio_status</c> runs during the load (see
+/// <see cref="StudioTool.RunsDuringLoad"/>).</param>
 /// <param name="UserEdit">A batch or a transaction of the user is open.</param>
 /// <param name="Renaming">The rename field of the Hierarchy is open, for example after a create of the user, or the
 /// rename popup of a mission row. Its rename applies to the item of its start, so an agent edit must not change that item
@@ -57,10 +59,18 @@ internal sealed class AgentDispatcher : IDisposable
 
     public ToolQueue Queue { get; }
 
-    /// <summary>Runs the session part of the first call, or ends the calls that waited too long. On the UI
-    /// thread.</summary>
+    /// <summary>Runs the session part of the first call, or ends the calls that waited too long. On the UI thread. While
+    /// the game data loads and nothing else holds the calls, a call of <c>studio_status</c> still runs. So the agent can
+    /// see the state of the load.</summary>
     /// <returns>True when a session part ran.</returns>
-    public bool Frame() => Queue.RunNext(WaitReason(activity()));
+    public bool Frame()
+    {
+        var now = activity();
+        return Queue.RunNext(WaitReason(now), OnlyLoad(now));
+    }
+
+    /// <summary>True when the load of the game data is the only reason why a call waits now.</summary>
+    internal static bool OnlyLoad(EditorActivity now) => now.Loading && WaitReason(now with { Loading = false }) == null;
 
     /// <summary>Why a call waits now, in strict STE, or null when the call can run. The reason is the start of the error
     /// <c>busy</c> after the wait limit. The texts are in <c>agent-tools.json</c> (decision D726).</summary>

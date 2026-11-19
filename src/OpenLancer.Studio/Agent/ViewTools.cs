@@ -177,14 +177,9 @@ public sealed record PanelShotView(AgentPanel Panel, int Width, int Height);
 /// <remarks>A member gives a refusal as an <see cref="EditException"/>, also from its tail.</remarks>
 public interface IAgentViews
 {
-    /// <summary>Ready, or reloading while the editor loads the game data. A reload after a save waits for a load that
-    /// runs, and it counts as reloading while it waits.</summary>
+    /// <summary>Ready, or reloading while the editor loads the game data. A reload after a save that comes during a
+    /// load starts when that load ends, so the state stays reloading.</summary>
     AgentDataLoad DataLoad { get; }
-
-    /// <summary>True when the loaded game data has the system or the base with the nickname. The Scene, the images of a
-    /// system and Play show only such an item.</summary>
-    /// <param name="kind"><see cref="ItemRefKind.System"/> or <see cref="ItemRefKind.Base"/>.</param>
-    bool Loaded(ItemRefKind kind, string nickname);
 
     /// <summary>Opens a system in the Scene, a mission in the Mission tab or a cutscene in the Cutscene tab, and shows
     /// the tab.</summary>
@@ -245,7 +240,6 @@ internal static class ViewTools
             case "system":
                 RequireGroup(call, ToolGroup.Scene);
                 (kind, target) = (ViewKind.System, SceneQueries.System(session, text).Nickname);
-                RefuseWhileReloading(call, ItemRefKind.System, target, "system");
                 reference = SceneQueries.SystemRef(target);
                 break;
             case "mission":
@@ -277,11 +271,7 @@ internal static class ViewTools
         var target = Target(call.Session, refs[0]);
         if (GroupOf(target) is { } group)
             RequireGroup(call, group);
-        var frame = call.Args.Flag("frame");
-        // A frame opens the system of the item in the Scene.
-        if (frame && target.System is { } system)
-            RefuseWhileReloading(call, ItemRefKind.System, system, "refs");
-        return ToolResult.Of(Views(call, "select_items").Select(target, frame));
+        return ToolResult.Of(Views(call, "select_items").Select(target, call.Args.Flag("frame")));
     }
 
     public static ToolStep RenderScene(ToolCall call)
@@ -293,7 +283,6 @@ internal static class ViewTools
             : call.Host.View?.System is { } open ? ItemRefs.Parse(open).Name
             : throw new EditException(new EditError(EditErrorKind.Refused, "NoSystem",
                 AgentTexts.Error("render_no_system")));
-        RefuseWhileReloading(call, ItemRefKind.System, system, "system");
         ShotCamera? camera = null;
         if (args.Group("camera") is { } lens)
         {
@@ -349,41 +338,11 @@ internal static class ViewTools
         return Image(Views(call, "capture_panel").CapturePanel(panel, call.Limits.RenderPixels));
     }
 
-    /// <summary>The detail code of a view or a play that waits for the reload of the game data.</summary>
-    public const string DataReloadingDetail = "DataReloading";
-
-    /// <summary>
-    /// Refuses a view or a play of a system or a base while the editor reloads the game data (shared step SH8). The
-    /// refusal applies only when the saved files have the item and the loaded game data does not have it yet. An example
-    /// is a system that the last save added. The reload then loads it. An item that only the unsaved edits have keeps the
-    /// refusal of the views, because the reload does not load it (decision O21). The host without a window has no
-    /// views and no reload.
-    /// </summary>
-    /// <param name="field">The argument that names the item, for the error.</param>
-    /// <exception cref="EditException"><see cref="EditErrorKind.Refused"/> with the detail
-    /// <see cref="DataReloadingDetail"/>.</exception>
-    internal static void RefuseWhileReloading(ToolCall call, ItemRefKind kind, string nickname, string field)
-    {
-        if (call.Host.Views is not { DataLoad: AgentDataLoad.Reloading } views || views.Loaded(kind, nickname) ||
-            !Saved(call.Session, kind, nickname))
-        {
-            return;
-        }
-        throw new EditException(new EditError(EditErrorKind.Refused, DataReloadingDetail,
-            AgentTexts.Error("data_reloading")) { Field = field });
-    }
-
     /// <summary>The error of a system of W that the loaded game data does not have. An example is a new system of the
     /// active mod before the save. The views of the editor give it.</summary>
     /// <param name="field">The argument that names the system, for the error.</param>
     internal static EditException NotLoaded(string nickname, string field) => new(new EditError(EditErrorKind.Refused,
         "NotLoaded", AgentTexts.Error("view_not_loaded", ("system", nickname))) { Field = field });
-
-    /// <summary>True when the saved files have the <c>[system]</c> or the <c>[Base]</c> of <c>universe.ini</c> with the
-    /// nickname: the section was in W at the open of the file or at the last save.</summary>
-    private static bool Saved(EditSession session, ItemRefKind kind, string nickname) =>
-        session.UniversePath is { } universe && session.SavedSection(new SectionRef(universe,
-            new SectionIdentity(kind == ItemRefKind.System ? "system" : "Base", nickname))) != null;
 
     /// <summary>The tail of an image call: it waits for the image, then gives the result with the image.</summary>
     internal static ToolStep Image<T>(Func<CancellationToken, Task<(T View, ToolImage Image)>> shot) where T : notnull =>

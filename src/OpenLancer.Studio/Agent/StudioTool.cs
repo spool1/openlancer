@@ -149,6 +149,11 @@ public sealed class StudioTool
     /// running.</summary>
     internal bool RunsInPause { get; init; }
 
+    /// <summary>True for a tool whose call also runs while the editor loads the game data: <c>studio_status</c>. It reads
+    /// no data that the load fills, and it gives the state of the load (shared step SH8). Each other call waits until
+    /// the load ends (section 5.5, item 3 of the MCP1 design).</summary>
+    internal bool RunsDuringLoad { get; init; }
+
     public ToolGroup Group { get; }
 
     public ToolHosts Hosts { get; }

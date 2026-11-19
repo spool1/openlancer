@@ -32,20 +32,12 @@ internal sealed class EditorAgentViews(EditorWindow window) : IAgentViews
 {
     public AgentDataLoad DataLoad => DataLoadOf(window.Session?.Loads);
 
-    /// <summary>Reloading while the first load or a reload of the game data runs. A reload after a save that waits for
-    /// the running load counts too (see <see cref="DataLoads"/>). The views have no game data of the save until
-    /// then.</summary>
+    /// <summary>Reloading while the first load or a reload of the game data runs. A reload after a save that comes
+    /// during a load starts when that load ends, so the state stays reloading (see <see cref="DataLoads"/>). The views
+    /// have no game data of the save until then.</summary>
     /// <param name="loads">The loads of the open profile, or null while no profile is open.</param>
-    internal static AgentDataLoad DataLoadOf(DataLoads? loads) => loads is { } open && (open.IsBusy || open.ReloadWaits)
-        ? AgentDataLoad.Reloading
-        : AgentDataLoad.Ready;
-
-    public bool Loaded(ItemRefKind kind, string nickname) => window.Session?.GameData?.Items is { } items && kind switch
-    {
-        ItemRefKind.System => items.Systems.Get(nickname) != null,
-        ItemRefKind.Base => items.Bases.Get(nickname) != null,
-        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "The loaded game data has systems and bases."),
-    };
+    internal static AgentDataLoad DataLoadOf(DataLoads? loads) =>
+        loads is { IsBusy: true } ? AgentDataLoad.Reloading : AgentDataLoad.Ready;
 
     public void Open(ViewKind kind, string target)
     {

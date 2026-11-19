@@ -123,25 +123,32 @@ public sealed class ToolQueue : IDisposable
 
     /// <summary>
     /// Runs the session part of the first call, on the thread that owns the session. While <paramref name="waitReason"/>
-    /// is not null, no call starts, and each call that waited too long ends with <c>busy</c> and the reason.
+    /// is not null, no call starts, and each call that waited too long ends with <c>busy</c> and the reason. When the
+    /// load of the game data is the only reason, the first call of a tool that runs during a load
+    /// (<see cref="StudioTool.RunsDuringLoad"/>) starts. The other calls keep their places.
     /// </summary>
     /// <param name="waitReason">Why the calls must wait now, in strict STE, or null.</param>
+    /// <param name="onlyLoad">True when the load of the game data is the only reason why the calls wait.</param>
     /// <returns>True when a session part ran.</returns>
-    public bool RunNext(string? waitReason = null)
+    public bool RunNext(string? waitReason = null, bool onlyLoad = false)
     {
         if (waitReason != null)
         {
             foreach (var pending in Expired())
                 Expire(pending, waitReason);
-            return false;
+            if (!onlyLoad)
+                return false;
         }
-        Pending? next;
+        Pending next;
         lock (gate)
         {
-            if (waiting.First is not { } first)
+            var node = waiting.First;
+            while (waitReason != null && node is { Value.RunsDuringLoad: false })
+                node = node.Next;
+            if (node == null)
                 return false;
-            next = first.Value;
-            waiting.RemoveFirst();
+            next = node.Value;
+            waiting.Remove(node);
             next.Node = null;
         }
         next.Registration.Dispose();
@@ -331,6 +338,10 @@ public sealed class ToolQueue : IDisposable
 
         public CancellationTokenRegistration Registration { get; set; }
 
+        /// <summary>True when the session part also runs while the game data loads. A read of a resource always
+        /// waits.</summary>
+        public virtual bool RunsDuringLoad => false;
+
         /// <summary>Runs the session part, on the thread that owns the session.</summary>
         public abstract void Run(ToolQueue queue);
 
@@ -353,6 +364,8 @@ public sealed class ToolQueue : IDisposable
         public IProgress<ToolProgress> Progress { get; } = progress;
 
         public TaskCompletionSource<ToolResult> Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override bool RunsDuringLoad { get; } = AgentTools.Find(tool) is { RunsDuringLoad: true };
 
         public override void Run(ToolQueue queue) => queue.Run(this);
 

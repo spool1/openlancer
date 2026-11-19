@@ -186,11 +186,6 @@ internal static class PlayTools
         // Without an open profile, play gives the error of each tool that reads the session (section 10 of the MCP1
         // design). The checks of the Play menu give the other reasons.
         _ = call.Session;
-        // The checks of the Play menu read the loaded game data. A system or a base of the last save waits for the reload.
-        if (start is PlayStart.AtBase dock)
-            ViewTools.RefuseWhileReloading(call, ItemRefKind.Base, dock.Base, "base");
-        else if (start is PlayStart.InSpace space)
-            ViewTools.RefuseWhileReloading(call, ItemRefKind.System, space.System, "system");
         var wait = play.Start(start);
         return ToolStep.Then(async cancel => ToolResult.Of(await wait(cancel).ConfigureAwait(false)));
     }

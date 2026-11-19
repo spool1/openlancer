@@ -6,7 +6,6 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
-using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Studio.Agent;
 using Xunit;
 
@@ -117,10 +116,8 @@ internal sealed class FakeAgentViews : IAgentViews
 
     public AgentDataLoad DataLoad { get; set; }
 
-    /// <summary>The nicknames of the systems and the bases that the loaded game data of the test does not have.</summary>
+    /// <summary>The nicknames of the systems that the loaded game data of the test does not have.</summary>
     public HashSet<string> Unloaded { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    public bool Loaded(ItemRefKind kind, string nickname) => !Unloaded.Contains(nickname);
 
     public List<(ViewKind Kind, string Target)> Opened { get; } = [];
 

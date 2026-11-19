@@ -163,6 +163,41 @@ public sealed class ToolQueueTests
         Assert.StartsWith("The user edits a field now.", refusal.Error.Message);
     }
 
+    /// <summary>
+    /// While the load of the game data is the only reason to wait, the first call of a tool that runs during a load
+    /// starts: studio_status (shared step SH8). The other calls and the reads keep their order and wait. With another
+    /// reason, studio_status waits too.
+    /// </summary>
+    [Fact]
+    public async Task DuringALoadOnlyACallOfStudioStatusStarts()
+    {
+        using var queue = new ToolQueue(new TestAgentHost(null), new FakeClock());
+        const string reason = "The editor loads the game data now.";
+
+        var list = queue.CallAsync("list_systems", null, null, Token);
+        var read = queue.ReadAsync(_ => "catalog", Token);
+        var first = queue.CallAsync("studio_status", null, null, Token);
+        var second = queue.CallAsync("studio_status", null, null, Token);
+        Assert.False(queue.RunNext(reason));
+        Assert.True(queue.RunNext(reason, onlyLoad: true));
+        var waitingAfterFirst = (second.IsCompleted, queue.Waiting);
+        Assert.True(queue.RunNext(reason, onlyLoad: true));
+        Assert.False(queue.RunNext(reason, onlyLoad: true));
+        var waited = (list.IsCompleted, read.IsCompleted);
+        Assert.True(queue.RunNext());
+        var readWaited = read.IsCompleted;
+        Assert.True(queue.RunNext());
+
+        Assert.False((await Done(first)).IsError);
+        Assert.Equal((false, 3), waitingAfterFirst);
+        Assert.False((await Done(second)).IsError);
+        Assert.Equal((false, false), waited);
+        // The call of list_systems ran: without a profile, it gives its error.
+        Assert.Equal("not_available", (string?)(await Done(list)).Content["code"]);
+        Assert.False(readWaited);
+        Assert.Equal("catalog", await read.WaitAsync(TimeSpan.FromSeconds(10), Token));
+    }
+
     [Fact]
     public async Task ACallStartsAfterTheGestureOfTheUserEnds()
     {

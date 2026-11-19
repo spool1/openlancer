@@ -162,7 +162,7 @@
               "ready",
               "reloading"
             ],
-            "description": "ready, or reloading while the editor loads the game data, for example after a save. While it is reloading, open_view, render_scene and play refuse a system or a base of the last save with data_reloading. The host without a window always gives ready."
+            "description": "ready, or reloading while the editor loads the game data, for example after a save. studio_status also runs during a load. Each other call waits until the load ends, so it reads the game data of the save. The host without a window always gives ready."
           },
           "tool_groups": {
             "type": "array",
