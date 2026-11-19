@@ -306,7 +306,7 @@
         { "index": 5, "name": "tick", "label": "Counts while", "kind": "token", "tokens": "tickMode", "optional": true }
       ],
       "sentences": [
-        { "when": { "side": "inside" }, "text": "Starts when {ship} is within {range} m of {other}." },
+        { "when": { "side": "inside" }, "text": "Starts when {ship} is closer than {range} m to {other}." },
         { "text": "Starts when {ship} is farther than {range} m from {other}." }
       ],
       "suffixes": [ { "when": { "hold": "present" }, "text": " for {hold} s" } ], "evidence": "TR11, fork Cnd_DistShip" },
@@ -320,7 +320,7 @@
         { "index": 7, "name": "tick", "label": "Counts while", "kind": "token", "tokens": "tickMode", "optional": true }
       ],
       "sentences": [
-        { "when": { "side": "inside" }, "text": "Starts when {ship} is within {radius} m of a point." },
+        { "when": { "side": "inside" }, "text": "Starts when {ship} is closer than {radius} m to a point." },
         { "text": "Starts when {ship} is farther than {radius} m from a point." }
       ],
       "suffixes": [ { "when": { "hold": "present" }, "text": " for {hold} s" } ], "evidence": "TR11, fork Cnd_DistVec" },
@@ -333,7 +333,10 @@
         { "index": 6, "name": "radius", "label": "Radius", "kind": "number" },
         { "index": 7, "name": "hold", "label": "Hold time", "kind": "number", "optional": true }
       ],
-      "sentences": [ { "text": "Starts when the ships of label {label} are within {radius} m of a point." } ], "evidence": "TR11, fork Cnd_DistVecLbl" },
+      "sentences": [
+        { "when": { "side": "inside" }, "text": "Starts when the ships of label {label} are closer than {radius} m to a point." },
+        { "text": "Starts when the ships of label {label} are farther than {radius} m from a point." }
+      ], "evidence": "TR11, fork Cnd_DistVecLbl" },
     { "name": "Cnd_DistCircle", "plain": "Through a ring", "event": "distance", "polls": true,
       "values": [
         { "index": 0, "name": "ship", "label": "Ship", "kind": "object" },

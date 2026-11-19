@@ -117,6 +117,44 @@ public sealed class MissionSchemaTests
         Assert.Contains("no_such_value", error.Message);
     }
 
+    /// <summary>The inside test of a distance condition is strict (OL-0078). So a ship exactly at the radius is not
+    /// inside. The sentences say "closer than" and "farther than", as the help of the side does.</summary>
+    [Theory]
+    [InlineData("Cnd_DistShip", "inside", "Starts when ol_ship is closer than 1000 m to ol_other.")]
+    [InlineData("Cnd_DistShip", "outside", "Starts when ol_ship is farther than 1000 m from ol_other.")]
+    [InlineData("Cnd_DistVec", "inside", "Starts when ol_ship is closer than 1000 m to a point.")]
+    [InlineData("Cnd_DistVec", "outside", "Starts when ol_ship is farther than 1000 m from a point.")]
+    public void TheSentenceOfADistanceConditionTellsItsStrictSide(string condition, string side, string expected)
+    {
+        var values = new Dictionary<string, string>
+        {
+            ["side"] = side, ["ship"] = "ol_ship", ["other"] = "ol_other", ["range"] = "1000", ["radius"] = "1000",
+        };
+
+        Assert.Equal(expected, Schema.Name(condition)!.Sentence(values.GetValueOrDefault));
+    }
+
+    /// <summary>The Inspector does not show the sentences of the label distance condition yet. They tell the strict side
+    /// too, so that they are correct when the Inspector shows them.</summary>
+    [Fact]
+    public void TheSentencesOfTheLabelDistanceConditionTellTheirSide()
+    {
+        var name = Schema.Name("Cnd_DistVecLbl")!;
+
+        Assert.False(name.Checked);
+        Assert.Collection(name.Sentences,
+            inside =>
+            {
+                Assert.Equal(["inside"], inside.When["side"]);
+                Assert.Contains("are closer than {radius} m to a point", inside.Text);
+            },
+            outside =>
+            {
+                Assert.Empty(outside.When);
+                Assert.Contains("are farther than {radius} m from a point", outside.Text);
+            });
+    }
+
     /// <summary>The start role of each action (section 5.3, step 9 of the M6c design): one role of the closed set for each
     /// of the 85 actions, and none for a condition or an order.</summary>
     [Fact]
