@@ -15,9 +15,9 @@ namespace OpenLancer.Data.Ini;
 /// <c>[Base]</c> before the first <c>[system]</c>. A <c>[Base]</c> at the end of the file thus has no station in the
 /// game.</para>
 /// <para>The edit (<c>EditCommand.AddSection</c>), the merge (<see cref="IniPatcher"/>) and the patch writer use this
-/// one rule. So W and each merged file agree. The merged files are the overlay of F5, the target build of Ctrl+F5, the
-/// play copies, the drop-in zip and the W of a patch that the editor opens again. The rule needs no directive, so a
-/// patch keeps <c>ol.new</c> and the mod format does not change.</para>
+/// one rule. So W and each merged file agree. The merged files are the overlay of F5, the target build of Ctrl+F5 and
+/// the play copies. The drop-in zip and the W of a patch that the editor opens again are merged files too. The rule
+/// needs no directive, so a patch keeps <c>ol.new</c> and the mod format does not change.</para>
 /// </remarks>
 internal static class UniverseOrder
 {
@@ -35,9 +35,9 @@ internal static class UniverseOrder
     /// <summary>True for a <c>[Base]</c> section.</summary>
     public static bool IsBase(Section section) => IsBase(section.Name);
 
-    /// <summary>The index at which a new section of a type goes in the sections of a file: the first <c>[system]</c>
-    /// for a <c>[Base]</c> of <c>universe.ini</c>, else the end of the file. A <c>universe.ini</c> without a
-    /// <c>[system]</c> gets the new <c>[Base]</c> at the end.</summary>
+    /// <summary>The index at which a new section of a type goes in the sections of a file. A <c>[Base]</c> of
+    /// <c>universe.ini</c> goes at the first <c>[system]</c>. Each other section goes at the end of the file. A
+    /// <c>universe.ini</c> without a <c>[system]</c> gets the new <c>[Base]</c> at the end.</summary>
     /// <param name="path">The install path of the file.</param>
     /// <param name="sections">The sections of the file.</param>
     /// <param name="type">The type of the new section.</param>

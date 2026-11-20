@@ -139,7 +139,7 @@ public static class ZoneShapes
     /// <item>A cylinder: the larger of two values. One is the distance from the middle plane divided by half the
     /// height. The other is the distance from the axis divided by the radius.</item>
     /// <item>A ring: the same two values in the cross section of the ring. The cross section has its center on the
-    /// middle circle of the ring, and it is as wide as the outer radius minus the inner radius. Retail does not take
+    /// middle circle of the ring. Its width is the outer radius minus the inner radius. Retail does not take
     /// the larger value. It uses the height value when that value is larger than the distance from the middle circle
     /// divided by the outer radius. So it uses the height value for some points beyond the inner or the outer side of
     /// a flat ring, and counts them as inside.</item>
@@ -199,7 +199,7 @@ public static class ZoneShapes
 
     /// <summary>
     /// A scaled distance, or 0 when the point is less than 0.0001 m from the center. It is also 0 when the surface is
-    /// 0.0001 m or less from the center in the direction of the point, or when the value is not a number.
+    /// 0.0001 m or less from the center in the direction of the point. A value that is not a number gives 0 too.
     /// </summary>
     /// <param name="distance">The distance from the center in meters.</param>
     /// <param name="scaled">The scaled distance.</param>

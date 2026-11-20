@@ -344,7 +344,7 @@ public sealed class NewModFileTests
     }
 
     /// <summary>An INI file of the folder of the active mod stays an editable whole file also when the base data or a
-    /// lower mod has a file at the same path, because the rule of the whole files has no test of the lower layer. The
+    /// lower mod has a file at the same path. The rule of the whole files has no test of the lower layer. The
     /// save writes the whole file. The editor does not delete it, because the game then uses the lower file
     /// again.</summary>
     [Fact]

@@ -265,8 +265,8 @@ public sealed class PatchRoundTripTests(ITestOutputHelper output)
             var removed = runs.SelectMany(r => Enumerable.Range(r.Key, r.Value)).ToHashSet();
             var without = sections.Where((_, k) => !removed.Contains(k)).ToList();
 
-            // The merge adds a new child after the other children of its parent, a new [Base] of universe.ini directly
-            // before the first [system] (UniverseOrder), and any other new section at the end.
+            // The merge adds a new child after the other children of its parent. It adds a new [Base] of universe.ini
+            // directly before the first [system] (UniverseOrder), and each other new section at the end.
             var edited = new List<Section>();
             var copies = new Dictionary<int, Section>();
             var childrenOf = runs.Keys.Where(i => SectionKeys.IsChild(sections[i].Name)).ToLookup(i => ProofSections.Parent(sections, i));

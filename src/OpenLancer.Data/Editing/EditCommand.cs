@@ -120,9 +120,10 @@ public abstract class EditCommand
     /// its file.
     /// </summary>
     /// <remarks>When it runs, the command throws an <see cref="ArgumentException"/> for a path outside the folder of
-    /// the active mod, and for a file that is not an INI file. It throws an <see cref="InvalidOperationException"/> in
-    /// three cases: the session is read-only, W or the lower layer has a file at the path (see
-    /// <see cref="ContentPaths.Taken"/>), or the active mod is in the OpenLancer repo (decision D70).</remarks>
+    /// the active mod. It also throws it for a file that is not an INI file. It throws an
+    /// <see cref="InvalidOperationException"/> when the session is read-only, or when W or the lower layer has a file
+    /// at the path (see <see cref="ContentPaths.Taken"/>). It also throws it when the active mod is in the OpenLancer
+    /// repo (decision D70).</remarks>
     /// <param name="path">The install path of the new file.</param>
     /// <param name="sections">The sections of the file. A key can repeat, because a whole file needs no patch.</param>
     public static EditCommand NewFile(string path, IReadOnlyList<SectionEntries> sections)

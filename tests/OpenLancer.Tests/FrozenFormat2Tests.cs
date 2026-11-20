@@ -27,8 +27,8 @@ namespace OpenLancer.Tests;
 /// <summary>
 /// The frozen format 2 test mod (issue #63): the promise that each 1.x editor loads, validates and exports a format 2
 /// mod of 1.0. The mod in <c>FrozenMods/format2/mod</c> holds each patch directive, text placeholders and a THN patch
-/// with each kind of entry. It also holds a whole mission file with a prefab instance, a whole file in the folder of the
-/// mod, the editor files of missions, a prop group and the publish settings. All data is made up.
+/// with each kind of entry. It also holds a whole mission file with a prefab instance and a whole file in the folder of
+/// the mod. The editor files of missions, a prop group and the publish settings are in it too. All data is made up.
 /// </summary>
 /// <remarks>
 /// <para>The mod loads over the fake games of the export tests (<see cref="ExportGame"/>). They give the code files

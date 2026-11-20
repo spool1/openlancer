@@ -349,12 +349,12 @@ public sealed class AgentToolTableTests
     }
 
     /// <summary>The edit tools, the tools of the session and the play tools of this build in the order of the table,
-    /// with their kinds and hints. The tools of section 7.3 follow the tools of section 7.2, the mission tools of section
-    /// 7.4 follow them with the mission play, its live trace and play_capture at their end, and the tools of section 7.6
-    /// come next. mission_edit can remove triggers and items, so it is
-    /// destructive. A tool that adds data is not destructive, and a tool that can change or remove data is (review
-    /// finding R7 of MCP1-2). So a mission tool that sets, moves or links lines is destructive. edit_batch can have a
-    /// step that removes data, so it is destructive (final finding of MCP1-2). play and mission_play can save the mod, so
+    /// with their kinds and hints. The tools of section 7.3 follow the tools of section 7.2. The mission tools of
+    /// section 7.4 follow them, with the mission play, its live trace and play_capture at their end. The tools of
+    /// section 7.6 come next. mission_edit can remove triggers and items, so it is destructive. A tool that adds data
+    /// is not destructive, and a tool that can change or remove data is (review finding R7 of MCP1-2). So a mission
+    /// tool that sets, moves or links lines is destructive. edit_batch can have a step that removes data, so it is
+    /// destructive (final finding of MCP1-2). play and mission_play can save the mod, so
     /// they are destructive (section 7.0). play_stop removes no data. mission_play_trace only reads, and so does
     /// play_capture, which is in the group Play.</summary>
     private static readonly Dictionary<string, (ToolKind Kind, ToolHints Hints)> Edits = new()
