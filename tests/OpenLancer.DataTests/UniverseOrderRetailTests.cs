@@ -14,7 +14,7 @@ using Xunit;
 namespace OpenLancer.DataTests;
 
 /// <summary>
-/// The merge of a new <c>[Base]</c> over the <c>universe.ini</c> of each game (<see cref="UniverseOrder"/>): the base
+/// The merge of a new <c>[Base]</c> over the <c>universe.ini</c> of each game (<see cref="UniverseOrder"/>). The base
 /// goes directly before the first <c>[system]</c>, after the bases of the game. The mod is invented and goes to a
 /// temporary folder. The tests only read the game data.
 /// </summary>

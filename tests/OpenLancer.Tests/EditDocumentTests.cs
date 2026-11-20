@@ -410,8 +410,9 @@ public sealed class EditDocumentTests
         Assert.Equal(new SectionRef(FilePath, new SectionIdentity("Trigger", "t1")), problem.Target);
     }
 
-    /// <summary>The editor edits a whole file of the active mod under <c>DATA\MISSIONS</c>, and an INI file in the
-    /// folder of the active mod, in any letter case. Each other whole file stays read-only.</summary>
+    /// <summary>The editor edits a whole file of the active mod under <c>DATA\MISSIONS</c>. It also edits an INI file
+    /// in the folder of the active mod. The letter case of the path has no effect. Each other whole file stays
+    /// read-only.</summary>
     [Fact]
     public void TheEditorEditsAMissionFileAndAnIniFileOfTheFolderOfTheActiveMod()
     {
@@ -425,9 +426,9 @@ public sealed class EditDocumentTests
         Assert.False(EditDocument.EditsWholeFile(FilePath, "m"));
     }
 
-    /// <summary>A whole INI file in the folder of the active mod opens as an editable document of the kind "whole file",
-    /// also without a file of the lower layer. The same file of a mod with another id replaces a lower file, so it gives
-    /// no patch.</summary>
+    /// <summary>A whole INI file in the folder of the active mod opens as an editable document of the kind "whole
+    /// file". The lower layer does not need a file at the path. The same file of a mod with another id replaces a lower
+    /// file, so it gives no patch.</summary>
     [Fact]
     public void AWholeFileOfTheFolderOfTheActiveModOpensAsAnEditableWholeFile()
     {

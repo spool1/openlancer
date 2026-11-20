@@ -14,9 +14,9 @@ using Xunit;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The place of a new <c>[Base]</c> in <c>universe.ini</c> (<see cref="UniverseOrder"/>): directly before the first
-/// <c>[system]</c>, in W, in the merge, in the patch that a save writes and in the export. The FLMM package refuses a
-/// new <c>[Base]</c>. The data is invented.
+/// The place of a new <c>[Base]</c> in <c>universe.ini</c> (<see cref="UniverseOrder"/>) is directly before the first
+/// <c>[system]</c>. The tests check W, the merge, the patch that a save writes and the export. The FLMM package refuses
+/// a new <c>[Base]</c>. The data is invented.
 /// </summary>
 public sealed class UniverseOrderTests
 {
@@ -73,7 +73,7 @@ public sealed class UniverseOrderTests
         Assert.DoesNotContain(result.Problems, p => p.Severity == DiagnosticSeverity.Error);
     }
 
-    /// <summary>Saves, opens the profile again, and checks that W of the reopened session and the merged
+    /// <summary>Saves and opens the profile again. Then checks that W of the reopened session and the merged
     /// <c>universe.ini</c> of the edit view have the order of <paramref name="expected"/>.</summary>
     /// <returns>The reopened session.</returns>
     private static EditSession AssertSavedOrder(TestWorkspace ws, EditSession session, string[] expected)

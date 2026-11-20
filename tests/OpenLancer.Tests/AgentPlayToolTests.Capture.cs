@@ -73,8 +73,8 @@ public sealed partial class AgentPlayToolTests
         new(play) { Png = AgentImages.Png(width, height, new byte[4 * width * height]).Png, Width = width, Height = height };
 
     /// <summary>Only the game of Play in OpenLancer gives an image. Play answers at once when no such game runs. The
-    /// cases are idle, a running game of a play copy only, a game that stops, and the report of a crash that waits for
-    /// a validation. The tool then gives refused with NoGame, not CaptureFailed.</summary>
+    /// cases are idle, a running game of a play copy only, and a game that stops. The report of a crash that waits for
+    /// a validation is a case too. The tool then gives refused with NoGame, not CaptureFailed.</summary>
     [Theory]
     [InlineData("Idle", false)]
     [InlineData("Idle", true)]

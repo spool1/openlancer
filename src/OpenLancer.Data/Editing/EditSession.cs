@@ -955,8 +955,9 @@ public sealed partial class EditSession : IDisposable
         /// </summary>
         /// <exception cref="ArgumentException">The path is not the path of an INI file in the folder of the active
         /// mod.</exception>
-        /// <exception cref="InvalidOperationException">The session is read-only or has no active mod, W or the lower
-        /// layer has a file at the path, or the active mod is in the OpenLancer repo.</exception>
+        /// <exception cref="InvalidOperationException">The session is read-only or has no active mod. The call also
+        /// throws it when the path has a file in W or in the lower layer. It also throws it when the active mod is in
+        /// the OpenLancer repo.</exception>
         public EditDocument NewFile(string path)
         {
             session.ThrowIfReadOnly();
@@ -980,8 +981,9 @@ public sealed partial class EditSession : IDisposable
         /// <see cref="EditCommand.DeleteFile"/>).
         /// </summary>
         /// <exception cref="ArgumentException">W has no such INI file.</exception>
-        /// <exception cref="InvalidOperationException">The file is not a whole file of the folder of the active mod, the
-        /// lower layer has the file too, or the session or the file is read-only.</exception>
+        /// <exception cref="InvalidOperationException">The file is not a whole file of the folder of the active mod, or
+        /// the lower layer has the file too. The call also throws it when the session or the file is
+        /// read-only.</exception>
         public EditDocument DeleteFile(string path)
         {
             session.ThrowIfReadOnly();

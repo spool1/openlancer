@@ -121,10 +121,10 @@ internal sealed record DocumentState(
 /// whole file, so an edit of the whole file cannot reach the game. W is the whole file with the patch, as the game
 /// gets it, and the document only shows it.</item>
 /// </list>
-/// <para>A whole file of the active mod that the editor edits (see <see cref="EditsWholeFile"/>) is a document of the
-/// kind "whole file" (section 6.7 of the M6b design). B is the file of the mod as it is on disk, and W gets the edits.
-/// A save writes the whole file as text (see <see cref="ChangedWholeFile"/>), not a patch. Each section is editable,
-/// also a section whose key repeats.</para>
+/// <para>The editor edits some whole files of the active mod (see <see cref="EditsWholeFile"/>). Such a file is a
+/// document of the kind "whole file" (section 6.7 of the M6b design). B is the file of the mod as it is on disk, and W
+/// gets the edits. A save writes the whole file as text (see <see cref="ChangedWholeFile"/>), not a patch. Each section
+/// is editable, also a section whose key repeats.</para>
 /// <para>Edits never change a section or an entry in place. They put new sections into the list, so an old
 /// <see cref="DocumentState"/> stays valid.</para>
 /// </remarks>
@@ -218,8 +218,8 @@ internal sealed class EditDocument : IEditFile
     /// <summary>
     /// True when the editor edits a whole file of the active mod at an install path. The rule takes two kinds of file:
     /// <list type="bullet">
-    /// <item>A file under <c>DATA\MISSIONS</c> (decision D680, section 6.7 of the M6b design), for example a test
-    /// script, a replaced slot script or a ship build file.</item>
+    /// <item>A file under <c>DATA\MISSIONS</c> (decision D680, section 6.7 of the M6b design). Examples are a test
+    /// script, a replaced slot script and a ship build file.</item>
     /// <item>An INI file below the folder of the active mod, <c>DATA\MODS\&lt;mod id&gt;</c> (see
     /// <see cref="ContentPaths"/>), for example the file of a new star system. Two mods have two ids, so such a file
     /// is a new file of the active mod.</item>

@@ -212,9 +212,9 @@ internal sealed class PlayHost
     }
 
     /// <summary>Asks the engine for the next frame of the game, from its back buffer. More requests before that frame
-    /// get the same frame. The image shows the game as the player sees it, so the debug view does not draw its windows
-    /// until the frame of the capture ends. The engine keeps one screenshot request. A key of the player reads its input
-    /// before the queue of the UI thread runs, so a screenshot of the player in the same frame is lost.</summary>
+    /// get the same frame. The image shows the game as the player sees it. So the debug view draws no windows until the
+    /// frame of the capture ends. The engine keeps one screenshot request. A key of the player reads its input before
+    /// the queue of the UI thread runs. So a screenshot of the player in the same frame is lost.</summary>
     private void Capture(int request)
     {
         if (captures.Count == 0)

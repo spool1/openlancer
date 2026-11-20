@@ -517,8 +517,9 @@ public sealed class AgentViewToolTests
         Assert.Equal(MissionEdits.Script, views.Opened.Single().Target);
     }
 
-    /// <summary>A new system of the active mod: its file in the folder of the mod, the text of its name and its
-    /// <c>[system]</c> in <c>universe.ini</c>, as one edit. With <paramref name="dock"/>, also a new base in it.</summary>
+    /// <summary>A new system of the active mod, as one edit. The edit makes the file of the system in the folder of the
+    /// mod, the text of its name and its <c>[system]</c> in <c>universe.ini</c>. With <paramref name="dock"/>, it also
+    /// makes a new base in the system.</summary>
     private static EditCommand NewSystem(EditSession session, bool dock = false) => EditCommand.Group("New system",
     [
         EditCommand.NewFile(NewModFileTests.NewPath, ContentPathsTests.Sections(NewModFileTests.SystemText)),

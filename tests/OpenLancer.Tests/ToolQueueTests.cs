@@ -164,9 +164,9 @@ public sealed class ToolQueueTests
     }
 
     /// <summary>
-    /// While the load of the game data is the only reason to wait, the first call of a tool that runs during a load
-    /// starts: studio_status. The other calls and the reads keep their order and wait. With another
-    /// reason, studio_status waits too.
+    /// While the load of the game data is the only reason to wait, the first waiting call of studio_status starts. Only
+    /// that tool runs during a load. The other calls and the reads keep their order and wait. With another reason,
+    /// studio_status waits too.
     /// </summary>
     [Fact]
     public async Task DuringALoadOnlyACallOfStudioStatusStarts()

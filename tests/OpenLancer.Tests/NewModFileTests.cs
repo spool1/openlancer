@@ -105,7 +105,7 @@ public sealed class NewModFileTests
 
     /// <summary>A new file and the delete of a file are structural changes that list each section of the file. A new
     /// file without sections is a structural change too. So the Scene and the marks of the agent edits see each added
-    /// and each removed section: the delete of an agent removes the marks of the sections of its file.</summary>
+    /// and each removed section. The delete of an agent removes the marks of the sections of its file.</summary>
     [Fact]
     public void NewFileAndDeleteFileAreStructuralChangesThatListTheSectionsOfTheFile()
     {
@@ -275,7 +275,7 @@ public sealed class NewModFileTests
         Assert.Throws<ArgumentException>(() => EditCommand.NewFile(@"DATA\MODS\act\x.ini", [new SectionEntries("a]b", [])]));
     }
 
-    /// <summary>The editor writes no new INI file into a mod in the OpenLancer repo (decision D70), so New file refuses
+    /// <summary>The editor writes no new INI file into a mod in the OpenLancer repo (decision D70). So New file refuses
     /// such a mod with the message of the save.</summary>
     [Fact]
     public void NewFileRefusesAModInTheRepo()
@@ -343,9 +343,9 @@ public sealed class NewModFileTests
         Assert.False(session.IsDirty);
     }
 
-    /// <summary>An INI file of the folder of the active mod stays an editable whole file also when the base data or a
-    /// lower mod has a file at the same path. The rule of the whole files has no test of the lower layer. The
-    /// save writes the whole file. The editor does not delete it, because the game then uses the lower file
+    /// <summary>An INI file of the folder of the active mod stays an editable whole file. This is also true when the
+    /// base data or a lower mod has a file at the same path. The rule of the whole files has no test of the lower
+    /// layer. The save writes the whole file. The editor does not delete it, because the game then uses the lower file
     /// again.</summary>
     [Fact]
     public void AnIniFileOfTheFolderOfTheModStaysEditableWhenTheLowerLayerHasIt()
@@ -409,8 +409,8 @@ public sealed class NewModFileTests
         Assert.Null(script.ReadOnlyReason);
     }
 
-    /// <summary>The view of the target checks gives W of a new file of the folder of the mod with the mods, and no
-    /// sections without them. A file that W deleted has no sections.</summary>
+    /// <summary>With the mods, the view of the target checks gives W of a new file of the folder of the mod. Without
+    /// the mods, it gives no sections. A file that W deleted has no sections.</summary>
     [Fact]
     public void TheTargetCheckViewGivesWOfANewFileAndNoSectionsForADeletedFile()
     {
@@ -476,10 +476,10 @@ public sealed class NewModFileTests
         Assert.False(File.Exists(FileOf(ws)));
     }
 
-    /// <summary>The real flow in the host without a window. The test makes a new system file of the folder of the mod
-    /// with its <c>[system]</c>, runs the save tool and opens a new host on the same profile. The file is editable after
-    /// the profile opens again. The agent tools read and change it, and the merged files of the edit view have
-    /// it.</summary>
+    /// <summary>The real flow in the host without a window. The test makes a new system file with its <c>[system]</c>
+    /// in the folder of the mod. Then it runs the save tool and opens a new host on the same profile. The file is
+    /// editable after the profile opens again. The agent tools read and change it, and the merged files of the edit
+    /// view have it.</summary>
     [Fact]
     public void ASavedNewFileIsEditableAfterTheProfileOpensAgainInTheHostWithoutAWindow()
     {

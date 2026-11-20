@@ -98,8 +98,8 @@ public static class ContentPaths
             : null;
 
     /// <summary>
-    /// The value of a <c>[system] file</c> line of <c>universe.ini</c> that names a file: the install path relative to
-    /// the folder of the <c>universe.ini</c> of the edit view. An example is
+    /// The value of a <c>[system] file</c> line of <c>universe.ini</c> that names a file. The value is the install path
+    /// relative to the folder of the <c>universe.ini</c> of the edit view. An example is
     /// <c>..\MODS\my_mod\SYSTEMS\Ol01\Ol01.ini</c>. The map of the system files resolves the value against the same
     /// folder (see <see cref="SystemFiles.Folder"/>). Null when <c>freelancer.ini</c> names no <c>universe.ini</c>, or
     /// the path is not an install path.
