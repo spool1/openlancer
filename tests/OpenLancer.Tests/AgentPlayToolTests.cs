@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json.Nodes;
@@ -424,7 +425,7 @@ public sealed partial class AgentPlayToolTests : IDisposable
     }
 
     /// <summary>The texts of the Play of the agent pass the STE lint. Each group of the agent settings has its
-    /// tooltip.</summary>
+    /// tooltip. So do the data notice and the tooltips of the limits that play_capture uses.</summary>
     [Fact]
     public void TheTextsPassTheSteLint()
     {
@@ -432,9 +433,27 @@ public sealed partial class AgentPlayToolTests : IDisposable
         [
             EditorAgentPlay.OtherPlayReason,
             .. Enum.GetValues<ToolGroup>().Where(g => g != ToolGroup.Studio).Select(AgentMenu.GroupTip),
+            AgentMenu.DataNotice, AgentMenu.WaitTip, AgentMenu.TailTip, AgentMenu.RenderPixelsTip,
         ];
 
         Assert.Empty(texts.SelectMany(t => SteLint.Problems(t)));
+    }
+
+    /// <summary>The data notice of the first start and the help page tell the user the same thing. The agent also gets
+    /// images of the game. The tooltips of the group Play and of the limits name the image of the game, and the wait
+    /// for the game data load.</summary>
+    [Fact]
+    public void TheNoticeAndTheTooltipsNameTheImagesOfTheGame()
+    {
+        var help = File.ReadAllText(RepoFiles.Of("docs", "MCP.md"));
+
+        Assert.Contains("It also reads the Console messages, and it gets images of the editor panels and of the game of Play.",
+            AgentMenu.DataNotice);
+        Assert.Contains("It also gets images of the editor panels and of the game.", help);
+        Assert.Contains("the image of the running game", AgentMenu.GroupTip(ToolGroup.Play));
+        Assert.Contains("while the editor loads the game data", AgentMenu.WaitTip);
+        Assert.Contains($"{PlayTools.MaxCaptureDelay} s more for its delay", AgentMenu.TailTip);
+        Assert.Contains("of the game", AgentMenu.RenderPixelsTip);
     }
 
     /// <summary>The state of Play for the agent has a value for each Play status, with the same name.</summary>

@@ -90,9 +90,9 @@ When another program uses the port, the server does not start. The status bar th
 | Size of a result (KB) | 256 | The most text of one result. A larger result asks the agent for pages. An edit with a larger result changes nothing. |
 | Calls each second | 10 | The most calls that the server takes in one second. A read of the catalog of the prefabs counts as a call. |
 | Wait for the editor (s) | 30 | How long a call waits while you edit a field, rename an item or drag an item, and while a dialog is open. A call also waits while the editor loads the game data. A longer wait gives the error `busy`. A read of the catalog of the prefabs has the same wait. |
-| Time of a check or an image (s) | 60 | How long a check of a retail target or an image can take. |
+| Time of a check or an image (s) | 60 | How long a check of a retail target or an image can take. An image of the game (`play_capture`) can take 60 s more for its `delay`. |
 | Size of a request (MB) | 4 | The largest request. The change applies at the next start of the server. |
-| Largest side of an image (pixels) | 2048 | The most pixels on each side of an image. A larger panel capture becomes smaller. A `render_scene` or `render_cutscene` call with a larger `width` or `height` gives the error `limit`. |
+| Largest side of an image (pixels) | 2048 | The most pixels on each side of an image. A larger panel capture or image of the game becomes smaller. A `render_scene`, `render_cutscene` or `play_capture` call with a larger `width` or `height` gives the error `limit`. |
 | Items of one edit | 200 | The most items that one call of `delete_items`, `duplicate_items` or `prop_group_save` names. Also the most moves of one `scene_transform` call, the most events of one `cutscene_move_events` call and the most rows of `expect_events`. |
 | Sections of one edit | 2000 | The most sections that one edit call changes, adds or removes. Also the most keys of `fields` of cutscene items that one call sets, in all steps of `edit_batch`. A larger edit changes nothing and gives the error `limit`. |
 | Steps of one batch | 100 | The most steps of one `edit_batch` call, and the most commands of one `mission_edit` call. |

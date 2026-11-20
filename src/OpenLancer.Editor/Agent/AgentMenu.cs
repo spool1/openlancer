@@ -124,10 +124,7 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
             controller.Start();
             return;
         }
-        window.Choice.Show("Start the agent server",
-            "The agent reads the game data and the mod data of this profile. It also reads the Console messages and " +
-            "images of the editor panels. The agent program can send this data to its model service. The server accepts " +
-            "connections from this computer only.",
+        window.Choice.Show("Start the agent server", DataNotice,
             [
                 new Choice("Start server", () =>
                 {
@@ -138,6 +135,13 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
                 new Choice("Cancel", () => { }),
             ]);
     }
+
+    /// <summary>The data notice of the first start of the server. It tells the same as "Data that goes to the agent" in
+    /// docs/MCP.md.</summary>
+    internal const string DataNotice =
+        "The agent reads the game data and the mod data of this profile. It also reads the Console messages, and it " +
+        "gets images of the editor panels and of the game of Play. The agent program can send this data to its model " +
+        "service. The server accepts connections from this computer only.";
 
     /// <summary>The agent settings: the port, the setting of agent Play (user decision of 2026-10-20 of the M6c design),
     /// the tool groups and the limits (section 10 of the MCP1 design).</summary>
@@ -205,9 +209,24 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
         ToolGroup.Scene => "The tools of the star systems, their items, the assets and the prop groups.",
         ToolGroup.Missions => "The tools of the mission scripts.",
         ToolGroup.Cutscenes => "The tools of the cutscene scripts.",
-        ToolGroup.Play => "The tools that start and stop a play in OpenLancer.",
+        ToolGroup.Play => "The tools that start and stop a play in OpenLancer, and the image of the running game.",
         _ => throw new ArgumentOutOfRangeException(nameof(group), group, null),
     };
+
+    /// <summary>The tooltip of the wait limit. The game data load holds the calls too.</summary>
+    internal const string WaitTip =
+        "How long a call waits while you edit a field or a dialog is open, and while the editor loads the game data.";
+
+    /// <summary>The tooltip of the time limit of the second part of a call. An image of the game gets the most delay
+    /// of play_capture on top.</summary>
+    internal static readonly string TailTip =
+        "How long a check of a retail target or an image can take. An image of the game can take " +
+        $"{Studio.Agent.PlayTools.MaxCaptureDelay} s more for its delay. A longer call gives the agent an error.";
+
+    /// <summary>The tooltip of the size limit of the images.</summary>
+    internal const string RenderPixelsTip =
+        "The most pixels on each side of an image of a system, of a cutscene or of the game. A larger panel capture " +
+        "or image of the game becomes smaller. A large image takes more time in a frame of the editor.";
 
     /// <summary>The fields of the limits of one agent call (decision D724).</summary>
     private void Limits(AgentSettings settings)
@@ -228,18 +247,14 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
             AgentLimits.ResultKilobytesRange, v => limits = limits with { ResultKilobytes = v });
         changed |= RangeField("Calls each second", "The most calls that the server takes in one second.",
             limits.CallsPerSecond, AgentLimits.CallsPerSecondRange, v => limits = limits with { CallsPerSecond = v });
-        changed |= RangeField("Wait for the editor (s)",
-            "How long a call waits while you edit a field or a dialog is open.", limits.WaitSeconds,
-            AgentLimits.WaitSecondsRange, v => limits = limits with { WaitSeconds = v });
-        changed |= RangeField("Time of a check or an image (s)",
-            "How long a check of a retail target or an image can take. A longer call gives the agent an error.",
-            limits.TailSeconds, AgentLimits.TailSecondsRange, v => limits = limits with { TailSeconds = v });
+        changed |= RangeField("Wait for the editor (s)", WaitTip, limits.WaitSeconds, AgentLimits.WaitSecondsRange,
+            v => limits = limits with { WaitSeconds = v });
+        changed |= RangeField("Time of a check or an image (s)", TailTip, limits.TailSeconds,
+            AgentLimits.TailSecondsRange, v => limits = limits with { TailSeconds = v });
         changed |= RangeField("Size of a request (MB)",
             "The largest request. The change applies at the next start of the server.", limits.RequestMegabytes,
             AgentLimits.RequestMegabytesRange, v => limits = limits with { RequestMegabytes = v });
-        changed |= RangeField("Largest side of an image (pixels)",
-            "The most pixels on each side of an image of a system or of a cutscene. A larger panel capture becomes " +
-            "smaller. A large image takes more time in a frame of the editor.", limits.RenderPixels,
+        changed |= RangeField("Largest side of an image (pixels)", RenderPixelsTip, limits.RenderPixels,
             AgentLimits.RenderPixelsRange, v => limits = limits with { RenderPixels = v });
         changed |= RangeField("Items of one edit",
             "The most items that one agent call deletes, copies, moves or saves into a prop group. A larger change is " +
