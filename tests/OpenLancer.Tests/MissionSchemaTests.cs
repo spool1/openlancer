@@ -135,24 +135,25 @@ public sealed class MissionSchemaTests
     }
 
     /// <summary>The Inspector does not show the sentences of the label distance condition yet. They tell the strict side
-    /// too, so that they are correct when the Inspector shows them.</summary>
-    [Fact]
-    public void TheSentencesOfTheLabelDistanceConditionTellTheirSide()
+    /// and the ships that must be on it, so that they are correct when the Inspector shows them. The engine reads ANY in
+    /// any letter case, and each other value as ALL.</summary>
+    [Theory]
+    [InlineData("inside", "ANY", "Starts when at least one ship of label ol_wing is closer than 1000 m to a point.")]
+    [InlineData("inside", "any", "Starts when at least one ship of label ol_wing is closer than 1000 m to a point.")]
+    [InlineData("inside", "ALL", "Starts when each ship of label ol_wing is closer than 1000 m to a point.")]
+    [InlineData("outside", "ANY", "Starts when at least one ship of label ol_wing is farther than 1000 m from a point.")]
+    [InlineData("outside", "ALL", "Starts when each ship of label ol_wing is farther than 1000 m from a point.")]
+    public void TheSentencesOfTheLabelDistanceConditionTellTheirSideAndTheirShips(string side, string which,
+        string expected)
     {
         var name = Schema.Name("Cnd_DistVecLbl")!;
+        var values = new Dictionary<string, string>
+        {
+            ["side"] = side, ["which"] = which, ["label"] = "ol_wing", ["radius"] = "1000",
+        };
 
         Assert.False(name.Checked);
-        Assert.Collection(name.Sentences,
-            inside =>
-            {
-                Assert.Equal(["inside"], inside.When["side"]);
-                Assert.Contains("are closer than {radius} m to a point", inside.Text);
-            },
-            outside =>
-            {
-                Assert.Empty(outside.When);
-                Assert.Contains("are farther than {radius} m from a point", outside.Text);
-            });
+        Assert.Equal(expected, (name with { Checked = true }).Sentence(values.GetValueOrDefault));
     }
 
     /// <summary>The start role of each action (section 5.3, step 9 of the M6c design): one role of the closed set for each

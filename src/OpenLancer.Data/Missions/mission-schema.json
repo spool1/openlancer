@@ -334,8 +334,10 @@
         { "index": 7, "name": "hold", "label": "Hold time", "kind": "number", "optional": true }
       ],
       "sentences": [
-        { "when": { "side": "inside" }, "text": "Starts when the ships of label {label} are closer than {radius} m to a point." },
-        { "text": "Starts when the ships of label {label} are farther than {radius} m from a point." }
+        { "when": { "side": "inside", "which": "ANY" }, "text": "Starts when at least one ship of label {label} is closer than {radius} m to a point." },
+        { "when": { "side": "inside" }, "text": "Starts when each ship of label {label} is closer than {radius} m to a point." },
+        { "when": { "which": "ANY" }, "text": "Starts when at least one ship of label {label} is farther than {radius} m from a point." },
+        { "text": "Starts when each ship of label {label} is farther than {radius} m from a point." }
       ], "evidence": "TR11, fork Cnd_DistVecLbl" },
     { "name": "Cnd_DistCircle", "plain": "Through a ring", "event": "distance", "polls": true,
       "values": [
