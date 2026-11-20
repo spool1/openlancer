@@ -30,8 +30,8 @@ namespace OpenLancer.Play;
 /// <para>A thread reads the commands of the editor from the standard input and gives each one to the UI thread. The end
 /// of the input exits the game, as stop does. The events go to the standard output. A timer takes the trigger changes of
 /// the mission observer at most each 100 ms and writes them as mission events (section 6.2 of the M6c design).</para>
-/// <para>A capture takes the next frame from the back buffer of the game (shared step SH9). A task writes the PNG file
-/// in the capture folder of the play folder and then sends captured.</para>
+/// <para>A capture takes the next frame from the back buffer of the game. That frame has no debug windows. A task
+/// writes the PNG file in the capture folder of the play folder and then sends captured.</para>
 /// </remarks>
 internal sealed class PlayHost
 {
@@ -65,6 +65,10 @@ internal sealed class PlayHost
 
     /// <summary>The capture requests that wait for the next frame, oldest first.</summary>
     private readonly List<int> captures = [];
+
+    /// <summary>True when the debug view showed before the first capture request that waits. The frame of a capture
+    /// has no debug windows, and the view shows again after that frame.</summary>
+    private bool debugBeforeCapture;
 
     /// <summary>The screenshot handler of the engine. It saves the screenshots of the player (see
     /// <see cref="OnScreenshot"/>).</summary>
@@ -208,11 +212,17 @@ internal sealed class PlayHost
     }
 
     /// <summary>Asks the engine for the next frame of the game, from its back buffer. More requests before that frame
-    /// get the same frame.</summary>
+    /// get the same frame. The image shows the game as the player sees it, so the debug view does not draw its windows
+    /// until the frame of the capture ends. The engine keeps one screenshot request. A key of the player reads its input
+    /// before the queue of the UI thread runs, so a screenshot of the player in the same frame is lost.</summary>
     private void Capture(int request)
     {
         if (captures.Count == 0)
+        {
+            debugBeforeCapture = game.Debug.Enabled;
+            game.Debug.Enabled = false;
             game.Screenshot(captureMark);
+        }
         captures.Add(request);
     }
 
@@ -235,6 +245,7 @@ internal sealed class PlayHost
 
         var requests = captures.ToArray();
         captures.Clear();
+        game.Debug.Enabled = debugBeforeCapture;
         var folder = PlayFolder.CapturesPath(args.Profile);
         Task.Run(() => WriteCaptures(folder, requests, width, height, data));
     }

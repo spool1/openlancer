@@ -740,7 +740,7 @@ The result also gives the state of Play, the mission and its script. `dropped` g
 
 #### Images of the game
 
-`play_capture` gives an image of the running game of Play in OpenLancer, as the player sees it. It works only in the editor host, and it changes nothing. So it also works while you pause the agent edits. The previews of the editor do not run the mission orders. So an image of the game is the only true image of a mission shot, a comm window or a base room.
+`play_capture` gives an image of the running game of Play in OpenLancer, as the player sees it. The game hides its debug windows for the frame of the image. It works only in the editor host, and it changes nothing. So it also works while you pause the agent edits. The previews of the editor do not run the mission orders. So an image of the game is the only true image of a mission shot, a comm window or a base room.
 
 | Argument | What it does |
 |---|---|
