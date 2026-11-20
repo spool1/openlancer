@@ -177,9 +177,11 @@ internal sealed partial class FlmmScript
         if (UniverseOrder.IsUniverse(file.Path) &&
             diff.Added.Where(m => UniverseOrder.IsBase(diff.MergedSections[m])).ToList() is { Count: > 0 } bases)
         {
-            Refuse(file.Path, $"the mod adds {string.Join(", ", bases.Select(m => SectionIdentity.Of(diff.MergedSections, m)))}" +
-                              " to universe.ini. The game links a base to its station only when the [Base] comes before " +
-                              "the [system] sections. FLMM has no tested operation that puts a section there yet");
+            // The nickname names the base. A [Base] without a nickname keeps the name of its section.
+            var names = bases.Select(m => SectionIdentity.Of(diff.MergedSections, m)).Select(s => s.Key ?? s.ToString());
+            Refuse(file.Path, $"the mod adds the new {(bases.Count == 1 ? "base" : "bases")} {string.Join(", ", names)} to " +
+                              "universe.ini. The game links a base to its station only when the [Base] comes before the " +
+                              "[system] sections. FLMM has no tested operation that puts a section there yet");
             return;
         }
         var binary = file.BaseDocument!.IsBinary;
