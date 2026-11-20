@@ -49,7 +49,7 @@ public enum SelectionPlace
     Cutscene,
 }
 
-/// <summary>The state of the game data of the editor, as <c>studio_status</c> gives it (shared step SH8).</summary>
+/// <summary>The state of the game data of the editor, as <c>studio_status</c> gives it.</summary>
 public enum AgentDataLoad
 {
     /// <summary>The editor has the game data of the saved files, and no load runs.</summary>

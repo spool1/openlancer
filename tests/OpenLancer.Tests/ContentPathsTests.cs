@@ -10,7 +10,7 @@ using Xunit;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The places of the new files of a mod and the values that name them (decision O2). The tests cover the folder of the
+/// The places of the new files of a mod and the values that name them. The tests cover the folder of the
 /// mod and the place of each kind of new file. They also cover the value relative to the data folder, the value
 /// relative to the folder of <c>universe.ini</c>, and the test of a taken path. The names are invented.
 /// </summary>
@@ -31,7 +31,7 @@ public sealed class ContentPathsTests
         Assert.False(ContentPaths.IsOwnFile(@"DATA\UNIVERSE\SYSTEMS\Li01\li01.ini", "act"));
     }
 
-    /// <summary>Each kind of new file has one place in the folder of the mod (decision O2). A cutscene keeps its folder
+    /// <summary>Each kind of new file has one place in the folder of the mod. A cutscene keeps its folder
     /// (decision D67).</summary>
     [Fact]
     public void EachKindOfNewFileHasItsPlaceInTheFolderOfTheMod()

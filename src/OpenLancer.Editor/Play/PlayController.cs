@@ -96,7 +96,7 @@ internal sealed record PlayCaptureResult(PlayStatus Play)
 /// at the new start. The game gives the trigger changes of its mission to the editor (section 6.2).</para>
 /// <para>Each request gives its result when it ends: the play started, or the reason why it did not (section 7.2 of the
 /// M6c design). The agent tools read it. The keys and the menus do not need it.</para>
-/// <para>A capture of the agent (shared step SH9) waits for its delay, then asks the running game for an image of its
+/// <para>A capture of the agent waits for its delay, then asks the running game for an image of its
 /// next frame. The game writes the image as a file of the capture folder of the play folder. The controller reads the
 /// file from there only, and deletes it after the read.</para>
 /// <para>The controller talks to the editor only through <see cref="IPlayEditor"/> (D50), and it reads the time from a
@@ -274,7 +274,7 @@ internal sealed class PlayController : IDisposable
         Replace(new PlayRequest(start, package, clock()) { Save = save, Origin = origin });
 
     /// <summary>
-    /// Asks the game for an image of a frame after a delay (the agent tool <c>play_capture</c>, shared step SH9).
+    /// Asks the game for an image of a frame after a delay (the agent tool <c>play_capture</c>).
     /// <see cref="Update"/> sends the capture command when the delay ends. The game writes the image and sends
     /// captured, and the controller then reads the file and deletes it.
     /// </summary>

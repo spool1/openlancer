@@ -53,7 +53,7 @@ internal interface IAgentPlayEditor : IAgentPlayHost
 /// 2026-10-20: it never saves on its own, and with unsaved edits the editor asks the user first. While a game runs, the
 /// request gives <c>refused</c>, and the agent stops the game with <c>play_stop</c> first. The Play menu closes the
 /// running game instead. A mission play of an agent starts a running mission play again at its start, as F5 does.
-/// <c>play_capture</c> gives an image of the game of Play in OpenLancer (shared step SH9).
+/// <c>play_capture</c> gives an image of the game of Play in OpenLancer.
 /// </summary>
 internal sealed class EditorAgentPlay(IAgentPlayEditor editor) : IAgentPlay
 {

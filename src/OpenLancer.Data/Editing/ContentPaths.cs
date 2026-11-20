@@ -6,7 +6,7 @@ using OpenLancer.Data.IO;
 namespace OpenLancer.Data.Editing;
 
 /// <summary>
-/// The places of the new files of a mod, and the values of the lines that name them (decision O2). Each new INI file of
+/// The places of the new files of a mod, and the values of the lines that name them. Each new INI file of
 /// a mod goes below the folder of the mod, <c>DATA\MODS\&lt;mod id&gt;</c>. Two mods have two ids, so their new files
 /// cannot collide. The editor edits each INI file of that folder of the active mod (see
 /// <see cref="EditDocument.EditsWholeFile"/>).
@@ -24,8 +24,7 @@ public static class ContentPaths
     /// <c>freelancer.ini</c> gives it.</summary>
     private const string DataFolder = "DATA";
 
-    /// <summary>The folder of the new files of a mod, as an install path: <c>DATA\MODS\&lt;mod id&gt;</c> (decision
-    /// O2).</summary>
+    /// <summary>The folder of the new files of a mod, as an install path: <c>DATA\MODS\&lt;mod id&gt;</c>.</summary>
     internal static string OwnFolder(string modId) => $@"{DataFolder}\MODS\{modId}";
 
     /// <summary>True when an install path names a file below the folder of a mod (see <see cref="OwnFolder"/>), in
@@ -43,23 +42,23 @@ public static class ContentPaths
     internal static string NewCutsceneFolder(string modId) => $@"{OwnFolder(modId)}\CUTSCENES";
 
     /// <summary>The file of a new star system of a mod: <c>SYSTEMS\&lt;nickname&gt;\&lt;nickname&gt;.ini</c> in the
-    /// folder of the mod (decision O2). Its <c>[system]</c> names it with <see cref="UniverseValue"/>.</summary>
+    /// folder of the mod. Its <c>[system]</c> names it with <see cref="UniverseValue"/>.</summary>
     internal static string NewSystemFile(string modId, string nickname) =>
         $@"{OwnFolder(modId)}\SYSTEMS\{nickname}\{nickname}.ini";
 
-    /// <summary>The file of a new base of a mod: <c>BASES\&lt;base&gt;.ini</c> in the folder of the mod (decision O2).
+    /// <summary>The file of a new base of a mod: <c>BASES\&lt;base&gt;.ini</c> in the folder of the mod.
     /// Its <c>[Base]</c> names it with <see cref="DataValue"/>.</summary>
     internal static string NewBaseFile(string modId, string baseNickname) => $@"{OwnFolder(modId)}\BASES\{baseNickname}.ini";
 
     /// <summary>The copy of a room file for a new base of a mod: <c>BASES\ROOMS\&lt;base&gt;_&lt;room&gt;.ini</c> in the
-    /// folder of the mod (decision O2). The <c>[Room]</c> of the base file names it with
+    /// folder of the mod. The <c>[Room]</c> of the base file names it with
     /// <see cref="DataValue"/>.</summary>
     internal static string NewRoomFile(string modId, string baseNickname, string room) =>
         $@"{OwnFolder(modId)}\BASES\ROOMS\{baseNickname}_{room}.ini";
 
     /// <summary>
     /// The file of a new nebula or asteroid field of a mod: <c>SOLAR\NEBULA\&lt;name&gt;.ini</c> or
-    /// <c>SOLAR\ASTEROIDS\&lt;name&gt;.ini</c> in the folder of the mod (decision O2). The retail files have the same
+    /// <c>SOLAR\ASTEROIDS\&lt;name&gt;.ini</c> in the folder of the mod. The retail files have the same
     /// two folders. The <c>[Nebula]</c> or <c>[Asteroids]</c> section of a system file names it with
     /// <see cref="DataValue"/>.
     /// </summary>
@@ -78,11 +77,11 @@ public static class ContentPaths
         return $@"{OwnFolder(modId)}\SOLAR\{folder}\{name}.ini";
     }
 
-    /// <summary>The voices file of a mod: <c>AUDIO\voices.ini</c> in the folder of the mod (decision O2). The voice
+    /// <summary>The voices file of a mod: <c>AUDIO\voices.ini</c> in the folder of the mod. The voice
     /// banks are not in it: the games read a bank only from <c>DATA\AUDIO</c>.</summary>
     internal static string VoicesFile(string modId) => $@"{OwnFolder(modId)}\AUDIO\voices.ini";
 
-    /// <summary>The sounds file of a mod: <c>AUDIO\sounds.ini</c> in the folder of the mod (decision O2), with the
+    /// <summary>The sounds file of a mod: <c>AUDIO\sounds.ini</c> in the folder of the mod, with the
     /// sound files beside it.</summary>
     internal static string SoundsFile(string modId) => $@"{OwnFolder(modId)}\AUDIO\sounds.ini";
 

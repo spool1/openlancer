@@ -95,7 +95,7 @@ public sealed partial class EditSession
     }
 
     /// <summary>
-    /// The documents of the INI files below the folder of the active mod that the session has (decision O2). These are
+    /// The documents of the INI files below the folder of the active mod that the session has. These are
     /// the new files of W, the files that the session opened, and the files that W deleted. The files lists and the
     /// file check read them (see <see cref="DataLists"/>). So a new file is in a list before its save, and a file that W
     /// deleted is not. Empty without an active mod.

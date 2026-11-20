@@ -2525,7 +2525,7 @@ public sealed class PlayControllerTests : IDisposable
     }
 
     /// <summary>
-    /// A capture of the agent (shared step SH9) waits for its delay, then sends the capture command with the next request
+    /// A capture of the agent waits for its delay, then sends the capture command with the next request
     /// number. The game writes the image file and answers captured. The controller reads the file from the capture folder
     /// of the play folder and deletes it.
     /// </summary>

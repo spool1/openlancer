@@ -977,7 +977,7 @@ public sealed partial class EditSession : IDisposable
 
         /// <summary>
         /// The document of a whole INI file that the active mod adds in its folder, to delete it (see
-        /// <see cref="EditCommand.DeleteFile"/>, decision O5).
+        /// <see cref="EditCommand.DeleteFile"/>).
         /// </summary>
         /// <exception cref="ArgumentException">W has no such INI file.</exception>
         /// <exception cref="InvalidOperationException">The file is not a whole file of the folder of the active mod, the

@@ -10,7 +10,7 @@ using static OpenLancer.Tests.AgentCalls;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The tool <c>play_capture</c> (shared step SH9): an image of the game of Play in OpenLancer after a delay, with the
+/// The tool <c>play_capture</c>: an image of the game of Play in OpenLancer after a delay, with the
 /// Play of a fake editor. The fake gives the PNG image that the game wrote, and the tool makes a larger image smaller.
 /// </summary>
 public sealed partial class AgentPlayToolTests

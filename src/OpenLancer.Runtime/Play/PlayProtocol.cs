@@ -24,7 +24,7 @@ public enum PlayCommandKind
     Restart,
 
     /// <summary>The game writes an image of its next frame as a PNG file, then sends captured (the agent tool
-    /// <c>play_capture</c>, shared step SH9).</summary>
+    /// <c>play_capture</c>).</summary>
     Capture,
 }
 

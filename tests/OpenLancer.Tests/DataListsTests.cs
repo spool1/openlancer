@@ -312,7 +312,7 @@ public sealed class DataListsTests
     private const string NewCloudValue = @"MODS\act\SOLAR\NEBULA\new_cloud.ini";
 
     /// <summary>
-    /// A files list holds a new INI file of the folder of the active mod before the save (decision O2). The file must
+    /// A files list holds a new INI file of the folder of the active mod before the save. The file must
     /// pass the filters of the list. The save does not change the entry or its place. A delete takes the entry
     /// away before the save. <see cref="DataLists.FileExists"/> follows the list, so a check of a <c>file</c> line
     /// agrees with the list.

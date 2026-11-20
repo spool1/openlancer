@@ -9,8 +9,8 @@ using Xunit;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// <see cref="SectionCopies.CopyTo"/> copies sections into a new file or into an existing file, with new keys (shared
-/// step SH5). A text of a mod gets a copy with a new key, and a text id of the base game stays. The data is invented.
+/// <see cref="SectionCopies.CopyTo"/> copies sections into a new file or into an existing file, with new keys.
+/// A text of a mod gets a copy with a new key, and a text id of the base game stays. The data is invented.
 /// </summary>
 public sealed class SectionCopiesTests
 {

@@ -8,7 +8,7 @@ using Universe = LibreLancer.Data.Schema.Universe;
 namespace OpenLancer.Data.Editing.Scene;
 
 /// <summary>
-/// The shape of a zone (shared step SH6). The class has the rules of the engine that make the shape, the size and the
+/// The shape of a zone. The class has the rules of the engine that make the shape, the size and the
 /// rotation of a zone from its lines. The scene build uses the same rules. The class also has the math of the shape.
 /// The math tells whether a point is inside and how deep the point is. It also gives the size of the shape in meters,
 /// and the size line for a size in meters.

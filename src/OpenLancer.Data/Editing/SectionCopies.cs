@@ -103,7 +103,7 @@ internal sealed class SectionCopies(EditSession session, Action<string> problem)
 
     /// <summary>
     /// The command that copies sections into a file, for example the header sections of a system into a new system
-    /// file (shared step SH5). With <paramref name="newFile"/>, it makes the new INI file of the folder of the active mod
+    /// file. With <paramref name="newFile"/>, it makes the new INI file of the folder of the active mod
     /// with the copies in their order (see <see cref="EditCommand.NewFile"/>). Else it adds the copies at the end of the
     /// existing file (see <see cref="EditCommand.AddSection"/>). There, a child copy goes under the last other copy
     /// before it, or under <paramref name="parent"/>.

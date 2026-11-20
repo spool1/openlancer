@@ -821,7 +821,7 @@ public sealed class AgentQueryTests
     private static (string?, string?) Code((string? Code, string? Detail, string? Message) error) => (error.Code, error.Detail);
 
     /// <summary>
-    /// studio_status gives data_load (shared step SH8): reloading while the editor loads the game data, and ready
+    /// studio_status gives data_load: reloading while the editor loads the game data, and ready
     /// after the load. A reload of a save during the first load waits for that load, and it counts as reloading while it
     /// waits. The host without a window has no reload, so it always gives ready.
     /// </summary>

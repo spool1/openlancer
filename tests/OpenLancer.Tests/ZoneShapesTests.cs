@@ -8,7 +8,7 @@ using Universe = LibreLancer.Data.Schema.Universe;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// The zone math of <see cref="ZoneShapes"/> (shared step SH6) for each shape. The tests cover the points inside, the
+/// The zone math of <see cref="ZoneShapes"/> for each shape. The tests cover the points inside, the
 /// immersion with the retail rule, the size in meters and the size line for a size in meters. The zones are
 /// invented.
 /// </summary>

@@ -411,7 +411,7 @@ public sealed class EditDocumentTests
     }
 
     /// <summary>The editor edits a whole file of the active mod under <c>DATA\MISSIONS</c>, and an INI file in the
-    /// folder of the active mod, in any letter case (decision O2). Each other whole file stays read-only.</summary>
+    /// folder of the active mod, in any letter case. Each other whole file stays read-only.</summary>
     [Fact]
     public void TheEditorEditsAMissionFileAndAnIniFileOfTheFolderOfTheActiveMod()
     {

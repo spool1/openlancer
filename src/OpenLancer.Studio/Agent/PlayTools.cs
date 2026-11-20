@@ -147,7 +147,7 @@ public interface IAgentPlay
     MissionTraceView Trace(int play, long since, int limit);
 
     /// <summary>
-    /// Asks the game of Play in OpenLancer for an image of a frame after a delay (shared step SH9). The image has at most
+    /// Asks the game of Play in OpenLancer for an image of a frame after a delay. The image has at most
     /// the size of the arguments and keeps the shape of the game window.
     /// </summary>
     /// <returns>The wait for the image, as the tail of the call. It throws an <see cref="EditException"/> when the game
@@ -164,7 +164,7 @@ public interface IAgentPlay
 
 /// <summary>
 /// The tools <c>play</c> and <c>play_stop</c> of section 7.6 of the MCP1 design, <c>mission_play</c> and
-/// <c>mission_play_trace</c> of section 7.4, and <c>play_capture</c> (shared step SH9). Only the editor host has them.
+/// <c>mission_play_trace</c> of section 7.4, and <c>play_capture</c>. Only the editor host has them.
 /// The handler checks the arguments and makes the start. The Play of the editor then runs the checks of the Play menu or
 /// of the mission play request, and the agent play rule.
 /// </summary>

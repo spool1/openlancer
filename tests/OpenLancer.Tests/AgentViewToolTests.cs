@@ -549,7 +549,7 @@ public sealed class AgentViewToolTests
 
     /// <summary>
     /// While the editor loads the game data again after a save, the dispatcher of the editor runs only studio_status, and
-    /// it gives data_load reloading (shared step SH8). A view of a system that the save added and a play at its base
+    /// it gives data_load reloading. A view of a system that the save added and a play at its base
     /// wait for the load. After the load, they run in their order with the game data of the save. Without the wait,
     /// the view would refuse the system because the loaded data does not have it yet.
     /// </summary>

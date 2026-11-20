@@ -689,7 +689,7 @@ public sealed class AgentControllerTests : IDisposable
     }
 
     /// <summary>A call of studio_status runs during a load of the game data only when the load is the only reason to
-    /// wait (shared step SH8).</summary>
+    /// wait.</summary>
     [Fact]
     public void OnlyALoadWithoutAnotherReasonLetsStudioStatusRun()
     {
