@@ -354,7 +354,7 @@ For other changes, a mod can replace `freelancer.ini` as a whole file in `files/
 
 ### universe.ini
 
-The game reads `DATA/UNIVERSE/universe.ini` from the start. It links a station of a system file to its base only when it read the `[Base]` before the `[system]` of that system. The files of the game have each `[Base]` before the first `[system]`. A `[Base]` at the end of the file has no station in the game.
+The game reads the sections of `DATA/UNIVERSE/universe.ini` in file order. It links a station of a system file to its base only when it read the `[Base]` before the `[system]` of that system. The files of the game have each `[Base]` before the first `[system]`. A `[Base]` at the end of the file has no station in the game.
 
 So the merge puts a new `[Base]` of a patch of `universe.ini` directly before the first `[system]` of the file. A new section of another type, for example a new `[system]`, goes at the end of the file:
 
@@ -376,8 +376,8 @@ file = ..\MODS\my-mod\SYSTEMS\Ol01\Ol01.ini
 - Two new bases go before the first `[system]` in the order of the patch.
 - When a lower mod has a whole `universe.ini` with a `[Base]` after a `[system]`, the new base still goes before every system.
 - When the file has no `[system]`, the new base goes at the end.
-- The editor uses the same rule. A new `[Base]` goes before the first `[system]` in the edit and in the drop-in zip. OpenLancer Play (F5) and Play in the game (Ctrl+F5) use the same place. The save writes the base with `ol.new`, and a later edit of the patch keeps the place.
-- In the edit, a base of the lower layers can come after a new base, for example when you delete it and add it again. The save then writes `ol.delete` and `ol.new` for that base, so the merge puts it after the new base. The save writes no line for the systems.
+- The editor uses the same rule. A new `[Base]` goes before the first `[system]` in the edit view and in the drop-in zip. OpenLancer Play (F5) and Play in the game (Ctrl+F5) use the same place. The save writes the base with `ol.new`, and a later edit of the patch keeps the place.
+- In the edit view, a base of the lower layers can come after a new base, for example when you delete it and add it again. The save then writes `ol.delete` and `ol.new` for that base, so the merge puts it after the new base. The save writes no line for the systems.
 - The FLMM package refuses a new `[Base]` (see "FLMM package (preview)"). Use the drop-in zip.
 
 ## Text: strings.json
@@ -408,17 +408,17 @@ A file in `files/` adds a new file, or replaces the file at the same install pat
 The editor edits two kinds of whole files of the active mod:
 
 - A file under `DATA/MISSIONS`, for example a test script, a replaced slot script or a file of ship builds.
-- An INI file below `DATA/MODS/<mod id>/` of the active mod, for example the file of a new star system. The editor also makes and deletes such a file, with undo. A new file cannot take the path of a file that the game, a mod or an unsaved edit has, in any letter case.
+- An INI file below `DATA/MODS/<mod id>/` of the active mod, for example the file of a new star system. Put such a file in `files/` of the mod. This version has no menu item and no agent tool that makes or deletes such a file.
 
 A line of another file names such a file by its path. For example, the `file` line of a new `[system]` or a new `[Base]` in `universe.ini` names a file in the mod folder (see "universe.ini"). A `[Data]` line of `freelancer.ini` names a new data file (see "freelancer.ini").
 
 Each section of such a file is editable, also a section whose key another section has. The save writes the whole file as text into `files/`. A text file keeps its comments and the lines that do not change. A binary file becomes text, and the save tells it.
 
-A new file can use text placeholders, and the save checks that `strings.json` has their text. After a delete, the save deletes the file. An undo of the delete gives the file back, and the next save writes it again.
+A new file can use text placeholders, and the save checks that `strings.json` has their text.
 
 An INI file below `DATA/MODS/<mod id>/` stays editable also when the game or a lower mod has a file at the same path. The editor does not delete such a file, because the game then uses the other file again. A whole file outside `DATA/MODS/<mod id>/` that replaces a file of the game or of a lower mod stays read-only, except under `DATA/MISSIONS`. The editor shows the other whole files of the active mod, but it does not change them.
 
-When the active mod is in the OpenLancer repo, the save refuses a whole mission file and a whole INI file below `DATA/MODS/<mod id>/`. The editor also makes no new INI file in that folder. The content scan cannot tell a whole mission file or a whole INI file from a copy of a retail file. The save can still delete such a file.
+When the active mod is in the OpenLancer repo, the save refuses a whole mission file and a whole INI file below `DATA/MODS/<mod id>/`. The content scan cannot tell a whole mission file or a whole INI file from a copy of a retail file.
 
 When the active mod has a whole mission file and a patch for the same path, the merge applies the patch to the whole file. The editor shows the file as the game gets it, but it does not change it. Move the lines of the patch into the whole file, then delete the patch.
 
@@ -1080,7 +1080,7 @@ A `scene` line names its script by its place: value 2 when value 0 is `all`, els
 
 The `file` key of a `[Nebula]` and of an `[Asteroids]` section uses the list of the nebula files or of the asteroid files. The list holds the INI files below `SOLAR\NEBULA` or `SOLAR\ASTEROIDS` whose sections all belong to a nebula file or to an asteroid file. So the texture files of these folders, for example `edge_shapes.ini`, are not in the list. The engine reads a file of any folder. So a value outside the list is valid when its file exists, and the picker shows it as "value (other folder)". A file that does not exist is an error: the game crashes when it loads the data.
 
-A list of files also holds each new INI file of the active mod below `DATA/MODS/<mod id>/` (see "Whole files"), also before its save. The file must fit the list: the extension, the folder and, for a list with a file class, the sections of the file. The list leaves out a file that the active mod deletes, also before the save. So the save does not change the list. A check of a `file` line accepts a new file of the active mod before the save. It refuses a file that the active mod deletes.
+A list of files reads each INI file of the active mod below `DATA/MODS/<mod id>/` (see "Whole files") with its unsaved edits. The file must fit the list: the extension, the folder and, for a list with a file class, the sections of the file. So the save does not change the list.
 
 The `zone` key uses the list of the zones of the system file. A zone that the system does not have is an error: the game drops the nebula or the field. A section without a `file` line is an error of a section that the active mod changes: the game drops the item.
 
@@ -1255,7 +1255,7 @@ A save also stops in these cases:
 - A patch line of a key that holds a text id holds the id of a text of a mod as a number. The id comes from the position of the text in the generated DLL, so it changes when a mod adds text. Copy this text into the mod and use its placeholder.
 - A file that the save writes is a folder now, a folder of its path is a file, or the file is read-only.
 - The active mod is in the OpenLancer repo, and the save would write a whole cutscene file into it. The content scan cannot tell such a file from a copy of a retail script. A THN patch is allowed.
-- The save would write a whole mission file, or a whole INI file below `DATA/MODS/<mod id>/`, into a mod in the OpenLancer repo. The content scan cannot tell such a file from a copy of a retail file. The save can still delete such a file (see "Whole files").
+- The save would write a whole mission file, or a whole INI file below `DATA/MODS/<mod id>/`, into a mod in the OpenLancer repo. The content scan cannot tell such a file from a copy of a retail file.
 - The save gate finds an error (see "The save gate"). For example, a light names an attenuation curve (`atten_curve`) that the engine cannot load: no FLOAT graph of `igraph.ini` has the name, more than one graph has it, or the graph has no points. The light can be a light of the active mod, or a light of any layer when the active mod removed the points of the curve. The game stops loading with such a light, so each later load of the profile would fail. The Console names the light, the curve and the file. The gate reads the curves from the edit view, so it needs no loaded game data.
 
 While the editor has unsaved edits, it keeps them in `.olsave/recovery.json`, a moment after each edit. When no unsaved edits remain, for example after an undo, the editor deletes the file. A close of the profile and a change of the active mod ask first: Save, Discard or Cancel. After a save, the action continues, also when the save needed your confirmation to overwrite a file.

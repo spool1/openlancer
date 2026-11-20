@@ -658,7 +658,7 @@ After a save that changed files, the editor loads the game data again. `studio_s
 
 During a load, only `studio_status` runs. Each other call waits until the load ends, because the load fills the game data of the editor. The call then reads the game data of the save. So a view or a play of a system or a base that the save added works after the wait. When the load takes longer than the wait limit of the agent settings, the call gives `busy` with the reason. Call `studio_status` until `data_load` is `ready`, then call the tool again.
 
-A system that the mod did not save gives `refused` with the detail `NotLoaded`. The load reads only the saved files, so save the mod first. A new object, zone or light of a system that the game data has shows at once, without a save.
+A system that you did not save gives `refused` with the detail `NotLoaded`. The load reads only the saved files, so save the mod first. A new object, zone or light of a system that the game data has shows at once, without a save.
 
 The save gate runs first, as in the editor. When the checks find errors, the save stops and writes nothing. `save` then gives the error `save_blocked` with the messages of the first errors. Call `check` to read each error. When a file of the mod changed outside OpenLancer, `save` gives `changed_on_disk` and writes nothing. In the editor, a dialog then asks you to replace the file or to keep it. The agent never replaces such a file. While an export runs, `save` gives `busy` and writes nothing, because the export reads the saved files.
 
@@ -752,21 +752,24 @@ The result gives the size of the image and the state of Play when the game took 
 These cases give an error:
 
 - No game of Play in OpenLancer runs, or only the game of a play copy runs: `refused` with the detail `NoGame`. Start a game with `play` or `mission_play` first.
-- The game did not give the image in 10 s, the game closed, or the game could not write the file: `refused` with the detail `CaptureFailed` and the reason.
+- The game did not give the image in 10 s, or the game closed: `refused` with the detail `CaptureFailed` and the reason.
+- The game could not write the file: `refused` with the detail `CaptureFailed` and the reason.
 - The editor cannot read the file as a PNG image: `refused` with the detail `CaptureFailed` and the reason.
 - A side above the image limit: `limit`.
 - You clear the group Play: `not_available`. The oltool host also gives `not_available`.
 
 #### Example: see the game
 
-These steps check the data reload and the images of the game with a new base of a mod.
+These steps check the data reload and the images of the game with a base of the mod. The base can be a base that the last save added.
 
 1. Ask the user to save the mod, or call `save` when the user allows it.
 2. Call `studio_status`.
 3. If `data_load` is `reloading`, wait 5 seconds. Then do step 2 again.
-4. Call `play` with `start: base` and the new base.
-5. Call `play_capture` with `delay: 5`. The image shows the room of the base.
-6. Call `play_stop`.
+4. Call `play` with `start: base` and the base. The call can end before the game shows the base.
+5. Call `play_capture` with `delay: 5`.
+6. If the call gives `CaptureFailed`, or `play` in its result is not `running`, do step 5 again. Before `running`, the image can show the load of the game.
+7. Look at the image. It shows the room of the base.
+8. Call `play_stop`.
 
 ### What you see in the editor
 
