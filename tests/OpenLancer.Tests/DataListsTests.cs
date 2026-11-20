@@ -931,6 +931,21 @@ public sealed class RemovedEntriesTests
         Assert.Null(session.Lists.List("cutscene")!.Find(@"MODS\act\CUTSCENES\bar_shot.thn"));
     }
 
+    /// <summary>The list of the cutscenes has the extension .thn and no folder. A new INI file of the folder of the
+    /// active mod is no cutscene, so the list does not hold it.</summary>
+    [Fact]
+    public void TheCutsceneListHoldsNoNewIniFileOfTheFolderOfTheMod()
+    {
+        using var ws = RoomWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.NewFile(@"DATA\MODS\act\x.ini", ContentPathsTests.Sections("[Thing]\nnickname = a\n")));
+
+        var values = session.Lists.List("cutscene")!.Entries.Select(e => e.Value).ToList();
+
+        Assert.Contains(@"SCRIPTS\BASES\Li_01_bar_hardpoint_01.thn", values);
+        Assert.DoesNotContain(@"MODS\act\x.ini", values, StringComparer.OrdinalIgnoreCase);
+    }
+
     /// <summary>The values of the list of the cutscenes compare as paths below the data folder: without letter case,
     /// with either separator, and without empty parts or "." parts, as the engine finds the files.</summary>
     [Theory]

@@ -180,6 +180,13 @@ public sealed class ZoneShapesTests
         Assert.Equal(0, ZoneShapes.Immersion(zone, new Vector3(2001, 0, 0)));
         // A point on the axis of the ring is in its hole.
         Assert.Equal(0, ZoneShapes.Immersion(zone, Vector3.Zero));
+        // The retail rule: the height value wins when it is larger than the side value for the outer radius. So a
+        // point 50 m into the hole and 50 m above the middle plane is fully inside. In the middle plane, it is in the
+        // hole.
+        Assert.Equal(1, ZoneShapes.Immersion(zone, new Vector3(950, 50, 0)));
+        Assert.Equal(0, ZoneShapes.Immersion(zone, new Vector3(950, 0, 0)));
+        // The height value also wins 100 m beyond the outer radius, but that point is outside the bounding sphere.
+        Assert.Equal(0, ZoneShapes.Immersion(zone, new Vector3(2100, 60, 0)));
     }
 
     /// <summary>The size line of the smallest shape that has at least the extent on each axis, in the order of the
