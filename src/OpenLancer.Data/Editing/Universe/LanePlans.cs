@@ -526,9 +526,9 @@ public static class LanePlans
 
     /// <summary>
     /// Plans a repair of the links of a lane, as one entry of the edit history. The plan finds the rings of the lane
-    /// from any ring. They are the rings that the links reach in both directions, and the rings with a broken link near
-    /// the line of the two end rings (see <see cref="LineReach"/>). A ring with a broken link brings the rings that its
-    /// own links reach. The plan sorts the rings along the line, writes their <c>prev_ring</c> and <c>next_ring</c> lines
+    /// from any ring. They are the rings that the links reach in both directions. They are also the rings with a broken
+    /// link near the line of the two end rings (see <see cref="LineReach"/>). A ring with a broken link brings the rings
+    /// that its own links reach. The plan sorts the rings along the line, writes their <c>prev_ring</c> and <c>next_ring</c> lines
     /// again, and moves the end names to the two end rings. It keeps the positions. A lane with good links gives a
     /// command that changes nothing.
     /// </summary>
@@ -712,20 +712,20 @@ public static class LanePlans
     /// <summary>
     /// The lane of a ring: the rings that the links reach from it, in order. The walk follows <c>prev_ring</c> back to
     /// the first ring and <c>next_ring</c> on to the last ring, as the HUD does. It stops at a link to an object that the
-    /// file does not have, at a link to an object that is no ring, and at a ring that it finds again. It also stops at a
-    /// stray link, unless <paramref name="strays"/> is true. Null for a section that is no object of a system file.
+    /// file does not have or that is no ring. It also stops at a ring that it finds again, and at a stray link unless
+    /// <paramref name="strays"/> is true. Null for a section that is no object of a system file.
     /// </summary>
     /// <remarks>
     /// <para>This is the one walk of the links of a lane in W. The plans, the checks and the Inspector use it. A ring is
     /// an object with an archetype of the type <c>TRADELANE_RING</c>, because the game makes lanes only from such
-    /// objects. So a link of a ring to a jump gate or a sun does not make the gate or the sun a part of the lane.</para>
+    /// objects. So a link to a jump gate or a sun does not make the gate or the sun a part of the lane.</para>
     /// <para>A stray link names a ring that links both ways with another ring on that side. For example, a stray ring
-    /// names the third ring of a lane in its <c>next_ring</c> line, and the third ring names the second ring in its
-    /// <c>prev_ring</c> line. The stray ring is then no part of that lane, and a plan for the stray ring does not change
-    /// the lane.</para>
+    /// names the third ring of a lane in its <c>next_ring</c> line. The third ring names the second ring in its
+    /// <c>prev_ring</c> line, and the second ring names it back. The stray ring is then no part of that lane, and a plan
+    /// for the stray ring does not change the lane.</para>
     /// </remarks>
     /// <param name="strays">True to follow a stray link too, as the HUD does. A check for a lane that goes in a circle
-    /// needs it, because a stray link can make the walk of the HUD go in a circle.</param>
+    /// needs it. A stray link can make the walk of the HUD go in a circle.</param>
     public static LaneChain? LaneOf(EditSession session, SectionRef ring, bool strays = false)
     {
         if (SceneSections.KindOf(session, ring) != SceneKind.Object || session.Get(ring) is not { } view)
@@ -781,8 +781,8 @@ public static class LanePlans
     }
 
     /// <summary>
-    /// The refusal of a delete when a link line of an object that stays names a ring that goes, and the ring does not
-    /// link back. The relink of the lane does not change such a line. The text names only fixes that work. A repair
+    /// The refusal of a delete for a one-way link. A link line of an object that stays names a ring that goes, and the
+    /// ring does not link back. The relink of the lane does not change such a line. The text names only fixes that work. A repair
     /// works only when the rings of the object stand on one line, so the text names the repair only then.
     /// </summary>
     internal static string OneWayLinkRefusal(EditSession session, SectionRef referrer, string key, string ring)
@@ -1048,8 +1048,8 @@ public static class LanePlans
     }
 
     /// <summary>
-    /// The distance of a point from the line through the two end rings of a lane, or null when the point stands more
-    /// than <see cref="MaxSpacing"/> beyond an end ring along the line. A ring stands at most that far from its
+    /// The distance of a point from the line through the two end rings of a lane. Null when the point stands more than
+    /// <see cref="MaxSpacing"/> beyond an end ring along the line. A ring stands at most that far from its
     /// neighbor, so a ring farther beyond an end is no part of the lane. The limit also keeps a far lane on the same
     /// line apart.
     /// </summary>

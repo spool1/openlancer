@@ -747,8 +747,8 @@ public sealed class LanePlansTests
     }
 
     /// <summary>
-    /// The link of a stray ring to the third ring is no part of the lane, because the third ring links both ways with
-    /// the second ring. So a delete of the stray ring and the third ring, in each order, relinks the lane and takes no
+    /// The link of a stray ring to the third ring is no part of the lane. The third ring links both ways with the second
+    /// ring. So a delete of the stray ring and the third ring, in each order, relinks the lane and takes no
     /// other ring. A delete of the stray ring alone does not change the lane. The walk of the HUD follows the stray link.
     /// </summary>
     [Theory]
