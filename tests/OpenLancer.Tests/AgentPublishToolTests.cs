@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Export;
+using OpenLancer.Data.Games;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Publishing;
 using OpenLancer.Studio;
@@ -193,6 +194,36 @@ public sealed class AgentPublishToolTests
         Assert.False(Directory.Exists(Path.Combine(ExportRoot(game), "1.2.0")));
         Assert.Empty(PublishHistory.Load(ExportRoot(game), "ol-test").History.Exports);
         Assert.False(host.Exports.Running);
+    }
+
+    /// <summary>
+    /// The host without a window has the base folder of the profile as its one game. Its save gate checks no mission
+    /// patch on a target game, because the merge of the profile already checks the patches on that game. So the gate of
+    /// <c>export_mod</c> is the gate of <c>oltool export</c> without <c>--game</c>. A saved patch that changes a trigger
+    /// that the game does not have passes both gates. The checks of the export stop it, and it writes no package.
+    /// </summary>
+    [Fact]
+    public void TheHostWithoutAWindowRunsTheGateOfOltoolExport()
+    {
+        const string script = @"DATA\MISSIONS\OL_TEST\ol_test.ini";
+        using var game = new ExportGame();
+        game.Game.Write(script, "[Mission]\n\n[Trigger]\nnickname = ol_end\nCnd_True = no_params\n");
+        var profile = Profile(game, targets: ", \"targets\": [ \"vanilla-1.1\" ]");
+        var patch = Path.Combine(ModFolder(game), Mod.PatchesFolder, script);
+        Directory.CreateDirectory(Path.GetDirectoryName(patch)!);
+        File.WriteAllText(patch, "[Trigger]\nnickname = ol_gone\nAct_ChangeState = FAIL\n");
+        using var host = HeadlessHost.Open(profile, "ol-test", new HeadlessOptions { WritesRecovery = false });
+
+        var export = Ok(host, "export_mod", """{ "formats": ["drop_in"] }""");
+
+        Assert.Empty(ExportGate.Errors(host.Session));
+        Assert.Empty(ExportGate.Errors(ModProfile.Load(profile), "ol-test", [GameDetector.CheckRoot(game.Root)],
+            TestWorkspace.FakeDllWriter.Instance, ThnScripts.Evaluator));
+        Assert.False((bool)export["succeeded"]!);
+        Assert.Contains(export["problems"]!.AsArray(), p => ((string?)p!["message"])!.StartsWith(
+            $"[Trigger] nickname = ol_gone: no section to patch in {script}.", StringComparison.Ordinal));
+        Assert.False(Directory.Exists(Path.Combine(ExportRoot(game), "1.2.0")) &&
+                     Directory.GetFiles(Path.Combine(ExportRoot(game), "1.2.0"), "*.zip").Length > 0);
     }
 
     /// <summary>The same-version guard (decision D568 of the M11c design). An export of the version with other game

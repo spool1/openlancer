@@ -102,6 +102,7 @@ A source build is a play target only. Make the profile with a retail game first.
 - [PLAY.md](PLAY.md): Play in OpenLancer, Play in the game and the test server.
 - [GAME_LINK.md](GAME_LINK.md): the game link, the Game link window and the play copies.
 - [MOD_FORMAT.md](MOD_FORMAT.md): the files of a mod, the save gate and the export.
+- [MCP.md](MCP.md): the agent server, with the agent tools that make new star systems and jump connections.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md): what to do when something does not work, and how to report a problem.
 
 To ask for help, join the [OpenLancer Discord server](https://discord.gg/BUh3nucfmP). In the editor, **Help > Discord** opens the invite.

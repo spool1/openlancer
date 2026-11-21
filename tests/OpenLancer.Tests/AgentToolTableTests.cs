@@ -36,6 +36,18 @@ public sealed class AgentToolTableTests
         ], AgentTools.All.Select(t => t.Name));
     }
 
+    /// <summary>The table of the tools in the README and the help page of the agent server name each tool. Help >
+    /// Documentation opens the README, and the editor sends users to the tools.</summary>
+    [Fact]
+    public void TheReadmeAndTheHelpPageNameEachTool()
+    {
+        var readme = System.IO.File.ReadAllText(RepoFiles.Of("README.md"));
+        var help = System.IO.File.ReadAllText(RepoFiles.Of("docs", "MCP.md"));
+
+        Assert.Empty(AgentTools.All.Select(t => $"`{t.Name}`").Where(name => !readme.Contains(name, StringComparison.Ordinal)));
+        Assert.Empty(AgentTools.All.Select(t => $"`{t.Name}`").Where(name => !help.Contains(name, StringComparison.Ordinal)));
+    }
+
     [Fact]
     public void EachToolHasAValidNameATitleADescriptionAndObjectSchemas()
     {

@@ -100,6 +100,22 @@ public sealed class HelpMenuTests : IDisposable
         Assert.False(File.Exists(RepoFiles.Of("docs", "README.md")));
     }
 
+    /// <summary>Read me first tells what this version can do. A delete of a jump gate or a jump hole deletes its pair,
+    /// and the agent tools make new systems and jump connections. So the file names them, and it does not say that no
+    /// jump gate can go.</summary>
+    [Fact]
+    public void ReadmeFirstTellsTheAgentToolsOfTheSystemsAndTheJumpConnections()
+    {
+        var readme = Merge(File.ReadAllText(RepoFiles.Of("release", "README-FIRST.txt")));
+
+        Assert.DoesNotContain("create or delete jump gates", readme);
+        Assert.Contains("A delete of a jump gate or a jump hole deletes its pair.", readme);
+        Assert.Contains("Agent > Start agent server", readme);
+        Assert.Contains("system_create makes a new star system", readme);
+        Assert.Contains("connection_create", readme);
+        Assert.Contains("route tables", readme);
+    }
+
     [Fact]
     public void DiscordOpensTheInviteOfTheReadme()
     {

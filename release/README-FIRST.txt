@@ -148,6 +148,13 @@ WHAT WORKS IN THIS VERSION
   FLMM package with FLMM yet.
 - Look at the cutscenes of the game, and preview them. Change the values of
   a cutscene in your mod.
+- Let an AI agent edit your mod with Agent > Start agent server. The
+  agent uses the same edits, checks, undo and save as you. Its tool
+  system_create makes a new star system, and connection_create connects
+  two systems with a jump gate pair or a jump hole pair. The editor
+  shows the results in the Scene, the Hierarchy and the Inspector.
+- When your mods change the jump connections, the export and Play in
+  your own game (Ctrl+F5) make new route tables for the game.
 - oltool checks your game folder, and checks, merges and shows mods from
   the command line.
 
@@ -172,8 +179,11 @@ WHAT DOES NOT WORK YET
 - Play (F5) does not run the HD Edition plugins.
 - OpenLancer does not support total conversions such as Discovery. The
   editor can open their data, with a warning.
-- You cannot create or delete jump gates, jump holes and trade lane
-  rings yet. You cannot make new bases, nebulae or asteroid fields yet.
+- The editor cannot create jump gates, jump holes and trade lane rings.
+  The agent tool connection_create makes a jump gate pair or a jump hole
+  pair. A delete of a jump gate or a jump hole deletes its pair. You
+  cannot delete airlock gates and trade lane rings yet.
+- You cannot make new bases, nebulae or asteroid fields yet.
 - You can select only one item at a time.
 - A Play start at a checkpoint restores only the triggers of the
   checkpoint. It does not restore the objective, the dock and lane rules

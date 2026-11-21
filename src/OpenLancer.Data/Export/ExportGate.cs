@@ -34,8 +34,9 @@ public sealed record ExportGateRun(ExportGateSource Source, Func<IReadOnlyList<D
 /// <summary>
 /// The save gate before an export (#87). An export refuses a mod that the save gate of the mod refuses, with the same
 /// errors (see <see cref="EditSession.SaveProblems"/>). So a mod that the editor cannot save does not reach a package.
-/// An example is a patch with <c>ol.delete</c> of a costume that only an unchanged retail cutscene loads. The agent tool
-/// <c>export_mod</c>, the Export dialog and <c>oltool export</c> run this gate. <c>oltool validate</c> does not run it.
+/// An example is a patch with <c>ol.delete</c> of a costume that an unchanged retail cutscene loads for a DEFORMABLE
+/// without <c>userprops.Actor</c>. The agent tool <c>export_mod</c>, the Export dialog and <c>oltool export</c> run this
+/// gate. <c>oltool validate</c> does not run it.
 /// </summary>
 public static class ExportGate
 {
