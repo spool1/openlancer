@@ -83,7 +83,8 @@ public sealed class SceneFieldsTests
         Rows(SceneSection.Object, data | reinit, false, "loadout", "star", "spin", "dock_with");
         // The link of a jump connection: the connection tools change the pair, and the raw INI block can change it.
         Rows(SceneSection.Object, data | reinit, true, "goto");
-        Rows(SceneSection.Object, data | lanes | reinit, false, "prev_ring", "next_ring");
+        // The links of a trade lane: the lane tools change the lane, and the raw INI block can change them.
+        Rows(SceneSection.Object, data | lanes | reinit, true, "prev_ring", "next_ring");
         Rows(SceneSection.Object, data | label, false, "tradelane_space_name", "ids_name");
         Rows(SceneSection.Object, data, false, "ids_info", "base", "reputation", "faction", "pilot", "behavior",
             "difficulty_level", "msg_id_prefix", "parent", "voice", "space_costume", "jump_effect", "comment",

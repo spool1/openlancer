@@ -382,6 +382,33 @@ public sealed class FieldCommandsTests
             Fields("""{ "pos": [100, 0, 0] }"""))).Status);
     }
 
+    /// <summary>The prev_ring and next_ring lines of a trade lane ring link the lane, so set_fields refuses them with
+    /// FieldNotWritable and names the lane tools. The goto line keeps the reason of a jump connection. The lane name and
+    /// the position of the ring take edits.</summary>
+    [Theory]
+    [InlineData("ring1", "next_ring")]
+    [InlineData("ring2", "prev_ring")]
+    [InlineData("ring1", "prev_ring")]
+    public void SetFieldsRefusesTheLinkLinesOfATradeLaneRing(string ring, string key)
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var section = SceneWorkspace.Object(ring);
+
+        var plan = FieldCommands.SetFields(session, section, Fields($$"""{ "{{key}}": "Li01_01" }"""));
+
+        Assert.False(plan.CanRun);
+        var error = Assert.Single(plan.Report(session).Errors);
+        Assert.Equal((EditErrorKind.Refused, MissionErrors.FieldNotWritable), (error.Kind, error.Detail));
+        Assert.Equal($"'{key}': " + FieldBinding.LaneLinkReason, error.Message);
+        Assert.True(FieldCommands.IsLocked(session, section, session.Get(section)!, key));
+        Assert.False(FieldCommands.IsLocked(session, section, session.Get(section)!, "tradelane_space_name"));
+        Assert.Equal("'goto': " + FieldBinding.JumpLinkReason, Assert.Single(FieldCommands.SetFields(session,
+            SceneWorkspace.Object("Li01_to_Li02"), Fields("""{ "goto": "Li02" }""")).Report(session).Errors).Message);
+        Assert.Equal(EditStatus.Applied, FakeCommandHost.Runner(session).Run(FieldCommands.SetFields(session, section,
+            Fields("""{ "pos": [100, 0, 0] }"""))).Status);
+    }
+
     /// <summary>A session that takes no edits refuses each field of a section with the reason of the session.</summary>
     [Fact]
     public void SetFieldsRefusesEachFieldOfAReadOnlySection()

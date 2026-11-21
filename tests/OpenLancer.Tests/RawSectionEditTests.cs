@@ -140,6 +140,30 @@ public sealed class RawSectionEditTests
                 StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// The next_ring line of a trade lane ring is locked in the rows, but the raw INI block still changes it (editor UI
+    /// rule 11). A raw edit that breaks the lane then gets the warning of the trade lane checks, which names the repair.
+    /// </summary>
+    [Fact]
+    public void ARawEditOfALinkOfATradeLaneRingApplies()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        var ring = LaneWorkspace.Ring(1);
+        var start = Text(session, ring);
+        Assert.NotNull(FieldBinding.Create(session, ring, session.Get(ring)!, "next_ring").ReadOnlyReason);
+
+        var plan = RawSectionEdit.Plan(session, ring, start,
+            start.Replace("next_ring = Li01_Trade_Lane_Ring_2", "next_ring = Li01_Trade_Lane_Ring_3", StringComparison.Ordinal));
+
+        Assert.Empty(plan.Problems);
+        session.Execute(plan.Edit!.Command!);
+        Assert.Equal("Li01_Trade_Lane_Ring_3", Lines(session, ring, "next_ring"));
+        Assert.Contains(ObjectComponents.Checks(session, ring),
+            p => p.Message.StartsWith("The rings Li01_Trade_Lane_Ring_1 and Li01_Trade_Lane_Ring_3 do not link both ways.",
+                StringComparison.Ordinal) && p.Message.Contains("trade_lane_repair", StringComparison.Ordinal));
+    }
+
     /// <summary>A list error does not stop a raw edit: the value goes into W, and the rows show the error.</summary>
     [Fact]
     public void AListErrorDoesNotStopThePlan()

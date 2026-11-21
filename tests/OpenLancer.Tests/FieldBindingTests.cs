@@ -427,6 +427,33 @@ public sealed class FieldBindingTests
             new SectionIdentity("Solar", "jumpgate")), "goto"));
     }
 
+    /// <summary>The prev_ring and next_ring rows of a trade lane ring are read-only, because a change of one ring breaks
+    /// the links of the lane. The reason names the ring buttons, the lane tools and the raw INI block. The goto row keeps
+    /// its own reason, and the lane name row of a ring takes edits.</summary>
+    [Fact]
+    public void TheLinkRowsOfATradeLaneRingAreReadOnlyWithTheReason()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+
+        var next = Bind(session, SceneWorkspace.Object("ring1"), "next_ring");
+        var prev = Bind(session, SceneWorkspace.Object("ring2"), "prev_ring");
+
+        Assert.Equal("This line links the ring to its neighbor in a trade lane. To change the lane, use Insert ring after, " +
+                     "Repair lane or Delete ring on the Trade lane ring component. An agent uses the tools " +
+                     "trade_lane_insert_ring, trade_lane_repair and delete_items. The raw INI block can change the line.",
+            next.ReadOnlyReason);
+        Assert.Empty(SteLint.Problems(next.ReadOnlyReason!, SteLint.InstructionWords));
+        Assert.Equal(FieldBinding.LaneLinkReason, prev.ReadOnlyReason);
+        // A key without a line is locked too, so a row cannot add a link.
+        Assert.Equal(FieldBinding.LaneLinkReason, Bind(session, SceneWorkspace.Object("ring1"), "prev_ring").ReadOnlyReason);
+        Assert.False(next.CanRevert);
+        Assert.Equal(FieldBinding.JumpLinkReason, Bind(session, SceneWorkspace.Object("Li01_to_Li02"), "goto").ReadOnlyReason);
+        Assert.Null(Bind(session, SceneWorkspace.Object("ring1"), "tradelane_space_name").ReadOnlyReason);
+        Assert.Null(FieldBinding.LinkLock(session, new SectionRef(ListWorkspace.SolarPath,
+            new SectionIdentity("Solar", "ring")), "next_ring"));
+    }
+
     /// <summary>
     /// A revert of a whole section puts back each line of the lower layer. So it cannot run for a [system] whose file
     /// the active mod sets, for example with a patch that the user wrote: that would move the system to another file,

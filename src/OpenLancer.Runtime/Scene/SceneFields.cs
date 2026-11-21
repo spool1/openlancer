@@ -74,7 +74,8 @@ public enum SceneSection
 
 /// <summary>One key of a section type and what the scene does when it changes.</summary>
 /// <param name="Locked">True when the Inspector shows the key read-only: a key entry, a key of a linked group, the
-/// file of a system, the link of a jump connection, or a key of a section that a patch cannot find.</param>
+/// file of a system, the link of a jump connection or of a trade lane, or a key of a section that a patch cannot
+/// find.</param>
 /// <param name="Evidence">The engine code that reads the key, or the reason for the effect.</param>
 public sealed record SceneField(SceneSection Section, string Key, SceneEffect Effect, bool Locked, string Evidence);
 
@@ -113,6 +114,10 @@ public static class SceneFields
 
     private const string UniverseSystemType = "system";
 
+    /// <summary>Why the links of a trade lane ring are locked rows.</summary>
+    private const string LaneLink =
+        "The lane tools and the ring buttons change the links of a lane, and the raw INI block can change the line.";
+
     public static IReadOnlyList<SceneField> Rows { get; } =
     [
         // [Object]: GetSystemObject (GameItemDb.cs:2583-2668).
@@ -128,8 +133,8 @@ public static class SceneFields
         Row(SceneSection.Object, "dock_with", DataReinit, "GameItemDb.cs:2614-2620. GameWorld.cs:147-160 makes the dock."),
         LockedRow(SceneSection.Object, "goto", DataReinit, "GameItemDb.cs:2622-2630. GameWorld.cs:147-160 makes the " +
             "dock. The jump connection tools change the pair, and the raw INI block can change the line."),
-        Row(SceneSection.Object, "prev_ring", DataReinit | SceneEffect.Lanes, "GameItemDb.cs:2651-2659"),
-        Row(SceneSection.Object, "next_ring", DataReinit | SceneEffect.Lanes, "GameItemDb.cs:2651-2659"),
+        LockedRow(SceneSection.Object, "prev_ring", DataReinit | SceneEffect.Lanes, "GameItemDb.cs:2651-2659. " + LaneLink),
+        LockedRow(SceneSection.Object, "next_ring", DataReinit | SceneEffect.Lanes, "GameItemDb.cs:2651-2659. " + LaneLink),
         Row(SceneSection.Object, "tradelane_space_name", DataLabel, "GameItemDb.cs:2640-2649 and the lane walk at :1537-1595"),
         Row(SceneSection.Object, "ids_name", DataLabel, "GameItemDb.cs:2590"),
         Row(SceneSection.Object, "ids_info", SceneEffect.Data, "GameItemDb.cs:2594"),

@@ -169,7 +169,8 @@ public sealed class AgentQueryTests
     }
 
     /// <summary>A key is locked when the field commands cannot change it, as in the Inspector. The file of a system moves
-    /// the contents of the system, so it is locked.</summary>
+    /// the contents of the system, so it is locked. So are the goto line of a jump gate and the links of a trade lane
+    /// ring.</summary>
     [Fact]
     public void GetItemLocksTheKeysThatTheFieldCommandsCannotChange()
     {
@@ -185,6 +186,10 @@ public sealed class AgentQueryTests
         var gate = Ok(host, "get_item", """{ "ref": "obj:Li01_to_Li02" }""")["section"]!["fields"]!.AsArray();
         Assert.True((bool)gate.Single(f => (string?)f!["key"] == "goto")!["locked"]!);
         Assert.False((bool)gate.Single(f => (string?)f!["key"] == "archetype")!["locked"]!);
+        // The links of a trade lane ring are locked too, so only the lane tools change them.
+        var ring = Ok(host, "get_item", """{ "ref": "obj:ring1" }""")["section"]!["fields"]!.AsArray();
+        Assert.True((bool)ring.Single(f => (string?)f!["key"] == "next_ring")!["locked"]!);
+        Assert.False((bool)ring.Single(f => (string?)f!["key"] == "archetype")!["locked"]!);
     }
 
     [Fact]
