@@ -13,6 +13,7 @@ using OpenLancer.Editor.Missions;
 using OpenLancer.Editor.Mods;
 using OpenLancer.Editor.Scene;
 using OpenLancer.Editor.Ui;
+using OpenLancer.Editor.Universe;
 using Xunit;
 
 namespace OpenLancer.Tests;
@@ -50,7 +51,7 @@ public sealed class EmptyStateTests
             typeof(PanelStates), typeof(SceneView), typeof(HierarchyPanel), typeof(InspectorPanel),
             typeof(DatabasePanel), typeof(AssetsPanel), typeof(ConsolePanel), typeof(MissionsBrowser),
             typeof(MissionView), typeof(CutsceneBrowser), typeof(CutsceneView), typeof(TimelinePanel),
-            typeof(ModsWindow),
+            typeof(ModsWindow), typeof(UniversePanel),
         ];
         Assert.All(panels, p => Assert.Contains(p, owners));
     }

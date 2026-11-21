@@ -588,6 +588,7 @@ The editor shows a new system before the save and after it:
 - The Scene builds a system from the loaded game data. So it opens a new system only after the save and the reload of the game data. Before that, an open of the system shows a card: "This system is new. Save the mod to open it in the Scene." The Save button runs File > Save, with the save gate.
 - During the reload, the card says "The editor loads the game data." Then the Scene opens the system. When a field edit or a drag runs at the end of the reload, the open waits for its end. Each open of a new system shows this card. Examples are "Go to partner", the "Go to" of a completeness step, the Database, the link "Open system" and follow mode of the agent. The `[system]` of the system gets the selection.
 - A rename of the system before the save keeps the card with the new nickname, also a rename of the agent. An undo of the create and a delete of the system close the card. When the Scene cannot show the card, the Console tells why. Examples are the first load of the game data, and two `[system]` sections with one nickname.
+- The Universe panel shows a new system at its place before the save, with a blue dot. Its new jump connections show as lines (see "The Universe panel").
 - After the save and the reload, the row of the system has no dot and shows the counts of the loaded game data. A click on the row selects the system. Its page has the same rows of the `[system]`, and it also shows the environment, the music and the contents of the system.
 
 ### Jump connections and gate locks
@@ -1333,6 +1334,22 @@ The `archetype` and the `loadout` rows of an object page have a button that show
 The engine renders an image of the model of each tile that shows, one new image in each frame at most. It renders only while the game data is loaded and no reload runs, and not while the camera moves or a drag runs. A tile shows the glyph of its kind until its image is ready. A model that no solar archetype, ship or asteroid uses, an effect, a loadout and a faction show their glyph. "Thumbnails: Rendered" in the View menu turns the images off. Then a hover still shows the image.
 
 The editor keeps the images in `%LOCALAPPDATA%\OpenLancer\thumbnails`, one `.olthumb` file for each image. The key of an image holds the files of its model with their layers, lengths and times, so a changed model gets a new image. Over 200 MiB, the editor deletes the least recently used images until the folder uses less than 150 MiB. An image shows retail art, so it never goes into a repository or an export. `tools/content_scan.py` refuses the extension and the signature of these files.
+
+### The Universe panel
+
+The Universe tab at the bottom shows the systems of the edit view on the nav map grid, with their jump connections. The panel is read-only. It reads the `[system]` sections of `universe.ini` and the `goto` lines of the system files, as the agent tool `get_universe` does. So each edit shows at once, also an edit of the agent and a new system before the save. The info icon in the toolbar tells what the panel shows. The toolbar also gives the count of the systems and of the new systems.
+
+- Each system is a dot at its `pos`, with its name below it. A system without a name shows its nickname. The grid goes from 0 to 15 on x and from 0 to 14 on y. A larger y is lower, as on the nav map of the game. A place outside the grid shows outside it, because the nav map of the game shows that system off the map.
+- A solid line is a pair of jump gates, and a dashed line is a pair of jump holes. An airlock gate shows as a gate. Two ends of a pair make one line.
+- A red line has a player lock in a new game (`locked_gate`). An NPC lock does not change the line.
+- A jump whose other end does not go back has a line of its own. Its arrow points to the system of its `goto` line. The player cannot jump back.
+- Two lines between the same two systems go side by side, for example a gate pair and a hole pair.
+- A blue dot at a system marks a new system that the mod has not saved.
+- A system without a `pos` line is not on the map. A note at the bottom left names it.
+
+The tooltip of a system tells its name, its nickname and its jump objects, for example "Jump objects: 3 of 10". It also gives each jump connection of the system with its lock. A click on a system selects it, as a row of the Systems table of the Database does. The Inspector then shows the page of the system, or the page of the `[system]` of a new system. A double-click opens the system in the Scene. A new system shows the save card of the Scene (see "New systems"). The selected system has a blue ring, and its lines are wider.
+
+Change the place of a system in the Inspector of the system. The agent tools `system_create`, `connection_create` and `connection_set_lock` add systems, add connections and change locks. The agent tool `capture_panel` with the panel `universe` gives an image of the panel. While no profile is open or the game data loads, the panel tells it.
 
 ### Data lists and pickers
 

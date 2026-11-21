@@ -52069,9 +52069,10 @@
               "timeline",
               "inspector",
               "hierarchy",
-              "console"
+              "console",
+              "universe"
             ],
-            "description": "The panel to capture. Its tab must show in the editor."
+            "description": "The panel to capture. Its tab must show in the editor. universe is the Universe panel: the systems on the nav map grid and their jump connections."
           }
         },
         "additionalProperties": false,
@@ -52089,7 +52090,8 @@
               "timeline",
               "inspector",
               "hierarchy",
-              "console"
+              "console",
+              "universe"
             ],
             "description": "The panel of the image."
           },

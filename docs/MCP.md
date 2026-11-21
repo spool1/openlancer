@@ -134,7 +134,7 @@ These tools work only in the editor host.
 - `select_items` selects an item, as a click does. By default, it also opens the view of the item and moves the view to it. With `frame: false`, it opens no view and does not move the camera.
 - `render_scene` gives an image of a system from a camera that the agent chooses. The camera of the Scene does not move, and the Scene keeps its system. The result also gives the place of each item in the image.
 - `render_cutscene` gives an image of a cutscene at a time. The preview in the Cutscene tab does not change. A space script shows without its system. A script of the image with a path text that is not only a path does not go to the engine. The call then gives `refused` with the detail `NoPreview`, and the message names the entity.
-- `capture_panel` gives an image of a panel as you see it, with its marks and labels.
+- `capture_panel` gives an image of a panel as you see it, with its marks and labels. The panels are `scene`, `mission`, `timeline`, `inspector`, `hierarchy`, `console` and `universe`. The tab of the panel must show. `universe` is the Universe panel: the systems on the nav map grid and their jump connections. A capture of `scene` or `universe` needs the tool group Scene, `mission` needs Missions and `timeline` needs Cutscenes.
 - `play` and `play_stop` start and stop Play in OpenLancer. See "Play".
 - `mission_play` plays a mission script from a start in OpenLancer, and `mission_play_trace` gives the trigger changes of that play. See "Mission play".
 - `play_capture` gives an image of the running game of Play in OpenLancer. See "Images of the game".
@@ -899,7 +899,7 @@ The editor shows each agent edit in the Console, in the Scene, in the Hierarchy 
 
 An undo of an agent edit removes its marks, and a redo puts them back. A save clears the marks.
 
-The Database and the Inspector show a new system at once, before the save. The Scene opens a new system only after the save and the reload of the game data. Before that, an open of the system shows a card: "This system is new. Save the mod to open it in the Scene." Its Save button saves the mod with the save gate. During the reload, the card says "The editor loads the game data." Then the Scene opens the system. An agent rename of the system keeps the card with the new nickname, also with follow mode off. "New systems" in [MOD_FORMAT.md](MOD_FORMAT.md) tells more.
+The Database, the Universe panel and the Inspector show a new system at once, before the save. The Scene opens a new system only after the save and the reload of the game data. Before that, an open of the system shows a card: "This system is new. Save the mod to open it in the Scene." Its Save button saves the mod with the save gate. During the reload, the card says "The editor loads the game data." Then the Scene opens the system. An agent rename of the system keeps the card with the new nickname, also with follow mode off. "New systems" in [MOD_FORMAT.md](MOD_FORMAT.md) tells more.
 
 An agent call never runs during a gesture of your own. It waits while you edit a field, rename an item or drag an item, and while a dialog is open. In the mission studio, it waits while one of these is open:
 

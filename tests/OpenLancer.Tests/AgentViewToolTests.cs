@@ -11,6 +11,7 @@ using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Thn;
 using OpenLancer.Editor;
 using OpenLancer.Editor.Agent;
+using OpenLancer.Editor.Universe;
 using OpenLancer.Mcp;
 using OpenLancer.Studio.Agent;
 using Xunit;
@@ -275,8 +276,10 @@ public sealed class AgentViewToolTests
         Assert.Equal("not_found", none.Code);
     }
 
+    /// <summary>capture_panel takes the seven panels of its list, with the Universe panel, and refuses each other
+    /// panel.</summary>
     [Fact]
-    public void CapturePanelTakesOneOfTheSixPanels()
+    public void CapturePanelTakesOneOfTheSevenPanels()
     {
         var (ws, host, views) = Editor();
         using var _ = ws;
@@ -290,6 +293,12 @@ public sealed class AgentViewToolTests
         Assert.Equal("console", (string?)console.Content["panel"]);
         Assert.Equal([FakeAgentViews.Image], console.Images);
         Assert.Equal(("invalid_argument", "BadArgument"), (other.Code, other.Detail));
+
+        var universe = Call(host, "capture_panel", """{ "panel": "universe" }""");
+        Assert.False(universe.IsError, universe.Text);
+        Assert.Equal(AgentPanel.Universe, views.Panel);
+        Assert.Equal("universe", (string?)universe.Content["panel"]);
+        Assert.Equal(7, Enum.GetValues<AgentPanel>().Length);
     }
 
     /// <summary>The name of each panel of the tool is the id of its panel in the layout, so the error of a hidden panel
@@ -299,6 +308,7 @@ public sealed class AgentViewToolTests
     {
         foreach (var panel in Enum.GetValues<AgentPanel>())
             Assert.Equal(AgentTools.Snake(panel.ToString()), EditorAgentViews.PanelIdOf(panel));
+        Assert.Equal(UniversePanel.PanelId, EditorAgentViews.PanelIdOf(AgentPanel.Universe));
     }
 
     /// <summary>The binding gives the JSON as a text block and each image as an image block after it (section 5.7 and
@@ -482,6 +492,7 @@ public sealed class AgentViewToolTests
             Error(sceneHost, "open_view", """{ "system": "Li01" }"""),
             Error(sceneHost, "select_items", """{ "refs": ["obj:Li01_01"] }"""),
             Error(sceneHost, "capture_panel", """{ "panel": "scene" }"""),
+            Error(sceneHost, "capture_panel", """{ "panel": "universe" }"""),
         };
         Ok(sceneHost, "capture_panel", """{ "panel": "console" }""");
 
