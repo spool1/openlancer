@@ -52,9 +52,9 @@ public sealed class SystemEntryTests
         Assert.Equal("Avalon", session.Text(placeholder));
         Assert.Equal(StringKind.Infocard, Binding(session, entry, "ids_info").Key!.TextKind);
 
+        var place = Binding(session, entry, "pos");
         Assert.Equal(new[] { 4, 5 },
             PropertyGrid.WholeValues(place.Text, SystemEntryRows.PositionLabels.Length, (0, 15)));
-        Assert.Equal([4, 5], PropertyGrid.WholeValues(place.Text, SystemEntryRows.PositionLabels.Length, (0, 15)));
         Assert.Equal(0ul, PropertyGrid.LineBits(Binding(session, entry, "visit").Lines));
 
         var file = Binding(session, entry, "file");

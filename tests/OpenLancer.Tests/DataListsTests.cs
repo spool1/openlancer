@@ -617,6 +617,28 @@ public sealed class DataListsTests
         Assert.Same(list, lists.List("loadout"));
     }
 
+    /// <summary>
+    /// The system list of the pickers reads W of <c>universe.ini</c>, so a new system is in it at once, before the save.
+    /// An example is the system picker of a mission line. The entry is unsaved and names the new file. An undo takes it
+    /// away.
+    /// </summary>
+    [Fact]
+    public void TheSystemListHasANewSystemBeforeTheSave()
+    {
+        using var ws = NewSystemWorkspace.Create();
+        var session = ws.Session("act");
+        Assert.DoesNotContain(session.Lists.List("system")!.Entries, e => e.Value == "Av01");
+
+        NewSystemWorkspace.CreateAv01(session);
+
+        var entry = Assert.Single(session.Lists.List("system")!.Entries, e => e.Value == "Av01");
+        Assert.Equal(NewSystemWorkspace.System("Av01"), entry.Section);
+        Assert.True(entry.Unsaved);
+        Assert.Contains("Av01.ini", entry.Detail, StringComparison.OrdinalIgnoreCase);
+        session.Undo();
+        Assert.DoesNotContain(session.Lists.List("system")!.Entries, e => e.Value == "Av01");
+    }
+
     /// <summary>A list is available only when its files have a file in the edit view (section 8.3). So a synthetic
     /// profile without the files of a role gets no list check.</summary>
     [Fact]
