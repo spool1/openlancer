@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
 using LibreLancer.Data;
@@ -341,6 +342,7 @@ public sealed class AgentUniverseToolTests
             """{ "kind": "jump_hole", "from": { "system": "Li03" }, "to": { "system": "Li01" } }""");
 
         Assert.Equal(("refused", ConnectionPlans.JumpLimit, null), ((string?)pair["code"], (string?)pair["detail"], (string?)pair["field"]));
+        Assert.Contains("`JumpLimit` names no argument", File.ReadAllText(RepoFiles.Of("docs", "MCP.md")));
         Assert.Equal("Li03 would have 11 jump objects. The game crashes with more than 10 in one system. Delete a jump gate " +
                      "or a jump hole of Li03 first.", (string?)pair["message"]);
         Assert.Equal(10, (int)tenth["jump_objects"]!["from"]!["used"]!);

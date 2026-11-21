@@ -327,7 +327,7 @@ A new end gets its lines, its nickname, its name, its position and its traffic z
 | `NameTaken` | `name_taken` | Another object has the nickname of a new end. |
 | `EndOtherSystem` | `invalid_argument` | An `obj:` reference of an end names an object of another system. |
 
-The `field` of each error names the argument, for example `to.object`. The message is the text that the editor shows for the same refusal.
+When a refusal is about one argument, the `field` of the error names it, for example `to.object`. `JumpLimit` names no argument, because the limit is about the jump objects of a system. The message is the text that the editor shows for the same refusal.
 
 `connection_set_lock` sets `locked` to `none`, `player`, `npc` or `both`. With `pair`, the default, the partner gets the same lock when it goes back to the object. A gate of the game or of a lower mod works too, because the patch of the gate lock file changes. A player lock gives a warning: the route tables leave out the jump gate or the jump hole, also after a mission unlocks it. A second call with the same lock gives `no_change`. An object that is no jump gate and no jump hole gives `invalid_value` with the detail `NotConnection`.
 
