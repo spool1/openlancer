@@ -16250,7 +16250,7 @@
               "both"
             ],
             "default": "none",
-            "description": "The lock at the start of a new game: none, player, npc or both. A mission unlocks a gate with Act_LockDock. The route tables leave out a gate that is locked for the player, also after the unlock."
+            "description": "The lock at the start of a new game: none, player, npc or both. A mission unlocks a gate with Act_LockDock. The route tables leave out a jump gate or a jump hole that is locked for the player, also after the unlock."
           },
           "traffic_zone": {
             "type": "boolean",
@@ -16946,7 +16946,7 @@
               "npc",
               "both"
             ],
-            "description": "The lock: none, player, npc or both. A mission unlocks a gate with Act_LockDock. The route tables leave out a gate that is locked for the player, also after the unlock."
+            "description": "The lock: none, player, npc or both. A mission unlocks a gate with Act_LockDock. The route tables leave out a jump gate or a jump hole that is locked for the player, also after the unlock."
           },
           "pair": {
             "type": "boolean",
@@ -17829,7 +17829,7 @@
     {
       "name": "get_route",
       "title": "Get the routes of a system",
-      "description": "Gives the shortest routes from one system, as the route tables of the retail games give them after Ctrl\u002BF5 or an export. The tables leave out each gate that is locked for the player. This tool changes nothing.",
+      "description": "Gives the shortest routes from one system, as the route tables of the retail games give them after Ctrl\u002BF5 or an export. The tables leave out each jump gate and each jump hole that is locked for the player. This tool changes nothing.",
       "inputSchema": {
         "type": "object",
         "properties": {

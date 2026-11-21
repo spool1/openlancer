@@ -329,11 +329,11 @@ A new end gets its lines, its nickname, its name, its position and its traffic z
 
 The `field` of each error names the argument, for example `to.object`. The message is the text that the editor shows for the same refusal.
 
-`connection_set_lock` sets `locked` to `none`, `player`, `npc` or `both`. With `pair`, the default, the partner gets the same lock when it goes back to the object. A gate of the game or of a lower mod works too, because the patch of the gate lock file changes. A player lock gives a warning: the route tables leave out the gate, also after a mission unlocks it. A second call with the same lock gives `no_change`. An object that is no jump gate and no jump hole gives `invalid_value` with the detail `NotConnection`.
+`connection_set_lock` sets `locked` to `none`, `player`, `npc` or `both`. With `pair`, the default, the partner gets the same lock when it goes back to the object. A gate of the game or of a lower mod works too, because the patch of the gate lock file changes. A player lock gives a warning: the route tables leave out the jump gate or the jump hole, also after a mission unlocks it. A second call with the same lock gives `no_change`. An object that is no jump gate and no jump hole gives `invalid_value` with the detail `NotConnection`.
 
 `get_universe` gives one page of systems in the order of `universe.ini`, and the connections of these systems in the order of each system file. With `system`, it gives one system and its connections. Each connection gives its kind, the object that it goes to, if that object goes back (`pair_ok`), and its lock. `route_files_change` is true when the route tables of the mods differ from the route tables of the game without mods. Ctrl+F5 and an export for a retail game then write the route files, as "Route tables" of `docs/MOD_FORMAT.md` tells.
 
-`get_route` gives the shortest route from `from` to each system that the table reaches, and the systems that it does not reach. `kind` picks the table: `all`, `gates` or `holes`. The tables leave out each gate that is locked for the player. OpenLancer Play computes its own routes, so these tables show what the retail games read.
+`get_route` gives the shortest route from `from` to each system that the table reaches, and the systems that it does not reach. `kind` picks the table: `all`, `gates` or `holes`. The tables leave out each jump gate and each jump hole that is locked for the player. OpenLancer Play computes its own routes, so these tables show what the retail games read.
 
 In `edit_batch`, a step of these edit tools gives the result of its edit, without `system`, `pair` and the other parts above. The `adds` of the step name the new items.
 

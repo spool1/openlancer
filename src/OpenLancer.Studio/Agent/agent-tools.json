@@ -413,7 +413,7 @@
         "faction": "The faction of a new jump gate. Get the values from list_values with the list faction. Without it, each gate takes the local faction of its system.",
         "loadout": "The loadout of a new jump gate. Get the values from list_values with the list loadout. Without it, the gate takes the loadout of like, else the loadout that the gates of its faction have most often.",
         "pilot": "The pilot of a new jump gate. Get the values from list_values with the list pilot. Without it, the gate takes the pilot of like, else the pilot that the gates of its faction have most often.",
-        "locked": "The lock at the start of a new game: none, player, npc or both. A mission unlocks a gate with Act_LockDock. The route tables leave out a gate that is locked for the player, also after the unlock.",
+        "locked": "The lock at the start of a new game: none, player, npc or both. A mission unlocks a gate with Act_LockDock. The route tables leave out a jump gate or a jump hole that is locked for the player, also after the unlock.",
         "traffic_zone": "True makes a traffic zone at each new object, where NPCs come and go. Give it encounters with scene_set_encounters."
       }
     },
@@ -422,7 +422,7 @@
       "description": "Sets the lock of a jump gate or a jump hole at the start of a new game. The tool writes the gate lock lines of the game data. The tool makes one Undo step. A gate of the game or of a lower mod works too. The result tells how the routes change.",
       "fields": {
         "object": "The reference of the jump gate or the jump hole, for example obj:my_sys01_to_my_sys02.",
-        "locked": "The lock: none, player, npc or both. A mission unlocks a gate with Act_LockDock. The route tables leave out a gate that is locked for the player, also after the unlock.",
+        "locked": "The lock: none, player, npc or both. A mission unlocks a gate with Act_LockDock. The route tables leave out a jump gate or a jump hole that is locked for the player, also after the unlock.",
         "pair": "True also sets the lock of the partner, when the partner goes back to the object."
       }
     },
@@ -435,7 +435,7 @@
     },
     "get_route": {
       "title": "Get the routes of a system",
-      "description": "Gives the shortest routes from one system, as the route tables of the retail games give them after Ctrl+F5 or an export. The tables leave out each gate that is locked for the player. This tool changes nothing.",
+      "description": "Gives the shortest routes from one system, as the route tables of the retail games give them after Ctrl+F5 or an export. The tables leave out each jump gate and each jump hole that is locked for the player. This tool changes nothing.",
       "fields": {
         "from": "The start system: its nickname or its system: reference.",
         "to": "Show only the route to this system: its nickname or its system: reference. Without it, the result gives the routes to all systems.",
