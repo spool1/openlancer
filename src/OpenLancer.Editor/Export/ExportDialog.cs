@@ -360,9 +360,15 @@ internal sealed class ExportDialog : ModalDialog
         switch (ExportGate.SourceOf(edits, exported.Folder))
         {
             case ExportGateSource.Session:
-                // The gate can wait for the index of the cutscene uses, so the status bar tells it first.
+                // The gate can wait for the index of the cutscene uses, so the status bar tells it first. A close of
+                // the dialog in that time stops the export.
                 window.AfterGateStatus(() =>
                 {
+                    if (!IsOpen || run.Running)
+                    {
+                        return;
+                    }
+
                     if (ExportGate.Errors(edits!) is { Count: > 0 } errors)
                     {
                         Gated(errors);

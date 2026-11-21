@@ -194,7 +194,7 @@ The Inspector shows the selected entity or event, the selected events, or the cu
 
   The editor and the agent tools can make such a change only to a ship or an equipment. An example is an INI edit that removes the `DA_archetype` line of a ship. The other items change only through a file of the mod that you write outside the editor. Examples are a costume, a room of petalDB and a clip.
 
-  To find such a cutscene, the gate reads an index of the templates and the clips that each cutscene uses. The editor builds the index in the background when it opens the profile, and again after each save. With the retail data, the build takes about 2 seconds. When the index is not complete at a save or at Play, the status bar shows "The editor checks the cutscenes that use the changed items." until the gate ends. The export of the mod runs the same gate, so it refuses such a change too.
+  To find such a cutscene, the gate reads an index of the templates and the clips that each cutscene uses. The editor builds the index in the background when it opens the profile, and again after each save that changes a file. With the retail data, the build takes about 2 seconds. When the index is not complete at a save or at Play, the status bar shows "The editor checks the cutscenes that use the changed items." until the gate ends. The export of the mod runs the same gate, so it refuses such a change too.
 
   The Problems section of such a cutscene shows the problems. Until you edit the cutscene, a note tells the cause. To correct a problem, undo that change, or pick another item or clip in the cutscene. The save then writes the new item into a THN patch of the active mod.
 
