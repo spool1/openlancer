@@ -106,8 +106,8 @@ internal static class SceneSections
         return view.Lines("prev_ring").Count > 0 || view.Lines("next_ring").Count > 0 ? LaneRingKind : null;
     }
 
-    /// <summary>True for a trade lane ring: an object with an archetype of the type <c>TRADELANE_RING</c>, or with a
-    /// <c>prev_ring</c> or a <c>next_ring</c> line and no other connection (see <see cref="ConnectionKind"/>).</summary>
+    /// <summary>True for a trade lane ring (see <see cref="ConnectionKind"/>). It is an object with an archetype of the
+    /// type <c>TRADELANE_RING</c>, or with a <c>prev_ring</c> or a <c>next_ring</c> line and no other connection.</summary>
     public static bool IsLaneRing(EditSession session, SectionView view) => ConnectionKind(session, view) == LaneRingKind;
 
     /// <summary>The kind of a connection type of the rule data in plain words, for example "jump hole" for
@@ -130,13 +130,13 @@ internal static class SceneSections
 
     /// <summary>
     /// Why the editor refuses an action on a connection object (decision D253). A jump gate, a jump hole or a trade
-    /// lane ring cannot get a copy, because a copy has no partner or is not a part of the lane. In this version, an
+    /// lane ring cannot get a copy. A copy has no partner, or it is not a part of the lane. In this version, an
     /// airlock gate takes only the rename. For example: "Li01_to_Li02 is a jump gate. This version cannot copy jump
     /// gates or jump holes, because a copy has no partner. To make a pair, use the jump connection tool
     /// connection_create of the agent server."
     /// </summary>
     /// <param name="verb">The action, for example "copy" or "delete". For a jump gate, a jump hole or a trade lane ring,
-    /// it is an action that makes copies, because the editor deletes their pairs and relinks their lanes.</param>
+    /// it is an action that makes copies. The editor deletes their pairs and relinks their lanes.</param>
     public static string ConnectionMessage(string verb, SectionRef section, string kind)
     {
         var name = section.Id.Key;
@@ -145,7 +145,7 @@ internal static class SceneSections
                    $"partner. To make a pair, use {PairTool}.";
         if (kind == LaneRingKind)
             return $"{name} is a trade lane ring. This version cannot {verb} trade lane rings, because a copy is not a " +
-                   $"part of the lane. To make a lane or to add a ring to a lane, use {LaneTool}.";
+                   $"part of the lane. To make a lane or a ring, use {LaneTool}.";
         return $"{name} is {WithArticle(kind)}. This version cannot {verb} {kind}s.";
     }
 

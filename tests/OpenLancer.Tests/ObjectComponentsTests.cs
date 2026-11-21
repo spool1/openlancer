@@ -58,9 +58,9 @@ public sealed class ObjectComponentsTests
         Assert.Equal("The goto line links the object to its partner. To delete a jump gate pair or a jump hole pair, " +
                      "delete one of its objects.", ObjectComponents.RemoveProblem(ObjectComponent.JumpConnection));
         // The ring buttons and the lane tools change the links, so the remove of the lines names them.
-        Assert.Equal("These lines link the ring to its trade lane. To change the lane, use Insert ring after, Repair lane " +
-                     "or Delete ring on this component, or the trade lane tools trade_lane_insert_ring, trade_lane_repair " +
-                     "and delete_items of the agent server.", ObjectComponents.RemoveProblem(ObjectComponent.TradeLaneRing));
+        Assert.Equal("These lines link the ring to its trade lane. To change the lane, use the buttons Insert ring after, " +
+                     "Repair lane and Delete ring of this component. An agent uses the tools trade_lane_insert_ring, " +
+                     "trade_lane_repair and delete_items.", ObjectComponents.RemoveProblem(ObjectComponent.TradeLaneRing));
         Assert.Null(ObjectComponents.RemoveProblem(ObjectComponent.PlanetRing));
         // The agent tool scene_set_encounters edits the encounter lines, so only the Inspector cannot remove them.
         Assert.Equal("The Inspector cannot edit the encounters of a zone.",

@@ -566,7 +566,7 @@ public sealed class SystemPlansTests
 
     /// <summary>
     /// A delete of a system takes the trade lanes of its file with the file. A ring that goes with its file gets no
-    /// lane part, so its links do not refuse the delete and the delete changes no other ring.
+    /// lane part. So its links do not refuse the delete, and the delete changes no other ring.
     /// </summary>
     [Fact]
     public void ADeleteOfASystemTakesTheLanesOfItsFile()

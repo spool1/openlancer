@@ -16,9 +16,9 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// A synthetic install for the trade lanes, on top of <see cref="SceneWorkspace"/>. Li01 has a local faction of the
-/// house li, a sun at the center with a death zone of 12000 m, a jump gate, a planet with a name, a planet without a
-/// name, and a lane of four rings along the x axis with its lane zone. The archetypes have a <c>solar_radius</c>. All
-/// names and values are invented.
+/// house li and a sun at the center with a death zone of 12000 m. It has a jump gate, a planet with a name and a planet
+/// without a name. It also has a lane of four rings along the x axis with its lane zone. The archetypes have a
+/// <c>solar_radius</c>. All names and values are invented.
 /// </summary>
 internal static class LaneWorkspace
 {
@@ -180,9 +180,9 @@ public sealed class LanePlansTests
         new() { Point = new Vector3(x, y, z), Name = name };
 
     /// <summary>
-    /// A lane of 30000 m gets one ring each 7500 m, plus one: five rings with the retail lines in the retail order, the
-    /// next free ring nicknames, the names of the rule data and the faction, loadout and pilot of the house of the local
-    /// faction. The end rings get the end names in the text of the mod. The lane zone is a box on the lane that meets
+    /// A lane of 30000 m gets one ring each 7500 m, plus one: five rings. They have the retail lines in the retail order
+    /// and the next free ring nicknames. They get the names of the rule data, and the loadout and the pilot of the house
+    /// of the local faction. The end rings get the end names in the text of the mod. The lane zone is a box on the lane that meets
     /// the lane zone rule. One undo takes back the rings, the zone and the texts.
     /// </summary>
     [Fact]
@@ -251,8 +251,8 @@ public sealed class LanePlansTests
     }
 
     /// <summary>
-    /// An end with an object and no point goes on the line toward the other end, at the solar radius of the archetype
-    /// of the object plus 2000 m. The end takes the name of the object.
+    /// An end with an object and no point goes on the line toward the other end. Its distance from the object is the
+    /// solar radius of the archetype of the object plus 2000 m. The end takes the name of the object.
     /// </summary>
     [Fact]
     public void AnEndAtAnObjectKeepsItsClearanceAndTakesItsName()
@@ -295,8 +295,8 @@ public sealed class LanePlansTests
     }
 
     /// <summary>
-    /// The rotation of each ring turns its front along the lane: the yaw for a flat lane, and the yaw and the pitch for a
-    /// lane with a height difference. The rotation rule of the engine (<see cref="MathHelper.MatrixFromEulerDegrees(Vector3)"/>)
+    /// The rotation of each ring turns its front along the lane. A flat lane needs the yaw, and a lane with a height
+    /// difference needs the yaw and the pitch. The rotation rule of the engine (<see cref="MathHelper.MatrixFromEulerDegrees(Vector3)"/>)
     /// turns the front axis of the ring, its negative z axis, to the direction of the lane.
     /// </summary>
     [Theory]
@@ -373,8 +373,8 @@ public sealed class LanePlansTests
     }
 
     /// <summary>
-    /// The lane zone of a lane of two rings meets the lane zone rule, also for a short lane: it is 1000 m longer than
-    /// the lane, and its width and height are at most 500 and at most one eleventh of its length.
+    /// The lane zone of a lane of two rings meets the lane zone rule, also for a short lane. It is 1000 m longer than
+    /// the lane. Its width and height are at most 500 and at most one eleventh of its length.
     /// </summary>
     [Theory]
     [InlineData(1000, "181, 181, 2000")]

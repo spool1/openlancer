@@ -804,8 +804,8 @@ public static partial class ScenePlans
     /// <summary>
     /// Why an action cannot run on a section, from the checks that need no plan, or null: the section is not an item of a
     /// system file, it is read-only, or it is a duplicate of a nebula or a field (decision D260). A connection object
-    /// cannot get a duplicate (decision D253). An airlock gate cannot go, but a delete of a jump gate or a jump hole
-    /// deletes its pair, and a delete of a trade lane ring relinks its lane. The menus show the reason as the tooltip of a
+    /// cannot get a duplicate (decision D253). An airlock gate cannot go. A delete of a jump gate or a jump hole deletes
+    /// its pair, and a delete of a trade lane ring relinks its lane. The menus show the reason as the tooltip of a
     /// disabled item. A plan can still refuse for another reason.
     /// </summary>
     public static string? Unavailable(EditSession session, SceneAction action, SectionRef section)

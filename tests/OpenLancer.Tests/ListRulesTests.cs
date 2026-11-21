@@ -439,9 +439,9 @@ public sealed class ListRulesTests
     }
 
     /// <summary>
-    /// The rule data of a new trade lane: the archetype, the name and the infocard of a ring, the spacing with the retail
-    /// range, the clearance, the lines of a ring, the lane zone, and the loadout and the pilot of each house. Each line is
-    /// a key of the engine schema. A spacing outside the retail range does not load. Nor does a line that the builder
+    /// The rule data of a new trade lane. It gives the archetype, the name, the infocard and the lines of a ring. It also
+    /// gives the spacing with the retail range, the clearance, the lane zone, and the loadout and the pilot of each house.
+    /// Each line is a key of the engine schema. A spacing outside the retail range does not load. Nor does a line that the builder
     /// writes, a ring line of another key, a zone without a width or a house that repeats.
     /// </summary>
     [Fact]

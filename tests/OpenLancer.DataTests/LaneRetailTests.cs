@@ -16,9 +16,9 @@ using Xunit;
 namespace OpenLancer.DataTests;
 
 /// <summary>
-/// Retail proof of the plans of the trade lanes. Each retail lane is a chain without a circle, its rings turn along the
-/// lane by the rotation rule of the plans, and its lane zone meets the one lane zone rule and covers its ends. The
-/// generic name and infocard of the rule data are texts of both games. A delete of a middle ring of a retail lane
+/// Retail proof of the plans of the trade lanes. Each retail lane is a chain without a circle. Its rings turn along the
+/// lane by the rotation rule of the plans. Its lane zone meets the one lane zone rule and covers its ends. The generic
+/// name and infocard of the rule data are texts of both games. A delete of a middle ring of a retail lane
 /// relinks the lane in the patch of the mod.
 /// </summary>
 public sealed class LaneRetailTests(ITestOutputHelper output)
@@ -133,8 +133,8 @@ public sealed class LaneRetailTests(ITestOutputHelper output)
                                           session.Get(s) is { } view && SceneSections.ArchetypeType(session, view) == "tradelane_ring" &&
                                           view.Lines("prev_ring").Count == 0);
 
-    /// <summary>True when the front of each ring of a lane is within the tolerance of the front that the rotation rule
-    /// gives for the direction from the first to the last ring.</summary>
+    /// <summary>True when the front of each ring of a lane is within the tolerance of the front of the rotation rule.
+    /// The rule gets the direction from the first to the last ring.</summary>
     private static bool Fits(EditSession session, LaneChain lane)
     {
         var first = SceneSections.Position(session.Get(lane.Rings[0])!)!.Value;

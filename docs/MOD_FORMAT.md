@@ -655,6 +655,72 @@ The count error stops the save of a data mod (tier 1) when the active mod makes 
 
 The Inspector shows the problems in the Jump connection component of the object, and above the sections of `[locked_gates]`. The spacing warning shows at the position of the object. Retail has seven pairs of jump objects closer than 8000 m. So a jump object that the active mod does not place gets no spacing warning. The raw INI block marks the line of each problem. The agent tools `get_item` and `check` give them too.
 
+### Trade lanes
+
+A trade lane is a chain of `[Object]` rings in one system file. Each ring links to its neighbors, and the two end rings have the names of the lane.
+
+```ini
+[Object]
+nickname = Av01_Trade_Lane_Ring_1
+ids_name = 60245
+pos = 51400, 0, 0
+rotate = 0, 90, 0
+archetype = Trade_Lane_Ring
+ids_info = 66170
+next_ring = Av01_Trade_Lane_Ring_2
+behavior = NOTHING
+tradelane_space_name = $str:av01_lane_start
+reputation = li_n_grp
+difficulty_level = 10
+loadout = trade_lane_ring_li_01
+pilot = pilot_solar_hard
+```
+
+- The archetype of a ring has the type `TRADELANE_RING`. The game makes lanes only from rings with that archetype.
+- `next_ring` names the next ring, and `prev_ring` names the ring before. The first ring has no `prev_ring`, and the last ring has no `next_ring`. The links stay in one system file.
+- The two end rings have `tradelane_space_name`. The HUD shows "<first end name> -> <last end name>". When one end has no name, the HUD shows no lane label.
+- The HUD follows the links to the two ends. A chain that goes in a circle makes the game hang.
+- The rings of a retail lane stand 5165 to 9445 m apart, and the median is 7500 m. A retail lane has 4 to 15 rings.
+- `rotate` turns the front of the ring, its negative z axis, along the lane. It has the pitch, the yaw and no roll of the direction from the first ring to the last ring.
+
+The lane zone is a `[zone]` where lane traffic spawns:
+
+- Its nickname has the word `Tradelane`, and the letter case counts.
+- Its shape is `BOX`, and its x size and its y size are each more than 10 times smaller than its z size.
+- Without such a zone, the lane has no traffic. The lane still works.
+- Lane traffic spawns only when the zone has encounters. Give them with the agent tool `scene_set_encounters`.
+- `lane_id` and `tradelane_down` have no effect in the retail game. OpenLancer writes them as the retail files have them.
+
+OpenLancer finds the lane zone of a lane. It is a zone that meets these rules, and whose z axis passes the first and the last ring within 1500 m. Each of the 124 retail lanes has such a zone.
+
+The agent tool `trade_lane_create` makes a lane (see "The universe tools" in `docs/MCP.md`). When OpenLancer makes a lane:
+
+- An end can be a point or an object. An end at an object goes on the line toward the other end. Its distance from the object is the `solar_radius` of the archetype of the object plus 2000 m.
+- When a zone with `damage` holds that place, the end goes farther along the line, to 2000 m past the edge of the zone. So a lane toward a sun ends outside the death zone of the sun.
+- The lane gets one ring each 7500 m, plus one ring. A lane has 2 to 100 rings, and two rings are 1000 to 20000 m apart. A distance outside the retail range gives a warning.
+- The rings get the nicknames `<system>_Trade_Lane_Ring_<n>` with the first free numbers. Their lines come in the order of the example.
+- The name `60245` and the infocard `66170` are the texts that the retail rings share. `behavior` and `difficulty_level` come from the rule data.
+- The faction is the local faction of the system. The loadout and the pilot come from the rule data for the house of the faction, for example `trade_lane_ring_li_01` for `li_n_grp`.
+- A template ring can give its archetype, name, infocard, behavior, difficulty, faction, loadout and pilot.
+- An end name is a new text in `strings.json`, or the `ids_name` of the object at that end. An end without a name stops the plan.
+- The lane zone is `Zone_<system>_Tradelane_<n>`: a `BOX` at the middle of the lane, with the `rotate` of the rings. It is 1000 m longer than the lane. Its x size and its y size are at most 500 m and at most one eleventh of its length. So a short zone meets the rules too.
+- The zone gets `pop_type = major_tradelane` and the other values that most retail lane zones have. It has no encounters.
+- A ring inside a zone with `damage` or inside the `solar_radius` of an object gives a warning.
+- The new lane is one entry of the edit history, with its rings, its zone and the texts.
+
+The other edits of a lane:
+
+- `trade_lane_insert_ring` adds a ring after a ring, or before the first ring. The new ring takes the links of its place, and it copies the lines of the ring next to it. Its default place is the middle between the two rings, or one ring distance beyond the end.
+- After the last ring or before the first ring, the lane gets longer. The end name moves to the new end ring, and the lane zone follows the new ends.
+- A delete of a ring links its neighbors to each other. A removed end ring makes its neighbor the new end, and the end name moves to it. The lane zone follows the new ends and keeps its extra length.
+- The new links, the end name and the zone are parts of the lane, so the delete of a ring does not ask. When one ring or none stays, the whole lane goes with its lane zone, and the delete asks.
+- A delete of a ring of a lane that goes in a circle cuts the circle at that ring.
+- `trade_lane_repair` finds the rings of a lane from any ring. It follows the links in both directions. It also takes the rings with a broken link that stand on the line of the end rings, within 1500 m.
+- The repair sorts the rings along the line, writes `prev_ring` and `next_ring` again, and moves the end names to the end rings. It keeps the positions, so it stops when the rings do not stand on one line. A lane with good links does not change.
+- `trade_lane_delete` deletes all rings of a lane and its lane zone. It always asks.
+- A lane zone that the editor cannot change stays as it is, with a warning.
+- A rename of a ring changes the links of its neighbors (see "Create, duplicate, rename and delete").
+
 ## Prop groups
 
 A prop group is a set of separate objects, zones and lights. The editor saves it in the `props/` folder of a mod, as Unity saves a prefab asset. The editor places a group again in any system, and each member becomes a separate item. The merge, the game, `oltool deploy` and the validation ignore the folder. So a group changes no game data until you place it.
@@ -1018,7 +1084,7 @@ The Scene adds, copies, renames and deletes the objects, zones and lights of the
 
 The keys work only when no text field is active and no field edit or drag is open. A disabled menu item tells why in its tooltip.
 
-Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has a `goto`, a `prev_ring` or a `next_ring` line, or an archetype of such a type. The Create menu and Duplicate cannot make them, because each one needs a partner or a lane. The jump connection tool `connection_create` of the agent server makes a jump gate pair or a jump hole pair (see "Jump connections and gate locks"). A delete of a jump gate or a jump hole deletes its pair. This version cannot delete an airlock gate or a trade lane ring. A rename of a connection object works.
+Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has a `goto`, a `prev_ring` or a `next_ring` line, or an archetype of such a type. The Create menu and Duplicate cannot make them, because each one needs a partner or a lane. The jump connection tool `connection_create` of the agent server makes a jump gate pair or a jump hole pair (see "Jump connections and gate locks"). The trade lane tools `trade_lane_create` and `trade_lane_insert_ring` make a lane and add a ring to it (see "Trade lanes"). A delete of a jump gate or a jump hole deletes its pair. A delete of a trade lane ring links the lane again. This version cannot delete an airlock gate. A rename of a connection object works.
 
 #### Create
 
@@ -1051,7 +1117,7 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 - A copy leaves out the `base` line, because a base has one object in space. The Console tells it.
 - A text placeholder of the active mod gets a copy of its text with a new key, as New from template does. A numeric text id stays.
 - This version cannot copy nebulae, asteroid fields or the zones that hold them.
-- This version cannot copy connection objects. A copy of a jump gate or a jump hole has no partner.
+- This version cannot copy connection objects. A copy of a jump gate or a jump hole has no partner, and a copy of a trade lane ring is not a part of the lane.
 
 #### Delete
 
@@ -1061,14 +1127,15 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 - A zone takes its `[Nebula]` and `[Asteroids]` sections, and the `[LootableZone]` sections that name it. The engine drops a nebula or a field without its zone.
 - A line that names the item gets a safe fix in the same entry when one exists. The `ring` line of a planet goes. The lines of each hole of a deleted zone go from the `[Exclusion Zones]` sections of the nebula and field files. The engine skips a hole whose zone is not there. But retail gives the lines of that hole to the hole before it, so the lines must go.
 - Another line keeps its value and shows "Missing" (see "Data lists and pickers"). Two cases give such a line. One is a fix of a line that the editor cannot change. The other is a line of a mission script that names a deleted object. The save stops at such a mission line until you fix it.
-- A line whose rule refuses the delete names the line and stops the delete, as Unity RequireComponent does. This version refuses the delete of an airlock gate and a trade lane ring.
+- A line whose rule refuses the delete names the line and stops the delete, as Unity RequireComponent does. This version refuses the delete of an airlock gate.
 - A jump gate or a jump hole goes with its pair, because a pair is one connection item. The other end goes when its `goto` line names the end back. The traffic zones that `connection_create` makes for each end go, and so do the `locked_gate` and `npc_locked_gate` lines of each end. A one-way object goes alone. When the other end is in a file that the editor cannot change, the delete stops with the reason. This is an OpenLancer choice: Unity would keep the other end with a "Missing" link.
+- A trade lane ring is a part of its lane, so a delete of a ring links the lane again (see "Trade lanes"). The neighbors of the ring link to each other, and an end name moves to the new end ring. The lane zone follows the new ends. When one ring or none stays, the whole lane goes with its lane zone. A ring can name a ring that goes, while the ring that goes does not name it back. Such a one-way link stops the delete. Repair that lane first with the agent tool `trade_lane_repair`.
 - A one-way object whose `goto` line names an end that goes is no part of the pair. Its locked `goto` line stops the delete, and the message names the object. Delete the one-way object first or in the same delete. To keep it, change its `goto` line in the raw INI block. You can also pair it with the jump connection tool `connection_create` of the agent server.
 - A delete of a nebula or an asteroid field removes only its section, as Unity "Remove Component" does. Its zone stays, with its encounters, its music and its damage.
 
-A delete that removes only the item and its child sections runs at once. So does the delete of a jump connection in one file. Its other end, the traffic zones that `connection_create` made for it and its lock lines are parts of the item.
+A delete that removes only the item and its child sections runs at once. So does the delete of a jump connection in one file. Its other end, the traffic zones that `connection_create` made for it and its lock lines are parts of the item. So does the delete of a ring of a lane that keeps two or more rings. The new links, the end names and the lane zone are parts of the lane.
 
-Another delete opens a dialog. It lists the items that go too, the lines that change and the lines that show "Missing". For a jump gate pair, the list names the other end and its file. The dialog also lists the files that name the item as text, and these warnings:
+Another delete opens a dialog. It lists the items that go too, the lines that change and the lines that show "Missing". For a jump gate pair, the list names the other end and its file. For a lane that goes as a whole, the list names its last ring and its lane zone. The dialog also lists the files that name the item as text, and these warnings:
 
 - A base that loses the last object of its system that docks with it. The game then puts the player at the center of the system after a launch.
 - A base that loses the last object of its system with `base = <base>`. The navigation map then does not list the base, and its rooms show no planet.
@@ -1118,7 +1185,7 @@ The Inspector page of an object starts with its components, as Unity shows the c
 | Base object | `base` | the base picker | removes `base` |
 | Faction member | `reputation` | the faction picker | removes `reputation` |
 | Jump connection | `goto` | the jump connection tool `connection_create` of the agent server | refused: delete the object, and its pair goes too |
-| Trade lane ring | `prev_ring`, `next_ring`, `tradelane_space_name` | not in this version | refused in this version |
+| Trade lane ring | `prev_ring`, `next_ring`, `tradelane_space_name` | the trade lane tools `trade_lane_create` and `trade_lane_insert_ring` of the agent server | refused: the `Delete` key and the trade lane tools change the lane |
 | Planet ring | `ring` | not in this version | removes `ring` |
 
 A click on a chip opens the section of the page with its keys. A chip with a glyph has a problem, and its tooltip tells it. "Add component" offers the components that the object does not have. A right click on a chip offers "Remove component". Each add and each remove is one entry of the edit history.
@@ -1154,7 +1221,7 @@ The Assets panel is the first tab of the bottom group, as the Unity Project wind
 | Factions | the `[Group]` sections of `initialworld.ini` | On an object only |
 | Models | the `.cmp`, `.3db` and `.sph` files below `DATA`, by top folder | Placed as a static prop when a solar archetype, a ship or an asteroid uses the model |
 
-The rule data gives the categories. A solar archetype whose type is in no template shows in "Other solar" with a lock: it does not spawn. Jump gates, jump holes, airlock gates and trade lane rings show with a lock, because each one needs a partner or a lane. The lock names the jump connection tool `connection_create` of the agent server, which makes a jump gate pair or a jump hole pair.
+The rule data gives the categories. A solar archetype whose type is in no template shows in "Other solar" with a lock: it does not spawn. Jump gates, jump holes, airlock gates and trade lane rings show with a lock, because each one needs a partner or a lane. The lock names the jump connection tool `connection_create` of the agent server, which makes a jump gate pair or a jump hole pair. It also names the trade lane tools `trade_lane_create` and `trade_lane_insert_ring`, which make a lane and add a ring to it.
 
 The toolbar has the search field (`Ctrl+F`), the path of the category, and the size slider. The smallest size shows a list. The search finds the name, the nickname, the type and the model file, without letter case. "All assets" searches each category. A tile shows a "+" when the active mod adds the item, and a blue bar when it changes it. A ship, an asteroid or a model shows a "prop" badge when a solar archetype uses its model. The hover tooltip shows a larger image, the layer, the model file, and the number of lines that name the entry.
 

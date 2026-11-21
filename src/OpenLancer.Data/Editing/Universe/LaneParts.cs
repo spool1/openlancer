@@ -22,9 +22,9 @@ internal sealed record LaneRelinks(List<EditCommand> Commands, List<SectionRef> 
 internal sealed class LaneParts(EditSession session)
 {
     /// <summary>
-    /// The rings and the lane zones that go with the lanes of a delete and that it does not take yet: the last ring of
-    /// a lane that keeps one ring, and the lane zone of a lane that keeps one ring or none. A lane zone that the editor
-    /// cannot delete stays, and <paramref name="warnings"/> gets the reason.
+    /// The rings and the lane zones that go with the lanes of a delete, which the delete does not take yet. They are the
+    /// last ring of a lane that keeps one ring, and the lane zone of a lane that keeps one ring or none. A lane zone
+    /// that the editor cannot delete stays, and <paramref name="warnings"/> gets the reason.
     /// </summary>
     /// <param name="going">The sections that the delete reads so far.</param>
     /// <param name="queued">The sections that the delete takes, also before it reads them.</param>
@@ -55,8 +55,8 @@ internal sealed class LaneParts(EditSession session)
     }
 
     /// <summary>
-    /// The edits of the lanes that keep two or more rings after a delete. Each link line of a ring that stays and that
-    /// names a ring that goes names the next ring that stays, or goes when no ring stays on that side. In a lane that
+    /// The edits of the lanes that keep two or more rings after a delete. A ring that stays can have a link line that
+    /// names a ring that goes. That line then names the next ring that stays on that side, or it goes. In a lane that
     /// goes in a circle, the delete cuts the circle at the first ring that goes. An end name moves from a removed end
     /// ring to the new end ring. The lane zone follows the new ends.
     /// </summary>

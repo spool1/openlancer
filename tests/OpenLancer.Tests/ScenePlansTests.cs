@@ -744,8 +744,8 @@ public sealed class ScenePlansDuplicateTests
         Assert.Equal("Li02_airlock is an airlock gate. This version cannot copy airlock gates.",
             Assert.Single(ScenePlans.Duplicate(session, [airlock]).Refusals).Message);
         Assert.Equal("ring2 is a trade lane ring. This version cannot copy trade lane rings, because a copy is not a part " +
-                     "of the lane. To make a lane or to add a ring to a lane, use the trade lane tools trade_lane_create " +
-                     "and trade_lane_insert_ring of the agent server.",
+                     "of the lane. To make a lane or a ring, use the trade lane tools trade_lane_create and " +
+                     "trade_lane_insert_ring of the agent server.",
             ScenePlans.Unavailable(session, SceneAction.Duplicate, Object("ring2")));
         Assert.Equal(ScenePlans.Unavailable(session, SceneAction.Duplicate, Object("ring2")),
             Assert.Single(ScenePlans.Duplicate(session, [Object("ring2")]).Refusals).Message);

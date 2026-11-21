@@ -70,7 +70,7 @@ public sealed record LaneChain(string Path, IReadOnlyList<SectionRef> Rings, boo
 /// The plans of the trade lanes: a new lane with its lane zone, a new ring, a repair of the links, the remove of rings
 /// and the delete of a lane. Each plan gives one command, which runs as one entry of the edit history. The agent tools
 /// and the ring buttons of the Inspector call the same plans. <see cref="LaneOf"/> is the one walk of the links of a
-/// lane, and the checks and the Inspector use it too.
+/// lane. The checks and the Inspector use it too.
 /// </summary>
 /// <remarks>
 /// <para>Retail facts: a lane is a chain of <c>[Object]</c> rings of one system file with the archetype type
@@ -140,16 +140,16 @@ public static class LanePlans
     /// Plans a new trade lane in a system, with its lane zone, as one entry of the edit history.
     /// </summary>
     /// <remarks>
-    /// <para>An end with an object and no point goes on the line toward the other end, at the <c>solar_radius</c> of
-    /// the archetype of the object plus the clearance of the rule data. When a zone with damage holds that place, for
-    /// example the death zone of a sun, the end goes farther along the line until it is out of the zone, plus the
-    /// clearance. The ring count is one ring each spacing of the rule data, plus one. The rings get the nicknames
+    /// <para>An end with an object and no point goes on the line toward the other end. Its distance from the object is
+    /// the <c>solar_radius</c> of the archetype of the object plus the clearance of the rule data. A zone with damage
+    /// can hold that place, for example the death zone of a sun. The end then goes farther along the line, to the
+    /// clearance past the edge of the zone. The ring count is one ring each spacing of the rule data, plus one. The rings get the nicknames
     /// <c>&lt;System&gt;_Trade_Lane_Ring_&lt;n&gt;</c> with the first free numbers, and a rotation whose front looks
     /// along the lane. The end names go into the text of the active mod, or the ends take the name of their object.
     /// The lane zone <c>Zone_&lt;System&gt;_Tradelane_&lt;n&gt;</c> is a box on the lane that meets the lane zone rule.
     /// It holds no encounters.</para>
-    /// <para>The plan refuses a system without a file that the editor can change, an end without a point and an object,
-    /// and an end without a name. It also refuses a template that is not a ring, and a ring count or a spacing outside
+    /// <para>The plan refuses a system without a file that the editor can change. It refuses an end without a point and
+    /// an object, and an end without a name. It also refuses a template that is not a ring, and a ring count or a spacing outside
     /// the limits. A spacing outside the retail range and a ring inside a zone with damage or inside an object give
     /// warnings.</para>
     /// </remarks>
@@ -370,7 +370,7 @@ public static class LanePlans
     /// Plans a new ring after a ring of a lane, or before its first ring, as one entry of the edit history. The new ring
     /// takes the links of its place, and it copies the lines of the ring that it goes next to.
     /// </summary>
-    /// <remarks>After the last ring or before the first ring, the lane gets longer: the end name moves to the new end
+    /// <remarks>After the last ring or before the first ring, the lane gets longer. The end name moves to the new end
     /// ring, and the lane zone follows the new ends. The default position is the middle between the two rings, or one
     /// spacing beyond the end. The plan refuses an object that is not a ring of a lane, and a ring before that is not
     /// the first ring.</remarks>
@@ -491,11 +491,11 @@ public static class LanePlans
         if (!lane.Loops && lane.Rings.Count > 1 && (place == LanePlace.Before || next == null) &&
             ZoneOf(session, lane) is { } laneZone)
         {
-            zone = laneZone;
             var first = place == LanePlace.Before ? placeAt : PositionOf(session, lane.Rings[0]);
             var last = place == LanePlace.After ? placeAt : PositionOf(session, lane.Rings[^1]);
             if (first is { } a && last is { } b)
                 commands.AddRange(Follow(session, laneZone, a, b, LengthOf(session, lane), rule, changes, warnings));
+            zone = changes.Contains(laneZone) ? laneZone : null;
         }
         if (new LanePlacement(session, ring.Path).Inside(placeAt) is { } inside)
             warnings.Add(PlacementWarning(added, inside));
@@ -515,8 +515,8 @@ public static class LanePlans
 
     /// <summary>
     /// Plans a repair of the links of a lane, as one entry of the edit history. The plan finds the rings of the lane
-    /// from any ring: the rings that the links reach in both directions, and the rings on the line of the two end rings
-    /// within <see cref="Reach"/> that have a broken link. It sorts them along the line, writes their
+    /// from any ring. They are the rings that the links reach in both directions, and the rings with a broken link on
+    /// the line of the two end rings within <see cref="Reach"/>. It sorts them along the line, writes their
     /// <c>prev_ring</c> and <c>next_ring</c> lines again, and moves the end names to the two end rings. It keeps the
     /// positions. A lane with good links gives a command that changes nothing.
     /// </summary>
@@ -725,8 +725,8 @@ public static class LanePlans
     }
 
     /// <summary>
-    /// The lane zone of a lane: a zone of its file that meets the lane zone rule (see <see cref="LaneZones"/>) and whose
-    /// axis covers the first and the last ring within <see cref="Reach"/>. Of two such zones, the zone nearer to the
+    /// The lane zone of a lane. It is a zone of its file that meets the lane zone rule (see <see cref="LaneZones"/>).
+    /// Its axis covers the first and the last ring within <see cref="Reach"/>. Of two such zones, the zone nearer to the
     /// axis counts. Null for a lane without such a zone, for a lane of one ring and for a lane that goes in a circle. The
     /// plans then change no zone.
     /// </summary>
@@ -739,9 +739,8 @@ public static class LanePlans
         var nearest = float.MaxValue;
         foreach (var zone in session.Sections(lane.Path))
         {
-            if (!SceneSections.Is(zone.Id.Type, SceneSections.ZoneType) || !LaneZones.IsLaneZone(session, zone) ||
-                ZoneShapes.Read(session, zone) is not { } read || Cover(read, a, b) is not { } distance ||
-                distance >= nearest)
+            if (!SceneSections.Is(zone.Id.Type, SceneSections.ZoneType) || LaneZones.Read(session, zone) is not { } read ||
+                Cover(read, a, b) is not { } distance || distance >= nearest)
                 continue;
             best = zone;
             nearest = distance;
@@ -755,9 +754,9 @@ public static class LanePlans
                                       "hit it. Move the ring.") with { Target = ring, Key = "pos" };
 
     /// <summary>
-    /// The total distance of the first and the last ring of a lane from the axis of a box zone, or null when the zone
-    /// does not cover both rings within <see cref="Reach"/>. The axis is the z axis of the zone after its rotation,
-    /// and a ring is covered when it is near the axis and within the length of the zone plus <see cref="Reach"/>.
+    /// The total distance of the first and the last ring of a lane from the axis of a box zone. Null when the zone does
+    /// not cover both rings within <see cref="Reach"/>. The axis is the z axis of the zone after its rotation. A ring is
+    /// covered when it is near the axis and within the length of the zone plus <see cref="Reach"/>.
     /// </summary>
     internal static float? Cover(UniverseSchema.Zone zone, Vector3 first, Vector3 last)
     {
@@ -776,9 +775,9 @@ public static class LanePlans
     }
 
     /// <summary>
-    /// The commands that make a lane zone follow the new ends of its lane: the zone goes to the middle of the end
-    /// rings, and its length keeps its margin beyond the lane. Its width and height shrink when the zone would break
-    /// the lane zone rule. Its rotation turns to the lane when the lane turns more than 1 degree. A zone that the editor
+    /// The commands that make a lane zone follow the new ends of its lane. The zone goes to the middle of the end rings,
+    /// and its length keeps its margin beyond the lane. Its width and height shrink when the zone would break the lane
+    /// zone rule. Its rotation turns to the lane when the lane turns more than 1 degree. A zone that the editor
     /// cannot change gets a warning and no command.
     /// </summary>
     /// <param name="oldLength">The length of the lane before the edit, for the margin of the zone, or null.</param>
@@ -910,9 +909,9 @@ public static class LanePlans
         session.Get(section) is { } view && SceneSections.ArchetypeType(session, view) == RingType;
 
     /// <summary>
-    /// The rings that the links reach from a ring, in both directions: the rings that a link line of a ring names,
-    /// and the rings whose link line names a ring. Only objects with an archetype of the type <c>TRADELANE_RING</c>
-    /// join, and the first ring.
+    /// The rings that the links reach from a ring, in both directions. A ring joins when a link line of a ring names
+    /// it, and when its link line names a ring. Only the first ring and objects with an archetype of the type
+    /// <c>TRADELANE_RING</c> join.
     /// </summary>
     private static HashSet<SectionRef> Linked(EditSession session, IReadOnlyDictionary<string, SectionRef> objects,
         SectionRef ring)
@@ -939,8 +938,8 @@ public static class LanePlans
         return set;
     }
 
-    /// <summary>True for a ring with a broken link: no link, a link to an object that the file does not have or that is
-    /// no ring, or a link that does not go both ways.</summary>
+    /// <summary>True for a ring with a broken link. The ring has no link, or a link that does not go both ways. Or a link
+    /// names an object that the file does not have or that is no ring.</summary>
     private static bool Broken(EditSession session, IReadOnlyDictionary<string, SectionRef> objects, SectionRef ring)
     {
         var view = session.Get(ring)!;
@@ -1008,8 +1007,9 @@ public static class LanePlans
 }
 
 /// <summary>
-/// The places of a system file where a ring of a lane does not belong: inside a zone with damage, for example the death
-/// zone of a sun, and inside the <c>solar_radius</c> of an object. The plans of the lanes and the checks use it.
+/// The places of a system file where a ring of a lane does not belong. One place is inside a zone with damage, for
+/// example the death zone of a sun. The other is inside the <c>solar_radius</c> of an object. The plans of the lanes
+/// and the checks use it.
 /// </summary>
 internal sealed class LanePlacement(EditSession session, string path)
 {

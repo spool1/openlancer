@@ -118,8 +118,8 @@ internal sealed record ConnectionRule(string Tunnel, float MinRadius, JumpEndRul
 
 /// <summary>
 /// The rules of a new trade lane. They give the archetype, the generic name and infocard and the lines of each ring.
-/// They also give the spacing of the rings, the clearance of an end at an object, the lane zone, and the loadout and
-/// the pilot of a ring for each house.
+/// They also give the spacing of the rings, the clearance of an end at an object and the lane zone. The last part is
+/// the loadout and the pilot of a ring for each house.
 /// </summary>
 /// <param name="Archetype">The solar archetype of a new ring when the request and its template give none.</param>
 /// <param name="Name">The id of the name that the rings of a lane share in the target view.</param>
@@ -129,8 +129,8 @@ internal sealed record ConnectionRule(string Tunnel, float MinRadius, JumpEndRul
 /// gets a warning.</param>
 /// <param name="RetailMax">The largest distance between two rings of a retail lane, in meters. A new lane with more
 /// gets a warning.</param>
-/// <param name="Clearance">The distance of an end ring beyond the <c>solar_radius</c> of the object at that end, and
-/// beyond the edge of a zone with damage, in meters.</param>
+/// <param name="Clearance">The distance in meters of an end ring beyond the <c>solar_radius</c> of the object at that
+/// end. It is also the distance beyond the edge of a zone with damage.</param>
 /// <param name="Lines">The lines of a new ring that the template ring does not give, each with a value. Only the keys
 /// of <see cref="RingKeys"/> can occur.</param>
 /// <param name="ZoneMargin">The lane zone is longer than the lane by this value, in meters.</param>
