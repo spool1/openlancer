@@ -405,6 +405,25 @@ public sealed class FieldBindingTests
         Assert.Null(Bind(session, SystemWorkspace.System("Li01"), "strid_name").ReadOnlyReason);
     }
 
+    /// <summary>The goto row of a jump gate is read-only, because a change of one end breaks the pair. The reason names
+    /// the agent tools that change the pair. The goto key of a section of another file takes edits.</summary>
+    [Fact]
+    public void TheGotoRowOfAJumpGateIsReadOnlyWithTheReason()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+
+        var gate = Bind(session, SceneWorkspace.Object("Li01_to_Li02"), "goto");
+
+        Assert.Equal("This key links the two ends of a jump connection. Use the agent tools connection_create and " +
+                     "delete_items to change the pair.", gate.ReadOnlyReason);
+        Assert.Equal(FieldBinding.JumpLinkReason, gate.ReadOnlyReason);
+        Assert.False(gate.CanRevert);
+        Assert.Null(FieldBinding.LinkLock(session, SceneWorkspace.Object("Li01_to_Li02"), "pos"));
+        Assert.Null(FieldBinding.LinkLock(session, new SectionRef(ListWorkspace.SolarPath,
+            new SectionIdentity("Solar", "jumpgate")), "goto"));
+    }
+
     /// <summary>
     /// A revert of a whole section puts back each line of the lower layer. So it cannot run for a [system] whose file
     /// the active mod sets, for example with a patch that the user wrote: that would move the system to another file,

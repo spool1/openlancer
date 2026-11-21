@@ -181,6 +181,10 @@ public sealed class AgentQueryTests
 
         Assert.True((bool)system.Single(f => (string?)f!["key"] == "file")!["locked"]!);
         Assert.True((bool)system.Single(f => (string?)f!["key"] == "nickname")!["locked"]!);
+        // The goto line of a jump gate links the pair, so only the connection tools change it.
+        var gate = Ok(host, "get_item", """{ "ref": "obj:Li01_to_Li02" }""")["section"]!["fields"]!.AsArray();
+        Assert.True((bool)gate.Single(f => (string?)f!["key"] == "goto")!["locked"]!);
+        Assert.False((bool)gate.Single(f => (string?)f!["key"] == "archetype")!["locked"]!);
     }
 
     [Fact]

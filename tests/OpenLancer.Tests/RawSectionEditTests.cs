@@ -1,7 +1,9 @@
+using System;
 using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Studio.Commands;
 using Xunit;
@@ -113,6 +115,29 @@ public sealed class RawSectionEditTests
         var plan = RawSectionEdit.Plan(session, system, start, start.Replace("li01.ini", "other.ini"));
 
         Assert.Contains("moves all its contents", Assert.Single(plan.Problems).Message);
+    }
+
+    /// <summary>
+    /// The goto line of a jump gate is locked in the rows, but the raw INI block still changes it (editor UI rule 11).
+    /// A raw edit that breaks the pair then gets the warning of the checks of the jump connections.
+    /// </summary>
+    [Fact]
+    public void ARawEditOfTheGotoLineOfAJumpGateApplies()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var gate = SceneWorkspace.Object("Li01_to_Li02");
+        var start = Text(session, gate);
+        Assert.NotNull(FieldBinding.Create(session, gate, session.Get(gate)!, "goto").ReadOnlyReason);
+
+        var plan = RawSectionEdit.Plan(session, gate, start, start.Replace("Li02_to_Li01", "Li02_01"));
+
+        Assert.Empty(plan.Problems);
+        session.Execute(plan.Edit!.Command!);
+        Assert.Equal("Li02, Li02_01, gate_tunnel_bretonia", Lines(session, gate, "goto"));
+        Assert.Contains(ObjectComponents.Checks(session, SceneWorkspace.Li02("Object", "Li02_to_Li01")),
+            p => p.Message.StartsWith("Li02_to_Li01 goes to Li01_to_Li02 in Li01, but Li01_to_Li02 does not go back.",
+                StringComparison.Ordinal));
     }
 
     /// <summary>A list error does not stop a raw edit: the value goes into W, and the rows show the error.</summary>

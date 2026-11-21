@@ -707,4 +707,40 @@ public sealed class ScenePlansDuplicateTests
         Assert.Equal(Zone("Zone_hole_1"), ScenePlans.Duplicate(session, [Zone("Zone_hole")]).Adds[0]);
         Assert.Equal(Li01("LightSource", "light1_1"), ScenePlans.Duplicate(session, [Li01("LightSource", "light1")]).Adds[0]);
     }
+
+    /// <summary>
+    /// A copy of a jump gate or a jump hole would have no partner, so Duplicate refuses it and names the tool that makes
+    /// a pair. An airlock gate and a trade lane ring refuse too. The Delete menu takes a gate and a hole, because a
+    /// delete takes the pair, and it refuses an airlock gate and a ring. The menu and the plan give one reason.
+    /// </summary>
+    [Fact]
+    public void ACopyOfAConnectionObjectIsRefusedAndTheDeleteMenuTakesAGateAndAHole()
+    {
+        using var ws = Create();
+        ws.WriteBase(ListWorkspace.SolarPath, Solars + "\n[Solar]\nnickname = jumphole\ntype = JUMP_HOLE\n" +
+                                              "[Solar]\nnickname = airlock\ntype = AIRLOCK_GATE\n");
+        ws.WriteBase(Li02Path, Li02Text + "\n[Object]\nnickname = Li02_hole\narchetype = jumphole\n" +
+                                          "[Object]\nnickname = Li02_airlock\narchetype = airlock\n");
+        var session = ws.Session("act");
+        var gate = Object("Li01_to_Li02");
+        var hole = Li02("Object", "Li02_hole");
+        var airlock = Li02("Object", "Li02_airlock");
+
+        var copy = Assert.Single(ScenePlans.Duplicate(session, [gate]).Refusals).Message;
+
+        Assert.Equal("Li01_to_Li02 is a jump gate. This version cannot copy jump gates or jump holes, because a copy has " +
+                     "no partner. To make a pair, use the jump connection tool connection_create of the agent server.", copy);
+        Assert.Equal(copy, ScenePlans.Unavailable(session, SceneAction.Duplicate, gate));
+        Assert.StartsWith("Li02_hole is a jump hole. This version cannot copy jump gates or jump holes",
+            ScenePlans.Unavailable(session, SceneAction.Duplicate, hole));
+        Assert.Equal("Li02_airlock is an airlock gate. This version cannot copy airlock gates.",
+            Assert.Single(ScenePlans.Duplicate(session, [airlock]).Refusals).Message);
+        Assert.Equal("ring2 is a trade lane ring. This version cannot copy trade lane rings. Its neighbor rings ring1 " +
+                     "must change with it.", ScenePlans.Unavailable(session, SceneAction.Duplicate, Object("ring2")));
+        Assert.Null(ScenePlans.Unavailable(session, SceneAction.Delete, gate));
+        Assert.Null(ScenePlans.Unavailable(session, SceneAction.Delete, hole));
+        Assert.NotNull(ScenePlans.Unavailable(session, SceneAction.Delete, airlock));
+        Assert.NotNull(ScenePlans.Unavailable(session, SceneAction.Delete, Object("ring2")));
+        Assert.Equal([hole], ScenePlans.Delete(session, [hole]).Deletes.Select(d => d.Section));
+    }
 }

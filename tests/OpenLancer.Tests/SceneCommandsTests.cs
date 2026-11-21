@@ -41,6 +41,28 @@ public sealed class SceneCommandsTests
     }
 
     /// <summary>
+    /// The Delete key on a jump gate gives the delete of the pair. The partner is in another file, so the editor asks,
+    /// and the question names the partner and its file. The command gives the W of the plan of the pair.
+    /// </summary>
+    [Fact]
+    public void TheDeleteOfAGateAsksWithThePartnerAndItsFile()
+    {
+        using var ws = Create();
+        var session = ws.Session("act");
+        var gate = Object("Li01_to_Li02");
+
+        var plan = SceneCommands.Delete(session, [gate]);
+
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        Assert.True(plan.NeedsConfirmation);
+        Assert.Equal(["Li02_to_Li01 (goto = Li01, Li01_to_Li02) in li02.ini"], OpenLancer.Editor.Dialogs.PlanDialog.GoesToo(plan));
+        Assert.Equal(EditStatus.Applied, FakeCommandHost.Runner(session).Run(plan).Status);
+        Assert.Null(session.Get(Li02("Object", "Li02_to_Li01")));
+        AssertParity(() => Create(), s => OpenLancer.Data.Editing.Universe.ConnectionPlans.DeletePair(s, [gate]),
+            s => SceneCommands.Delete(s, [gate]), Li02Path);
+    }
+
+    /// <summary>
     /// The spawn of an asset (section 8 of the M23 design). A solar archetype takes the template of its type. A station
     /// archetype with a docking sphere asks for a base. A ship or a model makes a new static prop archetype with its
     /// object. An asset that the Scene does not place gives a plan that refuses.

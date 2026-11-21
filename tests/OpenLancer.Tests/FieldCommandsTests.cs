@@ -360,6 +360,28 @@ public sealed class FieldCommandsTests
         Assert.NotNull(AgentTools.Find("scene_set_encounters"));
     }
 
+    /// <summary>The goto line of a jump gate links the pair, so set_fields refuses it with FieldNotWritable and names
+    /// the connection tools. get_item marks it as locked. The other keys of the gate take edits.</summary>
+    [Fact]
+    public void SetFieldsRefusesTheGotoLineOfAJumpGate()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var gate = SceneWorkspace.Object("Li01_to_Li02");
+
+        var plan = FieldCommands.SetFields(session, gate,
+            Fields("""{ "goto": ["Li02", "Li02_01", "gate_tunnel_bretonia"] }"""));
+
+        Assert.False(plan.CanRun);
+        var error = Assert.Single(plan.Report(session).Errors);
+        Assert.Equal((EditErrorKind.Refused, MissionErrors.FieldNotWritable), (error.Kind, error.Detail));
+        Assert.Equal("'goto': " + FieldBinding.JumpLinkReason, error.Message);
+        Assert.True(FieldCommands.IsLocked(session, gate, session.Get(gate)!, "goto"));
+        Assert.False(FieldCommands.IsLocked(session, gate, session.Get(gate)!, "pos"));
+        Assert.Equal(EditStatus.Applied, FakeCommandHost.Runner(session).Run(FieldCommands.SetFields(session, gate,
+            Fields("""{ "pos": [100, 0, 0] }"""))).Status);
+    }
+
     /// <summary>A session that takes no edits refuses each field of a section with the reason of the session.</summary>
     [Fact]
     public void SetFieldsRefusesEachFieldOfAReadOnlySection()

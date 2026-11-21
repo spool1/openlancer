@@ -55,8 +55,7 @@ internal sealed class PlanDialog : ModalDialog
         }
 
         var nickname = plan.Deletes.FirstOrDefault()?.Section.Id.Key ?? plan.SelectAfter?.Id.Key ?? "";
-        List("These items go too:", plan.Deletes.Where(d => d.Why == DeleteReason.Cascade)
-            .Select(d => $"{d.Section.Id.Key ?? d.Section.Id.ToString()} ({d.Cause}) in {Path.GetFileName(d.Section.Path)}"));
+        List("These items go too:", GoesToo(plan));
         List("These lines change:", plan.Fixes.Select(f => f.Text));
         List("These lines show Missing:", plan.Missing.Select(m =>
             $"{m.Reference.Section.Id} '{m.Reference.Key}' in {Path.GetFileName(m.Reference.Section.Path)}. {m.Consequence}" +
@@ -85,6 +84,12 @@ internal sealed class PlanDialog : ModalDialog
             Close();
         }
     }
+
+    /// <summary>The lines of "These items go too:": each item that goes with a target, with the line that names the
+    /// target and its file. For a jump gate, the partner and its file come here.</summary>
+    internal static System.Collections.Generic.IEnumerable<string> GoesToo(ScenePlan plan) =>
+        plan.Deletes.Where(d => d.Why == DeleteReason.Cascade)
+            .Select(d => $"{d.Section.Id.Key ?? d.Section.Id.ToString()} ({d.Cause}) in {Path.GetFileName(d.Section.Path)}");
 
     /// <summary>A heading and a bullet for each line, or nothing when there are no lines.</summary>
     private static void List(string heading, System.Collections.Generic.IEnumerable<string> lines)
