@@ -13,6 +13,7 @@ using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Assets;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.IO;
 using OpenLancer.Data.Validation;
 using Xunit;
 
@@ -140,16 +141,52 @@ public sealed class SceneDeleteRetailTests(ITestOutputHelper output)
             f => f.Zone!.Nickname.Equals(YanagiField, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// A delete of a retail jump gate deletes its pair: the partner in Li02 and the lock lines of both ends. The partner
+    /// is in another file, so the plan asks. The story missions name both ends, so their lines show "Missing". One undo
+    /// gives both ends back.
+    /// </summary>
     [Fact]
-    public void AJumpGateDeleteIsRefusedAndNamesThePartner()
+    public void AJumpGateDeleteTakesThePartnerAndTheLockLines()
     {
         using var workspace = SceneRetail.Workspace("m3gate");
         var session = workspace.Open();
+        var gate = SceneRetail.Section(session, SceneRetail.Li01, "Object", "Li01_to_Li02");
+        var locks = GateLocks.Of(session, "Li01_to_Li02").Count + GateLocks.Of(session, "Li02_to_Li01").Count;
 
-        var plan = ScenePlans.Delete(session, [SceneRetail.Section(session, SceneRetail.Li01, "Object", "Li01_to_Li02")]);
+        var plan = ScenePlans.Delete(session, [gate]);
 
-        Assert.Null(plan.Command);
-        Assert.Contains("The partner gate Li02: Li02_to_Li01", Assert.Single(plan.Refusals).Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        Assert.True(plan.NeedsConfirmation);
+        var partner = Assert.Single(plan.Deletes, d => d.Section.Id.Key!.Equals("Li02_to_Li01", StringComparison.OrdinalIgnoreCase));
+        Assert.True(VfsPath.Comparer.Equals(SceneRetail.Li02, partner.Section.Path), partner.Section.Path);
+        Assert.Equal(DeleteReason.Cascade, partner.Why);
+        Assert.Equal(locks, plan.Fixes.Count(f => f.Key.Contains("locked_gate", StringComparison.OrdinalIgnoreCase)));
+        Assert.NotEmpty(plan.MissionMissing);
+        session.Execute(plan.Command!);
+
+        Assert.Null(session.Get(gate));
+        Assert.Null(session.Get(partner.Section));
+        session.Undo();
+        Assert.NotNull(session.Get(gate));
+        Assert.NotNull(session.Get(partner.Section));
+    }
+
+    /// <summary>The player lock of Li01_to_Iw03 goes with the pair as a fix of the gate lock file.</summary>
+    [Fact]
+    public void ALockedRetailGateDeleteRemovesItsLockLine()
+    {
+        using var workspace = SceneRetail.Workspace("m3gatelock");
+        var session = workspace.Open();
+        var gate = SceneRetail.Section(session, SceneRetail.Li01, "Object", "Li01_to_Iw03");
+        Assert.True(GateLocks.PlayerLocked(session, "Li01_to_Iw03"));
+
+        var plan = ScenePlans.Delete(session, [gate]);
+
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        Assert.Contains(plan.Fixes, f => f.Text.EndsWith("the locked_gate line of Li01_to_Iw03", StringComparison.Ordinal));
+        session.Execute(plan.Command!);
+        Assert.False(GateLocks.PlayerLocked(session, "Li01_to_Iw03"));
     }
 
     /// <summary><c>Li01_14</c> takes its 5 children and gives the two base warnings of decision D254.</summary>
