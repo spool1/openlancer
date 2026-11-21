@@ -372,7 +372,7 @@ The refusals of the trade lane tools are:
 
 | Detail | Error | Cause |
 |---|---|---|
-| `LaneRings` | `invalid_value` | A ring count outside 2 to 100, or a spacing outside 1000 to 20000 m. |
+| `LaneRings` | `invalid_value` | A ring count above 100, or a spacing outside 1000 to 20000 m. |
 | `LaneEnd` | `invalid_argument` | An end without a point and without an object. Or two ends at objects that are too close for the clearance, so that the rings pass each other. |
 | `LaneEndName` | `invalid_argument` | An end without a name and without an object with a name. |
 | `LaneArchetype` | `invalid_value` | `like` is not a trade lane ring, or the profile has no ring archetype. |
@@ -380,9 +380,12 @@ The refusals of the trade lane tools are:
 | `BeforeNotFirst` | `invalid_value` | `before` names a ring that is not the first ring of its lane. |
 | `LaneNotLine` | `invalid_value` | The rings of the lane do not stand on one line, so the repair cannot sort them. |
 | `NameTaken` | `name_taken` | Another object has the nickname of the new ring. |
+| `NameInvalid` | `invalid_value` | An INI line cannot hold `nickname`, for example a nickname with a `;` or a line break. |
+| `FieldValue` | `invalid_value` | An object without a position: `start_near` or `end_near` without a point, the ring of an insert without `position`, or a ring of a repair. |
+| `ItemNotFound` | `not_found` | `start_near` or `end_near` names an item that is not an object, for example a zone. |
 | `EndOtherSystem` | `invalid_argument` | `start_near` or `end_near` names an object of another system. |
 
-When a refusal is about one argument, the `field` of the error names it, as for `connection_create`.
+When a refusal is about one argument, the `field` of the error names it, as for `connection_create`. A ring count below 2 gives `invalid_argument` with the detail `BadArgument` before the plan runs, because the input schema of `rings` has the minimum 2.
 
 In `edit_batch`, a step of these edit tools gives the result of its edit, without `system`, `pair`, `rings` and the other parts above. The `adds` of the step name the new items. So a batch can make a system, a gate pair to it and a lane from the new gate. The `start_near` of `trade_lane_create` names the gate that `connection_create` made in an earlier step.
 
@@ -957,7 +960,7 @@ The server gives three prompts. An agent program shows a prompt as a command. In
 
 The prompts need the edit tools. So a host that only reads, for example `oltool mcp serve --read-only`, lists no prompt.
 
-A host without `save`, for example `oltool mcp serve --no-save`, lists all three prompts. The steps of the save tell the agent what to do without `save`. Only the editor host makes the images of `short_cutscene` and `new_system`. In the host without a window, the agent does not make them.
+A host without `save`, for example `oltool mcp serve --no-save`, lists all three prompts. The prompts call `save` only when you ask for it, so the other steps work without `save`. The last step of `new_system` comes only after a save. Only the editor host makes the images of `short_cutscene` and `new_system`. In the host without a window, the agent does not make them.
 
 The prompts `build_outpost` and `patrol_and_wreck` and the resource `openlancer://guide/workflows` are not in this version. They come after version 1.0 ([#70](https://github.com/spool1/openlancer/issues/70)).
 
