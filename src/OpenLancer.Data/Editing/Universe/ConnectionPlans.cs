@@ -146,6 +146,8 @@ public static class ConnectionPlans
     {
         options ??= new ConnectionOptions();
         var words = kind == ConnectionKind.Hole ? "jump hole" : "jump gate";
+        // The kind as the agent tools name it.
+        var kindName = kind == ConnectionKind.Hole ? "jump_hole" : "jump_gate";
         var plan = new ConnectionPlan($"Create {words} pair {from.System.Trim()} to {to.System.Trim()}");
         if (session.ReadOnlyReason is { } locked)
             return plan.Refuse("", locked);
@@ -166,7 +168,7 @@ public static class ConnectionPlans
         }
         var same = FLHash.CreateID(ends[0].System) == FLHash.CreateID(ends[1].System);
         if (kind == ConnectionKind.Gate && same)
-            return plan.Refuse(ends[1].Path, "A jump gate pair needs two systems. Use the kind jump hole for a hole inside " +
+            return plan.Refuse(ends[1].Path, "A jump gate pair needs two systems. Use the kind jump_hole for a hole inside " +
                                              "one system.", ends[1].SystemSection, GateSameSystem);
 
         SectionView? like = null;
@@ -187,7 +189,7 @@ public static class ConnectionPlans
             return plan.Refuse(ends[0].Path, (archetypeType == null
                 ? $"No solar archetype has the name {archetype}."
                 : $"The archetype {archetype} is a {archetypeType.ToUpperInvariant()}.") +
-                $" The kind {words} needs an archetype of the type {needed.ToUpperInvariant()}.", detail: KindMismatch);
+                $" The kind {kindName} needs an archetype of the type {needed.ToUpperInvariant()}.", detail: KindMismatch);
 
         // The existing ends.
         foreach (var end in ends.Where(e => e.Request.Object != null))
@@ -203,7 +205,7 @@ public static class ConnectionPlans
             if (type != needed)
                 return plan.Refuse(end.Path, $"{existing.Id.Key} is " + (type == null
                     ? "not an object with an archetype of the solar archetypes."
-                    : $"a {type.ToUpperInvariant()}.") + $" The kind {words} needs an object of the type " +
+                    : $"a {type.ToUpperInvariant()}.") + $" The kind {kindName} needs an object of the type " +
                     $"{needed.ToUpperInvariant()}.", existing, KindMismatch);
             if (PartnerOf(session, view) is { } partner && GoesBack(session, partner.View, end.System, existing.Id.Key!))
                 return plan.Refuse(end.Path, $"{existing.Id.Key} already goes to {partner.Section.Id.Key}, and " +
