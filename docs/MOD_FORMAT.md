@@ -653,7 +653,7 @@ The checks of the jump connections:
 
 The count error stops the save of a data mod (tier 1) when the active mod makes the count go above 10. The order error stops the save when the active mod writes the `goto` line. Each other case is a warning. A `goto` line that names a system or an object that does not exist gets the error of the data lists.
 
-The Inspector shows the problems in the Jump connection component of the object, and above the sections of `[locked_gates]`. The spacing warning shows at the position of the object. Retail has seven pairs of jump objects closer than 8000 m, so a jump object that the active mod does not place gets no spacing warning. The raw INI block marks the line of each problem. The agent tools `get_item` and `check` give them too.
+The Inspector shows the problems in the Jump connection component of the object, and above the sections of `[locked_gates]`. The spacing warning shows at the position of the object. Retail has seven pairs of jump objects closer than 8000 m. So a jump object that the active mod does not place gets no spacing warning. The raw INI block marks the line of each problem. The agent tools `get_item` and `check` give them too.
 
 ## Prop groups
 

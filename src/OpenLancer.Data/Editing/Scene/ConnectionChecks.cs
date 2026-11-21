@@ -110,8 +110,8 @@ internal static class ConnectionChecks
     /// </summary>
     public static string LockText(string gate, bool lowerGate) =>
         $"The route tables leave out {gate}, because a new game locks it for the player. After a mission unlocks it with " +
-        "Act_LockDock, nav map routes and NPC routes still do not use it. To keep the gate on the routes, set its lock to " +
-        $"npc or none with {SceneSections.LockTool}." + (lowerGate ? " The story can depend on this lock." : "");
+        "Act_LockDock, nav map routes and NPC routes still do not use it. Set its lock to npc or none to keep it on the " +
+        $"routes. Use {SceneSections.LockTool}." + (lowerGate ? " The story can depend on this lock." : "");
 
     /// <summary>True for a <c>[locked_gates]</c> section of a file of the role <c>groups</c>.</summary>
     private static bool IsLockSection(EditSession session, SectionRef section) =>

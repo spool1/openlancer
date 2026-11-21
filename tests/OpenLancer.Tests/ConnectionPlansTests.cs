@@ -468,9 +468,10 @@ public sealed class ConnectionPlansTests
         Assert.Equal(new RouteDiff(0, 0, 0, 0), plan.Routes);
         Assert.Equal(["Li01_to_Li03", "Li03_to_Li01"], plan.Warnings.Select(w => w.Target!.Id.Key));
         Assert.Equal("The route tables leave out Li01_to_Li03, because a new game locks it for the player. After a mission " +
-                     "unlocks it with Act_LockDock, nav map routes and NPC routes still do not use it. To keep the gate on " +
-                     "the routes, set its lock to npc or none with the jump connection tool connection_set_lock of the agent " +
-                     "server.", plan.Warnings[0].Message);
+                     "unlocks it with Act_LockDock, nav map routes and NPC routes still do not use it. Set its lock to npc or " +
+                     "none to keep it on the routes. Use the jump connection tool connection_set_lock of the agent server.",
+            plan.Warnings[0].Message);
+        Assert.Empty(SteLint.Problems(plan.Warnings[0].Message));
 
         session.Undo();
         plan = Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Gate, new ConnectionEnd("Li01"),
