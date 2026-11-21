@@ -421,6 +421,28 @@ public sealed class ThnReferrerTests
     }
 
     /// <summary>
+    /// The editor shows the status line of the wait only when the gate waits (#87): a change of the active mod breaks
+    /// an item, and the index of the cutscene uses is not complete. The question starts no build. After the build, the
+    /// gate does not wait.
+    /// </summary>
+    [Fact]
+    public void TheGateWaitsOnlyAfterABreakAndBeforeTheIndexIsComplete()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        Assert.False(session.CutsceneGateWaits);
+
+        session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
+
+        Assert.True(session.CutsceneGateWaits);
+        Assert.False(session.Uses.IsStarted);
+        _ = session.Uses.LastBuild;
+        Assert.False(session.CutsceneGateWaits);
+        session.Undo();
+        Assert.False(session.CutsceneGateWaits);
+    }
+
+    /// <summary>
     /// The rule of the search and of the save gate: each cutscene of the edit view with an error is a cutscene of the
     /// gate. Such a cutscene is a cutscene that the active mod changes, or a cutscene of the search.
     /// </summary>

@@ -84,6 +84,7 @@ internal sealed partial class EditorWindow : Game
     // The base run of the Console: the engine lines of the base folder without mods (decision D516 of the console
     // filter design).
     private readonly BaseRunRunner baseRun = new();
+    private readonly GateWait gateWait = new();
 
     // The time since the last frame. The Scene panel reads it while the layout draws.
     private double frameElapsed;
@@ -776,6 +777,8 @@ internal sealed partial class EditorWindow : Game
         // The marks follow the session of the open profile before an agent call can change it.
         AgentMarks.Track(Session?.Edits);
         AgentFollow.Track(Session?.Edits);
+        // A save or a Play that waits for the index of the cutscene uses runs after a frame with its status line.
+        gateWait.Frame();
         // The session part of at most one agent call runs before the panels draw (decision D708 of the MCP1 design).
         agentController.Frame();
         agentRender.Frame();

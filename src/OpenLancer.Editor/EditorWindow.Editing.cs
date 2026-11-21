@@ -88,7 +88,16 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         ImGui.SetWindowFocus(null);
     }
 
-    void ISaveCommandHost.Save() => Edits.Save();
+    void ISaveCommandHost.Save() => AfterGateStatus(() => Edits.Save());
+
+    /// <summary>
+    /// Runs a save or a Play of the user. When the save gate must wait for the index of the cutscene uses, the status bar
+    /// first shows the wait for one frame (see <see cref="GateWait"/>). A session that takes no edits does not save, so
+    /// it does not wait.
+    /// </summary>
+    internal void AfterGateStatus(Action action) =>
+        gateWait.Run(Session is { NoEditReason: null } session && session.Edits.CutsceneGateWaits,
+            status => Log.AddStatus(ConsoleSeverity.Info, SaveReport.Source, status), action);
 
     /// <summary>
     /// The section of the edit view that an item shows: the <c>[Ship]</c> of a ship, the section of equipment, the
@@ -594,7 +603,7 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         }
         else if (ImGui.Shortcut(EditorKeys.PlayInGame.Chord.Shortcut, global))
         {
-            GamePlay.PlayLast();
+            AfterGateStatus(GamePlay.PlayLast);
         }
         else if (ImGui.Shortcut(EditorKeys.Play.Chord.Shortcut, global))
         {
