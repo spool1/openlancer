@@ -923,20 +923,19 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
                     newProblems.Add(AgentRows.ProblemOf(session, problem));
             }
             foreach (var problem in was.Where(p => left.Remove(Key(p))))
-                fixedProblems.Add(AgentRows.ProblemOf(session, problem));
+                fixedProblems.Add(AgentRows.FixedProblemOf(session, problem));
         }
         // A cutscene problem names its element by the entity name or the event key, not by the place, so the messages
         // compare across adds and deletes of other elements (see ThnChecks.Errors).
         foreach (var (path, was) in cutscenesBefore.Concat(NewGateCutscenes()))
         {
-            Problem Of(Diagnostic problem) => AgentRows.ProblemOf(session, problem);
             var now = session.CutsceneErrors(path);
             var left = was.Select(Key).ToList();
             foreach (var problem in now.Where(p => !left.Remove(Key(p))))
-                newProblems.Add(Of(problem));
+                newProblems.Add(AgentRows.ProblemOf(session, problem));
             var after = now.Select(Key).ToList();
             foreach (var problem in was.Where(p => !after.Remove(Key(p))))
-                fixedProblems.Add(Of(problem));
+                fixedProblems.Add(AgentRows.FixedProblemOf(session, problem));
         }
         return new EditResult(EditStatus.Applied) { NewProblems = newProblems, FixedProblems = fixedProblems };
     }

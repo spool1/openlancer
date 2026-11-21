@@ -80,6 +80,11 @@ internal static class AgentRows
             : diagnostic.Cutscene is { } place ? CutsceneQueries.RefOf(session, place)
             : null) with { Note = NoteOf(session, diagnostic) };
 
+    /// <summary>A problem that a call corrected, as a fixed problem of a result (see <see cref="ProblemOf"/>). It has no
+    /// note, because the note tells how to correct a problem that stays.</summary>
+    public static Problem FixedProblemOf(EditSession session, Diagnostic diagnostic) =>
+        ProblemOf(session, diagnostic) with { Note = null };
+
     /// <summary>The note of an error of a cutscene, as the Problems section of the Cutscene page shows it, or null. Only
     /// a cutscene that the active mod does not change has a note (see
     /// <see cref="EditSession.CutsceneProblemsNote"/>).</summary>

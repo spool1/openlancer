@@ -252,8 +252,8 @@ public sealed class ThnReferenceGateTests
     /// The agent results give the note of the Problems section for an error of a cutscene that the active mod does not
     /// change (#87): <c>check</c>, <c>get_cutscene</c>, the new problems of an edit, and the message of
     /// <c>save_blocked</c> one time. The user deleted the costume, and the agent removes the model line of the
-    /// equipment. After an edit of the base script, the active mod changes it, so its errors have no note. The script
-    /// of the lower mod keeps the note.
+    /// equipment. A problem that the agent corrects has no note. After an edit of the base script, the active mod
+    /// changes it, so its errors have no note. The script of the lower mod keeps the note.
     /// </summary>
     [Fact]
     public void TheAgentResultsGiveTheNoteOfTheProblemsSection()
@@ -294,11 +294,16 @@ public sealed class ThnReferenceGateTests
         Assert.EndsWith($". {note}", message);
         Assert.Equal(2, message.Split(note).Length);
 
+        // The note tells how to correct a problem. So a problem that a call corrected has no note.
+        var mended = AgentCalls.Ok(host, "set_fields",
+            $$"""{ "ref": {{gear}}, "fields": { "DA_archetype": "equipment\\thruster1.3db" } }""");
+        Assert.Equal([null], Notes(mended, "fixed_problems"));
+
         var cam = AgentCalls.Json($"thn:{ScriptPath}#entity/Cam");
         AgentCalls.Ok(host, "set_fields", $$"""{ "ref": {{cam}}, "fields": { "cameraprops.fovh": 20 } }""");
         var changed = AgentCalls.Ok(host, "get_cutscene", $$"""{ "ref": {{script}} }""");
 
-        Assert.Equal([null, null], Notes(changed, "problems"));
+        Assert.Equal([null], Notes(changed, "problems"));
         var lower = AgentCalls.Json($"thn:{LowScript}");
         Assert.Equal([note], Notes(AgentCalls.Ok(host, "get_cutscene", $$"""{ "ref": {{lower}} }"""), "problems"));
     }

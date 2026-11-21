@@ -629,7 +629,9 @@ The check reads the data lists with the unsaved edits. So a change of the active
 
 To find these cutscenes, the save gate reads an index of the templates and the clips that each script uses. The index runs each script, so it also finds a template that the Lua text of a script joins from parts, for example with `..`. The server builds the index when it opens the profile. Until the index is complete, the first call after such a change waits for it.
 
-A problem of a cutscene that the active mod does not change has the field `note`. It is the note of the Problems section of the Cutscene page. The note tells that a change of the active mod in the game data causes the problem. To correct it, undo that change, or pick another item or clip. `check`, `get_cutscene` and the problems of a call result give the note. The error `save_blocked` adds it one time after the messages of the errors. A problem of a cutscene that the active mod changes, or that has unsaved edits, has no note.
+A problem of a cutscene that the active mod does not change has the field `note`. It is the note of the Problems section of the Cutscene page. The note tells that a change of the active mod in the game data causes the problem. To correct it, undo that change, or pick another item or clip.
+
+`check`, `get_cutscene` and the new problems of a call result give the note. The error `save_blocked` adds it one time after the messages of the errors. A fixed problem of a call result has no note, because the call corrected it. A problem of a cutscene that the active mod changes, or that has unsaved edits, has no note either.
 
 `list_values` gives the names of the data lists of the templates:
 
@@ -733,7 +735,9 @@ The result tells each package and if the export wrote it. `recorded` tells if th
 
 A mod with an infocard needs the drop-in form now. An infocard of the editor starts with an XML header with quotes, and the FLMM form has no known escape for a quote. So an FLMM package of such a mod fails, and the export tells it. `scene_place_wreck` always writes an infocard. Give `"formats": ["drop_in"]` for such a mod.
 
-The export refuses unsaved edits, because it uses the saved files. Save first. It also refuses while another export runs, a version that is not safe in a path and a publish history that does not load. The export runs the save gate of the mod first, as `save` does. When the gate finds errors, the export gives `save_blocked` with the detail `Gate` and writes nothing. The message starts with "The export of mod '<id>' stopped." and then gives the messages of the first errors, as the message of `save` does. An example is a patch with `ol.delete` of a costume that only an unchanged retail cutscene loads. Call `check` with the scope `all` to read each error. A version with the mark "published" always gives the error `guard_conflict`. An earlier export of the version with other game files gives `guard_conflict` without `replace_version`.
+The export refuses unsaved edits, because it uses the saved files. Save first. It also refuses while another export runs, a version that is not safe in a path and a publish history that does not load. A version with the mark "published" always gives the error `guard_conflict`. An earlier export of the version with other game files gives `guard_conflict` without `replace_version`.
+
+The export runs the save gate of the mod first, as `save` does. When the gate finds errors, the export gives `save_blocked` with the detail `Gate` and writes nothing. The message starts with "The export of mod '<id>' stopped." and then gives the messages of the first errors, as the message of `save` does. An example is a patch with `ol.delete` of a costume that only an unchanged retail cutscene loads. Call `check` with the scope `all` to read each error.
 
 An export can take minutes. A client that asks for progress gets a progress notification at each step, before the result of the call. The time limit of an export is 10 minutes. When the call stops before the write, for example at a cancel of the client, the export writes nothing. A write that started always goes on to its end, and the publish history records it. While an export of the agent runs, the Export dialog and the Mods window wait for it. **File > Save** also writes nothing while an export of the agent runs, and the Console tells why.
 

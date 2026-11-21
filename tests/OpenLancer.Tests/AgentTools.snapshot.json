@@ -701,7 +701,7 @@
                           "string",
                           "null"
                         ],
-                        "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                        "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                       }
                     },
                     "required": [
@@ -1568,7 +1568,7 @@
                               "string",
                               "null"
                             ],
-                            "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                            "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                           }
                         },
                         "required": [
@@ -4275,7 +4275,7 @@
                         "string",
                         "null"
                       ],
-                      "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                      "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                     }
                   },
                   "required": [
@@ -4895,7 +4895,7 @@
                           "string",
                           "null"
                         ],
-                        "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                        "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                       }
                     },
                     "required": [
@@ -6277,7 +6277,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -6737,7 +6737,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -7491,7 +7491,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -8078,7 +8078,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -8663,7 +8663,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -9275,7 +9275,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -9895,7 +9895,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -10502,7 +10502,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -11096,7 +11096,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -11660,7 +11660,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -12232,7 +12232,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -12825,7 +12825,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -13398,7 +13398,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -14040,7 +14040,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -14737,7 +14737,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -15393,7 +15393,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -16047,7 +16047,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -16891,7 +16891,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -17478,7 +17478,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -18548,7 +18548,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -19107,7 +19107,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -19657,7 +19657,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -20200,7 +20200,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -20802,7 +20802,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -21361,7 +21361,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -36221,7 +36221,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -36884,7 +36884,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -37506,7 +37506,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -38134,7 +38134,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -38734,7 +38734,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -39313,7 +39313,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -39908,7 +39908,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -40545,7 +40545,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -41208,7 +41208,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -41821,7 +41821,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -43413,7 +43413,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -43999,7 +43999,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -44574,7 +44574,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -45149,7 +45149,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -45697,7 +45697,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -46251,7 +46251,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -46536,7 +46536,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [
@@ -47395,7 +47395,7 @@
                           "string",
                           "null"
                         ],
-                        "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                        "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                       }
                     },
                     "required": [
@@ -47923,7 +47923,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page."
+                  "description": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note."
                 }
               },
               "required": [

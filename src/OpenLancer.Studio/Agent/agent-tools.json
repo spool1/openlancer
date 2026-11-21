@@ -1868,7 +1868,7 @@
     "Problem.origin": "Who causes the problem: base_game, mod, some_mod, openlancer or unknown. A base_game problem does not stop a save.",
     "Problem.mod_id": "The mod that causes the problem when the origin is mod, else none.",
     "Problem.fixes": "The ids of the fixes that the editor has for the problem.",
-    "Problem.note": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page.",
+    "Problem.note": "What causes the problem and how to correct it, or none. An error of a cutscene that the active mod does not change has the note of the Problems section of the Cutscene page. A fixed problem of a result has no note.",
     "StudioStatus.host": "editor for the agent server of the editor, headless for oltool mcp serve.",
     "StudioStatus.profile": "The name of the open profile, or none while no profile is open.",
     "StudioStatus.mods": "The ids of the mods of the profile, in load order.",
