@@ -56,7 +56,10 @@ internal sealed class SceneView : IDisposable
     private SectionRef? pendingSelection;
 
     // The new system whose save card shows in place of a system, and the section to select when it opens, or null.
-    private (string System, SectionRef? Select)? saveCard;
+    private SaveCardTarget? saveCard;
+
+    // The edit view that the save card follows for a rename of its system, or null.
+    private EditSession? saveCardEdits;
     private Vector2 dragStart;
 
     // The scene button was active in the last frame: an orbit, a pan, a fly or a click is in progress.
@@ -110,7 +113,7 @@ internal sealed class SceneView : IDisposable
 
     /// <summary>The new system whose save card the Scene shows, and the section to select when the system opens after
     /// the save, or null (see <see cref="SaveCard"/>).</summary>
-    public (string System, SectionRef? Select)? SaveCardTarget => saveCard;
+    public SaveCardTarget? SaveCardTarget => saveCard;
 
     /// <summary>The world of the open system, or null when no system is open. The agent renders its images of the open
     /// system with it.</summary>
@@ -284,14 +287,23 @@ internal sealed class SceneView : IDisposable
 
     /// <summary>
     /// Shows the save card of a new system that the loaded game data does not have, in place of the open system (see
-    /// <see cref="SaveCard"/>). The open system closes, as at the open of another system.
+    /// <see cref="SaveCard"/>). The open system closes, as at the open of another system. The card follows a rename of
+    /// the system in the edit view (see <see cref="SaveCardTarget.After"/>).
     /// </summary>
-    /// <param name="select">The section of an item of the system to select when the system opens after the save, or
-    /// null.</param>
-    public void ShowSaveCard(string system, SectionRef? select)
+    public void ShowSaveCard(EditSession edits, SaveCardTarget target)
     {
         Close();
-        saveCard = (system, select);
+        saveCard = target;
+        saveCardEdits = edits;
+        edits.Changed += FollowSaveCardRename;
+    }
+
+    private void FollowSaveCardRename(EditChange change)
+    {
+        if (saveCard != null && saveCardEdits != null)
+        {
+            saveCard = saveCard.After(change, saveCardEdits);
+        }
     }
 
     /// <summary>
@@ -300,6 +312,12 @@ internal sealed class SceneView : IDisposable
     /// </summary>
     public void Close()
     {
+        if (saveCardEdits != null)
+        {
+            saveCardEdits.Changed -= FollowSaveCardRename;
+            saveCardEdits = null;
+        }
+
         saveCard = null;
         // A drag ends before the scene stops following W, so that W keeps the line of its last frame.
         transform.End();
@@ -828,22 +846,35 @@ internal sealed class SceneView : IDisposable
     }
 
     /// <summary>
-    /// Draws the save card of a new system: the text and the Save button, or a spinner while the game data loads. The
-    /// window opens the system when the loaded game data has it (see <see cref="SaveCard"/>).
+    /// Draws the save card of a new system: the text and the Save button, or a spinner with the text of the wait. The
+    /// window opens the system when the loaded game data has it, and it closes the card when the edit view no longer has
+    /// the system (see <see cref="SaveCard"/>).
     /// </summary>
     private void DrawSaveCard(string system)
     {
         var session = window.Session!;
         var loaded = session.GameData?.Items.Systems.Get(system) != null;
-        if (SaveCard.StateOf(session.Edits, system, session.IsBusy, loaded) != SaveCardState.New)
+        switch (SaveCard.StateOf(session.Edits, system, session.IsBusy, loaded, window.OpenWaits))
         {
-            PanelStates.Loading(SaveCard.Reloading);
-            return;
-        }
+            case SaveCardState.New:
+                if (PanelStates.MessageWithButton(SaveCard.NewSystem, SaveCard.SaveButton, session.NoEditReason))
+                {
+                    SaveCommand.Run(window);
+                }
 
-        if (PanelStates.MessageWithButton(SaveCard.NewSystem, SaveCard.SaveButton, session.NoEditReason))
-        {
-            SaveCommand.Run(window);
+                break;
+            case SaveCardState.Reloading:
+                PanelStates.Loading(SaveCard.Reloading);
+                break;
+            case SaveCardState.Waiting:
+                PanelStates.Loading(SaveCard.Waiting);
+                break;
+            case SaveCardState.Open:
+                PanelStates.Loading(SaveCard.Opening);
+                break;
+            case SaveCardState.Gone:
+                PanelStates.Message(NoSystem);
+                break;
         }
     }
 

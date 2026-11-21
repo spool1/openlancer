@@ -195,6 +195,10 @@ internal sealed partial class EditorWindow : Game
     public bool IsEditing => inspector.IsEditing || Scene.IsDragging || timeline.IsDragging || cutsceneView.IsDragging ||
                              missionView.IsEditing;
 
+    /// <summary>True while <see cref="IsEditing"/> is true or a drag from the Assets panel runs. The open of a system
+    /// after a reload of the game data waits for its end.</summary>
+    internal bool OpenWaits => IsEditing || AssetDrag.IsDragging;
+
     /// <summary>The dialog for the questions of the editor, for example Save, Discard or Cancel.</summary>
     public ChoiceDialog Choice { get; } = new();
 
@@ -682,20 +686,26 @@ internal sealed partial class EditorWindow : Game
     /// its item. "Go to partner" of a jump connection, the "Go to" of a completeness step, the Database and the page of a
     /// <c>[system]</c> use it. A new system that the mod has not saved shows the save card of the Scene, and its
     /// <c>[system]</c> gets the selection, as in follow mode of the agent. The Scene opens the system after the save and
-    /// the reload of the game data, and it then selects the section.
+    /// the reload of the game data, and it then selects the section. When the Scene shows no card, the Console tells why
+    /// (see <see cref="SaveCard.EntryOf"/>).
     /// </summary>
     /// <param name="select">The section of an item of the system to select, or null.</param>
     public void OpenSystem(string nickname, SectionRef? select)
     {
-        if (Session?.GameData?.Items.Systems.Get(nickname) is not { } system)
+        if (Session is not { } session)
         {
-            if (ShowSaveCard(nickname, select) && Session?.Edits.SystemSection(nickname) is { } entry)
+            return;
+        }
+
+        if (session.GameData?.Items.Systems.Get(nickname) is not { } system)
+        {
+            if (ShowSaveCard(nickname, select, out var why) is { } entry)
             {
                 Selection = entry;
             }
-            else
+            else if (why != null)
             {
-                Log.Add(ConsoleSeverity.Info, EditorSource, $"The game data and the mod have no system {nickname}.");
+                Log.Add(ConsoleSeverity.Info, EditorSource, why);
             }
 
             return;
@@ -717,23 +727,31 @@ internal sealed partial class EditorWindow : Game
     /// not have yet (see <see cref="SaveCard"/>). The Console tells it once for each card.
     /// </summary>
     /// <param name="select">The section of an item of the system to select when the system opens, or null.</param>
-    /// <returns>False for a system of the loaded game data, or for a system that the edit view does not have.</returns>
-    internal bool ShowSaveCard(string nickname, SectionRef? select)
+    /// <param name="why">Why the Scene shows no card (see <see cref="SaveCard.EntryOf"/>), or null for a system of the
+    /// loaded game data and without a profile.</param>
+    /// <returns>The <c>[system]</c> of the new system, or null when the Scene shows no card.</returns>
+    private SectionRef? ShowSaveCard(string nickname, SectionRef? select, out string? why)
     {
-        if (Session is not { GameData: { } data } session || data.Items.Systems.Get(nickname) != null ||
-            session.Edits.SystemSection(nickname) == null)
+        why = null;
+        if (Session is not { } session || session.GameData?.Items.Systems.Get(nickname) != null)
         {
-            return false;
+            return null;
         }
 
-        if (Scene.SaveCardTarget?.System.Equals(nickname, StringComparison.OrdinalIgnoreCase) != true)
+        (var entry, why) = SaveCard.EntryOf(session.Edits, nickname, session.GameData != null);
+        if (entry?.Id.Key is not { } system)
+        {
+            return null;
+        }
+
+        if (Scene.SaveCardTarget?.System.Equals(system, StringComparison.OrdinalIgnoreCase) != true)
         {
             Log.Add(ConsoleSeverity.Info, EditorSource,
-                $"The system {nickname} is new. Save the mod to open it in the Scene.");
+                $"The system {system} is new. Save the mod to open it in the Scene.");
         }
 
-        Scene.ShowSaveCard(nickname, select);
-        return true;
+        Scene.ShowSaveCard(session.Edits, new SaveCardTarget(system, select));
+        return entry;
     }
 
     /// <summary>
@@ -749,9 +767,9 @@ internal sealed partial class EditorWindow : Game
         }
 
         var system = data.Items.Systems.Get(card.System);
-        switch (SaveCard.StateOf(session.Edits, card.System, session.IsBusy, system != null))
+        switch (SaveCard.StateOf(session.Edits, card.System, session.IsBusy, system != null, OpenWaits))
         {
-            case SaveCardState.Open when !IsEditing && !AssetDrag.IsDragging:
+            case SaveCardState.Open:
                 Scene.Open(system!, session);
                 if (card.Select != null)
                 {
@@ -821,7 +839,7 @@ internal sealed partial class EditorWindow : Game
     /// </summary>
     private void ReopenAfterReload()
     {
-        if (!reopenAfterReload || IsEditing || AssetDrag.IsDragging ||
+        if (!reopenAfterReload || OpenWaits ||
             Session is not { IsBusy: false, GameData: { } data } session || Scene.System is not { } open)
         {
             return;

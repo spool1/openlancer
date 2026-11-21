@@ -166,7 +166,7 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
     /// Scene.</summary>
     bool IFollowView.ShowNewSystem(string system)
     {
-        if (!ShowSaveCard(system, null))
+        if (ShowSaveCard(system, null, out _) == null)
         {
             return false;
         }
