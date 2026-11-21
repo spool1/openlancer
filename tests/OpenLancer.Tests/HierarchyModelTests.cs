@@ -438,12 +438,12 @@ public sealed class HierarchyModelTests
     }
 
     /// <summary>
-    /// A new jump gate and the rings of a new lane show as rows in the next tree of the open system: the scene builds
-    /// their items at once (milestone C3), and the tree of the new index has the gate in the gates and the lane as one
-    /// node with its rings in lane order. The open groups stay.
+    /// The next tree of a system that has a new jump gate and the rings of a new lane: the gate is in the gates, and the
+    /// lane is one node with its rings in lane order. The open groups stay. The test makes the items by hand. The
+    /// retail test of the lanes proves that the scene makes such items from the edit view.
     /// </summary>
     [Fact]
-    public void ANewGateAndTheRingsOfANewLaneShowAtOnce()
+    public void TheNextTreeShowsANewGateAndTheRingsOfANewLane()
     {
         var system = System();
         var model = HierarchyModel.For(new SystemIndex(system, system), 1, IdText, null);

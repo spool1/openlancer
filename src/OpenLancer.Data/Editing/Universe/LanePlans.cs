@@ -358,14 +358,11 @@ public static class LanePlans
         if (options.Zone)
         {
             var zoneName = session.Nicknames.FirstFree($"Zone_{nickname}_{LaneZones.Word}", 1, reserved);
-            var laneLength = Vector3.Distance(positions[0], positions[^1]);
-            var z = MathF.Round(laneLength + rule.ZoneMargin);
-            var width = MathF.Min(rule.ZoneWidth, MathF.Floor(z / (LaneZones.Thinness + 1)));
+            var box = ZoneBox(positions[0], positions[^1], rule);
             var zoneLines = new List<(string, string)>
             {
-                ("nickname", zoneName), ("pos", ScenePlans.PositionText((positions[0] + positions[^1]) / 2)),
-                ("rotate", RotationText(rotation)), ("shape", "BOX"), ("size", SizeText(width, width, z)),
-                ("lane_id", zoneName[(zoneName.LastIndexOf('_') + 1)..]),
+                ("nickname", zoneName), ("pos", box.Position), ("rotate", box.Rotation), ("shape", "BOX"),
+                ("size", box.Size), ("lane_id", zoneName[(zoneName.LastIndexOf('_') + 1)..]),
             };
             zoneLines.AddRange(rule.Zone.Select(l => (l.Key, l.Value!)));
             if (ScenePlans.Entries(zoneLines, binary, out var zoneError) is not { } zoneEntries)
@@ -829,6 +826,31 @@ public static class LanePlans
             nearest = distance;
         }
         return best;
+    }
+
+    /// <summary>
+    /// The values of the <c>pos</c>, <c>rotate</c> and <c>size</c> lines of a new lane zone for a lane, as
+    /// <see cref="Create"/> writes them, or null for a lane without two end rings with positions and for rule data
+    /// without lane rules. The completeness of a lane without a zone gives these values.
+    /// </summary>
+    internal static (string Position, string Rotation, string Size)? NewZoneBox(EditSession session, LaneChain lane) =>
+        !lane.Loops && lane.Rings.Count > 1 && PositionOf(session, lane.Rings[0]) is { } first &&
+        PositionOf(session, lane.Rings[^1]) is { } last && session.Lists.RuleData.Builders.Lane is { } rule
+            ? ZoneBox(first, last, rule)
+            : null;
+
+    /// <summary>
+    /// The values of the <c>pos</c>, <c>rotate</c> and <c>size</c> lines of a lane zone between two end rings. The box
+    /// stands at the middle of the lane, and its z axis goes along the lane. It is longer than the lane by the margin of
+    /// the rule. Its x size and its y size are at most the width of the rule and at most one eleventh of its z size, so
+    /// it meets the lane zone rule.
+    /// </summary>
+    private static (string Position, string Rotation, string Size) ZoneBox(Vector3 first, Vector3 last, LaneRule rule)
+    {
+        var z = MathF.Round(Vector3.Distance(first, last) + rule.ZoneMargin);
+        var width = MathF.Min(rule.ZoneWidth, MathF.Floor(z / (LaneZones.Thinness + 1)));
+        return (ScenePlans.PositionText((first + last) / 2), RotationText(RotationOf(last - first)),
+            SizeText(width, width, z));
     }
 
     /// <summary>

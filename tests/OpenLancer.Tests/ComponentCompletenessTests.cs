@@ -1,4 +1,7 @@
+using System.IO;
 using System.Linq;
+using System.Numerics;
+using System.Text.RegularExpressions;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
@@ -6,6 +9,7 @@ using OpenLancer.Data.Editing.Fields;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Editing.Universe;
 using Xunit;
+using ZoneShape = LibreLancer.Data.Schema.Universe.ZoneShape;
 
 namespace OpenLancer.Tests;
 
@@ -59,6 +63,7 @@ public sealed class ComponentCompletenessTests
         Assert.Empty(jump.TrafficZones);
         Assert.Equal(JumpLock.Both, jump.Lock);
         Assert.Null(jump.LockUnavailable);
+        Assert.Empty(jump.LockRefusals);
         Assert.Equal(JumpLock.Npc, ConnectionComponents.Jump(session, Partner)!.Lock);
         Assert.Equal(JumpLock.None, ConnectionComponents.Jump(session, ConnectionWorkspace.Li03("Object", "Li03_hole"))!.Lock);
 
@@ -217,8 +222,9 @@ public sealed class ComponentCompletenessTests
         Assert.True(ComponentCompleteness.Of(session, plan.Rings[2])!.Complete);
     }
 
-    /// <summary>A lane without a zone misses the zone step, which tells how to add one. A lane zone that misses the lane
-    /// after a move of an end ring gives the text of the zone check and goes to the zone.</summary>
+    /// <summary>A lane without a zone misses the zone step, which tells how to add one and goes to the first ring. A
+    /// lane zone that misses the lane after a move of an end ring gives the text of the zone check and goes to the
+    /// zone.</summary>
     [Fact]
     public void ALaneWithoutAZoneAndAZoneThatMissesTheLaneMissTheZoneStep()
     {
@@ -231,7 +237,7 @@ public sealed class ComponentCompletenessTests
         Assert.Equal("Lane traffic spawns only in a lane zone that covers the lane.", none.Reason);
         Assert.StartsWith("No zone of the file covers the lane from Li01_Trade_Lane_Ring_1 to Li01_Trade_Lane_Ring_4.",
             none.Detail);
-        Assert.Null(none.GoTo);
+        Assert.Equal(Ring(1), none.GoTo);
         Assert.Null(ConnectionComponents.Ring(session, Ring(2))!.Zone);
         Assert.Equal("2 of 3 steps complete", ComponentCompleteness.Of(session, Ring(2))!.Summary);
         session.Undo();
@@ -241,6 +247,128 @@ public sealed class ComponentCompletenessTests
         Assert.Equal(CompletenessState.Missing, off.State);
         Assert.Equal(Check(session, LaneWorkspace.Zone, "The lane zone Zone_Li01_Tradelane_1 does not cover"), off.Detail);
         Assert.Equal(LaneWorkspace.Zone, off.GoTo);
+    }
+
+    /// <summary>
+    /// An end whose archetype has a type that the route tables do not count gets the text of its own type in the kinds
+    /// step, also when its partner is a jump hole. Such an end takes no lock. A partner that is an airlock gate gets the
+    /// kinds text with the right article.
+    /// </summary>
+    [Fact]
+    public void TheKindsStepNamesTheEndWhoseTypeTheRouteTablesDoNotCount()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        ws.WriteBase(ListWorkspace.SolarPath, SceneWorkspace.Solars + ConnectionWorkspace.Solars + """
+
+            [Solar]
+            nickname = old_hole
+            type = JUMPHOLE
+            """);
+        var session = ws.Session("act");
+        session.Execute(EditCommand.SetLinesFromText(Gate, "archetype", ["old_hole"]));
+        session.Execute(EditCommand.SetLinesFromText(Partner, "archetype", ["jumphole"]));
+
+        var kinds = Step(session, Gate, 1);
+
+        Assert.Equal(CompletenessState.Missing, kinds.State);
+        Assert.Equal("Li01_to_Li02 has an archetype of the type JUMPHOLE. The route tables count only the types " +
+                     "JUMP_GATE and JUMP_HOLE. Give Li01_to_Li02 an archetype of one of these types.", kinds.Detail);
+        Assert.Null(kinds.GoTo);
+        Assert.Null(ConnectionComponents.Jump(session, Gate)!.Lock);
+        Assert.Empty(SteLint.Problems(kinds.Detail!));
+        session.Undo();
+        session.Undo();
+
+        session.Execute(EditCommand.SetLinesFromText(Partner, "archetype", ["airlock"]));
+        Assert.StartsWith("Li01_to_Li02 is a jump gate and its partner Li02_to_Li01 is an airlock gate.",
+            Step(session, Gate, 1).Detail);
+    }
+
+    /// <summary>
+    /// A gate lock file that the editor cannot change makes the lock plan refuse each other lock. Each refused lock
+    /// gives the refusal of the plan, and the whole dropdown takes the first one. The profile takes edits, so the reason
+    /// is not the reason of the profile.
+    /// </summary>
+    [Fact]
+    public void ALockThatThePlanRefusesGivesTheRefusalOfThePlan()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        // The active mod replaces the whole gate lock file outside its folder, so the editor cannot change the file.
+        ws.Mod("act", new()
+        {
+            [@"files\" + ListWorkspace.GroupsPath] = File.ReadAllText(Path.Combine(ws.Base, ListWorkspace.GroupsPath)),
+        });
+        var session = ws.Session("act");
+        Assert.Null(session.ReadOnlyReason);
+        Assert.NotNull(session.Get(ConnectionWorkspace.Locks)!.ReadOnlyReason);
+
+        var jump = ConnectionComponents.Jump(session, Gate)!;
+
+        Assert.Equal(JumpLock.Both, jump.Lock);
+        Assert.Equal([JumpLock.None, JumpLock.Player, JumpLock.Npc], jump.LockRefusals.Keys.Order());
+        foreach (var (choice, refusal) in jump.LockRefusals)
+        {
+            var plan = ConnectionPlans.SetLock(session, Gate, choice);
+            Assert.False(plan.CanRun);
+            Assert.Equal(plan.Refusals[0].Message, refusal);
+        }
+
+        Assert.Equal(jump.LockRefusals[JumpLock.None], jump.LockUnavailable);
+    }
+
+    /// <summary>
+    /// The zone step of a lane without a zone gives the steps of Create, the lane zone rule and the values of a new
+    /// lane zone. A box zone that follows the text completes the step only after its rename to a nickname with the word
+    /// Tradelane in this letter case.
+    /// </summary>
+    [Fact]
+    public void ABoxZoneThatFollowsTheTextOfTheZoneStepCompletesTheLane()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.DeleteSection(LaneWorkspace.Zone));
+        var detail = Step(session, Ring(2), 2).Detail!;
+        Assert.Contains("In the Hierarchy, use Create > Zone > Box.", detail);
+        Assert.Contains("a nickname with the word Tradelane, and the letter case counts.", detail);
+        Assert.Contains("Its z size must stay more than 10 times its x size and its y size.", detail);
+        Assert.Contains("scene_create_zone", detail);
+        var values = Regex.Matches(detail, @"\(([^)]*)\)").Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal(["11250, 0, -20000", "0, -90, 0", "500, 500, 23500"], values);
+
+        // Create > Zone > Box puts a zone with a default nickname and a default size at the pivot of the Scene camera.
+        var create = ScenePlans.Create(session, "Li01", SceneTemplate.Zone, null, Vector3.Zero, null, shape: ZoneShape.BOX);
+        Run(session, create);
+        var zone = create.Adds[0];
+        foreach (var (key, value) in new[] { ("pos", values[0]), ("rotate", values[1]), ("size", values[2]) })
+        {
+            session.Execute(EditCommand.SetLinesFromText(zone, key, [value]));
+        }
+
+        Assert.Equal(CompletenessState.Missing, Step(session, Ring(2), 2).State);
+        Run(session, ScenePlans.Rename(session, zone, "Zone_Li01_tradelane_2"));
+        Assert.Equal(CompletenessState.Missing, Step(session, Ring(2), 2).State);
+        session.Undo();
+        Run(session, ScenePlans.Rename(session, zone, "Zone_Li01_Tradelane_2"));
+
+        Assert.Equal(CompletenessState.Done, Step(session, Ring(2), 2).State);
+        Assert.Equal(SceneWorkspace.Zone("Zone_Li01_Tradelane_2"), ConnectionComponents.Ring(session, Ring(2))!.Zone);
+    }
+
+    /// <summary>The reason of "Insert ring after" comes from the insert plan. A ring without a position gets no ring
+    /// after it, and the plan tells why.</summary>
+    [Fact]
+    public void TheReasonOfInsertRingAfterComesFromItsPlan()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.RemoveName(Ring(2), "pos"));
+
+        var reason = ConnectionComponents.Ring(session, Ring(2))!.InsertUnavailable;
+
+        var plan = LanePlans.InsertRing(session, Ring(2), LanePlace.After);
+        Assert.False(plan.CanRun);
+        Assert.Equal(plan.Refusals[0].Message, reason);
+        Assert.StartsWith("Li01_Trade_Lane_Ring_2 has no position.", reason);
     }
 
     /// <summary>A link that does not go both ways misses the link step with the text of the check, goes to the ring of
@@ -298,6 +426,12 @@ public sealed class ComponentCompletenessTests
         Assert.True(ring.Loops);
         Assert.False(ring.IsEnd);
         Assert.EndsWith("of 4, in a circle", ring.Place);
+        // Each ring of the circle has the ring before it and the ring after it by the links, also across the start.
+        foreach (var n in Enumerable.Range(1, 4))
+        {
+            var info = ConnectionComponents.Ring(session, Ring(n))!;
+            Assert.Equal((Ring((n + 2) % 4 + 1), Ring(n % 4 + 1)), (info.Previous, info.Next));
+        }
     }
 
     /// <summary>A ring without links is in no lane: all three steps miss. A repair has no lane to join, so the step has

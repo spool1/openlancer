@@ -109,6 +109,7 @@ public sealed class ConnectionSectionsTests
         [
             ConnectionSections.LockHelp, ConnectionSections.LaneNameHelp, ConnectionSections.InsertTip,
             ConnectionSections.RepairTip, ConnectionSections.DeleteTip, ConnectionSections.PartnerTip,
+            ConnectionSections.FieldEditReason,
             .. ConnectionSections.LockChoices.Select(c => c.Label),
         ];
 

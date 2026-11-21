@@ -43,7 +43,11 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
     /// <summary>The help of the lock dropdown.</summary>
     internal const string LockHelp =
         "The lock at the start of a new game. A mission can unlock the gate with Act_LockDock. The route tables leave out " +
-        "a gate that the player cannot use, also after the unlock. A change also locks the partner.";
+        "a gate that the player cannot use, also after the unlock. A change gives the same lock to the partner when the " +
+        "partner names this gate in its goto line.";
+
+    /// <summary>Why a control waits while a field of the Inspector takes an edit.</summary>
+    internal const string FieldEditReason = "Wait until the field edit ends.";
 
     /// <summary>The help of the "Lane name" row of an end ring.</summary>
     internal const string LaneNameHelp =
@@ -65,15 +69,24 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
 
     private Page? page;
 
+    /// <summary>Why the controls of the sections take no click now, or null: the profile takes no edit, or a field of
+    /// the Inspector takes an edit.</summary>
+    private string? EditorReason => window.Session?.NoEditReason ?? (window.IsEditing ? FieldEditReason : null);
+
     /// <summary>The models of the page of a section, with the edit view that they came from.</summary>
     /// <param name="Revision">The revision of the edit view (see <see cref="EditSession.Revision"/>).</param>
     internal sealed record Page(EditSession Session, SectionRef Section, long Revision, JumpConnectionInfo? Jump,
         TradeLaneRingInfo? Ring, CompletenessReport? Completeness)
     {
-        /// <summary>The models of a section in the edit view now.</summary>
-        public static Page Of(EditSession session, SectionRef section) => new(session, section, session.Revision,
-            ConnectionComponents.Jump(session, section), ConnectionComponents.Ring(session, section),
-            ComponentCompleteness.Of(session, section));
+        /// <summary>The models of a section in the edit view now. Each model runs its plans once, and the completeness
+        /// report reads the same models.</summary>
+        public static Page Of(EditSession session, SectionRef section)
+        {
+            var jump = ConnectionComponents.Jump(session, section);
+            var ring = ConnectionComponents.Ring(session, section);
+            return new Page(session, section, session.Revision, jump, ring,
+                ComponentCompleteness.Of(session, section, jump, ring));
+        }
     }
 
     /// <summary>True when the page shows the "Lane name" row of a ring: on an end ring, or without a ring model. An
@@ -190,7 +203,7 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
 
             if (jump.Lock is { } locked)
             {
-                LockRow(section, locked, window.Session?.NoEditReason ?? jump.LockUnavailable);
+                LockRow(section, jump, locked);
             }
         }
 
@@ -268,10 +281,12 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
         grid.EndSection();
     }
 
-    /// <summary>The row of the lock dropdown. A pick runs the lock plan as one entry of the edit history.</summary>
-    /// <param name="unavailable">Why the lock cannot change, or null.</param>
-    private void LockRow(SectionRef gate, JumpLock locked, string? unavailable)
+    /// <summary>The row of the lock dropdown. A pick runs the lock plan as one entry of the edit history. The dropdown
+    /// is disabled when the editor takes no edit or the plan refuses each other lock. A lock that the plan refuses is
+    /// disabled. Each disabled part tells why in its tooltip.</summary>
+    private void LockRow(SectionRef gate, JumpConnectionInfo jump, JumpLock locked)
     {
+        var unavailable = EditorReason ?? jump.LockUnavailable;
         grid.Help(LockHelp);
         grid.Row("Lock at start", () =>
         {
@@ -281,9 +296,17 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
             {
                 foreach (var (choice, label) in LockChoices)
                 {
+                    var refusal = jump.LockRefusals.GetValueOrDefault(choice);
+                    ImGui.BeginDisabled(refusal != null);
                     if (ImGui.Selectable(label, choice == locked) && choice != locked)
                     {
                         window.SceneEdits.SetLock(gate, choice);
+                    }
+
+                    ImGui.EndDisabled();
+                    if (refusal != null && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    {
+                        ImGui.SetTooltip(refusal);
                     }
                 }
 
@@ -301,7 +324,7 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
     /// <summary>The row of the ring buttons. A disabled button tells why in its tooltip.</summary>
     private void RingButtons(SectionRef section, TradeLaneRingInfo ring)
     {
-        var editor = window.Session?.NoEditReason ?? (window.IsEditing ? "Wait until the field edit ends." : null);
+        var editor = EditorReason;
         grid.FullRow(() =>
         {
             if (Button("Insert ring after", editor ?? ring.InsertUnavailable, InsertTip))

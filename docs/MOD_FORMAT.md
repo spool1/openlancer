@@ -1025,7 +1025,7 @@ The swatch is disabled, and its tooltip tells why, when the line has fewer than 
 
 Each change of the text shows at once. While a field is active, it stays in its place, also when its text adds or removes the key. After the field ends, the key moves to its list, for example from "Unset keys" to "Keys". Two kinds of field change the data only when the field ends: the text of a key that holds a text id, for example a name, and a market line.
 
-A blue label marks a value that the active mod sets. The tooltip of the label names the layer that sets the value: the base data, a mod that loads before the active mod, or the active mod. A lock tells why a row cannot change, for example the key of a section, or a section that a patch cannot change. The `goto` line of a jump gate and the `prev_ring` and `next_ring` lines of a trade lane ring are locked rows. Their lock names the tools that change the pair or the lane, and the raw INI block can still change these lines. The lock dropdown of the Jump connection component and the ring buttons of the Trade lane ring component change a pair or a lane by hand (see "Components").
+A blue label marks a value that the active mod sets. The tooltip of the label names the layer that sets the value: the base data, a mod that loads before the active mod, or the active mod. A lock tells why a row cannot change, for example the key of a section, or a section that a patch cannot change. The `goto` line of a jump gate and the `prev_ring` and `next_ring` lines of a trade lane ring are locked rows. Their lock names the tools that change the pair or the lane, and the raw INI block can still change these lines. The Jump connection component has a lock dropdown, and the Trade lane ring component has ring buttons. They change a pair or a lane by hand (see "Components").
 
 Revert, in the menu of a row or in the item menu, puts back the lines of the lower layer: the base data with the mods that load before the active mod. The next save then writes no line for them. A section that the active mod adds has no lower lines, so it has no Revert. A key of a group of lines that belong together (see "Lines that belong together") reverts only with its whole section. When the active mod sets the `file` of a `[system]` of `universe.ini`, the Revert of the whole item is not available, because the revert would move the contents of the system to another file.
 
@@ -1230,7 +1230,7 @@ The Jump connection component and the Trade lane ring component have their own s
 - "Exit object": a link that goes to the partner. An exit object that the edit view does not have shows "Missing".
 - "Partner": the button "Go to partner" and the state of the pair. The button opens the system of the partner in the Scene and selects the partner. A new system that the mod has not saved does not open, and the Console tells why.
 - "Traffic zone": a link to each traffic zone that `connection_create` makes for the object.
-- "Lock at start": a dropdown with "No lock", "Locked for the player", "Locked for NPCs" and "Locked for the player and NPCs". A pick runs the plan of the agent tool `connection_set_lock`, so the partner gets the same lock. Only a jump gate and a jump hole have this row.
+- "Lock at start": a dropdown with "No lock", "Locked for the player", "Locked for NPCs" and "Locked for the player and NPCs". A pick runs the plan of the agent tool `connection_set_lock`. The partner gets the same lock when the partner names this gate in its `goto` line. Only a jump gate and a jump hole have this row.
 
 The Trade lane ring section has these rows:
 
@@ -1240,9 +1240,9 @@ The Trade lane ring section has these rows:
 - "Lane zone": a link to the lane zone that covers the lane.
 - The buttons "Insert ring after", "Repair lane" and "Delete ring". They run the plans of the agent tools `trade_lane_insert_ring` and `trade_lane_repair`. "Insert ring after" selects the new ring. "Delete ring" does what the `Delete` key does, with the same dialog.
 
-Each pick and each click is one entry of the edit history. A disabled control tells why in its tooltip. For example, the profile takes no edits, the editor cannot change the ring, or the plan stops. "Repair lane" is disabled when a repair has nothing to change. The lock dropdown writes only the gate locks of `InitialWorld.ini`, so a system file that the editor cannot change does not stop it.
+Each pick and each click is one entry of the edit history. A disabled control tells why in its tooltip. For example, the profile takes no edits, the editor cannot change the ring, or the plan stops. "Repair lane" is disabled when a repair has nothing to change. The lock dropdown writes only the gate locks of `InitialWorld.ini`, so a system file that the editor cannot change does not stop it. A lock that the plan refuses is disabled in the list, and its tooltip tells why. When the plan refuses each other lock, the whole dropdown is disabled. While a field of the Inspector takes an edit, the controls wait until the edit ends.
 
-The page of a jump gate, a jump hole or a trade lane ring starts with a completeness panel under the components strip. An example is "2 of 3 steps complete". Each missing step tells what is missing and why the step is necessary. The text of a missing step is the text of its check. "Go to" selects the item of the step: the partner, the system, a ring or the lane zone. A broken link of a lane also has the button "Fix", which repairs the lane.
+The page of a jump gate, a jump hole or a trade lane ring starts with a completeness panel under the components strip. An example is "2 of 3 steps complete". Each missing step tells what is missing and why the step is necessary. The text of a missing step is the text of its check. "Go to" selects the item of the step: the partner, the system, a ring or the lane zone. A lane without a lane zone goes to its first ring. A broken link of a lane also has the button "Fix", which repairs the lane.
 
 | Component | Step | Done when |
 |---|---|---|
@@ -1251,7 +1251,7 @@ The page of a jump gate, a jump hole or a trade lane ring starts with a complete
 | Jump connection | Jump objects of the system | The system has at most 10 objects with `goto`. The step name gives the count, for example "Jump objects of Li01: 6 of 10". |
 | Trade lane | Links go both ways | Each link of the lane goes both ways, each link names a ring, and the links do not go in a circle. |
 | Trade lane | Names at both ends | Both end rings have `tradelane_space_name`. |
-| Trade lane | Zone covers the lane | A lane zone covers the first ring and the last ring of the lane. |
+| Trade lane | Zone covers the lane | A lane zone covers the first ring and the last ring of the lane. Without one, the step gives the position, the rotation and the size of a new lane zone. Give the new zone a nickname with the word `Tradelane` (see "Trade lanes"). |
 
 A step whose check stops the save is an error, and the panel opens its list of missing steps. An airlock gate has no partner, so it has no panel. The game makes no lane from an object of another type with a link line. So such an object gets no place in a lane, no ring buttons and no panel.
 

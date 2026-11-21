@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Editing.Commands;
@@ -21,13 +22,18 @@ namespace OpenLancer.Data.Editing.Scene;
 /// <param name="TrafficZones">The traffic zones of the object, where NPCs come and go.</param>
 /// <param name="Lock">The lock at the start of a new game, or null for an object that cannot take a lock: an object
 /// that is no jump gate or jump hole.</param>
-/// <param name="LockUnavailable">Why the lock cannot change, or null.</param>
+/// <param name="LockUnavailable">Why the lock cannot change, or null: the profile takes no edits, or the lock plan
+/// refuses each other lock.</param>
 public sealed record JumpConnectionInfo(string Kind, string? System, SectionRef? SystemSection, string? Exit,
     SectionRef? Partner, string? PartnerKind, bool GoesBack, IReadOnlyList<SectionRef> TrafficZones, JumpLock? Lock,
     string? LockUnavailable)
 {
     /// <summary>True for a jump gate or a jump hole. A delete of one end deletes the pair.</summary>
     public bool IsPair => SceneSections.IsPairKind(Kind);
+
+    /// <summary>Why the lock plan refuses each lock that it refuses, other than the current lock (see
+    /// <see cref="ConnectionPlans.SetLock"/>).</summary>
+    public IReadOnlyDictionary<JumpLock, string> LockRefusals { get; init; } = new Dictionary<JumpLock, string>();
 }
 
 /// <summary>The Trade lane ring component of a ring, as its section of the Inspector shows it (see
@@ -88,7 +94,8 @@ public static class ConnectionComponents
 
     /// <summary>
     /// The Jump connection component of an object: an object with a <c>goto</c> line or an archetype of a jump type.
-    /// Null for another section.
+    /// Null for another section. The lock reasons come from the lock plan, so a lock that the plan refuses shows its
+    /// reason before the pick.
     /// </summary>
     public static JumpConnectionInfo? Jump(EditSession session, SectionRef section)
     {
@@ -104,12 +111,27 @@ public static class ConnectionComponents
         var partner = ConnectionPlans.PartnerOf(session, view);
         var own = session.SystemNicknameOf(section.Path);
         var locked = type is "jump_gate" or "jump_hole" ? GateLocks.LockOf(session, name) : (JumpLock?)null;
+        var refusals = new Dictionary<JumpLock, string>();
+        if (locked is { } current && session.ReadOnlyReason == null)
+        {
+            foreach (var other in Enum.GetValues<JumpLock>().Where(l => l != current))
+            {
+                if (ConnectionPlans.LockRefusal(session, section, other) is { } refusal)
+                    refusals[other] = refusal;
+            }
+        }
+        var unavailable = locked == null ? null
+            : session.ReadOnlyReason ?? (refusals.Count == Enum.GetValues<JumpLock>().Length - 1
+                ? refusals.OrderBy(r => r.Key).First().Value
+                : null);
         return new JumpConnectionInfo(SceneSections.ConnectionKind(session, view) ?? "jump gate", system,
             system == null ? null : session.SystemSection(system), exit, partner?.Section,
             partner is { } found ? ConnectionChecks.KindWords(SceneSections.ArchetypeType(session, found.View)) : null,
             partner is { } back && own != null && ConnectionPlans.GoesBack(session, back.View, own, name),
-            ConnectionPlans.PairParts(session, section, view)?.Zones ?? [], locked,
-            locked == null ? null : session.ReadOnlyReason);
+            ConnectionPlans.PairParts(session, section, view)?.Zones ?? [], locked, unavailable)
+        {
+            LockRefusals = refusals,
+        };
     }
 
     /// <summary>

@@ -188,7 +188,8 @@ internal static class ConnectionChecks
     /// <summary>The text of an object whose partner is another kind. The completeness of a jump connection shows it
     /// too.</summary>
     internal static string KindText(string name, string kind, string exit, string other) =>
-        $"{name} is a {kind} and its partner {exit} is a {other}. The game counts each end in another route table. Delete " +
+        $"{name} is {SceneSections.WithArticle(kind)} and its partner {exit} is {SceneSections.WithArticle(other)}. The " +
+        "game counts each end in another route table. Delete " +
         $"one end, and its pair goes too. Then make the pair again with {SceneSections.PairTool}.";
 
     /// <summary>

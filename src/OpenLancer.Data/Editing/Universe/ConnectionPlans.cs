@@ -404,21 +404,14 @@ public static class ConnectionPlans
         var plan = new ConnectionPlan($"Lock {gate.Id.Key}");
         if (session.ReadOnlyReason is { } closed)
             return plan.Refuse("", closed);
-        if (SceneSections.KindOf(session, gate) != SceneKind.Object || session.Get(gate) is not { } view ||
-            gate.Id.Key is not { } name || SceneSections.ArchetypeType(session, view) is not ("jump_gate" or "jump_hole"))
-            return plan.Refuse(gate.Path, $"{gate.Id.Key ?? gate.Id.ToString()} is not a jump gate or a jump hole.", gate,
-                NotConnection);
-        var gates = new List<SectionRef> { gate };
-        if (pair && PartnerOf(session, view) is { } partner &&
-            SceneSections.ArchetypeType(session, partner.View) is "jump_gate" or "jump_hole" &&
-            session.SystemNicknameOf(gate.Path) is { } system && GoesBack(session, partner.View, system, name))
-            gates.Add(partner.Section);
-        var player = locked is JumpLock.Player or JumpLock.Both;
+        if (LockedGates(session, gate, pair) is not { } gates)
+            return plan.Refuse(gate.Path, NotJumpText(gate), gate, NotConnection);
         var planned = new PlannedSections(session);
-        var edit = GateLocks.Set(session, gates.Select(g => g.Id.Key!).ToList(), player,
-            locked is JumpLock.Npc or JumpLock.Both, planned);
+        var edit = LockLines(session, gates, locked, planned);
         if (edit.Refusal is { } refusal)
             return plan.Refuse(gate.Path, refusal, gate);
+        var name = gate.Id.Key!;
+        var player = locked is JumpLock.Player or JumpLock.Both;
         plan.Label = locked == JumpLock.None ? $"Unlock {name}" : $"Lock {name}";
         plan.Changes = edit.Changes;
         plan.Routes = RouteTable.Diff(session.Routes.Tables.All, planned.Routes().All);
@@ -427,6 +420,42 @@ public static class ConnectionPlans
         plan.Command = EditCommand.Group(plan.Label, edit.Commands, session.Snapshot());
         return plan;
     }
+
+    /// <summary>
+    /// Why <see cref="SetLock"/> refuses a lock of a jump gate or a jump hole and its partner, or null when the plan can
+    /// run. It makes the checks of the plan without the route tables. So the lock dropdown of the Inspector can ask it
+    /// for each choice.
+    /// </summary>
+    internal static string? LockRefusal(EditSession session, SectionRef gate, JumpLock locked) =>
+        session.ReadOnlyReason ?? (LockedGates(session, gate, true) is { } gates
+            ? LockLines(session, gates, locked, new PlannedSections(session)).Refusal
+            : NotJumpText(gate));
+
+    /// <summary>The gates that a lock of a gate changes: the gate, and with <paramref name="pair"/> its partner, when
+    /// the partner is a jump gate or a jump hole and goes back to the gate. Null for a section that is no jump gate or
+    /// jump hole.</summary>
+    private static List<SectionRef>? LockedGates(EditSession session, SectionRef gate, bool pair)
+    {
+        if (SceneSections.KindOf(session, gate) != SceneKind.Object || session.Get(gate) is not { } view ||
+            gate.Id.Key is not { } name || SceneSections.ArchetypeType(session, view) is not ("jump_gate" or "jump_hole"))
+            return null;
+        var gates = new List<SectionRef> { gate };
+        if (pair && PartnerOf(session, view) is { } partner &&
+            SceneSections.ArchetypeType(session, partner.View) is "jump_gate" or "jump_hole" &&
+            session.SystemNicknameOf(gate.Path) is { } system && GoesBack(session, partner.View, system, name))
+            gates.Add(partner.Section);
+        return gates;
+    }
+
+    /// <summary>The edit of the gate lock lines that gives gates a lock.</summary>
+    private static LockEdit LockLines(EditSession session, List<SectionRef> gates, JumpLock locked,
+        PlannedSections planned) =>
+        GateLocks.Set(session, gates.Select(g => g.Id.Key!).ToList(), locked is JumpLock.Player or JumpLock.Both,
+            locked is JumpLock.Npc or JumpLock.Both, planned);
+
+    /// <summary>The refusal of a plan of the jump connections for a section that is no jump gate or jump hole.</summary>
+    private static string NotJumpText(SectionRef section) =>
+        $"{section.Id.Key ?? section.Id.ToString()} is not a jump gate or a jump hole.";
 
     /// <summary>
     /// Plans the delete of jump gates and jump holes, as one entry of the edit history. Each object goes with its pair:
@@ -447,7 +476,7 @@ public static class ConnectionPlans
             if (SceneSections.KindOf(session, item) != SceneKind.Object || session.Get(item) is not { } view ||
                 SceneSections.ConnectionKind(session, view) is not { } kind || !SceneSections.IsPairKind(kind))
                 return ScenePlans.Refused(new ScenePlan(SceneAction.Delete, "Delete"),
-                    Diagnostic.Error(item.Path, $"{item.Id.Key ?? item.Id.ToString()} is not a jump gate or a jump hole.") with
+                    Diagnostic.Error(item.Path, NotJumpText(item)) with
                     {
                         Target = item, Rule = NotConnection,
                     });
