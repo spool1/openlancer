@@ -373,6 +373,7 @@ file = ..\MODS\my-mod\SYSTEMS\Ol01\Ol01.ini
 ```
 
 - The place needs no directive. `ol.new = true` is enough, so the mod format does not change.
+- "New systems" tells the lines of a new `[system]` and the place of its file.
 - Two new bases go before the first `[system]` in the order of the patch.
 - When a lower mod has a whole `universe.ini` with a `[Base]` after a `[system]`, the new base still goes before every system.
 - When the file has no `[system]`, the new base goes at the end.
@@ -408,7 +409,7 @@ A file in `files/` adds a new file, or replaces the file at the same install pat
 The editor edits two kinds of whole files of the active mod:
 
 - A file under `DATA/MISSIONS`, for example a test script, a replaced slot script or a file of ship builds.
-- An INI file below `DATA/MODS/<mod id>/` of the active mod, for example the file of a new star system. Put such a file in `files/` of the mod. This version has no menu item and no agent tool that makes or deletes such a file.
+- An INI file below `DATA/MODS/<mod id>/` of the active mod, for example the file of a new star system (see "New systems"). Put such a file in `files/` of the mod. This version has no menu item and no agent tool that makes or deletes such a file.
 
 A line of another file names such a file by its path. For example, the `file` line of a new `[system]` or a new `[Base]` in `universe.ini` names a file in the mod folder (see "universe.ini"). A `[Data]` line of `freelancer.ini` names a new data file (see "freelancer.ini").
 
@@ -524,6 +525,56 @@ Act_ActTrig = {port:done}
 - A slot puts a value into a line. `{field}` is the value of a field, and `{field.column}` is a column of a list field. `{port:id}` is the triggers of a port, and `{instance}` is the id of the instance. A line `{field} =` takes the line of a condition field, or the lines of a lines field.
 
 The editor checks each prefab file and shows each problem with its line. A prefab with a problem does not place, and its instances get the warning P02.
+
+## New systems
+
+A new star system has two parts: a `[system]` in the patch of `universe.ini`, and a new system file in the folder of the mod. The system file is a whole file of the active mod, so the editor edits each of its sections (see "Whole files").
+
+```ini
+[system]
+ol.new = true
+nickname = Av01
+file = ..\MODS\my-mod\SYSTEMS\Av01\Av01.ini
+pos = 4, 5
+visit = 0
+strid_name = $str:av01
+ids_info = $ifc:av01.info
+NavMapScale = 2.5
+```
+
+- The system file goes to `DATA/MODS/<mod id>/SYSTEMS/<nickname>/<nickname>.ini`. The mod stores it in `files/` as text.
+- The `file` line names the file relative to the folder of `universe.ini`, `DATA/UNIVERSE`. So the value starts with `..\` to go up to `DATA`. The game, OpenLancer Play and the editor resolve the `..` part.
+- The lines come in the order of the example, and `nickname` is always first. The game reads the system file at the `file` line, with the nickname that the section has before that line.
+- A new system has no `msg_id_prefix`. The game writes one line to its log for such a system, and NPC speech that names the system is silent. A prefix of another system makes the NPCs say the wrong name.
+- `pos` is the place on the nav map grid, 0 to 15 on each axis. `visit = 0` shows the system on the nav map after the first visit. `visit = 1` shows it in a new game.
+- `strid_name` is the name on the nav map, and `ids_info` is the infocard. Write them as text placeholders. The new system file can use placeholders too, for example the `ids_name` of its sun.
+- The nickname has 2 to 15 letters, digits or `_`, and it starts with a letter. The game keeps only 15 characters of a system nickname in its route tables. The id of a system is the FLHash of its nickname, and the game drops a second system with the same id.
+
+When OpenLancer makes a new system, it copies a template system:
+
+- The `[system]` gets a new name, a new infocard, its place and its visit flag. It copies the `NavMapScale` of the template.
+- The new file gets these sections of the template, in this order: `[SystemInfo]`, `[Archetype]`, `[TexturePanels]`, `[Dust]`, `[Music]`, `[Ambient]`, `[Background]`, each `[LightSource]` and each `[EncounterParameters]`. A light keeps its nickname, because a light name is unique only in its file. The faction of `[SystemInfo]` can change.
+- A sun goes to the center, `<nickname>_sun`. It copies the archetype, the star, the colors, the atmosphere range and the numeric infocard of the first sun of the template. It gets a new name. A template without a sun needs the archetype and the star of the sun.
+- The death zone of the sun goes to the center too, `zone_<nickname>_sun_death`. It copies the `SPHERE` zone with `damage` at the sun of the template. Without a death zone, the player flies through the sun.
+- When the template sun has no death zone, the zone gets the defaults of the rule data. Its radius is the atmosphere range of the sun less 1000 m, or 10000 m when the sun has no range. Its lines are `damage = 10000`, `sort = 99.5`, `density = 0` and `relief_time = 0`.
+- The names and the infocard go into `strings.json`. The new system is one entry of the edit history. One Undo takes back the `[system]`, the file and the texts.
+
+A rename of a system changes its nickname, value 0 of each `goto` that names it, the `system` line of each `[Base]` of the system, and the mission lines that name it. The file keeps its path. The editor renames only a system that the active mod adds. A save game in the system does not find it after the rename.
+
+The checks of a system and of a base of `universe.ini`:
+
+| Problem | Severity | What the game does |
+|---|---|---|
+| The `file` line comes before the `nickname` line. | Error | The game loads the system under another id. |
+| Two systems have one nickname or one FLHash. | Error | The game drops one of the two systems. |
+| The `file` line names no file of the edit view. A new file that you did not save counts. | Error | The game loads the system without its objects and zones, and the game can crash. |
+| `pos` is outside 0 to 15 on an axis. | Warning | The nav map shows the system off the map. |
+| Two systems have one `pos`. | Warning | Their stars overlap on the nav map. |
+| No jump gate or jump hole of another system leads to the system. | Warning | The player can only go there with a mission or a new game start. |
+| Two systems name one file. | Warning | The game loads its objects twice. |
+| A `[Base]` comes after the `[system]` of its system. | Warning | The game does not link the base to its station. |
+
+An error stops the save only when the active mod writes the line. A problem of a line of the game or of a lower mod is a warning. The Inspector shows these problems above the sections of a `[system]` or a `[Base]`. The agent tools `get_system`, `get_item` and `check` give them too.
 
 ## Prop groups
 
@@ -1140,6 +1191,7 @@ Each save runs the save gate first, also a save with nothing to write, and also 
   | A name that is not in the list of names of the key, for example `type = BOAT`, or a value that is not a GUID | The game ignores the line. |
   | A required key without a line, for example `da_archetype` of a `[Ship]` | The game drops this section. |
 - A zone of the active mod with the nickname or the FLHash of another zone of any system. The game drops one of the two zones.
+- A `[system]` of `universe.ini` that the active mod adds or changes, with one of three errors (see "New systems"). Its `file` line comes before its `nickname` line, so the game loads the system under another id. Another system has its nickname or its FLHash, so the game drops one of the two. Its `file` line names no file, so the game loads it without objects and zones and can crash. The error comes only from a line of the active mod.
 - An error of the format checks of the export or of the content checks of the retail game, when the active mod adds it. See "Format checks" and "Content checks of the retail game". These checks run only for a tier-1 mod that names a retail target. They compare the data with the active mod with the data of the mods that load before it. They do not merge on the files of each target game. Play in the game and the export do that. For example, a good with the price 0 blocks the save, because the retail game can crash when a player buys or sells it.
 - An error of the mission checks in a mission script that the active mod changes. Examples are a trigger without a condition (rule M01) and two triggers whose names have one game id (rule M27). A line of any script that names a name that the active mod removes or renames is an error too. A mission problem that the base game or a lower mod also has is a warning, so it does not block the save.
 - A mission patch that does not merge on the game of a retail target of `mod.json` (rule T01). The check runs for each target with a linked game. It merges the lower mods of the profile on that game first, as Play in the game does. For example, the patch changes a trigger that the game of the target does not have. A section of the target that differs from the `ol.base` of the patch gives a warning (rule T02), because the changes of the target in the section go away. A target without a linked game gives one info line in the Console.
