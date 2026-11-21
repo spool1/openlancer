@@ -17,8 +17,9 @@ namespace OpenLancer.Editor.Inspector;
 /// <remarks>
 /// The rows edit the sections of W that set the fields of the system: the <c>[system]</c> of the system in
 /// <c>universe.ini</c>, and the <c>[SystemInfo]</c>, <c>[Ambient]</c>, <c>[Background]</c>, <c>[Dust]</c>,
-/// <c>[Music]</c> and <c>[TexturePanels]</c> sections of its file. Each row binds to its own section. The contents and
-/// the preloads are read-only. A section that the file does not have shows the values of the game data.
+/// <c>[Music]</c> and <c>[TexturePanels]</c> sections of its file. Each row binds to its own section. The rows of the
+/// <c>[system]</c> are the rows of <see cref="SystemEntryRows"/>, which the page of a new system shows too. The contents
+/// and the preloads are read-only. A section that the file does not have shows the values of the game data.
 /// </remarks>
 internal sealed class StarSystemPage(EditorWindow window, PropertyGrid grid)
 {
@@ -32,6 +33,7 @@ internal sealed class StarSystemPage(EditorWindow window, PropertyGrid grid)
     ];
 
     private readonly SectionExtras extras = new(window, grid);
+    private readonly SystemEntryRows entryRows = new(window, grid);
 
     // The counts of the last system. They are counted again only for a different system.
     private StarSystem? countedSystem;
@@ -80,16 +82,7 @@ internal sealed class StarSystemPage(EditorWindow window, PropertyGrid grid)
             return;
         }
 
-        using (grid.Bind(parts.Universe))
-        {
-            grid.Text("Nickname", system.Nickname, "nickname");
-            grid.Ids("Name", system.IdsName, "strid_name");
-            grid.Info("Info", system.IdsInfo, "ids_info");
-            grid.SetNextNote("The system file, from the [system] section of universe.ini.");
-            grid.Text("File", system.SourceFile, "file");
-            grid.Text("Message id prefix", system.MsgIdPrefix, "msg_id_prefix");
-        }
-
+        entryRows.Identity(system.Nickname, parts.Universe, system);
         grid.EndSection();
     }
 
@@ -100,15 +93,7 @@ internal sealed class StarSystemPage(EditorWindow window, PropertyGrid grid)
             return;
         }
 
-        using (grid.Bind(parts.Universe))
-        {
-            grid.Text("Position", string.Create(CultureInfo.InvariantCulture,
-                $"{system.UniversePosition.X:0.###}, {system.UniversePosition.Y:0.###}"), "pos");
-            grid.Flags("Visit", system.Visit, "visit");
-            grid.Number("Visit value", (int)system.Visit, iniKey: "visit");
-            grid.Number("Navmap scale", system.NavMapScale, iniKey: "navmapscale");
-        }
-
+        entryRows.NavMap(system.Nickname, parts.Universe, system);
         using (grid.Bind(parts.Of(SceneSection.SystemInfo)))
         {
             var faction = system.LocalFaction;
@@ -214,6 +199,7 @@ internal sealed class StarSystemPage(EditorWindow window, PropertyGrid grid)
             return;
         }
 
+        entryRows.Advanced(system.Nickname, parts.Universe, system);
         using (grid.Bind(parts.Of(SceneSection.TexturePanels)))
         {
             grid.Text("Texture panels", Join(system.TexturePanelsFiles), "file");

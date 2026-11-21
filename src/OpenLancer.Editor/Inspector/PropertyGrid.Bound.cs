@@ -199,8 +199,11 @@ internal sealed partial class PropertyGrid
     /// <param name="labels">Gives the labels of the values of a line with a number of values, or null when a line with
     /// that number of values gets one text field. Null for the default: X, Y and Z for a vector of three values.</param>
     /// <param name="follow">The button that selects the item of a reference, or null for no button.</param>
+    /// <param name="whole">The range of the values of a line with labels for its values, when the values are whole
+    /// numbers, or null. A line whose values are whole numbers in the range then gets a whole-number field for each
+    /// value (see <see cref="WholeValues"/>).</param>
     private bool BoundRow(string label, string? iniKey, string unset,
-        Func<int, IReadOnlyList<ComponentLabel>?>? labels = null, Follow? follow = null)
+        Func<int, IReadOnlyList<ComponentLabel>?>? labels = null, Follow? follow = null, (int Min, int Max)? whole = null)
     {
         if (Binding(iniKey) is not { } field)
         {
@@ -237,8 +240,15 @@ internal sealed partial class PropertyGrid
             var labelsOf = slots ?? labels ?? DefaultLabels(field.Key);
             var values = FieldEdit.Values(shape.Text).Length;
             var listed = single && IsListed(rules) && ListOf(field, rules[0]) != null;
-            switch (WidgetOf(field.Key, shape.Lines.Count, values, labelsOf, listed))
+            var wholeLabels = whole != null && single && shape.Lines.Count == 1 ? labelsOf?.Invoke(values) : null;
+            var widget = wholeLabels != null && WholeValues(shape.Text, wholeLabels.Count, whole!.Value) != null
+                ? BoundWidget.WholeNumbers
+                : WidgetOf(field.Key, shape.Lines.Count, values, labelsOf, listed);
+            switch (widget)
             {
+                case BoundWidget.WholeNumbers:
+                    WholeField(field, wholeLabels!, whole!.Value);
+                    break;
                 case BoundWidget.Bool:
                     BoolField(field, unset);
                     break;
@@ -453,6 +463,110 @@ internal sealed partial class PropertyGrid
         }, reserve, kind is { } drag ? (index, size) => BoundDragLabel(field, drag, labels, index, size) : null);
         FieldError(field);
     }
+
+    /// <summary>
+    /// The values of a line of a bound row as whole numbers, when the line has <paramref name="count"/> values and each
+    /// value is a whole number in the range. Else null. Then the row shows a text field for each value, so it never
+    /// hides a value that a whole-number field cannot show.
+    /// </summary>
+    internal static int[]? WholeValues(string line, int count, (int Min, int Max) range)
+    {
+        var values = FieldEdit.Values(line);
+        if (values.Length != count)
+        {
+            return null;
+        }
+
+        var numbers = new int[count];
+        for (var i = 0; i < count; i++)
+        {
+            if (!int.TryParse(values[i], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out numbers[i]) ||
+                numbers[i] < range.Min || numbers[i] > range.Max)
+            {
+                return null;
+            }
+        }
+
+        return numbers;
+    }
+
+    /// <summary>
+    /// One whole-number field for each value of the line, each with its label in front of it. A drag on a field changes
+    /// its value, and a double-click types it. A field keeps its value in the range. Each field is its own field edit.
+    /// </summary>
+    private void WholeField(FieldBinding field, IReadOnlyList<ComponentLabel> labels, (int Min, int Max) range)
+    {
+        var numbers = WholeValues(field.Text, labels.Count, range);
+        ComponentFields(FieldEdit.Values(field.Text), labels, (index, _, width) =>
+        {
+            var value = numbers?[index] ?? range.Min;
+            ImGui.SetNextItemWidth(width);
+            var changed = ImGui.DragInt("##value", ref value, WholeDragSpeed, range.Min, range.Max, "%d",
+                ImGuiSliderFlags.AlwaysClamp);
+            // The other values come from the line at the start of the edit.
+            Route(field, changed,
+                start => FieldEdit.WithValue(start, index, value.ToString(CultureInfo.InvariantCulture)));
+        }, reserve);
+        FieldError(field);
+    }
+
+    /// <summary>The change of a whole-number field for each pixel of a drag: one step for each 10 pixels.</summary>
+    private const float WholeDragSpeed = 0.1f;
+
+    /// <summary>
+    /// A choice of two texts for one bit of a flags key, for example the visit flag of a system: "After the first visit"
+    /// or "On the map at start". A change sets or clears the bit as one edit, and it keeps the other bits. A page shows
+    /// the other bits in its Advanced section, and the raw INI block shows the line. Without a bound section, the row
+    /// shows the choice of <paramref name="unbound"/>.
+    /// </summary>
+    /// <param name="unbound">The bits of the game data, for a row without a bound section.</param>
+    /// <param name="texts">The text of the choice without the bit, and the text of the choice with the bit.</param>
+    public void BitChoice(string label, ulong unbound, string iniKey, ulong bit, (string Clear, string Set) texts)
+    {
+        var bits = FlagBits(iniKey, unbound);
+        var set = (bits & bit) != 0;
+        var text = set ? texts.Set : texts.Clear;
+        if (Binding(iniKey) is not { } field)
+        {
+            BeginRow(label, iniKey);
+            Field(text);
+            EndRow();
+            return;
+        }
+
+        var reason = field.ReadOnlyReason ?? window.Session!.NoEditReason;
+        BeginRow(label, iniKey, field, reason);
+        if (reason != null)
+        {
+            Field(text, FillWidth);
+        }
+        else
+        {
+            ImGui.SetNextItemWidth(FillWidth);
+            if (ImGui.BeginCombo("##value", text))
+            {
+                foreach (var choice in (ReadOnlySpan<bool>)[false, true])
+                {
+                    if (ImGui.Selectable(choice ? texts.Set : texts.Clear, choice == set) && choice != set)
+                    {
+                        var line = WithBit(bits, bit, choice);
+                        window.Commands.Run(session => FieldCommands.SetLines(session, field.Section, field.Name, [line]));
+                    }
+                }
+
+                ImGui.EndCombo();
+            }
+        }
+
+        RowProblems(field, reason);
+        EndRow();
+        NoteShown(field);
+    }
+
+    /// <summary>The text of a flags line with one bit set or cleared and the other bits kept. The engine reads the line
+    /// as a whole number (see <see cref="LineBits"/>).</summary>
+    internal static string WithBit(ulong bits, ulong bit, bool set) =>
+        unchecked((int)(set ? bits | bit : bits & ~bit)).ToString(CultureInfo.InvariantCulture);
 
     private void BoolField(FieldBinding field, string unset)
     {
@@ -703,6 +817,9 @@ internal sealed partial class PropertyGrid
 
         /// <summary>The picker of a key with a data list.</summary>
         List,
+
+        /// <summary>A whole-number field for each value of a line, each in a range (see <see cref="WholeField"/>).</summary>
+        WholeNumbers,
     }
 
     /// <summary>Formats a number for the text of a row that is not set.</summary>

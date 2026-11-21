@@ -220,7 +220,8 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
         return true;
     }
 
-    private bool IsSceneSystem(string system) =>
+    /// <summary>True when the Scene shows the system with the nickname.</summary>
+    internal bool IsSceneSystem(string system) =>
         Scene.System?.Nickname.Equals(system, StringComparison.OrdinalIgnoreCase) == true;
 
     /// <summary>

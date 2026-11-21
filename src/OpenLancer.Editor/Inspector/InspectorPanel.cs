@@ -62,6 +62,7 @@ internal sealed class InspectorPanel : IDisposable
     private readonly ShipPage shipPage;
     private readonly EquipmentPage equipmentPage;
     private readonly StarSystemPage starSystemPage;
+    private readonly SystemEntryPage systemEntryPage;
     private readonly SchemaPage schemaPage;
     private readonly ThnPage thnPage;
     private readonly AssetPage assetPage;
@@ -81,6 +82,7 @@ internal sealed class InspectorPanel : IDisposable
         shipPage = new ShipPage(window, grid);
         equipmentPage = new EquipmentPage(window, grid);
         starSystemPage = new StarSystemPage(window, grid);
+        systemEntryPage = new SystemEntryPage(window, grid);
         schemaPage = new SchemaPage(window, grid);
         thnPage = new ThnPage(window, grid);
         assetPage = new AssetPage(window);
@@ -206,6 +208,10 @@ internal sealed class InspectorPanel : IDisposable
                     break;
                 case StarSystem system:
                     starSystemPage.Draw(system);
+                    break;
+                // A [system] of universe.ini, for example of a new system that the mod has not saved.
+                case SectionRef section when window.Session?.Edits.IsSystemSection(section) == true:
+                    systemEntryPage.Draw(section);
                     break;
                 case SectionRef section:
                     schemaPage.Draw(section);

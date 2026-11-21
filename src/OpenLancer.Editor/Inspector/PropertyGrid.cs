@@ -347,6 +347,27 @@ internal sealed partial class PropertyGrid(EditorWindow window)
         EndRow();
     }
 
+    /// <summary>
+    /// The values of one line as whole-number fields, each with its label in front of it, for example the place of a
+    /// system on the nav map grid. A bound row edits each value in the range. A line whose values are not whole numbers
+    /// in the range shows a text field for each value, so the row never hides a value.
+    /// </summary>
+    /// <param name="values">The values of the game data, for a row without a bound section.</param>
+    public void WholeNumbers(string label, IReadOnlyList<double> values, IReadOnlyList<ComponentLabel> labels, int min,
+        int max, string iniKey)
+    {
+        if (BoundRow(label, iniKey, string.Join(", ", values.Select(v => Unset(v, "0.###"))),
+                count => count == labels.Count ? labels : null, whole: (min, max)))
+        {
+            return;
+        }
+
+        BeginRow(label, iniKey);
+        ComponentFields(values.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture)).ToArray(), labels,
+            (_, text, width) => Field(text, width));
+        EndRow();
+    }
+
     /// <summary>Three fields with an X, Y and Z prefix in the axis colors.</summary>
     public void Vector(string label, Vector3 value, string? iniKey = null)
     {
