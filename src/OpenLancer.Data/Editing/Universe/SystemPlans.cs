@@ -424,7 +424,7 @@ public static class SystemPlans
 
     /// <summary>
     /// The death zone of the sun of the template: the first <c>SPHERE</c> zone of its file with a <c>damage</c> line at
-    /// the position of the sun, or null. 27 of the 42 first suns of the vanilla 1.1 system files have one.
+    /// the position of the sun, or null. 27 of the 43 first suns of the vanilla 1.1 system files have one.
     /// </summary>
     private static Section? DeathZone(EditSession session, IReadOnlyList<SectionRef> sections, SectionRef? sun,
         Section? sunSection)
