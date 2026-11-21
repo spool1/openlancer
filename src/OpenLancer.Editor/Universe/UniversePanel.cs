@@ -189,10 +189,14 @@ internal sealed class UniversePanel(EditorWindow window)
             Line(drawList, frame, map, line, selected);
         }
 
+        // The labels use the caption font.
+        ImGui.PushFont(null, EditorTheme.CaptionSize);
         foreach (var system in map.Systems)
         {
             System(drawList, frame, system, selected, ReferenceEquals(system, target));
         }
+
+        ImGui.PopFont();
 
         Note(drawList, map, canvasMin, canvasSize);
         drawList.PopClipRect();
@@ -310,8 +314,8 @@ internal sealed class UniversePanel(EditorWindow window)
         }
     }
 
-    /// <summary>Draws the dot of a placed system and its label. A ring marks the selected system and the system under the
-    /// mouse, and a blue dot marks a new system.</summary>
+    /// <summary>Draws the dot of a placed system and its label in the current font. A ring marks the selected system and
+    /// the system under the mouse, and a blue dot marks a new system.</summary>
     private static void System(ImDrawListPtr drawList, UniverseFrame frame, UniverseMapSystem system, string? selected,
         bool hovered)
     {
@@ -339,11 +343,9 @@ internal sealed class UniversePanel(EditorWindow window)
             drawList.AddCircleFilled(center + new Vector2(radius, -radius), mark, ImGui.GetColorU32(EditorTheme.AccentText));
         }
 
-        ImGui.PushFont(null, EditorTheme.CaptionSize);
         var size = ImGui.CalcTextSize(system.Label);
         drawList.AddText(new Vector2(MathF.Round(center.X - size.X / 2), MathF.Round(center.Y + radius + LabelGap * scale)),
             ImGui.GetColorU32(EditorTheme.Text), system.Label);
-        ImGui.PopFont();
     }
 
     /// <summary>Names the systems without a place on the map, at the bottom left of the canvas.</summary>
