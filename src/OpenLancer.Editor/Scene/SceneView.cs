@@ -827,8 +827,6 @@ internal sealed class SceneView : IDisposable
             .Items.OfType<SystemObject>().FirstOrDefault();
     }
 
-    /// <summary>Draws the stage of the open system in the draw-list callback of the panel, with the camera, the
-    /// selection and the hover of the user.</summary>
     /// <summary>
     /// Draws the save card of a new system: the text and the Save button, or a spinner while the game data loads. The
     /// window opens the system when the loaded game data has it (see <see cref="SaveCard"/>).
@@ -849,6 +847,8 @@ internal sealed class SceneView : IDisposable
         }
     }
 
+    /// <summary>Draws the stage of the open system in the draw-list callback of the panel, with the camera, the
+    /// selection and the hover of the user.</summary>
     private void DrawWorld(int x, int y, int width, int height) =>
         stage?.Draw(x, y, width, height,
             new StagePass(camera, sky, window.Settings.ShowZones, window.Selection, hovered, PanelLines: true));

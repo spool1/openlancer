@@ -101,9 +101,9 @@ internal readonly record struct FollowFrame(
 /// view does not change. Follow mode does not leave prefab mode, as Unity keeps prefab mode open when the scene changes.
 /// An edit of a mission then shows only in the Console. A camera input, a pan or a zoom of the mission graph, or a
 /// selection of the user stops follow mode until the user turns it on again. An edit in a new system that the loaded game
-/// data does not have yet shows the save card of the Scene and selects the <c>[system]</c> of the system. With follow mode off, the agent never
-/// changes the view or the selection. Only a selection of a section that an agent edit removed goes, as after an undo. A
-/// selected item keeps its item when an agent edit renames it or moves its row.
+/// data does not have yet shows the save card of the Scene and selects the <c>[system]</c> of the system. With follow
+/// mode off, the agent never changes the view or the selection. Only a selection of a section that an agent edit removed
+/// goes, as after an undo. A selected item keeps its item when an agent edit renames it or moves its row.
 /// </summary>
 /// <param name="settings">The setting "Follow agent". It keeps the last value that the user clicked.</param>
 internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
