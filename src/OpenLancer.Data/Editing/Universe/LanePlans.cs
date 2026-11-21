@@ -708,15 +708,24 @@ public static class LanePlans
         return ScenePlans.Delete(session, rings);
     }
 
-    /// <summary>Plans the delete of the lane of a ring: all its rings and its lane zone, as one entry of the edit
-    /// history. The plan always asks first. It refuses an object that is not a ring of a lane.</summary>
+    /// <summary>
+    /// Plans the delete of the lane of a ring: all its rings and its lane zone, as one entry of the edit history. The
+    /// plan always asks first. Its question names the lane by its first ring, the ring count, and if no lane zone goes.
+    /// The list of the items that go too names the lane zone. The plan refuses an object that is not a ring of a lane.
+    /// </summary>
     public static ScenePlan Delete(EditSession session, SectionRef ring)
     {
         if (RingView(session, ring) is null)
             return NotRingDelete(ring);
-        var plan = ScenePlans.Delete(session, LaneOf(session, ring)!.Rings);
-        if (plan.CanRun)
-            plan.NeedsConfirmation = true;
+        var lane = LaneOf(session, ring)!;
+        var plan = ScenePlans.Delete(session, lane.Rings);
+        if (!plan.CanRun)
+            return plan;
+        plan.NeedsConfirmation = true;
+        var zoneGoes = ZoneOf(session, lane) is { } zone && plan.Deletes.Any(d => d.Section.Equals(zone));
+        plan.Question = $"This deletes the whole trade lane of {lane.Rings[0].Id.Key} with " +
+                        (lane.Rings.Count == 1 ? "its ring." : $"its {lane.Rings.Count} rings.") +
+                        (zoneGoes ? "" : " No lane zone goes with it.");
         return plan;
     }
 

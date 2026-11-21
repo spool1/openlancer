@@ -212,7 +212,7 @@ Each edit tool takes these arguments:
 | `preview` | Runs the edit and gives its result, then changes nothing. The revision, the history and the unsaved state stay the same. The views do not change. |
 | `with_patch` | With `preview`: also gives the text that a save writes for each INI file and each cutscene that the edit changes. This is the patch, or the whole file when the mod has one. |
 | `if_revision` | Refuses the edit with `stale_revision` when the edit view changed after this revision. Each result gives the revision as `rev`. A save does not change it. |
-| `confirm` | `rename_item`, `delete_items`, `trade_lane_delete` and `mission_edit`: applies an edit that changes more than its targets. The prop group writes: writes the files. |
+| `confirm` | `rename_item`, `delete_items` and `mission_edit`: applies an edit that changes more than its targets. `trade_lane_delete`: applies the delete of the whole lane, which always asks. The prop group writes: writes the files. |
 
 When you would see a dialog for a delete or a rename, the tool gives `needs_confirmation`, and nothing changes. A delete or a rename that leaves "Missing" lines also needs it. The server tells the agent to show the changes to you and to ask you first. When you agree, the agent calls the tool again with `confirm: true`. A preview tells it in `needs_confirmation`, and the warnings of the preview tell why.
 
@@ -364,7 +364,7 @@ Without `rings`, the lane gets one ring for each 7500 m of length, plus one. Wit
 
 `trade_lane_repair` finds the rings of the lane of a ring from their links and from their places on the line. It sorts them along the line, writes their `prev_ring` and `next_ring` lines again, and moves the end names to the two end rings. The positions stay. A ring without links joins the nearest lane whose line passes it. A lane with good links gives `no_change`. The result gives `rings` in the new order.
 
-`trade_lane_delete` always needs `confirm: true`. The question names the lane zone that goes with the rings. To delete one ring and relink the lane, use `delete_items` (see "The edit tools").
+`trade_lane_delete` always needs `confirm: true`. The question names the lane by its first ring and gives the ring count. It also names the lane zone that goes with the rings, or tells that no lane zone goes. To delete one ring and relink the lane, use `delete_items` (see "The edit tools").
 
 `get_trade_lane` gives the lane of any ring. Each ring row has its position and the distance to the next ring. `start_name` and `end_name` give the text that the HUD shows and the value of the `tradelane_space_name` line. `zone` is null when no lane zone covers the first and the last ring. `problems` gives the problems of the lane checks on the rings. It also gives the problem of each lane zone that does not cover the lane, for example after the move of an end ring with `set_fields`.
 

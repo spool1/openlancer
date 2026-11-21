@@ -465,7 +465,8 @@
       "title": "Delete a trade lane",
       "description": "Deletes the trade lane of a ring: all its rings and its lane zone. The tool makes one Undo step. The delete always asks for confirm: true. To delete one ring and relink the lane, use delete_items.",
       "fields": {
-        "ring": "The reference of a ring of the lane, for example obj:my_sys01_Trade_Lane_Ring_1."
+        "ring": "The reference of a ring of the lane, for example obj:my_sys01_Trade_Lane_Ring_1.",
+        "confirm": "Apply the delete of the whole lane. Without it, the tool gives needs_confirmation and deletes nothing."
       }
     },
     "get_universe": {

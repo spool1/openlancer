@@ -68,6 +68,11 @@ public abstract class EditPlan
     /// (decisions D238 and D242).</summary>
     public bool NeedsConfirmation { get; protected internal set; }
 
+    /// <summary>What a plan that always asks does as a whole, in plain words, or null. The question of an agent tool
+    /// starts with it in place of the text that the edit changes more than its targets. An example is the delete of a
+    /// whole trade lane, which names the lane and its ring count.</summary>
+    internal string? Question { get; set; }
+
     /// <summary>The detail code of the error of a refused plan whose refusal names no rule.</summary>
     public const string PlanRefused = "PlanRefused";
 

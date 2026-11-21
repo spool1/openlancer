@@ -255,8 +255,9 @@ public sealed class AgentLaneToolTests
     }
 
     /// <summary>
-    /// trade_lane_delete always asks. The question names the lane zone that goes with the rings. With confirm: true,
-    /// the rings and the lane zone go as one entry, and undo gives them back.
+    /// trade_lane_delete always asks. The question names the lane by its first ring, the ring count and the lane zone
+    /// that goes with the rings. With confirm: true, the rings and the lane zone go as one entry, and undo gives them
+    /// back.
     /// </summary>
     [Fact]
     public void TradeLaneDeleteAsksAndTakesTheRingsAndTheZone()
@@ -266,7 +267,8 @@ public sealed class AgentLaneToolTests
 
         var asked = Failure(host, "trade_lane_delete", """{ "ring": "obj:Li01_Trade_Lane_Ring_3" }""");
         Assert.Equal("needs_confirmation", (string?)asked["code"]);
-        Assert.Contains("zone:Zone_Li01_Tradelane_1", (string?)asked["message"]);
+        Assert.StartsWith("This deletes the whole trade lane of Li01_Trade_Lane_Ring_1 with its 4 rings. It also removes " +
+                          "zone:Zone_Li01_Tradelane_1.", (string?)asked["message"]);
         Assert.Equal(0, session.Revision);
 
         var result = Ok(host, "trade_lane_delete", """{ "ring": "obj:Li01_Trade_Lane_Ring_3", "confirm": true }""");
@@ -278,6 +280,32 @@ public sealed class AgentLaneToolTests
         Ok(host, "undo");
         Assert.NotNull(session.Get(Ring(2)));
         Assert.NotNull(session.Get(LaneWorkspace.Zone));
+    }
+
+    /// <summary>
+    /// The question of trade_lane_delete on a lane without a lane zone names the lane and its ring count, and tells
+    /// that no lane zone goes. The question of the generic delete would name nothing, because the call takes only the
+    /// rings.
+    /// </summary>
+    [Fact]
+    public void TradeLaneDeleteOfALaneWithoutAZoneTellsTheRings()
+    {
+        var (ws, session, host) = Lanes();
+        using var _ = ws;
+        var made = Ok(host, "trade_lane_create", """
+            { "system": "Li01", "start": [0, 0, 30000], "start_name": "a", "end": [15000, 0, 30000], "end_name": "b",
+              "rings": 3, "zone": false }
+            """);
+        var rings = Texts(made["rings"]);
+
+        var asked = Failure(host, "trade_lane_delete", $$"""{ "ring": "{{rings[1]}}" }""");
+
+        Assert.Equal("needs_confirmation", (string?)asked["code"]);
+        Assert.StartsWith($"This deletes the whole trade lane of {rings[0][4..]} with its 3 rings. No lane zone goes with it. " +
+                          "Use preview: true", (string?)asked["message"]);
+        Assert.Equal(1, session.Revision);
+        var result = Ok(host, "trade_lane_delete", $$"""{ "ring": "{{rings[1]}}", "confirm": true }""");
+        Assert.Equal(rings.Order(StringComparer.Ordinal), Deletes(result).Order(StringComparer.Ordinal));
     }
 
     /// <summary>

@@ -596,7 +596,8 @@ internal static class EditTools
     /// <summary>
     /// Why a plan needs <c>confirm: true</c> from an agent, or null. The editor asks about the plan (decisions D238 and
     /// D242), or the plan leaves "Missing" lines, also mission lines (section 4.0.5 of the M6b design, item 6). The
-    /// text names what the plan changes beside its targets.
+    /// text names what the plan changes beside its targets. A plan that always asks starts the text with its own
+    /// question (see <see cref="EditPlan.Question"/>).
     /// </summary>
     /// <remarks>The cutscene plans of a step ask with one text (see <see cref="CutsceneConfirmation"/>).</remarks>
     internal static string? ConfirmationOf(EditSession session, EditPlan plan)
@@ -604,7 +605,7 @@ internal static class EditTools
         if (!plan.NeedsConfirmation && plan.Missing.Count == 0 && plan.MissionMissing.Count == 0)
             return null;
         string Ref(SectionRef section) => ItemRefs.Canonical(session, section);
-        var parts = new List<string> { AgentTexts.Error("confirm_intro", ("label", plan.Label)) };
+        var parts = new List<string> { plan.Question ?? AgentTexts.Error("confirm_intro", ("label", plan.Label)) };
         var cascade = plan.Deletes.Where(d => d.Why == DeleteReason.Cascade)
             .Select(d => Ref(d.Section)).ToList();
         if (cascade.Count > 0)

@@ -19547,7 +19547,7 @@
           "confirm": {
             "type": "boolean",
             "default": false,
-            "description": "Apply an edit that changes more than its targets. Without it, such an edit gives needs_confirmation."
+            "description": "Apply the delete of the whole lane. Without it, the tool gives needs_confirmation and deletes nothing."
           }
         },
         "additionalProperties": false,
