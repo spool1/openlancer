@@ -28,8 +28,8 @@ internal sealed record RouteFileChange(RouteDiff Diff, IReadOnlyList<string> Unr
 /// <para>The build compares the tables of the merged data with the tables of the game data without mods. Only a
 /// change of the routes writes the files. When no file of the merge is <c>universe.ini</c>, a system file, a solar
 /// archetype file or a gate lock file, the routes cannot change, and the build reads no graph.</para>
-/// <para>The route files of a mod (whole files or patches) go to the game only when the build makes no tables. The
-/// warning R1a or R1b of the design tells the modder.</para>
+/// <para>The route files of a mod (whole files or patches) go to the game only when the build makes no tables. A
+/// warning tells the modder.</para>
 /// </remarks>
 internal sealed class TargetRoutes
 {

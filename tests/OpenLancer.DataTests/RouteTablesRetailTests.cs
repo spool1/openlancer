@@ -12,8 +12,8 @@ using Xunit;
 namespace OpenLancer.DataTests;
 
 /// <summary>
-/// Retail proof of the route tables (section H.2 of the systems design): the tables that OpenLancer makes from the data
-/// of a game have each path of the route files that the game ships, in the same order of systems.
+/// Retail proof of the route tables: the tables that OpenLancer makes from the data of a game have each path of the
+/// route files that the game ships, in the same order of systems.
 /// </summary>
 public sealed class RouteTablesRetailTests(ITestOutputHelper output)
 {

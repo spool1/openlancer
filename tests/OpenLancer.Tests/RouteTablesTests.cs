@@ -7,8 +7,7 @@ using Xunit;
 
 namespace OpenLancer.Tests;
 
-/// <summary>The route tables of a jump graph follow the rules of the retail game (section B.5 of the systems
-/// design).</summary>
+/// <summary>The route tables of a jump graph follow the rules of the retail game.</summary>
 public sealed class RouteTablesTests
 {
     [Fact]

@@ -9,8 +9,7 @@ using Xunit;
 
 namespace OpenLancer.Tests;
 
-/// <summary>The jump graph reads the same universe from each of its three sources (section C.2 of the systems
-/// design).</summary>
+/// <summary>The jump graph reads the same universe from each of its three sources.</summary>
 public sealed class UniverseGraphTests
 {
     private const string NewGate =

@@ -9,15 +9,15 @@ using Xunit;
 
 namespace OpenLancer.Tests;
 
-/// <summary>A build for a retail game makes the route tables of the game when the mods change the routes (section C.7
-/// of the systems design).</summary>
+/// <summary>A build for a retail game makes the route tables of the game when the mods change the routes.</summary>
 public sealed class TargetBuildRouteTests
 {
     private const string AllPath = @"data\Universe\systems_shortest_path.ini";
+    private const string GatesPath = @"data\Universe\shortest_legal_path.ini";
     private const string HolesPath = @"data\Universe\shortest_illegal_path.ini";
 
     /// <summary>The paths of the three tables, in the order of the install paths.</summary>
-    private static readonly string[] RoutePaths = [HolesPath, @"data\Universe\shortest_legal_path.ini", AllPath];
+    private static readonly string[] RoutePaths = [HolesPath, GatesPath, AllPath];
 
     private static ExportGame Game(bool hd = false) =>
         new RouteWorld().System("A", "gate B").System("B", "gate A").WriteInto(new ExportGame(hd));

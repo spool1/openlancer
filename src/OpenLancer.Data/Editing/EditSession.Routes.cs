@@ -25,9 +25,9 @@ public sealed partial class EditSession
     private (ModOverlay View, Dictionary<string, IReadOnlyList<Section>?> Files)? editViewSections;
 
     /// <summary>
-    /// The jump graph of W and its route tables (section C.2 of the systems design). The session keeps them until a
-    /// section list of W of <c>universe.ini</c>, of a system file, of a solar archetype file or of a gate lock file
-    /// changes. A W state cannot change, so the session compares the section lists by reference.
+    /// The jump graph of W and its route tables. The session keeps them until a section list of W of
+    /// <c>universe.ini</c>, of a system file, of a solar archetype file or of a gate lock file changes. A W state
+    /// cannot change, so the session compares the section lists by reference.
     /// </summary>
     internal UniverseRoutes Routes
     {
