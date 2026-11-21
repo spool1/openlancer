@@ -114,7 +114,8 @@ internal static class LaneTools
             values.ThrowIfAny();
             var plan = LanePlans.Create(session, system, start, end, new LaneOptions
             {
-                Rings = (int?)args.Whole("rings"),
+                // A count above the limit stays above it, so the plan refuses it with its text.
+                Rings = args.Whole("rings") is { } count ? (int)Math.Min(count, LanePlans.MaxRings + 1) : null,
                 Like = like,
                 Faction = faction,
                 Zone = args.Flag("zone"),

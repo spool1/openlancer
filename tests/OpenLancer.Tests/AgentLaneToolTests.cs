@@ -79,8 +79,8 @@ public sealed class AgentLaneToolTests
             Assert.Equal([.. rings, "zone:Zone_Li01_Tradelane_2"], Texts(made["adds"]));
             Assert.Null(made["ring"]);
         }
-        Assert.Contains("Li01_Trade_Lane_Ring_9", (string?)preview["patch"]![ListWorkspace.Li01Path]
-            ?? preview["patch"]!.AsObject().Single().Value!.ToString());
+        Assert.Contains(preview["patch"]!.AsObject(), p => p.Key.Equals(ListWorkspace.Li01Path, StringComparison.OrdinalIgnoreCase) &&
+                                                         p.Value!.ToString().Contains("Li01_Trade_Lane_Ring_9", StringComparison.Ordinal));
         Assert.Equal(("previewed", "applied"), ((string?)preview["status"], (string?)result["status"]));
         Assert.Equal(("Agent: Create trade lane in Li01", "obj:Li01_Trade_Lane_Ring_5"),
             ((string?)result["undo_label"], (string?)result["select"]));
@@ -127,6 +127,8 @@ public sealed class AgentLaneToolTests
     /// nothing.</summary>
     [Theory]
     [InlineData("trade_lane_create", """{ "system": "Li01", "start": [0, 0, 30000], "end": [30000, 0, 30000], "start_name": "a", "end_name": "b", "rings": 101 }""",
+        "invalid_value", LanePlans.LaneRings, "rings")]
+    [InlineData("trade_lane_create", """{ "system": "Li01", "start": [0, 0, 30000], "end": [30000, 0, 30000], "start_name": "a", "end_name": "b", "rings": 4294967298 }""",
         "invalid_value", LanePlans.LaneRings, "rings")]
     [InlineData("trade_lane_create", """{ "system": "Li01", "start": [0, 0, 30000], "end": [30000, 0, 30000], "start_name": "a", "end_name": "b", "rings": 1 }""",
         "invalid_argument", ToolInput.BadArgument, "rings")]
