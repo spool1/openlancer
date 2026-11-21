@@ -247,4 +247,26 @@ public sealed class RouteTablesTests
         var text = System.Text.Encoding.ASCII.GetString(tables.All.Text());
         Assert.StartsWith("[SystemConnections]\r\nPath = A, A, A\r\n", text);
     }
+
+    [Fact]
+    public void AReadRouteFileHasEachPathLineOfItsSections()
+    {
+        var tables = new RouteWorld()
+            .System("A", "gate B", "hole C")
+            .System("B", "gate A")
+            .System("C", "hole A")
+            .Tables();
+
+        foreach (var table in tables.Tables)
+        {
+            var read = RouteTable.Read(table.Kind,
+                RouteWorld.Parse(table.FileName, System.Text.Encoding.ASCII.GetString(table.Text())));
+            Assert.Equal(RouteWorld.Lines(table), RouteWorld.Lines(read));
+            Assert.Equal(table.Sections.Count, read.Sections.Count);
+        }
+        // A line with two systems, a line of another key and a line of another section are no routes.
+        var other = RouteTable.Read(RouteKind.All, RouteWorld.Parse("routes.ini",
+            "[SystemConnections]\nPath = A, B\nRoute = A, B, A, B\npath = A, B, A, B\n\n[Other]\nPath = B, A, B, A\n"));
+        Assert.Equal(["Path = A, B, A, B"], RouteWorld.Lines(other));
+    }
 }

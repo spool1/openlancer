@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using LibreLancer.Data.Ini;
 using OpenLancer.Data.Ini;
 using OpenLancer.Data.Validation;
 
@@ -55,8 +56,8 @@ internal sealed class RouteTable
     /// <summary>The file name of the table in the universe folder of the game.</summary>
     public string FileName => RouteTables.FileName(Kind);
 
-    /// <summary>The routes of each section, in file order. The first route of a section is the route of its start
-    /// system to itself.</summary>
+    /// <summary>The routes of each section, in file order. In a table that <see cref="RouteTables"/> makes, the first
+    /// route of a section is the route of its start system to itself.</summary>
     public IReadOnlyList<IReadOnlyList<Route>> Sections { get; }
 
     /// <summary>Each route of the table, in file order.</summary>
@@ -111,6 +112,20 @@ internal sealed class RouteTable
         var lost = old.Keys.Count(k => !k.From.Equals(k.To, StringComparison.OrdinalIgnoreCase) && !now.ContainsKey(k));
         return new RouteDiff(added, shorter, longer, lost);
     }
+
+    /// <summary>
+    /// Reads the routes of a route file. Each <c>Path</c> line of a <c>[SystemConnections]</c> section with three or
+    /// more systems is a route. The first two systems are the start system and the last system. The other systems are
+    /// the path.
+    /// </summary>
+    public static RouteTable Read(RouteKind kind, IReadOnlyList<Section> sections) =>
+        new(kind, sections
+            .Where(s => s.Name.Equals("SystemConnections", StringComparison.OrdinalIgnoreCase))
+            .Select(s => (IReadOnlyList<Route>)s
+                .Where(e => e.Name.Equals("Path", StringComparison.OrdinalIgnoreCase) && e.Count >= 3)
+                .Select(e => new Route(e[0].ToString()!, e[1].ToString()!, [.. e.Skip(2).Select(v => v.ToString()!)]))
+                .ToList())
+            .ToList());
 
     /// <summary>The systems of a list that no route of the table from another system reaches.</summary>
     public IReadOnlyList<string> Unreached(IEnumerable<string> systems)

@@ -14,7 +14,8 @@ using OpenLancer.Data.Validation;
 namespace OpenLancer.Data.Export;
 
 /// <summary>What a route table of a target build changes, for the checklist.</summary>
-/// <param name="Diff">The routes that the mods add, make shorter, make longer and remove.</param>
+/// <param name="Diff">The routes that the table adds, makes shorter, makes longer and removes. The diff compares the
+/// table with the route file that the game has at its path (see <see cref="TargetRoutes.GameFile"/>).</param>
 /// <param name="Unreached">The systems that the mods add and that no route of the table reaches.</param>
 internal sealed record RouteFileChange(RouteDiff Diff, IReadOnlyList<string> Unreached);
 
@@ -146,11 +147,21 @@ internal sealed class TargetRoutes
             {
                 HasBase = baseFs.FileExists(path),
                 Generated = true,
-                Routes = new RouteFileChange(RouteTable.Diff(before.Tables[(int)kind], table), table.Unreached(added)),
+                Routes = new RouteFileChange(RouteTable.Diff(GameFile(path, kind) ?? before.Tables[(int)kind], table),
+                    table.Unreached(added)),
             });
         }
         return result;
     }
+
+    /// <summary>
+    /// The route table that the game has at a path, or null when the game has no file at the path or the file does not
+    /// parse. The tables of a game can differ from the tables of its data. For example, HD Edition 0.7.1 locks a jump
+    /// hole of Ku07, and it keeps the route files of the retail game. When the game has no file, the checklist compares
+    /// with the table of the game data without mods.
+    /// </summary>
+    private RouteTable? GameFile(string path, RouteKind kind) =>
+        Base(path) is { } sections ? RouteTable.Read(kind, sections) : null;
 
     /// <summary>True when a file of the merge can change the routes: <c>universe.ini</c>, a system file, a solar
     /// archetype file or a gate lock file. Else the build reads no graph.</summary>

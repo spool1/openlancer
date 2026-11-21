@@ -192,6 +192,29 @@ public sealed class TargetBuildRouteTests
     }
 
     [Fact]
+    public void TheCountsCompareEachTableWithTheRouteFileOfTheGame()
+    {
+        // The game locks the hole of C after it made its route files, as HD Edition 0.7.1 does with a hole of Ku07. So
+        // its files have a section for C, and the tables of its data have none.
+        var world = new RouteWorld().System("A", "gate B", "hole C").System("B", "gate A").System("C", "hole A");
+        using var game = world.WriteInto(new ExportGame());
+        game.Game.Write(RouteWorld.LocksPath, world.Lock("C_to_A").Locks);
+        // The game has no file of the table of gates, so its counts compare with the table of the game data.
+        game.Game.Delete(@"DATA\UNIVERSE\shortest_legal_path.ini");
+
+        var files = RouteWorld.Build(game, RouteWorld.ConnectionMod(game));
+
+        // New: A and B reach E, and E reaches A, B and C. Lost: C to A and C to B.
+        Assert.Equal(new RouteDiff(5, 0, 0, 2), files.File(AllPath)!.Routes!.Diff);
+        Assert.Equal(new RouteDiff(0, 0, 0, 1), files.File(HolesPath)!.Routes!.Diff);
+        Assert.Equal(new RouteDiff(4, 0, 0, 0), files.File(GatesPath)!.Routes!.Diff);
+        Assert.False(files.File(GatesPath)!.HasBase);
+        Assert.Contains(
+            "- OpenLancer makes this route table from the merged data: 0 new, 0 shorter, 0 longer and 1 lost routes.",
+            PackageTexts.Checklist(files));
+    }
+
+    [Fact]
     public void TheChecklistNamesTheChangedRoutesAndTheNewSystemsThatNoRouteReaches()
     {
         using var game = Game();

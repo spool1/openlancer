@@ -1401,10 +1401,10 @@ A mod does not hold route tables. OpenLancer makes them when it builds the mods 
 - The routes can change only when the mods change `universe.ini`, a system file, a solar archetype file or `initialworld.ini`. Else the build does not read the jump connections.
 - The tables follow the rules of the retail game. Each system with an open jump connection gets one section, with the shortest path to each system that it reaches. The first shortest path in the order of the system files wins.
 - A `locked_gate` line of `initialworld.ini` closes its jump gate or jump hole for the tables. An `npc_locked_gate` line has no effect on the tables. An airlock gate counts only in `systems_shortest_path.ini`.
-- The tables come from the data of each target game. HD Edition 0.7.1 locks a jump hole of Ku07, so its tables have no section for Ku07. The route files that HD Edition ships still have that section.
+- The tables come from the data of each target game. HD Edition 0.7.1 locks a jump hole of Ku07, so the tables that OpenLancer makes for HD Edition 0.7.1 have no section for Ku07. The route files that HD Edition ships still have that section.
 - A path line longer than 1,023 bytes is an error, because the game reads only the first 1,023 bytes of a line. Use shorter system nicknames, or add a connection that makes the route shorter.
 - When a mod has its own route files, as whole files or as patches, a warning tells it. When the build makes tables, they replace the files of the mod. When the build makes no tables, the files of the mod go to the game as they are, and they can be out of date.
-- The checklist names each table with the counts of its new, shorter, longer and lost routes. It also names each new system that no route of the table reaches.
+- The checklist names each table with the counts of its new, shorter, longer and lost routes. The counts compare the table with the route file of the game that it replaces. On HD Edition 0.7.1, the routes from Ku07 thus count as lost. The checklist also names each new system that no route of the table reaches.
 - The export of the target OpenLancer makes no tables. OpenLancer Play computes its routes from the jump connections when it loads the game data.
 - An FLMM package holds the tables of the target game with this mod. The connections of another mod are not in them.
 
