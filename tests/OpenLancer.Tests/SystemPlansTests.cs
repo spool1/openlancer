@@ -7,6 +7,7 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Editing.Universe;
+using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Data.Strings;
 using Xunit;
@@ -613,6 +614,32 @@ public sealed class SystemPlansTests
         Assert.Null(session.Get(NewSystemWorkspace.System("Xw01")));
         Assert.True(session.OpenDocument(ListWorkspace.Li01Path)!.State.Exists);
         Assert.NotNull(session.Get(SceneWorkspace.Object("Li01_to_Li02")));
+    }
+
+    /// <summary>A file of the active mod stays when another new [system] names it too. The plan deletes only the
+    /// [system], and its warning names the other system. A raw INI edit or an agent edit can make such a pair.</summary>
+    [Fact]
+    public void ADeleteKeepsAFileThatAnotherSystemUses()
+    {
+        using var ws = NewSystemWorkspace.Create();
+        var session = ws.Session("act");
+        NewSystemWorkspace.CreateAv01(session);
+        session.Execute(EditCommand.AddSection(ListWorkspace.UniversePath, "system",
+            [ListWorkspace.Line("nickname", "Xw02"), ListWorkspace.Line("file", @"..\MODS\act\SYSTEMS\Av01\Av01.ini")]));
+        Assert.True(VfsPath.Comparer.Equals(NewSystemWorkspace.NewPath, session.SystemPath("Xw02")));
+
+        var plan = SystemPlans.Delete(session, "Av01");
+
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        Assert.Null(plan.File);
+        Assert.Equal([Av01], plan.Deletes.Select(d => d.Section));
+        Assert.Equal("A save game in Av01 does not find the system after the delete. The file " +
+                     $"{NewSystemWorkspace.NewPath} stays, because the system Xw02 uses it too.", plan.Warnings[0].Message);
+        session.Execute(plan.Command!);
+        Assert.Null(session.Get(Av01));
+        Assert.True(session.OpenDocument(NewSystemWorkspace.NewPath)!.State.Exists);
+        Assert.NotNull(session.Get(NewSystemWorkspace.New("Object", "Av01_sun")));
+        Assert.True(VfsPath.Comparer.Equals(NewSystemWorkspace.NewPath, session.Routes.Graph.System("Xw02")?.File));
     }
 
     /// <summary>A delete of a saved system, then a save, removes the file from the mod and the [system] from the patch.

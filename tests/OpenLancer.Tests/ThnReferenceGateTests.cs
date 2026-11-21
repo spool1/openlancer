@@ -290,6 +290,7 @@ public sealed class ThnReferenceGateTests
         Assert.Equal([note, note, note], Notes(check, "problems"));
         Assert.Equal([note, note], Notes(cutscene, "problems"));
         Assert.Equal("save_blocked", code);
+        Assert.NotNull(message);
         Assert.StartsWith("The save stopped. 3 errors block it.", message);
         Assert.EndsWith($". {note}", message);
         Assert.Equal(2, message.Split(note).Length);

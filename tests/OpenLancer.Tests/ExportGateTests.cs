@@ -1,9 +1,11 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Export;
+using OpenLancer.Data.Games;
 using OpenLancer.Data.Mods;
 using Xunit;
 
@@ -131,6 +133,41 @@ public sealed class ExportGateTests
         Assert.Contains("\"trent\"", Assert.Single(errors).Message);
         Assert.Equal(writable.SaveProblems(), reader.SaveProblems());
         Assert.Equal(errors, ExportGate.Errors(reader));
+    }
+
+    /// <summary>
+    /// The gate of a profile checks the mission patches of the mod on the linked game of each retail target, as the
+    /// editor save does with its game links. A saved patch changes a trigger that the linked Freelancer 1.1 does not
+    /// have, so the gate of the profile gives the target error of a writable session with the same games. Without a
+    /// linked game, the gate checks no target.
+    /// </summary>
+    [Fact]
+    public void TheGateOfAProfileChecksTheMissionPatchesOnTheLinkedGames()
+    {
+        const string script = @"DATA\MISSIONS\OL_TEST\ol_test.ini";
+        const string text = "[Mission]\n\n[Trigger]\nnickname = ol_end\nInitState = ACTIVE\nCnd_True = no_params\n" +
+                            "Act_ChangeState = SUCCEED\n";
+        using var ws = new TestWorkspace();
+        ws.WriteBase(script, text);
+        ws.Mod("act", new() { [@"patches\" + script] = "[Trigger]\nnickname = ol_end\nAct_ChangeState = FAIL\n" });
+        ws.WriteProfile("act");
+        using var game = new TestWorkspace();
+        game.WriteBase(script, text.Replace("nickname = ol_end", "nickname = ol_finish"));
+        var report = new GameReport(game.Base, game.Base, GameKind.Vanilla, "1.1", VersionProof.Hash, false, null, null,
+            null, ModTargets.Vanilla, ModTargets.Vanilla, DataState.NotChanged, ModTargets.Vanilla, 0, 0, [], [], []);
+        var writable = ws.Session("act");
+        writable.TargetGame = ExportGate.TargetGames([report]);
+        IReadOnlyList<Diagnostic> Gate(params GameReport[] reports) => ExportGate.Errors(ModProfile.Load(ws.ProfilePath),
+            "act", reports, TestWorkspace.FakeDllWriter.Instance, ThnScripts.Evaluator);
+
+        var errors = Gate(report);
+
+        var error = Assert.Single(errors);
+        Assert.Equal("T01", error.Rule);
+        Assert.Equal($"[Trigger] nickname = ol_end is not in {script} of Freelancer 1.1. The merge of this patch fails on " +
+                     "Freelancer 1.1. Remove the edit, or remove Freelancer 1.1 from the targets of the mod.", error.Message);
+        Assert.Equal(ExportGate.Errors(writable), errors);
+        Assert.Empty(Gate());
     }
 
     [Fact]
