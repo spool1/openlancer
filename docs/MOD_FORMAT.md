@@ -566,7 +566,7 @@ The checks of a system and of a base of `universe.ini`:
 | Problem | Severity | What the game does |
 |---|---|---|
 | The `file` line comes before the `nickname` line. | Error | The game loads the system under another id. |
-| Two systems have one nickname or one FLHash. | Error | The game drops one of the two systems. |
+| Two systems have one nickname. The game ignores letter case. | Error | The game drops one of the two systems. |
 | The `file` line names no file of the edit view. A new file that you did not save counts. | Error | The game loads the system without its objects and zones, and the game can crash. |
 | `pos` is outside 0 to 15 on an axis. | Warning | The nav map shows the system off the map. |
 | Two systems have one `pos`. | Warning | Their stars overlap on the nav map. |
@@ -574,7 +574,7 @@ The checks of a system and of a base of `universe.ini`:
 | Two systems name one file. | Warning | The game loads its objects twice. |
 | A `[Base]` comes after the `[system]` of its system. | Warning | The game does not link the base to its station. |
 
-An error stops the save only when the active mod writes the line. A problem of a line of the game or of a lower mod is a warning. The Inspector shows these problems above the sections of a `[system]` or a `[Base]`. The agent tools `get_system`, `get_item` and `check` give them too.
+An error stops the save only when the active mod writes the line. A problem of a line of the game or of a lower mod is a warning. Two different system nicknames with one FLHash get the FLHash error of the data lists (see "The save gate"). The Inspector shows these problems above the sections of a `[system]` or a `[Base]`. The agent tools `get_system`, `get_item` and `check` give them too.
 
 ## Prop groups
 
@@ -1191,7 +1191,7 @@ Each save runs the save gate first, also a save with nothing to write, and also 
   | A name that is not in the list of names of the key, for example `type = BOAT`, or a value that is not a GUID | The game ignores the line. |
   | A required key without a line, for example `da_archetype` of a `[Ship]` | The game drops this section. |
 - A zone of the active mod with the nickname or the FLHash of another zone of any system. The game drops one of the two zones.
-- A `[system]` of `universe.ini` that the active mod adds or changes, with one of three errors (see "New systems"). Its `file` line comes before its `nickname` line, so the game loads the system under another id. Another system has its nickname or its FLHash, so the game drops one of the two. Its `file` line names no file, so the game loads it without objects and zones and can crash. The error comes only from a line of the active mod.
+- A `[system]` of `universe.ini` that the active mod adds or changes, with one of three errors (see "New systems"). Its `file` line comes before its `nickname` line, so the game loads the system under another id. Another system has its nickname, so the game drops one of the two. Its `file` line names no file, so the game loads it without objects and zones and can crash. The error comes only from a line of the active mod.
 - An error of the format checks of the export or of the content checks of the retail game, when the active mod adds it. See "Format checks" and "Content checks of the retail game". These checks run only for a tier-1 mod that names a retail target. They compare the data with the active mod with the data of the mods that load before it. They do not merge on the files of each target game. Play in the game and the export do that. For example, a good with the price 0 blocks the save, because the retail game can crash when a player buys or sells it.
 - An error of the mission checks in a mission script that the active mod changes. Examples are a trigger without a condition (rule M01) and two triggers whose names have one game id (rule M27). A line of any script that names a name that the active mod removes or renames is an error too. A mission problem that the base game or a lower mod also has is a warning, so it does not block the save.
 - A mission patch that does not merge on the game of a retail target of `mod.json` (rule T01). The check runs for each target with a linked game. It merges the lower mods of the profile on that game first, as Play in the game does. For example, the patch changes a trigger that the game of the target does not have. A section of the target that differs from the `ol.base` of the patch gives a warning (rule T02), because the changes of the target in the section go away. A target without a linked game gives one info line in the Console.

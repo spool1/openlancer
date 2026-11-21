@@ -11,7 +11,8 @@ namespace OpenLancer.Data.Editing.Scene;
 /// <summary>
 /// The checks of the <c>[system]</c> and <c>[Base]</c> sections of <c>universe.ini</c>. Three errors stop the save,
 /// because the game loads a wrong system or no system content: a <c>file</c> line before the <c>nickname</c> line, two
-/// systems with one nickname or one FLHash, and a <c>file</c> that names no file. The other checks are warnings.
+/// systems with one nickname, and a <c>file</c> that names no file. The other checks are warnings. The list checks
+/// report two different system nicknames with one FLHash, as for each hash list.
 /// </summary>
 /// <remarks>
 /// <para>Retail facts: the game reads the system file at the <c>file</c> line, with the nickname that the section set
@@ -66,11 +67,13 @@ internal static class UniverseChecks
                 "another id. Move the nickname line up.");
 
         var others = Systems(session).Where(s => !s.Section.Equals(section)).ToList();
-        var hash = FLHash.CreateID(nickname);
-        foreach (var other in others.Where(o => FLHash.CreateID(o.Nickname) == hash))
+        // Two different names with one FLHash are a collision of the hash list "system". The list checks report it, so
+        // this check reports only one name in two sections.
+        foreach (var other in others.Where(o => o.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase)))
             yield return Error(session, section, "nickname",
-                $"The system {nickname} has the same nickname or the same FLHash as {other.Nickname}. The game drops one of " +
-                "the two systems. Give one system another nickname.");
+                $"The system {nickname} has the same nickname as {other.Nickname}." +
+                (other.Nickname == nickname ? "" : " The game ignores the letter case of a nickname.") +
+                " The game drops one of the two systems. Give one system another nickname.");
 
         var value = FileValue(view);
         var path = value == null ? null : SystemFiles.FilePath(section.Path, value);

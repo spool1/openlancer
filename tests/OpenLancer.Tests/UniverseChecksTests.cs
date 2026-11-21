@@ -1,4 +1,5 @@
 using System.Linq;
+using LibreLancer.Data;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Scene;
@@ -43,18 +44,53 @@ public sealed class UniverseChecksTests
         Assert.Contains(saved.Problems, p => p.Severity == DiagnosticSeverity.Error && p.Message == problem.Message);
     }
 
+    /// <summary>Two systems with one nickname in another letter case are an error of the save gate. The system of the
+    /// base game gets a warning.</summary>
     [Fact]
-    public void TwoSystemsWithOneFlHashAreAnError()
+    public void TwoSystemsWithOneNicknameAreAnErrorOfTheSaveGate()
     {
         using var ws = NewSystemWorkspace.Create();
         var session = ws.Session("act");
+        var second = NewSystemWorkspace.System("LI01", 1);
         AddSystem(session, ("nickname", "LI01"), ("file", @"systems\Li02\li02.ini"), ("pos", "1, 1"));
 
-        var problem = One(session, NewSystemWorkspace.System("LI01", 1), "The system LI01 has the same");
+        var problem = One(session, second, "The system LI01 has the same");
+        var gate = session.SaveProblems().Where(p => p.Severity == DiagnosticSeverity.Error).ToList();
 
         Assert.Equal((DiagnosticSeverity.Error, "nickname"), (problem.Severity, problem.Key));
-        Assert.Equal("The system LI01 has the same nickname or the same FLHash as Li01. The game drops one of the two " +
-                     "systems. Give one system another nickname.", problem.Message);
+        Assert.Equal("The system LI01 has the same nickname as Li01. The game ignores the letter case of a nickname. The " +
+                     "game drops one of the two systems. Give one system another nickname.", problem.Message);
+        var error = Assert.Single(gate);
+        Assert.Equal((second, "nickname", problem.Message), (error.Target, error.Key, error.Message));
+        Assert.Equal(DiagnosticSeverity.Warning,
+            One(session, NewSystemWorkspace.System("Li01"), "The system Li01 has the same").Severity);
+    }
+
+    /// <summary>Two different nicknames with one FLHash give one error for each system: the FLHash error of the data
+    /// lists. The universe checks do not report the same cause again.</summary>
+    [Fact]
+    public void TwoNicknamesWithOneFlHashGiveOneErrorForEachSystem()
+    {
+        const string first = "Bew9fowohqb";
+        const string second = "Y54361bk";
+        Assert.Equal(FLHash.CreateID(first), FLHash.CreateID(second));
+        using var ws = NewSystemWorkspace.Create();
+        var session = ws.Session("act");
+        AddSystem(session, ("nickname", first), ("file", @"systems\Li01\li01.ini"), ("pos", "1, 1"));
+        AddSystem(session, ("nickname", second), ("file", @"systems\Li02\li02.ini"), ("pos", "2, 2"));
+
+        var gate = session.SaveProblems().Where(p => p.Severity == DiagnosticSeverity.Error).ToList();
+
+        Assert.Equal(2, gate.Count);
+        foreach (var (name, other) in new[] { (first, second), (second, first) })
+        {
+            var system = NewSystemWorkspace.System(name);
+            var error = Assert.Single(gate, p => system.Equals(p.Target));
+            Assert.Equal("nickname", error.Key);
+            Assert.Contains($"the name '{name}' has the FLHash of '{other}'.", error.Message);
+            var agent = Assert.Single(AgentRows.DiagnosticsOf(session, system), p => p.Severity == DiagnosticSeverity.Error);
+            Assert.Equal(error.Message, agent.Message);
+        }
         Assert.False(session.Save().Saved);
     }
 
