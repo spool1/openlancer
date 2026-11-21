@@ -370,7 +370,8 @@ internal sealed class GamePlay : IDisposable, IGameStop
     /// <param name="dialogOpen">True while a dialog is open.</param>
     public void Update(bool editing, bool dialogOpen)
     {
-        if (pending != null && !editing && !dialogOpen)
+        // The request waits one more frame before its save while the status bar first shows the wait of the save gate.
+        if (pending != null && !editing && !dialogOpen && !host.HoldForGate(pending))
         {
             var request = pending;
             pending = null;

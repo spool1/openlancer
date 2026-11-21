@@ -7,7 +7,8 @@ namespace OpenLancer.Tests;
 /// <summary>
 /// The status frame of a save or a Play that waits for the index of the cutscene uses (#87). The gate blocks the UI
 /// thread, so a status line written just before it does not show. The editor writes the status line first, draws one
-/// frame with it, and runs the save in the next frame.
+/// frame with it, and runs the save in the next frame. A Play request waits in its controller, which asks the hold in
+/// each frame.
 /// </summary>
 public sealed class GateWaitTests
 {
@@ -60,6 +61,47 @@ public sealed class GateWaitTests
         wait.Frame();
 
         Assert.Equal([GateWait.Status, GateWait.Status, "play"], calls);
+    }
+
+    /// <summary>A Play request stays in its controller. The hold writes the status line one time, keeps the request in
+    /// the frame that draws the line, and lets it start in the frame after that.</summary>
+    [Fact]
+    public void APlayRequestThatWaitsStartsAfterAFrameWithTheStatusLine()
+    {
+        var wait = new GateWait();
+        var calls = new List<string>();
+        var request = new object();
+
+        Assert.True(wait.Hold(request, true, s => calls.Add(s)));
+        Assert.True(wait.Hold(request, true, s => calls.Add(s)));
+        // The frame that draws the status line.
+        wait.Frame();
+        Assert.True(wait.Hold(request, true, s => calls.Add(s)));
+        wait.Frame();
+        Assert.False(wait.Hold(request, true, s => calls.Add(s)));
+
+        Assert.Equal([GateWait.Status], calls);
+    }
+
+    /// <summary>Another request writes the status line again and waits for a frame of its own. A request does not wait
+    /// while the gate does not wait.</summary>
+    [Fact]
+    public void AnotherPlayRequestWaitsForAFrameOfItsOwn()
+    {
+        var wait = new GateWait();
+        var calls = new List<string>();
+        var (first, second) = (new object(), new object());
+        Assert.True(wait.Hold(first, true, s => calls.Add(s)));
+        wait.Frame();
+
+        Assert.True(wait.Hold(second, true, s => calls.Add(s)));
+        wait.Frame();
+        Assert.True(wait.Hold(second, true, s => calls.Add(s)));
+        wait.Frame();
+        Assert.False(wait.Hold(second, true, s => calls.Add(s)));
+        Assert.False(wait.Hold(first, false, s => calls.Add(s)));
+
+        Assert.Equal([GateWait.Status, GateWait.Status], calls);
     }
 
     [Fact]

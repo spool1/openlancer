@@ -157,6 +157,15 @@ internal sealed class FakeGameHost : IGamePlayHost
         return SaveResult;
     }
 
+    /// <summary>The status frame of the save gate, as the editor has it. The test calls its frames.</summary>
+    public GateWait Gate { get; } = new();
+
+    /// <summary>True: the save gate waits for the index of the cutscene uses.</summary>
+    public bool GateWaits { get; set; }
+
+    public bool HoldForGate(object request) =>
+        Gate.Hold(request, GateWaits, s => Log.AddStatus(ConsoleSeverity.Info, "Save", s));
+
     /// <summary>A save that changed files: it starts its validation.</summary>
     public void Commit(int number)
     {
@@ -287,6 +296,33 @@ public sealed class GamePlayTests : IAsyncDisposable
         rig.Plays.Update(false, false);
 
         Assert.Single(rig.Console, GamePlay.ReloadNote);
+    }
+
+    /// <summary>
+    /// When the save gate waits for the index of the cutscene uses (#87), each Play in the game first shows the status
+    /// line for one frame, and then saves. So the menu items and Ctrl+F5 show it the same way.
+    /// </summary>
+    [Fact]
+    public async Task APlayThatWaitsForTheSaveGateShowsTheStatusLineForOneFrameFirst()
+    {
+        rig.Open(rig.Game.Export.GoodsMod(GamePlayRig.GoodsPatch));
+        rig.Host.GateWaits = true;
+
+        rig.Plays.Play(rig.Target);
+        rig.Plays.Update(false, false);
+        Assert.Equal(GateWait.Status, rig.Console[^1]);
+        Assert.Equal(0, rig.Host.SaveCalls);
+        Assert.True(rig.Plays.Busy);
+        // The frame that draws the status line.
+        rig.Host.Gate.Frame();
+        rig.Plays.Update(false, false);
+        Assert.Equal(0, rig.Host.SaveCalls);
+        rig.Host.Gate.Frame();
+        rig.Plays.Update(false, false);
+
+        Assert.Equal(1, rig.Host.SaveCalls);
+        Assert.Single(rig.Console, GateWait.Status);
+        await rig.RunAsync(() => rig.Starts.Count == 1, "the start of the game");
     }
 
     [Fact]

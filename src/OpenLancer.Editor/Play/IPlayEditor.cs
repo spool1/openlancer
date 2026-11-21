@@ -27,6 +27,14 @@ internal interface IPlayHost : IUIThread
     /// <summary>Saves the edits of the active mod for Play, with all checks of a save (section 9.2).</summary>
     SaveOutcome Save();
 
+    /// <summary>
+    /// True while a Play request must wait one more frame before it saves. The save gate then waits for the index of
+    /// the cutscene uses, and the status bar shows that first (see <see cref="Editing.GateWait.Hold"/>). Play asks it in
+    /// each frame for the request that it starts next.
+    /// </summary>
+    /// <param name="request">The request that starts next.</param>
+    bool HoldForGate(object request);
+
     /// <summary>The state of the last validation of the session, or null.</summary>
     ValidationState? Validation { get; }
 

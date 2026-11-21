@@ -255,6 +255,43 @@ public sealed class PlayControllerTests : IDisposable
         Assert.Contains(OpenLancer.Data.Games.GameTexts.PlayRefused, Console);
     }
 
+    /// <summary>
+    /// When the save gate waits for the index of the cutscene uses (#87), each play request first shows the status line
+    /// for one frame, and then saves. So each Play control of the editor and the agent shows it the same way. A request
+    /// that does not save does not wait.
+    /// </summary>
+    [Fact]
+    public async Task ARequestThatWaitsForTheSaveGateShowsTheStatusLineForOneFrameFirst()
+    {
+        editor.Commit(1);
+        editor.Finish(1);
+        editor.GateWaits = true;
+        _ = play.Request(Space, null);
+
+        play.Update(editing: false, dialogOpen: false);
+        Assert.Equal(GateWait.Status, Console[^1]);
+        Assert.Equal(0, editor.SaveCalls);
+        // The frame that draws the status line.
+        editor.Gate.Frame();
+        play.Update(editing: false, dialogOpen: false);
+        Assert.Equal(0, editor.SaveCalls);
+        Assert.Empty(starts);
+        editor.Gate.Frame();
+        play.Update(editing: false, dialogOpen: false);
+
+        Assert.Equal(1, editor.SaveCalls);
+        Assert.Single(starts);
+        Assert.Single(Console, GateWait.Status);
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
+        _ = play.Request(Space, null, PlaySaveRule.None);
+        play.Update(editing: false, dialogOpen: false);
+        Assert.Equal(2, starts.Count);
+        Assert.Single(Console, GateWait.Status);
+        await RunUntilAsync(PlayStatus.Running);
+        await StopAndRunToIdleAsync();
+    }
+
     /// <summary>(7) A request while a field or a dialog is open runs at the first update without one.</summary>
     [Fact]
     public async Task ARequestWaitsWhileAFieldOrADialogIsOpen()
@@ -2688,6 +2725,15 @@ public sealed class PlayControllerTests : IDisposable
 
         /// <summary>True: <see cref="ValidateNow"/> gives a result at once, as when oltool does not start.</summary>
         public bool ValidationCannotStart { get; set; }
+
+        /// <summary>The status frame of the save gate, as the editor has it. The test calls its frames.</summary>
+        public GateWait Gate { get; } = new();
+
+        /// <summary>True: the save gate waits for the index of the cutscene uses.</summary>
+        public bool GateWaits { get; set; }
+
+        public bool HoldForGate(object request) =>
+            Gate.Hold(request, GateWaits, s => Log.AddStatus(ConsoleSeverity.Info, "Save", s));
 
         public SaveOutcome Save()
         {

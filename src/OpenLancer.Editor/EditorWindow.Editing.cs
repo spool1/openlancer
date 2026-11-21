@@ -17,6 +17,7 @@ using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Export;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Mods;
+using OpenLancer.Editor.Play;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Studio.Commands;
 
@@ -60,7 +61,7 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
 
     void IClosePromptHost.RevertDraft() => Mods.RevertDraft();
 
-    void IClosePromptHost.Save(Action saved) => Edits.Save(saved);
+    void IClosePromptHost.Save(Action saved) => AfterGateStatus(() => Edits.Save(saved));
 
     void IClosePromptHost.DiscardRecovery() => Edits.DiscardRecovery();
 
@@ -91,13 +92,21 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
     void ISaveCommandHost.Save() => AfterGateStatus(() => Edits.Save());
 
     /// <summary>
-    /// Runs a save or a Play of the user. When the save gate must wait for the index of the cutscene uses, the status bar
-    /// first shows the wait for one frame (see <see cref="GateWait"/>). A session that takes no edits does not save, so
-    /// it does not wait.
+    /// Runs a save of the user, or another call of the save gate on the UI thread: Ctrl+S, File > Save, the save of the
+    /// close prompt, the save before an export and the gate of the Export dialog. When the save gate must wait for the
+    /// index of the cutscene uses, the status bar first shows the wait for one frame (see <see cref="GateWait.Run"/>). A
+    /// Play request waits in its controller, which asks <see cref="IPlayHost.HoldForGate"/>.
     /// </summary>
-    internal void AfterGateStatus(Action action) =>
-        gateWait.Run(Session is { NoEditReason: null } session && session.Edits.CutsceneGateWaits,
-            status => Log.AddStatus(ConsoleSeverity.Info, SaveReport.Source, status), action);
+    internal void AfterGateStatus(Action action) => gateWait.Run(SaveGateWaits, GateStatus, action);
+
+    bool IPlayHost.HoldForGate(object request) => gateWait.Hold(request, SaveGateWaits, GateStatus);
+
+    /// <summary>True when a save waits now for the index of the cutscene uses. A session that takes no edits does not
+    /// save, so it does not wait.</summary>
+    private bool SaveGateWaits => Session is { NoEditReason: null } session && session.Edits.CutsceneGateWaits;
+
+    /// <summary>Writes the status line of a save that waits for the gate.</summary>
+    private void GateStatus(string status) => Log.AddStatus(ConsoleSeverity.Info, SaveReport.Source, status);
 
     /// <summary>
     /// The section of the edit view that an item shows: the <c>[Ship]</c> of a ship, the section of equipment, the
@@ -510,13 +519,13 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
 
         Choice.Show("Export mod", "The export uses the saved files. Save the changes first?",
         [
-            new Choice("Save", () =>
+            new Choice("Save", () => AfterGateStatus(() =>
             {
                 if (Edits.Save().Saved && Session == session && !session.Edits.IsDirty)
                 {
                     Show();
                 }
-            }),
+            })),
             new Choice("Cancel", () => { }),
         ]);
     }
@@ -603,7 +612,7 @@ internal sealed partial class EditorWindow : IClosePromptHost, ISaveCommandHost,
         }
         else if (ImGui.Shortcut(EditorKeys.PlayInGame.Chord.Shortcut, global))
         {
-            AfterGateStatus(GamePlay.PlayLast);
+            GamePlay.PlayLast();
         }
         else if (ImGui.Shortcut(EditorKeys.Play.Chord.Shortcut, global))
         {

@@ -72,7 +72,7 @@ internal sealed class PlayMenu(EditorWindow window)
     /// F5 and the Play button (decision D744 of the M6c design): in the Mission tab with an open mission, a mission play
     /// from the play start of the mission. Else Play from camera, as milestone M4 defines it.
     /// </summary>
-    public void PlayF5() => window.AfterGateStatus(() =>
+    public void PlayF5()
     {
         if (OpenMission is { } script)
         {
@@ -81,7 +81,7 @@ internal sealed class PlayMenu(EditorWindow window)
         }
 
         PlayFromCamera();
-    });
+    }
 
     /// <summary>The script of the open mission while the Mission tab shows it, else null. F5 then plays the
     /// mission.</summary>
@@ -108,7 +108,7 @@ internal sealed class PlayMenu(EditorWindow window)
         var playKey = OpenMission == null ? EditorKeys.Play.Chord.Text : "";
         if (MenuItems.Item(EditorIcons.Play, "Play from camera", block, PlayTooltip(null), playKey))
         {
-            window.AfterGateStatus(PlayFromCamera);
+            PlayFromCamera();
         }
 
         BaseMenu();

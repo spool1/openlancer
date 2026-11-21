@@ -360,7 +360,7 @@ internal sealed class PlayController : IDisposable
             // design). The process stays.
             if (request.Mission != null && running.Mission != null && CanRestart(running))
             {
-                if (sceneBehind)
+                if (sceneBehind || HoldForGate(request))
                 {
                     return;
                 }
@@ -380,7 +380,7 @@ internal sealed class PlayController : IDisposable
             return;
         }
 
-        if (sceneBehind)
+        if (sceneBehind || HoldForGate(request))
         {
             return;
         }
@@ -388,6 +388,10 @@ internal sealed class PlayController : IDisposable
         pending = null;
         Finish(request, Begin(request));
     }
+
+    /// <summary>True while a request waits one more frame before its save, so the status bar first shows the wait of
+    /// the save gate (see <see cref="IPlayHost.HoldForGate"/>). A request that does not save does not wait.</summary>
+    private bool HoldForGate(PlayRequest request) => request.Save != PlaySaveRule.None && editor.HoldForGate(request);
 
     /// <summary>
     /// Lets the Scene apply each edit for a request or a restart whose start check reads the Scene (section 9.5). The
