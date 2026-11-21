@@ -73,7 +73,7 @@ internal sealed class DatabaseTable
     private SortKey[]? sortKeys;
 
     private DatabaseTable(string id, string noun, (string, float, bool)[] columns, DatabaseRow[] rows,
-        Action<object>? open, string openLabel, RowAction<object>? action)
+        Action<object>? open, string openLabel, RowAction<object>? action, string? markTip)
     {
         this.id = id;
         Noun = noun;
@@ -82,10 +82,14 @@ internal sealed class DatabaseTable
         this.open = open;
         this.openLabel = openLabel;
         this.action = action;
+        MarkTip = markTip;
     }
 
     /// <summary>The word for the items in the count of the toolbar strip, for example "ships".</summary>
     public string Noun { get; }
+
+    /// <summary>The tooltip of a row with the dot, or null for no tooltip.</summary>
+    public string? MarkTip { get; }
 
     /// <summary>The number of rows of the kind that shows, before the filter.</summary>
     public int Total { get; private set; }
@@ -111,9 +115,10 @@ internal sealed class DatabaseTable
     /// <param name="openLabel">The context menu text of <paramref name="open"/>.</param>
     /// <param name="marked">True for an item whose row has a dot next to its glyph, or null for no dots.</param>
     /// <param name="action">One more item of the context menu of the rows, or null.</param>
+    /// <param name="markTip">The tooltip of a row with the dot, which tells what the dot means, or null.</param>
     public static DatabaseTable Create<T>(string id, string noun, IEnumerable<T> items,
         IReadOnlyList<Column<T>> columns, Func<T, ObjectKind> kind, Action<T>? open = null, string openLabel = "Open",
-        Func<T, bool>? marked = null, RowAction<T>? action = null)
+        Func<T, bool>? marked = null, RowAction<T>? action = null, string? markTip = null)
         where T : notnull
     {
         var rows = items.Select((item, index) => new DatabaseRow(index, item, kind(item),
@@ -126,7 +131,7 @@ internal sealed class DatabaseTable
             action == null
                 ? null
                 : new RowAction<object>(action.Icon, action.Label, item => action.Applies((T)item),
-                    item => action.Run((T)item)));
+                    item => action.Run((T)item)), markTip);
     }
 
     /// <summary>
@@ -289,6 +294,11 @@ internal sealed class DatabaseTable
         }
 
         ImGui.PopStyleColor(selected ? 2 : 1);
+        if (row.Marked && MarkTip != null)
+        {
+            ImGui.SetItemTooltip(MarkTip);
+        }
+
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
         {
             window.Selection = row.Item;

@@ -22,12 +22,18 @@ namespace OpenLancer.Editor.Database;
 /// or one type of equipment. The table at the right shows the items of the category.
 /// </summary>
 /// <remarks>
-/// The goods come from the edit view, not from the game data, so they show each edit at once. A dot marks a good that
-/// the active mod adds or changes. A good row selects its section.
+/// The systems and the goods come from the edit view, not from the game data, so they show each edit at once. A dot
+/// marks a good that the active mod adds or changes, and a new system that the mod has not saved. A good row selects its
+/// section. A system row selects the system, or the <c>[system]</c> of a new system.
 /// </remarks>
 internal sealed class DatabasePanel(EditorWindow window)
 {
+    private const string SystemsId = "systems";
     private const string GoodsId = "goods";
+
+    /// <summary>The tooltip of the row of a new system that the mod has not saved. The loaded game data does not have
+    /// the system, so its counts are empty.</summary>
+    internal const string NewSystemMark = "New. Save to open it in the Scene.";
 
     /// <summary>The empty state of a table whose rows the filter hides (#56). The next action is a link.</summary>
     internal static readonly EmptyState NoRowMatch = new($"No rows match '{EmptyState.TextPlace}'.", "Clear filter");
@@ -43,7 +49,6 @@ internal sealed class DatabasePanel(EditorWindow window)
     private const float NumberWidth = 80;
 
     private GameDataManager? loadedData;
-    private int goodsVersion = -1;
     private Category[] categories = [];
     private Category? current;
     private string filter = "";
@@ -55,8 +60,25 @@ internal sealed class DatabasePanel(EditorWindow window)
     /// <param name="Id">The id that the settings keep, for example "equipment/Gun".</param>
     /// <param name="RowKind">The kind of the rows that show, or null for all the rows of the table.</param>
     /// <param name="Depth">The indent level in the list.</param>
+    /// <param name="Remake">Makes the category again, for a category whose rows come from the edit view. Null for a
+    /// category of the loaded game data.</param>
+    /// <param name="Version">The version of the session that the rows of a category from the edit view show.</param>
     private sealed record Category(string Id, string Name, ObjectKind Kind, DatabaseTable Table, ObjectKind? RowKind,
-        int Depth, int Count);
+        int Depth, int Count, Func<EditorSession, Category>? Remake = null, int Version = 0);
+
+    /// <summary>A row of the Systems table: a <c>[system]</c> of the edit view, with the system of the loaded game
+    /// data.</summary>
+    /// <param name="Loaded">The system of the loaded game data, or null for a new system that the mod has not
+    /// saved.</param>
+    internal sealed record SystemRow(string Nickname, SectionRef Entry, StarSystem? Loaded)
+    {
+        /// <summary>True for a new system that the loaded game data does not have.</summary>
+        public bool IsNew => Loaded == null;
+
+        /// <summary>The item that a click on the row selects: the system of the loaded game data, so that its full page
+        /// shows, or the <c>[system]</c> of a new system.</summary>
+        public object Item => (object?)Loaded ?? Entry;
+    }
 
     /// <summary>Forgets the tables of the game data. Call it when the profile closes.</summary>
     public void Reset()
@@ -168,8 +190,8 @@ internal sealed class DatabasePanel(EditorWindow window)
     }
 
     /// <summary>
-    /// The category that shows. The tables and the category list are made once for each data load. The goods table is
-    /// made again after an edit, while it shows.
+    /// The category that shows. The tables and the category list are made once for each data load. The tables of the
+    /// systems and the goods come from the edit view, so they are made again after an edit, while they show.
     /// </summary>
     private Category CurrentCategory(GameDataManager data)
     {
@@ -178,21 +200,68 @@ internal sealed class DatabasePanel(EditorWindow window)
             Build(data);
         }
 
-        if (current!.Id == GoodsId && window.Session is { } session && session.Version != goodsVersion)
+        if (current!.Remake is { } remake && window.Session is { } session && session.Version != current.Version)
         {
-            var goods = GoodsCategory(session);
-            categories[Array.FindIndex(categories, c => c.Id == GoodsId)] = goods;
-            current = goods;
+            var made = remake(session);
+            categories[Array.FindIndex(categories, c => c.Id == made.Id)] = made;
+            current = made;
         }
 
         return current!;
+    }
+
+    /// <summary>The systems category: the <c>[system]</c> sections of the edit view, with the counts of the loaded game
+    /// data. A new system shows at once, with a dot and empty counts.</summary>
+    private Category SystemsCategory(EditorSession session)
+    {
+        var table = SystemsTable(SystemRows(session.Edits, nickname => session.GameData?.Items.Systems.Get(nickname)),
+            session.SectionName, OpenSystem);
+        return new Category(SystemsId, "Systems", ObjectKinds.StarSystem, table, null, 0, table.RowCount,
+            SystemsCategory, session.Version);
+    }
+
+    /// <summary>
+    /// The rows of the Systems table: one for each nickname of the <c>[system]</c> sections of the edit view, in file
+    /// order. A nickname that two sections share gets one row, because the engine uses only one of them.
+    /// </summary>
+    /// <param name="loaded">The system of the loaded game data with a nickname, or null.</param>
+    internal static IReadOnlyList<SystemRow> SystemRows(EditSession edits, Func<string, StarSystem?> loaded) =>
+        edits.SystemSections()
+            .DistinctBy(s => s.Id.Key!, StringComparer.OrdinalIgnoreCase)
+            .Select(s => new SystemRow(s.Id.Key!, s, loaded(s.Id.Key!)))
+            .ToList();
+
+    /// <summary>The Systems table of the rows. A new system has the dot, the tooltip <see cref="NewSystemMark"/> and
+    /// empty counts.</summary>
+    /// <param name="name">The name of a <c>[system]</c> in the edit view.</param>
+    /// <param name="open">Opens the item of a row, or null.</param>
+    internal static DatabaseTable SystemsTable(IReadOnlyList<SystemRow> rows, Func<SectionRef, string> name,
+        Action<object>? open)
+    {
+        var byItem = rows.ToDictionary(r => r.Item);
+        return DatabaseTable.Create<object>("##db-systems", "systems", rows.Select(r => r.Item),
+            SystemColumns(item => byItem[item], name), _ => ObjectKinds.StarSystem, open, "Open system",
+            marked: item => byItem[item].IsNew, markTip: NewSystemMark);
+    }
+
+    /// <summary>Opens the system of a row in the Scene. A new system shows the save card of the Scene.</summary>
+    private void OpenSystem(object item)
+    {
+        switch (item)
+        {
+            case StarSystem system:
+                window.OpenSystem(system);
+                break;
+            case SectionRef { Id.Key: { } nickname }:
+                window.OpenSystem(nickname, null);
+                break;
+        }
     }
 
     /// <summary>The goods category: the [Good] sections of the edit view. A ship package has the row action Use for
     /// Play (decision D15).</summary>
     private Category GoodsCategory(EditorSession session)
     {
-        goodsVersion = session.Version;
         var rows = new Dictionary<SectionRef, (string Category, string Name, double Price, bool Changed, bool Package)>();
         foreach (var section in session.Edits.List(ItemFileKind.Goods))
         {
@@ -215,7 +284,8 @@ internal sealed class DatabasePanel(EditorWindow window)
         ], _ => ObjectKinds.Good, marked: s => rows[s].Changed,
             action: new RowAction<SectionRef>(EditorIcons.Play, "Use for Play", s => rows[s].Package && s.Id.Key != null,
                 s => window.UseForPlay(s.Id.Key!)));
-        return new Category(GoodsId, "Goods", ObjectKinds.Good, table, null, 0, table.RowCount);
+        return new Category(GoodsId, "Goods", ObjectKinds.Good, table, null, 0, table.RowCount, GoodsCategory,
+            session.Version);
     }
 
     private static string? First(SectionView view, string name) =>
@@ -227,8 +297,6 @@ internal sealed class DatabasePanel(EditorWindow window)
         loadedData = data;
         var session = window.Session!;
         var items = data.Items;
-        var systems = DatabaseTable.Create("##db-systems", "systems", items.Systems, SystemColumns(session.Name),
-            _ => ObjectKinds.StarSystem, window.OpenSystem, "Open system");
         var ships = DatabaseTable.Create("##db-ships", "ships", items.Ships, ShipColumns(session.Name, items),
             _ => ObjectKinds.Ship);
         var equipment = DatabaseTable.Create<Equipment>("##db-equipment", "equipment", items.Equipment,
@@ -236,7 +304,7 @@ internal sealed class DatabasePanel(EditorWindow window)
 
         var list = new List<Category>
         {
-            new("systems", "Systems", ObjectKinds.StarSystem, systems, null, 0, systems.RowCount),
+            SystemsCategory(session),
             new("ships", "Ships", ObjectKinds.Ship, ships, null, 0, ships.RowCount),
             GoodsCategory(session),
         };
@@ -294,15 +362,24 @@ internal sealed class DatabasePanel(EditorWindow window)
         ListRow.PopStyle();
     }
 
-    private static Column<StarSystem>[] SystemColumns(Func<int, string> name) =>
+    /// <summary>The columns of the Systems table. The counts and the faction come from the loaded game data, so a new
+    /// system has empty cells.</summary>
+    /// <param name="row">The row of an item of the table.</param>
+    private static Column<object>[] SystemColumns(Func<object, SystemRow> row, Func<SectionRef, string> name) =>
     [
-        new("Nickname", s => s.Nickname, NicknameWidth),
-        new("Name", s => name(s.IdsName), NameWidth),
-        new("Objects", s => DatabaseTable.Count(s.Objects.Count), NumberWidth, s => s.Objects.Count),
-        new("Zones", s => DatabaseTable.Count(s.Zones.Count), NumberWidth, s => s.Zones.Count),
-        new("Lights", s => DatabaseTable.Count(s.LightSources.Count), NumberWidth, s => s.LightSources.Count),
-        new("Local faction", s => s.LocalFaction?.Nickname ?? "", 140),
+        new("Nickname", i => row(i).Nickname, NicknameWidth),
+        new("Name", i => name(row(i).Entry), NameWidth),
+        LoadedCount("Objects", row, s => s.Objects.Count),
+        LoadedCount("Zones", row, s => s.Zones.Count),
+        LoadedCount("Lights", row, s => s.LightSources.Count),
+        new("Local faction", i => row(i).Loaded?.LocalFaction?.Nickname ?? "", 140),
     ];
+
+    /// <summary>A column of a count of the loaded game data. A new system has an empty cell, which sorts as a missing
+    /// number.</summary>
+    private static Column<object> LoadedCount(string header, Func<object, SystemRow> row, Func<StarSystem, int> count) =>
+        new(header, i => row(i).Loaded is { } system ? DatabaseTable.Count(count(system)) : "", NumberWidth,
+            i => row(i).Loaded is { } system ? count(system) : double.NaN);
 
     private static Column<Ship>[] ShipColumns(Func<int, string> name, GameItemDb items) =>
     [

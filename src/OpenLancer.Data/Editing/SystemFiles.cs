@@ -37,6 +37,7 @@ internal sealed class SystemFiles
     private Dictionary<string, List<SystemEntry>> byNickname = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> files = new(VfsPath.Comparer);
     private List<string> ordered = [];
+    private List<SectionRef> sections = [];
 
     /// <param name="universePath">The install path of <c>universe.ini</c>, or null when <c>freelancer.ini</c> names
     /// none.</param>
@@ -103,6 +104,17 @@ internal sealed class SystemFiles
         }
     }
 
+    /// <summary>The <c>[system]</c> sections that have a nickname, in file order. Two sections can have one nickname,
+    /// and then the engine uses only one of them.</summary>
+    public IReadOnlyList<SectionRef> Sections
+    {
+        get
+        {
+            Refresh();
+            return sections;
+        }
+    }
+
     /// <summary>True when a <c>[system]</c> section names the file, also when its nickname is ambiguous.</summary>
     public bool IsSystemFile(string path)
     {
@@ -136,6 +148,7 @@ internal sealed class SystemFiles
         byNickname = new Dictionary<string, List<SystemEntry>>(StringComparer.OrdinalIgnoreCase);
         files = new HashSet<string>(VfsPath.Comparer);
         ordered = [];
+        sections = [];
         if (document == null)
             return;
         for (var i = 0; i < document.Working.Count; i++)
@@ -148,8 +161,10 @@ internal sealed class SystemFiles
             var path = FileValue(document.Working[i]) is { } file ? FilePath(document.Path, file) : null;
             if (path != null && files.Add(path))
                 ordered.Add(path);
+            var section = new SectionRef(document.Path, id);
+            sections.Add(section);
             (byNickname.TryGetValue(id.Key, out var named) ? named : byNickname[id.Key] = [])
-                .Add(new SystemEntry(new SectionRef(document.Path, id), path));
+                .Add(new SystemEntry(section, path));
         }
     }
 

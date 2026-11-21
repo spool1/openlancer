@@ -42,6 +42,11 @@ public sealed partial class EditSession
     /// than one has the nickname.</summary>
     public SectionRef? SystemSection(string systemNickname) => Systems.SectionOf(systemNickname);
 
+    /// <summary>The <c>[system]</c> sections of W of <c>universe.ini</c> that have a nickname, in file order. A new system
+    /// that the mod has not saved is in the list. Two sections can have one nickname, and then the engine uses only one
+    /// of them.</summary>
+    public IReadOnlyList<SectionRef> SystemSections() => Systems.Sections;
+
     /// <summary>True for a <c>[system]</c> section of <c>universe.ini</c>.</summary>
     public bool IsSystemSection(SectionRef section) =>
         UniversePath is { } universe && IO.VfsPath.Comparer.Equals(section.Path, universe) &&
