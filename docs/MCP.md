@@ -110,8 +110,9 @@ These tools work in both hosts. They change nothing.
 | Tool | What it gives |
 |---|---|
 | `studio_status` | The profile, the active mod, the revision, the tool groups, the limits and the state of the game data (`data_load`). The agent calls it first. See "Save". |
-| `list_systems`, `get_system` | The star systems, and one system with its counts, bases, connections and problems. |
-| `list_items`, `get_item` | The items of a system, and one item with its fields, their origins and their problems. A cutscene entity or event gives its fields by their THN paths. |
+| `list_systems`, `get_system` | The star systems, and one system with its counts, bases, connections and problems. `get_system` also gives the place on the nav map, the zoom of the system map and the jump objects of the system. |
+| `get_universe`, `get_route` | The systems with their jump connections, and the shortest routes from one system. See "The universe tools". |
+| `list_items`, `get_item` | The items of a system, and one item with its fields, their origins and their problems. A cutscene entity or event gives its fields by their THN paths. An object row of `list_items` and a connection row of `get_system` give the `solar_radius` of the archetype. |
 | `find_references` | Each line and each file that names an item, also in the mission scripts. |
 | `list_values` | The values that a field can take, from one data list. |
 | `search_assets`, `list_prop_groups` | The assets of the Assets panel, and the prop groups of the mods. |
@@ -156,8 +157,8 @@ These tools change the data of the active mod. They work in both hosts. The olto
 |---|---|
 | `set_fields` | Sets fields of one item by their INI keys, or of a cutscene entity or event by their THN paths. |
 | `set_text` | Sets the name, the infocard or another text of one item, or a text id of a mission line. The text goes into the `strings.json` of the active mod. It does not change cutscene items. Use `set_fields` for their texts. |
-| `rename_item` | Gives an item a new nickname, and changes each line that names it. A line that the active mod cannot change keeps the old nickname and shows "Missing". A data item must be an item that the active mod adds. A rename of a ship or equipment also changes the templates of the cutscene COMPOUNDs that name it. A cutscene entity gets a new name, and the events of its script that name it change too. |
-| `delete_items` | Deletes items of a system with their children, mission items, and cutscene entities and events. Other lines that name them show "Missing". A cutscene entity goes with the events that name it. |
+| `rename_item` | Gives an item a new nickname, and changes each line that names it. A line that the active mod cannot change keeps the old nickname and shows "Missing". A data item and a system must be items that the active mod adds. A rename of a ship or equipment also changes the templates of the cutscene COMPOUNDs that name it. A cutscene entity gets a new name, and the events of its script that name it change too. |
+| `delete_items` | Deletes items of a system with their children, mission items, and cutscene entities and events. Other lines that name them show "Missing". A cutscene entity goes with the events that name it. A system that the active mod adds goes with its file. |
 | `duplicate_items` | Copies items of a system with their children, mission items and cutscene events. With `offset`, the copies of a system move by the offset. A copy without a position, a mission copy and a copy of a cutscene event do not move, and the result warns about them. With `time_offset`, each copy of an event is at the time of its event plus the offset. |
 | `undo` | Undoes the last edit of the agent. |
 | `redo` | Redoes the last edit that the agent undid. |
@@ -167,7 +168,11 @@ Each edit is one Undo step. The Edit menu shows its label with "Agent: " before 
 
 The five tools `set_fields`, `set_text`, `rename_item`, `delete_items` and `duplicate_items` also change mission items. "The generic tools on mission items" tells which references each tool takes. Four of them also change cutscene items, as "The generic tools on cutscene items" tells. The other edit tools change only items of INI files that are not mission files. A reference of a mission item gives them `invalid_argument` with the detail `MissionItem`. A reference of a cutscene item gives them `invalid_argument` with the detail `CutsceneItem`, and the message names the tools that change cutscenes.
 
-A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. Of the items of a system, `delete_items` takes objects, zones, lights, nebulae and asteroid fields. A jump gate or a jump hole goes with its pair, its traffic zones and its gate lock lines. The delete needs `confirm: true` when the other end is in another file. A one-way object whose `goto` line names an end gives `refused`, because it is no part of the pair. Name it in the same call, or delete it first. `duplicate_items` takes objects, zones and lights of a system. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. Another section, for example a loadout, gives `refused`.
+A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. Of the items of a system, `delete_items` takes objects, zones, lights, nebulae and asteroid fields. A jump gate or a jump hole goes with its pair, its traffic zones and its gate lock lines. The delete needs `confirm: true` when the other end is in another file. A one-way object whose `goto` line names an end gives `refused`, because it is no part of the pair. Name it in the same call, or delete it first.
+
+`delete_items` also takes a system that the active mod adds, by its `system:` reference. The delete always needs `confirm: true`. The system file goes too, and each object of another system whose `goto` line names the system goes with its pair. The mission lines that name the system show "Missing". A system with a base gives `refused` in this version. A system of the game or of a lower mod gives `refused` with the detail `GameSystem`. A call can also name items of the system. These items go with the system.
+
+`duplicate_items` takes objects, zones and lights of a system. A jump gate, a jump hole, an airlock gate and a trade lane ring give `refused`, because a copy has no partner. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. It also takes a system that the active mod adds. The rename of a system changes the `goto` lines, the `[Base]` lines and the mission lines that name it, and its file keeps its path. Another section, for example a loadout, gives `refused`.
 
 A rename of a ship or equipment also changes the template of each cutscene COMPOUND that names it, as the data API does. A rename of a good also renames its equipment, so the COMPOUNDs of that equipment change too. The result gives these entities in `changes` as `thn:` references. Such a change alone needs no `confirm: true`. When the rename asks for another reason, the question also names their cutscenes. A cutscene that the editor cannot change keeps the old name, and the rename asks with a warning.
 
@@ -241,7 +246,7 @@ These tools call the commands of the Scene, the Assets panel and the Database of
 
 A create can also give the new item a nickname, a rotation, a size, a name and more fields. These parts go into the same Undo step, and the label is "Create" and the nickname. The result gives the new item with its last reference and selects it. Without a nickname, the item gets the next free nickname, as in the Create menu. The editor rounds a position to whole numbers.
 
-A station archetype with a docking sphere needs a base, because the Create menu asks for one. A station archetype without a docking sphere takes no base. A `parent` must be an object of the same system. An archetype of another template gives `invalid_value` with the reason.
+A station archetype with a docking sphere needs a base, because the Create menu asks for one. A station archetype without a docking sphere takes no base. A `parent` must be an object of the same system. An archetype of another template gives `invalid_value` with the reason. A jump gate, a jump hole, an airlock gate and a trade lane ring need a partner or a lane. So `scene_create_object` and `scene_spawn_asset` refuse their archetypes. Use `connection_create` for a jump gate pair or a jump hole pair.
 
 `scene_spawn_asset` takes the template of the type of a solar archetype. A ship, an asteroid or a model makes a new static prop archetype. The Scene shows its object after a save, when the editor loads the new archetype, and the result tells it.
 
@@ -283,6 +288,54 @@ These steps build an NPC patrol and a wreck with cargo in a system.
 11. If you called `undo`, call `scene_place_wreck` again with the correct rows.
 12. Correct each other error with `set_fields`, for example an error of the patrol.
 13. Save the mod in the editor.
+
+### The universe tools
+
+These tools make new star systems and jump connections, and read the jump graph of the edit view. They work in both hosts. Each edit tool is one Undo step, also when it changes two system files, the gate locks and the text of the mod. Each edit tool can be a step of `edit_batch`. A later step can name a system or an object that an earlier step made.
+
+| Tool | What it does |
+|---|---|
+| `system_create` | Makes a new star system of the active mod like a template system. It adds the `[system]` to `universe.ini`, and a system file with a sun and its death zone. |
+| `connection_create` | Makes a jump gate pair or a jump hole pair between two systems, or a jump hole pair inside one system. |
+| `connection_set_lock` | Sets the lock of a jump gate or a jump hole at the start of a new game, and of its partner. |
+| `get_universe` | Gives the systems with their places on the nav map and their jump objects, and their jump connections. |
+| `get_route` | Gives the shortest routes from one system, as the route tables of the retail games give them. |
+
+`system_create` puts the new file into the folder of the active mod, as "New systems" of `docs/MOD_FORMAT.md` tells. The nickname has 2 to 15 letters, digits or `_`, and starts with a letter. `map_pos` takes two whole numbers from 0 to 15. Each value that names other data, for example `local_faction` or the archetype of `sun`, must be an entry of its list.
+
+The result gives `system`, `file` and `sun`. It also warns that no jump gate or jump hole leads to the new system yet. In the editor, the Scene opens the new system only after a save and the reload of the game data, and the result tells it. The refusals are:
+
+| Detail | Error | Cause |
+|---|---|---|
+| `NameTaken` | `name_taken` | Another system has the nickname or its FLHash. |
+| `PathInUse` | `invalid_value` | The game data, a lower mod or the active mod has the file of the nickname. |
+| `MapPosRange` | `invalid_value` | A place outside 0 to 15. |
+| `LikeNoFile` | `invalid_value` | The template system has no file. |
+| `LikeNoSun` | `invalid_value` | The template system has no sun, and `sun` gives no archetype and star. |
+| `SunType` | `invalid_value` | The archetype of `sun` is not of the type `SUN`. |
+
+`connection_create` takes `kind`, `from` and `to`. Each end names its system. Without `object`, the end is a new object. With `object`, the end is an existing jump gate or jump hole of the system without a partner. The tool then writes only its `goto` line. The other members of such an end give `invalid_argument`.
+
+A new end gets its lines, its nickname, its name, its position and its traffic zone as "Jump connections and gate locks" of `docs/MOD_FORMAT.md` tells. The result gives `pair`, `traffic_zones`, the `loadout` and the `pilot` of each end, `routes` and `jump_objects`. `routes` counts the routes of the table of all connections that the edit adds, makes shorter, makes longer and removes. The refusals are:
+
+| Detail | Error | Cause |
+|---|---|---|
+| `JumpLimit` | `refused` | A system would have more than 10 jump objects. A hole pair inside one system counts 2. |
+| `GateSameSystem` | `invalid_value` | A jump gate pair inside one system. |
+| `KindMismatch` | `invalid_value` | The archetype or the existing end is of another kind. |
+| `EndPaired` | `invalid_value` | The existing end has a partner that goes back to it. |
+| `NameTaken` | `name_taken` | Another object has the nickname of a new end. |
+| `EndOtherSystem` | `invalid_argument` | An `obj:` reference of an end names an object of another system. |
+
+The `field` of each error names the argument, for example `to.object`. The message is the text that the editor shows for the same refusal.
+
+`connection_set_lock` sets `locked` to `none`, `player`, `npc` or `both`. With `pair`, the default, the partner gets the same lock when it goes back to the object. A gate of the game or of a lower mod works too, because the patch of the gate lock file changes. A player lock gives a warning: the route tables leave out the gate, also after a mission unlocks it. A second call with the same lock gives `no_change`. An object that is no jump gate and no jump hole gives `invalid_value` with the detail `NotConnection`.
+
+`get_universe` gives one page of systems in the order of `universe.ini`, and the connections of these systems in the order of each system file. With `system`, it gives one system and its connections. Each connection gives its kind, the object that it goes to, if that object goes back (`pair_ok`), and its lock. `route_files_change` is true when the route tables of the mods differ from the route tables of the game without mods. Ctrl+F5 and an export for a retail game then write the route files, as "Route tables" of `docs/MOD_FORMAT.md` tells.
+
+`get_route` gives the shortest route from `from` to each system that the table reaches, and the systems that it does not reach. `kind` picks the table: `all`, `gates` or `holes`. The tables leave out each gate that is locked for the player. OpenLancer Play computes its own routes, so these tables show what the retail games read.
+
+In `edit_batch`, a step of these edit tools gives the result of its edit, without `system`, `pair` and the other parts above. The `adds` of the step name the new items.
 
 ### The mission tools
 

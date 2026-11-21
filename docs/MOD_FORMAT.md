@@ -409,7 +409,7 @@ A file in `files/` adds a new file, or replaces the file at the same install pat
 The editor edits two kinds of whole files of the active mod:
 
 - A file under `DATA/MISSIONS`, for example a test script, a replaced slot script or a file of ship builds.
-- An INI file below `DATA/MODS/<mod id>/` of the active mod, for example the file of a new star system (see "New systems"). Put such a file in `files/` of the mod. This version has no menu item and no agent tool that makes or deletes such a file.
+- An INI file below `DATA/MODS/<mod id>/` of the active mod, for example the file of a new star system (see "New systems"). Put such a file in `files/` of the mod. The agent tools `system_create` and `delete_items` make and delete the file of a new system. This version has no menu item for it.
 
 A line of another file names such a file by its path. For example, the `file` line of a new `[system]` or a new `[Base]` in `universe.ini` names a file in the mod folder (see "universe.ini"). A `[Data]` line of `freelancer.ini` names a new data file (see "freelancer.ini").
 
@@ -550,7 +550,7 @@ NavMapScale = 2.5
 - `strid_name` is the name on the nav map, and `ids_info` is the infocard. Write them as text placeholders. The new system file can use placeholders too, for example the `ids_name` of its sun.
 - The nickname has 2 to 15 letters, digits or `_`, and it starts with a letter. The game keeps only 15 characters of a system nickname in its route tables. The id of a system is the FLHash of its nickname, and the game drops a second system with the same id.
 
-When OpenLancer makes a new system, it copies a template system:
+The agent tool `system_create` makes a new system (see "The universe tools" in `docs/MCP.md`). OpenLancer copies a template system:
 
 - The `[system]` gets a new name, a new infocard, its place and its visit flag. It copies the `NavMapScale` of the template.
 - The new file gets these sections of the template, in this order: `[SystemInfo]`, `[Archetype]`, `[TexturePanels]`, `[Dust]`, `[Music]`, `[Ambient]`, `[Background]`, each `[LightSource]` and each `[EncounterParameters]`. A light keeps its nickname, because a light name is unique only in its file. The faction of `[SystemInfo]` can change.
@@ -606,7 +606,7 @@ pilot = pilot_solar_hard
 - The game records the jump with the nickname that the object has before its `goto` line. So `nickname` comes first.
 - The game crashes with more than 10 objects with `goto` in one system. Airlock gates count too. The retail maximum is 9, in Li01 and Br04.
 
-When OpenLancer makes a jump gate pair or a jump hole pair:
+The agent tool `connection_create` makes a pair, and `connection_set_lock` sets the locks of a gate (see "The universe tools" in `docs/MCP.md`). When OpenLancer makes a jump gate pair or a jump hole pair:
 
 - Each new end gets the lines in the order of the example. A gate to a system with `msg_id_prefix` gets that line after `archetype`. A jump hole has no `reputation`, `behavior`, `difficulty_level`, `loadout` and `pilot` lines. It has `visit = 0` as its last line.
 - The nickname is `<system>_to_<other system>` for a gate and `<system>_to_<other system>_hole` for a hole. When an object or a zone has that nickname, OpenLancer adds `_1`, `_2` and so on.
