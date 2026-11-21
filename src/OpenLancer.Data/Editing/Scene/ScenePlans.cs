@@ -355,7 +355,8 @@ public static partial class ScenePlans
     /// "Missing". A delete of a nebula or a field removes only its section, and its zone stays.
     /// </summary>
     /// <remarks>A jump gate or a jump hole goes with its pair, as <see cref="Universe.ConnectionPlans.DeletePair"/>
-    /// tells. Airlock gates and trade lane rings refuse the delete.</remarks>
+    /// tells. Airlock gates and trade lane rings refuse the delete. A one-way object whose <c>goto</c> line names a
+    /// deleted object refuses the delete with the text of <see cref="Universe.ConnectionPlans.OneWayRefusal"/>.</remarks>
     public static ScenePlan Delete(EditSession session, IReadOnlyList<SectionRef> targets) =>
         Delete(session, new ScenePlan(SceneAction.Delete, "Delete"), targets, [], []);
 
@@ -478,6 +479,8 @@ public static partial class ScenePlans
                             break;
                         case DeleteAction.Refuse:
                             refusals.Add(Diagnostic.Error(reference.Section.Path,
+                                Universe.ConnectionPlans.OneWayRefusal(session, reference.Section, referrer, reference.Key,
+                                    name) ??
                                 $"{reference.Section.Id} names {name} in its '{reference.Key}' line. " +
                                 $"{reference.Rule.ConsequenceText} Remove that line first, or keep {name}.") with
                             {

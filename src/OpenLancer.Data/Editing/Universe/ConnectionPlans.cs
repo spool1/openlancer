@@ -435,7 +435,8 @@ public static class ConnectionPlans
     /// </summary>
     /// <remarks>The plan asks before it runs when a partner is in another file. A partner in the same file, the traffic
     /// zones and the lock lines are parts of the pair, so they do not make the plan ask. The plan refuses an object that
-    /// is no jump gate or jump hole, and a partner that the editor cannot change, with the reason.</remarks>
+    /// is no jump gate or jump hole, and a partner that the editor cannot change, with the reason. It also refuses an
+    /// end that a one-way object goes to, with the text of <see cref="OneWayRefusal"/>.</remarks>
     public static ScenePlan DeletePair(EditSession session, IReadOnlyList<SectionRef> objects)
     {
         foreach (var item in objects)
@@ -480,6 +481,28 @@ public static class ConnectionPlans
                          key[(stem.Length + 1)..].All(char.IsAsciiDigit)))
             .ToList();
         return (partner, line, zones);
+    }
+
+    /// <summary>
+    /// The refusal text of a delete for an object whose <c>goto</c> line names a deleted object, or null for another
+    /// line. The deleted object does not go back to it, because a partner goes with the pair. Such a one-way object is
+    /// not a part of the pair, so the delete keeps the refusal of the line. The Inspector and <c>set_fields</c> lock the
+    /// <c>goto</c> line, so the text names the actions that can change it.
+    /// </summary>
+    /// <param name="view">The object that names the deleted object, as <see cref="EditSession.Get"/> gives it.</param>
+    internal static string? OneWayRefusal(EditSession session, SectionRef referrer, SectionView? view, string key,
+        string name)
+    {
+        if (!key.Equals("goto", StringComparison.OrdinalIgnoreCase) || referrer.Id.Key is not { } own ||
+            SceneSections.KindOf(session, referrer) != SceneKind.Object)
+            return null;
+        var text = $"The goto line of {own} in {SceneSections.FileName(referrer.Path)} names {name}, but {name} does " +
+                   $"not go back to {own}.";
+        return view?.ReadOnlyReason is { } reason
+            ? $"{text} Keep {name}, because the editor cannot change {own}: {reason}"
+            : $"{text} Delete {own} first or in the same delete, or keep {name}. The Delete of the editor and the agent " +
+              $"tool delete_items delete a one-way object alone. To keep {own}, change its goto line in the raw INI " +
+              $"block, or pair it with {SceneSections.PairTool}.";
     }
 
     /// <summary>One end of a new pair while the plan reads it.</summary>

@@ -677,4 +677,96 @@ public sealed class ConnectionPlansTests
         Assert.Equal(ConnectionPlans.NotConnection, Assert.Single(station.Refusals).Rule);
         Assert.Equal("Li01_01 is not a jump gate or a jump hole.", station.Refusals[0].Message);
     }
+
+    /// <summary>
+    /// A one-way object that goes to one end of a pair is no part of the pair. The delete of that end stops at the goto
+    /// line of the one-way object. The Inspector and set_fields lock that line, so the text names the actions that can
+    /// change it. A delete of the end and the one-way object together runs, and the one-way object goes alone.
+    /// </summary>
+    [Fact]
+    public void AnEndThatAOneWayObjectGoesToRefusesTheDeleteAndNamesTheWayOut()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        var oneWay = ConnectionWorkspace.Li03("Object", "Li03_gate");
+        var end = SceneWorkspace.Object("Li01_to_Li02");
+        session.Execute(EditCommand.SetLinesFromText(oneWay, "goto", ["Li01, Li01_to_Li02, gate_tunnel_bretonia"]));
+
+        var plan = ConnectionPlans.DeletePair(session, [end]);
+
+        Assert.False(plan.CanRun);
+        var refusal = Assert.Single(plan.Refusals);
+        Assert.Equal(oneWay, refusal.Target);
+        Assert.Equal("goto", refusal.Key, ignoreCase: true);
+        Assert.Equal("The goto line of Li03_gate in li03.ini names Li01_to_Li02, but Li01_to_Li02 does not go back to " +
+                     "Li03_gate. Delete Li03_gate first or in the same delete, or keep Li01_to_Li02. The Delete of the " +
+                     "editor and the agent tool delete_items delete a one-way object alone. To keep Li03_gate, change its " +
+                     "goto line in the raw INI block, or pair it with the jump connection tool connection_create of the " +
+                     "agent server.", refusal.Message);
+        Assert.Equal(refusal.Message, Assert.Single(ScenePlans.Delete(session, [end]).Refusals).Message);
+
+        var alone = ConnectionPlans.DeletePair(session, [oneWay]);
+        var both = ConnectionPlans.DeletePair(session, [end, oneWay]);
+
+        Assert.Equal([oneWay], alone.Deletes.Select(d => d.Section));
+        Assert.True(both.CanRun, string.Join("\n", both.Refusals.Select(r => r.Message)));
+        Assert.Equal([(end, DeleteReason.Target), (oneWay, DeleteReason.Target),
+            (SceneWorkspace.Li02("Object", "Li02_to_Li01"), DeleteReason.Cascade)], both.Deletes.Select(d => (d.Section, d.Why)));
+        session.Execute(both.Command!);
+        Assert.Null(session.Get(oneWay));
+        Assert.Null(session.Get(end));
+    }
+
+    /// <summary>A one-way object in a file that the editor cannot change leaves only the keep of the end. The text tells
+    /// why.</summary>
+    [Fact]
+    public void AOneWayObjectInAReadOnlyFileTellsWhyTheEndMustStay()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        // The active mod replaces the whole file of Li03 outside its folder, so the editor cannot change the file.
+        ws.Mod("act", new()
+        {
+            [@"files\" + ConnectionWorkspace.Li03Path] = ConnectionWorkspace.Li03Text.Replace("archetype = jumpgate",
+                "archetype = jumpgate\ngoto = Li01, Li01_to_Li02, gate_tunnel_bretonia", StringComparison.Ordinal),
+        });
+        var session = ws.Session("act");
+        var oneWay = ConnectionWorkspace.Li03("Object", "Li03_gate");
+        var reason = session.Get(oneWay)!.ReadOnlyReason;
+        Assert.NotNull(reason);
+
+        var plan = ConnectionPlans.DeletePair(session, [SceneWorkspace.Object("Li01_to_Li02")]);
+
+        Assert.Equal("The goto line of Li03_gate in li03.ini names Li01_to_Li02, but Li01_to_Li02 does not go back to " +
+                     $"Li03_gate. Keep Li01_to_Li02, because the editor cannot change Li03_gate: {reason}",
+            Assert.Single(plan.Refusals).Message);
+    }
+
+    /// <summary>
+    /// A traffic zone nickname that another file already has makes the zone of a new end take the next free number. The
+    /// delete of the pair takes that zone from the file of the end. The zone of the other file stays.
+    /// </summary>
+    [Fact]
+    public void ADeleteTakesTheNumberedTrafficZoneOfTheFileOfTheEnd()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        var other = ConnectionWorkspace.Li03(SceneSections.ZoneType, "Zone_Li01_to_Li03_traffic");
+        session.Execute(EditCommand.AddSection(ConnectionWorkspace.Li03Path, SceneSections.ZoneType,
+        [
+            ListWorkspace.Line("nickname", "Zone_Li01_to_Li03_traffic"), ListWorkspace.Line("pos", "0, 0, 0"),
+            ListWorkspace.Line("shape", "SPHERE"), ListWorkspace.Line("size", "4000"),
+        ]));
+        var made = Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Gate, new ConnectionEnd("Li01"),
+            new ConnectionEnd("Li03")));
+        Assert.Equal(["Zone_Li01_to_Li03_traffic_1", "Zone_Li03_to_Li01_traffic"], made.TrafficZones.Select(z => z.Id.Key));
+
+        var plan = ConnectionPlans.DeletePair(session, [SceneWorkspace.Object("Li01_to_Li03")]);
+
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        Assert.Contains((made.TrafficZones[0], "traffic zone of Li01_to_Li03"), plan.Deletes.Select(d => (d.Section, d.Cause)));
+        Assert.DoesNotContain(other, plan.Deletes.Select(d => d.Section));
+        session.Execute(plan.Command!);
+        Assert.All(made.TrafficZones, z => Assert.Null(session.Get(z)));
+        Assert.NotNull(session.Get(other));
+    }
 }
