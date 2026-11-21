@@ -561,6 +561,8 @@ When OpenLancer makes a new system, it copies a template system:
 
 A rename of a system changes its nickname and value 0 of each `goto` that names it. It also changes the `system` line of each `[Base]` of the system and the mission lines that name it. The file keeps its path. OpenLancer renames only a system that the active mod adds. A save game in the system does not find it after the rename.
 
+A delete of a system removes its `[system]` and its file. Each object of another system whose `goto` names the system goes too, with its traffic zones and its gate lock lines. OpenLancer deletes only a system that the active mod adds, and it always asks first. A system with a base cannot go in this version. The mission lines that name the system or its objects show "Missing". A save game in the system does not find it after the delete.
+
 The checks of a system and of a base of `universe.ini`:
 
 | Problem | Severity | What the game does |
@@ -614,6 +616,8 @@ When OpenLancer makes a jump gate pair or a jump hole pair:
 - An end can name an existing object without a pair. Then OpenLancer writes only the `goto` line of that object. This fixes a one-way object of a lower mod or of a raw edit.
 - Each new end gets the lock that the request asks for. A lock line of `InitialWorld.ini` can already name the nickname of a new end. OpenLancer then keeps or removes that line, as the request asks. An existing end keeps its locks when the request asks for no lock.
 - The new pair is one entry of the edit history, also when it changes two system files, the gate locks and `strings.json`.
+
+A pair is one jump connection item, so a delete of one end deletes the pair. The other end goes when it names the end back. The traffic zones `Zone_<object>_traffic` and the gate lock lines of each end go too. A one-way object goes alone. The Inspector and `set_fields` lock the `goto` line, so a change of one end cannot break the pair. The raw INI block can still change the line (see "Create, duplicate, rename and delete" and "The raw INI block").
 
 The gate locks are in the `[locked_gates]` section of `InitialWorld.ini`:
 
@@ -987,6 +991,7 @@ These keys are locked, and the other keys of the section take edits:
 - The key of the section, for example `nickname`.
 - The `encounter`, `faction` and `faction_weight` lines of a `[Zone]` (see "Lines that belong together").
 - The `file` of a `[system]` of `universe.ini`, because a change moves all the contents of the system.
+- The `goto` line of an `[Object]`, because it links the two ends of a jump connection. The agent tools `connection_create` and `delete_items` change the pair. The raw INI block can still change the line.
 
 The gizmo also does not show when a line that it reads has an error, for example a `pos` line with text. Correct the line in the Inspector first.
 
@@ -1003,7 +1008,9 @@ The Scene adds, copies, renames and deletes the objects, zones and lights of the
 | The Edit menu | Create, Duplicate, Rename and Delete |
 | The keys, while the Hierarchy or the Scene has the focus | `F2` Rename, `Ctrl+D` Duplicate, `Delete` Delete |
 
-The keys work only when no text field is active and no field edit or drag is open. A disabled menu item tells why in its tooltip. Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has a `goto`, a `prev_ring` or a `next_ring` line, or an archetype of such a type. This version cannot add, copy or delete them, because the partner gate, the neighbor rings and the route files must change with them. A rename of a connection object works.
+The keys work only when no text field is active and no field edit or drag is open. A disabled menu item tells why in its tooltip.
+
+Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has a `goto`, a `prev_ring` or a `next_ring` line, or an archetype of such a type. The Create menu and Duplicate cannot make them, because each one needs a partner or a lane. The jump connection tool `connection_create` of the agent server makes a jump gate pair or a jump hole pair (see "Jump connections and gate locks"). A delete of a jump gate or a jump hole deletes its pair, but this version cannot delete an airlock gate or a trade lane ring. A rename of a connection object works.
 
 #### Create
 
@@ -1036,6 +1043,7 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 - A copy leaves out the `base` line, because a base has one object in space. The Console tells it.
 - A text placeholder of the active mod gets a copy of its text with a new key, as New from template does. A numeric text id stays.
 - This version cannot copy nebulae, asteroid fields or the zones that hold them.
+- This version cannot copy connection objects. A copy of a jump gate or a jump hole has no partner.
 
 #### Delete
 
@@ -1045,16 +1053,19 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 - A zone takes its `[Nebula]` and `[Asteroids]` sections, and the `[LootableZone]` sections that name it. The engine drops a nebula or a field without its zone.
 - A line that names the item gets a safe fix in the same entry when one exists. The `ring` line of a planet goes. The lines of each hole of a deleted zone go from the `[Exclusion Zones]` sections of the nebula and field files. The engine skips a hole whose zone is not there. But retail gives the lines of that hole to the hole before it, so the lines must go.
 - Another line keeps its value and shows "Missing" (see "Data lists and pickers"). Two cases give such a line. One is a fix of a line that the editor cannot change. The other is a line of a mission script that names a deleted object. The save stops at such a mission line until you fix it.
-- A line whose rule refuses the delete names the line and stops the delete, as Unity RequireComponent does. This version refuses the delete of a jump gate, a jump hole and a trade lane ring.
+- A line whose rule refuses the delete names the line and stops the delete, as Unity RequireComponent does. This version refuses the delete of an airlock gate and a trade lane ring.
+- A jump gate or a jump hole goes with its pair, because a pair is one connection item. The other end goes when its `goto` line names the end back. The traffic zones `Zone_<object>_traffic` of each end go, and so do the `locked_gate` and `npc_locked_gate` lines of each end. A one-way object goes alone. When the other end is in a file that the editor cannot change, the delete stops with the reason. This is an OpenLancer choice: Unity would keep the other end with a "Missing" link.
 - A delete of a nebula or an asteroid field removes only its section, as Unity "Remove Component" does. Its zone stays, with its encounters, its music and its damage.
 
-A delete that removes only the item and its child sections runs at once. Another delete opens a dialog. It lists the items that go too, the lines that change and the lines that show "Missing". It also lists the files that name the item as text, and these warnings:
+A delete that removes only the item and its child sections runs at once. So does the delete of a jump connection in one file: its other end, its traffic zones and its lock lines are parts of the item. Another delete opens a dialog. It lists the items that go too, the lines that change and the lines that show "Missing". For a jump gate pair, the list names the other end and its file. The dialog also lists the files that name the item as text, and these warnings:
 
 - A base that loses the last object of its system that docks with it. The game then puts the player at the center of the system after a launch.
 - A base that loses the last object of its system with `base = <base>`. The navigation map then does not list the base, and its rooms show no planet.
 - A mod that loads later and changes a section that goes. Its patch cannot find the section after the delete.
 
 A delete of a read-only section is refused with the reason, for example a light of the St02c file whose nickname another light also has.
+
+The texts of the items that go stay in `strings.json` as unused texts of the mod, as for each other delete.
 
 #### Rename
 
@@ -1094,7 +1105,7 @@ The Inspector page of an object starts with its components, as Unity shows the c
 | Dockable station | `dock_with` | the base picker, only for an archetype with a docking sphere | removes `dock_with` |
 | Base object | `base` | the base picker | removes `base` |
 | Faction member | `reputation` | the faction picker | removes `reputation` |
-| Jump connection | `goto` | not in this version | refused in this version |
+| Jump connection | `goto` | the jump connection tool `connection_create` of the agent server | refused: delete the object, and its pair goes too |
 | Trade lane ring | `prev_ring`, `next_ring`, `tradelane_space_name` | not in this version | refused in this version |
 | Planet ring | `ring` | not in this version | removes `ring` |
 
@@ -1131,7 +1142,7 @@ The Assets panel is the first tab of the bottom group, as the Unity Project wind
 | Factions | the `[Group]` sections of `initialworld.ini` | On an object only |
 | Models | the `.cmp`, `.3db` and `.sph` files below `DATA`, by top folder | Placed as a static prop when a solar archetype, a ship or an asteroid uses the model |
 
-The rule data gives the categories. A solar archetype whose type is in no template shows in "Other solar" with a lock: it does not spawn. Jump gates, jump holes, airlock gates and trade lane rings show with a lock, because this version cannot make them.
+The rule data gives the categories. A solar archetype whose type is in no template shows in "Other solar" with a lock: it does not spawn. Jump gates, jump holes, airlock gates and trade lane rings show with a lock, because each one needs a partner or a lane. The lock names the jump connection tool `connection_create` of the agent server, which makes a jump gate pair or a jump hole pair.
 
 The toolbar has the search field (`Ctrl+F`), the path of the category, and the size slider. The smallest size shows a list. The search finds the name, the nickname, the type and the model file, without letter case. "All assets" searches each category. A tile shows a "+" when the active mod adds the item, and a blue bar when it changes it. A ship, an asteroid or a model shows a "prop" badge when a solar archetype uses its model. The hover tooltip shows a larger image, the layer, the model file, and the number of lines that name the entry.
 
@@ -1227,6 +1238,8 @@ An `.anm` file that does not read gives one warning, and the list keeps the clip
 Each Inspector page that edits sections ends with "Loaded values (read-only)" and then "Raw INI". The raw block shows `[Type]` and one `name = values` line for each line of the section. Edit the lines, then click outside the block. The edit changes only the names whose lines you changed. One raw edit is one entry of the edit history, and one Undo puts back all its lines. The order of different names stays the file order. A new name goes at the end of the section.
 
 The block refuses an edit and keeps nothing when the text has a problem: a second header, a comment, a line without `=`, a changed nickname line, a line that the type of its key cannot hold, or a key that no row can change. The Console line then holds the problem and your whole text, so you can copy it back. When the section changed while you typed, for example by an undo, the block also refuses the edit. A value outside its list does not stop the edit: the row above then shows the error. The block is read-only when the section is read-only.
+
+The `goto` line of an `[Object]` is an exception to the keys that no row can change. No row changes it, because it links the two ends of a jump connection, but the block takes an edit of it. A raw edit that breaks a pair gets the warnings of "Jump connections and gate locks".
 
 #### Raw edits of mission files
 
