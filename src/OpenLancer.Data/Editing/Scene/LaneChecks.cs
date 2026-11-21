@@ -40,9 +40,9 @@ internal static class LaneChecks
     }
 
     /// <summary>
-    /// The errors of the trade lanes for the save gate, in a system file that the active mod changes: each lane that goes
-    /// in a circle, when the active mod writes a link line of the circle. Each circle gives one error, on the first ring
-    /// of the file whose link line the active mod writes.
+    /// The errors of the trade lanes for the save gate, in a system file that the active mod changes. A lane that goes in
+    /// a circle gives an error when the active mod writes a link line of the circle. Each circle gives one error, on the
+    /// first ring of the file whose link line the active mod writes.
     /// </summary>
     public static IEnumerable<Diagnostic> SaveErrors(EditSession session, string path)
     {
@@ -149,8 +149,8 @@ internal static class LaneChecks
             Target = ring, Key = key,
         };
 
-    /// <summary>The fix of a broken link of a ring: the repair of its lane, or the move or the delete of the ring that
-    /// stops the repair.</summary>
+    /// <summary>The fix of a broken link of a ring: the repair of its lane. When a ring stops the repair, the fix is the
+    /// move or the delete of that ring.</summary>
     private static string Fix(EditSession session, SectionRef ring) =>
         RepairStops(session, ring) is { } off
             ? $"{off.Id.Key} does not stand on the line of the lane, so a repair stops. Move {off.Id.Key} onto the line, or " +

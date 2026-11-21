@@ -132,8 +132,8 @@ internal sealed class FieldBinding
     }
 
     /// <summary>
-    /// Why a row and a field edit cannot change a key that links two items, or null: the <c>goto</c>, <c>prev_ring</c>
-    /// and <c>next_ring</c> lines of an <c>[Object]</c> of a system file. A change of one end breaks the jump connection,
+    /// Why a row and a field edit cannot change a key that links two items, or null. These keys are the <c>goto</c>,
+    /// <c>prev_ring</c> and <c>next_ring</c> lines of an <c>[Object]</c> of a system file. A change of one end breaks the jump connection,
     /// so the connection tools change the pair. A change of one ring breaks the links of the trade lane, so the lane
     /// tools and the ring buttons change the lane. The raw INI block does not use this lock, because the raw INI stays
     /// open to each key (editor UI rule 11). The checks of the jump connections and of the trade lanes then tell what a

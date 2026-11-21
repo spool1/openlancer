@@ -73,9 +73,9 @@ public enum SceneSection
 }
 
 /// <summary>One key of a section type and what the scene does when it changes.</summary>
-/// <param name="Locked">True when the Inspector shows the key read-only: a key entry, a key of a linked group, the
-/// file of a system, the link of a jump connection or of a trade lane, or a key of a section that a patch cannot
-/// find.</param>
+/// <param name="Locked">True when the Inspector shows the key read-only: a key entry, a key of a linked group, or the
+/// file of a system. A link of a jump connection or of a trade lane is read-only too, and so is a key of a section that
+/// a patch cannot find.</param>
 /// <param name="Evidence">The engine code that reads the key, or the reason for the effect.</param>
 public sealed record SceneField(SceneSection Section, string Key, SceneEffect Effect, bool Locked, string Evidence);
 

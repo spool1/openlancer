@@ -13,9 +13,9 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// The checks of the trade lanes: a lane that goes in a circle is an error of the active mod and stops the save. A
-/// one-way link, an end without a name, a link to an object that is no ring, a ring without a lane, a placed ring inside
-/// an object or a zone with damage, and a lane zone that does not cover its lane give warnings. Each text names a fix
-/// that works. The data is invented (see <see cref="LaneWorkspace"/>).
+/// one-way link, an end without a name, a link to an object that is no ring and a ring without a lane give warnings. A
+/// placed ring inside an object or a zone with damage and a lane zone away from its lane warn too.
+/// Each text names a fix that works. The data is invented (see <see cref="LaneWorkspace"/>).
 /// </summary>
 public sealed class LaneChecksTests
 {

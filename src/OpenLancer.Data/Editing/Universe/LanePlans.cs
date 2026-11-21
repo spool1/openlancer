@@ -802,9 +802,8 @@ public static class LanePlans
                                       "hit it. Move the ring.") with { Target = ring, Key = "pos" };
 
     /// <summary>
-    /// The total distance of the first and the last ring of a lane from the axis of a box zone. Null when the zone does
-    /// not cover both rings within <see cref="Reach"/>. The axis is the z axis of the zone after its rotation. A ring is
-    /// covered when it is near the axis and within the length of the zone plus <see cref="Reach"/>.
+    /// The total distance of the first and the last ring of a lane from the axis of a box zone (see
+    /// <see cref="AxisDistance"/>). Null when the zone does not cover both rings.
     /// </summary>
     internal static float? Cover(UniverseSchema.Zone zone, Vector3 first, Vector3 last) =>
         AxisDistance(zone, first) is { } a && AxisDistance(zone, last) is { } b ? a + b : null;

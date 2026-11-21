@@ -515,8 +515,8 @@ internal sealed class InspectorPanel : IDisposable
     }
 
     /// <summary>
-    /// The component checks of a section without a components strip: a <c>[Base]</c> or a <c>[system]</c> of
-    /// <c>universe.ini</c>, a <c>[locked_gates]</c> section of the gate locks, or a zone. A base warns when no object of
+    /// The component checks of a section without a components strip. Such a section is a <c>[Base]</c>, a
+    /// <c>[system]</c>, a <c>[locked_gates]</c> section or a zone. A base warns when no object of
     /// its system docks with it, or no object of its system is its object in space (decision D254 of the M3 design). The
     /// checks of the universe tell, for example, that no jump gate leads to a system, or that a system names no file. A
     /// gate lock warns when it names no jump gate or jump hole. A zone gives the error of a nickname that another zone
