@@ -738,9 +738,15 @@ The checks of the trade lanes:
 | The active mod places a ring inside a zone with `damage` or inside the `solar_radius` of an object. | Warning | Ships on the lane can take damage or hit the object. |
 | A lane zone does not cover the first and the last ring of a lane near it, and the lane has no other lane zone. | Warning | Lane traffic spawns away from the lane. |
 
-The circle check follows the links as the HUD does: each direction alone, and also a stray link. A walk that comes to a ring of the walk in the other direction is no circle. A ring before a circle also gets the problem, because the walk of the HUD from it goes round the circle. The circle error stops the save when the active mod writes a link line of a ring of the circle. A circle of the game or of a lower mod is a warning. The save gate gives one error for each circle, on the first ring of the circle in the file whose link line the active mod writes. A link line that names no object of the file gets the error of the data lists.
+The circle check follows the links as the HUD does: each direction alone, and also a stray link. A walk that comes to a ring of the walk in the other direction is no circle. A ring before a circle also gets the problem, because the walk of the HUD from it goes round the circle.
 
-Each text names a fix: the button Repair lane and the agent tool `trade_lane_repair`, a delete, the Lane name row and `set_text`, or a move. A repair sorts the rings along their line, so a ring off the line stops it. The text then names the move or the delete of that ring. The circle text names the ring whose delete cuts the circle. When the circle has a stray link, that is the ring with the stray link, because the relink of a delete does not follow a stray link. The zone warning comes after a move of an end ring, or after a raw edit that adds a ring beyond an end. A lane zone that covers the first and the last ring of a lane near it is the zone of that lane, so it gives no warning for another lane.
+The circle error stops the save when the active mod writes a link line of a ring of the circle. A circle of the game or of a lower mod is a warning. The save gate gives one error for each circle, on the first ring of the circle in the file whose link line the active mod writes. A link line that names no object of the file gets the error of the data lists.
+
+Each text names a fix: the button Repair lane and the agent tool `trade_lane_repair`, a delete, the Lane name row and `set_text`, or a move. A repair sorts the rings along their line, so a ring off the line stops it. The text then names the move or the delete of that ring.
+
+The circle text names the ring whose delete cuts the circle. When the circle has a stray link, that is the ring with the stray link, because the relink of a delete does not follow a stray link.
+
+The zone warning comes after a move of an end ring, or after a raw edit that adds a ring beyond an end. A lane zone that covers the first and the last ring of a lane near it is the zone of that lane, so it gives no warning for another lane.
 
 The Inspector shows the circle, link and name problems in the Trade lane ring component of the ring. The placement warning shows at the position of the ring, in the Solar component. The zone warning shows above the sections of the zone. A ring of the game or of a lower mod gets no placement warning. The raw INI block marks the line of each problem. The agent tools `get_item` and `check` give them too.
 
