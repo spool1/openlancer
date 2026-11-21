@@ -162,7 +162,10 @@ public static class ObjectComponents
         ObjectComponent.JumpConnection =>
             "The goto line links the object to its partner. To delete a jump gate pair or a jump hole pair, delete one " +
             "of its objects.",
-        ObjectComponent.TradeLaneRing => "This version cannot change the links of trade lane rings.",
+        ObjectComponent.TradeLaneRing =>
+            "These lines link the ring to its trade lane. To change the lane, use Insert ring after, Repair lane or " +
+            "Delete ring on this component, or the trade lane tools trade_lane_insert_ring, trade_lane_repair and " +
+            "delete_items of the agent server.",
         ObjectComponent.FieldReferences => "Delete the nebula or the asteroid field to remove its section.",
         ObjectComponent.EncounterZone => "The Inspector cannot edit the encounters of a zone.",
         _ => null,

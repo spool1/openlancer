@@ -410,7 +410,7 @@ public sealed class ListRulesTests
         Assert.Equal("wormhole", connection.Hole.Traffic.Single(l => l.Key == "pop_type").Value);
         Assert.Equal("jumpgate", connection.Gate.Traffic.Single(l => l.Key == "pop_type").Value);
         Assert.Same(connection.Hole, connection.For(OpenLancer.Data.Editing.Universe.ConnectionKind.Hole));
-        Assert.Equal(new JumpHouse("br", "jumpgate_br_02", "pilot_solar_easiest"), connection.HouseOf("br_n_grp"));
+        Assert.Equal(new HouseLoadout("br", "jumpgate_br_02", "pilot_solar_easiest"), connection.HouseOf("br_n_grp"));
         Assert.Equal("jumpgate_li_01", connection.HouseOf("LI_P_GRP")!.Loadout);
         Assert.Null(connection.HouseOf("fc_x_grp"));
         Assert.Null(connection.HouseOf(null));

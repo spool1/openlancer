@@ -620,7 +620,7 @@ public static class ConnectionPlans
             : null;
 
     /// <summary>The local faction of the <c>[SystemInfo]</c> of a system file in W, or null.</summary>
-    private static string? LocalFaction(EditSession session, string path) =>
+    internal static string? LocalFaction(EditSession session, string path) =>
         session.Sections(path).FirstOrDefault(s => SceneSections.Is(s.Id.Type, "SystemInfo")) is { } info &&
         session.Get(info) is { } view
             ? SceneSections.Last(view, "local_faction")

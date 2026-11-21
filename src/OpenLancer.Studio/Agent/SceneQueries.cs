@@ -314,9 +314,9 @@ internal static class SceneQueries
             };
         }
 
-        /// <summary>The <c>solar_radius</c> of the archetype of an object in meters, or null.</summary>
-        public float? RadiusOf(SectionView view) =>
-            Solar(view) is { } solar && AgentRows.Numbers(solar, "solar_radius") is [var radius, ..] ? radius : null;
+        /// <summary>The <c>solar_radius</c> of the archetype of an object in meters, or null (see
+        /// <see cref="SceneSections.SolarRadius"/>).</summary>
+        public float? RadiusOf(SectionView view) => Solar(view) is { } solar ? SceneSections.SolarRadius(solar) : null;
 
         /// <summary>The <c>[Solar] type</c> of the archetype of an object in lowercase, or null.</summary>
         private string? TypeOf(SectionView view) => Solar(view) is { } solar

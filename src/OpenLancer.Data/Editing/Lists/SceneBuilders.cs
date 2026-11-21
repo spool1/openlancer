@@ -65,10 +65,31 @@ internal sealed record SunZoneRule(float Size, float AtmosphereMargin, IReadOnly
 internal sealed record JumpEndRule(string Archetype, int Infocard, string Name, IReadOnlyList<BuilderLine> Lines,
     float TrafficSize, IReadOnlyList<BuilderLine> Traffic);
 
-/// <summary>The loadout and the pilot of a new jump gate of a house, when no gate of the same faction gives
-/// them.</summary>
+/// <summary>The loadout and the pilot of a new jump gate or a new trade lane ring of a house, when no template object
+/// gives them.</summary>
 /// <param name="House">The start of the faction nickname before the first <c>_</c>, for example <c>li</c>.</param>
-internal sealed record JumpHouse(string House, string Loadout, string Pilot);
+internal sealed record HouseLoadout(string House, string Loadout, string Pilot)
+{
+    /// <summary>The loadout of the house of a faction nickname, or null.</summary>
+    public static HouseLoadout? Of(IReadOnlyList<HouseLoadout> houses, string? faction) =>
+        faction?.Split('_')[0] is { Length: > 0 } house
+            ? houses.FirstOrDefault(h => h.House.Equals(house, StringComparison.OrdinalIgnoreCase))
+            : null;
+
+    /// <summary>Reads the <c>houses</c> list of a builder. A house occurs once.</summary>
+    /// <param name="owner">The builder, for a message.</param>
+    /// <exception cref="FormatException">The data is not valid.</exception>
+    public static IReadOnlyList<HouseLoadout> Read(JsonElement e, string owner)
+    {
+        var houses = e.TryGetProperty("houses", out var array)
+            ? array.EnumerateArray().Select(h => new HouseLoadout(SceneBuilders.Text(h, "house"),
+                SceneBuilders.Text(h, "loadout"), SceneBuilders.Text(h, "pilot"))).ToList()
+            : [];
+        if (houses.GroupBy(h => h.House, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1) is { } twice)
+            throw new FormatException($"The {owner} has the house '{twice.Key}' more than one time.");
+        return houses;
+    }
+}
 
 /// <summary>
 /// The rules of a new jump connection. They give the tunnel of the <c>goto</c> line and the smallest distance of a new
@@ -78,7 +99,7 @@ internal sealed record JumpHouse(string House, string Loadout, string Pilot);
 /// <param name="Tunnel">Value 2 of the <c>goto</c> line of a new end.</param>
 /// <param name="MinRadius">The smallest distance of a new end from the center of its system, in meters.</param>
 internal sealed record ConnectionRule(string Tunnel, float MinRadius, JumpEndRule Gate, JumpEndRule Hole,
-    IReadOnlyList<JumpHouse> Houses)
+    IReadOnlyList<HouseLoadout> Houses)
 {
     /// <summary>The keys of the lines of a new end that the rule data or a template object can give. The builder
     /// writes each other line itself.</summary>
@@ -92,19 +113,48 @@ internal sealed record ConnectionRule(string Tunnel, float MinRadius, JumpEndRul
     public float Spacing => 2 * Math.Max(Gate.TrafficSize, Hole.TrafficSize);
 
     /// <summary>The house of a faction nickname, or null.</summary>
-    public JumpHouse? HouseOf(string? faction) =>
-        faction?.Split('_')[0] is { Length: > 0 } house
-            ? Houses.FirstOrDefault(h => h.House.Equals(house, StringComparison.OrdinalIgnoreCase))
-            : null;
+    public HouseLoadout? HouseOf(string? faction) => HouseLoadout.Of(Houses, faction);
+}
+
+/// <summary>
+/// The rules of a new trade lane. They give the archetype, the generic name and infocard and the lines of each ring.
+/// They also give the spacing of the rings, the clearance of an end at an object, the lane zone, and the loadout and
+/// the pilot of a ring for each house.
+/// </summary>
+/// <param name="Archetype">The solar archetype of a new ring when the request and its template give none.</param>
+/// <param name="Name">The id of the name that the rings of a lane share in the target view.</param>
+/// <param name="Infocard">The id of the infocard that the rings share.</param>
+/// <param name="Spacing">The distance between two rings that gives the ring count, in meters.</param>
+/// <param name="RetailMin">The smallest distance between two rings of a retail lane, in meters. A new lane with less
+/// gets a warning.</param>
+/// <param name="RetailMax">The largest distance between two rings of a retail lane, in meters. A new lane with more
+/// gets a warning.</param>
+/// <param name="Clearance">The distance of an end ring beyond the <c>solar_radius</c> of the object at that end, and
+/// beyond the edge of a zone with damage, in meters.</param>
+/// <param name="Lines">The lines of a new ring that the template ring does not give, each with a value. Only the keys
+/// of <see cref="RingKeys"/> can occur.</param>
+/// <param name="ZoneMargin">The lane zone is longer than the lane by this value, in meters.</param>
+/// <param name="ZoneWidth">The largest width and height of the lane zone, in meters.</param>
+/// <param name="Zone">The lines of the lane zone after its <c>lane_id</c> line, each with a value.</param>
+internal sealed record LaneRule(string Archetype, int Name, int Infocard, float Spacing, float RetailMin, float RetailMax,
+    float Clearance, IReadOnlyList<BuilderLine> Lines, float ZoneMargin, float ZoneWidth, IReadOnlyList<BuilderLine> Zone,
+    IReadOnlyList<HouseLoadout> Houses)
+{
+    /// <summary>The keys of the lines of a new ring that the rule data or a template ring can give. The builder writes
+    /// each other line itself.</summary>
+    public static readonly IReadOnlyList<string> RingKeys = ["behavior", "difficulty_level"];
+
+    /// <summary>The house of a faction nickname, or null.</summary>
+    public HouseLoadout? HouseOf(string? faction) => HouseLoadout.Of(Houses, faction);
 }
 
 /// <summary>
 /// The rule data of the builders of the agent tools in <c>list-rules.json</c> (milestone MCP1-2). It gives the wreck,
-/// the route templates, the death zone of the sun of a new system and the new jump connections. Section 9.3 of the
-/// MCP1 design names that file as the source of the builders.
+/// the route templates, the death zone of the sun of a new system, the new jump connections and the new trade lanes.
+/// Section 9.3 of the MCP1 design names that file as the source of the builders.
 /// </summary>
 internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTemplate> Routes, SunZoneRule? SunZone,
-    ConnectionRule? Connection)
+    ConnectionRule? Connection, LaneRule? Lane)
 {
     /// <summary>The key of the label and the leg number of a route zone.</summary>
     public const string PathLabel = "path_label";
@@ -113,13 +163,14 @@ internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTempla
     public const string Usage = "usage";
 
     /// <summary>The rule data without builders.</summary>
-    public static readonly SceneBuilders None = new(null, [], null, null);
+    public static readonly SceneBuilders None = new(null, [], null, null, null);
 
     /// <summary>The keys that a builder writes itself. A template cannot give them.</summary>
     private static readonly string[] BuilderKeys =
     [
         "nickname", "pos", "rotate", "shape", "size", "archetype", "loadout", "encounter", "faction", "faction_weight",
-        "density_restriction", "ids_name", "ids_info",
+        "density_restriction", "ids_name", "ids_info", "prev_ring", "next_ring", "tradelane_space_name", "reputation",
+        "pilot", "lane_id",
     ];
 
     /// <summary>The template of a usage, or null.</summary>
@@ -180,7 +231,8 @@ internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTempla
                 throw new FormatException($"The line '{empty.Key}' of the sun death zone needs a value.");
         }
         var connection = e.TryGetProperty("connection", out var c) ? ReadConnection(c) : null;
-        return new SceneBuilders(wreck, routes, sunZone, connection);
+        var lane = e.TryGetProperty("lane", out var l) ? ReadLane(l) : null;
+        return new SceneBuilders(wreck, routes, sunZone, connection, lane);
     }
 
     /// <summary>Reads the rules of a new jump connection.</summary>
@@ -192,14 +244,42 @@ internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTempla
         var radius = e.GetProperty("minRadius").GetSingle();
         if (!float.IsFinite(radius) || radius < 1)
             throw new FormatException("The connection builder needs a minRadius of 1 or more.");
-        var houses = e.TryGetProperty("houses", out var array)
-            ? array.EnumerateArray().Select(h => new JumpHouse(Text(h, "house"), Text(h, "loadout"), Text(h, "pilot")))
-                .ToList()
-            : [];
-        if (houses.GroupBy(h => h.House, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1) is { } twice)
-            throw new FormatException($"The connection builder has the house '{twice.Key}' more than one time.");
         return new ConnectionRule(tunnel, radius, ReadEnd(e.GetProperty("gate"), "jump gate"),
-            ReadEnd(e.GetProperty("hole"), "jump hole"), houses);
+            ReadEnd(e.GetProperty("hole"), "jump hole"), HouseLoadout.Read(e, "connection builder"));
+    }
+
+    /// <summary>Reads the rules of a new trade lane.</summary>
+    private static LaneRule ReadLane(JsonElement e)
+    {
+        var name = e.GetProperty("name").GetInt32();
+        var infocard = e.GetProperty("infocard").GetInt32();
+        if (name < 1 || infocard < 1)
+            throw new FormatException("The lane builder needs a name and an infocard of 1 or more.");
+        var spacing = e.GetProperty("spacing").GetSingle();
+        var range = e.GetProperty("retailRange").EnumerateArray().Select(v => v.GetSingle()).ToList();
+        if (range.Count != 2 || !float.IsFinite(spacing) || !float.IsFinite(range[1]) ||
+            !(range[0] >= 1 && range[0] <= spacing && spacing <= range[1]))
+            throw new FormatException("The lane builder needs a retailRange of two values of 1 or more, with the spacing " +
+                                      "between them.");
+        var clearance = e.GetProperty("clearance").GetSingle();
+        if (!float.IsFinite(clearance) || clearance < 0)
+            throw new FormatException("The lane builder needs a clearance of 0 or more.");
+        var lines = Lines(e, "lane builder");
+        if (lines.FirstOrDefault(l => l.Value == null || !LaneRule.RingKeys.Contains(l.Key, StringComparer.OrdinalIgnoreCase))
+            is { } bad)
+            throw new FormatException($"The line '{bad.Key}' of the lane builder needs a value and one of the keys " +
+                                      $"{string.Join(", ", LaneRule.RingKeys)}.");
+        var zone = e.GetProperty("zone");
+        var margin = zone.GetProperty("margin").GetSingle();
+        var width = zone.GetProperty("width").GetSingle();
+        if (!float.IsFinite(margin) || margin < 0 || !float.IsFinite(width) || width < 1)
+            throw new FormatException("The lane zone of the lane builder needs a margin of 0 or more and a width of 1 or " +
+                                      "more.");
+        var zoneLines = Lines(zone, "lane zone");
+        if (zoneLines.FirstOrDefault(l => l.Value == null) is { } empty)
+            throw new FormatException($"The line '{empty.Key}' of the lane zone needs a value.");
+        return new LaneRule(Text(e, "archetype"), name, infocard, spacing, range[0], range[1], clearance, lines, margin,
+            width, zoneLines, HouseLoadout.Read(e, "lane builder"));
     }
 
     /// <summary>Reads the rules of the ends of one kind of a new jump connection.</summary>
@@ -245,7 +325,7 @@ internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTempla
         return lines;
     }
 
-    private static string Text(JsonElement e, string name) =>
+    internal static string Text(JsonElement e, string name) =>
         e.GetProperty(name).GetString() is { Length: > 0 } text
             ? text
             : throw new FormatException($"The builder rule data needs a text '{name}'.");

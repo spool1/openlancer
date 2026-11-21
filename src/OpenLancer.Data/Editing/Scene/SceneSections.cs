@@ -52,17 +52,43 @@ internal static class SceneSections
 
     /// <summary>The <c>[Solar] type</c> of the archetype of an object in W, in lowercase, or null.</summary>
     public static string? ArchetypeType(EditSession session, SectionView view) =>
+        SolarOf(session, view) is { } solar ? Last(solar, "type")?.ToLowerInvariant() : null;
+
+    /// <summary>The <c>[Solar]</c> of the archetype of an object in W, or null.</summary>
+    public static SectionView? SolarOf(EditSession session, SectionView view) =>
         Last(view, "archetype") is { } archetype &&
-        session.Lists.List("solar_archetype")?.Find(archetype)?.Section is { } solar &&
-        session.Get(solar) is { } section
-            ? Last(section, "type")?.ToLowerInvariant()
+        session.Lists.List("solar_archetype")?.Find(archetype)?.Section is { } solar
+            ? session.Get(solar)
             : null;
+
+    /// <summary>
+    /// The <c>solar_radius</c> of a <c>[Solar]</c> in meters, or null when the last line of the key has no finite
+    /// number. This is the one reader of the key: the plans of the trade lanes, their placement checks and the agent
+    /// tools use it.
+    /// </summary>
+    public static float? SolarRadius(SectionView solar) =>
+        solar.Lines("solar_radius").LastOrDefault() is { Values.Count: > 0 } line &&
+        float.TryParse(line.Values[0].ToString().Trim(), System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var radius) && float.IsFinite(radius)
+            ? radius
+            : null;
+
+    /// <summary>The <c>solar_radius</c> of the archetype of an object in W in meters, or null (see
+    /// <see cref="SolarRadius"/>).</summary>
+    public static float? RadiusOf(EditSession session, SectionView view) =>
+        SolarOf(session, view) is { } solar ? SolarRadius(solar) : null;
 
     /// <summary>The tool that makes a jump gate pair or a jump hole pair, as the texts of the editor name it.</summary>
     public const string PairTool = "the jump connection tool connection_create of the agent server";
 
     /// <summary>The tool that sets the lock of a jump gate or a jump hole, as the texts of the editor name it.</summary>
     public const string LockTool = "the jump connection tool connection_set_lock of the agent server";
+
+    /// <summary>The tools that make a trade lane and add a ring to one, as the texts of the editor name them.</summary>
+    public const string LaneTool = "the trade lane tools trade_lane_create and trade_lane_insert_ring of the agent server";
+
+    /// <summary>The kind of a trade lane ring in plain words (see <see cref="ConnectionKind"/>).</summary>
+    public const string LaneRingKind = "trade lane ring";
 
     /// <summary>
     /// The kind of a connection object in plain words, or null for another section (decision D253): an object with a
@@ -77,8 +103,12 @@ internal static class SceneSections
             return ConnectionWords(type);
         if (view.Lines("goto").Count > 0)
             return "jump gate";
-        return view.Lines("prev_ring").Count > 0 || view.Lines("next_ring").Count > 0 ? "trade lane ring" : null;
+        return view.Lines("prev_ring").Count > 0 || view.Lines("next_ring").Count > 0 ? LaneRingKind : null;
     }
+
+    /// <summary>True for a trade lane ring: an object with an archetype of the type <c>TRADELANE_RING</c>, or with a
+    /// <c>prev_ring</c> or a <c>next_ring</c> line and no other connection (see <see cref="ConnectionKind"/>).</summary>
+    public static bool IsLaneRing(EditSession session, SectionView view) => ConnectionKind(session, view) == LaneRingKind;
 
     /// <summary>The kind of a connection type of the rule data in plain words, for example "jump hole" for
     /// <c>jumphole</c>.</summary>
@@ -88,7 +118,7 @@ internal static class SceneSections
         "jump_gate" => "jump gate",
         "jump_hole" or "jumphole" => "jump hole",
         "airlock_gate" => "airlock gate",
-        _ => "trade lane ring",
+        _ => LaneRingKind,
     };
 
     /// <summary>True for a connection kind that goes as a pair: a jump gate or a jump hole. A delete of one end
@@ -99,27 +129,24 @@ internal static class SceneSections
     public static string WithArticle(string kind) => (kind.Length > 0 && "aeiou".Contains(kind[0]) ? "an " : "a ") + kind;
 
     /// <summary>
-    /// Why the editor refuses an action on a connection object (decision D253). A jump gate or a jump hole cannot get a
-    /// copy, because a copy has no partner. In this version, an airlock gate and a trade lane ring take only the
-    /// rename. For example: "Li01_to_Li02 is a jump gate. This version cannot copy jump gates or jump holes,
-    /// because a copy has no partner. To make a pair, use the jump connection tool connection_create of the agent
-    /// server."
+    /// Why the editor refuses an action on a connection object (decision D253). A jump gate, a jump hole or a trade
+    /// lane ring cannot get a copy, because a copy has no partner or is not a part of the lane. In this version, an
+    /// airlock gate takes only the rename. For example: "Li01_to_Li02 is a jump gate. This version cannot copy jump
+    /// gates or jump holes, because a copy has no partner. To make a pair, use the jump connection tool
+    /// connection_create of the agent server."
     /// </summary>
-    /// <param name="verb">The action, for example "copy" or "delete". For a jump gate or a jump hole, it is an action
-    /// that makes copies, because the editor deletes their pairs.</param>
-    public static string ConnectionMessage(string verb, SectionRef section, SectionView view, string kind)
+    /// <param name="verb">The action, for example "copy" or "delete". For a jump gate, a jump hole or a trade lane ring,
+    /// it is an action that makes copies, because the editor deletes their pairs and relinks their lanes.</param>
+    public static string ConnectionMessage(string verb, SectionRef section, string kind)
     {
         var name = section.Id.Key;
         if (IsPairKind(kind))
             return $"{name} is a {kind}. This version cannot {verb} jump gates or jump holes, because a copy has no " +
                    $"partner. To make a pair, use {PairTool}.";
-        if (kind != "trade lane ring")
-            return $"{name} is {WithArticle(kind)}. This version cannot {verb} {kind}s.";
-        var text = $"{name} is a trade lane ring. This version cannot {verb} trade lane rings.";
-        var rings = new[] { Last(view, "prev_ring"), Last(view, "next_ring") }.OfType<string>().ToList();
-        return rings.Count > 0
-            ? text + $" Its neighbor rings {string.Join(" and ", rings)} must change with it."
-            : text;
+        if (kind == LaneRingKind)
+            return $"{name} is a trade lane ring. This version cannot {verb} trade lane rings, because a copy is not a " +
+                   $"part of the lane. To make a lane or to add a ring to a lane, use {LaneTool}.";
+        return $"{name} is {WithArticle(kind)}. This version cannot {verb} {kind}s.";
     }
 
     /// <summary>The label of an item for a message, for example "the nebula of Zone_Bw05_Crow_nebula".</summary>
