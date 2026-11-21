@@ -97,8 +97,8 @@ internal sealed record UniverseConnection(string System, string Object, string T
 /// </summary>
 /// <remarks>
 /// <para>Retail facts: the game reads the <c>[system]</c> sections in file order. The id of a system is the FLHash of
-/// its nickname, and a second system with the same id is dropped. Each object with <c>goto</c> becomes one connection
-/// of its system. The type of its solar archetype gives the kind: <c>JUMP_GATE</c>, <c>JUMP_HOLE</c> or
+/// its nickname, and the game drops a second system with the same id. Each object with <c>goto</c> becomes one
+/// connection of its system. The type of its solar archetype gives the kind: <c>JUMP_GATE</c>, <c>JUMP_HOLE</c> or
 /// <c>AIRLOCK_GATE</c>. An object of another type is no connection. Each <c>locked_gate</c> and
 /// <c>npc_locked_gate</c> line of <c>[locked_gates]</c> holds the FLHash of an object nickname.</para>
 /// <para>The graph keeps the connections of each system in the order of its file. A system file that does not open
