@@ -701,8 +701,8 @@ public sealed class ConnectionPlansTests
         Assert.Equal("The goto line of Li03_gate in li03.ini names Li01_to_Li02, but Li01_to_Li02 does not go back to " +
                      "Li03_gate. Delete Li03_gate first or in the same delete, or keep Li01_to_Li02. The Delete of the " +
                      "editor and the agent tool delete_items delete a one-way object alone. To keep Li03_gate, change its " +
-                     "goto line in the raw INI block, or pair it with the jump connection tool connection_create of the " +
-                     "agent server.", refusal.Message);
+                     "goto line in the raw INI block. You can also pair Li03_gate with the jump connection tool " +
+                     "connection_create of the agent server.", refusal.Message);
         Assert.Equal(refusal.Message, Assert.Single(ScenePlans.Delete(session, [end]).Refusals).Message);
 
         var alone = ConnectionPlans.DeletePair(session, [oneWay]);

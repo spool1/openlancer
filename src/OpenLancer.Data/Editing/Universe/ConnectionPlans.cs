@@ -502,7 +502,7 @@ public static class ConnectionPlans
             ? $"{text} Keep {name}, because the editor cannot change {own}: {reason}"
             : $"{text} Delete {own} first or in the same delete, or keep {name}. The Delete of the editor and the agent " +
               $"tool delete_items delete a one-way object alone. To keep {own}, change its goto line in the raw INI " +
-              $"block, or pair it with {SceneSections.PairTool}.";
+              $"block. You can also pair {own} with {SceneSections.PairTool}.";
     }
 
     /// <summary>One end of a new pair while the plan reads it.</summary>
