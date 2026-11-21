@@ -7,6 +7,7 @@ using LibreLancer;
 using LibreLancer.Data;
 using LibreLancer.Data.IO;
 using LibreLancer.Data.Schema;
+using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Editing.Scene;
@@ -16,10 +17,10 @@ using Xunit;
 namespace OpenLancer.DataTests;
 
 /// <summary>
-/// Retail proof of the plans of the trade lanes. Each retail lane is a chain without a circle. Its rings turn along the
-/// lane by the rotation rule of the plans. Its lane zone meets the one lane zone rule and covers its ends. The generic
-/// name and infocard of the rule data are texts of both games. A delete of a middle ring of a retail lane
-/// relinks the lane in the patch of the mod.
+/// Retail proof of the plans and the checks of the trade lanes. Each retail lane is a chain without a circle. Its rings
+/// turn along the lane by the rotation rule of the plans. Its lane zone meets the one lane zone rule and covers its
+/// ends. The lane checks give no error and one known warning in each game. The generic name and infocard of the rule
+/// data are texts of both games. A delete of a middle ring of a retail lane relinks the lane in the patch of the mod.
 /// </summary>
 public sealed class LaneRetailTests(ITestOutputHelper output)
 {
@@ -28,6 +29,15 @@ public sealed class LaneRetailTests(ITestOutputHelper output)
     /// <summary>The largest angle in degrees between the front of a retail ring and the front of the rotation rule. The
     /// retail rotate values are whole degrees.</summary>
     private const double Tolerance = 1.01;
+
+    /// <summary>The lane warnings of both games: the section, the first sentence of the text, and why the game has the
+    /// warning. No retail lane gives a lane error.</summary>
+    private static readonly (string Section, string Text, string Reason)[] Exceptions =
+    [
+        ("Bw10_Trade_Lane_Ring_Construct_A_4", "The trade lane of Bw10_Trade_Lane_Ring_Construct_A_4 has no name at its start",
+            "The lane is under construction in the story. Its first ring is its fourth ring, and only its last ring has " +
+            "a lane name."),
+    ];
 
     [Fact]
     public void TheLanesOfVanillaFitThePlans() => CheckLanes(GameDataPaths.RequireBase());
@@ -100,7 +110,8 @@ public sealed class LaneRetailTests(ITestOutputHelper output)
     /// <summary>
     /// The lanes of one game: 124 chains of 4 to 15 rings without a circle, and 129 zones that meet the lane zone rule.
     /// The rings of at least 90 percent of the lanes turn along the lane within 1 degree. The lane zone of each lane
-    /// covers its first and last ring.
+    /// covers its first and last ring. The lane checks give no error, and each lane warning is in the list of the
+    /// exceptions.
     /// </summary>
     private void CheckLanes(string root)
     {
@@ -114,6 +125,14 @@ public sealed class LaneRetailTests(ITestOutputHelper output)
             zones += session.Sections(path).Count(s => s.Id.Type.Equals("zone", StringComparison.OrdinalIgnoreCase) &&
                                                        LaneZones.IsLaneZone(session, s));
         }
+        var problems = new List<Diagnostic>();
+        foreach (var path in RetailChecks.SystemFiles(session).Skip(1).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            foreach (var section in session.Sections(path).Where(s => IsLaneSection(session, s)))
+                problems.AddRange(LaneChecks.Check(session, section));
+        }
+        foreach (var problem in problems)
+            output.WriteLine($"{problem.Severity} {problem.Target?.Id.Key}: {problem.Message}");
         var fit = lanes.Count(l => Fits(session, l));
         var without = lanes.Where(l => LanePlans.ZoneOf(session, l) == null).Select(l => l.Rings[0].Id.Key).ToList();
         output.WriteLine($"{root}: {lanes.Count} lanes, {lanes.Sum(l => l.Rings.Count)} rings, {zones} lane zones, " +
@@ -125,7 +144,16 @@ public sealed class LaneRetailTests(ITestOutputHelper output)
         Assert.Equal((4, 15), (lanes.Min(l => l.Rings.Count), lanes.Max(l => l.Rings.Count)));
         Assert.True(fit * 10 >= lanes.Count * 9, $"{fit} of {lanes.Count} lanes fit the rotation rule");
         Assert.Empty(without);
+        Assert.DoesNotContain(problems, p => p.Severity == DiagnosticSeverity.Error);
+        Assert.Equal(Exceptions.Select(e => (e.Section, e.Text)).Order(),
+            problems.Select(p => (p.Target!.Id.Key!, p.Message[..p.Message.IndexOf('.')])).Order());
     }
+
+    /// <summary>A ring of a lane or a lane zone.</summary>
+    private static bool IsLaneSection(EditSession session, SectionRef section) =>
+        section.Id.Type.Equals("zone", StringComparison.OrdinalIgnoreCase) && LaneZones.IsLaneZone(session, section) ||
+        section.Id.Type.Equals("Object", StringComparison.OrdinalIgnoreCase) && session.Get(section) is { } view &&
+        SceneSections.ArchetypeType(session, view) == "tradelane_ring";
 
     /// <summary>The rings of a system file without a previous ring: the first ring of each lane.</summary>
     private static IEnumerable<SectionRef> FirstRings(EditSession session, string path) =>
