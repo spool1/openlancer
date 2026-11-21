@@ -559,7 +559,7 @@ When OpenLancer makes a new system, it copies a template system:
 - When the template sun has no death zone, the zone gets the defaults of the rule data. Its radius is the atmosphere range of the sun less 1000 m, or 10000 m when the sun has no range. Its lines are `damage = 10000`, `sort = 99.5`, `density = 0` and `relief_time = 0`.
 - The names and the infocard go into `strings.json`. The new system is one entry of the edit history. One Undo takes back the `[system]`, the file and the texts.
 
-A rename of a system changes its nickname, value 0 of each `goto` that names it, the `system` line of each `[Base]` of the system, and the mission lines that name it. The file keeps its path. The editor renames only a system that the active mod adds. A save game in the system does not find it after the rename.
+A rename of a system changes its nickname, value 0 of each `goto` that names it, the `system` line of each `[Base]` of the system, and the mission lines that name it. The file keeps its path. OpenLancer renames only a system that the active mod adds. A save game in the system does not find it after the rename.
 
 The checks of a system and of a base of `universe.ini`:
 
