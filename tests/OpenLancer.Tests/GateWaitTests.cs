@@ -109,5 +109,6 @@ public sealed class GateWaitTests
     {
         Assert.Equal("The editor checks the cutscenes that use the changed items.", GateWait.Status);
         Assert.Empty(SteLint.Problems(GateWait.Status));
+        Assert.Empty(SteLint.Problems(OpenLancer.Editor.Export.ExportDialog.ClosedBeforeStart));
     }
 }

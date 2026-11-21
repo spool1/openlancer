@@ -23,6 +23,14 @@ public enum ExportGateSource
     None,
 }
 
+/// <summary>The save gate of one export: where the export gets it, and the call that gives its errors (see
+/// <see cref="ExportGate.For"/>).</summary>
+/// <param name="Source">Where the export gets the gate.</param>
+/// <param name="Errors">Gives the errors of the gate, or null when the export runs no gate. For
+/// <see cref="ExportGateSource.Session"/>, the call reads the open session, so it runs on the thread of the session. For
+/// <see cref="ExportGateSource.Profile"/>, the call opens a session of its own, so a worker can run it.</param>
+public sealed record ExportGateRun(ExportGateSource Source, Func<IReadOnlyList<Diagnostic>>? Errors);
+
 /// <summary>
 /// The save gate before an export (#87). An export refuses a mod that the save gate of the mod refuses, with the same
 /// errors (see <see cref="EditSession.SaveProblems"/>). So a mod that the editor cannot save does not reach a package.
@@ -68,6 +76,29 @@ public static class ExportGate
         : session.Profile.Mods.Any(m => GameFolders.Same(m.Folder, modFolder)) ? ExportGateSource.Profile
         : ExportGateSource.None;
 
+    /// <summary>
+    /// The save gate of an export of the mod in a folder (see <see cref="SourceOf"/>). The open session gives the errors
+    /// of its gate. Else a session that only reads the saved profile file of the open session gives them. The Export
+    /// dialog uses it.
+    /// </summary>
+    /// <param name="session">The open session, or null.</param>
+    /// <param name="reports">The checks of the linked games (see <see cref="TargetGames"/>).</param>
+    public static ExportGateRun For(EditSession? session, string modFolder, string modId,
+        IReadOnlyList<GameReport> reports, IStringResourceWriter strings, IThnEvaluator thn)
+    {
+        switch (SourceOf(session, modFolder))
+        {
+            case ExportGateSource.Session:
+                return new ExportGateRun(ExportGateSource.Session, () => Errors(session!));
+            case ExportGateSource.Profile:
+                var profile = session!.Profile.FilePath;
+                return new ExportGateRun(ExportGateSource.Profile,
+                    () => Errors(ModProfile.Load(profile), modId, reports, strings, thn));
+            default:
+                return new ExportGateRun(ExportGateSource.None, null);
+        }
+    }
+
     /// <summary>The linked game of each retail target, from the checks of the linked games, or null for a target
     /// without a linked game. The save gate checks the mission patches on these games.</summary>
     public static Func<string, GameBase?> TargetGames(IReadOnlyList<GameReport> reports) =>
@@ -78,8 +109,11 @@ public static class ExportGate
         $"The export of mod '{modId}' stopped. The save gate refuses the mod with {Plural.Count(errors, "error")}, so " +
         $"a save of the mod stops too. Correct {(errors == 1 ? "the error" : "the errors")}, then export again.";
 
-    /// <summary>The note of an export of a mod that no profile of the editor holds. The export then runs no save
-    /// gate.</summary>
-    public static string NoGate(string modId) =>
-        $"The open profile does not hold mod '{modId}', so the export does not run the save gate of the mod.";
+    /// <summary>The warning of an export that runs no save gate, because no open profile holds the mod. The export
+    /// can then write a mod that a save refuses.</summary>
+    /// <param name="profileOpen">True when a profile is open.</param>
+    public static string NoGate(string modId, bool profileOpen) =>
+        $"{(profileOpen ? $"The open profile does not hold mod '{modId}'" : "No profile is open")}, so the export " +
+        $"does not run the save gate of mod '{modId}'. The packages can have errors that a save refuses. To check the " +
+        "mod, open a profile that holds it, then export again.";
 }

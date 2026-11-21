@@ -170,6 +170,25 @@ public sealed class HeadlessHostTests
         Assert.Equal(AgentTools.All, host.Tools);
     }
 
+    /// <summary>The host with edits and the host that only reads start the build of the index of the cutscene uses when
+    /// they open the profile (#87). So the first check after a change that breaks an item of a cutscene does not wait
+    /// for the build.</summary>
+    [Fact]
+    public void TheHostStartsTheIndexOfTheCutsceneUsesWhenItOpens()
+    {
+        using var ws = SceneWorkspace.Create();
+
+        using (var host = HeadlessHost.Open(ws.ProfilePath, "act", new HeadlessOptions()))
+        {
+            Assert.True(host.Session.Uses.IsStarted);
+            _ = host.Session.Uses.LastBuild;
+        }
+
+        using var reader = HeadlessHost.OpenReadOnly(ws.ProfilePath, "act");
+        Assert.True(reader.Session.Uses.IsStarted);
+        _ = reader.Session.Uses.LastBuild;
+    }
+
     /// <summary>A profile in a game folder opens read-only, as the session does in the editor (section 8.2, item 7 of
     /// the MCP1 design). The host writes nothing into the game folder.</summary>
     [Fact]

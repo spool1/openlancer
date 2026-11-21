@@ -339,8 +339,8 @@ internal sealed class ExportDialog : ModalDialog
     /// <summary>
     /// Saves the choices and prepares the export on a worker thread. The save gate of the mod runs first (#87, see
     /// <see cref="ExportGate"/>). When the open session holds the saved mod, its gate runs on the UI thread, as a save
-    /// does. Else the worker opens the profile with the mod active, as <c>oltool export</c> does. The guard runs when
-    /// the prepare ends.
+    /// does. Else the worker opens the profile with the mod active, as <c>oltool export</c> does. A mod that the open
+    /// profile does not hold gets no gate, and the Console warns about it. The guard runs when the prepare ends.
     /// </summary>
     private void Start(Mod exported, ExportTarget? play)
     {
@@ -356,40 +356,39 @@ internal sealed class ExportDialog : ModalDialog
             window.Log.Add(ConsoleSeverity.Warning, Source, $"{exported.Folder}: {problem}");
         var location = Location(exported);
         GuardedExport Prepare() => GuardedExport.Prepare(request, location, DateTime.UtcNow);
-        var edits = window.Session?.Edits;
-        switch (ExportGate.SourceOf(edits, exported.Folder))
+        var gate = ExportGate.For(window.Session?.Edits, exported.Folder, exported.Id, bases,
+            DllStringResourceWriter.Instance, ThornEvaluator.Instance);
+        if (gate.Source != ExportGateSource.Session)
         {
-            case ExportGateSource.Session:
-                // The gate can wait for the index of the cutscene uses, so the status bar tells it first. A close of
-                // the dialog in that time stops the export.
-                window.AfterGateStatus(() =>
-                {
-                    if (!IsOpen || run.Running)
-                    {
-                        return;
-                    }
+            if (gate.Source == ExportGateSource.None)
+            {
+                window.Log.Add(ConsoleSeverity.Warning, Source, ExportGate.NoGate(exported.Id, window.Session != null));
+            }
 
-                    if (ExportGate.Errors(edits!) is { Count: > 0 } errors)
-                    {
-                        Gated(errors);
-                    }
-                    else
-                    {
-                        run.Prepare(Prepare);
-                    }
-                });
-                break;
-            case ExportGateSource.Profile:
-                var (profile, reports) = (edits!.Profile.FilePath, bases);
-                run.Prepare(() => ExportGate.Errors(ModProfile.Load(profile), exported.Id, reports,
-                    DllStringResourceWriter.Instance, ThornEvaluator.Instance), Prepare);
-                break;
-            default:
-                window.Log.Add(ConsoleSeverity.Info, Source, ExportGate.NoGate(exported.Id));
-                run.Prepare(Prepare);
-                break;
+            run.Prepare(gate.Errors, Prepare);
+            return;
         }
+
+        // The gate of the open session runs on the UI thread. It can wait for the index of the cutscene uses, so the
+        // status bar tells it first. A close of the dialog in that time stops the export.
+        window.AfterGateStatus(() =>
+        {
+            if (!IsOpen)
+            {
+                window.Log.AddStatus(ConsoleSeverity.Info, Source, ClosedBeforeStart);
+                return;
+            }
+
+            if (!run.Running)
+            {
+                var errors = gate.Errors!();
+                run.Prepare(() => errors, Prepare);
+            }
+        });
     }
+
+    /// <summary>The status line when the dialog closes while the export waits for the save gate.</summary>
+    internal const string ClosedBeforeStart = "The Export dialog closed before the export started. The export wrote nothing.";
 
     /// <summary>The save gate refuses the mod: the Console gets each error, and the dialog and the Console get the
     /// refusal. Nothing is written.</summary>

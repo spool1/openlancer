@@ -62,6 +62,35 @@ public sealed class ExportGateTests
     }
 
     /// <summary>
+    /// The gate of the Export dialog for each source (see <see cref="ExportGate.For"/>). The gate of the open session and
+    /// the gate of the saved profile give the errors of a save of the mod, so the export refuses the mod. A mod that no
+    /// open profile holds gets no gate.
+    /// </summary>
+    [Fact]
+    public void TheGateOfTheExportDialogGivesTheErrorsOfASave()
+    {
+        using var game = new ExportGame();
+        var profile = Profile(game);
+        using var own = Open(profile);
+        using var other = Open(profile, "other");
+        ExportGateRun For(EditSession? session, string id) => ExportGate.For(session, Path.Combine(game.ModsFolder, id), id,
+            [game.Report()], TestWorkspace.FakeDllWriter.Instance, ThnScripts.Evaluator);
+        var save = own.GateRefusal()!.Problems.Where(p => p.Severity == DiagnosticSeverity.Error).ToList();
+        Assert.NotEmpty(save);
+
+        var fromSession = For(own, "ol-test");
+        var fromProfile = For(other, "ol-test");
+
+        Assert.Equal(ExportGateSource.Session, fromSession.Source);
+        Assert.Equal(save, fromSession.Errors!());
+        Assert.Equal(ExportGateSource.Profile, fromProfile.Source);
+        Assert.Equal(save, fromProfile.Errors!());
+        Assert.Empty(For(own, "other").Errors!());
+        Assert.Equal(new ExportGateRun(ExportGateSource.None, null), For(own, "outside"));
+        Assert.Equal(new ExportGateRun(ExportGateSource.None, null), For(null, "ol-test"));
+    }
+
+    /// <summary>
     /// A session that only reads the profile with the mod active gives the gate of a writable session for the same
     /// saved mod. So the Export dialog and <c>oltool export</c> refuse what a save refuses. The gate of the other mod of
     /// the profile has no error.
@@ -112,6 +141,12 @@ public sealed class ExportGateTests
         Assert.Equal("The export of mod 'm' stopped. The save gate refuses the mod with 2 errors, so a save of the mod " +
                      "stops too. Correct the errors, then export again.", ExportGate.Refusal("m", 2));
         Assert.Empty(SteLint.Problems(ExportGate.Refusal("m", 2)));
-        Assert.Empty(SteLint.Problems(ExportGate.NoGate("m")));
+        Assert.Equal("The open profile does not hold mod 'm', so the export does not run the save gate of mod 'm'. The " +
+                     "packages can have errors that a save refuses. To check the mod, open a profile that holds it, then " +
+                     "export again.", ExportGate.NoGate("m", true));
+        Assert.StartsWith("No profile is open, so the export does not run the save gate of mod 'm'.",
+            ExportGate.NoGate("m", false));
+        Assert.Empty(SteLint.Problems(ExportGate.NoGate("m", true)));
+        Assert.Empty(SteLint.Problems(ExportGate.NoGate("m", false)));
     }
 }
