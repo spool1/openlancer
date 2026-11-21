@@ -588,6 +588,28 @@ public sealed class OltoolExportTests
         Assert.Equal(2, noMod.Exit);
     }
 
+    /// <summary>
+    /// <c>oltool export</c> refuses a mod that the save gate refuses (#87). It opens the profile with the mod active,
+    /// and that session only reads. It prints each error of the gate and the refusal, and it writes no package. The
+    /// retail test of the costume also shows that <c>oltool validate</c> keeps its rule.
+    /// </summary>
+    [Fact]
+    public async Task TheExportRefusesAModThatTheSaveGateRefuses()
+    {
+        using var game = new ExportGame();
+        var profile = Profile(game, ExportGateTests.DeletePatch, ", \"targets\": [ \"vanilla-1.1\" ]");
+        var output = Path.Combine(game.Game.Folder, "out");
+
+        var export = await RunAsync("export", profile, "--mod", "ol-test", "--target", "vanilla-1.1", "--format", "dropin",
+            "--out", output);
+
+        Assert.Equal(1, export.Exit);
+        Assert.Contains("Error: ", export.Errors);
+        Assert.Contains("the active mod removes the good 'lf_hull'", export.Errors);
+        Assert.Contains(ExportGate.Refusal("ol-test", 1), export.Errors);
+        Assert.False(Directory.Exists(output));
+    }
+
     [Fact]
     public async Task TheChecklistIsPrintedAndNothingIsWritten()
     {

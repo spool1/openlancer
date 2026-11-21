@@ -71,6 +71,7 @@ internal sealed class ExportDialog : ModalDialog
     {
         this.window = window;
         run.Prepared += Prepared;
+        run.Gated += Gated;
         run.Written += Finish;
         run.Failed += Failed;
     }
@@ -335,8 +336,12 @@ internal sealed class ExportDialog : ModalDialog
     private static string BaseText(GameReport report) =>
         report.Kind == GameKind.Vanilla ? $"{report.Root} ({report.Name})" : report.Root!;
 
-    /// <summary>Saves the choices and prepares the export on a worker thread. The guard runs when the prepare
-    /// ends.</summary>
+    /// <summary>
+    /// Saves the choices and prepares the export on a worker thread. The save gate of the mod runs first (#87, see
+    /// <see cref="ExportGate"/>). When the open session holds the saved mod, its gate runs on the UI thread, as a save
+    /// does. Else the worker opens the profile with the mod active, as <c>oltool export</c> does. The guard runs when
+    /// the prepare ends.
+    /// </summary>
     private void Start(Mod exported, ExportTarget? play)
     {
         error = null;
@@ -350,7 +355,46 @@ internal sealed class ExportDialog : ModalDialog
         foreach (var problem in publishProblems)
             window.Log.Add(ConsoleSeverity.Warning, Source, $"{exported.Folder}: {problem}");
         var location = Location(exported);
-        run.Prepare(() => GuardedExport.Prepare(request, location, DateTime.UtcNow));
+        GuardedExport Prepare() => GuardedExport.Prepare(request, location, DateTime.UtcNow);
+        var edits = window.Session?.Edits;
+        switch (ExportGate.SourceOf(edits, exported.Folder))
+        {
+            case ExportGateSource.Session:
+                // The gate can wait for the index of the cutscene uses, so the status bar tells it first.
+                window.AfterGateStatus(() =>
+                {
+                    if (ExportGate.Errors(edits!) is { Count: > 0 } errors)
+                    {
+                        Gated(errors);
+                    }
+                    else
+                    {
+                        run.Prepare(Prepare);
+                    }
+                });
+                break;
+            case ExportGateSource.Profile:
+                var (profile, reports) = (edits!.Profile.FilePath, bases);
+                run.Prepare(() => ExportGate.Errors(ModProfile.Load(profile), exported.Id, reports,
+                    DllStringResourceWriter.Instance, ThornEvaluator.Instance), Prepare);
+                break;
+            default:
+                window.Log.Add(ConsoleSeverity.Info, Source, ExportGate.NoGate(exported.Id));
+                run.Prepare(Prepare);
+                break;
+        }
+    }
+
+    /// <summary>The save gate refuses the mod: the Console gets each error, and the dialog and the Console get the
+    /// refusal. Nothing is written.</summary>
+    private void Gated(IReadOnlyList<Diagnostic> errors)
+    {
+        foreach (var problem in errors)
+        {
+            window.Log.Add(problem);
+        }
+
+        Failed(ExportGate.Refusal(mod?.Id ?? "", errors.Count));
     }
 
     /// <summary>The publish history of a mod in the workspace of the dialog (decision D565).</summary>

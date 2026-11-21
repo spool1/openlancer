@@ -420,9 +420,9 @@ internal static class Program
         return ExitOk;
     }
 
-    /// <summary>Exports one mod of a profile for its targets (section 7.14 of the M11 design). The export goes into
-    /// the version folder, runs the same-version guard and records the publish history (section 15 of the M11c
-    /// design).</summary>
+    /// <summary>Exports one mod of a profile for its targets (section 7.14 of the M11 design). The save gate of the mod
+    /// runs first, and its errors stop the export (#87, see <see cref="ExportGate"/>). The export goes into the version
+    /// folder, runs the same-version guard and records the publish history (section 15 of the M11c design).</summary>
     private static int Export(string profilePath, string[] options)
     {
         string? modId = null, format = null, output = null;
@@ -529,6 +529,25 @@ internal static class Program
                 return prepared.Problems.Any(p => p.Severity == DiagnosticSeverity.Error) ? ExitProblems : ExitOk;
             }
             return PrintPackages(ModExport.Write(prepared, []));
+        }
+
+        // The export refuses a mod that the save gate refuses, with the errors of a save (#87). The gate opens the
+        // profile with the mod active, and it only reads. oltool validate does not run it.
+        IReadOnlyList<Diagnostic> gate;
+        try
+        {
+            gate = ExportGate.Errors(profile, modId, reports, DllStringResourceWriter.Instance, ThornEvaluator.Instance);
+        }
+        catch (ModLoadException e)
+        {
+            return Fail(e.Message);
+        }
+        if (gate.Count > 0)
+        {
+            foreach (var error in gate)
+                Err.WriteLine(error);
+            Err.WriteLine(ExportGate.Refusal(modId, gate.Count));
+            return ExitProblems;
         }
 
         var version = mod.Manifest.Version;

@@ -49,10 +49,7 @@ internal sealed partial class EditorWindow : IGameLinkHost
 
     /// <summary>The linked game that is the base of a retail target, or null. The save gate merges the mission patches
     /// of the active mod on it (section 6.12 of the M6b design).</summary>
-    private GameBase? TargetGameOf(string target) =>
-        ExportTarget.Find(target) is { } found && found.BaseIn(LinkedGameReports()) is { Root: { } root }
-            ? GameBase.Standard(root)
-            : null;
+    private GameBase? TargetGameOf(string target) => ExportGate.TargetGames(LinkedGameReports())(target);
 
     IReadOnlyList<string> IGameLinkHost.KnownProfiles()
     {

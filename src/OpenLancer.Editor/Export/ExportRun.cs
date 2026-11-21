@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using OpenLancer.Data;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Export;
 using OpenLancer.Data.Publishing;
@@ -26,13 +27,17 @@ internal sealed record ExportWritten(ExportResult Result, RecordResult? Record, 
 /// result of a prepare, but the packages of a write that started go on to the disk.</remarks>
 internal sealed class ExportRun
 {
-    private Task<GuardedExport>? preparing;
+    private Task<(IReadOnlyList<Diagnostic> Gate, GuardedExport? Export)>? preparing;
     private Task<ExportResult>? writing;
     private GuardedExport? writes;
     private bool replace;
 
     /// <summary>Runs when a prepare ends while the dialog is open.</summary>
     public event Action<GuardedExport>? Prepared;
+
+    /// <summary>Runs when the save gate of a prepare refuses the mod while the dialog is open, with the errors of the
+    /// gate. The prepare then did not run.</summary>
+    public event Action<IReadOnlyList<Diagnostic>>? Gated;
 
     /// <summary>Runs when a write ends, also after a close of the dialog.</summary>
     public event Action<ExportWritten>? Written;
@@ -51,7 +56,13 @@ internal sealed class ExportRun
 
     /// <summary>Starts the prepare of a new run on a thread of its own.</summary>
     /// <exception cref="InvalidOperationException">A run is not complete.</exception>
-    public void Prepare(Func<GuardedExport> prepare)
+    public void Prepare(Func<GuardedExport> prepare) => Prepare(null, prepare);
+
+    /// <summary>Starts the prepare of a new run on a thread of its own. The save gate of the mod runs first on that
+    /// thread. When it gives errors, the prepare does not run.</summary>
+    /// <param name="gate">Gives the errors of the save gate of the mod, or null when the run has no gate.</param>
+    /// <exception cref="InvalidOperationException">A run is not complete.</exception>
+    public void Prepare(Func<IReadOnlyList<Diagnostic>>? gate, Func<GuardedExport> prepare)
     {
         if (Running)
         {
@@ -59,7 +70,11 @@ internal sealed class ExportRun
         }
 
         Closed = false;
-        preparing = OwnThread.Run(prepare);
+        preparing = OwnThread.Run(() =>
+        {
+            var errors = gate?.Invoke() ?? [];
+            return (errors, errors.Count > 0 ? null : prepare());
+        });
     }
 
     /// <summary>Starts the write of a prepared export on a thread of its own.</summary>
@@ -94,7 +109,14 @@ internal sealed class ExportRun
             }
             else if (!Closed)
             {
-                Prepared?.Invoke(prepared.Result);
+                if (prepared.Result is (var errors, null))
+                {
+                    Gated?.Invoke(errors);
+                }
+                else
+                {
+                    Prepared?.Invoke(prepared.Result.Export!);
+                }
             }
         }
 

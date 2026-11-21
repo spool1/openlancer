@@ -167,6 +167,34 @@ public sealed class AgentPublishToolTests
         Assert.False(host.Exports.Running);
     }
 
+    /// <summary>
+    /// The export refuses a mod that the save gate refuses, with the errors of a save (#87). The saved patch deletes a
+    /// good that the unchanged market file names, so the save gate refuses it, and the checks of the export do not. The
+    /// message starts with the refusal text of the Export dialog and of <c>oltool export</c>, then gives the error as
+    /// <c>save</c> does. The export writes nothing and records nothing.
+    /// </summary>
+    [Fact]
+    public void AnExportRefusesAModThatTheSaveGateRefuses()
+    {
+        using var game = new ExportGame();
+        var profile = Profile(game, ExportGateTests.DeletePatch, ", \"targets\": [ \"vanilla-1.1\" ]");
+        using var session = EditSession.Open(ModProfile.Load(profile), "ol-test", TestWorkspace.FakeDllWriter.Instance,
+            ThnScripts.Evaluator);
+        var host = new TestAgentHost(session);
+
+        var export = Error(host, "export_mod", """{ "formats": ["drop_in"] }""");
+        var save = Error(host, "save");
+
+        var error = Assert.Single(ExportGate.Errors(session));
+        Assert.Equal(("save_blocked", "Gate"), (export.Code, export.Detail));
+        Assert.Equal($"{ExportGate.Refusal("ol-test", 1)} {error.Message}", export.Message);
+        Assert.Equal(("save_blocked", "Gate"), (save.Code, save.Detail));
+        Assert.EndsWith(error.Message, save.Message);
+        Assert.False(Directory.Exists(Path.Combine(ExportRoot(game), "1.2.0")));
+        Assert.Empty(PublishHistory.Load(ExportRoot(game), "ol-test").History.Exports);
+        Assert.False(host.Exports.Running);
+    }
+
     /// <summary>The same-version guard (decision D568 of the M11c design). An export of the version with other game
     /// files gives <c>guard_conflict</c> without <c>replace_version</c>, and replaces the packages with it. A version
     /// with the mark "published" always gives <c>guard_conflict</c>.</summary>

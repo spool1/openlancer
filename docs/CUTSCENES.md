@@ -10,7 +10,7 @@ This version has these limits:
 - A new cutscene is a text file. Nobody checked a new cutscene in the retail games yet, so the editor marks it "not checked in the retail games".
 - The editor cannot change a whole cutscene file of a mod into a patch.
 - The validation reports only the errors that stop a cutscene, the templates that name no item and the clips that the game does not have. It does not report warnings, for example an event after the end of the script.
-- A change of the active mod in the game data can break a cutscene. To find such a cutscene, the save gate looks for the item name in the cutscene file. So it does not find a template that the Lua text of a script joins from parts, for example with `..`. The save then passes, and the game can crash when it plays that cutscene. When you open such a cutscene, its Problems section can show the problem, but the save does not stop for it.
+- A change of the active mod in the game data can break a cutscene that no mod changes. The save gate and the export find such a cutscene, but `oltool validate` does not check it.
 
 ## Browse and preview the retail cutscenes
 
@@ -194,7 +194,7 @@ The Inspector shows the selected entity or event, the selected events, or the cu
 
   The editor and the agent tools can make such a change only to a ship or an equipment. An example is an INI edit that removes the `DA_archetype` line of a ship. The other items change only through a file of the mod that you write outside the editor. Examples are a costume, a room of petalDB and a clip.
 
-  After such a change, the editor can wait some seconds before a save or Play starts. The gate then reads each cutscene that can name the item. With the retail data, this can take 5 seconds or more.
+  To find such a cutscene, the gate reads an index of the templates and the clips that each cutscene uses. The editor builds the index in the background when it opens the profile, and again after each save. With the retail data, the build takes about 2 seconds. When the index is not complete at a save or at Play, the status bar shows "The editor checks the cutscenes that use the changed items." until the gate ends. The export of the mod runs the same gate, so it refuses such a change too.
 
   The Problems section of such a cutscene shows the problems. Until you edit the cutscene, a note tells the cause. To correct a problem, undo that change, or pick another item or clip in the cutscene. The save then writes the new item into a THN patch of the active mod.
 

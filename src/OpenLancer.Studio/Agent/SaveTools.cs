@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Export;
 using OpenLancer.Data.Missions.Editing;
 
 namespace OpenLancer.Studio.Agent;
@@ -133,13 +134,29 @@ internal static class SaveTools
     private static EditException Blocked(EditSession session, string detail, IReadOnlyList<Diagnostic> problems)
     {
         var errors = problems.Where(p => p.Severity == DiagnosticSeverity.Error).ToList();
+        var key = detail != "Gate" ? "save_failed" : errors.Count == 1 ? "save_blocked_one" : "save_blocked";
+        return GateError(session, detail, errors, shown => AgentTexts.Error(key, ("count", errors.Count), ("errors", shown)));
+    }
+
+    /// <summary>The error <c>save_blocked</c> of <c>export_mod</c> when the save gate refuses the mod (#87). The
+    /// message starts with the refusal of the export (see <see cref="ExportGate.Refusal"/>), and then gives the errors as
+    /// the message of <c>save</c> does.</summary>
+    /// <param name="errors">The errors of the save gate (see <see cref="ExportGate.Errors(EditSession)"/>).</param>
+    public static EditException ExportBlocked(EditSession session, IReadOnlyList<Diagnostic> errors) =>
+        GateError(session, "Gate", errors,
+            shown => $"{ExportGate.Refusal(session.ActiveMod!.Id, errors.Count)} {shown}");
+
+    /// <summary>The error <c>save_blocked</c> with the messages of the first errors (see <see cref="Blocked"/>).</summary>
+    /// <param name="start">Makes the start of the message from the messages of the shown errors.</param>
+    private static EditException GateError(EditSession session, string detail, IReadOnlyList<Diagnostic> errors,
+        Func<string, string> start)
+    {
         string? CutsceneRef(Diagnostic error) =>
             error is { Target: null, Cutscene: { } place } ? CutsceneQueries.RefOf(session, place) : null;
         var shown = string.Join(" ", errors.Take(ShownErrors).Select(e => CutsceneRef(e) is { } where
             ? $"{e.Message} {AgentTexts.Error("save_blocked_cutscene", ("ref", where))}"
             : e.Message));
-        var key = detail != "Gate" ? "save_failed" : errors.Count == 1 ? "save_blocked_one" : "save_blocked";
-        var message = AgentTexts.Error(key, ("count", errors.Count), ("errors", shown));
+        var message = start(shown);
         foreach (var note in errors.Take(ShownErrors).Select(e => AgentRows.NoteOf(session, e)).OfType<string>().Distinct())
             message += " " + note;
         if (errors.Count > ShownErrors)

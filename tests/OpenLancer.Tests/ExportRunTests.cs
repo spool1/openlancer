@@ -117,4 +117,30 @@ public sealed class ExportRunTests
         Assert.Equal(["The disk is full."], failures);
         Assert.False(run.Running);
     }
+
+    /// <summary>The save gate of a mod runs on the thread of the prepare, before it (#87). Errors stop the run: the
+    /// dialog gets them, and the prepare does not run. A gate without errors lets the prepare run.</summary>
+    [Fact]
+    public async Task TheErrorsOfTheSaveGateStopThePrepare()
+    {
+        using var game = new ExportGame();
+        var mod = game.GoodsMod(Patch);
+        var run = new ExportRun();
+        var gated = new List<IReadOnlyList<OpenLancer.Data.Diagnostic>>();
+        var prepared = new List<GuardedExport>();
+        run.Gated += gated.Add;
+        run.Prepared += prepared.Add;
+        var error = OpenLancer.Data.Diagnostic.Error(ExportGame.GoodsPath, "The game crashes.");
+
+        run.Prepare(() => [error], () => throw new InvalidOperationException("The prepare must not run."));
+        await FinishAsync(run);
+
+        Assert.Equal([error], Assert.Single(gated));
+        Assert.Empty(prepared);
+        Assert.False(Directory.Exists(Path.Combine(Location(game, mod).Folder, "1.2.0")));
+        run.Prepare(() => [], () => Prepare(game, mod));
+        await FinishAsync(run);
+        Assert.Single(gated);
+        Assert.Single(prepared);
+    }
 }

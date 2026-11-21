@@ -126,7 +126,8 @@ internal static class PublishTools
 
     /// <summary>
     /// The export of the saved files of the active mod (decisions D714 and D765), as the Export dialog does it. The
-    /// session part checks the request and takes the place of the one export. The tail runs
+    /// session part checks the request, runs the save gate of the mod (see <see cref="ExportGate"/>) and takes the place
+    /// of the one export. The tail runs
     /// <see cref="GuardedExport.Prepare"/>, the same-version guard, the write and the record of the export on a worker.
     /// The packages go into the default export folder of the mod only.
     /// </summary>
@@ -147,6 +148,10 @@ internal static class PublishTools
         var games = host.Games(mod.Manifest);
         var targets = TargetsOf(call.Args, mod.Manifest, games.Reports);
         var forms = FormsOf(call.Args, targets);
+        // The export refuses a mod that the save gate refuses, with the errors of the save (#87). The session has no
+        // unsaved edits, so its gate checks the saved files of the mod.
+        if (ExportGate.Errors(session) is { Count: > 0 } gateErrors)
+            throw SaveTools.ExportBlocked(session, gateErrors);
         var root = ModExport.DefaultFolder(session.Profile.FilePath, mod.Id);
         var request = ExportRequest.Of(mod, targets, games.Reports, ModExport.VersionFolder(root, mod.Manifest), forms,
             DllStringResourceWriter.Instance, ThornEvaluator.Instance, out var publishProblems);

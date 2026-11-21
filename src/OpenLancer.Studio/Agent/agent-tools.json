@@ -725,7 +725,7 @@
     },
     "export_mod": {
       "title": "Export the active mod",
-      "description": "Exports the saved files of the active mod as packages into the default export folder of the mod, as the Export dialog does. The export does not change the data. Save the edits first.",
+      "description": "Exports the saved files of the active mod as packages into the default export folder of the mod, as the Export dialog does. The export does not change the data. Save the edits first. When the save gate refuses the mod, the export gives save_blocked and writes nothing.",
       "fields": {
         "targets": "The target games of the packages. Without it, the export takes each target of mod.json that has a linked game.",
         "formats": "The package forms of a retail target: drop_in for a zip for Nexus, flmm for an FLMM package. Without it, the export makes both.",

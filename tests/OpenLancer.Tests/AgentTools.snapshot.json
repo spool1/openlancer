@@ -47750,7 +47750,7 @@
     {
       "name": "export_mod",
       "title": "Export the active mod",
-      "description": "Exports the saved files of the active mod as packages into the default export folder of the mod, as the Export dialog does. The export does not change the data. Save the edits first.",
+      "description": "Exports the saved files of the active mod as packages into the default export folder of the mod, as the Export dialog does. The export does not change the data. Save the edits first. When the save gate refuses the mod, the export gives save_blocked and writes nothing.",
       "inputSchema": {
         "type": "object",
         "properties": {

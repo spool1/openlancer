@@ -11,6 +11,7 @@ using LibreLancer.Data.GameData;
 using LibreLancer.Data.IO;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Export;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Thn;
@@ -150,6 +151,35 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
     [Trait(Timing.Category, Timing.Performance)]
     public void ADeleteOfTheHdEditionCostumeThatTheMostCutscenesNameBlocksEachOfThem() =>
         CheckADeletedCostume(GameDataPaths.RequireHde(), "m8dhde");
+
+    /// <summary>
+    /// The export refuses a mod that the save gate refuses (#87): a temporary mod with an <c>ol.delete</c> patch of the
+    /// costume that only unchanged retail cutscenes load. <c>oltool export</c> opens the profile with the mod active,
+    /// prints the errors of the gate and the refusal, and writes no package. <c>oltool validate</c> keeps its rule
+    /// (decision of the owner of 2026-11-20) and passes.
+    /// </summary>
+    [Fact]
+    public void TheExportRefusesADeletedRetailCostumeAndValidateKeepsItsRule()
+    {
+        var game = GameDataPaths.RequireBase();
+        using var workspace = new RetailWorkspace(game, "m87export");
+        var reader = workspace.Open();
+        var (costume, section, scripts) = MostNamed(reader, Templates(game).Costumes, "costume", _ => true);
+        WritePatch(workspace, section.Path, $"[{section.Id.Type}]\nnickname = {costume}\nol.delete = true\n");
+        reader.Dispose();
+        var folder = Path.Combine(workspace.Root, "out");
+
+        var export = Oltool.Run("export", workspace.ProfilePath, "--mod", workspace.ModId, "--target", "openlancer",
+            "--out", folder);
+        var validate = Oltool.Run("validate", workspace.ProfilePath, "--active", workspace.ModId);
+        output.WriteLine(export.Errors);
+
+        Assert.Equal(1, export.Exit);
+        Assert.Contains(ExportGate.Refusal(workspace.ModId, scripts), export.Errors);
+        Assert.Contains($"The costume \"{costume}\" is not in the game data.", export.Errors);
+        Assert.False(Directory.Exists(folder));
+        Assert.True(validate.Exit == 0, validate.Errors);
+    }
 
     /// <summary>
     /// A saved patch that removes the <c>DA_archetype</c> line of the retail equipment that the most COMPOUNDs name
