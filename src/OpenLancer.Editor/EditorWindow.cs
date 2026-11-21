@@ -37,6 +37,7 @@ using OpenLancer.Editor.Play;
 using OpenLancer.Editor.Scene;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Editor.Ui.Fields;
+using OpenLancer.Editor.Universe;
 using OpenLancer.Runtime;
 using OpenLancer.Runtime.Strings;
 using OpenLancer.Runtime.Thn;
@@ -67,6 +68,7 @@ internal sealed partial class EditorWindow : Game
     private HierarchyPanel hierarchy = null!;
     private InspectorPanel inspector = null!;
     private DatabasePanel database = null!;
+    private UniversePanel universe = null!;
     private AssetsPanel assets = null!;
     private WelcomeScreen welcome = null!;
     private StatusBar statusBar = null!;
@@ -240,6 +242,7 @@ internal sealed partial class EditorWindow : Game
         hierarchy = new HierarchyPanel(this);
         inspector = new InspectorPanel(this);
         database = new DatabasePanel(this);
+        universe = new UniversePanel(this);
         assets = new AssetsPanel(this, ThumbnailFolder);
         console = new ConsolePanel(this);
         cutsceneView = new CutsceneView(this, Cutscenes);
@@ -270,6 +273,9 @@ internal sealed partial class EditorWindow : Game
                     tooltip: "The assets of the game data and the mods, as the Unity Project window shows them."),
                 new EditorPanel("database", "Database", EditorIcons.Database, () => database.Draw(Session?.GameData),
                     database.Toolbar, padding: false),
+                new EditorPanel(UniversePanel.PanelId, "Universe", EditorIcons.Map, universe.Draw, universe.Toolbar,
+                    padding: false,
+                    tooltip: "The systems on the nav map grid and their jump connections. The panel is read-only."),
                 new EditorPanel(ConsolePanel.PanelId, "Console", EditorIcons.Terminal, console.Draw, console.Toolbar,
                     padding: false, badges: console.Badges),
                 new EditorPanel(TimelinePanel.PanelId, "Timeline", EditorIcons.Stream, timeline.Draw, timeline.Toolbar,
@@ -618,6 +624,7 @@ internal sealed partial class EditorWindow : Game
         hierarchy.Reset();
         inspector.Reset();
         database.Reset();
+        universe.Reset();
         assets.Reset();
         reopenAfterReload = false;
         Selection = null;

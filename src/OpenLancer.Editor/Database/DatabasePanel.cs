@@ -31,10 +31,6 @@ internal sealed class DatabasePanel(EditorWindow window)
     private const string SystemsId = "systems";
     private const string GoodsId = "goods";
 
-    /// <summary>The tooltip of the row of a new system that the mod has not saved. The loaded game data does not have
-    /// the system, so its counts are empty.</summary>
-    internal const string NewSystemMark = "New. Save to open it in the Scene.";
-
     /// <summary>The empty state of a table whose rows the filter hides (#56). The next action is a link.</summary>
     internal static readonly EmptyState NoRowMatch = new($"No rows match '{EmptyState.TextPlace}'.", "Clear filter");
 
@@ -65,20 +61,6 @@ internal sealed class DatabasePanel(EditorWindow window)
     /// <param name="Version">The version of the session that the rows of a category from the edit view show.</param>
     private sealed record Category(string Id, string Name, ObjectKind Kind, DatabaseTable Table, ObjectKind? RowKind,
         int Depth, int Count, Func<EditorSession, Category>? Remake = null, int Version = 0);
-
-    /// <summary>A row of the Systems table: a <c>[system]</c> of the edit view, with the system of the loaded game
-    /// data.</summary>
-    /// <param name="Loaded">The system of the loaded game data, or null for a new system that the mod has not
-    /// saved.</param>
-    internal sealed record SystemRow(string Nickname, SectionRef Entry, StarSystem? Loaded)
-    {
-        /// <summary>True for a new system that the loaded game data does not have.</summary>
-        public bool IsNew => Loaded == null;
-
-        /// <summary>The item that a click on the row selects: the system of the loaded game data, so that its full page
-        /// shows, or the <c>[system]</c> of a new system.</summary>
-        public object Item => (object?)Loaded ?? Entry;
-    }
 
     /// <summary>Forgets the tables of the game data. Call it when the profile closes.</summary>
     public void Reset()
@@ -214,34 +196,23 @@ internal sealed class DatabasePanel(EditorWindow window)
     /// data. A new system shows at once, with a dot and empty counts.</summary>
     private Category SystemsCategory(EditorSession session)
     {
-        var table = SystemsTable(SystemRows(session.Edits, nickname => session.GameData?.Items.Systems.Get(nickname)),
+        var table = SystemsTable(SystemEntry.All(session.Edits, nickname => session.GameData?.Items.Systems.Get(nickname)),
             session.SectionName, OpenSystem);
         return new Category(SystemsId, "Systems", ObjectKinds.StarSystem, table, null, 0, table.RowCount,
             SystemsCategory, session.Version);
     }
 
-    /// <summary>
-    /// The rows of the Systems table: one for each nickname of the <c>[system]</c> sections of the edit view, in file
-    /// order. A nickname that two sections share gets one row, because the engine uses only one of them.
-    /// </summary>
-    /// <param name="loaded">The system of the loaded game data with a nickname, or null.</param>
-    internal static IReadOnlyList<SystemRow> SystemRows(EditSession edits, Func<string, StarSystem?> loaded) =>
-        edits.SystemSections()
-            .DistinctBy(s => s.Id.Key!, StringComparer.OrdinalIgnoreCase)
-            .Select(s => new SystemRow(s.Id.Key!, s, loaded(s.Id.Key!)))
-            .ToList();
-
-    /// <summary>The Systems table of the rows. A new system has the dot, the tooltip <see cref="NewSystemMark"/> and
-    /// empty counts.</summary>
+    /// <summary>The Systems table of the systems of the edit view. A new system has the dot, the tooltip
+    /// <see cref="SystemEntry.NewMark"/> and empty counts, because the loaded game data does not have it.</summary>
     /// <param name="name">The name of a <c>[system]</c> in the edit view.</param>
     /// <param name="open">Opens the item of a row, or null.</param>
-    internal static DatabaseTable SystemsTable(IReadOnlyList<SystemRow> rows, Func<SectionRef, string> name,
+    internal static DatabaseTable SystemsTable(IReadOnlyList<SystemEntry> rows, Func<SectionRef, string> name,
         Action<object>? open)
     {
         var byItem = rows.ToDictionary(r => r.Item);
         return DatabaseTable.Create<object>("##db-systems", "systems", rows.Select(r => r.Item),
             SystemColumns(item => byItem[item], name), _ => ObjectKinds.StarSystem, open, "Open system",
-            marked: item => byItem[item].IsNew, markTip: NewSystemMark);
+            marked: item => byItem[item].IsNew, markTip: SystemEntry.NewMark);
     }
 
     /// <summary>Opens the system of a row in the Scene. A new system shows the save card of the Scene.</summary>
@@ -365,10 +336,10 @@ internal sealed class DatabasePanel(EditorWindow window)
     /// <summary>The columns of the Systems table. The counts and the faction come from the loaded game data, so a new
     /// system has empty cells.</summary>
     /// <param name="row">The row of an item of the table.</param>
-    private static Column<object>[] SystemColumns(Func<object, SystemRow> row, Func<SectionRef, string> name) =>
+    private static Column<object>[] SystemColumns(Func<object, SystemEntry> row, Func<SectionRef, string> name) =>
     [
         new("Nickname", i => row(i).Nickname, NicknameWidth),
-        new("Name", i => name(row(i).Entry), NameWidth),
+        new("Name", i => name(row(i).Section), NameWidth),
         LoadedCount("Objects", row, s => s.Objects.Count),
         LoadedCount("Zones", row, s => s.Zones.Count),
         LoadedCount("Lights", row, s => s.LightSources.Count),
@@ -377,7 +348,7 @@ internal sealed class DatabasePanel(EditorWindow window)
 
     /// <summary>A column of a count of the loaded game data. A new system has an empty cell, which sorts as a missing
     /// number.</summary>
-    private static Column<object> LoadedCount(string header, Func<object, SystemRow> row, Func<StarSystem, int> count) =>
+    private static Column<object> LoadedCount(string header, Func<object, SystemEntry> row, Func<StarSystem, int> count) =>
         new(header, i => row(i).Loaded is { } system ? DatabaseTable.Count(count(system)) : "", NumberWidth,
             i => row(i).Loaded is { } system ? count(system) : double.NaN);
 

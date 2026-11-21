@@ -21,6 +21,9 @@ public enum AgentPanel
     Inspector,
     Hierarchy,
     Console,
+
+    /// <summary>The read-only Universe panel: the systems on the nav map grid and their jump connections.</summary>
+    Universe,
 }
 
 /// <summary>A view that <c>open_view</c> opens: a system in the Scene, a mission in the Mission tab or a cutscene in the
@@ -328,7 +331,7 @@ internal static class ViewTools
         var panel = Enum.GetValues<AgentPanel>().First(p => AgentTools.Snake(p.ToString()) == call.Args.Text("panel"));
         var group = panel switch
         {
-            AgentPanel.Scene => ToolGroup.Scene,
+            AgentPanel.Scene or AgentPanel.Universe => ToolGroup.Scene,
             AgentPanel.Mission => ToolGroup.Missions,
             AgentPanel.Timeline => ToolGroup.Cutscenes,
             _ => (ToolGroup?)null,

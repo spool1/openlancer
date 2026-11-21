@@ -18,6 +18,7 @@ using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Missions;
 using OpenLancer.Editor.Scene;
 using OpenLancer.Editor.Ui;
+using OpenLancer.Editor.Universe;
 using OpenLancer.Studio.Agent;
 
 namespace OpenLancer.Editor.Agent;
@@ -167,6 +168,7 @@ internal sealed class EditorAgentViews(EditorWindow window) : IAgentViews
         AgentPanel.Timeline => TimelinePanel.PanelId,
         AgentPanel.Inspector => InspectorPanel.PanelId,
         AgentPanel.Hierarchy => HierarchyPanel.PanelId,
+        AgentPanel.Universe => UniversePanel.PanelId,
         _ => ConsolePanel.PanelId,
     };
 

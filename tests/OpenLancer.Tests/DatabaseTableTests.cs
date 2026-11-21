@@ -4,6 +4,7 @@ using System.Linq;
 using LibreLancer.Data.GameData.World;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Universe;
+using OpenLancer.Editor;
 using OpenLancer.Editor.Database;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Studio.Commands;
@@ -105,7 +106,7 @@ public sealed class DatabaseTableTests
     {
         var texts = new ItemTexts(session, _ => "", _ => "");
         return DatabasePanel.SystemsTable(
-            DatabasePanel.SystemRows(session, n => loaded.FirstOrDefault(s => s.Nickname.Equals(n, StringComparison.OrdinalIgnoreCase))),
+            SystemEntry.All(session, n => loaded.FirstOrDefault(s => s.Nickname.Equals(n, StringComparison.OrdinalIgnoreCase))),
             texts.NameOf, null);
     }
 
@@ -127,7 +128,7 @@ public sealed class DatabaseTableTests
 
         Assert.Equal(["Li01", "Li02", "Av01"], table.Rows.Select(r => r.Nickname));
         Assert.Equal([false, false, true], table.Rows.Select(r => r.Marked));
-        Assert.Equal(DatabasePanel.NewSystemMark, table.MarkTip);
+        Assert.Equal(SystemEntry.NewMark, table.MarkTip);
         Assert.Same(loaded[0], table.Rows[0].Item);
         Assert.Equal("0", table.Rows[0].Texts[2]);
         var av01 = table.Rows[2];
@@ -135,7 +136,7 @@ public sealed class DatabaseTableTests
         Assert.Equal("Avalon", av01.Name);
         Assert.Equal(["", "", "", ""], av01.Texts[2..]);
         Assert.All(av01.Values[2..5], v => Assert.True(double.IsNaN(v)));
-        Assert.Empty(SteLint.Problems(DatabasePanel.NewSystemMark));
+        Assert.Empty(SteLint.Problems(SystemEntry.NewMark));
     }
 
     /// <summary>
@@ -182,7 +183,7 @@ public sealed class DatabaseTableTests
         using var ws = SystemWorkspace.Create();
         var session = ws.Session("act");
 
-        var rows = DatabasePanel.SystemRows(session, _ => null);
+        var rows = SystemEntry.All(session, _ => null);
 
         Assert.Single(rows, r => r.Nickname == "twice");
         Assert.Equal(session.SystemSections().Select(s => s.Id.Key).Distinct(StringComparer.OrdinalIgnoreCase),

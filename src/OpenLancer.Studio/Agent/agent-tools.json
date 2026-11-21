@@ -844,7 +844,7 @@
       "title": "Capture a panel of the editor",
       "description": "Gives an image of a panel of the editor as the user sees it, with its marks and labels, after the next frame. A panel larger than the image limit gives a smaller image. This tool changes nothing. Only the editor host has this tool.",
       "fields": {
-        "panel": "The panel to capture. Its tab must show in the editor."
+        "panel": "The panel to capture. Its tab must show in the editor. universe is the Universe panel: the systems on the nav map grid and their jump connections."
       }
     }
   },
