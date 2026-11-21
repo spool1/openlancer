@@ -269,14 +269,17 @@ internal sealed class SectionExtras(EditorWindow window, PropertyGrid grid)
         }
     }
 
-    /// <summary>The problems of a section for its raw block: the field checks and the list checks, each with the line of
-    /// its key in the text, or 0, and true for a base-game field problem (the key rule, decision D512 of the console
-    /// filter design). A list problem keeps its normal look, as on its row (section 6 of the design).</summary>
+    /// <summary>The problems of a section for its raw block: the field checks, the list checks and the component checks,
+    /// each with the line of its key in the text, or 0, and true for a base-game field problem (the key rule, decision
+    /// D512 of the console filter design). A list problem or a component problem keeps its normal look, as on its row
+    /// or strip (section 6 of the design). The component checks give, for example, the problems of a <c>[system]</c> of
+    /// <c>universe.ini</c>.</summary>
     internal static IEnumerable<(int Line, Diagnostic Problem, bool BaseGame)> SectionProblems(EditSession edits,
         SectionRef section, SectionView view)
     {
         var problems = edits.Check(section).Select(p => (Problem: p, BaseGame: edits.IsBaseGameProblem(p)))
-            .Concat(edits.CheckLists(section).Select(p => (Problem: p, BaseGame: false)));
+            .Concat(edits.CheckLists(section).Select(p => (Problem: p, BaseGame: false)))
+            .Concat(Data.Editing.Scene.ObjectComponents.Checks(edits, section).Select(p => (Problem: p, BaseGame: false)));
         foreach (var (problem, baseGame) in problems)
         {
             var index = problem.Key == null

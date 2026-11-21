@@ -477,9 +477,8 @@ internal sealed class InspectorPanel : IDisposable
     };
 
     /// <summary>
-    /// The number of errors of the section that block the save, above the sections (section 11.2 of the M21 design): the
-    /// errors of the data lists, and the errors of the field checks of a section that the active mod adds or changes.
-    /// The rows show each error below its key.
+    /// The number of errors of the section that block the save, above the sections (section 11.2 of the M21 design). The
+    /// rows and the strips show each error.
     /// </summary>
     private void SaveErrors(SectionRef section)
     {
@@ -488,21 +487,31 @@ internal sealed class InspectorPanel : IDisposable
             return;
         }
 
-        // An error that the base game has too does not block the save (the key rule, decision D508 of the console
-        // filter design).
-        var edits = session.Edits;
-        var errors = edits.CheckLists(section)
-            .Count(p => p.Severity == DiagnosticSeverity.Error && !edits.IsBaseGameProblem(p));
-        if (view.IsChanged)
-        {
-            errors += edits.Check(section).Count(p => p.Severity == DiagnosticSeverity.Error && !edits.IsBaseGameProblem(p));
-        }
-
+        var errors = SaveErrorCount(session.Edits, section, view);
         if (errors > 0)
         {
             Strip("##save-errors", () => ImGui.TextColored(EditorTheme.Error,
                 $"{EditorIcons.ExclamationTriangle}  {(errors == 1 ? "1 error blocks" : $"{errors} errors block")} the save."));
         }
+    }
+
+    /// <summary>
+    /// The number of errors of a section that block the save: the errors of the data lists, and for a section that the
+    /// active mod adds or changes, the errors of the field checks and of the component checks. The component checks
+    /// give the errors of a zone nickname and of a <c>[system]</c> of <c>universe.ini</c>. An error that the base game
+    /// has too does not count (the key rule, decision D508 of the console filter design).
+    /// </summary>
+    internal static int SaveErrorCount(EditSession edits, SectionRef section, SectionView view)
+    {
+        bool Blocks(Diagnostic problem) => problem.Severity == DiagnosticSeverity.Error && !edits.IsBaseGameProblem(problem);
+
+        var errors = edits.CheckLists(section).Count(Blocks);
+        if (view.IsChanged)
+        {
+            errors += edits.Check(section).Concat(Data.Editing.Scene.ObjectComponents.Checks(edits, section)).Count(Blocks);
+        }
+
+        return errors;
     }
 
     /// <summary>

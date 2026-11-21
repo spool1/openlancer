@@ -3,6 +3,7 @@ using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Editor.Inspector;
 using Xunit;
 using static OpenLancer.Tests.SceneWorkspace;
 
@@ -134,6 +135,20 @@ public sealed class ComponentChecksTests
             p => p.Severity == DiagnosticSeverity.Warning && p.Message.Contains("The game can confuse the two objects."));
     }
 
+    /// <summary>The save-error strip of the Inspector counts the zone collision, because the collision stops the
+    /// save.</summary>
+    [Fact]
+    public void TheInspectorCountsAZoneCollisionAsAnErrorThatBlocksTheSave()
+    {
+        using var ws = Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.AddSection(Li01Path, "zone", [ListWorkspace.Line("nickname", "ZONE_LI02")]));
+
+        Assert.Single(session.SaveProblems());
+        Assert.Equal(1, InspectorPanel.SaveErrorCount(session, Zone("ZONE_LI02"), session.Get(Zone("ZONE_LI02"))!));
+        Assert.Equal(0, InspectorPanel.SaveErrorCount(session, Li02("zone", "Zone_li02"), session.Get(Li02("zone", "Zone_li02"))!));
+    }
+
     [Fact]
     public void TheDockChecksAreWarnings()
     {
@@ -165,8 +180,8 @@ public sealed class ComponentChecksTests
                       "Li02 after a launch.",
             "Li02_01_Base: No object in Li02 has 'base = Li02_01_Base'. The navigation map does not list the base, and its " +
             "rooms show no planet."], warnings.Select(w => w.Message));
-        Assert.Empty(ComponentChecks.Check(session,
-            new SectionRef(ListWorkspace.UniversePath, new SectionIdentity("Base", "Li01_01_Base")), onlyActiveMod: false)
-            .Where(NotOrder));
+        Assert.DoesNotContain(ComponentChecks.Check(session,
+            new SectionRef(ListWorkspace.UniversePath, new SectionIdentity("Base", "Li01_01_Base")), onlyActiveMod: false),
+            NotOrder);
     }
 }

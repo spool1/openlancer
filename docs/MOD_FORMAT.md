@@ -574,7 +574,7 @@ The checks of a system and of a base of `universe.ini`:
 | Two systems name one file. | Warning | The game loads its objects twice. |
 | A `[Base]` comes after the `[system]` of its system. | Warning | The game does not link the base to its station. |
 
-An error stops the save only when the active mod writes the line. A problem of a line of the game or of a lower mod is a warning. Two different system nicknames with one FLHash get the FLHash error of the data lists (see "The save gate"). The Inspector shows these problems above the sections of a `[system]` or a `[Base]`. The agent tools `get_system`, `get_item` and `check` give them too.
+An error stops the save only when the active mod writes the line. A problem of a line of the game or of a lower mod is a warning. Two different system nicknames with one FLHash get the FLHash error of the data lists (see "The save gate"). The Inspector shows these problems above the sections of a `[system]` or a `[Base]`, and the raw INI block marks the line of each problem. The count of the errors that block the save includes these errors. The agent tools `get_system`, `get_item` and `check` give them too.
 
 ## Prop groups
 

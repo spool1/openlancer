@@ -3,6 +3,7 @@ using LibreLancer.Data;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Editor.Inspector;
 using OpenLancer.Studio.Agent;
 using Xunit;
 using static OpenLancer.Tests.AgentCalls;
@@ -111,6 +112,28 @@ public sealed class UniverseChecksTests
         Assert.Equal(@"The system Av01 names the file ..\MODS\act\SYSTEMS\Av09\Av09.ini, and the mod has no such file. The " +
                      "game loads the system without its objects and zones, and the game can crash.", problem.Message);
         Assert.Contains(session.SaveProblems(), p => p.Message == problem.Message);
+    }
+
+    /// <summary>The save-error strip of the Inspector counts an error of a system, and the raw INI block marks the
+    /// line of its key.</summary>
+    [Fact]
+    public void TheInspectorCountsAnErrorOfASystemAndTheRawBlockMarksItsLine()
+    {
+        using var ws = NewSystemWorkspace.Create();
+        var session = ws.Session("act");
+        NewSystemWorkspace.CreateAv01(session);
+        Assert.Equal(0, InspectorPanel.SaveErrorCount(session, Av01, session.Get(Av01)!));
+
+        session.Execute(EditCommand.SetLinesFromText(Av01, "file", [@"..\MODS\act\SYSTEMS\Av09\Av09.ini"]));
+        Assert.Equal(1, InspectorPanel.SaveErrorCount(session, Av01, session.Get(Av01)!));
+
+        AddSystem(session, ("file", @"systems\Li01\li01.ini"), ("nickname", "Av02"), ("pos", "2, 2"));
+        var av02 = NewSystemWorkspace.System("Av02");
+        var order = One(session, av02, "The [system] Av02");
+        var marks = SectionExtras.SectionProblems(session, av02, session.Get(av02)!).ToList();
+        // Line 1 of the raw text is the header, so the file line is line 2.
+        Assert.Contains(marks, m => m.Line == 2 && m.Problem.Message == order.Message && !m.BaseGame);
+        Assert.Equal(1, InspectorPanel.SaveErrorCount(session, av02, session.Get(av02)!));
     }
 
     [Fact]
