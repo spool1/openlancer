@@ -479,7 +479,6 @@ public static class PropGroups
         return plan;
     }
 
-    /// <summary>The active mod of a session that takes edits.</summary>
     /// <summary>
     /// Why a prop group cannot hold a connection object. Each end of a jump gate pair or a jump hole pair needs its
     /// partner, and a placed copy has none. This version does not copy airlock gates and trade lane rings.
@@ -490,6 +489,7 @@ public static class PropGroups
               $"partner. To make a pair, use {SceneSections.PairTool}."
             : $"{section.Id.Key} is {SceneSections.WithArticle(kind)}. This version cannot put {kind}s into a prop group.";
 
+    /// <summary>The active mod of a session that takes edits.</summary>
     private static Mod Writable(EditSession session)
     {
         if (session.ReadOnlyReason is { } reason)
