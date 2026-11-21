@@ -139,12 +139,13 @@ public sealed class DatabaseTableTests
     }
 
     /// <summary>
-    /// The Database makes the Systems table again after each edit while it shows. A table of the edit view after an
-    /// edit has a second new system, a renamed system and the rows after an undo. After the save, the loaded game data
-    /// has the new system, so its row has no dot and selects the system.
+    /// A Systems table made from the edit view after an edit shows the edit: a second new system, a renamed system and
+    /// the rows after an undo. After the save, the loaded game data has the new system, so its row has no dot and selects
+    /// the system. The Database makes the table again when the version of the session changes while the table shows. That
+    /// check is in the draw code, so this test makes the table itself.
     /// </summary>
     [Fact]
-    public void TheSystemsTableFollowsEachEditBeforeAndAfterTheSave()
+    public void ATableOfTheEditViewShowsEachEditBeforeAndAfterTheSave()
     {
         using var ws = NewSystemWorkspace.Create();
         var session = ws.Session("act");
