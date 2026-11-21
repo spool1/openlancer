@@ -388,7 +388,8 @@ internal sealed class ExportDialog : ModalDialog
     }
 
     /// <summary>The status line when the dialog closes while the export waits for the save gate.</summary>
-    internal const string ClosedBeforeStart = "The Export dialog closed before the export started. The export wrote nothing.";
+    internal const string ClosedBeforeStart =
+        "The Export dialog closed before the export started. The export wrote nothing.";
 
     /// <summary>The save gate refuses the mod: the Console gets each error, and the dialog and the Console get the
     /// refusal. Nothing is written.</summary>
