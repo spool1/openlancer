@@ -7093,7 +7093,7 @@
     {
       "name": "set_fields",
       "title": "Set the fields of an item",
-      "description": "Sets fields of one item: a section by its INI keys, or a cutscene entity or event by its THN paths. The tool makes one Undo step. Use get_item or get_cutscene to see the keys and the values first. The goto line of a jump gate or a jump hole is locked. To change the pair, delete one end with delete_items, and its pair goes too. Then make a new pair with connection_create. A value that a list check refuses applies, and the result gives the new problem. A mission item runs in strict mode, so an edit that adds an error to its script refuses.",
+      "description": "Sets fields of one item: a section by its INI keys, or a cutscene entity or event by its THN paths. The tool makes one Undo step. Use get_item or get_cutscene to see the keys and the values first. The goto line of a jump gate or a jump hole is locked. To change the pair, delete one end with delete_items, and its pair goes too. Then make a new pair with connection_create. The prev_ring and next_ring lines of a trade lane ring are locked too. Use trade_lane_insert_ring, trade_lane_repair or delete_items to change the links of a lane. A value that a list check refuses applies, and the result gives the new problem. A mission item runs in strict mode, so an edit that adds an error to its script refuses.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8854,7 +8854,7 @@
     {
       "name": "delete_items",
       "title": "Delete items",
-      "description": "Deletes items with their children. Other lines that name them show \u0027Missing\u0027. A cutscene entity goes with the events that name it. A jump gate or a jump hole goes with its pair, its gate lock lines and the traffic zones that connection_create made for it. A system that the active mod adds goes with its file and the partners of its jump objects, and always asks for confirm: true. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true. Of the parts of a pair, only an end in another file makes it ask. A jump traffic zone with another name that stays at an end makes it ask too.",
+      "description": "Deletes items with their children. Other lines that name them show \u0027Missing\u0027. A cutscene entity goes with the events that name it. A jump gate or a jump hole goes with its pair, its gate lock lines and the traffic zones that connection_create made for it. A trade lane ring goes, and its neighbors link to each other. When a lane keeps one ring or none, the whole lane goes with its lane zone, and the tool asks for confirm: true. A system that the active mod adds goes with its file and the partners of its jump objects, and always asks for confirm: true. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true. Of the parts of a pair, only an end in another file makes it ask. A jump traffic zone with another name that stays at an end makes it ask too.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9478,7 +9478,7 @@
               "maxLength": 1024
             },
             "minItems": 1,
-            "description": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. A jump gate, a jump hole, an airlock gate and a trade lane ring refuse, because a copy has no partner. It also copies triggers and other mission items: trg: and sec: references. It also copies cutscene events: thn: references with #event/. studio_status gives the most items of one call."
+            "description": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. A jump gate, a jump hole, an airlock gate and a trade lane ring refuse, because a copy has no partner. Use connection_create for a pair, and trade_lane_create or trade_lane_insert_ring for a lane. It also copies triggers and other mission items: trg: and sec: references. It also copies cutscene events: thn: references with #event/. studio_status gives the most items of one call."
           },
           "offset": {
             "type": "array",
@@ -10111,7 +10111,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The solar archetype. Get the values from list_values with the list solar_archetype. A jump gate, a jump hole, an airlock gate or a trade lane ring refuses. Use connection_create for a pair."
+            "description": "The solar archetype. Get the values from list_values with the list solar_archetype. A jump gate, a jump hole, an airlock gate or a trade lane ring refuses. Use connection_create for a pair, and trade_lane_create or trade_lane_insert_ring for a lane."
           },
           "position": {
             "type": "array",
@@ -11868,7 +11868,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The asset reference from search_assets, for example asset:solar_archetype/my_archetype. Use prop_group_place for a prop group. A jump gate, a jump hole, an airlock gate or a trade lane ring refuses. Use connection_create for a pair."
+            "description": "The asset reference from search_assets, for example asset:solar_archetype/my_archetype. Use prop_group_place for a prop group. A jump gate, a jump hole, an airlock gate or a trade lane ring refuses. Use connection_create for a pair, and trade_lane_create or trade_lane_insert_ring for a lane."
           },
           "position": {
             "type": "array",
@@ -50473,7 +50473,7 @@
               ]
             },
             "uniqueItems": true,
-            "description": "The package forms of a retail target: drop_in for a zip for Nexus, flmm for an FLMM package. Without it, the export makes both."
+            "description": "The package forms of a retail target: drop_in for a zip for Nexus, flmm for an FLMM package. Without it, the export makes both. When one form refuses, the other form still exports. A mod with a new system exports as a drop-in zip. Give formats: [drop_in] to make only the zip."
           },
           "replace_version": {
             "type": "boolean",

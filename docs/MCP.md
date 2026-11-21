@@ -160,7 +160,7 @@ These tools change the data of the active mod. They work in both hosts. The olto
 | `set_fields` | Sets fields of one item by their INI keys, or of a cutscene entity or event by their THN paths. |
 | `set_text` | Sets the name, the infocard or another text of one item, or a text id of a mission line. The text goes into the `strings.json` of the active mod. It does not change cutscene items. Use `set_fields` for their texts. |
 | `rename_item` | Gives an item a new nickname, and changes each line that names it. A line that the active mod cannot change keeps the old nickname and shows "Missing". A data item and a system must be items that the active mod adds. A rename of a ship or equipment also changes the templates of the cutscene COMPOUNDs that name it. A cutscene entity gets a new name, and the events of its script that name it change too. |
-| `delete_items` | Deletes items of a system with their children, mission items, and cutscene entities and events. Other lines that name them show "Missing". A cutscene entity goes with the events that name it. A system that the active mod adds goes with its file. |
+| `delete_items` | Deletes items of a system with their children, mission items, and cutscene entities and events. Other lines that name them show "Missing". A cutscene entity goes with the events that name it. A trade lane ring goes, and its neighbors link to each other. A system that the active mod adds goes with its file. |
 | `duplicate_items` | Copies items of a system with their children, mission items and cutscene events. With `offset`, the copies of a system move by the offset. A copy without a position, a mission copy and a copy of a cutscene event do not move, and the result warns about them. With `time_offset`, each copy of an event is at the time of its event plus the offset. |
 | `undo` | Undoes the last edit of the agent. |
 | `redo` | Redoes the last edit that the agent undid. |
@@ -174,11 +174,17 @@ A rename of an object of a system also changes the mission lines that name it, a
 
 Of the items of a system, `delete_items` takes objects, zones, lights, nebulae and asteroid fields. A jump gate or a jump hole goes with its pair, its gate lock lines and the traffic zones that `connection_create` made for it. The delete needs `confirm: true` when the other end is in another file, or when a jump traffic zone with another name stays at an end. A one-way object whose `goto` line names an end gives `refused`, because it is no part of the pair. Name it in the same call, or delete it first.
 
+A trade lane ring goes, and the neighbors of the ring link to each other. The end name of a removed end ring moves to the new end ring, and the lane zone follows the new ends. These changes are parts of the lane, so they do not make the delete ask.
+
+When a lane keeps one ring or none, the whole lane goes with its lane zone, and the delete needs `confirm: true`. A one-way link to a ring of the call gives `refused`, because the relink does not change such a line. The message names the fix. `trade_lane_delete` deletes a whole lane (see "The universe tools").
+
 `delete_items` also takes a system that the active mod adds, by its `system:` reference. The delete always needs `confirm: true`. The system file goes too, and each object of another system whose `goto` line names the system goes with its pair. The mission lines that name the system show "Missing". A call can also name items of the system. These items go with the system.
 
 A system with a base gives `refused` in this version. A system of the game or of a lower mod gives `refused` with the detail `GameSystem`.
 
-`duplicate_items` takes objects, zones and lights of a system. A jump gate, a jump hole, an airlock gate and a trade lane ring give `refused`, because a copy has no partner. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. It also takes a system that the active mod adds. The rename of a system changes the `goto` lines, the `[Base]` lines and the mission lines that name it, and its file keeps its path. Another section, for example a loadout, gives `refused`.
+`duplicate_items` takes objects, zones and lights of a system. A jump gate, a jump hole, an airlock gate and a trade lane ring give `refused`, because a copy has no partner. Use `connection_create` for a pair, and `trade_lane_create` or `trade_lane_insert_ring` for a lane.
+
+`rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. It also takes a system that the active mod adds. The rename of a system changes the `goto` lines, the `[Base]` lines and the mission lines that name it, and its file keeps its path. Another section, for example a loadout, gives `refused`. A rename of a trade lane ring also changes the link lines of its neighbors, as each rename changes the lines that name the item.
 
 A rename of a ship or equipment also changes the template of each cutscene COMPOUND that names it, as the data API does. A rename of a good also renames its equipment, so the COMPOUNDs of that equipment change too. The result gives these entities in `changes` as `thn:` references. Such a change alone needs no `confirm: true`. When the rename asks for another reason, the question also names their cutscenes. A cutscene that the editor cannot change keeps the old name, and the rename asks with a warning.
 
@@ -256,7 +262,7 @@ A create can also give the new item a nickname, a rotation, a size, a name and m
 
 A station archetype with a docking sphere needs a base, because the Create menu asks for one. A station archetype without a docking sphere takes no base. A `parent` must be an object of the same system. An archetype of another template gives `invalid_value` with the reason.
 
-A jump gate, a jump hole, an airlock gate and a trade lane ring need a partner or a lane. So `scene_create_object` and `scene_spawn_asset` refuse their archetypes. Use `connection_create` for a jump gate pair or a jump hole pair.
+A jump gate, a jump hole, an airlock gate and a trade lane ring need a partner or a lane. So `scene_create_object` and `scene_spawn_asset` refuse their archetypes. Use `connection_create` for a jump gate pair or a jump hole pair. Use `trade_lane_create` for a trade lane, and `trade_lane_insert_ring` for one more ring of a lane. `list_values` with the list `solar_archetype` and the text `TRADELANE_RING` gives the ring archetypes.
 
 `scene_spawn_asset` takes the template of the type of a solar archetype. A ship, an asteroid or a model makes a new static prop archetype. The Scene shows its object after a save, when the editor loads the new archetype, and the result tells it.
 
@@ -775,6 +781,8 @@ The result gives the written and the deleted files, relative to the folder of th
 | `replace_version` | Replaces an earlier export of the same version with other game files, as **Replace version** of the Export dialog does. |
 
 The result tells each package and if the export wrote it. `recorded` tells if the publish history recorded the export. An export with a failed package also records the packages that it wrote.
+
+When one form refuses, the other form still exports, and the result tells the refusal. A mod with a new system exports as a drop-in zip, because the FLMM form refuses a new INI file with mod text. Give `"formats": ["drop_in"]` to make only the zip.
 
 A mod with an infocard needs the drop-in form now. An infocard of the editor starts with an XML header with quotes, and the FLMM form has no known escape for a quote. So an FLMM package of such a mod fails, and the export tells it. `scene_place_wreck` always writes an infocard. Give `"formats": ["drop_in"]` for such a mod.
 
