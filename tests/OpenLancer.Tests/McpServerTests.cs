@@ -14,6 +14,7 @@ using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Prefabs;
 using OpenLancer.Data.Mods;
@@ -211,6 +212,7 @@ public sealed class McpServerTests
         var resources = await client.ListResourcesAsync(cancellationToken: Token);
         var lists = await client.ReadResourceAsync("openlancer://catalog/lists", cancellationToken: Token);
         var refs = await client.ReadResourceAsync("openlancer://guide/refs", cancellationToken: Token);
+        var rules = await client.ReadResourceAsync("openlancer://guide/rules", cancellationToken: Token);
 
         Assert.Equal([
             "openlancer://schema/mission-names", "openlancer://schema/mission-sections",
@@ -231,6 +233,13 @@ public sealed class McpServerTests
         // The catalog of the prefabs gives the references of both forms.
         Assert.Contains("prefab:builtin:<id>", guide);
         Assert.Contains("prefab:mod:<id>", guide);
+        // The rules of the universe name the slot limit, the locked keys with their tools and a system with life.
+        var rule = Assert.IsType<TextResourceContents>(Assert.Single(rules.Contents)).Text;
+        Assert.Contains("1. A system has at most 10 jump objects", rule);
+        Assert.Contains("Change a lane with trade_lane_insert_ring, trade_lane_repair and delete_items.", rule);
+        Assert.Contains("A mission opens it with Act_LockDock and unlock.", rule);
+        Assert.Contains("A system with life:", rule);
+        Assert.Contains("prop_group_save", rule);
         await Assert.ThrowsAsync<McpProtocolException>(() => client.ReadResourceAsync("openlancer://none", cancellationToken: Token).AsTask());
     }
 
@@ -323,9 +332,26 @@ public sealed class McpServerTests
             Assert.Equal(SceneEditTools.ObjectTemplates, catalog["scene_templates"]!.AsArray().Select(t => (string?)t!["id"]));
             var station = catalog["scene_templates"]![0]!;
             Assert.Equal(("docking_sphere", "station"), ((string?)station["needs"], (string?)station["types"]![0]));
-            Assert.Equal(["scene_place_wreck", "scene_place_patrol_route"],
-                catalog["builders"]!.AsArray().Select(b => (string?)b!["tool"]));
+            Assert.Equal(["scene_place_wreck", "scene_place_patrol_route", "system_create", "connection_create",
+                "trade_lane_create"], catalog["builders"]!.AsArray().Select(b => (string?)b!["tool"]));
             Assert.Equal(AgentTexts.Tool("scene_place_wreck").Description, (string?)catalog["builders"]![0]!["description"]);
+            // The builders of the universe give the defaults of the rule data. The other builders give none.
+            var builders = catalog["builders"]!.AsArray();
+            Assert.Null(builders[0]!["defaults"]);
+            var rules = ListRules.Retail.Builders;
+            var zone = builders[2]!["defaults"]!["sun_death_zone"]!;
+            Assert.Equal(rules.SunZone!.Size, (float)zone["size"]!);
+            Assert.Contains(zone["lines"]!.AsArray(), l => (string?)l!["key"] == "damage");
+            var connection = builders[3]!["defaults"]!;
+            Assert.Equal((rules.Connection!.Tunnel, rules.Connection.Spacing),
+                ((string?)connection["tunnel"], (float)connection["spacing"]!));
+            Assert.Equal(rules.Connection.Gate.TrafficSize, (float)connection["gate"]!["traffic_size"]!);
+            Assert.Contains(connection["houses"]!.AsArray(), h => (string?)h!["house"] == "li");
+            var lane = builders[4]!["defaults"]!;
+            Assert.Equal((rules.Lane!.Spacing, rules.Lane.RetailMin, rules.Lane.RetailMax, rules.Lane.Clearance),
+                ((float)lane["spacing"]!, (float)lane["retail_min"]!, (float)lane["retail_max"]!, (float)lane["clearance"]!));
+            Assert.Equal((rules.Lane.ZoneMargin, rules.Lane.ZoneWidth), ((float)lane["zone_margin"]!, (float)lane["zone_width"]!));
+            Assert.Contains(lane["zone"]!.AsArray(), l => (string?)l!["key"] == "pop_type");
         }
     }
 
@@ -409,7 +435,7 @@ public sealed class McpServerTests
         var result = await client.GetPromptAsync("two_trigger_mission",
             new Dictionary<string, object?> { ["script"] = script }, cancellationToken: Token);
 
-        Assert.Equal(["two_trigger_mission", "short_cutscene"], prompts.Select(p => p.Name));
+        Assert.Equal(["two_trigger_mission", "short_cutscene", "new_system"], prompts.Select(p => p.Name));
         var prompt = prompts[0].ProtocolPrompt;
         Assert.Equal(("two_trigger_mission", AgentTexts.Prompts["two_trigger_mission"].Title), (prompt.Name, prompt.Title));
         var argument = Assert.Single(prompt.Arguments!);
@@ -483,7 +509,7 @@ public sealed class McpServerTests
             var result = await client.GetPromptAsync("short_cutscene",
                 new Dictionary<string, object?> { ["name"] = "my_intro" }, cancellationToken: Token);
 
-            Assert.Equal(["two_trigger_mission", "short_cutscene"], prompts.Select(p => p.Name));
+            Assert.Equal(["two_trigger_mission", "short_cutscene", "new_system"], prompts.Select(p => p.Name));
             var argument = Assert.Single(prompts[1].ProtocolPrompt.Arguments!);
             Assert.Equal(("name", true), (argument.Name, argument.Required));
             var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Messages).Content).Text;
@@ -503,9 +529,38 @@ public sealed class McpServerTests
         {
             await using var connection = new Connection(host);
             var client = await connection.Client();
-            Assert.Equal(["two_trigger_mission", "short_cutscene"],
+            Assert.Equal(["two_trigger_mission", "short_cutscene", "new_system"],
                 (await client.ListPromptsAsync(cancellationToken: Token)).Select(p => p.Name));
         }
+    }
+
+    /// <summary>The prompt new_system gives the steps of a new system with its two arguments: a gate pair to the
+    /// neighbor, a lane from the new gate toward the sun, the encounters, a patrol and the checks. The steps of the save
+    /// and of the image tell what to do without these tools, so the host without a window and the host without the save
+    /// list it. A host that only reads does not list it (see <see cref="AHostThatOnlyReadsDoesNotListAnEditToolAndRefusesItsCall"/>).</summary>
+    [Fact]
+    public async Task ThePromptOfANewSystemGivesItsStepsWithTheNicknameAndTheNeighbor()
+    {
+        await using var connection = new Connection(new TestAgentHost(null));
+        var client = await connection.Client();
+
+        var prompts = await client.ListPromptsAsync(cancellationToken: Token);
+        var result = await client.GetPromptAsync("new_system",
+            new Dictionary<string, object?> { ["nickname"] = "my_sys01", ["neighbor"] = "Li01" }, cancellationToken: Token);
+
+        var prompt = prompts.Single(p => p.Name == "new_system").ProtocolPrompt;
+        Assert.Equal([("nickname", true), ("neighbor", true)], prompt.Arguments!.Select(a => (a.Name, a.Required)));
+        var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Messages).Content).Text;
+        Assert.StartsWith("Make a new star system with the nickname my_sys01 next to the system Li01.", text);
+        Assert.Contains("3. Call system_create with the nickname my_sys01, a name, like Li01", text);
+        Assert.Contains("4. Call connection_create with the kind jump_gate, from the system my_sys01 and to the system Li01.", text);
+        Assert.Contains("5. Call trade_lane_create with the system my_sys01, start_near the new gate and end_near the sun.", text);
+        Assert.Contains("10. Tell the user what you added. Do not call save until the user asks for it.", text);
+        Assert.Contains("11. After a save, wait until studio_status shows data_load ready.", text);
+        Assert.DoesNotContain("{nickname}", text);
+        Assert.DoesNotContain("{neighbor}", text);
+        await Assert.ThrowsAsync<McpProtocolException>(() => client.GetPromptAsync("new_system",
+            new Dictionary<string, object?> { ["nickname"] = "my_sys01" }, cancellationToken: Token).AsTask());
     }
 
     [Fact]

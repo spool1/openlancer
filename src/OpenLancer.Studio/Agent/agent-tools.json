@@ -1727,7 +1727,7 @@
     "openlancer://catalog/prefabs": {
       "name": "prefabs",
       "title": "The prefabs, templates, builders and prop groups",
-      "description": "The behavior prefabs with their fields, the templates of scene_create_object, the builders of the Scene and the prop groups of the profile. Without a profile, it has the built-in prefabs and the rule data only.",
+      "description": "The behavior prefabs with their fields, the templates of scene_create_object, the builders of the Scene and the prop groups of the profile. The builders give the defaults of the rule data. Without a profile, it has the built-in prefabs and the rule data only.",
       "text": []
     },
     "openlancer://catalog/lists": {
@@ -1771,6 +1771,20 @@
         "1. Write short sentences: at most 20 words for an instruction and 25 words for a description.",
         "2. Do not use semicolons or contractions.",
         "3. Use the active voice and one name for one thing.",
+        "",
+        "Rules of the jump connections and the trade lanes:",
+        "1. A system has at most 10 jump objects: the objects with a goto line. The game crashes with more. get_universe gives the count of each system.",
+        "2. A jump gate or a jump hole is one end of a pair. Each end names the other end in its goto line. Make pairs with connection_create.",
+        "3. A trade lane is a chain of rings. Each ring names its neighbors in its prev_ring and next_ring lines. The two end rings have the end names for the HUD.",
+        "4. The route tables of the retail games come from the jump connections. OpenLancer makes them at Ctrl+F5 and at an export, so the edit view holds none.",
+        "5. A gate lock keeps a jump gate or a jump hole closed at the start of a new game. A mission opens it with Act_LockDock and unlock.",
+        "6. The goto, prev_ring and next_ring lines are locked. Change a pair with connection_create and delete_items. Change a lane with trade_lane_insert_ring, trade_lane_repair and delete_items.",
+        "",
+        "A system with life:",
+        "1. connection_create makes a traffic zone at each new jump object. Give it encounters with scene_set_encounters, so that NPCs come and go.",
+        "2. trade_lane_create makes the lane zone, where lane traffic spawns. Give it encounters with scene_set_encounters too.",
+        "3. Add a patrol with scene_place_patrol_route and the usage patrol. Give the route an encounter group in the same call.",
+        "4. To copy zones of a retail system, save them as a prop group with prop_group_save. Then place the group with prop_group_place.",
         "",
         "Rules of the server:",
         "1. The server reads only the files of the edit view. It takes install paths only, for example DATA\\SHIPS\\loadouts.ini.",
@@ -1886,6 +1900,41 @@
         "9. To correct the timing, call cutscene_move_events or set_fields. Give expect_type and expect_time with each event reference.",
         "10. Call check with the scope cutscene and the ref of the new script. Correct each error.",
         "11. Tell the user what you added. Do not call save until the user asks for it."
+      ]
+    },
+    "new_system": {
+      "title": "Make a new star system",
+      "description": "Gives the steps to make a new star system next to another system. The steps add a jump gate pair, a trade lane, encounters and a patrol, and run the checks.",
+      "arguments": {
+        "nickname": "The nickname of the new system, for example my_sys01. At most 15 characters. Start it with a short prefix of your mod, so that two mods do not collide.",
+        "neighbor": "The nickname of an existing system, for example Li01. The new system gets a jump gate pair to it. get_universe gives the systems."
+      },
+      "optional_tools": [
+        "render_scene",
+        "save"
+      ],
+      "text": [
+        "Make a new star system with the nickname {nickname} next to the system {neighbor}. Do the steps in this order.",
+        "The names in the steps are examples. Use names that fit the system.",
+        "",
+        "1. Call studio_status. Make sure that can_edit is true.",
+        "2. Call get_universe. Find the map_pos of {neighbor} and a free place next to it on the nav map.",
+        "3. Call system_create with the nickname {nickname}, a name, like {neighbor} and the free place as map_pos.",
+        "   The result gives the new system and its sun.",
+        "4. Call connection_create with the kind jump_gate, from the system {nickname} and to the system {neighbor}.",
+        "   The first object of the pair is the new gate in {nickname}. The result also gives the traffic zones.",
+        "5. Call trade_lane_create with the system {nickname}, start_near the new gate and end_near the sun.",
+        "   The lane goes from the gate toward the sun. Each end takes the name of its object.",
+        "   Call get_trade_lane with the first ring of the result. Make sure that the lane has no problems.",
+        "6. Call list_values with the list encounter_of_system and the system {neighbor}. Pick an encounter.",
+        "   Call list_values with the list faction. Pick a faction that fits the encounter.",
+        "7. Call scene_set_encounters on the traffic zone of the new gate. Then call it on the lane zone.",
+        "8. Call scene_place_patrol_route with the system {nickname}, a name, the usage patrol and three points.",
+        "   Give it one encounter group with the encounter and the faction of step 6.",
+        "9. Call check with the scope all. Correct each error.",
+        "10. Tell the user what you added. Do not call save until the user asks for it.",
+        "11. After a save, wait until studio_status shows data_load ready. Then call render_scene with the system {nickname}.",
+        "   Only the editor host can render. If render_scene gives not_available, do not do this step."
       ]
     }
   },

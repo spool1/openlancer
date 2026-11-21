@@ -933,22 +933,33 @@ The server gives these resources. An agent program can read them before its firs
 | `openlancer://schema/mission-names` | The 129 conditions and actions of a trigger. Each one has its plain name, its event or action group, its values with their kinds and help, and what OpenLancer does with it. These are the rows of `describe_mission_name` without the counts of the base game. |
 | `openlancer://schema/mission-sections` | The 12 section types of a mission script and the ship build (`[NPCShipArch]`), with their keys and values. A type that `mission_add_item` adds has its kind, for example `ship` for `[MsnShip]`. |
 | `openlancer://schema/objlist-directives` | The 23 orders of an order list, with their values. The `steps` of `mission_add_item` take them. |
-| `openlancer://catalog/prefabs` | The behavior prefabs with their fields: the built-in prefabs and the prefab assets of the mods. Also the templates of `scene_create_object`, the builders `scene_place_wreck` and `scene_place_patrol_route`, and the prop groups of the profile. Without a profile, it gives the built-in prefabs and the rule data only. |
+| `openlancer://catalog/prefabs` | The behavior prefabs with their fields: the built-in prefabs and the prefab assets of the mods. Also the templates of `scene_create_object`, the builders and the prop groups of the profile. Without a profile, it gives the built-in prefabs and the rule data only. |
 | `openlancer://catalog/lists` | The data lists with their ids and labels. `list_values` takes the ids. |
 | `openlancer://catalog/thn-events` | The event types that `cutscene_add_event` adds, in the order of the Add event menu. Each one has the entity types of its first and its second target, if it needs the second target, and if it has a length. Also the entity types that `cutscene_add_entity` adds, and if each one takes a position. |
-| `openlancer://guide/rules` | The rules of the editor and what they mean for an agent. |
+| `openlancer://guide/rules` | The rules of the editor and what they mean for an agent. It also gives the rules of the jump connections and the trade lanes, and the steps of a system with life. |
 | `openlancer://guide/refs` | The forms of the item references. |
+
+The builders of the catalog are `scene_place_wreck`, `scene_place_patrol_route`, `system_create`, `connection_create` and `trade_lane_create`. Each row gives the tool, its title and its description. The three universe builders also give `defaults`: the rules of the rule data that they use when a call does not give a value. These rules come from `sceneBuilders` of `list-rules.json`:
+
+- `system_create`: `sun_death_zone`, the death zone of a new sun when the template sun has none. It gives the radius, the margin below the atmosphere of the sun and the zone lines.
+- `connection_create`: the tunnel of the `goto` line, the smallest distance from the center (`min_radius`) and the distance between two jump objects (`spacing`). `gate` and `hole` give the archetype, the infocard, the name pattern, the lines and the traffic zone of each kind. `houses` gives the loadout and the pilot of a gate for each house.
+- `trade_lane_create`: the archetype, the name, the infocard and the lines of a ring. Also the ring spacing, its retail range (`retail_min`, `retail_max`) and the clearance of an end. Also the size and the lines of the lane zone. `houses` gives the loadout and the pilot of a ring for each house.
 
 The catalog of the prefabs reads the open profile, so its read waits in the queue of the tool calls. It waits while you edit a field or do a gesture, as a call does. It counts in the calls each second. Above the calls each second or after the wait limit, the read gives a protocol error with the reason. The other resources read only the rule data, so they do not wait.
 
-The server gives two prompts. An agent program shows a prompt as a command. In Claude Code, the commands are `/mcp__openlancer__two_trigger_mission` and `/mcp__openlancer__short_cutscene`.
+The server gives three prompts. An agent program shows a prompt as a command. In Claude Code, the commands are `/mcp__openlancer__two_trigger_mission`, `/mcp__openlancer__short_cutscene` and `/mcp__openlancer__new_system`.
 
 | Prompt | Argument | What it gives |
 |---|---|---|
 | `two_trigger_mission` | `script`: the `msn:` reference of a mission script. `list_missions` gives the scripts. | The steps to add a pirate ambush with two triggers. The agent adds the ship build, the NPC and the ship with `mission_add_item`. It adds the two triggers and the loot in one `edit_batch`. Then it runs `mission_dry_run` and `check`. The names in the steps are examples. |
 | `short_cutscene` | `name`: the name of the new cutscene script, for example `my_intro`. | The steps to make a short cutscene. The agent makes the script with `cutscene_create`. It adds a second camera, a character with a costume of `list_values` and a marker with `cutscene_add_entity`. It adds a camera move and a cut to the second camera with `cutscene_add_event` and `set_fields`. Then it makes two images with `render_cutscene`, corrects the timing and runs `check`. It does not save until you ask. The names in the steps are examples. |
+| `new_system` | `nickname`: the nickname of the new system. `neighbor`: the nickname of an existing system. | The steps to make a new star system next to the neighbor. The agent finds a free place with `get_universe` and makes the system with `system_create`. It connects the system to the neighbor with `connection_create`, and makes a lane from the new gate toward the sun with `trade_lane_create`. It gives the traffic zone and the lane zone encounters with `scene_set_encounters`, and adds a patrol with `scene_place_patrol_route`. Then it runs `check`. It does not save until you ask. After a save, it waits for `data_load: ready` and makes an image with `render_scene`. |
 
-The prompts need the edit tools. So a host that only reads, for example `oltool mcp serve --read-only`, lists no prompt. A host without `save`, for example `oltool mcp serve --no-save`, lists both prompts. Only the editor host makes the images of `short_cutscene`. In the host without a window, the agent goes to the next step. The prompts `build_outpost` and `patrol_and_wreck` and the resource `openlancer://guide/workflows` are not in this version. They come after version 1.0 ([#70](https://github.com/spool1/openlancer/issues/70)).
+The prompts need the edit tools. So a host that only reads, for example `oltool mcp serve --read-only`, lists no prompt.
+
+A host without `save`, for example `oltool mcp serve --no-save`, lists all three prompts. The steps of the save tell the agent what to do without `save`. Only the editor host makes the images of `short_cutscene` and `new_system`. In the host without a window, the agent does not make them.
+
+The prompts `build_outpost` and `patrol_and_wreck` and the resource `openlancer://guide/workflows` are not in this version. They come after version 1.0 ([#70](https://github.com/spool1/openlancer/issues/70)).
 
 ## Permission rules for the agent program
 

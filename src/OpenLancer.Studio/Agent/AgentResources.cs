@@ -80,7 +80,10 @@ internal sealed record MissionSectionsView(IReadOnlyList<MissionSectionRow> Sect
 internal sealed record SceneTemplateRow(string Id, string Label, IReadOnlyList<string> Types, string? Needs);
 
 /// <summary>A builder of the Scene: a tool that makes a set of items in one step.</summary>
-internal sealed record BuilderRow(string Tool, string Title, string Description);
+/// <param name="Defaults">The rules of the rule data that the builder uses when a call does not give a value, or null.
+/// Examples are the death zone of a new sun, the tunnel and the traffic zones of a new jump connection, and the ring
+/// spacing and the lane zone of a new trade lane.</param>
+internal sealed record BuilderRow(string Tool, string Title, string Description, object? Defaults);
 
 /// <summary>The resource <c>openlancer://catalog/prefabs</c>: the behavior prefabs, the templates of Create, the
 /// builders and the prop groups. Without a profile, it has the built-in prefabs and the rule data only.</summary>
@@ -114,7 +117,8 @@ public static class AgentResources
     private static readonly JsonSerializerOptions Compact = new(EditJson.Options) { WriteIndented = false };
 
     /// <summary>The tools of the builders of the catalog of the prefabs.</summary>
-    private static readonly string[] Builders = ["scene_place_wreck", "scene_place_patrol_route"];
+    private static readonly string[] Builders =
+        ["scene_place_wreck", "scene_place_patrol_route", "system_create", "connection_create", "trade_lane_create"];
 
     /// <summary>The resources that the server makes from data, by URI, and if they read the session. Each other
     /// resource is the text of <c>agent-tools.json</c>.</summary>
@@ -191,11 +195,23 @@ public static class AgentResources
     {
         var session = host.Session;
         var templates = ListRules.Retail.SceneTemplates.Select(t => new SceneTemplateRow(t.Id, t.Label, t.Types, t.Needs));
-        var builders = Builders.Select(b => new BuilderRow(b, AgentTexts.Tool(b).Title, AgentTexts.Tool(b).Description));
+        var rules = session?.Lists.RuleData.Builders ?? ListRules.Retail.Builders;
+        var builders = Builders.Select(b => new BuilderRow(b, AgentTexts.Tool(b).Title, AgentTexts.Tool(b).Description,
+            DefaultsOf(b, rules)));
         return Json(new PrefabCatalogView(
             session?.Missions.Queries.ListPrefabs() ?? MissionQueries.ListBuiltinPrefabs(), [.. templates], [.. builders],
             session == null ? [] : [.. ItemQueries.Groups(session).Select(g => ItemQueries.GroupRow(session, g))]));
     }
+
+    /// <summary>The rules of the rule data that a builder uses when a call does not give a value, or null: the death
+    /// zone of the sun of a new system, the rules of a new jump connection, and the rules of a new trade lane.</summary>
+    private static object? DefaultsOf(string tool, SceneBuilders rules) => tool switch
+    {
+        "system_create" when rules.SunZone is { } zone => new { SunDeathZone = zone },
+        "connection_create" => rules.Connection,
+        "trade_lane_create" => rules.Lane,
+        _ => null,
+    };
 
     /// <summary>The data lists of the rule data: the id, the label, the section types that give the values, and if
     /// the list holds the items of one system or of one mission script. <c>list_values</c> then needs the argument

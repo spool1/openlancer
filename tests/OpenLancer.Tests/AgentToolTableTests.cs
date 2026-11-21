@@ -219,10 +219,16 @@ public sealed class AgentToolTableTests
             "cutscene_add_event", "cutscene_move_events"], cutscene.Tools);
         Assert.Equal(["render_cutscene", "save"], cutscene.OptionalTools);
         Assert.Equal(["name"], cutscene.Arguments.Select(a => a.Name));
-        Assert.Equal([mission, cutscene], AgentPrompts.For(AgentTools.All));
-        Assert.Equal([mission, cutscene],
-            AgentPrompts.For(AgentTools.All.Where(t => !HeadlessHost.SaveTools.Contains(t.Name) && t.Name != "render_cutscene")));
-        Assert.Equal([mission], AgentPrompts.For(AgentTools.All.Where(t => !t.Name.StartsWith("cutscene_"))));
+        var system = Assert.Single(AgentPrompts.All, p => p.Name == "new_system");
+        Assert.Equal(["studio_status", "list_values", "check", "scene_place_patrol_route", "scene_set_encounters",
+            "system_create", "connection_create", "trade_lane_create", "get_universe", "get_trade_lane"], system.Tools);
+        Assert.Equal(["render_scene", "save"], system.OptionalTools);
+        Assert.Equal(["nickname", "neighbor"], system.Arguments.Select(a => a.Name));
+        Assert.Equal([mission, cutscene, system], AgentPrompts.For(AgentTools.All));
+        Assert.Equal([mission, cutscene, system], AgentPrompts.For(AgentTools.All.Where(t =>
+            !HeadlessHost.SaveTools.Contains(t.Name) && t.Name is not ("render_cutscene" or "render_scene"))));
+        Assert.Equal([mission, system], AgentPrompts.For(AgentTools.All.Where(t => !t.Name.StartsWith("cutscene_"))));
+        Assert.Equal([mission, cutscene], AgentPrompts.For(AgentTools.All.Where(t => !t.Name.StartsWith("trade_lane_"))));
         Assert.Empty(AgentPrompts.For(AgentTools.ReadOnly));
         Assert.Contains(@"msn:DATA\MISSIONS\my_mission.ini 1", mission.Text(new Dictionary<string, string>
         {
