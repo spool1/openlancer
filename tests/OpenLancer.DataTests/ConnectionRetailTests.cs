@@ -25,30 +25,32 @@ public sealed class ConnectionRetailTests(ITestOutputHelper output)
 
     /// <summary>
     /// Vanilla 1.1 has 232 objects with goto, at most 9 in one system. Each pair goes both ways and has one kind, so no
-    /// jump object gets a problem. Six NPC locks of <c>InitialWorld.ini</c> name no object of the game, and HD Edition
+    /// jump object gets a problem, and the Inspector shows each jump gate and jump hole complete. Six NPC locks of <c>InitialWorld.ini</c> name no object of the game, and HD Edition
     /// removes these six lines. So they are the only warnings.
     /// </summary>
     [Fact]
     public void EachJumpObjectOfVanillaPassesTheConnectionChecks()
     {
-        var (jumps, most, problems) = Check(GameDataPaths.RequireBase());
+        var (jumps, most, problems, incomplete) = Check(GameDataPaths.RequireBase());
 
         Assert.Equal(232, jumps);
         Assert.Equal(9, most);
+        Assert.Empty(incomplete);
         Assert.Equal(6, problems.Count);
         Assert.All(problems, p => Assert.Equal(("locked_gates", DiagnosticSeverity.Warning, "npc_locked_gate"),
             (p.Target!.Id.Type, p.Severity, p.Key)));
     }
 
-    /// <summary>HD Edition 0.7.1 has the same jump objects. Its gate locks name jump objects only, so the checks give no
-    /// problem at all.</summary>
+    /// <summary>HD Edition 0.7.1 has the same jump objects, and each jump gate and jump hole is complete. Its gate locks
+    /// name jump objects only, so the checks give no problem at all.</summary>
     [Fact]
     public void EachJumpObjectOfHdEditionPassesTheConnectionChecks()
     {
-        var (jumps, most, problems) = Check(GameDataPaths.RequireHde());
+        var (jumps, most, problems, incomplete) = Check(GameDataPaths.RequireHde());
 
         Assert.Equal(232, jumps);
         Assert.Equal(9, most);
+        Assert.Empty(incomplete);
         Assert.Empty(problems);
     }
 
@@ -112,12 +114,14 @@ public sealed class ConnectionRetailTests(ITestOutputHelper output)
     }
 
     /// <summary>The count of the jump objects of a game and the most of one system. Also the problems of the checks of
-    /// each jump object and each gate lock section.</summary>
-    private (int Jumps, int Most, List<Diagnostic> Problems) Check(string root)
+    /// each jump object and each gate lock section, and the missing steps of the completeness of each jump gate and jump
+    /// hole.</summary>
+    private (int Jumps, int Most, List<Diagnostic> Problems, List<string> Incomplete) Check(string root)
     {
         using var workspace = new RetailWorkspace(root, "olconnect");
         var session = workspace.Open();
         var problems = new List<Diagnostic>();
+        var incomplete = new List<string>();
         var jumps = 0;
         var most = 0;
         foreach (var system in session.Routes.Graph.Systems.Where(s => s.File != null))
@@ -129,7 +133,11 @@ public sealed class ConnectionRetailTests(ITestOutputHelper output)
             jumps += objects.Count;
             most = Math.Max(most, objects.Count);
             foreach (var item in objects)
+            {
                 problems.AddRange(ConnectionChecks.Check(session, item));
+                incomplete.AddRange(ComponentCompleteness.JumpConnection(session, item)?.Missing
+                    .Select(s => $"{item.Id.Key}: {s.Name}: {s.Detail}") ?? []);
+            }
         }
         foreach (var path in session.DataFiles.Paths(UniverseGraph.LockRole))
         {
@@ -139,6 +147,7 @@ public sealed class ConnectionRetailTests(ITestOutputHelper output)
         output.WriteLine($"{root}: {jumps} jump objects, at most {most} in one system, {problems.Count} problems");
         foreach (var problem in problems)
             output.WriteLine(problem.ToString());
-        return (jumps, most, problems);
+        incomplete.ForEach(output.WriteLine);
+        return (jumps, most, problems, incomplete);
     }
 }

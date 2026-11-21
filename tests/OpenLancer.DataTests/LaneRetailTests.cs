@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using LibreLancer;
 using LibreLancer.Data;
+using LibreLancer.Data.GameData.World;
 using LibreLancer.Data.IO;
 using LibreLancer.Data.Schema;
 using OpenLancer.Data;
@@ -12,6 +13,8 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Editing.Universe;
+using OpenLancer.Editor.Hierarchy;
+using OpenLancer.Editor.Scene;
 using Xunit;
 
 namespace OpenLancer.DataTests;
@@ -108,10 +111,48 @@ public sealed class LaneRetailTests(ITestOutputHelper output)
     }
 
     /// <summary>
+    /// A new jump gate pair and a new lane in the open system New York show in the Scene and in the Hierarchy at once,
+    /// before the save. The scene builds the new gate with its jump and the new rings with their lane. The tree of the
+    /// new index has the gate in the gates and the lane as one node with its rings in lane order. The Inspector shows
+    /// both new items complete.
+    /// </summary>
+    [Fact]
+    public void ANewPairAndANewLaneShowInTheSceneAndTheHierarchyAtOnce()
+    {
+        var root = GameDataPaths.RequireBase();
+        using var workspace = new RetailWorkspace(root, "ollanes");
+        var session = workspace.Open();
+        using var scene = new HeadlessScene(session, "Li01");
+        scene.Applier.CatchUp();
+
+        var pair = ConnectionPlans.CreatePair(session, ConnectionKind.Gate, new ConnectionEnd("Li01"),
+            new ConnectionEnd("Li02"));
+        Assert.True(pair.CanRun, string.Join("\n", pair.Refusals.Select(r => r.Message)));
+        session.Execute(pair.Command!);
+        var lane = LanePlans.Create(session, "Li01", new TradeLaneEnd { Point = new Vector3(0, 30000, 0), Name = "Up" },
+            new TradeLaneEnd { Point = new Vector3(0, 30000, 30000), Name = "Down" });
+        Assert.True(lane.CanRun, string.Join("\n", lane.Refusals.Select(r => r.Message)));
+        session.Execute(lane.Command!);
+        scene.Applier.Run();
+
+        var gate = scene.Object(pair.Ends[0].Object.Id.Key!);
+        Assert.Equal(DockKinds.Jump, gate.Dock?.Kind);
+        var rings = lane.Rings.Select(r => scene.Object(r.Id.Key!)).ToList();
+        Assert.All(rings, r => Assert.Equal(DockKinds.Tradelane, r.Dock?.Kind));
+        var tree = new HierarchyModel(new SystemIndex(scene.System, scene.Source), (_, _) => "");
+        Assert.Contains(tree.NodeOf(gate)!, tree.Root.Children.Single(c => c.Id == "gates").Children);
+        Assert.Contains(tree.Root.Children.Single(c => c.Id == "lanes").Children,
+            l => l.Children.Select(c => c.Item).SequenceEqual(rings));
+        Assert.True(ComponentCompleteness.Of(session, pair.Ends[0].Object)!.Complete);
+        Assert.True(ComponentCompleteness.Of(session, lane.Rings[1])!.Complete);
+        RetailChecks.AssertBaseIsUnchanged(root);
+    }
+
+    /// <summary>
     /// The lanes of one game: 124 chains of 4 to 15 rings without a circle, and 129 zones that meet the lane zone rule.
     /// The rings of at least 90 percent of the lanes turn along the lane within 1 degree. The lane zone of each lane
     /// covers its first and last ring. The lane checks give no error, and each lane warning is in the list of the
-    /// exceptions.
+    /// exceptions. The completeness of each lane misses only the steps of these exceptions.
     /// </summary>
     private void CheckLanes(string root)
     {
@@ -147,6 +188,11 @@ public sealed class LaneRetailTests(ITestOutputHelper output)
         Assert.DoesNotContain(problems, p => p.Severity == DiagnosticSeverity.Error);
         Assert.Equal(Exceptions.Select(e => (e.Section, e.Text)).Order(),
             problems.Select(p => (p.Target!.Id.Key!, p.Message[..p.Message.IndexOf('.')])).Order());
+        // The Inspector shows each lane complete. The lane of the exception misses only its name step, which goes to the
+        // ring of the exception.
+        var missing = lanes.SelectMany(l => ComponentCompleteness.TradeLane(session, l.Rings[0])!.Missing).ToList();
+        Assert.Equal(Exceptions.Select(e => ("Names at both ends", (string?)e.Section)),
+            missing.Select(s => (s.Name, (s.GoTo as SectionRef)?.Id.Key)));
     }
 
     /// <summary>A ring of a lane or a lane zone.</summary>
