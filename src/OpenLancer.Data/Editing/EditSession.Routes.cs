@@ -54,8 +54,9 @@ public sealed partial class EditSession
                 return gameRoutes;
             var fs = GameBase.Standard(Profile.BaseFolder).OpenFileSystem();
             var files = new Dictionary<string, IReadOnlyList<Section>?>(VfsPath.Comparer);
-            var graph = UniverseGraph.Build(new FileUniverseSource(path =>
-                files.TryGetValue(path, out var sections) ? sections : files[path] = CheckView.Read(fs, path), ruleData));
+            var source = new FileUniverseSource(path =>
+                files.TryGetValue(path, out var sections) ? sections : files[path] = CheckView.Read(fs, path), ruleData);
+            var graph = UniverseGraph.Build(source);
             return gameRoutes = new UniverseRoutes(graph, RouteTables.Build(graph));
         }
     }
@@ -65,16 +66,17 @@ public sealed partial class EditSession
     internal bool RouteFilesChange => !Routes.Tables.SameRoutes(GameRoutes.Tables);
 
     /// <summary>
-    /// The sections of a file with the active mod, as the game reads them, or null when the file does not exist. This is
-    /// W of the document of the file, also of a new file of the folder of the active mod before its save. A file that W
-    /// deleted has no sections. For another whole file of the active mod, W has the lower data, so the result is the
-    /// file of the edit view.
+    /// The sections of a file with the active mod, as the game reads them, or null when the file does not exist. This
+    /// is W of the document of the file, also of a new file of the folder of the active mod before its save. A file
+    /// that W deleted has no sections. For another whole file of the active mod, W has the lower data, so the result is
+    /// the file of the edit view.
     /// </summary>
     internal IReadOnlyList<Section>? WorkingSections(string path)
     {
         if (VfsPath.Normalize(path) is not { } normal)
             return null;
-        if (ActiveMod is { } active && (active.Files.ContainsKey(normal) || OpenedDocument(normal) is { IsWholeFile: true }))
+        if (ActiveMod is { } active &&
+            (active.Files.ContainsKey(normal) || OpenedDocument(normal) is { IsWholeFile: true }))
         {
             if (OpenDocument(normal) is { IsWholeFile: true } whole)
                 return whole.State.Exists ? whole.Working : null;

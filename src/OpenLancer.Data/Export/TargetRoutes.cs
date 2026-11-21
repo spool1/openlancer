@@ -55,8 +55,10 @@ internal sealed class TargetRoutes
         var freelancerIni = Merged(ModOverlay.FreelancerIniPath) ?? [];
         foreach (var kind in Enum.GetValues<RouteKind>())
         {
-            if (DataPaths.Resolve(freelancerIni, RouteTables.DataPath(kind)) is { } path)
-                paths[path] = kind;
+            // The path keeps the letter case of the folders of the game, as the other files of a package do.
+            if (DataPaths.Resolve(freelancerIni, RouteTables.DataPath(kind)) is not { } path)
+                continue;
+            paths[overlay.Base.ToDisk(path) == path ? PathRules.WithDiskCase(overlay.Base.Root, path) : path] = kind;
         }
         GameSource = new FileUniverseSource(Base, ListRules.Retail);
         MergedSource = new FileUniverseSource(Merged, ListRules.Retail);
@@ -84,8 +86,8 @@ internal sealed class TargetRoutes
     public bool Holds(string path) => paths.ContainsKey(path);
 
     /// <summary>
-    /// Adds the generated tables to the files of the build when the mods change the routes. Else it adds the route files
-    /// of the mods. The list stays in the order of the install paths.
+    /// Adds the generated tables to the files of the build when the mods change the routes. Else it adds the route
+    /// files of the mods. The list stays in the order of the install paths.
     /// </summary>
     public void Finish(List<TargetFile> files, List<Diagnostic> diagnostics)
     {
@@ -95,8 +97,8 @@ internal sealed class TargetRoutes
         {
             files.AddRange(made);
             diagnostics.AddRange(owners.Select(m => Diagnostic.Warning(m.Folder,
-                $"Mod '{m.Id}' has its own route table files. OpenLancer makes new route tables from the merged data, " +
-                "so the game does not get the files of the mod.")));
+                $"Mod '{m.Id}' has its own route table files. OpenLancer makes new route tables from the merged " +
+                "data, so the game does not get the files of the mod.")));
         }
         else
         {
@@ -129,7 +131,12 @@ internal sealed class TargetRoutes
             var table = after.Tables[(int)kind];
             if (table.TooLong.ToList() is [var first, ..] tooLong)
             {
-                var more = tooLong.Count > 1 ? $" {Plural.Count(tooLong.Count - 1, "other route")} are too long too." : "";
+                var more = tooLong.Count switch
+                {
+                    1 => "",
+                    2 => " 1 other route is too long too.",
+                    _ => $" {tooLong.Count - 1} other routes are too long too.",
+                };
                 diagnostics.Add(Diagnostic.Error(path,
                     $"The route from {first.From} to {first.To} is too long for the game. The game reads only the " +
                     "first 1,023 bytes of a line, and it reads the rest as the next line. " +
@@ -149,9 +156,9 @@ internal sealed class TargetRoutes
     /// archetype file or a gate lock file. Else the build reads no graph.</summary>
     internal bool MayChange()
     {
-        var (game, merged) = (GameSource, MergedSource);
         if (paths.Count == 0)
             return false;
+        var (game, merged) = (GameSource, MergedSource);
         if (!VfsPath.Comparer.Equals(game.UniversePath ?? "", merged.UniversePath ?? "") ||
             !game.SolarPaths.SequenceEqual(merged.SolarPaths, VfsPath.Comparer) ||
             !game.LockPaths.SequenceEqual(merged.LockPaths, VfsPath.Comparer))
