@@ -172,15 +172,17 @@ public sealed class AssetCatalogTests
         Assert.Equal(@"solar\dockable\station1.cmp", AssetWorkspace.Row(session, "solars", "station1").ModelPath);
     }
 
-    /// <summary>A connection type cannot spawn until milestone M27. A type in no template goes to "Other solar" with its
-    /// reason (section 5.2).</summary>
+    /// <summary>A connection type cannot spawn, and its reason names the tool that makes a pair. A type in no template
+    /// goes to "Other solar" with its reason (section 5.2).</summary>
     [Fact]
     public void ConnectionsAndTypesInNoTemplateHaveTheirReasons()
     {
         using var ws = AssetWorkspace.Create();
         var session = ws.Session("act");
 
-        Assert.Equal("This version cannot make jump gates, jump holes or trade lane rings.",
+        Assert.Equal("The editor cannot make a jump gate, a jump hole, an airlock gate or a trade lane ring alone. Each " +
+                     "one needs a partner or a lane. For a jump gate pair or a jump hole pair, use the jump connection " +
+                     "tool connection_create of the agent server.",
             AssetWorkspace.Row(session, "solars/connections", "jumpgate").NotPlaceable);
         var odd = AssetWorkspace.Row(session, "solars", "odd");
         Assert.Equal("solars/solar", odd.CategoryId);

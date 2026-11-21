@@ -165,8 +165,8 @@ internal static class ConnectionChecks
         if (own == null || back == null || !Same(back[0], own) || !Same(back[1], name))
         {
             yield return Warning(section, $"{name} goes to {exit} in {system}, but {exit} does not go back. The player " +
-                                          "cannot jump back. To write the missing goto line, use the jump connection tool " +
-                                          $"connection_create of the agent server with {name} as one end.");
+                                          "cannot jump back. To write the missing goto line, use " +
+                                          $"{SceneSections.PairTool} with {name} as one end.");
             yield break;
         }
         var other = KindWords(SceneSections.ArchetypeType(session, partnerView));

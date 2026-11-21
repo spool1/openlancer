@@ -29,8 +29,10 @@ public sealed record TemplateArchetype(string Nickname, string Type, ListEntry E
 /// <para>A rename changes each line that the reverse index finds, the gate locks of <c>InitialWorld.ini</c> by their hash,
 /// and a section of the lower layer through <c>ol.rename</c>, so it keeps its place (decisions D9, D12, D231 and
 /// D257).</para>
-/// <para>Jump gates, jump holes, airlock gates and trade lane rings stay out of Create, Duplicate and Delete until
-/// milestone M27 (decision D253). A rename of them works.</para>
+/// <para>Jump gates, jump holes, airlock gates and trade lane rings stay out of Create and Duplicate (decision D253),
+/// because each one needs a partner or a lane. A delete of a jump gate or a jump hole deletes its pair (see
+/// <see cref="Universe.ConnectionPlans.DeletePair"/>). Airlock gates and trade lane rings stay out of Delete. A rename
+/// of each of them works.</para>
 /// <para>The asset browser of milestone M23 adds a static prop archetype with its object (<c>ScenePlans.Props.cs</c>)
 /// and places prop groups (<see cref="Assets.PropGroups"/>). Create, the prop archetype, Duplicate and the prop groups
 /// share the object builder (<see cref="NewObject"/>) and the copy builder (<see cref="CopyLines"/>). So the editor
@@ -38,9 +40,11 @@ public sealed record TemplateArchetype(string Nickname, string Type, ListEntry E
 /// </remarks>
 public static partial class ScenePlans
 {
-    /// <summary>Why the editor cannot make a connection object (decision D253). The Create menu, the Assets panel and
-    /// the templates show it.</summary>
-    public const string NoNewConnections = "This version cannot make jump gates, jump holes or trade lane rings.";
+    /// <summary>Why the editor cannot make a connection object alone (decision D253), and the tool that makes a pair.
+    /// The Create menu, the Assets panel and the templates show it.</summary>
+    public const string NoNewConnections =
+        "The editor cannot make a jump gate, a jump hole, an airlock gate or a trade lane ring alone. Each one needs a " +
+        "partner or a lane. For a jump gate pair or a jump hole pair, use " + SceneSections.PairTool + ".";
 
     /// <summary>The value of <c>pos</c> of a new item: whole numbers (decision D234).</summary>
     internal static string PositionText(Vector3 position) => string.Join(", ",
@@ -213,7 +217,8 @@ public static partial class ScenePlans
     {
         var type = TypeOf(session, archetype);
         if (type != null && session.Lists.RuleData.ConnectionTypes.Contains(type))
-            return $"The archetype {archetype} is a jump gate, a jump hole or a trade lane ring. {NoNewConnections}";
+            return $"The archetype {archetype} is {SceneSections.WithArticle(SceneSections.ConnectionWords(type))}. " +
+                   NoNewConnections;
         if (type != null && !session.Lists.RuleData.SceneTemplates.Any(t => t.Types.Contains(type)))
             return NoTemplateReason(type);
         return $"The archetype {archetype} is not an archetype of the template {template}.";
@@ -349,17 +354,34 @@ public static partial class ScenePlans
     /// <c>clearHole</c> goes in the same entry. A rule with <c>refuse</c> refuses the delete. Each other line shows
     /// "Missing". A delete of a nebula or a field removes only its section, and its zone stays.
     /// </summary>
-    public static ScenePlan Delete(EditSession session, IReadOnlyList<SectionRef> targets)
+    /// <remarks>A jump gate or a jump hole goes with its pair, as <see cref="Universe.ConnectionPlans.DeletePair"/>
+    /// tells. Airlock gates and trade lane rings refuse the delete.</remarks>
+    public static ScenePlan Delete(EditSession session, IReadOnlyList<SectionRef> targets) =>
+        Delete(session, new ScenePlan(SceneAction.Delete, "Delete"), targets, [], new HashSet<SectionRef>());
+
+    /// <summary>
+    /// The delete of <see cref="Delete(EditSession, IReadOnlyList{SectionRef})"/>, also for the delete of a system.
+    /// Each jump gate or jump hole that goes takes its pair: the partner when the partner goes back to it, its traffic
+    /// zones and its gate lock lines (see <see cref="Universe.ConnectionPlans.PairParts"/>). The pair is one connection
+    /// item, so a partner in the same file, the traffic zones and the lock lines do not make the editor ask. A partner
+    /// in another file does.
+    /// </summary>
+    /// <param name="plan">The plan to fill. It keeps its label when <paramref name="targets"/> is empty.</param>
+    /// <param name="cascades">Sections that go with an item that the caller deletes, each with the line that names
+    /// that item.</param>
+    /// <param name="gone">The sections that go with a file or a section that the caller deletes with its own command.
+    /// The plan checks the lines that name them and takes their pairs, but it gives them no command and no
+    /// <see cref="EditPlan.Deletes"/> row.</param>
+    internal static ScenePlan Delete(EditSession session, ScenePlan plan, IReadOnlyList<SectionRef> targets,
+        IReadOnlyList<(SectionRef Section, string Cause)> cascades, IReadOnlySet<SectionRef> gone)
     {
-        var plan = new ScenePlan(SceneAction.Delete, "Delete");
         var refusals = new List<Diagnostic>();
         foreach (var target in targets)
         {
             if (session.Get(target) is not { } view || SceneSections.KindOf(session, target) is null)
                 refusals.Add(NotAnItem(target, "delete"));
-            else if (SceneSections.ConnectionKind(session, view) is { } connection)
-                refusals.Add(Diagnostic.Error(target.Path, SceneSections.ConnectionMessage("delete", target, view, connection))
-                    with { Target = target });
+            else if (NoDelete(session, target, view) is { } connection)
+                refusals.Add(Diagnostic.Error(target.Path, connection) with { Target = target });
             else if (view.ReadOnlyReason is { } reason)
                 refusals.Add(Diagnostic.Error(target.Path, $"{target.Id}: {reason}") with { Target = target });
         }
@@ -368,48 +390,90 @@ public static partial class ScenePlans
 
         var deletes = new List<PlannedDelete>();
         var inSet = new HashSet<SectionRef>();
+        // Each section that goes with the delete, also before the plan reads it. A line of such a section does not
+        // refuse the delete and gets no fix.
+        var queued = new HashSet<SectionRef>();
         var queue = new Queue<(SectionRef Section, DeleteReason Why, string? Cause)>();
+        void Enqueue(SectionRef section, DeleteReason why, string? cause)
+        {
+            if (queued.Add(section))
+                queue.Enqueue((section, why, cause));
+        }
+        foreach (var section in gone)
+            Enqueue(section, DeleteReason.Cascade, null);
         foreach (var target in targets.Distinct())
-            queue.Enqueue((target, DeleteReason.Target, null));
+            Enqueue(target, DeleteReason.Target, null);
+        foreach (var (section, cause) in cascades)
+            Enqueue(section, DeleteReason.Cascade, cause);
         var fixes = new Dictionary<SectionRef, List<(int First, int Count, string Key, string Text)>>();
         var holes = new HashSet<(SectionRef, string)>();
         var missing = new List<MissingReference>();
+        var warnings = new List<Diagnostic>();
+        // The parts of the jump connections that do not make the editor ask, and the jump object of each partner.
+        var quiet = new HashSet<SectionRef>();
+        var quietFixes = new HashSet<(SectionRef, int)>();
+        var partners = new Dictionary<SectionRef, string>();
         while (queue.TryDequeue(out var next))
         {
             var (section, why, cause) = next;
             if (!inSet.Add(section) || session.Get(section) is not { } view)
                 continue;
-            if (why == DeleteReason.Cascade)
+            var isGone = gone.Contains(section);
+            if (!isGone && why == DeleteReason.Cascade)
             {
-                if (SceneSections.ConnectionKind(session, view) is { } connection)
+                if (NoDelete(session, section, view) is { } connection)
                 {
-                    refusals.Add(Diagnostic.Error(section.Path, $"{section.Id.Key} goes with {cause}, but " +
-                        SceneSections.ConnectionMessage("delete", section, view, connection)) with { Target = section });
+                    refusals.Add(Diagnostic.Error(section.Path, $"{section.Id.Key} goes with {cause}, but {connection}") with
+                    {
+                        Target = section,
+                    });
                     continue;
                 }
                 if (view.ReadOnlyReason is { } reason)
                 {
-                    refusals.Add(Diagnostic.Error(section.Path, $"{section.Id} goes with {cause}, but the editor cannot " +
-                                                                $"delete it: {reason}") with { Target = section });
+                    refusals.Add(Diagnostic.Error(section.Path, partners.TryGetValue(section, out var jump)
+                        ? $"{section.Id.Key} in {SceneSections.FileName(section.Path)} is the partner of {jump}, and a " +
+                          $"jump connection goes as one item. The editor cannot delete {section.Id.Key}: {reason}"
+                        : $"{section.Id} goes with {cause}, but the editor cannot delete it: {reason}") with
+                    {
+                        Target = section,
+                    });
                     continue;
                 }
             }
-            deletes.Add(new PlannedDelete(section, session.ChildCount(section), why, cause));
+            if (!isGone)
+                deletes.Add(new PlannedDelete(section, session.ChildCount(section), why, cause));
+            if (Universe.ConnectionPlans.PairParts(session, section, view) is { } pair)
+            {
+                if (pair.Partner is { } partner && !queued.Contains(partner))
+                {
+                    partners[partner] = section.Id.Key!;
+                    if (VfsPath.Comparer.Equals(partner.Path, section.Path))
+                        quiet.Add(partner);
+                    Enqueue(partner, DeleteReason.Cascade, pair.PartnerLine);
+                }
+                foreach (var zone in pair.Zones.Where(z => !queued.Contains(z)))
+                {
+                    quiet.Add(zone);
+                    Enqueue(zone, DeleteReason.Cascade, $"traffic zone of {section.Id.Key}");
+                }
+                LockFixes(session, section.Id.Key!, fixes, quietFixes, warnings);
+            }
             foreach (var (list, name, scope) in NamesOf(session, section))
             {
                 // Another section that stays still gives the name.
-                if (session.Sections(section.Path).Any(s => !inSet.Contains(s) && SceneSections.Is(s.Id.Type, section.Id.Type) &&
+                if (session.Sections(section.Path).Any(s => !queued.Contains(s) && SceneSections.Is(s.Id.Type, section.Id.Type) &&
                                                             string.Equals(s.Id.Key, name, StringComparison.OrdinalIgnoreCase)))
                     continue;
                 foreach (var reference in session.Lists.ReferencesTo(list, name, scope))
                 {
-                    if (inSet.Contains(reference.Section))
+                    if (queued.Contains(reference.Section))
                         continue;
                     var referrer = session.Get(reference.Section);
                     switch (reference.Rule.OnDelete)
                     {
                         case DeleteAction.Cascade:
-                            queue.Enqueue((reference.Section, DeleteReason.Cascade, $"{reference.Key} = {name}"));
+                            Enqueue(reference.Section, DeleteReason.Cascade, $"{reference.Key} = {name}");
                             break;
                         case DeleteAction.Refuse:
                             refusals.Add(Diagnostic.Error(reference.Section.Path,
@@ -451,18 +515,23 @@ public static partial class ScenePlans
             return Refused(plan, refusals.DistinctBy(r => r.Message).ToArray());
 
         // A fix or a "Missing" line of a section that goes with the delete does not apply.
-        foreach (var gone in fixes.Keys.Where(inSet.Contains).ToList())
-            fixes.Remove(gone);
+        foreach (var removed in fixes.Keys.Where(inSet.Contains).ToList())
+            fixes.Remove(removed);
         missing.RemoveAll(m => inSet.Contains(m.Reference.Section));
 
-        var warnings = new List<Diagnostic>();
         var mentions = new List<NamedMention>();
+        var objects = new List<string>();
+        foreach (var section in deletes.Select(d => d.Section).Concat(gone))
+        {
+            var kind = SceneSections.KindOf(session, section);
+            if (kind is not null && SceneSections.IsNamed(kind.Value) && section.Id.Key is { } key)
+                mentions.AddRange(session.StoryMentions(key).Select(m => new NamedMention(key, m.Path, m.Count)));
+            if (kind == SceneKind.Object && section.Id.Key is { } name)
+                objects.Add(name);
+        }
         foreach (var delete in deletes)
         {
-            var kind = SceneSections.KindOf(session, delete.Section);
-            if (kind is not null && SceneSections.IsNamed(kind.Value) && delete.Section.Id.Key is { } key)
-                mentions.AddRange(session.StoryMentions(key).Select(m => new NamedMention(key, m.Path, m.Count)));
-            if (kind == SceneKind.Object)
+            if (SceneSections.KindOf(session, delete.Section) == SceneKind.Object)
                 warnings.AddRange(BaseWarnings(session, delete.Section, inSet));
             foreach (var mod in session.LaterModsThatChangeSection(delete.Section))
                 warnings.Add(Diagnostic.Warning(delete.Section.Path, $"The mod {mod} loads later and changes " +
@@ -485,9 +554,12 @@ public static partial class ScenePlans
             foreach (var delete in file.OrderByDescending(d => order.IndexOf(d.Section)))
                 commands.Add(EditCommand.DeleteSection(delete.Section));
         }
-        var head = targets[0];
-        plan.Label = $"Delete {SceneSections.Label(SceneSections.KindOf(session, head)!.Value, head)}" +
-                     (deletes.Count > 1 ? $" and {deletes.Count - 1} more" : "");
+        if (targets.Count > 0)
+        {
+            var head = targets[0];
+            plan.Label = $"Delete {SceneSections.Label(SceneSections.KindOf(session, head)!.Value, head)}" +
+                         (deletes.Count > 1 ? $" and {deletes.Count - 1} more" : "");
+        }
         plan.Deletes = deletes;
         plan.Fixes = fixes.SelectMany(f => f.Value.Select(r => new PlannedFix(f.Key, r.Key, r.Text))).ToList();
         plan.Missing = missing;
@@ -496,14 +568,49 @@ public static partial class ScenePlans
         plan.Warnings = warnings;
         plan.Mentions = mentions;
         // The mission lines that name a deleted object stay and show "Missing" (decision D668).
-        plan.MissionMissing = session.Missions.References.Missing(Missions.Editing.MissionReferences.ObjectKinds,
-            deletes.Where(d => SceneSections.KindOf(session, d.Section) == SceneKind.Object && d.Section.Id.Key != null)
-                .Select(d => d.Section.Id.Key!));
-        plan.NeedsConfirmation = deletes.Any(d => d.Why == DeleteReason.Cascade) || plan.Fixes.Count > 0 ||
+        plan.MissionMissing = session.Missions.References.Missing(Missions.Editing.MissionReferences.ObjectKinds, objects);
+        plan.NeedsConfirmation = deletes.Any(d => d.Why == DeleteReason.Cascade && !quiet.Contains(d.Section)) ||
+                                 fixes.Any(f => f.Value.Any(r => !quietFixes.Contains((f.Key, r.First)))) ||
                                  missing.Count > 0 || warnings.Count > 0 || mentions.Count > 0 ||
                                  plan.MissionMissing.Count > 0;
         plan.Command = EditCommand.Group(plan.Label, commands, session.Snapshot());
         return plan;
+    }
+
+    /// <summary>Why the editor refuses the delete of a connection object, or null: an airlock gate or a trade lane ring.
+    /// A jump gate or a jump hole goes with its pair.</summary>
+    private static string? NoDelete(EditSession session, SectionRef section, SectionView view) =>
+        SceneSections.ConnectionKind(session, view) is { } kind && !SceneSections.IsPairKind(kind)
+            ? SceneSections.ConnectionMessage("delete", section, view, kind)
+            : null;
+
+    /// <summary>
+    /// The fixes that remove the gate lock lines of a jump gate or a jump hole that goes, so they cannot lock a later
+    /// object with the same nickname. A line that the editor cannot change gives a warning: the game then ignores it.
+    /// </summary>
+    /// <param name="quietFixes">Gets each fix, because the lock lines are a part of the jump connection.</param>
+    private static void LockFixes(EditSession session, string gate,
+        Dictionary<SectionRef, List<(int, int, string, string)>> fixes, HashSet<(SectionRef, int)> quietFixes,
+        List<Diagnostic> warnings)
+    {
+        foreach (var gateLock in GateLocks.Of(session, gate))
+        {
+            var file = SceneSections.FileName(gateLock.Section.Path);
+            if (session.Get(gateLock.Section) is not { } locks)
+                continue;
+            if (locks.ReadOnlyReason is { } reason)
+                warnings.Add(Diagnostic.Warning(gateLock.Section.Path, $"{file} locks {gate} at the start of a new game. The " +
+                                                                       $"editor cannot remove that line: {reason} The game " +
+                                                                       "then ignores the line.") with
+                {
+                    Target = gateLock.Section,
+                });
+            else if (LineIndex(locks, gateLock.Key, gateLock.Line) is >= 0 and var at)
+            {
+                AddFix(fixes, gateLock.Section, at, 1, gateLock.Key, $"{file}: the {gateLock.Key} line of {gate}");
+                quietFixes.Add((gateLock.Section, at));
+            }
+        }
     }
 
     /// <summary>
@@ -617,8 +724,10 @@ public static partial class ScenePlans
 
     /// <summary>
     /// Why an action cannot run on a section, from the checks that need no plan, or null: the section is not an item of a
-    /// system file, it is a connection object (decision D253), it is read-only, or a duplicate of a nebula or a field
-    /// (decision D260). The menus show it as the tooltip of a disabled item. A plan can still refuse for another reason.
+    /// system file, it is read-only, or it is a duplicate of a nebula or a field (decision D260). A connection object
+    /// cannot get a duplicate (decision D253). An airlock gate and a trade lane ring cannot go, but a delete of a jump
+    /// gate or a jump hole deletes its pair. The menus show the reason as the tooltip of a disabled item. A plan can
+    /// still refuse for another reason.
     /// </summary>
     public static string? Unavailable(EditSession session, SceneAction action, SectionRef section)
     {
@@ -652,9 +761,7 @@ public static partial class ScenePlans
                     return NoVolumeCopy(kind, section);
                 return session.OpenDocument(section.Path)?.ReadOnlyReason;
             default:
-                if (SceneSections.ConnectionKind(session, view) is { } deleted)
-                    return SceneSections.ConnectionMessage("delete", section, view, deleted);
-                return view.ReadOnlyReason;
+                return NoDelete(session, section, view) ?? view.ReadOnlyReason;
         }
     }
 

@@ -19,6 +19,14 @@ internal sealed class FieldBinding
     private const string SystemFileReason =
         "Changing the file of a system moves all its contents. This version cannot change the file of a system.";
 
+    /// <summary>The key of an <c>[Object]</c> of a system file that links the two ends of a jump connection.</summary>
+    private const string JumpKey = "goto";
+
+    /// <summary>Why a row and a field edit cannot change the link of a jump connection.</summary>
+    public const string JumpLinkReason =
+        "This key links the two ends of a jump connection. Use the agent tools connection_create and delete_items to " +
+        "change the pair.";
+
     /// <summary>Why a section of a file without a known schema is read-only (decision D123).</summary>
     public const string NoSchemaReason = "The editor cannot edit this file yet. It reads it for the lists.";
 
@@ -83,7 +91,8 @@ internal sealed class FieldBinding
     {
         var key = session.Schema(section, name);
         var (origin, mod) = session.Origin(section, name);
-        var reason = SectionLock(session, section, view) ?? KeyLock(session, section, view, key, name);
+        var reason = SectionLock(session, section, view) ?? KeyLock(session, section, view, key, name) ??
+                     LinkLock(session, section, name);
         return new FieldBinding(section, key?.Name ?? name, key, view.Lines(name), origin, mod,
             session.LaterModsThatChange(section, name), reason,
             reason == null && origin == ValueOrigin.ActiveMod && !view.IsNew);
@@ -112,6 +121,18 @@ internal sealed class FieldBinding
             ? SystemFileReason
             : null;
     }
+
+    /// <summary>
+    /// Why a row and a field edit cannot change a key that links two items, or null: the <c>goto</c> line of an
+    /// <c>[Object]</c> of a system file. A change of one end breaks the jump connection, so the connection tools change
+    /// the pair. The raw INI block does not use this lock, because the raw INI stays open to each key (editor UI rule
+    /// 11). The checks of the jump connections then tell what a raw edit breaks.
+    /// </summary>
+    internal static string? LinkLock(EditSession session, SectionRef section, string name) =>
+        name.Equals(JumpKey, StringComparison.OrdinalIgnoreCase) &&
+        section.Id.Type.Equals("Object", StringComparison.OrdinalIgnoreCase) && session.IsSystemFile(section.Path)
+            ? JumpLinkReason
+            : null;
 
     /// <summary>
     /// Why a revert of a whole section cannot run, or null. A revert puts back all the lines of the lower layer, also

@@ -159,8 +159,10 @@ public static class ObjectComponents
     public static string? RemoveProblem(ObjectComponent kind) => kind switch
     {
         ObjectComponent.Solar => "Each object needs an archetype.",
-        ObjectComponent.JumpConnection or ObjectComponent.TradeLaneRing =>
-            "This version cannot change the links of jump gates, jump holes or trade lane rings.",
+        ObjectComponent.JumpConnection =>
+            "The goto line links the object to its partner. To delete a jump gate pair or a jump hole pair, delete one " +
+            "of its objects.",
+        ObjectComponent.TradeLaneRing => "This version cannot change the links of trade lane rings.",
         ObjectComponent.FieldReferences => "Delete the nebula or the asteroid field to remove its section.",
         ObjectComponent.EncounterZone => "The Inspector cannot edit the encounters of a zone.",
         _ => null,

@@ -74,7 +74,7 @@ public enum SceneSection
 
 /// <summary>One key of a section type and what the scene does when it changes.</summary>
 /// <param name="Locked">True when the Inspector shows the key read-only: a key entry, a key of a linked group, the
-/// file of a system, or a key of a section that a patch cannot find.</param>
+/// file of a system, the link of a jump connection, or a key of a section that a patch cannot find.</param>
 /// <param name="Evidence">The engine code that reads the key, or the reason for the effect.</param>
 public sealed record SceneField(SceneSection Section, string Key, SceneEffect Effect, bool Locked, string Evidence);
 
@@ -126,7 +126,8 @@ public static class SceneFields
         Row(SceneSection.Object, "star", DataReinit, "GameItemDb.cs:2666, GameWorld.cs:113-115"),
         Row(SceneSection.Object, "spin", DataReinit, "GameItemDb.cs:2593, GameWorld.cs:142"),
         Row(SceneSection.Object, "dock_with", DataReinit, "GameItemDb.cs:2614-2620. GameWorld.cs:147-160 makes the dock."),
-        Row(SceneSection.Object, "goto", DataReinit, "GameItemDb.cs:2622-2630. GameWorld.cs:147-160 makes the dock."),
+        LockedRow(SceneSection.Object, "goto", DataReinit, "GameItemDb.cs:2622-2630. GameWorld.cs:147-160 makes the " +
+            "dock. The jump connection tools change the pair, and the raw INI block can change the line."),
         Row(SceneSection.Object, "prev_ring", DataReinit | SceneEffect.Lanes, "GameItemDb.cs:2651-2659"),
         Row(SceneSection.Object, "next_ring", DataReinit | SceneEffect.Lanes, "GameItemDb.cs:2651-2659"),
         Row(SceneSection.Object, "tradelane_space_name", DataLabel, "GameItemDb.cs:2640-2649 and the lane walk at :1537-1595"),

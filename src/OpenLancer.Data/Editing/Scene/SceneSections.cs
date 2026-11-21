@@ -51,6 +51,9 @@ internal static class SceneSections
             ? Last(section, "type")?.ToLowerInvariant()
             : null;
 
+    /// <summary>The tool that makes a jump gate pair or a jump hole pair, as the texts of the editor name it.</summary>
+    public const string PairTool = "the jump connection tool connection_create of the agent server";
+
     /// <summary>
     /// The kind of a connection object in plain words, or null for another section (decision D253): an object with a
     /// <c>goto</c>, a <c>prev_ring</c> or a <c>next_ring</c> line, or an archetype of a connection type.
@@ -61,34 +64,48 @@ internal static class SceneSections
             return null;
         var type = ArchetypeType(session, view);
         if (type != null && session.Lists.RuleData.ConnectionTypes.Contains(type))
-        {
-            return type switch
-            {
-                "jump_gate" => "jump gate",
-                "jump_hole" or "jumphole" => "jump hole",
-                "airlock_gate" => "airlock gate",
-                _ => "trade lane ring",
-            };
-        }
+            return ConnectionWords(type);
         if (view.Lines("goto").Count > 0)
             return "jump gate";
         return view.Lines("prev_ring").Count > 0 || view.Lines("next_ring").Count > 0 ? "trade lane ring" : null;
     }
 
+    /// <summary>The kind of a connection type of the rule data in plain words, for example "jump hole" for
+    /// <c>jumphole</c>.</summary>
+    /// <param name="type">The <c>[Solar] type</c> in lowercase.</param>
+    public static string ConnectionWords(string type) => type switch
+    {
+        "jump_gate" => "jump gate",
+        "jump_hole" or "jumphole" => "jump hole",
+        "airlock_gate" => "airlock gate",
+        _ => "trade lane ring",
+    };
+
+    /// <summary>True for a connection kind that goes as a pair: a jump gate or a jump hole. A delete of one end
+    /// deletes the pair (see <see cref="OpenLancer.Data.Editing.Universe.ConnectionPlans.DeletePair"/>).</summary>
+    public static bool IsPairKind(string kind) => kind is "jump gate" or "jump hole";
+
+    /// <summary>A kind in plain words with its article, for example "an airlock gate".</summary>
+    public static string WithArticle(string kind) => (kind.Length > 0 && "aeiou".Contains(kind[0]) ? "an " : "a ") + kind;
+
     /// <summary>
-    /// Why the editor refuses an action on a connection object, with its partner (decision D253). For example: "Li01_to_Li02
-    /// is a jump gate. This version cannot delete jump gates, jump holes or trade lane rings. The partner gate Li02:
-    /// Li02_to_Li01 and the route files must change with it."
+    /// Why the editor refuses an action on a connection object (decision D253). A jump gate or a jump hole cannot get a
+    /// copy, because a copy has no partner. An airlock gate and a trade lane ring take no action of this version but
+    /// the rename. For example: "Li01_to_Li02 is a jump gate. This version cannot copy jump gates or jump holes,
+    /// because a copy has no partner. To make a pair, use the jump connection tool connection_create of the agent
+    /// server."
     /// </summary>
-    /// <param name="verb">The action, for example "delete" or "copy".</param>
+    /// <param name="verb">The action, for example "copy" or "delete". For a jump gate or a jump hole, it is an action
+    /// that makes copies, because the editor deletes their pairs.</param>
     public static string ConnectionMessage(string verb, SectionRef section, SectionView view, string kind)
     {
-        var text = $"{section.Id.Key} is a {kind}. This version cannot {verb} jump gates, jump holes or trade lane rings.";
-        if (view.Lines("goto").LastOrDefault() is { Values.Count: >= 2 } line)
-        {
-            var partner = kind == "jump hole" ? "hole" : "gate";
-            return text + $" The partner {partner} {line.Values[0]}: {line.Values[1]} and the route files must change with it.";
-        }
+        var name = section.Id.Key;
+        if (IsPairKind(kind))
+            return $"{name} is a {kind}. This version cannot {verb} jump gates or jump holes, because a copy has no " +
+                   $"partner. To make a pair, use {PairTool}.";
+        if (kind != "trade lane ring")
+            return $"{name} is {WithArticle(kind)}. This version cannot {verb} {kind}s.";
+        var text = $"{name} is a trade lane ring. This version cannot {verb} trade lane rings.";
         var rings = new[] { Last(view, "prev_ring"), Last(view, "next_ring") }.OfType<string>().ToList();
         return rings.Count > 0
             ? text + $" Its neighbor rings {string.Join(" and ", rings)} must change with it."

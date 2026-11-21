@@ -138,7 +138,10 @@ internal sealed class SceneEdits(EditorWindow window)
         if (MenuItems.Item(ObjectKinds.Light.Icon, "Light", unavailable))
             Create(SceneTemplate.Light, row);
         ImGui.Separator();
+        // The text has three sentences, so it wraps to keep the menu narrow.
+        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + ImGui.GetFontSize() * 22);
         ImGui.TextDisabled(ScenePlans.NoNewConnections);
+        ImGui.PopTextWrapPos();
     }
 
     /// <summary>The items of the actions of a selected item for a menu: Duplicate, Rename and Delete, each disabled with

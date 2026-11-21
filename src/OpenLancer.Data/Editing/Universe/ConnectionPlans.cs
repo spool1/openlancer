@@ -85,9 +85,10 @@ public sealed record ConnectionOptions
 }
 
 /// <summary>
-/// The plans of the jump connections: a new jump gate pair or jump hole pair, and the gate locks of a gate. Each plan
-/// gives one command, which runs as one entry of the edit history. This is also true when it changes two system files,
-/// the gate locks and the text of the mod. The agent tools and the hand tools call the same plans.
+/// The plans of the jump connections: a new jump gate pair or jump hole pair, the delete of a pair, and the gate locks
+/// of a gate. Each plan gives one command, which runs as one entry of the edit history. This is also true when it
+/// changes two system files, the gate locks and the text of the mod. The agent tools and the hand tools call the same
+/// plans.
 /// </summary>
 /// <remarks>
 /// <para>Retail facts: an object with <c>goto = &lt;system&gt;, &lt;exit object&gt;, &lt;tunnel&gt;</c> is one jump
@@ -422,6 +423,63 @@ public static class ConnectionPlans
         plan.SelectAfter = gate;
         plan.Command = EditCommand.Group(plan.Label, edit.Commands, session.Snapshot());
         return plan;
+    }
+
+    /// <summary>
+    /// Plans the delete of jump gates and jump holes, as one entry of the edit history. Each object goes with its pair:
+    /// the partner when the partner goes back to it, the traffic zones <c>Zone_&lt;object&gt;_traffic</c> at each end,
+    /// and the gate lock lines of each end. A one-way object goes alone. The texts of the deleted sections stay in the
+    /// text of the mod, as for each other delete. The other rules are the rules of
+    /// <see cref="ScenePlans.Delete(EditSession, IReadOnlyList{SectionRef})"/>, which runs the same plan for a gate or a
+    /// hole.
+    /// </summary>
+    /// <remarks>The plan asks before it runs when a partner is in another file. A partner in the same file, the traffic
+    /// zones and the lock lines are parts of the pair, so they do not make the plan ask. The plan refuses an object that
+    /// is no jump gate or jump hole, and a partner that the editor cannot change, with the reason.</remarks>
+    public static ScenePlan DeletePair(EditSession session, IReadOnlyList<SectionRef> objects)
+    {
+        foreach (var item in objects)
+        {
+            if (SceneSections.KindOf(session, item) != SceneKind.Object || session.Get(item) is not { } view ||
+                SceneSections.ConnectionKind(session, view) is not { } kind || !SceneSections.IsPairKind(kind))
+                return ScenePlans.Refused(new ScenePlan(SceneAction.Delete, "Delete"),
+                    Diagnostic.Error(item.Path, $"{item.Id.Key ?? item.Id.ToString()} is not a jump gate or a jump hole.") with
+                    {
+                        Target = item, Rule = NotConnection,
+                    });
+        }
+        return ScenePlans.Delete(session, objects);
+    }
+
+    /// <summary>
+    /// The parts of a jump connection that go with one of its objects, or null for a section that is no jump gate or
+    /// jump hole: the partner when its <c>goto</c> line names the object back, that line, and the traffic zones of the
+    /// object. A traffic zone is a zone of the file of the object with the nickname <c>Zone_&lt;object&gt;_traffic</c>,
+    /// or that nickname with <c>_</c> and a number, as <see cref="CreatePair"/> names it.
+    /// </summary>
+    internal static (SectionRef? Partner, string? PartnerLine, IReadOnlyList<SectionRef> Zones)? PairParts(
+        EditSession session, SectionRef section, SectionView view)
+    {
+        if (SceneSections.KindOf(session, section) != SceneKind.Object || section.Id.Key is not { } name ||
+            SceneSections.ConnectionKind(session, view) is not { } kind || !SceneSections.IsPairKind(kind))
+            return null;
+        SectionRef? partner = null;
+        string? line = null;
+        if (PartnerOf(session, view) is { } found && session.SystemNicknameOf(section.Path) is { } system &&
+            GoesBack(session, found.View, system, name) &&
+            found.View.Lines("goto").LastOrDefault(l => l.Values.Count > 1) is { } back)
+        {
+            partner = found.Section;
+            line = $"goto = {back.Values[0].ToString().Trim()}, {back.Values[1].ToString().Trim()}";
+        }
+        var stem = $"Zone_{name}_traffic";
+        var zones = session.Sections(section.Path)
+            .Where(s => SceneSections.Is(s.Id.Type, SceneSections.ZoneType) && s.Id.Key is { } key &&
+                        (key.Equals(stem, StringComparison.OrdinalIgnoreCase) ||
+                         key.Length > stem.Length + 1 && key.StartsWith(stem + "_", StringComparison.OrdinalIgnoreCase) &&
+                         key[(stem.Length + 1)..].All(char.IsAsciiDigit)))
+            .ToList();
+        return (partner, line, zones);
     }
 
     /// <summary>One end of a new pair while the plan reads it.</summary>

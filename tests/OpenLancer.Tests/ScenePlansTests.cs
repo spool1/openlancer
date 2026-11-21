@@ -130,20 +130,47 @@ public sealed class ScenePlansDeleteTests
         Assert.Equal("Delete the nebula of Zone_cloud", nebula.Label);
     }
 
+    /// <summary>
+    /// A delete of a jump gate deletes its pair: the partner in the other system file and the gate lock lines of both
+    /// ends. The partner is in another file, so the editor asks. A trade lane ring and an airlock gate still refuse
+    /// the delete, and Unavailable gives the same reason as the plan.
+    /// </summary>
     [Fact]
-    public void AConnectionObjectIsRefusedWithItsPartner()
+    public void AGateGoesWithItsPairAndARingAndAnAirlockGateAreRefused()
     {
         using var ws = Create();
+        ws.WriteBase(ListWorkspace.SolarPath, Solars + "\n[Solar]\nnickname = airlock\ntype = AIRLOCK_GATE\n");
+        ws.WriteBase(Li02Path, Li02Text + "\n[Object]\nnickname = Li02_airlock\narchetype = airlock\n");
         var session = ws.Session("act");
 
         var gate = ScenePlans.Delete(session, [Object("Li01_to_Li02")]);
         var ring = ScenePlans.Delete(session, [Object("ring2")]);
+        var airlock = ScenePlans.Delete(session, [Li02("Object", "Li02_airlock")]);
 
-        Assert.Null(gate.Command);
-        Assert.Equal("Li01_to_Li02 is a jump gate. This version cannot delete jump gates, jump holes or trade lane rings. " +
-                     "The partner gate Li02: Li02_to_Li01 and the route files must change with it.",
-            Assert.Single(gate.Refusals).Message);
-        Assert.Contains("Its neighbor rings ring1 must change with it.", Assert.Single(ring.Refusals).Message);
+        Assert.True(gate.CanRun, string.Join("\n", gate.Refusals.Select(r => r.Message)));
+        Assert.Equal([("Li01_to_Li02", DeleteReason.Target, null),
+            ("Li02_to_Li01", DeleteReason.Cascade, "goto = Li01, Li01_to_Li02")],
+            gate.Deletes.Select(d => (d.Section.Id.Key!, d.Why, d.Cause)));
+        Assert.Equal(["initialworld.ini: the locked_gate line of Li01_to_Li02",
+            "initialworld.ini: the npc_locked_gate line of Li01_to_Li02",
+            "initialworld.ini: the npc_locked_gate line of Li02_to_Li01"], gate.Fixes.Select(f => f.Text).Order());
+        Assert.True(gate.NeedsConfirmation);
+        Assert.Null(ScenePlans.Unavailable(session, SceneAction.Delete, Object("Li01_to_Li02")));
+        Assert.Equal("ring2 is a trade lane ring. This version cannot delete trade lane rings. Its neighbor rings ring1 " +
+                     "must change with it.", Assert.Single(ring.Refusals).Message);
+        Assert.Equal(Assert.Single(ring.Refusals).Message, ScenePlans.Unavailable(session, SceneAction.Delete, Object("ring2")));
+        Assert.Equal("Li02_airlock is an airlock gate. This version cannot delete airlock gates.",
+            Assert.Single(airlock.Refusals).Message);
+        Assert.Equal(Assert.Single(airlock.Refusals).Message,
+            ScenePlans.Unavailable(session, SceneAction.Delete, Li02("Object", "Li02_airlock")));
+
+        session.Execute(gate.Command!);
+        Assert.Null(session.Get(Object("Li01_to_Li02")));
+        Assert.Null(session.Get(Li02("Object", "Li02_to_Li01")));
+        Assert.Empty(session.Get(new SectionRef(ListWorkspace.GroupsPath, new SectionIdentity("locked_gates", null)))!.Entries);
+        session.Undo();
+        Assert.NotNull(session.Get(Object("Li01_to_Li02")));
+        Assert.NotNull(session.Get(Li02("Object", "Li02_to_Li01")));
     }
 
     [Fact]
@@ -485,7 +512,7 @@ public sealed class ScenePlansCreateTests
         using var ws = Create();
         var session = ws.Session("act");
 
-        Assert.Equal("The archetype jumpgate is a jump gate, a jump hole or a trade lane ring. " + ScenePlans.NoNewConnections,
+        Assert.Equal("The archetype jumpgate is a jump gate. " + ScenePlans.NoNewConnections,
             Assert.Single(ScenePlans.Create(session, "Li01", SceneTemplate.Solar, "jumpgate", Vector3.Zero, null).Refusals)
                 .Message);
         // Decision D277 of the M23 design: a station archetype without a docking sphere is an archetype of the station

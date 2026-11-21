@@ -70,9 +70,9 @@ public sealed record SystemOptions
 }
 
 /// <summary>
-/// The plans of the star systems: a new system and a rename of a system that the active mod adds. Each plan gives one
-/// command, which runs as one entry of the edit history, also when it changes several files and the text of the mod.
-/// The agent tools and the hand tools call the same plans.
+/// The plans of the star systems: a new system, and a rename and a delete of a system that the active mod adds. Each
+/// plan gives one command, which runs as one entry of the edit history, also when it changes several files and the text
+/// of the mod. The agent tools and the hand tools call the same plans.
 /// </summary>
 /// <remarks>
 /// <para>Retail facts: the game reads the system file at the <c>file</c> line of a <c>[system]</c>, with the nickname
@@ -101,6 +101,12 @@ public static class SystemPlans
     /// <summary>The detail code of a system of the game or of a lower mod, which the editor does not rename or
     /// delete.</summary>
     public const string GameSystem = "GameSystem";
+
+    /// <summary>The detail code of a system with bases, which this version does not delete.</summary>
+    public const string HasBases = "HasBases";
+
+    /// <summary>The detail code of a system whose file the editor cannot delete with it.</summary>
+    public const string FileKept = "FileKept";
 
     /// <summary>The largest place on each axis of the nav map grid.</summary>
     public const int MapMax = 15;
@@ -386,6 +392,117 @@ public static class SystemPlans
             session.Snapshot());
         return plan;
     }
+
+    /// <summary>
+    /// Plans the delete of a system that the active mod adds, as one entry of the edit history. The entry deletes the
+    /// <c>[system]</c> of <c>universe.ini</c> and the file of the system. Each object of another system whose
+    /// <c>goto</c> line names the system goes too, with its traffic zones and its gate lock lines, as
+    /// <see cref="ConnectionPlans.DeletePair"/> deletes a pair. The mission lines that name the system or its objects
+    /// show "Missing".
+    /// </summary>
+    /// <remarks>
+    /// <para>The plan always asks before it runs. Its deletes and its warnings name the partner objects and the file.
+    /// The texts of the deleted sections stay in the text of the mod, as for each other delete.</para>
+    /// <para>The plan refuses a system of the game or of a lower mod, and a system with a base, because this version has
+    /// no delete of a base. It also refuses a system whose file exists but is no file that the active mod adds in its
+    /// folder, or whose file another system uses. A file that does not exist does not stop the delete.</para>
+    /// </remarks>
+    public static UniversePlan Delete(EditSession session, string system)
+    {
+        var plan = new UniversePlan($"Delete system {system.Trim()}");
+        if (session.ReadOnlyReason is { } locked)
+            return plan.Refuse("", locked);
+        if (session.ActiveMod is not { } active)
+            return plan.Refuse("", "The profile has no active mod.");
+        if (session.SystemSection(system.Trim()) is not { } item || session.Get(item) is not { } view)
+            return plan.Refuse(session.UniversePath ?? "", $"No [system] has the nickname {system.Trim()}, or more than one " +
+                                                           "has it.", detail: MissionErrors.ItemNotFound);
+        var nickname = item.Id.Key!;
+        plan.Label = $"Delete system {nickname}";
+        if (!view.IsNew)
+            return plan.Refuse(item.Path, $"{nickname} is a system of the game or of a lower mod. This version deletes " +
+                                          "only systems that the active mod adds.", item, GameSystem);
+        if (view.ReadOnlyReason is { } reason)
+            return plan.Refuse(item.Path, $"{nickname}: {reason}", item);
+        var bases = session.Lists.ReferencesTo("system", nickname)
+            .Where(r => SceneSections.Is(r.Section.Id.Type, "Base") && SceneSections.Is(r.Key, "system"))
+            .Select(r => r.Section.Id.Key ?? r.Section.Id.ToString())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (bases.Count > 0)
+            return plan.Refuse(item.Path, $"{nickname} has the {(bases.Count == 1 ? "base" : "bases")} " +
+                                          $"{SceneSections.Join(bases)}. This version cannot delete a system with bases.",
+                item, HasBases);
+
+        // The file goes with the system. A file that does not exist leaves only the [system].
+        var path = session.SystemPath(nickname);
+        var file = path == null ? null : session.OpenDocument(path);
+        var deletesFile = file is { State.Exists: true };
+        if (file is { State.Exists: true } && (!file.IsWholeFile || !ContentPaths.IsOwnFile(file.Path, active.Id) ||
+                                               session.LowerLayerHas(file.Path)))
+            return plan.Refuse(file.Path, $"The file {file.Path} of {nickname} is no file that the active mod adds in its " +
+                                          $"folder {ContentPaths.OwnFolder(active.Id)}. The editor deletes a system only " +
+                                          "with its file.", item, FileKept);
+        if (deletesFile && session.UniversePath is { } universe &&
+            session.Sections(universe).FirstOrDefault(s => SceneSections.Is(s.Id.Type, "system") && !s.Equals(item) &&
+                                                          s.Id.Key is { } other &&
+                                                          VfsPath.Comparer.Equals(session.SystemPath(other), path))
+                is { } sharing)
+            return plan.Refuse(path!, $"The system {sharing.Id.Key} uses the file {path} too. The editor deletes a system " +
+                                      "only with its file.", sharing, FileKept);
+
+        var gone = new HashSet<SectionRef> { item };
+        if (deletesFile)
+            gone.UnionWith(session.Sections(path!));
+        // Each object of another system whose goto line names the system. A partner of an object of the file comes
+        // with the pair of that object too.
+        var cascades = session.Lists.ReferencesTo("system", nickname)
+            .Where(r => SceneSections.Is(r.Key, "goto") && !gone.Contains(r.Section) &&
+                        SceneSections.KindOf(session, r.Section) == SceneKind.Object)
+            .Select(r => r.Section)
+            .Distinct()
+            .Select(s => (s, GotoLine(session, s)))
+            .ToList();
+        var delete = ScenePlans.Delete(session, new ScenePlan(SceneAction.Delete, plan.Label), [], cascades, gone);
+        if (!delete.CanRun)
+        {
+            plan.Refusals = delete.Refusals;
+            return plan;
+        }
+
+        var mentions = session.StoryMentions(nickname)
+            .Where(m => !VfsPath.Comparer.Equals(m.Path, item.Path) && (path == null || !VfsPath.Comparer.Equals(m.Path, path)))
+            .Select(m => new NamedMention(nickname, m.Path, m.Count));
+        plan.System = item;
+        plan.File = deletesFile ? path : null;
+        plan.Deletes = [new PlannedDelete(item, 0, DeleteReason.Target, null), .. delete.Deletes];
+        plan.Fixes = delete.Fixes;
+        plan.Missing = delete.Missing;
+        plan.MissionMissing =
+            [.. delete.MissionMissing, .. session.Missions.References.Missing([MissionValueKind.System], [nickname])];
+        plan.Mentions = [.. mentions, .. delete.Mentions];
+        plan.Warnings =
+        [
+            Diagnostic.Warning(item.Path, $"A save game in {nickname} does not find the system after the delete." +
+                                          (deletesFile ? $" The system file {path} goes too." : "")) with
+            {
+                Target = item,
+            },
+            .. delete.Warnings,
+        ];
+        plan.NeedsConfirmation = true;
+        plan.Command = EditCommand.Group(plan.Label,
+            [delete.Command!, EditCommand.DeleteSection(item), .. deletesFile ? new[] { EditCommand.DeleteFile(path!) } : []],
+            session.Snapshot());
+        return plan;
+    }
+
+    /// <summary>The cause of a delete of an object with a <c>goto</c> line, for example <c>goto = Av01,
+    /// Av01_to_Li01</c>.</summary>
+    private static string GotoLine(EditSession session, SectionRef section) =>
+        session.Get(section)?.Lines("goto").LastOrDefault(l => l.Values.Count > 1) is { } line
+            ? $"goto = {line.Values[0].ToString().Trim()}, {line.Values[1].ToString().Trim()}"
+            : "goto";
 
     /// <summary>Why a text cannot be the nickname of a system, or null.</summary>
     internal static string? NicknameProblem(string nickname) => NicknameRule.IsMatch(nickname)

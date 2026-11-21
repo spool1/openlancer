@@ -64,7 +64,7 @@ public sealed class SceneFieldsTests
     /// <summary>
     /// The effect and the lock of each row, from the tables of the design (sections 7.2 to 7.5). The applier runs these
     /// effects, so a changed effect fails this test until the design changes too. The locked rows are the key entries,
-    /// the linked group, the file of a system and the preloads.
+    /// the linked group, the file of a system, the link of a jump connection and the preloads.
     /// </summary>
     [Fact]
     public void EachRowHasTheEffectAndTheLockOfTheDesign()
@@ -80,7 +80,9 @@ public sealed class SceneFieldsTests
         Rows(SceneSection.Object, none, true, "nickname");
         Rows(SceneSection.Object, transform, false, "pos", "rotate");
         Rows(SceneSection.Object, data | label | lanes | reinit, false, "archetype");
-        Rows(SceneSection.Object, data | reinit, false, "loadout", "star", "spin", "dock_with", "goto");
+        Rows(SceneSection.Object, data | reinit, false, "loadout", "star", "spin", "dock_with");
+        // The link of a jump connection: the connection tools change the pair, and the raw INI block can change it.
+        Rows(SceneSection.Object, data | reinit, true, "goto");
         Rows(SceneSection.Object, data | lanes | reinit, false, "prev_ring", "next_ring");
         Rows(SceneSection.Object, data | label, false, "tradelane_space_name", "ids_name");
         Rows(SceneSection.Object, data, false, "ids_info", "base", "reputation", "faction", "pilot", "behavior",

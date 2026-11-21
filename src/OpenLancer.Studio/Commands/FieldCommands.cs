@@ -125,7 +125,8 @@ public static class FieldCommands
     /// the text of each line (see <see cref="SetLines"/>). A value that the list checks refuse goes into the edit
     /// view, and the result gives the new problem, as the Inspector does.</para>
     /// <para>A key that the Inspector cannot change refuses (see <see cref="Lock"/>). Examples are the key line (use the
-    /// rename), a key of a group of linked lines, the file of a system and a read-only section.</para>
+    /// rename), a key of a group of linked lines, the file of a system, the link of a jump connection and a read-only
+    /// section.</para>
     /// </remarks>
     /// <exception cref="EditException">A value has a form that the tool does not take
     /// (<see cref="EditErrorKind.InvalidArgument"/>). Or the section and its schema do not have the key
@@ -183,8 +184,8 @@ public static class FieldCommands
 
     /// <summary>
     /// True when <see cref="SetFields"/> cannot change a key of a section. Examples are the key line, a key of a group of
-    /// linked lines, the file of a system and a key of a read-only section. The tool <c>get_item</c>
-    /// marks such a key as locked.
+    /// linked lines, the file of a system, the link of a jump connection and a key of a read-only section. The tool
+    /// <c>get_item</c> marks such a key as locked.
     /// </summary>
     internal static bool IsLocked(EditSession session, SectionRef section, SectionView view, string name) =>
         Lock(session, section, view, name) != null;
@@ -201,8 +202,8 @@ public static class FieldCommands
         };
 
     /// <summary>The detail code and the reason why a field edit cannot change a key, or null. The rules are the rules of
-    /// the rows of the Inspector (see <see cref="FieldBinding.SectionLock"/> and <see cref="FieldBinding.KeyLock"/>).
-    /// The key line and a key of linked lines get a reason for an agent.</summary>
+    /// the rows of the Inspector (see <see cref="FieldBinding.SectionLock"/>, <see cref="FieldBinding.KeyLock"/> and
+    /// <see cref="FieldBinding.LinkLock"/>). The key line and a key of linked lines get a reason for an agent.</summary>
     private static (string Detail, string Reason)? Lock(EditSession session, SectionRef section, SectionView view,
         string name)
     {
@@ -212,7 +213,7 @@ public static class FieldCommands
             return (MissionErrors.KeyLine, "This key finds the section. Use rename_item to give the item a new name.");
         var key = session.Schema(section, name);
         if (FieldBinding.KeyLock(session, section, view, key, name) is not { } locked)
-            return null;
+            return FieldBinding.LinkLock(session, section, name) is { } link ? (MissionErrors.FieldNotWritable, link) : null;
         return (MissionErrors.FieldNotWritable, key?.IsKeyEntry != true && view.IsLinked(name) ? LinkedLock(view) : locked);
     }
 
