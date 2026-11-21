@@ -21,6 +21,11 @@ internal sealed record RouteChange(int New, int Shorter, int Longer, int Lost)
 /// <summary>The jump objects of the two systems of a new pair after the edit.</summary>
 internal sealed record PairSlots(JumpSlots From, JumpSlots To);
 
+/// <summary>A value of each end of a new pair, for example the loadout of each gate.</summary>
+/// <param name="From">The value of the end <c>from</c>, or null.</param>
+/// <param name="To">The value of the end <c>to</c>, or null.</param>
+internal sealed record PairValues(string? From, string? To);
+
 /// <summary>The result of <c>system_create</c>: the result of the edit, with the new system, its file and its sun. A
 /// step of <c>edit_batch</c> gives the result of the edit only.</summary>
 internal sealed record SystemEditResult : EditResult
@@ -54,11 +59,11 @@ internal sealed record ConnectionEditResult : EditResult
     /// <summary>The <c>zone:</c> references of the new traffic zones.</summary>
     public IReadOnlyList<string>? TrafficZones { get; init; }
 
-    /// <summary>The loadout of each end of <see cref="Pair"/>, or null for a jump hole and an existing end.</summary>
-    public IReadOnlyList<string?>? Loadout { get; init; }
+    /// <summary>The loadout of each end. A jump hole and an existing end have none.</summary>
+    public PairValues? Loadout { get; init; }
 
-    /// <summary>The pilot of each end of <see cref="Pair"/>, or null for a jump hole and an existing end.</summary>
-    public IReadOnlyList<string?>? Pilot { get; init; }
+    /// <summary>The pilot of each end. A jump hole and an existing end have none.</summary>
+    public PairValues? Pilot { get; init; }
 
     public RouteChange? Routes { get; init; }
 
@@ -146,7 +151,7 @@ internal static class UniverseTools
         {
             var session = scope.Session;
             var args = call.Args;
-            var like = SceneQueries.System(session, args.Text("like")!, "like").Nickname;
+            var like = EditTools.At("like", () => SceneQueries.System(session, args.Text("like")!, "like")).Nickname;
             var values = new RowValues(session);
             var faction = Listed(values, args.Text("local_faction"), "local_faction", "faction");
             SunRow? sun = null;
@@ -224,8 +229,8 @@ internal static class UniverseTools
             {
                 Pair = plan.Ends.Select(e => ItemRefs.Canonical(session, e.Object)).ToList(),
                 TrafficZones = plan.TrafficZones.Select(z => ItemRefs.Canonical(session, z)).ToList(),
-                Loadout = plan.Ends.Select(e => e.Loadout).ToList(),
-                Pilot = plan.Ends.Select(e => e.Pilot).ToList(),
+                Loadout = new PairValues(plan.Ends[0].Loadout, plan.Ends[^1].Loadout),
+                Pilot = new PairValues(plan.Ends[0].Pilot, plan.Ends[^1].Pilot),
                 Routes = plan.Routes is { } routes ? RouteChange.Of(routes) : null,
                 JumpObjects = new PairSlots(Slots(plan.JumpObjects[0]), Slots(plan.JumpObjects[^1])),
             };
@@ -287,7 +292,8 @@ internal static class UniverseTools
     private static ConnectionEnd End(ToolCall call, string name)
     {
         var end = call.Args.Group(name)!;
-        var (system, _, path) = SceneQueries.System(call.Session, end.Text("system")!, $"{name}.system");
+        var field = $"{name}.system";
+        var (system, _, path) = EditTools.At(field, () => SceneQueries.System(call.Session, end.Text("system")!, field));
         string? existing = null;
         if (end.Text("object") is { } text)
         {

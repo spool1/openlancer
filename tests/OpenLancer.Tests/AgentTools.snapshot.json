@@ -16306,23 +16306,49 @@
           },
           "loadout": {
             "type": [
-              "array",
+              "object",
               "null"
             ],
-            "items": {
-              "type": "string"
+            "properties": {
+              "from": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The value of the end from, or none."
+              },
+              "to": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The value of the end to, or none."
+              }
             },
-            "description": "The loadout of each end of pair, in the same order. none for a jump hole and for an existing end."
+            "description": "The loadout of each end. A jump hole and an existing end have none."
           },
           "pilot": {
             "type": [
-              "array",
+              "object",
               "null"
             ],
-            "items": {
-              "type": "string"
+            "properties": {
+              "from": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The value of the end from, or none."
+              },
+              "to": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The value of the end to, or none."
+              }
             },
-            "description": "The pilot of each end of pair, in the same order. none for a jump hole and for an existing end."
+            "description": "The pilot of each end. A jump hole and an existing end have none."
           },
           "routes": {
             "type": [

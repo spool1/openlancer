@@ -2446,8 +2446,8 @@
     "SystemEditResult.sun": "The obj: reference of the sun at the center of the new system.",
     "ConnectionEditResult.pair": "The obj: references of the two ends, in the order of from and to.",
     "ConnectionEditResult.traffic_zones": "The zone: references of the new traffic zones.",
-    "ConnectionEditResult.loadout": "The loadout of each end of pair, in the same order. none for a jump hole and for an existing end.",
-    "ConnectionEditResult.pilot": "The pilot of each end of pair, in the same order. none for a jump hole and for an existing end.",
+    "ConnectionEditResult.loadout": "The loadout of each end. A jump hole and an existing end have none.",
+    "ConnectionEditResult.pilot": "The pilot of each end. A jump hole and an existing end have none.",
     "ConnectionEditResult.routes": "How the route table of all connections changes with the edit.",
     "ConnectionEditResult.jump_objects": "The jump objects of the two systems after the edit.",
     "LockEditResult.routes": "How the route table of all connections changes with the edit.",
@@ -2456,6 +2456,8 @@
     "RouteChange.longer": "The routes that get more jumps.",
     "RouteChange.lost": "The routes between two systems that the edit removes.",
     "PairSlots.from": "The jump objects of the system of from.",
-    "PairSlots.to": "The jump objects of the system of to."
+    "PairSlots.to": "The jump objects of the system of to.",
+    "PairValues.from": "The value of the end from, or none.",
+    "PairValues.to": "The value of the end to, or none."
   }
 }
