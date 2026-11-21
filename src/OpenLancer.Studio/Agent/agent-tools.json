@@ -227,7 +227,7 @@
     },
     "delete_items": {
       "title": "Delete items",
-      "description": "Deletes items with their children. Other lines that name them show 'Missing'. A cutscene entity goes with the events that name it. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true.",
+      "description": "Deletes items with their children. Other lines that name them show 'Missing'. A cutscene entity goes with the events that name it. A jump gate or a jump hole goes with its pair, its traffic zones and its gate lock lines. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true. Of the parts of a pair, only an end in another file makes it ask.",
       "fields": {
         "refs": "The references of the items, for example obj:my_station_1. The tool deletes objects, zones, lights, nebulae and asteroid fields of a system. It also deletes triggers, prefab instances and other mission items: trg:, inst: and sec: references. It also deletes cutscene entities and events: thn: references with #entity/ or #event/. studio_status gives the most items of one call.",
         "expect_events": "Guards for the cutscene events of refs. Each row names one event of refs with the type and the time that you read.",

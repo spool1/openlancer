@@ -8741,7 +8741,7 @@
     {
       "name": "delete_items",
       "title": "Delete items",
-      "description": "Deletes items with their children. Other lines that name them show \u0027Missing\u0027. A cutscene entity goes with the events that name it. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true.",
+      "description": "Deletes items with their children. Other lines that name them show \u0027Missing\u0027. A cutscene entity goes with the events that name it. A jump gate or a jump hole goes with its pair, its traffic zones and its gate lock lines. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true. Of the parts of a pair, only an end in another file makes it ask.",
       "inputSchema": {
         "type": "object",
         "properties": {
