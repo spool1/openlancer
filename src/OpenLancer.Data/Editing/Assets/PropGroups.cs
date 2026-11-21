@@ -146,8 +146,7 @@ public static class PropGroups
                 refusals.Add(Diagnostic.Error(section.Path, $"{section.Id}: a prop group holds only objects, zones and " +
                                                             "lights of a system file.") with { Target = section });
             else if (SceneSections.ConnectionKind(session, view) is { } connection)
-                refusals.Add(Diagnostic.Error(section.Path, SceneSections.ConnectionMessage("put into a prop group",
-                    section, view, connection)) with { Target = section });
+                refusals.Add(Diagnostic.Error(section.Path, ConnectionRefusal(section, connection)) with { Target = section });
             else if (kind is SceneKind.Nebula or SceneKind.Asteroids ||
                      kind == SceneKind.Zone && ScenePlans.HoldsVolume(session, section))
                 refusals.Add(Diagnostic.Error(section.Path, $"{SceneSections.Label(kind, section)}: this version cannot put " +
@@ -481,6 +480,16 @@ public static class PropGroups
     }
 
     /// <summary>The active mod of a session that takes edits.</summary>
+    /// <summary>
+    /// Why a prop group cannot hold a connection object. Each end of a jump gate pair or a jump hole pair needs its
+    /// partner, and a placed copy has none. This version does not copy airlock gates and trade lane rings.
+    /// </summary>
+    private static string ConnectionRefusal(SectionRef section, string kind) =>
+        SceneSections.IsPairKind(kind)
+            ? $"{section.Id.Key} is a {kind}. A prop group cannot hold jump gates or jump holes, because each one needs a " +
+              $"partner. To make a pair, use {SceneSections.PairTool}."
+            : $"{section.Id.Key} is {SceneSections.WithArticle(kind)}. This version cannot put {kind}s into a prop group.";
+
     private static Mod Writable(EditSession session)
     {
         if (session.ReadOnlyReason is { } reason)

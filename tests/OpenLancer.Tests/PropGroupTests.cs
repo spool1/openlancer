@@ -344,9 +344,11 @@ public sealed class PropGroupDraftTests
         using var ws = GroupWorkspace.Create();
         var session = ws.Session("act");
 
-        Assert.Equal("Li01_to_Li02 is a jump gate. This version cannot put into a prop group jump gates or jump holes, " +
-                     "because a copy has no partner. To make a pair, use the jump connection tool connection_create of " +
-                     "the agent server.", PropGroups.Draft(session, [SceneWorkspace.Object("Li01_to_Li02")]).Refusals[0].Message);
+        Assert.Equal("Li01_to_Li02 is a jump gate. A prop group cannot hold jump gates or jump holes, because each one " +
+                     "needs a partner. To make a pair, use the jump connection tool connection_create of the agent server.",
+            PropGroups.Draft(session, [SceneWorkspace.Object("Li01_to_Li02")]).Refusals[0].Message);
+        Assert.Equal("ring2 is a trade lane ring. This version cannot put trade lane rings into a prop group.",
+            PropGroups.Draft(session, [SceneWorkspace.Object("ring2")]).Refusals[0].Message);
         const string noVolume = "this version cannot put nebulae, asteroid fields or their zones into a prop group";
         Assert.Contains(noVolume, PropGroups.Draft(session, [SceneWorkspace.Li01("Nebula", "Zone_cloud")]).Refusals[0].Message);
         Assert.Contains(noVolume, PropGroups.Draft(session, [SceneWorkspace.Li01("Asteroids", "Zone_cloud")]).Refusals[0].Message);

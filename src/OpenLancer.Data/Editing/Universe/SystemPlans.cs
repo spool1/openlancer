@@ -401,9 +401,8 @@ public static class SystemPlans
     /// <para>The plan always asks before it runs. Its deletes and its warnings name the partner objects and the file.
     /// The texts of the deleted sections stay in the text of the mod, as for each other delete.</para>
     /// <para>The plan refuses a system of the game or of a lower mod, and a system with a base, because this version has
-    /// no delete of a base. A file that is no file that the active mod adds in its folder stays, and so does a file that
-    /// another system uses. The plan then deletes only the <c>[system]</c>, and a warning tells why the file
-    /// stays.</para>
+    /// no delete of a base. A file stays when the active mod does not add it in its folder, or when another system uses
+    /// it. The plan then deletes only the <c>[system]</c>, and a warning tells why the file stays.</para>
     /// </remarks>
     public static UniversePlan Delete(EditSession session, string system)
     {
@@ -444,7 +443,7 @@ public static class SystemPlans
                                                                 VfsPath.Comparer.Equals(session.SystemPath(other), path))
                 : null;
             kept = !file.IsWholeFile || !ContentPaths.IsOwnFile(file.Path, active.Id) || session.LowerLayerHas(file.Path)
-                ? $"The file {file.Path} stays, because it is no file that the active mod adds in its folder " +
+                ? $"The file {file.Path} stays, because the active mod does not add it in its folder " +
                   $"{ContentPaths.OwnFolder(active.Id)}."
                 : sharing != null
                     ? $"The file {file.Path} stays, because the system {sharing.Id.Key} uses it too."

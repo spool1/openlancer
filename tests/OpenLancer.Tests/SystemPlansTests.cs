@@ -605,7 +605,7 @@ public sealed class SystemPlansTests
         Assert.Null(shared.File);
         Assert.Equal([NewSystemWorkspace.System("Xw01")], shared.Deletes.Select(d => d.Section));
         Assert.Equal("A save game in Xw01 does not find the system after the delete. The file " +
-                     $@"{ListWorkspace.Li01Path} stays, because it is no file that the active mod adds in its folder " +
+                     $@"{ListWorkspace.Li01Path} stays, because the active mod does not add it in its folder " +
                      @"DATA\MODS\act.", shared.Warnings[0].Message);
         Assert.Equal("A save game in Xw02 does not find the system after the delete.", missing.Warnings[0].Message);
         Assert.Null(missing.File);
