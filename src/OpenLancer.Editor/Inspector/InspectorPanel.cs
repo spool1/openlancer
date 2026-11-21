@@ -496,10 +496,10 @@ internal sealed class InspectorPanel : IDisposable
     }
 
     /// <summary>
-    /// The number of errors of a section that block the save: the errors of the data lists, and for a section that the
-    /// active mod adds or changes, the errors of the field checks and of the component checks. The component checks
-    /// give the errors of a zone nickname and of a <c>[system]</c> of <c>universe.ini</c>. An error that the base game
-    /// has too does not count (the key rule, decision D508 of the console filter design).
+    /// The number of errors of a section that block the save. Each section counts the errors of the data lists. A section
+    /// that the active mod adds or changes also counts the errors of the field checks and of the component checks. The
+    /// component checks give the errors of a zone nickname and of a <c>[system]</c> of <c>universe.ini</c>. An error
+    /// that the base game has too does not count (the key rule, decision D508 of the console filter design).
     /// </summary>
     internal static int SaveErrorCount(EditSession edits, SectionRef section, SectionView view)
     {

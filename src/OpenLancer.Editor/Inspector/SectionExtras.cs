@@ -269,11 +269,11 @@ internal sealed class SectionExtras(EditorWindow window, PropertyGrid grid)
         }
     }
 
-    /// <summary>The problems of a section for its raw block: the field checks, the list checks and the component checks,
-    /// each with the line of its key in the text, or 0, and true for a base-game field problem (the key rule, decision
-    /// D512 of the console filter design). A list problem or a component problem keeps its normal look, as on its row
-    /// or strip (section 6 of the design). The component checks give, for example, the problems of a <c>[system]</c> of
-    /// <c>universe.ini</c>.</summary>
+    /// <summary>The problems of a section for its raw block: the field checks, the list checks and the component checks.
+    /// Each problem has the line of its key in the text, or 0. The flag is true for a base-game field problem (the key
+    /// rule, decision D512 of the console filter design). A list problem or a component problem keeps its normal look,
+    /// as on its row or strip (section 6 of the design). The component checks give, for example, the problems of a
+    /// <c>[system]</c> of <c>universe.ini</c>.</summary>
     internal static IEnumerable<(int Line, Diagnostic Problem, bool BaseGame)> SectionProblems(EditSession edits,
         SectionRef section, SectionView view)
     {
