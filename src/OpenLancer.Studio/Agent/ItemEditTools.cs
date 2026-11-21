@@ -144,10 +144,10 @@ internal static partial class ItemEditTools
     /// Deletes items. Items of a system go with the cascade of decision D81: the children, and the lines that a rule
     /// removes. A jump gate or a jump hole goes with its pair. The other lines that name them show "Missing". A
     /// <c>[system]</c> of <c>universe.ini</c> goes with its file and the partners of its jump objects (see
-    /// <see cref="SystemPlans.Delete"/>). Each system delete is one plan, and the plan of the other items of a system
-    /// runs after them. An item that went with a deleted system is not in that plan. The editor has no delete of a data
-    /// item, so such a reference refuses (review finding R4 of MCP1-2). Mission items go with the deletes of the mission
-    /// studio (see <see cref="DeleteMissionItems"/>).
+    /// <see cref="SystemPlans.Delete"/>). Each system delete is one plan. The plan of the other items of the system files
+    /// runs after them, without the items that went with a deleted system. The editor has no delete of a data item, so
+    /// such a reference refuses (review finding R4 of MCP1-2). Mission items go with the deletes of the mission studio
+    /// (see <see cref="DeleteMissionItems"/>).
     /// </summary>
     public static ToolStep DeleteItems(ToolCall call) => EditTools.Apply(call, scope =>
     {
@@ -248,7 +248,7 @@ internal static partial class ItemEditTools
                 ? (g.Any(t => t.Element.Kind == ThnElementKind.Event) ? 1 : 0) +
                   g.Count(t => t.Element.Kind == ThnElementKind.Entity)
                 : 1);
-        // A delete runs one plan for each system and one plan for the other items of the systems.
+        // A delete runs one plan for each system and one plan for the other items of the system files.
         var systems = verb == "Delete" ? scene.Count(call.Session.IsSystemSection) : 0;
         var scenePlans = systems + (scene.Count > systems ? 1 : 0);
         if (scenePlans + (missions.Count > 0 ? 1 : 0) + cutscenePlans > 1)

@@ -146,7 +146,7 @@ internal static class UniverseTools
     /// </summary>
     public static ToolStep SystemCreate(ToolCall call)
     {
-        SystemEditResult? made = null;
+        Func<EditResult, EditResult> finish = result => result;
         return EditTools.Apply(call, scope =>
         {
             var session = scope.Session;
@@ -154,10 +154,10 @@ internal static class UniverseTools
             var like = EditTools.At("like", () => SceneQueries.System(session, args.Text("like")!, "like")).Nickname;
             var values = new RowValues(session);
             var faction = Listed(values, args.Text("local_faction"), "local_faction", "faction");
-            SunRow? sun = null;
+            SunRow? sunRow = null;
             if (args.Group("sun") is { } row)
             {
-                sun = new SunRow(Listed(values, row.Text("archetype"), "sun.archetype", "solar_archetype"),
+                sunRow = new SunRow(Listed(values, row.Text("archetype"), "sun.archetype", "solar_archetype"),
                     Listed(values, row.Text("star"), "sun.star", "star"), row.Text("name"));
             }
             values.ThrowIfAny();
@@ -168,27 +168,24 @@ internal static class UniverseTools
                 NavMapScale = (float?)args.Number("nav_map_scale"),
                 Copy = args.Texts("copy")?.Select(p => Enum.Parse<SystemPart>(p, ignoreCase: true)).ToHashSet(),
                 LocalFaction = faction,
-                Sun = sun,
+                Sun = sunRow,
             };
             var plan = SystemPlans.Create(session, args.Text("nickname")!, like, (place[0], place[1]), args.Text("name")!,
                 args.Text("infocard"), options);
             Run(scope, plan, error => SystemRefusals.TryGetValue(error.Detail ?? "", out var cause)
                 ? (cause.Kind, cause.Field)
                 : ((EditErrorKind, string?)?)null);
+            // The references take the form that they have while the new items exist, also in a preview.
             var system = ItemRefs.Canonical(session, plan.System!);
-            made = new SystemEditResult(new EditResult(EditStatus.Applied))
-            {
-                System = system,
-                File = plan.File,
-                Sun = ItemRefs.Canonical(session, plan.Sun!),
-            };
+            var sun = ItemRefs.Canonical(session, plan.Sun!);
+            finish = result => new SystemEditResult(result) { System = system, File = plan.File, Sun = sun };
             if (call.Host.Kind != AgentHostKind.Editor)
                 return;
             scope.Report(new EditResult(EditStatus.Applied)
             {
                 Warnings = [new Problem(DiagnosticSeverity.Warning, AgentTexts.Error("system_save_to_open")) { Ref = system }],
             });
-        }, result => new SystemEditResult(result) { System = made?.System, File = made?.File, Sun = made?.Sun });
+        }, result => finish(result));
     }
 
     /// <summary>
@@ -199,7 +196,7 @@ internal static class UniverseTools
     /// </summary>
     public static ToolStep ConnectionCreate(ToolCall call)
     {
-        ConnectionEditResult? made = null;
+        Func<EditResult, EditResult> finish = result => result;
         return EditTools.Apply(call, scope =>
         {
             var session = scope.Session;
@@ -225,24 +222,18 @@ internal static class UniverseTools
             var kind = args.Text("kind") == "jump_hole" ? ConnectionKind.Hole : ConnectionKind.Gate;
             var plan = ConnectionPlans.CreatePair(session, kind, from, to, options);
             Run(scope, plan, error => (PairRefusals.GetValueOrDefault(error.Detail ?? "", error.Kind), plan.RefusedPart));
-            made = new ConnectionEditResult(new EditResult(EditStatus.Applied))
+            var pair = plan.Ends.Select(e => ItemRefs.Canonical(session, e.Object)).ToList();
+            var zones = plan.TrafficZones.Select(z => ItemRefs.Canonical(session, z)).ToList();
+            finish = result => new ConnectionEditResult(result)
             {
-                Pair = plan.Ends.Select(e => ItemRefs.Canonical(session, e.Object)).ToList(),
-                TrafficZones = plan.TrafficZones.Select(z => ItemRefs.Canonical(session, z)).ToList(),
+                Pair = pair,
+                TrafficZones = zones,
                 Loadout = new PairValues(plan.Ends[0].Loadout, plan.Ends[^1].Loadout),
                 Pilot = new PairValues(plan.Ends[0].Pilot, plan.Ends[^1].Pilot),
                 Routes = plan.Routes is { } routes ? RouteChange.Of(routes) : null,
                 JumpObjects = new PairSlots(Slots(plan.JumpObjects[0]), Slots(plan.JumpObjects[^1])),
             };
-        }, result => new ConnectionEditResult(result)
-        {
-            Pair = made?.Pair,
-            TrafficZones = made?.TrafficZones,
-            Loadout = made?.Loadout,
-            Pilot = made?.Pilot,
-            Routes = made?.Routes,
-            JumpObjects = made?.JumpObjects,
-        });
+        }, result => finish(result));
     }
 
     /// <summary>Sets the locks of a jump gate or a jump hole at the start of a new game, and of its partner (see
