@@ -7,13 +7,15 @@ namespace OpenLancer.Data.Editing.Scene;
 
 /// <summary>
 /// The component checks (layer 3 of roadmap section 5.4, section 5.5 of the M3 design). They give problems of a section
-/// with a target, a key, a severity and a consequence, as the list checks do. Only a zone nickname that another zone of
-/// any system has, also by FLHash, is an error: retail drops one of the two zones (decision D240). The other checks are
-/// warnings until a retail comparison proves an effect (decision D254).
+/// with a target, a key, a severity and a consequence, as the list checks do. A zone nickname that another zone of any
+/// system has, also by FLHash, is an error: retail drops one of the two zones (decision D240). The errors of the
+/// universe checks also stop the save (see <see cref="UniverseChecks"/>). The other checks are warnings until a retail
+/// comparison proves an effect (decision D254).
 /// </summary>
 internal static class ComponentChecks
 {
-    /// <summary>The problems of a section of a system file, or of a <c>[Base]</c> of <c>universe.ini</c>.</summary>
+    /// <summary>The problems of a section of a system file, or of a <c>[Base]</c> or a <c>[system]</c> of
+    /// <c>universe.ini</c>.</summary>
     /// <param name="onlyActiveMod">True to check the section only when the active mod adds or changes it. The retail
     /// tests check each section.</param>
     public static IReadOnlyList<Diagnostic> Check(EditSession session, SectionRef section, bool onlyActiveMod = true)
@@ -21,9 +23,11 @@ internal static class ComponentChecks
         if (session.Get(section) is not { } view || onlyActiveMod && !view.IsChanged)
             return [];
         var result = new List<Diagnostic>();
-        if (IsBase(session, section))
+        if (IsUniverse(session, section))
         {
-            result.AddRange(BaseChecks(session, section, view));
+            if (SceneSections.Is(section.Id.Type, "Base"))
+                result.AddRange(BaseChecks(session, section, view));
+            result.AddRange(UniverseChecks.Check(session, section));
             return result;
         }
         switch (SceneSections.KindOf(session, section))
@@ -62,17 +66,21 @@ internal static class ComponentChecks
 
     /// <summary>
     /// The errors of layer 3 for the save gate: the zone nickname collisions of the zones that the active mod adds or
-    /// changes in the system files that it changes.
+    /// changes in the system files that it changes. Then the errors of the universe checks of the <c>[system]</c>
+    /// sections that the active mod adds or changes, when it changes <c>universe.ini</c>.
     /// </summary>
     public static IEnumerable<Diagnostic> SaveErrors(EditSession session)
     {
-        var changed = session.ActiveChangedPaths().Where(session.IsSystemFile).ToHashSet(VfsPath.Comparer);
-        if (changed.Count == 0)
-            return [];
+        var paths = session.ActiveChangedPaths();
         var result = new List<Diagnostic>();
-        foreach (var path in changed)
+        foreach (var path in paths.Where(session.IsSystemFile).Distinct(VfsPath.Comparer))
         {
             foreach (var section in session.Sections(path).Where(s => SceneSections.Is(s.Id.Type, SceneSections.ZoneType)))
+                result.AddRange(Check(session, section).Where(p => p.Severity == DiagnosticSeverity.Error));
+        }
+        if (session.UniversePath is { } universe && paths.Contains(universe, VfsPath.Comparer))
+        {
+            foreach (var section in session.Sections(universe).Where(s => SceneSections.Is(s.Id.Type, "system")))
                 result.AddRange(Check(session, section).Where(p => p.Severity == DiagnosticSeverity.Error));
         }
         return result;
@@ -98,10 +106,10 @@ internal static class ComponentChecks
                 "no planet.");
     }
 
-    /// <summary>True for a <c>[Base]</c> of <c>universe.ini</c>.</summary>
-    private static bool IsBase(EditSession session, SectionRef section) =>
-        SceneSections.Is(section.Id.Type, "Base") && session.UniversePath is { } universe &&
-        VfsPath.Comparer.Equals(section.Path, universe);
+    /// <summary>True for a <c>[Base]</c> or a <c>[system]</c> of <c>universe.ini</c>.</summary>
+    private static bool IsUniverse(EditSession session, SectionRef section) =>
+        (SceneSections.Is(section.Id.Type, "Base") || SceneSections.Is(section.Id.Type, "system")) &&
+        session.UniversePath is { } universe && VfsPath.Comparer.Equals(section.Path, universe);
 
     /// <summary>The system of a base of the list of the bases, or null.</summary>
     internal static string? SystemOfBase(EditSession session, string baseName) =>

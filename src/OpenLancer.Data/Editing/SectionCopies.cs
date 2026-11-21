@@ -102,6 +102,17 @@ internal sealed class SectionCopies(EditSession session, Action<string> problem)
     }
 
     /// <summary>
+    /// Adds a new text to the text of the active mod for a line of a new section, with a key that the section gives
+    /// and that no section, text or copy has (see <see cref="Add"/>). So the new texts and the copied texts of one
+    /// plan get their keys in one way and do not collide. Null when the section gives no valid key: the problem then
+    /// tells why.
+    /// </summary>
+    /// <param name="section">The new section, for the key of the text.</param>
+    /// <param name="name">The key of the line, for example <c>strid_name</c>.</param>
+    public ValueBase? New(StringKind kind, string text, SectionIdentity section, string name) =>
+        Add(new CopiedText(kind, text, $"new:{section.Type}:{section.Key}:{name}"), section, name);
+
+    /// <summary>
     /// The command that copies sections into a file, for example the header sections of a system into a new system
     /// file. With <paramref name="newFile"/>, it makes the new INI file of the folder of the active mod
     /// with the copies in their order (see <see cref="EditCommand.NewFile"/>). Else it adds the copies at the end of the

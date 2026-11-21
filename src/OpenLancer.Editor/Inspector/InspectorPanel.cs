@@ -174,7 +174,7 @@ internal sealed class InspectorPanel : IDisposable
         if (window.SectionOf(item) is { } itemSection)
         {
             SaveErrors(itemSection);
-            BaseChecks(itemSection);
+            UniverseChecks(itemSection);
         }
 
         // The sections have no window padding, so their headers run from edge to edge.
@@ -506,24 +506,26 @@ internal sealed class InspectorPanel : IDisposable
     }
 
     /// <summary>
-    /// The warnings of a <c>[Base]</c> of <c>universe.ini</c> (decision D254 of the M3 design): no object of its system
-    /// docks with it, or no object of its system is its object in space.
+    /// The problems of a <c>[Base]</c> or a <c>[system]</c> of <c>universe.ini</c>. A base warns when no object of its
+    /// system docks with it, or no object of its system is its object in space (decision D254 of the M3 design). The
+    /// checks of the universe tell, for example, that no jump gate leads to a system, or that a system names no file.
     /// </summary>
-    private void BaseChecks(SectionRef section)
+    private void UniverseChecks(SectionRef section)
     {
-        if (!section.Id.Type.Equals("Base", StringComparison.OrdinalIgnoreCase) || window.Session is not { } session)
+        if (!section.Id.Type.Equals("Base", StringComparison.OrdinalIgnoreCase) &&
+            !section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase) || window.Session is not { } session)
         {
             return;
         }
 
-        var warnings = Data.Editing.Scene.ObjectComponents.Checks(session.Edits, section);
-        if (warnings.Count > 0)
+        var problems = Data.Editing.Scene.ObjectComponents.Checks(session.Edits, section);
+        if (problems.Count > 0)
         {
-            Strip("##base-checks", () =>
+            Strip("##universe-checks", () =>
             {
-                foreach (var warning in warnings)
+                foreach (var problem in problems)
                 {
-                    PropertyGrid.ProblemText(warning);
+                    PropertyGrid.ProblemText(problem);
                 }
             });
         }

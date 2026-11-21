@@ -34,10 +34,27 @@ internal sealed record WreckRule(string Help, IReadOnlyList<string> Types, IRead
 internal sealed record RouteTemplate(string Usage, string Help, float Radius, IReadOnlyList<BuilderLine> Lines);
 
 /// <summary>
-/// The rule data of the builders of the agent tools (milestone MCP1-2): the wreck and the route templates of
-/// <c>list-rules.json</c>. Section 9.3 of the MCP1 design names that file as the source of the builders.
+/// The rules of the death zone of the sun of a new star system, when the sun that the new system copies has none. The
+/// zone is a <c>SPHERE</c> at the sun. Its lines are <c>nickname</c>, <c>pos</c>, <c>shape</c> and <c>size</c>, then
+/// the lines of the rule in their order.
 /// </summary>
-internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTemplate> Routes)
+/// <param name="Size">The radius of the zone in meters, when the sun has no <c>atmosphere_range</c>.</param>
+/// <param name="AtmosphereMargin">The radius of the zone is the <c>atmosphere_range</c> of the sun less this value, in
+/// meters.</param>
+/// <param name="Lines">The lines after <c>size</c>, each with a value, for example <c>damage</c>.</param>
+internal sealed record SunZoneRule(float Size, float AtmosphereMargin, IReadOnlyList<BuilderLine> Lines)
+{
+    /// <summary>The radius of the zone of a sun, from its <c>atmosphere_range</c> or null.</summary>
+    public float RadiusFor(float? atmosphereRange) =>
+        atmosphereRange is { } range && range - AtmosphereMargin >= 1 ? range - AtmosphereMargin : Size;
+}
+
+/// <summary>
+/// The rule data of the builders of the agent tools (milestone MCP1-2): the wreck, the route templates and the death
+/// zone of the sun of a new system of <c>list-rules.json</c>. Section 9.3 of the MCP1 design names that file as the
+/// source of the builders.
+/// </summary>
+internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTemplate> Routes, SunZoneRule? SunZone)
 {
     /// <summary>The key of the label and the leg number of a route zone.</summary>
     public const string PathLabel = "path_label";
@@ -46,7 +63,7 @@ internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTempla
     public const string Usage = "usage";
 
     /// <summary>The rule data without builders.</summary>
-    public static readonly SceneBuilders None = new(null, []);
+    public static readonly SceneBuilders None = new(null, [], null);
 
     /// <summary>The keys that a builder writes itself. A template cannot give them.</summary>
     private static readonly string[] BuilderKeys =
@@ -99,7 +116,20 @@ internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTempla
                 routes.Add(route);
             }
         }
-        return new SceneBuilders(wreck, routes);
+        SunZoneRule? sunZone = null;
+        if (e.TryGetProperty("system", out var system))
+        {
+            var zone = system.GetProperty("sunDeathZone");
+            var size = zone.GetProperty("size").GetSingle();
+            var margin = zone.GetProperty("atmosphereMargin").GetSingle();
+            if (!float.IsFinite(size) || size < 1 || !float.IsFinite(margin) || margin < 0)
+                throw new FormatException("The sun death zone of the system builder needs a size of 1 or more and a " +
+                                          "margin of 0 or more.");
+            sunZone = new SunZoneRule(size, margin, Lines(zone, "sun death zone"));
+            if (sunZone.Lines.FirstOrDefault(l => l.Value == null) is { } empty)
+                throw new FormatException($"The line '{empty.Key}' of the sun death zone needs a value.");
+        }
+        return new SceneBuilders(wreck, routes, sunZone);
     }
 
     /// <summary>The lines of a template. Each key occurs once, and no key is a key that the builder writes

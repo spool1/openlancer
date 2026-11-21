@@ -7,6 +7,7 @@ using LibreLancer.Data.Ini;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Editing.Scene;
 
 namespace OpenLancer.Studio.Agent;
 
@@ -78,9 +79,12 @@ internal static class AgentRows
             : diagnostic.Cutscene is { } place ? CutsceneQueries.RefOf(session, place)
             : null);
 
-    /// <summary>The diagnostics of the field checks and the list checks of a section, each with a target.</summary>
+    /// <summary>The diagnostics of the field checks and the list checks of a section, each with a target. A
+    /// <c>[system]</c> or a <c>[Base]</c> of <c>universe.ini</c> also gets the problems of the universe checks (see
+    /// <see cref="UniverseChecks"/>).</summary>
     public static IReadOnlyList<Diagnostic> DiagnosticsOf(EditSession session, SectionRef section) =>
         session.Check(section).Concat(session.Lists.Problems(section).Select(p => p.Diagnostic))
+            .Concat(UniverseChecks.Check(session, section))
             .Select(d => d with { Target = d.Target ?? section }).ToList();
 
     /// <summary>The problems of the field checks and the list checks of a section.</summary>
