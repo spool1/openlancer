@@ -899,6 +899,8 @@ The editor shows each agent edit in the Console, in the Scene, in the Hierarchy 
 
 An undo of an agent edit removes its marks, and a redo puts them back. A save clears the marks.
 
+The Database and the Inspector show a new system at once, before the save. The Scene opens a new system only after the save and the reload of the game data. Before that, an open of the system shows a card: "This system is new. Save the mod to open it in the Scene." Its Save button saves the mod with the save gate. During the reload, the card says "The editor loads the game data." Then the Scene opens the system. "New systems" in [MOD_FORMAT.md](MOD_FORMAT.md) tells more.
+
 An agent call never runs during a gesture of your own. It waits while you edit a field, rename an item or drag an item, and while a dialog is open. In the mission studio, it waits while one of these is open:
 
 - The rename popup of a row of a mission in the Hierarchy.
@@ -914,6 +916,8 @@ A call also waits while the editor loads the game data, for example after a save
 #### Follow mode
 
 With **Agent > Follow agent** on, the editor opens the system of each agent edit and moves the camera to its item. An agent edit of a mission opens the script in the Mission tab, and the graph moves to the item. While the Mission tab shows the raw INI, the view does not move, also when you show the graph again. An item without a node, for example a mission ship, shows in the Hierarchy and the Inspector when it is selected. An item without a place in the Scene, for example a loadout, shows in the Inspector, and the view does not change. So does an item that the Mission tab cannot show yet, for example a trigger of a new script before the mission run reads the script.
+
+An agent edit in a new system that the mod has not saved shows the save card of the Scene. The Inspector then shows the `[system]` of the system. Examples are `system_create` and `trade_lane_create` in the new system. After the save and the reload of the game data, the Scene opens the system.
 
 The selection follows Unity. A create or a copy selects the new item, a delete clears the selection, and a rename keeps it. When the agent undoes its delete, follow mode selects the item again. When you undo an agent delete, the Scene selects the item again, as after the undo of your own delete. This is also true with follow mode off. An undo of an agent delete in a mission keeps the selection of the Mission tab, as the undo of your own mission edit does.
 

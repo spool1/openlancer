@@ -65,10 +65,12 @@ internal sealed class SystemEntryRows(EditorWindow window, PropertyGrid grid)
     internal static readonly Row[] AdvancedRows =
     [
         new("Visit flags", "visit", RowKind.VisitFlags,
-            "All the flags of the visit value. The Visit row changes only the flag that shows the system on the map at start."),
+            "All the flags of the visit value. The Visit row changes only the flag that shows the system on the map " +
+            "at start."),
         new("Visit value", "visit", RowKind.VisitValue, "The visit value as a whole number. It holds all the flags."),
         new("Message id prefix", "msg_id_prefix", RowKind.MessagePrefix,
-            "The prefix of the voice lines that say the name of the system. Without it, NPC speech about the system is silent."),
+            "The prefix of the voice lines that say the name of the system. Without it, NPC speech about the system " +
+            "is silent."),
     ];
 
     /// <summary>The texts of the Visit row: without the flag, and with the flag.</summary>
@@ -101,7 +103,8 @@ internal sealed class SystemEntryRows(EditorWindow window, PropertyGrid grid)
         Rows(IdentityRows, nickname, entry, loaded);
 
     /// <summary>Draws the rows of the nav map (see <see cref="Identity"/>).</summary>
-    public void NavMap(string nickname, SectionRef? entry, StarSystem? loaded) => Rows(NavMapRows, nickname, entry, loaded);
+    public void NavMap(string nickname, SectionRef? entry, StarSystem? loaded) =>
+        Rows(NavMapRows, nickname, entry, loaded);
 
     /// <summary>Draws the advanced rows (see <see cref="Identity"/>).</summary>
     public void Advanced(string nickname, SectionRef? entry, StarSystem? loaded) =>
@@ -177,7 +180,11 @@ internal sealed class SystemEntryRows(EditorWindow window, PropertyGrid grid)
             ImGui.BeginDisabled(shown);
             if (ImGui.TextLink(OpenText))
             {
+                // The open of a system clears the selection, so the page selects its item again, as a count of the
+                // contents does.
+                var selection = window.Selection;
                 window.OpenSystem(nickname, null);
+                window.Selection = selection;
             }
 
             ImGui.EndDisabled();

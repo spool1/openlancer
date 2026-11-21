@@ -580,6 +580,14 @@ The checks of a system and of a base of `universe.ini`:
 
 An error stops the save only when the active mod writes the line. A problem of a line of the game or of a lower mod is a warning. Two different system nicknames with one FLHash get the FLHash error of the data lists (see "The save gate"). The Inspector shows these problems above the sections of a `[system]` or a `[Base]`, and the raw INI block marks the line of each problem. The count of the errors that block the save includes these errors. The agent tools `get_system`, `get_item` and `check` give them too.
 
+The editor shows a new system before the save and after it:
+
+- The Systems table of the Database reads the `[system]` sections of the edit view. So a new system shows at once, and a rename, a delete and an undo show at once too. The row of a new system has a dot, the tooltip "New. Save to open it in the Scene." and empty counts. A click on the row selects the `[system]`.
+- The Inspector page of a `[system]` shows its rows from the edit view. The rows are "Name", "Infocard", the read-only "File" with the link "Open system", "Nav map position", "Nav map scale" and "Visit". The position has two whole-number fields from 0 to 15. "Visit" is a choice of "After the first visit" or "On the map at start". The choice changes only the flag with the value 1 of `visit`, and it keeps the other flags. The Advanced section shows all the flags, and the raw INI block shows the line.
+- The Scene builds a system from the loaded game data. So it opens a new system only after the save and the reload of the game data. Before that, an open of the system shows a card: "This system is new. Save the mod to open it in the Scene." The Save button runs File > Save, with the save gate.
+- During the reload, the card says "The editor loads the game data." Then the Scene opens the system. Each open of a new system shows this card. Examples are "Go to partner", the "Go to" of a completeness step, the Database, the link "Open system" and follow mode of the agent. The `[system]` of the system gets the selection.
+- After the save and the reload, the row of the system has no dot and shows the counts of the loaded game data. A click on the row selects the system. Its page has the same rows of the `[system]`, and it also shows the environment, the music and the contents of the system.
+
 ### Jump connections and gate locks
 
 A jump connection is a pair of objects in two system files, or in one system file for a hole pair. Each object has a `goto` line that names the system and the object at the other end, and the tunnel. The `goto` lines are in the system files, not in `universe.ini`.
@@ -1023,6 +1031,8 @@ The picker changes the first three values of the line. A fourth value, for examp
 
 The swatch is disabled, and its tooltip tells why, when the line has fewer than three values, when one of the first three values is not a number, or when one of them is outside the range of the form, for example `color = 300, 0, 0`. Correct such a line in the text field. A key without a line, or with two lines or more, has no swatch. Type the first value in the text field. A `Vector3` color factor, for example `color_shift`, has the label drag and no swatch.
 
+The page of a star system and the page of a `[system]` of `universe.ini` have the same rows of the `[system]` (see "New systems"). "Nav map position" has two whole-number fields from 0 to 15. Drag a field to change its value, or double-click the field and type the value. Each field is one entry of the edit history. A line with another value, for example `pos = 4.5, 5`, gets text fields, so the row shows each value.
+
 Each change of the text shows at once. While a field is active, it stays in its place, also when its text adds or removes the key. After the field ends, the key moves to its list, for example from "Unset keys" to "Keys". Two kinds of field change the data only when the field ends: the text of a key that holds a text id, for example a name, and a market line.
 
 A blue label marks a value that the active mod sets. The tooltip of the label names the layer that sets the value: the base data, a mod that loads before the active mod, or the active mod. A lock tells why a row cannot change, for example the key of a section, or a section that a patch cannot change. The `goto` line of a jump gate and the `prev_ring` and `next_ring` lines of a trade lane ring are locked rows. Their lock names the tools that change the pair or the lane, and the raw INI block can still change these lines. The Jump connection component has a lock dropdown, and the Trade lane ring component has ring buttons. They change a pair or a lane by hand (see "Components").
@@ -1228,7 +1238,7 @@ The Jump connection component and the Trade lane ring component have their own s
 - "Destination": the locked `goto` row with the lock reason.
 - "Target system": a link that selects the system.
 - "Exit object": a link that goes to the partner. An exit object that the edit view does not have shows "Missing".
-- "Partner": the button "Go to partner" and the state of the pair. The button opens the system of the partner in the Scene and selects the partner. A new system that the mod has not saved does not open, and the Console tells why.
+- "Partner": the button "Go to partner" and the state of the pair. The button opens the system of the partner in the Scene and selects the partner. For a new system that the mod has not saved, the Scene shows its save card, and the Inspector shows its `[system]` (see "New systems"). After the save, the Scene opens the system and selects the partner.
 - "Traffic zone": a link to each traffic zone that `connection_create` makes for the object.
 - "Lock at start": a dropdown with "No lock", "Locked for the player", "Locked for NPCs" and "Locked for the player and NPCs". A pick runs the plan of the agent tool `connection_set_lock`. The partner gets the same lock when the partner names this gate in its `goto` line. Only a jump gate and a jump hole have this row.
 
