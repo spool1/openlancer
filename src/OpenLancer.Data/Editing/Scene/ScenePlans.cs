@@ -357,7 +357,7 @@ public static partial class ScenePlans
     /// <remarks>A jump gate or a jump hole goes with its pair, as <see cref="Universe.ConnectionPlans.DeletePair"/>
     /// tells. Airlock gates and trade lane rings refuse the delete.</remarks>
     public static ScenePlan Delete(EditSession session, IReadOnlyList<SectionRef> targets) =>
-        Delete(session, new ScenePlan(SceneAction.Delete, "Delete"), targets, [], new HashSet<SectionRef>());
+        Delete(session, new ScenePlan(SceneAction.Delete, "Delete"), targets, [], []);
 
     /// <summary>
     /// The delete of <see cref="Delete(EditSession, IReadOnlyList{SectionRef})"/>, also for the delete of a system.
@@ -373,7 +373,7 @@ public static partial class ScenePlans
     /// The plan checks the lines that name them and takes their pairs, but it gives them no command and no
     /// <see cref="EditPlan.Deletes"/> row.</param>
     internal static ScenePlan Delete(EditSession session, ScenePlan plan, IReadOnlyList<SectionRef> targets,
-        IReadOnlyList<(SectionRef Section, string Cause)> cascades, IReadOnlySet<SectionRef> gone)
+        IReadOnlyList<(SectionRef Section, string Cause)> cascades, IReadOnlyList<SectionRef> gone)
     {
         var refusals = new List<Diagnostic>();
         foreach (var target in targets)
@@ -393,6 +393,7 @@ public static partial class ScenePlans
         // Each section that goes with the delete, also before the plan reads it. A line of such a section does not
         // refuse the delete and gets no fix.
         var queued = new HashSet<SectionRef>();
+        var goneSet = gone.ToHashSet();
         var queue = new Queue<(SectionRef Section, DeleteReason Why, string? Cause)>();
         void Enqueue(SectionRef section, DeleteReason why, string? cause)
         {
@@ -418,7 +419,7 @@ public static partial class ScenePlans
             var (section, why, cause) = next;
             if (!inSet.Add(section) || session.Get(section) is not { } view)
                 continue;
-            var isGone = gone.Contains(section);
+            var isGone = goneSet.Contains(section);
             if (!isGone && why == DeleteReason.Cascade)
             {
                 if (NoDelete(session, section, view) is { } connection)

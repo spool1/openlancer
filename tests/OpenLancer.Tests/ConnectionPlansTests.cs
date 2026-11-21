@@ -565,4 +565,116 @@ public sealed class ConnectionPlansTests
             ConnectionWorkspace.LockLines(session, "npc_locked_gate"));
         Assert.True(session.Save().Saved);
     }
+
+    /// <summary>
+    /// A delete of one end of a gate pair deletes the pair: the partner in the other file, the traffic zone of each
+    /// end and the lock lines of each end. The partner is in another file, so the plan asks. The lock lines go as
+    /// fixes. The texts of the ends stay as unused texts of the mod. One undo gives both ends back.
+    /// </summary>
+    [Fact]
+    public void ADeleteOfOneEndDeletesThePairWithItsTrafficZonesAndItsLockLines()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        var made = Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Gate, new ConnectionEnd("Li01"),
+            new ConnectionEnd("Li03"), new ConnectionOptions { Lock = JumpLock.Both }));
+        var li01 = SceneWorkspace.Object("Li01_to_Li03");
+        var li03 = ConnectionWorkspace.Li03("Object", "Li03_to_Li01");
+        var name = session.Get(li03)!.Lines("ids_name")[0].Values[0].ToString()!;
+
+        var plan = ConnectionPlans.DeletePair(session, [li03]);
+
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        Assert.Equal([(li03, DeleteReason.Target, null), (li01, DeleteReason.Cascade, "goto = Li03, Li03_to_Li01"),
+                (made.TrafficZones[1], DeleteReason.Cascade, "traffic zone of Li03_to_Li01"),
+                (made.TrafficZones[0], DeleteReason.Cascade, "traffic zone of Li01_to_Li03")],
+            plan.Deletes.Select(d => (d.Section, d.Why, d.Cause)));
+        Assert.Equal(["initialworld.ini: the locked_gate line of Li01_to_Li03",
+                "initialworld.ini: the locked_gate line of Li03_to_Li01",
+                "initialworld.ini: the npc_locked_gate line of Li01_to_Li03",
+                "initialworld.ini: the npc_locked_gate line of Li03_to_Li01"],
+            plan.Fixes.Select(f => f.Text).Order());
+        Assert.True(plan.NeedsConfirmation);
+        Assert.Equal("Delete Li03_to_Li01 and 3 more", plan.Label);
+
+        session.Execute(plan.Command!);
+        Assert.All([li01, li03, made.TrafficZones[0], made.TrafficZones[1]], s => Assert.Null(session.Get(s)));
+        Assert.Equal([FLHash.CreateID("Li01_to_Li02")], ConnectionWorkspace.LockLines(session, "locked_gate"));
+        Assert.Equal([FLHash.CreateID("Li02_to_Li01"), FLHash.CreateID("Li01_to_Li02")],
+            ConnectionWorkspace.LockLines(session, "npc_locked_gate"));
+        Assert.Equal("Li01 Jump Gate", ConnectionWorkspace.TextOf(session, name));
+        Assert.Equal(new RouteDiff(0, 0, 0, 0), RouteTable.Diff(session.GameRoutes.Tables.All, session.Routes.Tables.All));
+
+        session.Undo();
+        Assert.All([li01, li03, made.TrafficZones[0], made.TrafficZones[1]], s => Assert.NotNull(session.Get(s)));
+        Assert.Equal([FLHash.CreateID("Li01_to_Li02"), FLHash.CreateID("Li01_to_Li03"), FLHash.CreateID("Li03_to_Li01")],
+            ConnectionWorkspace.LockLines(session, "locked_gate"));
+    }
+
+    /// <summary>A hole pair in one system is one item of one file. Its partner, its traffic zones and its lock lines do
+    /// not make the plan ask, as a delete of one object does not.</summary>
+    [Fact]
+    public void ADeleteOfAHolePairInOneSystemDoesNotAsk()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        var made = Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Hole, new ConnectionEnd("Li03"),
+            new ConnectionEnd("Li03"), new ConnectionOptions { Lock = JumpLock.Npc }));
+
+        var plan = ConnectionPlans.DeletePair(session, [made.Ends[1].Object]);
+
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        Assert.Equal(["Li03_to_Li03_hole_1", "Li03_to_Li03_hole", "Zone_Li03_to_Li03_hole_1_traffic",
+            "Zone_Li03_to_Li03_hole_traffic"], plan.Deletes.Select(d => d.Section.Id.Key));
+        Assert.Equal(2, plan.Fixes.Count);
+        Assert.False(plan.NeedsConfirmation);
+        session.Execute(plan.Command!);
+        Assert.Null(session.Get(made.Ends[0].Object));
+        Assert.Equal([FLHash.CreateID("Li02_to_Li01"), FLHash.CreateID("Li01_to_Li02")],
+            ConnectionWorkspace.LockLines(session, "npc_locked_gate"));
+    }
+
+    /// <summary>A one-way object goes alone and does not make the plan ask. The object that it goes to stays, because
+    /// that object does not go back to it.</summary>
+    [Fact]
+    public void ADeleteOfAOneWayObjectDeletesOnlyThatObject()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        var gate = ConnectionWorkspace.Li03("Object", "Li03_gate");
+        session.Execute(EditCommand.SetLinesFromText(gate, "goto", ["Li02, Li02_to_Li01, gate_tunnel_bretonia"]));
+
+        var plan = ConnectionPlans.DeletePair(session, [gate]);
+
+        Assert.Equal([(gate, DeleteReason.Target)], plan.Deletes.Select(d => (d.Section, d.Why)));
+        Assert.Empty(plan.Fixes);
+        Assert.False(plan.NeedsConfirmation);
+        session.Execute(plan.Command!);
+        Assert.Null(session.Get(gate));
+        Assert.NotNull(session.Get(SceneWorkspace.Li02("Object", "Li02_to_Li01")));
+    }
+
+    /// <summary>A partner in a file that the editor cannot change refuses the delete with the reason, because a pair
+    /// goes as one item. An object that is no jump gate or jump hole gives the detail NotConnection.</summary>
+    [Fact]
+    public void APartnerInAReadOnlyFileAndAnObjectThatIsNoJumpAreRefused()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        // The active mod replaces the whole file of Li02 outside its folder, so the editor cannot change the file.
+        ws.Mod("act", new() { [@"files\" + ListWorkspace.Li02Path] = SceneWorkspace.Li02Text });
+        var session = ws.Session("act");
+        var partner = SceneWorkspace.Li02("Object", "Li02_to_Li01");
+        Assert.NotNull(session.Get(partner)!.ReadOnlyReason);
+
+        var plan = ConnectionPlans.DeletePair(session, [SceneWorkspace.Object("Li01_to_Li02")]);
+        var station = ConnectionPlans.DeletePair(session, [SceneWorkspace.Object("Li01_01")]);
+
+        Assert.False(plan.CanRun);
+        var refusal = Assert.Single(plan.Refusals);
+        Assert.Equal(partner, refusal.Target);
+        Assert.Equal("Li02_to_Li01 in li02.ini is the partner of Li01_to_Li02, and a jump connection goes as one item. " +
+                     $"The editor cannot delete Li02_to_Li01: {session.Get(partner)!.ReadOnlyReason}", refusal.Message);
+        Assert.Equal(ConnectionPlans.NotConnection, Assert.Single(station.Refusals).Rule);
+        Assert.Equal("Li01_01 is not a jump gate or a jump hole.", station.Refusals[0].Message);
+    }
 }

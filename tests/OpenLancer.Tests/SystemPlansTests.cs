@@ -5,6 +5,7 @@ using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Lists;
+using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Editing.Universe;
 using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Data.Strings;
@@ -505,5 +506,113 @@ public sealed class SystemPlansTests
         Assert.Equal(MissionErrors.NameInvalid, SystemPlans.Rename(session, "Av01", "AV01").Refusals[0].Rule);
         Assert.Equal(MissionErrors.NameInvalid, SystemPlans.Rename(session, "Av01", "9x").Refusals[0].Rule);
         Assert.Equal(MissionErrors.ItemNotFound, SystemPlans.Rename(session, "Xx01", "Xx02").Refusals[0].Rule);
+    }
+
+    /// <summary>Plans a jump connection between Av01 and another system, and runs it.</summary>
+    private static ConnectionPlan Connect(EditSession session, ConnectionKind kind, string other)
+    {
+        var plan = ConnectionPlans.CreatePair(session, kind, new ConnectionEnd("Av01"), new ConnectionEnd(other));
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        session.Execute(plan.Command!);
+        return plan;
+    }
+
+    /// <summary>
+    /// A delete of a system that the active mod adds deletes the [system], the system file and each partner in another
+    /// system, with the traffic zone of the partner. It always asks, and its deletes and its warning name the partners
+    /// and the file. The mission line that names the system shows "Missing". One undo gives everything back.
+    /// </summary>
+    [Fact]
+    public void ADeleteOfASystemDeletesItsFileAndThePartnersInTwoOtherSystems()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        NewSystemWorkspace.CreateAv01(session);
+        var gate = Connect(session, ConnectionKind.Gate, "Li01");
+        var hole = Connect(session, ConnectionKind.Hole, "Li03");
+
+        var plan = SystemPlans.Delete(session, "av01");
+
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        Assert.True(plan.NeedsConfirmation);
+        Assert.Equal("Delete system Av01", plan.Label);
+        Assert.Equal(Av01, plan.System);
+        Assert.Equal(NewSystemWorkspace.NewPath, plan.File);
+        Assert.Equal([(Av01, DeleteReason.Target, null),
+                (gate.Ends[1].Object, DeleteReason.Cascade, "goto = Av01, Av01_to_Li01"),
+                (hole.Ends[1].Object, DeleteReason.Cascade, "goto = Av01, Av01_to_Li03_hole"),
+                (gate.TrafficZones[1], DeleteReason.Cascade, "traffic zone of Li01_to_Av01"),
+                (hole.TrafficZones[1], DeleteReason.Cascade, "traffic zone of Li03_to_Av01_hole")],
+            plan.Deletes.Select(d => (d.Section, d.Why, d.Cause)));
+        Assert.Equal("A save game in Av01 does not find the system after the delete. The system file " +
+                     $"{NewSystemWorkspace.NewPath} goes too.", plan.Warnings[0].Message);
+        Assert.Contains(plan.MissionMissing, m => m.Key == "Cnd_SystemEnter");
+
+        session.Execute(plan.Command!);
+        Assert.Null(session.Get(Av01));
+        Assert.False(session.OpenDocument(NewSystemWorkspace.NewPath)?.State.Exists ?? false);
+        Assert.All([gate.Ends[1].Object, hole.Ends[1].Object, gate.TrafficZones[1], hole.TrafficZones[1]],
+            s => Assert.Null(session.Get(s)));
+        Assert.Null(session.Routes.Graph.System("Av01"));
+        Assert.Equal(plan.Label, session.UndoLabel);
+
+        session.Undo();
+        Assert.NotNull(session.Get(Av01));
+        Assert.True(session.OpenDocument(NewSystemWorkspace.NewPath)!.State.Exists);
+        Assert.All([gate.Ends[0].Object, gate.Ends[1].Object, hole.Ends[0].Object, hole.Ends[1].Object],
+            s => Assert.NotNull(session.Get(s)));
+    }
+
+    /// <summary>A system with a base refuses the delete, because this version has no delete of a base. A system of the
+    /// game and a system that does not exist refuse too.</summary>
+    [Fact]
+    public void ADeleteRefusesASystemWithABaseAndASystemOfTheGame()
+    {
+        using var ws = NewSystemWorkspace.Create();
+        var session = ws.Session("act");
+        NewSystemWorkspace.CreateAv01(session);
+        session.Execute(EditCommand.AddSection(ListWorkspace.UniversePath, "Base",
+            [ListWorkspace.Line("nickname", "Av01_01_Base"), ListWorkspace.Line("system", "Av01")]));
+
+        var withBase = SystemPlans.Delete(session, "Av01");
+        var game = SystemPlans.Delete(session, "Li01");
+
+        Assert.Equal((SystemPlans.HasBases, "Av01 has the base Av01_01_Base. This version cannot delete a system with " +
+                                            "bases."), (withBase.Refusals[0].Rule, withBase.Refusals[0].Message));
+        Assert.False(withBase.CanRun);
+        Assert.Equal((SystemPlans.GameSystem, "Li01 is a system of the game or of a lower mod. This version deletes only " +
+                                              "systems that the active mod adds."),
+            (game.Refusals[0].Rule, game.Refusals[0].Message));
+        Assert.Equal(MissionErrors.ItemNotFound, SystemPlans.Delete(session, "Xx01").Refusals[0].Rule);
+    }
+
+    /// <summary>A delete of a saved system, then a save, removes the file from the mod and the [system] from the patch.
+    /// An undo of the delete and a save write both again.</summary>
+    [Fact]
+    public void ASaveAfterTheDeleteRemovesTheFileAndASaveAfterTheUndoWritesItAgain()
+    {
+        using var ws = NewSystemWorkspace.Create();
+        var session = ws.Session("act");
+        NewSystemWorkspace.CreateAv01(session);
+        Assert.True(session.Save().Saved);
+        var file = Path.Combine(ws.ModFolder("act"), "files", "DATA", "MODS", "act", "SYSTEMS", "Av01", "Av01.ini");
+        Assert.True(File.Exists(file));
+
+        var plan = SystemPlans.Delete(session, "Av01");
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        session.Execute(plan.Command!);
+        var deleted = session.Save();
+
+        Assert.True(deleted.Saved, string.Join("\n", deleted.Problems));
+        Assert.False(File.Exists(file));
+        var patch = Path.Combine(ws.ModFolder("act"), OpenLancer.Data.Mods.Mod.PatchesFolder, ListWorkspace.UniversePath);
+        Assert.False(File.Exists(patch) && File.ReadAllText(patch).Contains("Av01", StringComparison.Ordinal));
+
+        session.Undo();
+        var restored = session.Save();
+        Assert.True(restored.Saved, string.Join("\n", restored.Problems));
+        Assert.DoesNotContain(restored.Problems, p => p.Severity == DiagnosticSeverity.Error);
+        Assert.True(File.Exists(file));
+        Assert.Contains(@"file = ..\MODS\act\SYSTEMS\Av01\Av01.ini", ws.ReadModPatch(ListWorkspace.UniversePath));
     }
 }

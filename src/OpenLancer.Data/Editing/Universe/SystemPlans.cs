@@ -451,9 +451,7 @@ public static class SystemPlans
             return plan.Refuse(path!, $"The system {sharing.Id.Key} uses the file {path} too. The editor deletes a system " +
                                       "only with its file.", sharing, FileKept);
 
-        var gone = new HashSet<SectionRef> { item };
-        if (deletesFile)
-            gone.UnionWith(session.Sections(path!));
+        List<SectionRef> gone = [item, .. deletesFile ? session.Sections(path!) : []];
         // Each object of another system whose goto line names the system. A partner of an object of the file comes
         // with the pair of that object too.
         var cascades = session.Lists.ReferencesTo("system", nickname)
