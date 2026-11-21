@@ -576,6 +576,72 @@ The checks of a system and of a base of `universe.ini`:
 
 An error stops the save only when the active mod writes the line. A problem of a line of the game or of a lower mod is a warning. Two different system nicknames with one FLHash get the FLHash error of the data lists (see "The save gate"). The Inspector shows these problems above the sections of a `[system]` or a `[Base]`, and the raw INI block marks the line of each problem. The count of the errors that block the save includes these errors. The agent tools `get_system`, `get_item` and `check` give them too.
 
+### Jump connections and gate locks
+
+A jump connection is a pair of objects in two system files, or in one system file for a hole pair. Each object has a `goto` line that names the system and the object at the other end, and the tunnel. The `goto` lines are in the system files, not in `universe.ini`.
+
+```ini
+[Object]
+nickname = Li01_to_Av01
+ids_name = $str:li01_to_av01
+pos = 50000, 0, 0
+rotate = 0, 90, 0
+archetype = jumpgate
+ids_info = 66145
+jump_effect = jump_effect_bretonia
+reputation = li_n_grp
+behavior = NOTHING
+difficulty_level = 10
+goto = Av01, Av01_to_Li01, gate_tunnel_bretonia
+loadout = jumpgate_li_01
+pilot = pilot_solar_hard
+```
+
+- The type of the solar archetype gives the kind: `JUMP_GATE`, `JUMP_HOLE` or `AIRLOCK_GATE`. An object with a `goto` line and an archetype of another type is no jump.
+- Each end of a pair names the other end. Both ends have one kind. A pair of two kinds puts each end in another route table (see "Route tables").
+- The game records the jump with the nickname that the object has before its `goto` line. So `nickname` comes first.
+- The game crashes with more than 10 objects with `goto` in one system. Airlock gates count too. The retail maximum is 9, in Li01 and Br04.
+
+When OpenLancer makes a jump gate pair or a jump hole pair:
+
+- Each new end gets the lines in the order of the example. A gate to a system with `msg_id_prefix` gets that line after `archetype`. A jump hole has no `reputation`, `behavior`, `difficulty_level`, `loadout` and `pilot` lines. It has `visit = 0` as its last line.
+- The nickname is `<system>_to_<other system>` for a gate and `<system>_to_<other system>_hole` for a hole. When an object or a zone has that nickname, OpenLancer adds `_1`, `_2` and so on.
+- The name is "<name of the other system> Jump Gate" or "<name of the other system> Jump Hole". It goes into `strings.json`. The infocard is the infocard that the retail ends of the kind share.
+- An end goes toward the other system on the nav map. Its distance from the center is the distance of the farthest object of its system, and at least 50000 m. Its front looks at the center. A hole pair in one system has no direction, so its ends go to the two sides of the center on the x axis. So do two systems at one place of the nav map.
+- A template object can give the archetype, the infocard, the jump effect, the behavior, the difficulty, the visit flag, the loadout, the pilot and the tunnel.
+- A gate gets the local faction of its system as `reputation`. Its loadout and its pilot come from the gates with the same faction. Without such a gate, they come from the rule data for the house of the faction, for example `li` for `li_n_grp`. A gate without a loadout has no lights.
+- Each new end gets a traffic zone, `Zone_<object>_traffic`: a `SPHERE` of 4000 m with `pop_type = jumpgate` or `pop_type = wormhole`. NPCs come and go at the end only when the zone has encounters.
+- An end can name an existing object without a pair. Then OpenLancer writes only the `goto` line of that object. This fixes a one-way object of a lower mod or of a raw edit.
+- The new pair is one entry of the edit history, also when it changes two system files, the gate locks and `strings.json`.
+
+The gate locks are in the `[locked_gates]` section of `InitialWorld.ini`:
+
+```ini
+[locked_gates]
+locked_gate = 2926089285
+npc_locked_gate = 2926089285
+```
+
+- Each value is the FLHash of the nickname of a gate or a hole, as a decimal number.
+- `locked_gate` locks the gate for the player in a new game. A mission opens it with `Act_LockDock`. The route tables leave out the gate, also after a mission opens it.
+- `npc_locked_gate` locks the gate for the NPCs. It does not change the route tables.
+- OpenLancer can change the locks of a gate of the game too. Then the patch of `InitialWorld.ini` changes. The story can depend on such a lock.
+- OpenLancer Play does not lock gates.
+
+The checks of the jump connections:
+
+| Problem | Severity | What the game does |
+|---|---|---|
+| A system has more than 10 objects with `goto`. | Error | The game crashes. |
+| An object has its `goto` line before its `nickname` line. | Error | The game records the jump under another object. |
+| The other end does not name the object in its `goto` line. | Warning | The player cannot jump back. |
+| The two ends of a pair have two kinds. | Warning | The game counts each end in another route table. |
+| An object with `goto` has an archetype that is no jump gate, jump hole or airlock gate. | Warning | The player cannot use the object as a jump. |
+| A gate lock names no jump gate, jump hole or airlock gate. | Warning | The game ignores the line. Vanilla 1.1 has six such lines. |
+| The active mod gives a gate a player lock. | Warning | The route tables leave out the gate. |
+
+The count error stops the save of a data mod (tier 1) when the active mod makes the count go above 10. The order error stops the save when the active mod writes the `goto` line. Each other case is a warning. A `goto` line that names a system or an object that does not exist gets the error of the data lists. The Inspector shows the problems in the Jump connection component of the object, and above the sections of `[locked_gates]`. The raw INI block marks the line of each problem. The agent tools `get_item` and `check` give them too.
+
 ## Prop groups
 
 A prop group is a set of separate objects, zones and lights. The editor saves it in the `props/` folder of a mod, as Unity saves a prefab asset. The editor places a group again in any system, and each member becomes a separate item. The merge, the game, `oltool deploy` and the validation ignore the folder. So a group changes no game data until you place it.
@@ -1191,6 +1257,7 @@ Each save runs the save gate first, also a save with nothing to write, and also 
   | A name that is not in the list of names of the key, for example `type = BOAT`, or a value that is not a GUID | The game ignores the line. |
   | A required key without a line, for example `da_archetype` of a `[Ship]` | The game drops this section. |
 - A zone of the active mod with the nickname or the FLHash of another zone of any system. The game drops one of the two zones.
+- A system file that the active mod changes, with more than 10 objects with `goto`. The game crashes. The error comes for each data mod (tier 1), also without a retail target, when the active mod makes the count go above 10. An `[Object]` of the active mod with its `goto` line before its `nickname` line is an error too, because the game records the jump under another object (see "Jump connections and gate locks").
 - A `[system]` of `universe.ini` that the active mod adds or changes, with one of three errors (see "New systems"). Its `file` line comes before its `nickname` line, so the game loads the system under another id. Another system has its nickname, so the game drops one of the two. Its `file` line names no file, so the game loads it without objects and zones and can crash. The error comes only from a line of the active mod.
 - An error of the format checks of the export or of the content checks of the retail game, when the active mod adds it. See "Format checks" and "Content checks of the retail game". These checks run only for a tier-1 mod that names a retail target. They compare the data with the active mod with the data of the mods that load before it. They do not merge on the files of each target game. Play in the game and the export do that. For example, a good with the price 0 blocks the save, because the retail game can crash when a player buys or sells it.
 - An error of the mission checks in a mission script that the active mod changes. Examples are a trigger without a condition (rule M01) and two triggers whose names have one game id (rule M27). A line of any script that names a name that the active mod removes or renames is an error too. A mission problem that the base game or a lower mod also has is a warning, so it does not block the save.
@@ -1592,6 +1659,8 @@ Librelancer loads some data that the retail game does not accept or does not rea
 | A key that only Librelancer reads: the section `[Extended]` of `freelancer.ini`, a `[Data]` key that the retail loaders do not know (for example `newplayer`, `mpnewcharacter`, `mbases`, `navmap`, `mouse` or `cameras`), and `cruise_speed` of an `[Engine]` | Error | It does not read the key. Only OpenLancer reads it. |
 | A boolean key with a value other than `true`, `false`, `1` or `0` (in any letter case) | Warning | It reads false and logs an error. For `requires_ammo` and `force_gun_ori`, the check gives an error, because the game can crash. |
 | A line of the mod that replaces a line that HD Edition changed (HD Edition 0.7.1 only) | Warning | The mod can undo a fix of HD Edition. The check compares the HD Edition file with the file of a linked Freelancer 1.0 or 1.1 game. Without such a game, the check does not run. |
+
+The save gate does not run the check of the jump holes and jump gates. It gives that error through the checks of the jump connections, for each data mod (see "Jump connections and gate locks"). So the save gate shows one error for one cause. Play in the game, the export and `oltool validate --target` run the content check.
 
 The crash checks follow the crash list of The Starport knowledge base. The retail data itself has two such cases, which the game uses only in scripted scenes. A cutscene missile has no `lootprops.ini` entries, and some capital ships of the story missions have no engine. These cases give no finding, because the checks report only what the mods add.
 

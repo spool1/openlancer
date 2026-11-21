@@ -177,11 +177,12 @@ public static class ObjectComponents
     }
 
     /// <summary>
-    /// The component checks of a section (layer 3, section 5.5 of the M3 design): for an object, a zone, or a
-    /// <c>[Base]</c> or a <c>[system]</c> of <c>universe.ini</c>, also of the lower layer. A zone nickname that another
-    /// zone has is an error, and so are three universe checks of a line of the active mod (see
-    /// <see cref="UniverseChecks"/>). The Inspector shows the problems of a base and a system here, because they have no
-    /// components strip.
+    /// The component checks of a section (layer 3, section 5.5 of the M3 design): for an object, a zone, a
+    /// <c>[Base]</c> or a <c>[system]</c> of <c>universe.ini</c>, or a <c>[locked_gates]</c> section, also of the lower
+    /// layer. A zone nickname that another zone has is an error, and so are three universe checks of a line of the
+    /// active mod (see <see cref="UniverseChecks"/>). So are two checks of the jump connections (see
+    /// <see cref="ConnectionChecks"/>). The Inspector shows the problems of a base, a system and the gate locks here,
+    /// because they have no components strip.
     /// </summary>
     public static IReadOnlyList<Diagnostic> Checks(EditSession session, SectionRef section) =>
         ComponentChecks.Check(session, section, onlyActiveMod: false);

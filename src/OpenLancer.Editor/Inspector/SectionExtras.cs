@@ -270,10 +270,10 @@ internal sealed class SectionExtras(EditorWindow window, PropertyGrid grid)
     }
 
     /// <summary>The problems of a section for its raw block: the field checks, the list checks and the component checks.
-    /// Each problem has the line of its key in the text, or 0. The flag is true for a base-game field problem (the key
-    /// rule, decision D512 of the console filter design). A list problem or a component problem keeps its normal look,
-    /// as on its row or strip (section 6 of the design). The component checks give, for example, the problems of a
-    /// <c>[system]</c> of <c>universe.ini</c>.</summary>
+    /// Each problem has the line of its entry index, else the line of its key in the text, or 0. The flag is true for a
+    /// base-game field problem (the key rule, decision D512 of the console filter design). A list problem or a component
+    /// problem keeps its normal look, as on its row or strip (section 6 of the design). The component checks give, for
+    /// example, the problems of a <c>[system]</c> of <c>universe.ini</c> and of each line of the gate locks.</summary>
     internal static IEnumerable<(int Line, Diagnostic Problem, bool BaseGame)> SectionProblems(EditSession edits,
         SectionRef section, SectionView view)
     {
@@ -282,8 +282,8 @@ internal sealed class SectionExtras(EditorWindow window, PropertyGrid grid)
             .Concat(Data.Editing.Scene.ObjectComponents.Checks(edits, section).Select(p => (Problem: p, BaseGame: false)));
         foreach (var (problem, baseGame) in problems)
         {
-            var index = problem.Key == null
-                ? -1
+            var index = problem.EntryIndex >= 0 && problem.EntryIndex < view.Entries.Count ? problem.EntryIndex
+                : problem.Key == null ? -1
                 : view.Entries.ToList().FindIndex(e => e.Name.Equals(problem.Key, StringComparison.OrdinalIgnoreCase));
             // Line 1 of the text is the header.
             yield return (index < 0 ? 0 : index + 2, problem, baseGame);

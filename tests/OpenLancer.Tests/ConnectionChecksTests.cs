@@ -6,6 +6,7 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Editing.Universe;
 using OpenLancer.Data.Mods;
+using OpenLancer.Editor.Inspector;
 using OpenLancer.Studio.Agent;
 using Xunit;
 using static OpenLancer.Tests.AgentCalls;
@@ -162,8 +163,8 @@ public sealed class ConnectionChecksTests
         Assert.Contains(AgentRows.DiagnosticsOf(session, Li03("Li03_oneway")), p => p.Message == oneWay);
     }
 
-    /// <summary>A gate lock that names no jump gate or jump hole gives a warning on its line. The locks of existing
-    /// gates give none.</summary>
+    /// <summary>A gate lock that names no jump gate or jump hole gives a warning on its line, and the raw INI block marks
+    /// that line. The locks of existing gates give none.</summary>
     [Fact]
     public void AGateLockOfNoGateGivesAWarning()
     {
@@ -178,6 +179,9 @@ public sealed class ConnectionChecksTests
             problem.Message);
         Assert.Equal((DiagnosticSeverity.Warning, "locked_gate", 1), (problem.Severity, problem.Key, problem.EntryIndex));
         Assert.Contains(AgentRows.DiagnosticsOf(session, ConnectionWorkspace.Locks), p => p.Message == problem.Message);
+        // Line 1 of the raw block is the header, so the second line of the section is line 3.
+        Assert.Equal(3, Assert.Single(SectionExtras.SectionProblems(session, ConnectionWorkspace.Locks,
+            session.Get(ConnectionWorkspace.Locks)!)).Line);
     }
 
     /// <summary>A player lock that the active mod adds warns on the gate. A gate of the game gets the sentence about the
