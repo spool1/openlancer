@@ -113,7 +113,7 @@ These tools work in both hosts. They change nothing.
 |---|---|
 | `studio_status` | The profile, the active mod, the revision, the tool groups, the limits and the state of the game data (`data_load`). The agent calls it first. See "Save". |
 | `list_systems`, `get_system` | The star systems, and one system with its counts, bases, connections and problems. `get_system` also gives the place on the nav map, the zoom of the system map and the jump objects of the system. |
-| `get_universe`, `get_route` | The systems with their jump connections, and the shortest routes from one system. See "The universe tools". |
+| `get_universe`, `get_route`, `get_trade_lane` | The systems with their jump connections, the shortest routes from one system, and one trade lane with its rings. See "The universe tools". |
 | `list_items`, `get_item` | The items of a system, and one item with its fields, their origins and their problems. A cutscene entity or event gives its fields by their THN paths. An object row of `list_items` and a connection row of `get_system` give the `solar_radius` of the archetype. |
 | `find_references` | Each line and each file that names an item, also in the mission scripts. |
 | `list_values` | The values that a field can take, from one data list. |
@@ -301,15 +301,20 @@ These steps build an NPC patrol and a wreck with cargo in a system.
 
 ### The universe tools
 
-These tools make new star systems and jump connections, and read the jump graph of the edit view. They work in both hosts. Each edit tool is one Undo step, also when it changes two system files, the gate locks and the text of the mod. Each edit tool can be a step of `edit_batch`. A later step can name a system or an object that an earlier step made.
+These tools make new star systems, jump connections and trade lanes, and read the jump graph and the lanes of the edit view. They work in both hosts. Each edit tool is one Undo step, also when it changes two system files, the gate locks and the text of the mod. Each edit tool can be a step of `edit_batch`. A later step can name a system or an object that an earlier step made.
 
 | Tool | What it does |
 |---|---|
 | `system_create` | Makes a new star system of the active mod like a template system. It adds the `[system]` to `universe.ini`, and a system file with a sun and its death zone. |
 | `connection_create` | Makes a jump gate pair or a jump hole pair between two systems, or a jump hole pair inside one system. |
 | `connection_set_lock` | Sets the lock of a jump gate or a jump hole at the start of a new game, and of its partner. |
+| `trade_lane_create` | Makes a trade lane in a system: a chain of rings with the end names and the lane zone. |
+| `trade_lane_insert_ring` | Adds a ring to a lane, after a ring or before the first ring. |
+| `trade_lane_repair` | Writes the links of the rings of a lane again in the order of the rings on the line. It also moves the end names to the end rings. |
+| `trade_lane_delete` | Deletes a lane: all its rings and its lane zone. |
 | `get_universe` | Gives the systems with their places on the nav map and their jump objects, and their jump connections. |
 | `get_route` | Gives the shortest routes from one system, as the route tables of the retail games give them. |
+| `get_trade_lane` | Gives the lane of a ring: the rings in order, the end names, the lane zone, the length and the problems of the lane checks. |
 
 `system_create` puts the new file into the folder of the active mod, as "New systems" of `docs/MOD_FORMAT.md` tells. The nickname has 2 to 15 letters, digits or `_`, and starts with a letter. `map_pos` takes two whole numbers from 0 to 15. Each value that names other data, for example `local_faction` or the archetype of `sun`, must be an entry of its list.
 
@@ -345,7 +350,35 @@ When a refusal is about one argument, the `field` of the error names it, for exa
 
 `get_route` gives the shortest route from `from` to each system that the table reaches, and the systems that it does not reach. `kind` picks the table: `all`, `gates` or `holes`. The tables leave out each jump gate and each jump hole that is locked for the player. OpenLancer Play computes its own routes, so these tables show what the retail games read.
 
-In `edit_batch`, a step of these edit tools gives the result of its edit, without `system`, `pair` and the other parts above. The `adds` of the step name the new items.
+`trade_lane_create` makes the rings, the end names and the lane zone, as "Trade lanes" of `docs/MOD_FORMAT.md` tells. Each end is a point (`start`, `end`), an object of the system (`start_near`, `end_near`), or both. An end at an object and without a point goes on the line toward the other end. Its distance from the object is the `solar_radius` of the archetype of the object plus a clearance. A zone with damage at that place, for example the death zone of a sun, moves the end out of the zone. An end without `start_name` or `end_name` takes the name of its object.
+
+Without `rings`, the lane gets one ring for each 7500 m of length, plus one. With `zone: false`, the tool makes no lane zone, and the lane has no lane traffic. The result gives `rings` in order, `zone` and `spacing`. A ring inside a zone with damage or inside an object gives a warning. A spacing outside the retail range of 5165 to 9445 m also gives a warning. Give the lane zone its encounters with `scene_set_encounters`.
+
+`trade_lane_insert_ring` takes `after` or `before`, not both. `before` takes only the first ring of a lane. The new ring takes the links of its place and copies the lines of its neighbor. Without `position`, it goes in the middle between two rings, or one spacing beyond the end. At an end, the end name moves to the new ring, and the lane zone follows the new end. The result gives `ring`, its `place` in the lane from 1, and the ring `count`.
+
+`trade_lane_repair` finds the rings of the lane of a ring from their links and from their places on the line. It sorts them along the line, writes their `prev_ring` and `next_ring` lines again, and moves the end names to the two end rings. The positions stay. A ring without links joins the nearest lane whose line passes it. A lane with good links gives `no_change`. The result gives `rings` in the new order.
+
+`trade_lane_delete` always needs `confirm: true`. The question names the lane zone that goes with the rings. To delete one ring and relink the lane, use `delete_items` (see "The edit tools").
+
+`get_trade_lane` gives the lane of any ring. Each ring row has its position and the distance to the next ring. `start_name` and `end_name` give the text that the HUD shows and the value of the `tradelane_space_name` line. `zone` is null for a lane without a lane zone. `problems` gives the problems of the lane checks on the rings and on the lane zone.
+
+The refusals of the trade lane tools are:
+
+| Detail | Error | Cause |
+|---|---|---|
+| `LaneRings` | `invalid_value` | A ring count outside 2 to 100, or a spacing outside 1000 to 20000 m. |
+| `LaneEnd` | `invalid_argument` | An end without a point and without an object. Or two ends at objects that are too close for the clearance, so that the rings pass each other. |
+| `LaneEndName` | `invalid_argument` | An end without a name and without an object with a name. |
+| `LaneArchetype` | `invalid_value` | `like` is not a trade lane ring, or the profile has no ring archetype. |
+| `NotLaneRing` | `invalid_value` | The object is not a ring of a trade lane. |
+| `BeforeNotFirst` | `invalid_value` | `before` names a ring that is not the first ring of its lane. |
+| `LaneNotLine` | `invalid_value` | The rings of the lane do not stand on one line, so the repair cannot sort them. |
+| `NameTaken` | `name_taken` | Another object has the nickname of the new ring. |
+| `EndOtherSystem` | `invalid_argument` | `start_near` or `end_near` names an object of another system. |
+
+When a refusal is about one argument, the `field` of the error names it, as for `connection_create`.
+
+In `edit_batch`, a step of these edit tools gives the result of its edit, without `system`, `pair`, `rings` and the other parts above. The `adds` of the step name the new items. So a batch can make a system, a gate pair to it and a lane from the new gate. The `start_near` of `trade_lane_create` names the gate that `connection_create` made in an earlier step.
 
 ### The mission tools
 

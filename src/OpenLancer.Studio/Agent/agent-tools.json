@@ -426,6 +426,48 @@
         "pair": "True also sets the lock of the partner, when the partner goes back to the object."
       }
     },
+    "trade_lane_create": {
+      "title": "Create a trade lane",
+      "description": "Makes a trade lane in a system: a chain of rings from a start to an end, with the lane zone where lane traffic spawns. The tool makes one Undo step. Each end is a point, an object of the system, or both. The result gives the rings in order, the lane zone and the spacing.",
+      "fields": {
+        "system": "The system of the lane: its nickname or its system: reference.",
+        "start": "The center of the first ring in meters: X, Y and Z. Give start, start_near or both.",
+        "end": "The center of the last ring in meters: X, Y and Z. Give end, end_near or both.",
+        "start_near": "The reference of an object of the system at the start, for example obj:my_sys01_to_my_sys02. Without start, the first ring goes at a clear distance from the object, toward the other end. The clear distance is the solar_radius of its archetype plus a clearance, and it is also outside a zone with damage. Without start_name, the start takes the name of the object.",
+        "end_near": "The reference of an object of the system at the end, for example obj:my_sys01_sun. Without end, the last ring goes at a clear distance from the object, toward the other end. The clear distance is the solar_radius of its archetype plus a clearance, and it is also outside a zone with damage. Without end_name, the end takes the name of the object.",
+        "start_name": "The name of the start for the HUD. The editor writes it into the text of the mod. Without it, the start takes the name of start_near.",
+        "end_name": "The name of the end for the HUD. The editor writes it into the text of the mod. Without it, the end takes the name of end_near.",
+        "rings": "The number of rings, from 2 to 100. Two rings stand 1000 to 20000 m apart. Without it, the lane gets one ring for each 7500 m of length, plus one.",
+        "like": "The reference of a trade lane ring. The new rings copy its archetype, name, infocard, behavior, difficulty, faction, loadout and pilot.",
+        "faction": "The faction of the rings. Get the values from list_values with the list faction. Without it, the rings take the faction of like, else the local faction of the system.",
+        "zone": "True also makes the lane zone, where lane traffic spawns. Give it encounters with scene_set_encounters.",
+        "nickname": "The stem of the ring nicknames, for example my_sys01_Trade_Lane_Ring. Each ring gets the stem with the next free number. Without it, the stem is the system nickname with _Trade_Lane_Ring."
+      }
+    },
+    "trade_lane_insert_ring": {
+      "title": "Insert a ring into a trade lane",
+      "description": "Adds a ring to a trade lane, after a ring or before the first ring. The new ring takes the links of its place and copies the lines of its neighbor. The tool makes one Undo step. At an end, the end name moves to the new ring, and the lane zone follows the new end.",
+      "fields": {
+        "after": "The reference of the ring that the new ring comes after. After the last ring, the lane gets longer at its end. Give after or before.",
+        "before": "The reference of the first ring of a lane. The new ring comes before it, and the lane gets longer at its start. Give after or before.",
+        "position": "The position of the new ring in meters: X, Y and Z. Without it, the ring goes in the middle between two rings, or one spacing beyond the end.",
+        "nickname": "The nickname of the new ring. Without it, the ring gets the next free nickname of its neighbor."
+      }
+    },
+    "trade_lane_repair": {
+      "title": "Repair the links of a trade lane",
+      "description": "Writes the prev_ring and next_ring lines of the rings of a lane again, in the order of the rings on the line. It also moves the end names to the two end rings. The positions stay. The tool makes one Undo step. A lane with good links gives no_change.",
+      "fields": {
+        "ring": "The reference of a ring of the lane, for example obj:my_sys01_Trade_Lane_Ring_1. A ring without links joins the nearest lane whose line passes it."
+      }
+    },
+    "trade_lane_delete": {
+      "title": "Delete a trade lane",
+      "description": "Deletes the trade lane of a ring: all its rings and its lane zone. The tool makes one Undo step. The delete always asks for confirm: true. To delete one ring and relink the lane, use delete_items.",
+      "fields": {
+        "ring": "The reference of a ring of the lane, for example obj:my_sys01_Trade_Lane_Ring_1."
+      }
+    },
     "get_universe": {
       "title": "Get the universe",
       "description": "Gives the star systems with their places on the nav map, their jump objects and if a connection reaches them. It also gives the jump connections of the systems of the page, and if the build writes route tables. This tool changes nothing.",
@@ -440,6 +482,13 @@
         "from": "The start system: its nickname or its system: reference.",
         "to": "Show only the route to this system: its nickname or its system: reference. Without it, the result gives the routes to all systems.",
         "kind": "The route table: all for each connection, gates for the jump gates, holes for the jump holes."
+      }
+    },
+    "get_trade_lane": {
+      "title": "Get a trade lane",
+      "description": "Gives the trade lane of a ring: its rings in order with their positions, the end names, the lane zone and the length. It also gives the problems of the lane checks. This tool changes nothing.",
+      "fields": {
+        "ring": "The reference of a ring of the lane, for example obj:my_sys01_Trade_Lane_Ring_1."
       }
     },
     "prop_group_place": {
@@ -1609,6 +1658,8 @@
     "system_save_to_open": "Save the mod to open the new system in the Scene.",
     "connection_end_existing": "{end}.object names an existing object, and the tool writes only its goto line. Remove {end}.{member}.",
     "connection_end_system": "{ref} is not an object of the system {system}. Give an object of that system.",
+    "lane_after_or_before": "Give after or before, not both. before takes only the first ring of a lane.",
+    "lane_not_ring": "{ref} is not a ring of a trade lane.",
     "place_errors": "Some lines of {group} name entries that this profile does not have. To place the group without these lines, call again with leave_out_error_lines: true. The lines: {lines}",
     "group_members": "The group has {count} members: {members}.",
     "group_member": "The group has 1 member: {members}.",
@@ -2452,6 +2503,24 @@
     "ConnectionEditResult.routes": "How the route table of all connections changes with the edit.",
     "ConnectionEditResult.jump_objects": "The jump objects of the two systems after the edit.",
     "LockEditResult.routes": "How the route table of all connections changes with the edit.",
+    "LaneEditResult.rings": "The obj: references of the rings of the lane, from the first ring to the last ring. A new lane and a repair give them.",
+    "LaneEditResult.zone": "The zone: reference of the new lane zone, or none.",
+    "LaneEditResult.spacing": "The distance between two rings of a new lane in meters.",
+    "LaneEditResult.ring": "The obj: reference of the new ring of an insert.",
+    "LaneEditResult.place": "The place of the new ring in its lane, from 1.",
+    "LaneEditResult.count": "The count of the rings of the lane after the insert.",
+    "LaneView.system": "The system: reference of the system of the lane, or none.",
+    "LaneView.rings": "The rings from the first ring to the last ring.",
+    "LaneView.start_name": "The name of the first ring for the HUD, or none.",
+    "LaneView.end_name": "The name of the last ring for the HUD, or none.",
+    "LaneView.zone": "The zone: reference of the lane zone, or none. A lane without a lane zone has no lane traffic.",
+    "LaneView.length": "The distance from the first ring to the last ring along the rings in meters, or none when a ring has no position.",
+    "LaneView.problems": "The problems of the trade lane checks on the rings and on the lane zone.",
+    "LaneRingRow.ref": "The obj: reference of the ring.",
+    "LaneRingRow.position": "The position of the ring in meters, or none when it has no pos line.",
+    "LaneRingRow.spacing_to_next": "The distance to the next ring in meters, or none for the last ring.",
+    "LaneEndText.text": "The text of the name, as the HUD shows it. An empty text when the text id has no text.",
+    "LaneEndText.key": "The value of the tradelane_space_name line: a text id, or a text of the active mod.",
     "RouteChange.new": "The routes between two systems that the edit adds.",
     "RouteChange.shorter": "The routes that get fewer jumps.",
     "RouteChange.longer": "The routes that get more jumps.",

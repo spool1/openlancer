@@ -107,28 +107,31 @@ internal static class LaneWorkspace
         pop_type = major_tradelane
         """;
 
+    /// <summary>The solar archetypes of the lanes, after the archetypes of <see cref="SceneWorkspace.Solars"/>.</summary>
+    public const string Solars = """
+
+        [Solar]
+        nickname = Trade_Lane_Ring
+        type = TRADELANE_RING
+        solar_radius = 300
+        [Solar]
+        nickname = lane_sun
+        type = SUN
+        solar_radius = 2000
+        [Solar]
+        nickname = lane_gate
+        type = JUMP_GATE
+        solar_radius = 400
+        [Solar]
+        nickname = lane_planet
+        type = PLANET
+        solar_radius = 1500
+        """;
+
     public static TestWorkspace Create(string? li01Text = null)
     {
         var ws = SceneWorkspace.Create();
-        ws.WriteBase(ListWorkspace.SolarPath, SceneWorkspace.Solars + """
-
-            [Solar]
-            nickname = Trade_Lane_Ring
-            type = TRADELANE_RING
-            solar_radius = 300
-            [Solar]
-            nickname = lane_sun
-            type = SUN
-            solar_radius = 2000
-            [Solar]
-            nickname = lane_gate
-            type = JUMP_GATE
-            solar_radius = 400
-            [Solar]
-            nickname = lane_planet
-            type = PLANET
-            solar_radius = 1500
-            """);
+        ws.WriteBase(ListWorkspace.SolarPath, SceneWorkspace.Solars + Solars);
         ws.WriteBase(SceneWorkspace.Li01Path, li01Text ?? Li01Text);
         return ws;
     }

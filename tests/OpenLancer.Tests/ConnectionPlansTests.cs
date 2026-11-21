@@ -43,18 +43,22 @@ internal static class ConnectionWorkspace
         archetype = jumphole
         """;
 
+    /// <summary>The solar archetypes of a jump hole and an airlock gate, after the archetypes of
+    /// <see cref="SceneWorkspace.Solars"/>.</summary>
+    public const string Solars = """
+
+        [Solar]
+        nickname = jumphole
+        type = JUMP_HOLE
+        [Solar]
+        nickname = airlock
+        type = AIRLOCK_GATE
+        """;
+
     public static TestWorkspace Create(Dictionary<string, string>? lowerFiles = null)
     {
         var ws = NewSystemWorkspace.Create(lowerFiles);
-        ws.WriteBase(ListWorkspace.SolarPath, SceneWorkspace.Solars + """
-
-            [Solar]
-            nickname = jumphole
-            type = JUMP_HOLE
-            [Solar]
-            nickname = airlock
-            type = AIRLOCK_GATE
-            """);
+        ws.WriteBase(ListWorkspace.SolarPath, SceneWorkspace.Solars + Solars);
         ws.WriteBase(ListWorkspace.UniversePath, """
             [Base]
             nickname = Li01_01_Base

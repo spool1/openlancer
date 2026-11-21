@@ -365,8 +365,9 @@ public sealed class AgentToolTableTests
     /// with their kinds and hints. The tools of section 7.3 follow the tools of section 7.2. The mission tools of
     /// section 7.4 follow them, with the mission play, its live trace and play_capture at their end. The universe tools
     /// come after the builders: system_create adds data, connection_create can change an existing end, and
-    /// connection_set_lock sets absolute values, so a second call changes nothing. The tools of
-    /// section 7.6 come next. mission_edit can remove triggers and items, so it is destructive. A tool that adds data
+    /// connection_set_lock sets absolute values, so a second call changes nothing. The trade lane tools follow them:
+    /// trade_lane_create adds data, an insert changes the links of the neighbors, and a second repair changes nothing.
+    /// get_trade_lane follows the other read tools of the universe. The tools of section 7.6 come next. mission_edit can remove triggers and items, so it is destructive. A tool that adds data
     /// is not destructive, and a tool that can change or remove data is (review finding R7 of MCP1-2). So a mission
     /// tool that sets, moves or links lines is destructive. edit_batch can have a step that removes data, so it is
     /// destructive (final finding of MCP1-2). play and mission_play can save the mod, so
@@ -391,8 +392,13 @@ public sealed class AgentToolTableTests
         ["system_create"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["connection_create"] = (ToolKind.Edit, new ToolHints(false, true, false)),
         ["connection_set_lock"] = (ToolKind.Edit, new ToolHints(false, true, true)),
+        ["trade_lane_create"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["trade_lane_insert_ring"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+        ["trade_lane_repair"] = (ToolKind.Edit, new ToolHints(false, true, true)),
+        ["trade_lane_delete"] = (ToolKind.Edit, new ToolHints(false, true, false)),
         ["get_universe"] = (ToolKind.Query, new ToolHints(true, false, true)),
         ["get_route"] = (ToolKind.Query, new ToolHints(true, false, true)),
+        ["get_trade_lane"] = (ToolKind.Query, new ToolHints(true, false, true)),
         ["prop_group_place"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["prop_group_save"] = (ToolKind.AssetWrite, new ToolHints(false, false, false)),
         ["prop_group_rename"] = (ToolKind.AssetWrite, new ToolHints(false, true, false)),

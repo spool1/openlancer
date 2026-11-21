@@ -261,7 +261,7 @@ internal static class UniverseTools
     /// <param name="cause">Gives the error kind and the argument of a refusal, or null to keep the error as the plan
     /// gives it. A null argument keeps the argument of the error.</param>
     /// <param name="targets">The sections that the request names, for the problems before and after the edit.</param>
-    private static void Run(EditScope scope, EditPlan plan, Func<EditError, (EditErrorKind Kind, string? Field)?> cause,
+    internal static void Run(EditScope scope, EditPlan plan, Func<EditError, (EditErrorKind Kind, string? Field)?> cause,
         IEnumerable<SectionRef>? targets = null)
     {
         if (!plan.CanRun)
@@ -323,7 +323,7 @@ internal static class UniverseTools
 
     /// <summary>The value of a text argument as its list spells it, or null when the call does not give it. A value that
     /// the list does not have adds an error to the values.</summary>
-    private static string? Listed(RowValues values, string? text, string field, string list) =>
+    internal static string? Listed(RowValues values, string? text, string field, string list) =>
         text == null ? null : values.Listed(text.Trim(), field, [list]);
 
     private static JumpLock Lock(string word) => Enum.Parse<JumpLock>(word, ignoreCase: true);
