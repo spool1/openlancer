@@ -105,9 +105,6 @@ public static class SystemPlans
     /// <summary>The detail code of a system with bases, which this version does not delete.</summary>
     public const string HasBases = "HasBases";
 
-    /// <summary>The detail code of a system whose file the editor cannot delete with it.</summary>
-    public const string FileKept = "FileKept";
-
     /// <summary>The largest place on each axis of the nav map grid.</summary>
     public const int MapMax = 15;
 
@@ -404,8 +401,9 @@ public static class SystemPlans
     /// <para>The plan always asks before it runs. Its deletes and its warnings name the partner objects and the file.
     /// The texts of the deleted sections stay in the text of the mod, as for each other delete.</para>
     /// <para>The plan refuses a system of the game or of a lower mod, and a system with a base, because this version has
-    /// no delete of a base. It also refuses a system whose file exists but is no file that the active mod adds in its
-    /// folder, or whose file another system uses. A file that does not exist does not stop the delete.</para>
+    /// no delete of a base. A file that is no file that the active mod adds in its folder stays, and so does a file that
+    /// another system uses. The plan then deletes only the <c>[system]</c>, and a warning tells why the file
+    /// stays.</para>
     /// </remarks>
     public static UniversePlan Delete(EditSession session, string system)
     {
@@ -434,22 +432,25 @@ public static class SystemPlans
                                           $"{SceneSections.Join(bases)}. This version cannot delete a system with bases.",
                 item, HasBases);
 
-        // The file goes with the system. A file that does not exist leaves only the [system].
+        // The file goes with the system when it is a file of the active mod that no other system uses.
         var path = session.SystemPath(nickname);
         var file = path == null ? null : session.OpenDocument(path);
-        var deletesFile = file is { State.Exists: true };
-        if (file is { State.Exists: true } && (!file.IsWholeFile || !ContentPaths.IsOwnFile(file.Path, active.Id) ||
-                                               session.LowerLayerHas(file.Path)))
-            return plan.Refuse(file.Path, $"The file {file.Path} of {nickname} is no file that the active mod adds in its " +
-                                          $"folder {ContentPaths.OwnFolder(active.Id)}. The editor deletes a system only " +
-                                          "with its file.", item, FileKept);
-        if (deletesFile && session.UniversePath is { } universe &&
-            session.Sections(universe).FirstOrDefault(s => SceneSections.Is(s.Id.Type, "system") && !s.Equals(item) &&
-                                                          s.Id.Key is { } other &&
-                                                          VfsPath.Comparer.Equals(session.SystemPath(other), path))
-                is { } sharing)
-            return plan.Refuse(path!, $"The system {sharing.Id.Key} uses the file {path} too. The editor deletes a system " +
-                                      "only with its file.", sharing, FileKept);
+        string? kept = null;
+        if (file is { State.Exists: true })
+        {
+            var sharing = session.UniversePath is { } universe
+                ? session.Sections(universe).FirstOrDefault(s => SceneSections.Is(s.Id.Type, "system") && !s.Equals(item) &&
+                                                                s.Id.Key is { } other &&
+                                                                VfsPath.Comparer.Equals(session.SystemPath(other), path))
+                : null;
+            kept = !file.IsWholeFile || !ContentPaths.IsOwnFile(file.Path, active.Id) || session.LowerLayerHas(file.Path)
+                ? $"The file {file.Path} stays, because it is no file that the active mod adds in its folder " +
+                  $"{ContentPaths.OwnFolder(active.Id)}."
+                : sharing != null
+                    ? $"The file {file.Path} stays, because the system {sharing.Id.Key} uses it too."
+                    : null;
+        }
+        var deletesFile = file is { State.Exists: true } && kept == null;
 
         List<SectionRef> gone = [item, .. deletesFile ? session.Sections(path!) : []];
         // Each object of another system whose goto line names the system. A partner of an object of the file comes
@@ -482,7 +483,8 @@ public static class SystemPlans
         plan.Warnings =
         [
             Diagnostic.Warning(item.Path, $"A save game in {nickname} does not find the system after the delete." +
-                                          (deletesFile ? $" The system file {path} goes too." : "")) with
+                                          (deletesFile ? $" The system file {path} goes too." : "") +
+                                          (kept != null ? $" {kept}" : "")) with
             {
                 Target = item,
             },

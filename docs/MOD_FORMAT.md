@@ -563,6 +563,8 @@ A rename of a system changes its nickname and value 0 of each `goto` that names 
 
 A delete of a system removes its `[system]` and its file. Each object of another system whose `goto` names the system goes too, with its traffic zones and its gate lock lines. OpenLancer deletes only a system that the active mod adds, and it always asks first. A system with a base cannot go in this version. The mission lines that name the system or its objects show "Missing". A save game in the system does not find it after the delete.
 
+The file stays when the active mod does not add it in its folder, or when another system uses it. The delete then removes only the `[system]`, and a warning tells why the file stays.
+
 The checks of a system and of a base of `universe.ini`:
 
 | Problem | Severity | What the game does |

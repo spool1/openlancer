@@ -586,6 +586,35 @@ public sealed class SystemPlansTests
         Assert.Equal(MissionErrors.ItemNotFound, SystemPlans.Delete(session, "Xx01").Refusals[0].Rule);
     }
 
+    /// <summary>A new [system] that names a file of the game deletes only its [system], and the warning tells why the
+    /// file stays. A new [system] without a file deletes only its [system] too.</summary>
+    [Fact]
+    public void ADeleteKeepsAFileThatTheModDoesNotAdd()
+    {
+        using var ws = NewSystemWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.AddSection(ListWorkspace.UniversePath, "system",
+            [ListWorkspace.Line("nickname", "Xw01"), ListWorkspace.Line("file", @"systems\Li01\li01.ini")]));
+        session.Execute(EditCommand.AddSection(ListWorkspace.UniversePath, "system",
+            [ListWorkspace.Line("nickname", "Xw02"), ListWorkspace.Line("file", @"systems\Xw02\xw02.ini")]));
+
+        var shared = SystemPlans.Delete(session, "Xw01");
+        var missing = SystemPlans.Delete(session, "Xw02");
+
+        Assert.True(shared.CanRun, string.Join("\n", shared.Refusals.Select(r => r.Message)));
+        Assert.Null(shared.File);
+        Assert.Equal([NewSystemWorkspace.System("Xw01")], shared.Deletes.Select(d => d.Section));
+        Assert.Equal("A save game in Xw01 does not find the system after the delete. The file " +
+                     $@"{ListWorkspace.Li01Path} stays, because it is no file that the active mod adds in its folder " +
+                     @"DATA\MODS\act.", shared.Warnings[0].Message);
+        Assert.Equal("A save game in Xw02 does not find the system after the delete.", missing.Warnings[0].Message);
+        Assert.Null(missing.File);
+        session.Execute(shared.Command!);
+        Assert.Null(session.Get(NewSystemWorkspace.System("Xw01")));
+        Assert.True(session.OpenDocument(ListWorkspace.Li01Path)!.State.Exists);
+        Assert.NotNull(session.Get(SceneWorkspace.Object("Li01_to_Li02")));
+    }
+
     /// <summary>A delete of a saved system, then a save, removes the file from the mod and the [system] from the patch.
     /// An undo of the delete and a save write both again.</summary>
     [Fact]
