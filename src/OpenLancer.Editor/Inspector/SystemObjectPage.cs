@@ -167,10 +167,10 @@ internal sealed class SystemObjectPage(EditorWindow window, PropertyGrid grid)
 
     /// <summary>
     /// The sections of the docks of the object: the base of the docking section, the Jump connection section and the
-    /// Trade lane ring section. Without a bound section, the dock of the game data decides. In a bound scope, only the lines of the keys decide (see
-    /// <see cref="PropertyGrid.Shows(bool, string[])"/>), because an edit of <c>dock_with</c> or <c>goto</c> changes
-    /// the dock of the scene item at once. A row would then come while the field of its key is open in "More keys",
-    /// and that field would end.
+    /// Trade lane ring section. Without a bound section, the dock of the game data decides. In a bound scope, only the
+    /// lines of the keys decide (see <see cref="PropertyGrid.Shows(bool, string[])"/>), because an edit of
+    /// <c>dock_with</c> or <c>goto</c> changes the dock of the scene item at once. A row would then come while the field
+    /// of its key is open in "More keys", and that field would end.
     /// </summary>
     /// <param name="layout">The section that a bound page lays out its rows from, or null without a bound
     /// section.</param>
