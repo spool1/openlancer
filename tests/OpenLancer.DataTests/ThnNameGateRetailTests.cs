@@ -16,6 +16,7 @@ using OpenLancer.Data.IO;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Thn;
 using OpenLancer.Data.Validation;
+using OpenLancer.Runtime.Missions;
 using OpenLancer.Runtime.Thn;
 using OpenLancer.Studio.Commands;
 using Xunit;
@@ -127,19 +128,22 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
     /// A saved <c>ol.delete</c> patch of the costume that the most retail cutscenes load stops the save. The save gate
     /// checks each cutscene that names the costume, also when the active mod does not change it (#81). The oracle
     /// checks each cutscene of the edit view without the search of the gate. The gate gives exactly the errors of the
-    /// oracle, and each error names the costume.
+    /// oracle, and each error names the costume. An INI edit that deletes the costume gives the same errors at the first
+    /// save after the edit, in the budget of 1 s (#87).
     /// </summary>
     /// <remarks>
-    /// <para>The search reads the index of the cutscene uses (#87). The hosts start its build when a profile opens, so
-    /// the test measures the gate after the build. Before #87, the gate searched the words of the files: it found 851
-    /// cutscenes in each game, and the first call took 4.5 to 5.1 s. Most of these cutscenes name the costume on a
-    /// DEFORMABLE with <c>userprops.Actor</c>, which does not load it.</para>
+    /// <para>The search reads the index of the cutscene uses (#87). When the editor opens a profile, it starts the build
+    /// of the index. It also runs the checks of the mission scripts, which read the names of the game data one time.
+    /// The test does the same, deletes the costume, and measures the first gate call after the edit. Before #87, the
+    /// gate searched the words of the files. It found 851 cutscenes in each game, and the first call took 4.5 to 5.1 s.
+    /// Most of these cutscenes name the costume on a DEFORMABLE with <c>userprops.Actor</c>, which does not load
+    /// it.</para>
     /// <para>Measured on 2026-11-21: the build ran 1,497 scripts of the retail game and 1,515 scripts of HD Edition, in
-    /// 1.7 to 2.2 s. In each game, the search finds the 19 cutscenes that load the costume. The cutscene part of the
-    /// first call took 0.3 to 0.4 s: the broken items, the search, and the open and the check of the 19 cutscenes. The
-    /// other parts took about 0.65 s. Most of it is the check of each mission script, because the mod removes a name of
-    /// the game data (decision D81). The second call took 4 ms. The budget of the cutscene part is 1 s, and the budget
-    /// of the whole first call is 2 s.</para>
+    /// 1.6 to 2.2 s. In each game, the search finds the 19 cutscenes that load the costume. The first gate call after
+    /// the edit took 0.13 s in each game, and the second call took 3 ms. The budget of the first call is 1 s.</para>
+    /// <para>A session that did not read the names of the game data for the mission checks reads them in its first gate
+    /// call. This takes 0.5 to 0.9 s one time in each session, also without a change. It is not a cost of the
+    /// cutscene check.</para>
     /// </remarks>
     [Fact]
     [Trait(Timing.Category, Timing.Performance)]
@@ -224,42 +228,40 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
 
     private void CheckADeletedCostume(string game, string modId)
     {
-        using var workspace = new RetailWorkspace(game, modId);
-        var reader = workspace.Open();
+        // A saved ol.delete patch of the costume, as a hand-written patch makes it.
+        using var saved = new RetailWorkspace(game, modId);
+        var reader = saved.Open();
         var (costume, section, scripts) = MostNamed(reader, Templates(game).Costumes, "costume", _ => true);
-        WritePatch(workspace, section.Path, $"[{section.Id.Type}]\nnickname = {costume}\nol.delete = true\n");
+        WritePatch(saved, section.Path, $"[{section.Id.Type}]\nnickname = {costume}\nol.delete = true\n");
         reader.Dispose();
-        var session = workspace.Open();
-        // The hosts start the index when the profile opens, so the first save comes after its build.
+        var patched = saved.Open();
+        var gate = CutsceneErrors(patched.SaveProblems());
+        Assert.Equal(Oracle(patched), gate.Order());
+        Assert.True(gate.Select(e => e.Source).Distinct().Count() >= 2);
+        Assert.All(gate, e => Assert.Contains($"\"{costume}\"", e.Message));
+
+        // An INI edit deletes the costume in a session that opened as the editor opens it: the index of the cutscene
+        // uses builds, and the check of the mission scripts reads the names of the game data.
+        using var edited = new RetailWorkspace(game, modId + "edit");
+        var session = edited.Open();
         session.StartCutsceneUses();
         var build = session.Uses.LastBuild;
+        session.Missions.Coverage = EngineCoverage.Instance;
+        session.Missions.RunInputs();
+        session.Execute(EditCommand.DeleteSection(section));
 
-        // The cutscene part of the first gate call: the broken items, the search and the check of each cutscene that
-        // it finds. Then the other parts of the gate, which do not depend on the cutscenes.
-        var cutscenes = Timing.Measure(() =>
-        {
-            foreach (var path in session.GateCutscenes())
-                session.CutsceneErrors(path);
-        });
         SaveResult? refusal = null;
-        var rest = Timing.Measure(() => refusal = session.GateRefusal());
-        var first = cutscenes + rest;
+        var first = Timing.Measure(() => refusal = session.GateRefusal());
         Assert.NotNull(refusal);
-        var gate = CutsceneErrors(refusal.Problems);
         var second = new TimingGates().WarmGate(TimeSpan.FromMilliseconds(100), 3, () => session.GateRefusal());
         output.WriteLine($"The costume \"{costume}\" of {scripts} scripts: the index ran {build.Runs} scripts in " +
                          $"{build.Time.TotalSeconds:0.00} s. The search finds {session.ReferrerCutscenes().Count} " +
                          $"cutscenes, the word index {session.Mentions.Cutscenes(costume).Count}. {gate.Count} gate " +
-                         $"errors in {gate.Select(e => e.Source).Distinct().Count()} cutscenes. First gate call " +
-                         $"{first.TotalSeconds:0.00} s: the cutscene part {cutscenes.TotalSeconds:0.00} s, the other parts " +
-                         $"{rest.TotalSeconds:0.00} s. Second gate call {second.TotalMilliseconds:0} ms.");
+                         $"errors in {gate.Select(e => e.Source).Distinct().Count()} cutscenes. First gate call after " +
+                         $"the edit {first.TotalSeconds:0.00} s, second call {second.TotalMilliseconds:0} ms.");
 
-        Assert.Equal(Oracle(session), gate.Order());
-        Assert.True(gate.Select(e => e.Source).Distinct().Count() >= 2);
-        Assert.All(gate, e => Assert.Contains($"\"{costume}\"", e.Message));
-        Assert.True(cutscenes < TimeSpan.FromSeconds(1),
-            $"The cutscene part of the first gate call took {cutscenes.TotalSeconds:0.00} s.");
-        Assert.True(first < TimeSpan.FromSeconds(2), $"The first gate call took {first.TotalSeconds:0.00} s.");
+        Assert.Equal(gate.Order(), CutsceneErrors(refusal.Problems).Order());
+        Assert.True(first < TimeSpan.FromSeconds(1), $"The first gate call after the edit took {first.TotalSeconds:0.00} s.");
         Assert.True(second < TimeSpan.FromMilliseconds(100), $"The second gate call took {second.TotalMilliseconds:0} ms.");
     }
 
