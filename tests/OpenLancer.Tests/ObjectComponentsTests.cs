@@ -149,21 +149,24 @@ public sealed class ComponentChecksTests
     }
 
     /// <summary>Decision D254: a base without a docking object or without a base object in its system gives two
-    /// warnings.</summary>
+    /// warnings. The bases of the workspace come after their systems, so the universe checks warn about them too. This
+    /// test leaves out those warnings.</summary>
     [Fact]
     public void ABaseWithoutObjectsGivesTwoWarnings()
     {
         using var ws = Create();
         var session = ws.Session("act");
         var li02Base = new SectionRef(ListWorkspace.UniversePath, new SectionIdentity("Base", "Li02_01_Base"));
+        static bool NotOrder(Diagnostic d) => !d.Message.StartsWith("[Base]", StringComparison.Ordinal);
 
-        var warnings = ComponentChecks.Check(session, li02Base, onlyActiveMod: false);
+        var warnings = ComponentChecks.Check(session, li02Base, onlyActiveMod: false).Where(NotOrder);
 
         Assert.Equal(["Li02_01_Base: No object in Li02 docks with Li02_01_Base. The game puts the player at the center of " +
                       "Li02 after a launch.",
             "Li02_01_Base: No object in Li02 has 'base = Li02_01_Base'. The navigation map does not list the base, and its " +
             "rooms show no planet."], warnings.Select(w => w.Message));
         Assert.Empty(ComponentChecks.Check(session,
-            new SectionRef(ListWorkspace.UniversePath, new SectionIdentity("Base", "Li01_01_Base")), onlyActiveMod: false));
+            new SectionRef(ListWorkspace.UniversePath, new SectionIdentity("Base", "Li01_01_Base")), onlyActiveMod: false)
+            .Where(NotOrder));
     }
 }

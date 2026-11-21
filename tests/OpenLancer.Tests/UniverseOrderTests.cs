@@ -190,6 +190,8 @@ public sealed class UniverseOrderTests
     public void ANewSystemStillGoesAtTheEnd()
     {
         using var ws = Workspace();
+        // The save gate refuses a system whose file does not exist.
+        ws.WriteBase(@"DATA\UNIVERSE\SYSTEMS\Ol01\Ol01.ini", "[Object]\nnickname = Ol01_sun\narchetype = station1\n");
         var session = ws.Session("act");
 
         session.Execute(NewSystem("Ol01"));

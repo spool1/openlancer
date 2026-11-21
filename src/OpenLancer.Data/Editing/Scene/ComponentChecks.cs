@@ -79,10 +79,7 @@ internal static class ComponentChecks
                 result.AddRange(Check(session, section).Where(p => p.Severity == DiagnosticSeverity.Error));
         }
         if (session.UniversePath is { } universe && paths.Contains(universe, VfsPath.Comparer))
-        {
-            foreach (var section in session.Sections(universe).Where(s => SceneSections.Is(s.Id.Type, "system")))
-                result.AddRange(Check(session, section).Where(p => p.Severity == DiagnosticSeverity.Error));
-        }
+            result.AddRange(UniverseChecks.SaveErrors(session));
         return result;
     }
 

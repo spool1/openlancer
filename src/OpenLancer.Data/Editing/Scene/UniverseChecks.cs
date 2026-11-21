@@ -33,12 +33,28 @@ internal static class UniverseChecks
             session.Get(section) is not { } view)
             return [];
         if (SceneSections.Is(section.Id.Type, "system"))
-            return System(session, section, view).ToList();
+            return System(session, section, view, warnings: true).ToList();
         return SceneSections.Is(section.Id.Type, "Base") ? Base(session, section, view).ToList() : [];
     }
 
+    /// <summary>The errors of the <c>[system]</c> sections that the active mod adds or changes, for the save gate. The
+    /// call skips the warnings, so a save does not read the jump connections of each system file.</summary>
+    public static IEnumerable<Diagnostic> SaveErrors(EditSession session)
+    {
+        if (session.UniversePath is not { } universe)
+            return [];
+        return session.Sections(universe)
+            .Where(s => SceneSections.Is(s.Id.Type, "system"))
+            .Select(s => (Section: s, View: session.Get(s)))
+            .Where(s => s.View is { IsChanged: true })
+            .SelectMany(s => System(session, s.Section, s.View!, warnings: false))
+            .Where(p => p.Severity == DiagnosticSeverity.Error)
+            .ToList();
+    }
+
     /// <summary>The problems of a <c>[system]</c>.</summary>
-    private static IEnumerable<Diagnostic> System(EditSession session, SectionRef section, SectionView view)
+    /// <param name="warnings">False to skip the checks that give only warnings.</param>
+    private static IEnumerable<Diagnostic> System(EditSession session, SectionRef section, SectionView view, bool warnings)
     {
         if (section.Id.Key is not { } nickname)
             yield break;
@@ -62,6 +78,8 @@ internal static class UniverseChecks
             yield return Error(session, section, "file",
                 $"The system {nickname} names the file {value}, and the mod has no such file. The game loads the system " +
                 "without its objects and zones, and the game can crash.");
+        if (!warnings)
+            yield break;
 
         if (MapPos(view) is { } pos)
         {
