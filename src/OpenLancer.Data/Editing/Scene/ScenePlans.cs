@@ -415,6 +415,7 @@ public static partial class ScenePlans
         var quiet = new HashSet<SectionRef>();
         var quietFixes = new HashSet<(SectionRef, int)>();
         var partners = new Dictionary<SectionRef, string>();
+        var pairEnds = new List<SectionRef>();
         while (queue.TryDequeue(out var next))
         {
             var (section, why, cause) = next;
@@ -447,6 +448,7 @@ public static partial class ScenePlans
                 deletes.Add(new PlannedDelete(section, session.ChildCount(section), why, cause));
             if (Universe.ConnectionPlans.PairParts(session, section, view) is { } pair)
             {
+                pairEnds.Add(section);
                 if (pair.Partner is { } partner && !queued.Contains(partner))
                 {
                     partners[partner] = section.Id.Key!;
@@ -518,6 +520,9 @@ public static partial class ScenePlans
         if (refusals.Count > 0)
             return Refused(plan, refusals.DistinctBy(r => r.Message).ToArray());
 
+        foreach (var end in pairEnds)
+            warnings.AddRange(TrafficLeft(session, end, inSet));
+
         // A fix or a "Missing" line of a section that goes with the delete does not apply.
         foreach (var removed in fixes.Keys.Where(inSet.Contains).ToList())
             fixes.Remove(removed);
@@ -579,6 +584,34 @@ public static partial class ScenePlans
                                  plan.MissionMissing.Count > 0;
         plan.Command = EditCommand.Group(plan.Label, commands, session.Snapshot());
         return plan;
+    }
+
+    /// <summary>
+    /// The warnings of the jump traffic zones at a jump gate or a jump hole that goes, when the delete does not take
+    /// them. The delete takes only the traffic zones that OpenLancer makes for an end (see
+    /// <see cref="Universe.ConnectionPlans.PairParts"/>). A retail traffic zone has another name, so it stays. Such a
+    /// zone has <c>pop_type = jumpgate</c> or <c>pop_type = wormhole</c>, and its size holds the object.
+    /// </summary>
+    private static IEnumerable<Diagnostic> TrafficLeft(EditSession session, SectionRef end, HashSet<SectionRef> gone)
+    {
+        if (session.Get(end) is not { } endView || SceneSections.Position(endView) is not { } at)
+            yield break;
+        foreach (var zone in session.Sections(end.Path))
+        {
+            if (!SceneSections.Is(zone.Id.Type, SceneSections.ZoneType) || gone.Contains(zone) ||
+                session.Get(zone) is not { } view || SceneSections.Position(view) is not { } center ||
+                !view.Lines("pop_type").SelectMany(l => l.Values).Any(v => v.ToString().Trim() is var pop &&
+                    (SceneSections.Is(pop, "jumpgate") || SceneSections.Is(pop, "wormhole"))))
+                continue;
+            var size = view.Lines("size").LastOrDefault()?.Values
+                .Select(v => v.TryToSingle(out var f) ? f : 0).DefaultIfEmpty(0).Max() ?? 0;
+            var distance = Vector3.Distance(at, center);
+            if (distance <= size)
+                yield return Diagnostic.Warning(zone.Path,
+                    $"The traffic zone {zone.Id.Key} stays. It is {ConnectionChecks.Meters(distance)} m from " +
+                    $"{end.Id.Key}. When the zone has encounters, NPC ships still come and go at that place. Delete the " +
+                    "zone too when no other jump object uses it.") with { Target = zone };
+        }
     }
 
     /// <summary>Why the editor refuses the delete of a connection object, or null: an airlock gate or a trade lane ring.

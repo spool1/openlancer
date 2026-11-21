@@ -40,7 +40,9 @@ public sealed class UniverseChecksTests
 
         Assert.Equal((DiagnosticSeverity.Error, "file"), (problem.Severity, problem.Key));
         Assert.Equal("The [system] Av01 has its file line before its nickname line. The game then loads the system under " +
-                     "another id. Move the nickname line up.", problem.Message);
+                     "another id. In a text editor, put the nickname line first in the file of its mod. Then open the profile " +
+                     "again.", problem.Message);
+        Assert.Empty(SteLint.Problems(problem.Message));
         Assert.False(saved.Saved);
         Assert.Contains(saved.Problems, p => p.Severity == DiagnosticSeverity.Error && p.Message == problem.Message);
     }
@@ -65,6 +67,14 @@ public sealed class UniverseChecksTests
         Assert.Equal((second, "nickname", problem.Message), (error.Target, error.Key, error.Message));
         Assert.Equal(DiagnosticSeverity.Warning,
             One(session, NewSystemWorkspace.System("Li01"), "The system Li01 has the same").Severity);
+
+        // Two sections with one spelling name the nickname once.
+        session.Undo();
+        AddSystem(session, ("nickname", "Li01"), ("file", @"systems\Li02\li02.ini"), ("pos", "1, 1"));
+        var same = One(session, NewSystemWorkspace.System("Li01", 1), "Two [system] sections");
+        Assert.Equal("Two [system] sections have the nickname Li01. The game drops one of the two systems. Give one system " +
+                     "another nickname.", same.Message);
+        Assert.Empty(SteLint.Problems(same.Message));
     }
 
     /// <summary>Two different nicknames with one FLHash give one error for each system: the FLHash error of the data
@@ -189,7 +199,9 @@ public sealed class UniverseChecksTests
 
         Assert.Equal((DiagnosticSeverity.Warning, "system"), (problem.Severity, problem.Key));
         Assert.Equal("[Base] Li01_01_Base comes after the [system] of Li01. The game does not link the base to its station. " +
-                     "Move the [Base] before the [system].", problem.Message);
+                     "In a text editor, move the [Base] before the [system] in the file of its mod. Then open the profile again.",
+            problem.Message);
+        Assert.Empty(SteLint.Problems(problem.Message));
         using var ordered = NewSystemWorkspace.Create();
         var good = ordered.Session("act");
         Assert.DoesNotContain(ObjectComponents.Checks(good, late), p => p.Message.StartsWith("[Base]"));

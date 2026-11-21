@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Numerics;
 using LibreLancer.Data;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing.Universe;
@@ -51,6 +53,8 @@ internal static class ConnectionChecks
             if (CountProblem(session, section) is { } count)
                 result.Add(count);
             result.AddRange(Partner(session, section, view, name));
+            if (Crowded(session, section, view, name) is { } crowded)
+                result.Add(crowded);
         }
         var type = SceneSections.ArchetypeType(session, view);
         if (type is "jump_gate" or "jump_hole" && GateLocks.PlayerLocked(session, name) &&
@@ -106,8 +110,8 @@ internal static class ConnectionChecks
     /// </summary>
     public static string LockText(string gate, bool lowerGate) =>
         $"The route tables leave out {gate}, because a new game locks it for the player. After a mission unlocks it with " +
-        "Act_LockDock, nav map routes and NPC routes still do not use it. Use the lock npc or none when the gate must be " +
-        "on routes." + (lowerGate ? " The story can depend on this lock." : "");
+        "Act_LockDock, nav map routes and NPC routes still do not use it. To keep the gate on the routes, set its lock to " +
+        $"npc or none with {SceneSections.LockTool}." + (lowerGate ? " The story can depend on this lock." : "");
 
     /// <summary>True for a <c>[locked_gates]</c> section of a file of the role <c>groups</c>.</summary>
     private static bool IsLockSection(EditSession session, SectionRef section) =>
@@ -118,7 +122,8 @@ internal static class ConnectionChecks
     private static Diagnostic OrderProblem(EditSession session, SectionRef section, string name)
     {
         var message = $"{name} has its goto line before its nickname line. The game then records the jump under another " +
-                      "object. Move the nickname line up.";
+                      "object. In the raw INI block, delete the goto line, then click outside the block. Then add the goto " +
+                      "line again. A new line goes at the end of the section.";
         return session.Origin(section, "goto").Origin == ValueOrigin.ActiveMod
             ? Error(section, message)
             : Warning(section, message);
@@ -135,7 +140,9 @@ internal static class ConnectionChecks
             return null;
         var system = session.SystemNicknameOf(target.Path) ?? SceneSections.FileName(target.Path);
         var message = $"{system} has {count} jump objects. The game crashes with more than {MaxJumpObjects} in one " +
-                      $"system. Remove {count - MaxJumpObjects} of them.";
+                      "system. " + (count - MaxJumpObjects == 1
+                          ? $"Delete a jump gate or a jump hole of {system}."
+                          : $"Delete {count - MaxJumpObjects} jump gates or jump holes of {system}.");
         var lower = JumpObjects(session.OpenDocument(target.Path)?.Base ?? []);
         return session.ActiveMod?.Manifest.Tier == ModManifest.DataTier && lower <= MaxJumpObjects
             ? Error(target, message)
@@ -172,9 +179,40 @@ internal static class ConnectionChecks
         var other = KindWords(SceneSections.ArchetypeType(session, partnerView));
         if (kind != null && other != null && kind != other)
             yield return Warning(section, $"{name} is a {kind} and its partner {exit} is a {other}. The game counts each " +
-                                          "end in another route table. Delete the pair with the agent tool delete_items, " +
-                                          "and make it again with connection_create.");
+                                          "end in another route table. Delete one end, and its pair goes too. Then make " +
+                                          $"the pair again with {SceneSections.PairTool}.");
     }
+
+    /// <summary>
+    /// The warning of a jump object of the active mod near another jump object of its system, or null. The active mod
+    /// adds the object or sets its <c>pos</c>. Two jump objects closer than the spacing of the rule data have traffic
+    /// zones that overlap. Retail has 7 such pairs, so a jump object that the active mod does not place gets no warning.
+    /// </summary>
+    private static Diagnostic? Crowded(EditSession session, SectionRef section, SectionView view, string name)
+    {
+        if (session.Lists.RuleData.Builders.Connection?.Spacing is not { } spacing ||
+            SceneSections.Position(view) is not { } at || session.Origin(section, "pos").Origin != ValueOrigin.ActiveMod)
+            return null;
+        foreach (var other in session.Sections(section.Path))
+        {
+            if (other.Equals(section) || !SceneSections.Is(other.Id.Type, SceneSections.ObjectType) ||
+                session.Get(other) is not { } otherView || !IsJump(otherView) ||
+                SceneSections.Position(otherView) is not { } there)
+                continue;
+            var distance = Vector3.Distance(at, there);
+            if (distance < spacing)
+                return Warning(section, $"{name} is {Meters(distance)} m from the jump object {other.Id.Key}. Keep jump " +
+                                        $"objects at least {Meters(spacing)} m apart, so that their traffic zones do not " +
+                                        "overlap.") with
+                {
+                    Key = "pos",
+                };
+        }
+        return null;
+    }
+
+    /// <summary>A distance in whole meters, for a message.</summary>
+    internal static string Meters(float distance) => MathF.Round(distance).ToString("0", CultureInfo.InvariantCulture);
 
     /// <summary>The warnings of a <c>[locked_gates]</c> section: each lock line that names no jump object of the jump
     /// graph. A jump object is a jump gate, a jump hole or an airlock gate with a <c>goto</c> line.</summary>

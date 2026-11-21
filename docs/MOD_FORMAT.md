@@ -612,6 +612,7 @@ The agent tool `connection_create` makes a pair, and `connection_set_lock` sets 
 - The nickname is `<system>_to_<other system>` for a gate and `<system>_to_<other system>_hole` for a hole. When an object or a zone has that nickname, OpenLancer adds `_1`, `_2` and so on.
 - The name is "<name of the other system> Jump Gate" or "<name of the other system> Jump Hole". It goes into `strings.json`. The infocard is the infocard that the retail ends of the kind share.
 - An end goes toward the other system on the nav map. Its distance from the center is the distance of the farthest object of its system, and at least 50000 m. Its front looks at the center. A hole pair in one system has no direction, so its ends go to the two sides of the center on the x axis. So do two systems at one place of the nav map.
+- An end keeps 8000 m from each jump object of its system: two traffic zones of 4000 m. When its place is closer, the end goes 8000 m farther out until the place is free. So a second pair to the same system goes past the first pair.
 - A template object can give its archetype, infocard, jump effect, behavior, difficulty, visit flag, loadout, pilot and tunnel.
 - A gate gets the local faction of its system as `reputation`. Its loadout and its pilot come from the gates with the same faction. Without such a gate, they come from the rule data for the house of the faction, for example `li` for `li_n_grp`. A gate without a loadout has no lights.
 - Each new end gets a traffic zone, `Zone_<object>_traffic`: a `SPHERE` of 4000 m with `pop_type = jumpgate` or `pop_type = wormhole`. NPCs come and go at the end only when the zone has encounters.
@@ -619,7 +620,9 @@ The agent tool `connection_create` makes a pair, and `connection_set_lock` sets 
 - Each new end gets the lock that the request asks for. A lock line of `InitialWorld.ini` can already name the nickname of a new end. OpenLancer then keeps or removes that line, as the request asks. An existing end keeps its locks when the request asks for no lock.
 - The new pair is one entry of the edit history, also when it changes two system files, the gate locks and `strings.json`.
 
-A pair is one jump connection item, so a delete of one end deletes the pair. The other end goes when it names the end back. The traffic zones `Zone_<object>_traffic` and the gate lock lines of each end go too. A one-way object goes alone. A one-way object that goes to an end is no part of the pair, so it stops the delete of that end. The Inspector and `set_fields` lock the `goto` line, so a change of one end cannot break the pair. The raw INI block can still change the line (see "Create, duplicate, rename and delete" and "The raw INI block").
+A pair is one jump connection item, so a delete of one end deletes the pair. The other end goes when it names the end back. The gate lock lines of each end go too. Of the traffic zones, only the zones that `connection_create` makes go with the pair: `Zone_<object>_traffic` and `Zone_<object>_traffic_<n>`. A retail traffic zone has another name, so it stays. When a zone with `pop_type = jumpgate` or `pop_type = wormhole` stays and its size holds a deleted end, the delete warns and asks.
+
+A one-way object goes alone. A one-way object that goes to an end is no part of the pair, so it stops the delete of that end. The Inspector and `set_fields` lock the `goto` line, so a change of one end cannot break the pair. The raw INI block can still change the line (see "Create, duplicate, rename and delete" and "The raw INI block").
 
 The gate locks are in the `[locked_gates]` section of `InitialWorld.ini`:
 
@@ -646,8 +649,11 @@ The checks of the jump connections:
 | An object with `goto` has an archetype that is no jump gate, jump hole or airlock gate. | Warning | The player cannot use the object as a jump. |
 | A gate lock names no jump gate, jump hole or airlock gate. | Warning | The game ignores the line. Vanilla 1.1 has six such lines. They name the plain nicknames of three hole pairs that the system files do not have. |
 | The active mod gives a gate a player lock. | Warning | The route tables leave out the gate. |
+| The active mod puts a jump object closer than 8000 m to another jump object of its system. | Warning | The traffic zones of the two objects overlap. |
 
-The count error stops the save of a data mod (tier 1) when the active mod makes the count go above 10. The order error stops the save when the active mod writes the `goto` line. Each other case is a warning. A `goto` line that names a system or an object that does not exist gets the error of the data lists. The Inspector shows the problems in the Jump connection component of the object, and above the sections of `[locked_gates]`. The raw INI block marks the line of each problem. The agent tools `get_item` and `check` give them too.
+The count error stops the save of a data mod (tier 1) when the active mod makes the count go above 10. The order error stops the save when the active mod writes the `goto` line. Each other case is a warning. A `goto` line that names a system or an object that does not exist gets the error of the data lists.
+
+The Inspector shows the problems in the Jump connection component of the object, and above the sections of `[locked_gates]`. The spacing warning shows at the position of the object. Retail has seven pairs of jump objects closer than 8000 m, so a jump object that the active mod does not place gets no spacing warning. The raw INI block marks the line of each problem. The agent tools `get_item` and `check` give them too.
 
 ## Prop groups
 
@@ -993,7 +999,7 @@ These keys are locked, and the other keys of the section take edits:
 - The key of the section, for example `nickname`.
 - The `encounter`, `faction` and `faction_weight` lines of a `[Zone]` (see "Lines that belong together").
 - The `file` of a `[system]` of `universe.ini`, because a change moves all the contents of the system.
-- The `goto` line of an `[Object]`, because it links the two ends of a jump connection. The agent tools `connection_create` and `delete_items` change the pair. The raw INI block can still change the line.
+- The `goto` line of an `[Object]`, because it links the two ends of a jump connection. To change the pair, delete one end, and its pair goes too. Then make a new pair with the agent tool `connection_create`. The raw INI block can still change the line.
 
 The gizmo also does not show when a line that it reads has an error, for example a `pos` line with text. Correct the line in the Inspector first.
 
@@ -1056,7 +1062,7 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 - A line that names the item gets a safe fix in the same entry when one exists. The `ring` line of a planet goes. The lines of each hole of a deleted zone go from the `[Exclusion Zones]` sections of the nebula and field files. The engine skips a hole whose zone is not there. But retail gives the lines of that hole to the hole before it, so the lines must go.
 - Another line keeps its value and shows "Missing" (see "Data lists and pickers"). Two cases give such a line. One is a fix of a line that the editor cannot change. The other is a line of a mission script that names a deleted object. The save stops at such a mission line until you fix it.
 - A line whose rule refuses the delete names the line and stops the delete, as Unity RequireComponent does. This version refuses the delete of an airlock gate and a trade lane ring.
-- A jump gate or a jump hole goes with its pair, because a pair is one connection item. The other end goes when its `goto` line names the end back. The traffic zones `Zone_<object>_traffic` of each end go, and so do the `locked_gate` and `npc_locked_gate` lines of each end. A one-way object goes alone. When the other end is in a file that the editor cannot change, the delete stops with the reason. This is an OpenLancer choice: Unity would keep the other end with a "Missing" link.
+- A jump gate or a jump hole goes with its pair, because a pair is one connection item. The other end goes when its `goto` line names the end back. The traffic zones that `connection_create` makes for each end go, and so do the `locked_gate` and `npc_locked_gate` lines of each end. A one-way object goes alone. When the other end is in a file that the editor cannot change, the delete stops with the reason. This is an OpenLancer choice: Unity would keep the other end with a "Missing" link.
 - A one-way object whose `goto` line names an end that goes is no part of the pair. Its locked `goto` line stops the delete, and the message names the object. Delete the one-way object first or in the same delete. To keep it, change its `goto` line in the raw INI block. You can also pair it with the jump connection tool `connection_create` of the agent server.
 - A delete of a nebula or an asteroid field removes only its section, as Unity "Remove Component" does. Its zone stays, with its encounters, its music and its damage.
 

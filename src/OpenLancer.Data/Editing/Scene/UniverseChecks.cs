@@ -64,15 +64,18 @@ internal static class UniverseChecks
         if (fileAt >= 0 && fileAt < IndexOf(entries, "nickname"))
             yield return Error(session, section, "file",
                 $"The [system] {nickname} has its file line before its nickname line. The game then loads the system under " +
-                "another id. Move the nickname line up.");
+                "another id. In a text editor, put the nickname line first in the file of its mod. Then open the profile " +
+                "again.");
 
         var others = Systems(session).Where(s => !s.Section.Equals(section)).ToList();
         // Two different names with one FLHash are a collision of the hash list "system". The list checks report it, so
         // this check reports only one name in two sections.
         foreach (var other in others.Where(o => o.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase)))
             yield return Error(session, section, "nickname",
-                $"The system {nickname} has the same nickname as {other.Nickname}." +
-                (other.Nickname == nickname ? "" : " The game ignores the letter case of a nickname.") +
+                (other.Nickname == nickname
+                    ? $"Two [system] sections have the nickname {nickname}."
+                    : $"The system {nickname} has the same nickname as {other.Nickname}. The game ignores the letter case " +
+                      "of a nickname.") +
                 " The game drops one of the two systems. Give one system another nickname.");
 
         var value = FileValue(view);
@@ -119,8 +122,8 @@ internal static class UniverseChecks
                                                   FLHash.CreateID(s.Id.Key) == hash);
         if (at >= 0 && sections.ToList().IndexOf(section) > at)
             yield return Warning(section, "system",
-                $"[Base] {name} comes after the [system] of {system}. The game does not link the base to its station. Move " +
-                "the [Base] before the [system].");
+                $"[Base] {name} comes after the [system] of {system}. The game does not link the base to its station. In a " +
+                "text editor, move the [Base] before the [system] in the file of its mod. Then open the profile again.");
     }
 
     /// <summary>One <c>[system]</c> of W of <c>universe.ini</c>.</summary>

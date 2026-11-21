@@ -87,6 +87,10 @@ internal sealed record ConnectionRule(string Tunnel, float MinRadius, JumpEndRul
     /// <summary>The rules of the ends of a kind: a jump hole, or else a jump gate.</summary>
     public JumpEndRule For(ConnectionKind kind) => kind == ConnectionKind.Hole ? Hole : Gate;
 
+    /// <summary>The smallest distance between two jump objects of one system that a new end keeps: two traffic zones
+    /// of a new end, so that the zones of two ends do not overlap. 8000 m with the retail values.</summary>
+    public float Spacing => 2 * Math.Max(Gate.TrafficSize, Hole.TrafficSize);
+
     /// <summary>The house of a faction nickname, or null.</summary>
     public JumpHouse? HouseOf(string? faction) =>
         faction?.Split('_')[0] is { Length: > 0 } house

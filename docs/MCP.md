@@ -170,9 +170,13 @@ Each edit is one Undo step. The Edit menu shows its label with "Agent: " before 
 
 The five tools `set_fields`, `set_text`, `rename_item`, `delete_items` and `duplicate_items` also change mission items. "The generic tools on mission items" tells which references each tool takes. Four of them also change cutscene items, as "The generic tools on cutscene items" tells. The other edit tools change only items of INI files that are not mission files. A reference of a mission item gives them `invalid_argument` with the detail `MissionItem`. A reference of a cutscene item gives them `invalid_argument` with the detail `CutsceneItem`, and the message names the tools that change cutscenes.
 
-A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts. Of the items of a system, `delete_items` takes objects, zones, lights, nebulae and asteroid fields. A jump gate or a jump hole goes with its pair, its traffic zones and its gate lock lines. The delete needs `confirm: true` when the other end is in another file. A one-way object whose `goto` line names an end gives `refused`, because it is no part of the pair. Name it in the same call, or delete it first.
+A rename of an object of a system also changes the mission lines that name it, as in the editor. The question of the rename names these mission scripts.
 
-`delete_items` also takes a system that the active mod adds, by its `system:` reference. The delete always needs `confirm: true`. The system file goes too, and each object of another system whose `goto` line names the system goes with its pair. The mission lines that name the system show "Missing". A system with a base gives `refused` in this version. A system of the game or of a lower mod gives `refused` with the detail `GameSystem`. A call can also name items of the system. These items go with the system.
+Of the items of a system, `delete_items` takes objects, zones, lights, nebulae and asteroid fields. A jump gate or a jump hole goes with its pair, its gate lock lines and the traffic zones that `connection_create` made for it. The delete needs `confirm: true` when the other end is in another file, or when a jump traffic zone with another name stays at an end. A one-way object whose `goto` line names an end gives `refused`, because it is no part of the pair. Name it in the same call, or delete it first.
+
+`delete_items` also takes a system that the active mod adds, by its `system:` reference. The delete always needs `confirm: true`. The system file goes too, and each object of another system whose `goto` line names the system goes with its pair. The mission lines that name the system show "Missing". A call can also name items of the system. These items go with the system.
+
+A system with a base gives `refused` in this version. A system of the game or of a lower mod gives `refused` with the detail `GameSystem`.
 
 `duplicate_items` takes objects, zones and lights of a system. A jump gate, a jump hole, an airlock gate and a trade lane ring give `refused`, because a copy has no partner. `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. It also takes a system that the active mod adds. The rename of a system changes the `goto` lines, the `[Base]` lines and the mission lines that name it, and its file keeps its path. Another section, for example a loadout, gives `refused`.
 
@@ -187,7 +191,9 @@ A rename of a ship or equipment also changes the template of each cutscene COMPO
 - An array of arrays gives one line for each array, for example `"cargo": [["my_good", 5], ["my_other_good", 1]]`.
 - `null` or `[]` removes the key. The engine then uses its default.
 
-A value never holds a comma. The key line, a key of linked lines, the `file` of a system and the `goto` line of an object are locked, and `get_item` marks them. The `goto` line links the two ends of a jump connection, so it gives `refused` with the detail `FieldNotWritable`. Use `rename_item` for the nickname. Use `scene_set_encounters` for the `encounter`, `faction` and `faction_weight` lines of a zone. A value that a list check refuses still applies, as in the Inspector. The result gives the problem in `new_problems`.
+A value never holds a comma. A value that a list check refuses still applies, as in the Inspector. The result gives the problem in `new_problems`.
+
+The key line, a key of linked lines, the `file` of a system and the `goto` line of an object are locked, and `get_item` marks them. The `goto` line links the two ends of a jump connection, so it gives `refused` with the detail `FieldNotWritable`. Use `rename_item` for the nickname. Use `scene_set_encounters` for the `encounter`, `faction` and `faction_weight` lines of a zone.
 
 A mission item takes the field forms of `mission_add_item` in place of these forms, and it runs in strict mode. See "The generic tools on mission items". A cutscene item takes THN paths and the value forms of "The generic tools on cutscene items".
 
@@ -248,7 +254,9 @@ These tools call the commands of the Scene, the Assets panel and the Database of
 
 A create can also give the new item a nickname, a rotation, a size, a name and more fields. These parts go into the same Undo step, and the label is "Create" and the nickname. The result gives the new item with its last reference and selects it. Without a nickname, the item gets the next free nickname, as in the Create menu. The editor rounds a position to whole numbers.
 
-A station archetype with a docking sphere needs a base, because the Create menu asks for one. A station archetype without a docking sphere takes no base. A `parent` must be an object of the same system. An archetype of another template gives `invalid_value` with the reason. A jump gate, a jump hole, an airlock gate and a trade lane ring need a partner or a lane. So `scene_create_object` and `scene_spawn_asset` refuse their archetypes. Use `connection_create` for a jump gate pair or a jump hole pair.
+A station archetype with a docking sphere needs a base, because the Create menu asks for one. A station archetype without a docking sphere takes no base. A `parent` must be an object of the same system. An archetype of another template gives `invalid_value` with the reason.
+
+A jump gate, a jump hole, an airlock gate and a trade lane ring need a partner or a lane. So `scene_create_object` and `scene_spawn_asset` refuse their archetypes. Use `connection_create` for a jump gate pair or a jump hole pair.
 
 `scene_spawn_asset` takes the template of the type of a solar archetype. A ship, an asteroid or a model makes a new static prop archetype. The Scene shows its object after a save, when the editor loads the new archetype, and the result tells it.
 

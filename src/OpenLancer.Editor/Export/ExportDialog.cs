@@ -400,8 +400,13 @@ internal sealed class ExportDialog : ModalDialog
             window.Log.Add(problem);
         }
 
-        Failed(ExportGate.Refusal(mod?.Id ?? "", errors.Count));
+        Failed(GateRefusal(mod?.Id ?? "", errors.Count));
     }
+
+    /// <summary>The error text of the dialog when the save gate refuses the mod. The dialog shows no list, so the text
+    /// sends the user to the Console, which gets each error.</summary>
+    internal static string GateRefusal(string modId, int errors) =>
+        $"{ExportGate.Refusal(modId, errors)} The Console lists each error.";
 
     /// <summary>The publish history of a mod in the workspace of the dialog (decision D565).</summary>
     private HistoryLocation Location(Mod exported) =>

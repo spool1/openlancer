@@ -262,6 +262,40 @@ public sealed class ConnectionPlansTests
             ConnectionWorkspace.Lines(session, plan.Ends[1].Object).Skip(2).Take(2));
     }
 
+    /// <summary>
+    /// A second pair between the same two systems without a position does not go onto the first pair. A new end that
+    /// is closer than 8000 m to a jump object of its system goes out from the center by 8000 m until it is free, so no
+    /// end gets the spacing warning. An end that the request places near a jump object gets the warning on its
+    /// position.
+    /// </summary>
+    [Fact]
+    public void ASecondPairToTheSameSystemGoesPastTheFirstPair()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        string Pos(SectionRef end) => ConnectionWorkspace.Lines(session, end).Single(l => l.Name == "pos").Text;
+        static bool Spacing(Diagnostic d) => d.Message.Contains("Keep jump objects", StringComparison.Ordinal);
+
+        var hole = Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Hole, new ConnectionEnd("Li01"),
+            new ConnectionEnd("Li03")));
+        var gate = Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Gate, new ConnectionEnd("Li01"),
+            new ConnectionEnd("Li03")));
+
+        Assert.Equal(["50000, 0, 0", "-60000, 0, 0"], hole.Ends.Select(e => Pos(e.Object)));
+        Assert.Equal(["58000, 0, 0", "-68000, 0, 0"], gate.Ends.Select(e => Pos(e.Object)));
+        Assert.All([.. hole.Ends, .. gate.Ends],
+            e => Assert.DoesNotContain(ConnectionChecks.Check(session, e.Object), Spacing));
+
+        var near = Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Hole,
+            new ConnectionEnd("Li01") { Position = new Vector3(58000, 0, 1000) }, new ConnectionEnd("Li03")));
+        var warning = Assert.Single(ConnectionChecks.Check(session, near.Ends[0].Object), Spacing);
+        Assert.Equal((DiagnosticSeverity.Warning, "pos"), (warning.Severity, warning.Key));
+        Assert.Equal("Li01_to_Li03_hole_1 is 1000 m from the jump object Li01_to_Li03. Keep jump objects at least 8000 m " +
+                     "apart, so that their traffic zones do not overlap.", warning.Message);
+        Assert.Empty(SteLint.Problems(warning.Message));
+        Assert.Equal("-76000, 0, 0", Pos(near.Ends[1].Object));
+    }
+
     /// <summary>The count of the jump objects of a system includes the objects that the plan adds: two for a hole pair
     /// in one system. A system with 9 jump objects takes a gate, but not a hole pair inside it.</summary>
     [Fact]
@@ -434,8 +468,9 @@ public sealed class ConnectionPlansTests
         Assert.Equal(new RouteDiff(0, 0, 0, 0), plan.Routes);
         Assert.Equal(["Li01_to_Li03", "Li03_to_Li01"], plan.Warnings.Select(w => w.Target!.Id.Key));
         Assert.Equal("The route tables leave out Li01_to_Li03, because a new game locks it for the player. After a mission " +
-                     "unlocks it with Act_LockDock, nav map routes and NPC routes still do not use it. Use the lock npc or " +
-                     "none when the gate must be on routes.", plan.Warnings[0].Message);
+                     "unlocks it with Act_LockDock, nav map routes and NPC routes still do not use it. To keep the gate on " +
+                     "the routes, set its lock to npc or none with the jump connection tool connection_set_lock of the agent " +
+                     "server.", plan.Warnings[0].Message);
 
         session.Undo();
         plan = Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Gate, new ConnectionEnd("Li01"),
@@ -768,5 +803,41 @@ public sealed class ConnectionPlansTests
         session.Execute(plan.Command!);
         Assert.All(made.TrafficZones, z => Assert.Null(session.Get(z)));
         Assert.NotNull(session.Get(other));
+    }
+
+    /// <summary>
+    /// The delete takes only the traffic zones that OpenLancer makes for an end. A jump traffic zone with another name,
+    /// as the retail zones have, stays. When its size holds a deleted end, the plan warns and asks. A zone with another
+    /// pop_type or a zone that does not hold the end gives no warning.
+    /// </summary>
+    [Fact]
+    public void ADeleteWarnsAboutAJumpTrafficZoneWithAnotherNameAtAnEnd()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Hole, new ConnectionEnd("Li01"),
+            new ConnectionEnd("Li01")));
+        void Zone(string name, float x, string pop) => session.Execute(EditCommand.AddSection(ListWorkspace.Li01Path,
+            SceneSections.ZoneType,
+        [
+            ListWorkspace.Line("nickname", name), ListWorkspace.Line("pos", $"{x}", "0", "0"), ListWorkspace.Line("shape", "SPHERE"),
+            ListWorkspace.Line("size", "4000"), ListWorkspace.Line("pop_type", pop),
+        ]));
+        Zone("Zone_ol_hole_traffic", 50900, "wormhole");
+        Zone("Zone_ol_far_traffic", 40000, "wormhole");
+        Zone("Zone_ol_patrol", 50000, "lane_patrol");
+        var zone = SceneWorkspace.Zone("Zone_ol_hole_traffic");
+
+        var plan = ConnectionPlans.DeletePair(session, [SceneWorkspace.Object("Li01_to_Li01_hole")]);
+
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        Assert.DoesNotContain(zone, plan.Deletes.Select(d => d.Section));
+        var warning = Assert.Single(plan.Warnings);
+        Assert.Equal(zone, warning.Target);
+        Assert.Equal("The traffic zone Zone_ol_hole_traffic stays. It is 900 m from Li01_to_Li01_hole. When the zone has " +
+                     "encounters, NPC ships still come and go at that place. Delete the zone too when no other jump " +
+                     "object uses it.", warning.Message);
+        Assert.Empty(SteLint.Problems(warning.Message));
+        Assert.True(plan.NeedsConfirmation);
     }
 }

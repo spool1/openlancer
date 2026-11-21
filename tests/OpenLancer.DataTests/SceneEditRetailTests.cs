@@ -163,10 +163,16 @@ public sealed class SceneDeleteRetailTests(ITestOutputHelper output)
         Assert.Equal(DeleteReason.Cascade, partner.Why);
         Assert.Equal(locks, plan.Fixes.Count(f => f.Key.Contains("locked_gate", StringComparison.OrdinalIgnoreCase)));
         Assert.NotEmpty(plan.MissionMissing);
+        // The retail traffic zone of the gate has another name than the zones of a new end, so it stays with a warning.
+        var traffic = Assert.Single(plan.Warnings, w => w.Target?.Id.Key?.Equals("Zone_Li01_Jumpgate_003",
+            StringComparison.OrdinalIgnoreCase) == true);
+        Assert.StartsWith("The traffic zone Zone_Li01_Jumpgate_003 stays. It is ", traffic.Message);
+        Assert.DoesNotContain(plan.Deletes, d => d.Section.Equals(traffic.Target));
         session.Execute(plan.Command!);
 
         Assert.Null(session.Get(gate));
         Assert.Null(session.Get(partner.Section));
+        Assert.NotNull(session.Get(traffic.Target!));
         session.Undo();
         Assert.NotNull(session.Get(gate));
         Assert.NotNull(session.Get(partner.Section));

@@ -19,7 +19,8 @@ namespace OpenLancer.Tests;
 /// </summary>
 public sealed class ConnectionChecksTests
 {
-    private const string Count = "Li03 has 11 jump objects. The game crashes with more than 10 in one system. Remove 1 of them.";
+    private const string Count = "Li03 has 11 jump objects. The game crashes with more than 10 in one system. Delete a " +
+        "jump gate or a jump hole of Li03.";
 
     private static SectionRef Li03(string key) => ConnectionWorkspace.Li03("Object", key);
 
@@ -109,7 +110,9 @@ public sealed class ConnectionChecksTests
         var warning = One(session, Li03("Li03_old"), "Li03_old has its goto line");
 
         Assert.Equal("Li03_new has its goto line before its nickname line. The game then records the jump under another " +
-                     "object. Move the nickname line up.", error.Message);
+                     "object. In the raw INI block, delete the goto line, then click outside the block. Then add the goto line " +
+                     "again. A new line goes at the end of the section.", error.Message);
+        Assert.Empty(SteLint.Problems(error.Message));
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
         Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
         Assert.Single(session.SaveProblems(), p => p.Message == error.Message);
@@ -155,7 +158,8 @@ public sealed class ConnectionChecksTests
         Assert.StartsWith("Li03_other goes to Li02_mixed in Li02, but Li02_mixed does not go back.",
             One(session, Li03("Li03_other"), "Li03_other goes").Message);
         Assert.Equal("Li03_mixed is a jump hole and its partner Li02_mixed is a jump gate. The game counts each end in another " +
-                     "route table. Delete the pair with the agent tool delete_items, and make it again with connection_create.",
+                     "route table. Delete one end, and its pair goes too. Then make the pair again with the jump connection " +
+                     "tool connection_create of the agent server.",
             One(session, Li03("Li03_mixed"), "Li03_mixed is").Message);
         Assert.Equal("Li03_station has a goto line, but its archetype station1 is a STATION. The player cannot use it as a jump.",
             Assert.Single(ObjectComponents.Checks(session, Li03("Li03_station"))).Message);

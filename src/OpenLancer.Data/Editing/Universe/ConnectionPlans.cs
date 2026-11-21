@@ -272,7 +272,7 @@ public static class ConnectionPlans
         var trafficZones = new List<SectionRef>();
         var changes = new List<SectionRef>();
         var results = new List<ConnectionEndPlan>();
-        var defaultPlaces = DefaultPlaces(session, ends, same, rule.MinRadius);
+        var defaultPlaces = DefaultPlaces(session, ends, same, rule);
         foreach (var (end, other, i) in new[] { (ends[0], ends[1], 0), (ends[1], ends[0], 1) })
         {
             var tunnel = end.View != null && TunnelOf(end.View) is { } own ? own
@@ -539,11 +539,13 @@ public static class ConnectionPlans
 
     /// <summary>
     /// The default positions of the new ends: toward the other system on the nav map. The distance from the center is
-    /// the distance of the farthest object of the system, and at least <paramref name="minRadius"/>. A hole pair inside
-    /// one system has no direction, and neither do two systems at one place of the nav map. Their ends go to the two
-    /// sides of the center on the X axis.
+    /// the distance of the farthest object of the system, and at least the smallest radius of the rule. A hole pair
+    /// inside one system has no direction, and neither do two systems at one place of the nav map. Their ends go to the
+    /// two sides of the center on the X axis. An end closer than the spacing of the rule to a jump object of its system
+    /// goes out from the center by the spacing until it is free. So a second pair to the same system does not go onto
+    /// the first pair.
     /// </summary>
-    private static Vector3[] DefaultPlaces(EditSession session, End[] ends, bool same, float minRadius)
+    private static Vector3[] DefaultPlaces(EditSession session, End[] ends, bool same, ConnectionRule rule)
     {
         var graph = session.Routes.Graph;
         var a = graph.System(ends[0].System)?.MapPos;
@@ -554,10 +556,16 @@ public static class ConnectionPlans
         var result = new Vector3[2];
         for (var i = 0; i < 2; i++)
         {
-            var radius = Math.Max(minRadius, Farthest(session, ends[i].Path));
+            var radius = Math.Max(rule.MinRadius, Farthest(session, ends[i].Path));
             var toward = direction is { } d ? (i == 0 ? d : -d) : new Vector2(i == 0 ? 1 : -1, 0);
             // The nav map draws the x of pos along the x axis of space, and its y along the z axis.
-            result[i] = new Vector3(toward.X, 0, toward.Y) * radius;
+            var axis = new Vector3(toward.X, 0, toward.Y);
+            var taken = JumpPositions(session, ends[i].Path).ToList();
+            if (same && i == 1)
+                taken.Add(result[0]);
+            while (taken.Any(p => Vector3.Distance(p, axis * radius) < rule.Spacing))
+                radius += rule.Spacing;
+            result[i] = axis * radius;
         }
         return result;
     }
@@ -567,13 +575,16 @@ public static class ConnectionPlans
     private static float LookAtCenter(Vector3 position) =>
         MathF.Atan2(position.X, position.Z) * 180 / MathF.PI;
 
+    /// <summary>The positions of the jump objects of a system file.</summary>
+    private static IEnumerable<Vector3> JumpPositions(EditSession session, string path) =>
+        session.Sections(path).Where(s => SceneSections.Is(s.Id.Type, SceneSections.ObjectType))
+            .Select(s => session.Get(s) is { } view && ConnectionChecks.IsJump(view) ? SceneSections.Position(view) : null)
+            .OfType<Vector3>();
+
     /// <summary>The distance of the farthest object of a system file from the center, or 0.</summary>
     private static float Farthest(EditSession session, string path) =>
         session.Sections(path).Where(s => SceneSections.Is(s.Id.Type, SceneSections.ObjectType))
-            .Select(s => session.Get(s)?.Lines("pos").LastOrDefault(l => l.Values.Count >= 3)?.Values)
-            .Select(p => p != null && p[0].TryToSingle(out var x) && p[1].TryToSingle(out var y) && p[2].TryToSingle(out var z)
-                ? new Vector3(x, y, z).Length()
-                : 0)
+            .Select(s => session.Get(s) is { } view && SceneSections.Position(view) is { } p ? p.Length() : 0)
             .DefaultIfEmpty(0).Max();
 
     /// <summary>The partner that the last <c>goto</c> line of an object names, or null when its system or its object

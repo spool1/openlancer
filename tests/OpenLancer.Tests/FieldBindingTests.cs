@@ -406,7 +406,8 @@ public sealed class FieldBindingTests
     }
 
     /// <summary>The goto row of a jump gate is read-only, because a change of one end breaks the pair. The reason names
-    /// the agent tools that change the pair. The goto key of a section of another file takes edits.</summary>
+    /// the delete of the editor, the agent tool that makes a pair and the raw INI block. The goto key of a section of
+    /// another file takes edits.</summary>
     [Fact]
     public void TheGotoRowOfAJumpGateIsReadOnlyWithTheReason()
     {
@@ -415,8 +416,10 @@ public sealed class FieldBindingTests
 
         var gate = Bind(session, SceneWorkspace.Object("Li01_to_Li02"), "goto");
 
-        Assert.Equal("This key links the two ends of a jump connection. Use the agent tools connection_create and " +
-                     "delete_items to change the pair.", gate.ReadOnlyReason);
+        Assert.Equal("This line links the two ends of a jump connection. To change the pair, delete one end, and its pair " +
+                     "goes too. Then make a new pair with the jump connection tool connection_create of the agent server. The " +
+                     "raw INI block can change the line.", gate.ReadOnlyReason);
+        Assert.Empty(SteLint.Problems(gate.ReadOnlyReason!));
         Assert.Equal(FieldBinding.JumpLinkReason, gate.ReadOnlyReason);
         Assert.False(gate.CanRevert);
         Assert.Null(FieldBinding.LinkLock(session, SceneWorkspace.Object("Li01_to_Li02"), "pos"));

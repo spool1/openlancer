@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Scene;
 
 namespace OpenLancer.Studio.Commands;
 
@@ -23,8 +24,8 @@ internal sealed class FieldBinding
 
     /// <summary>Why a row and a field edit cannot change the link of a jump connection.</summary>
     public const string JumpLinkReason =
-        "This key links the two ends of a jump connection. Use the agent tools connection_create and delete_items to " +
-        "change the pair.";
+        "This line links the two ends of a jump connection. To change the pair, delete one end, and its pair goes too. " +
+        $"Then make a new pair with {SceneSections.PairTool}. The raw INI block can change the line.";
 
     /// <summary>Why a section of a file without a known schema is read-only (decision D123).</summary>
     public const string NoSchemaReason = "The editor cannot edit this file yet. It reads it for the lists.";

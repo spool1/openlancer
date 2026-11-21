@@ -43,6 +43,13 @@ internal static class SceneSections
             ? value
             : null;
 
+    /// <summary>The value of the last <c>pos</c> line with three numbers, or null.</summary>
+    public static System.Numerics.Vector3? Position(SectionView view) =>
+        view.Lines("pos").LastOrDefault(l => l.Values.Count >= 3)?.Values is { } p && p[0].TryToSingle(out var x) &&
+        p[1].TryToSingle(out var y) && p[2].TryToSingle(out var z)
+            ? new System.Numerics.Vector3(x, y, z)
+            : null;
+
     /// <summary>The <c>[Solar] type</c> of the archetype of an object in W, in lowercase, or null.</summary>
     public static string? ArchetypeType(EditSession session, SectionView view) =>
         Last(view, "archetype") is { } archetype &&
@@ -53,6 +60,9 @@ internal static class SceneSections
 
     /// <summary>The tool that makes a jump gate pair or a jump hole pair, as the texts of the editor name it.</summary>
     public const string PairTool = "the jump connection tool connection_create of the agent server";
+
+    /// <summary>The tool that sets the lock of a jump gate or a jump hole, as the texts of the editor name it.</summary>
+    public const string LockTool = "the jump connection tool connection_set_lock of the agent server";
 
     /// <summary>
     /// The kind of a connection object in plain words, or null for another section (decision D253): an object with a

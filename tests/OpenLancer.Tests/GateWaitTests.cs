@@ -111,4 +111,16 @@ public sealed class GateWaitTests
         Assert.Empty(SteLint.Problems(GateWait.Status));
         Assert.Empty(SteLint.Problems(OpenLancer.Editor.Export.ExportDialog.ClosedBeforeStart));
     }
+
+    /// <summary>The Export dialog shows no list of the errors of the save gate, so its text sends the user to the
+    /// Console. oltool and the agent tool list the errors after the refusal, so their text stays.</summary>
+    [Fact]
+    public void TheGateRefusalOfTheExportDialogNamesTheConsole()
+    {
+        var text = OpenLancer.Editor.Export.ExportDialog.GateRefusal("m", 2);
+
+        Assert.Equal($"{OpenLancer.Data.Export.ExportGate.Refusal("m", 2)} The Console lists each error.", text);
+        Assert.DoesNotContain("Console", OpenLancer.Data.Export.ExportGate.Refusal("m", 2));
+        Assert.Empty(SteLint.Problems(text));
+    }
 }
