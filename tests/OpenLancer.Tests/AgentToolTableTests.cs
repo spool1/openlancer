@@ -44,8 +44,9 @@ public sealed class AgentToolTableTests
         var readme = System.IO.File.ReadAllText(RepoFiles.Of("README.md"));
         var help = System.IO.File.ReadAllText(RepoFiles.Of("docs", "MCP.md"));
 
-        Assert.Empty(AgentTools.All.Select(t => $"`{t.Name}`").Where(name => !readme.Contains(name, StringComparison.Ordinal)));
-        Assert.Empty(AgentTools.All.Select(t => $"`{t.Name}`").Where(name => !help.Contains(name, StringComparison.Ordinal)));
+        var names = AgentTools.All.Select(t => $"`{t.Name}`").ToList();
+        Assert.DoesNotContain(names, name => !readme.Contains(name, StringComparison.Ordinal));
+        Assert.DoesNotContain(names, name => !help.Contains(name, StringComparison.Ordinal));
     }
 
     [Fact]

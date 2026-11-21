@@ -217,7 +217,7 @@ public sealed class AgentPublishToolTests
         var export = Ok(host, "export_mod", """{ "formats": ["drop_in"] }""");
 
         Assert.Empty(ExportGate.Errors(host.Session));
-        Assert.Empty(ExportGate.Errors(ModProfile.Load(profile), "ol-test", [GameDetector.CheckRoot(game.Root)],
+        Assert.Empty(ExportGate.Errors(ModProfile.Load(profile), "ol-test", [GameDetector.CheckRoot(game.Root, cancel: TestContext.Current.CancellationToken)],
             TestWorkspace.FakeDllWriter.Instance, ThnScripts.Evaluator));
         Assert.False((bool)export["succeeded"]!);
         Assert.Contains(export["problems"]!.AsArray(), p => ((string?)p!["message"])!.StartsWith(
