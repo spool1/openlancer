@@ -390,6 +390,54 @@ public sealed class ListRulesTests
             Assert.Throws<InvalidDataException>(() => ListRules.Parse(With(bad)));
     }
 
+    /// <summary>
+    /// The rule data of a new jump connection: the tunnel, the smallest distance from the center, the lines and the
+    /// traffic zone of each kind, and the loadout and the pilot of each house. Each line is a key of the engine schema.
+    /// A name pattern without the system part, a line that the builder writes, a traffic zone without a size and a house
+    /// that repeats do not load.
+    /// </summary>
+    [Fact]
+    public void TheConnectionBuilderRulesParse()
+    {
+        var connection = Rules.Builders.Connection!;
+
+        Assert.Equal(("gate_tunnel_bretonia", 50000f), (connection.Tunnel, connection.MinRadius));
+        Assert.Equal(("jumpgate", 66145, "{system} Jump Gate", 4000f),
+            (connection.Gate.Archetype, connection.Gate.Infocard, connection.Gate.Name, connection.Gate.TrafficSize));
+        Assert.Equal(("jumphole", 66146, "{system} Jump Hole"),
+            (connection.Hole.Archetype, connection.Hole.Infocard, connection.Hole.Name));
+        Assert.Equal([new BuilderLine("jump_effect", "jump_effect_hole"), new BuilderLine("visit", "0")], connection.Hole.Lines);
+        Assert.Equal("wormhole", connection.Hole.Traffic.Single(l => l.Key == "pop_type").Value);
+        Assert.Equal("jumpgate", connection.Gate.Traffic.Single(l => l.Key == "pop_type").Value);
+        Assert.Same(connection.Hole, connection.For(OpenLancer.Data.Editing.Universe.ConnectionKind.Hole));
+        Assert.Equal(new JumpHouse("br", "jumpgate_br_02", "pilot_solar_easiest"), connection.HouseOf("br_n_grp"));
+        Assert.Equal("jumpgate_li_01", connection.HouseOf("LI_P_GRP")!.Loadout);
+        Assert.Null(connection.HouseOf("fc_x_grp"));
+        Assert.Null(connection.HouseOf(null));
+        Assert.All(connection.Gate.Lines.Concat(connection.Hole.Lines), l => Assert.True(Knows("system", "Object", l.Key), l.Key));
+        Assert.All(connection.Gate.Traffic.Concat(connection.Hole.Traffic),
+            l => Assert.True(Knows("system", "zone", l.Key), l.Key));
+
+        string With(string builder) => FilesRules("""{ "files": ".ini" }""", "")[..^1].TrimEnd() +
+                                       $$""", "connectionTypes": ["jump_gate"], "sceneBuilders": { "connection": {{builder}} } }""";
+        const string end = "\"archetype\": \"a\", \"infocard\": 1, \"name\": \"{system} Gate\", \"traffic\": { \"size\": 10 }";
+        Assert.Equal("t", ListRules.Parse(With($$"""{ "tunnel": "t", "minRadius": 1, "gate": { {{end}} }, "hole": { {{end}} } }"""))
+            .Builders.Connection!.Tunnel);
+        foreach (var bad in new[]
+                 {
+                     $$"""{ "tunnel": "t, u", "minRadius": 1, "gate": { {{end}} }, "hole": { {{end}} } }""",
+                     $$"""{ "tunnel": "t", "minRadius": 0, "gate": { {{end}} }, "hole": { {{end}} } }""",
+                     $$"""{ "tunnel": "t", "minRadius": 1, "gate": { {{end}} } }""",
+                     $$"""{ "tunnel": "t", "minRadius": 1, "gate": { {{end.Replace("{system} ", "")}} }, "hole": { {{end}} } }""",
+                     $$"""{ "tunnel": "t", "minRadius": 1, "gate": { {{end.Replace("10", "0")}} }, "hole": { {{end}} } }""",
+                     $$"""{ "tunnel": "t", "minRadius": 1, "gate": { {{end}}, "lines": [ { "key": "loadout", "value": "x" } ] }, "hole": { {{end}} } }""",
+                     $$"""{ "tunnel": "t", "minRadius": 1, "gate": { {{end}}, "lines": [ { "key": "mass", "value": "1" } ] }, "hole": { {{end}} } }""",
+                     $$"""{ "tunnel": "t", "minRadius": 1, "gate": { {{end}}, "lines": [ { "key": "visit" } ] }, "hole": { {{end}} } }""",
+                     $$"""{ "tunnel": "t", "minRadius": 1, "gate": { {{end}} }, "hole": { {{end}} }, "houses": [ { "house": "li", "loadout": "a", "pilot": "b" }, { "house": "LI", "loadout": "a", "pilot": "b" } ] }""",
+                 })
+            Assert.Throws<InvalidDataException>(() => ListRules.Parse(With(bad)));
+    }
+
     [Fact]
     public void FolderAndFileClassParse()
     {

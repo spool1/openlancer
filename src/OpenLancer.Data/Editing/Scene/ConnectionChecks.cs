@@ -176,12 +176,11 @@ internal static class ConnectionChecks
                                           "and make it again with connection_create.");
     }
 
-    /// <summary>The warnings of a <c>[locked_gates]</c> section: each lock line that names no jump gate or jump hole
-    /// with a <c>goto</c> line.</summary>
+    /// <summary>The warnings of a <c>[locked_gates]</c> section: each lock line that names no jump object of the jump
+    /// graph, that is no jump gate, jump hole or airlock gate with a <c>goto</c> line.</summary>
     private static IEnumerable<Diagnostic> Locks(EditSession session, SectionRef section, SectionView view)
     {
-        var gates = session.Routes.Graph.Connections.Where(c => c.Kind is ConnectionKind.Gate or ConnectionKind.Hole)
-            .Select(c => FLHash.CreateID(c.Object)).ToHashSet();
+        var gates = session.Routes.Graph.Connections.Select(c => FLHash.CreateID(c.Object)).ToHashSet();
         for (var i = 0; i < view.Entries.Count; i++)
         {
             var entry = view.Entries[i];
@@ -190,8 +189,8 @@ internal static class ConnectionChecks
                 continue;
             if (GateLocks.HashOf(entry.Values[0]) is { } hash && !gates.Contains(hash))
                 yield return Warning(section,
-                    $"The gate lock {entry.Values[0]} in {SceneSections.FileName(section.Path)} names no jump gate or jump " +
-                    "hole. The game ignores the line.") with { Key = entry.Name, EntryIndex = i };
+                    $"The gate lock {hash} in {SceneSections.FileName(section.Path)} names no jump gate or jump hole. The " +
+                    "game ignores the line.") with { Key = entry.Name, EntryIndex = i };
         }
     }
 
