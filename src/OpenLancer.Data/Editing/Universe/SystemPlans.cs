@@ -110,7 +110,9 @@ public static class SystemPlans
 
     /// <summary>The rule of a system nickname: a letter, then letters, digits or <c>_</c>, 2 to 15 characters. The
     /// retail route writer keeps 15 characters of a nickname.</summary>
-    private static readonly Regex NicknameRule = new("^[A-Za-z][A-Za-z0-9_]{1,14}$", RegexOptions.CultureInvariant);
+    public const string NicknamePattern = "^[A-Za-z][A-Za-z0-9_]{1,14}$";
+
+    private static readonly Regex NicknameRule = new(NicknamePattern, RegexOptions.CultureInvariant);
 
     /// <summary>The header sections that a new system copies, in the order of the new file, with their parts. The
     /// <c>[SystemInfo]</c> has no part, because the new system always copies it.</summary>

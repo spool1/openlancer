@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Editing;
-using OpenLancer.Data.IO;
 
 namespace OpenLancer.Studio.Commands;
 
@@ -117,7 +116,7 @@ internal sealed class FieldBinding
         // For example, a change of the encounter lines of a zone gives its faction lines to another encounter.
         if (view.IsLinked(name))
             return "This key belongs to a group of lines that belong together. The Inspector cannot edit the group.";
-        return name.Equals(SystemFileKey, StringComparison.OrdinalIgnoreCase) && IsUniverseSystem(session, section)
+        return name.Equals(SystemFileKey, StringComparison.OrdinalIgnoreCase) && session.IsSystemSection(section)
             ? SystemFileReason
             : null;
     }
@@ -141,15 +140,10 @@ internal sealed class FieldBinding
     /// and a revert of a group of lines that belong together puts back the whole group.
     /// </summary>
     public static string? RevertLock(EditSession session, SectionRef section) =>
-        IsUniverseSystem(session, section) && session.Get(section) != null &&
+        session.IsSystemSection(section) && session.Get(section) != null &&
         session.Origin(section, SystemFileKey).Origin == ValueOrigin.ActiveMod
             ? SystemFileReason
             : null;
-
-    /// <summary>True for a <c>[system]</c> section of universe.ini.</summary>
-    private static bool IsUniverseSystem(EditSession session, SectionRef section) =>
-        session.UniversePath is { } universe && VfsPath.Comparer.Equals(section.Path, universe) &&
-        section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>True when the value texts are the lines that the key has now.</summary>
     public bool Holds(IReadOnlyList<string> lines) =>

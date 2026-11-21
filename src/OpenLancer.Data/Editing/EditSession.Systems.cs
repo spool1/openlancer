@@ -42,6 +42,11 @@ public sealed partial class EditSession
     /// than one has the nickname.</summary>
     public SectionRef? SystemSection(string systemNickname) => Systems.SectionOf(systemNickname);
 
+    /// <summary>True for a <c>[system]</c> section of <c>universe.ini</c>.</summary>
+    public bool IsSystemSection(SectionRef section) =>
+        UniversePath is { } universe && IO.VfsPath.Comparer.Equals(section.Path, universe) &&
+        section.Id.Type.Equals("system", System.StringComparison.OrdinalIgnoreCase);
+
     /// <summary>True when a <c>[system]</c> section in W of <c>universe.ini</c> names the file, also when the nickname
     /// of that system is ambiguous. The engine reads the objects, zones and lights of a system only from such a
     /// file.</summary>

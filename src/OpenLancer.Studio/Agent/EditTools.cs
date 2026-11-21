@@ -373,7 +373,13 @@ internal static class EditTools
     /// <param name="body">Runs the commands of the request in the scope.</param>
     /// <exception cref="EditException">A check or a command refuses, or the result is too large. Nothing
     /// changed.</exception>
-    public static ToolResult Apply(ToolCall call, Action<EditScope> body)
+    public static ToolResult Apply(ToolCall call, Action<EditScope> body) => Apply(call, body, result => result);
+
+    /// <inheritdoc cref="Apply(ToolCall, Action{EditScope})"/>
+    /// <param name="shape">Makes the result of the tool from the result of the commands, for example with the parts that
+    /// the body noted while the commands ran. A step of <c>edit_batch</c> gives the result of its commands, because the
+    /// batch reads the result of each step from the scope.</param>
+    public static ToolResult Apply(ToolCall call, Action<EditScope> body, Func<EditResult, EditResult> shape)
     {
         var args = call.Args;
         if (call.Scope is { } batch)
@@ -394,7 +400,7 @@ internal static class EditTools
             throw ToolInput.Bad("with_patch", AgentTexts.Error("with_patch_preview"));
         ReadOnlyGuard(call);
         Guard(call);
-        return Commit(call, null, preview, withPatch, args.Flag("confirm"), body, Output);
+        return Commit(call, null, preview, withPatch, args.Flag("confirm"), body, result => Output(shape(result)));
     }
 
     /// <summary>The result of an edit tool in the JSON form of its type, so the result of mission commands gives its
@@ -564,9 +570,7 @@ internal static class EditTools
     /// under <c>DATA\MISSIONS</c> is in the group Missions.</summary>
     internal static ToolGroup? GroupOf(EditSession session, SectionRef section) =>
         SectionKeys.IsMissionFile(section.Path) ? ToolGroup.Missions
-        : session.IsSystemFile(section.Path) ||
-          session.UniversePath is { } universe && OpenLancer.Data.IO.VfsPath.Comparer.Equals(universe, section.Path) &&
-          section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase)
+        : session.IsSystemFile(section.Path) || session.IsSystemSection(section)
             ? ToolGroup.Scene
             : null;
 

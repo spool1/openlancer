@@ -7,6 +7,7 @@ using OpenLancer.Data.Editing.Assets;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.Editing.Universe;
 using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Data.Missions.Run;
 using OpenLancer.Studio.Commands;
@@ -31,6 +32,17 @@ public static class AgentTools
     private static readonly ToolParam TextFilter = new TextParam("text", false, null, null);
     private static readonly ToolParam Width = new WholeParam("width", ViewTools.MinSide, ViewTools.DefaultWidth);
     private static readonly ToolParam Height = new WholeParam("height", ViewTools.MinSide, ViewTools.DefaultHeight);
+
+    /// <summary>The members of an end of <c>connection_create</c>.</summary>
+    private static readonly IReadOnlyList<ToolParam> PairEnd =
+    [
+        new TextParam("system", true, null, null),
+        new TextParam("object", false, null, null),
+        new PointParam("position", false, BuilderTools.MaxCoordinate),
+        new PointParam("rotation", false),
+        new TextParam("nickname", false, null, null),
+        new TextParam("name", false, null, null, SceneEditTools.MaxName),
+    ];
 
     /// <summary>The tools in the order of <c>tools/list</c>.</summary>
     public static IReadOnlyList<StudioTool> All { get; } =
@@ -188,6 +200,40 @@ public static class AgentTools
         Edit("scene_set_encounters", ToolHints.Changing,
             EditTools.Input(false, [Text("zone", true), .. BuilderTools.EncounterBlock(true)]),
             BuilderTools.SetEncounters, ToolGroup.Scene),
+        Edit("system_create", ToolHints.Adding, EditTools.Input(false,
+                new TextParam("nickname", true, null, null, pattern: SystemPlans.NicknamePattern),
+                new TextParam("name", true, null, null, SceneEditTools.MaxName),
+                new TextParam("infocard", false, null, null, ItemEditTools.MaxText),
+                Text("like", true),
+                new NumbersParam("map_pos", true, 2, 2, whole: true),
+                new NumberParam("nav_map_scale", false, 0),
+                new FlagParam("on_map_at_start"),
+                new ChoicesParam("copy", UniverseTools.Parts),
+                Text("local_faction"),
+                new GroupParam("sun", [Text("archetype"), Text("star"), new TextParam("name", false, null, null, SceneEditTools.MaxName)])),
+            UniverseTools.SystemCreate, ToolGroup.Scene, typeof(SystemEditResult)),
+        // A call can change an existing end and remove a lock line that names a new end.
+        Edit("connection_create", ToolHints.Changing, EditTools.Input(false,
+                new TextParam("kind", true, UniverseTools.PairKinds, null),
+                new GroupParam("from", PairEnd, required: true),
+                new GroupParam("to", PairEnd, required: true),
+                Text("like"),
+                Text("archetype"),
+                Text("faction"),
+                Text("loadout"),
+                Text("pilot"),
+                new TextParam("locked", false, UniverseTools.Locks, "none"),
+                new FlagParam("traffic_zone", true)),
+            UniverseTools.ConnectionCreate, ToolGroup.Scene, typeof(ConnectionEditResult)),
+        // The locks are absolute values, so a second call changes nothing.
+        Edit("connection_set_lock", ToolHints.ChangingIdempotent, EditTools.Input(false,
+                Text("object", true), new TextParam("locked", true, UniverseTools.Locks, null), new FlagParam("pair", true)),
+            UniverseTools.ConnectionSetLock, ToolGroup.Scene, typeof(LockEditResult)),
+        Query("get_universe", ToolGroup.Scene, new ToolInput(Text("system"), Cursor, Limit), typeof(UniverseView),
+            UniverseQueries.GetUniverse),
+        Query("get_route", ToolGroup.Scene, new ToolInput(
+                Text("from", true), Text("to"), new TextParam("kind", false, UniverseQueries.RouteKinds, "all")),
+            typeof(RouteView), UniverseQueries.GetRoute),
         Edit("prop_group_place", ToolHints.Adding, EditTools.Input(false,
                 Text("group", true), Text("system", true), new PointParam("anchor", true), Text("parent"),
                 new FlagParam("leave_out_error_lines")),
@@ -463,9 +509,10 @@ public static class AgentTools
 
     /// <summary>An edit tool (section 7.3 of the MCP1 design). Its result is the result of the command layer, and it
     /// can be a step of <c>edit_batch</c>. A data tool is in the group Studio.</summary>
+    /// <param name="output">The type of a result that adds parts to the result of the command layer, or null.</param>
     private static StudioTool Edit(string name, ToolHints hints, ToolInput input, Func<ToolCall, ToolStep> run,
-        ToolGroup group = ToolGroup.Studio) =>
-        new(name, ToolKind.Edit, group, ToolHosts.Both, hints, input, typeof(EditResult), run);
+        ToolGroup group = ToolGroup.Studio, Type? output = null) =>
+        new(name, ToolKind.Edit, group, ToolHosts.Both, hints, input, output ?? typeof(EditResult), run);
 
     /// <summary>A generic edit tool (section 7.2 of the MCP1 design), in the group Studio. It takes items of each kind,
     /// also mission items. So its result also gives the inverse and the row moves of the mission commands that it ran

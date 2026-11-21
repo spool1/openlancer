@@ -47,14 +47,24 @@ internal sealed record SystemRow(string Ref, string Nickname, string Name, strin
 /// <param name="ToObject">The <c>obj:</c> reference of the partner of a gate or a hole, or null.</param>
 /// <param name="Previous">The <c>obj:</c> reference of the previous ring of a trade lane ring, or null.</param>
 /// <param name="Next">The <c>obj:</c> reference of the next ring of a trade lane ring, or null.</param>
+/// <param name="Radius">The <c>solar_radius</c> of the archetype in meters, or null.</param>
 internal sealed record ConnectionRow(string Ref, SceneObjectKind Kind, string? ToSystem, string? ToObject, string? Previous,
-    string? Next);
+    string? Next, float? Radius);
 
 /// <summary>A star system with its counts, bases, connections and fields (tool <c>get_system</c>).</summary>
 internal sealed record SystemView(string Ref, string Name, string? File)
 {
     /// <summary>The fields of the <c>[system]</c> section of <c>universe.ini</c>, as <c>get_item</c> gives them.</summary>
     public IReadOnlyList<FieldRow> Fields { get; init; } = [];
+
+    /// <summary>The place on the nav map grid, as the <c>pos</c> line gives it, or null.</summary>
+    public float[]? MapPos { get; init; }
+
+    /// <summary>The zoom of the system map (<c>NavMapScale</c>), or null.</summary>
+    public float? NavMapScale { get; init; }
+
+    /// <summary>The jump objects of the system file and the most that one system can have.</summary>
+    public required JumpSlots JumpObjects { get; init; }
 
     /// <summary>The number of items of each kind, by the names of <see cref="SceneItemKind"/>.</summary>
     public IReadOnlyDictionary<string, int> Counts { get; init; } = new Dictionary<string, int>();
@@ -95,6 +105,9 @@ internal sealed record SceneItemRow(string Ref, string? Nickname, string Name, S
     /// <summary>The size of a zone, as the <c>size</c> line gives it.</summary>
     public float[]? Size { get; init; }
 
+    /// <summary>The <c>solar_radius</c> of the archetype of an object in meters, or null.</summary>
+    public float? Radius { get; init; }
+
     public IReadOnlyList<ObjectComponent> Components { get; init; } = [];
 
     public required ItemOrigin Origin { get; init; }
@@ -126,22 +139,25 @@ internal static class SceneQueries
         var (_, section, path) = System(session, call.Args.Text("system")!);
         var view = session.Get(section)!;
         var items = path == null ? [] : Items(session, path).ToList();
-        var kinds = new ObjectKinds(session);
+        var archetypes = new Archetypes(session);
         var objects = items.Where(i => i.Kind == SceneKind.Object)
             .Select(i => (i.Section, View: session.Get(i.Section)!))
-            .Select(o => (o.Section, o.View, Kind: kinds.Of(o.View)))
+            .Select(o => (o.Section, o.View, Kind: archetypes.KindOf(o.View)))
             .ToList();
         string Ref(SectionRef s) => ItemRefs.Canonical(session, s);
         return ToolResult.Of(new SystemView(Ref(section), call.Texts.TextOf(section, "strid_name"), path)
         {
             Fields = ItemQueries.Fields(session, section, view, AgentRows.DiagnosticsOf(session, section)),
+            MapPos = AgentRows.Numbers(view, "pos"),
+            NavMapScale = AgentRows.Numbers(view, "NavMapScale") is [var scale, ..] ? scale : null,
+            JumpObjects = UniverseQueries.Slots(session, path),
             Counts = Enum.GetValues<SceneItemKind>().ToDictionary(Name, k => items.Count(i => KindOf(i.Kind) == k)),
             ObjectKinds = objects.GroupBy(o => o.Kind).ToDictionary(g => Name(g.Key), g => g.Count()),
             Bases = objects.Select(o => SceneSections.Last(o.View, "base")).OfType<string>()
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(b => ItemRefs.Format(new ItemReference(ItemRefKind.Base, b))).ToList(),
             Connections = objects.Where(o => o.Kind is SceneObjectKind.Gate or SceneObjectKind.Hole or SceneObjectKind.LaneRing)
-                .Select(o => Connection(session, o.Section, o.View, o.Kind)).ToList(),
+                .Select(o => Connection(session, o.Section, o.View, o.Kind, archetypes.RadiusOf(o.View))).ToList(),
             Nebulae = items.Where(i => i.Kind == SceneKind.Nebula).Select(i => Ref(i.Section)).ToList(),
             AsteroidFields = items.Where(i => i.Kind == SceneKind.Asteroids).Select(i => Ref(i.Section)).ToList(),
             Problems = AgentRows.ProblemsOf(session, section),
@@ -160,7 +176,7 @@ internal static class SceneQueries
         var near = args.Group("near");
         var point = near?.Point("point");
         var radius = near?.Number("radius");
-        var kindsOf = new ObjectKinds(session);
+        var archetypes = new Archetypes(session);
         // A filter reads only what it needs, and the rows of the page read the rest. So a list of a large system
         // stays in one frame of the editor.
         var rows = new List<(SectionRef Section, SceneKind Kind)>();
@@ -170,7 +186,7 @@ internal static class SceneQueries
                 continue;
             SectionView? view = null;
             SectionView View() => view ??= session.Get(section)!;
-            if (objectKinds != null && (kind != SceneKind.Object || !objectKinds.Contains(Name(kindsOf.Of(View())))))
+            if (objectKinds != null && (kind != SceneKind.Object || !objectKinds.Contains(Name(archetypes.KindOf(View())))))
                 continue;
             if (text != null && !ToolCall.Matches(text, section.Id.Key,
                     call.Texts.NameOf(Named(session, section, kind) ?? section), SceneSections.Last(View(), "archetype")))
@@ -189,11 +205,12 @@ internal static class SceneQueries
             return new SceneItemRow(ItemRefs.Canonical(session, r.Section), r.Section.Id.Key,
                 call.Texts.NameOf(Named(session, r.Section, r.Kind) ?? r.Section), KindOf(r.Kind))
             {
-                ObjectKind = isObject ? kindsOf.Of(view) : null,
+                ObjectKind = isObject ? archetypes.KindOf(view) : null,
                 Archetype = isObject ? SceneSections.Last(view, "archetype") : null,
                 Pos = AgentRows.Numbers(view, "pos"),
                 Rotate = AgentRows.Numbers(view, "rotate"),
                 Size = r.Kind == SceneKind.Zone ? AgentRows.Numbers(view, "size") : null,
+                Radius = isObject ? archetypes.RadiusOf(view) : null,
                 Components = isObject ? ObjectComponents.Of(session, r.Section).Select(c => c.Kind).ToList() : [],
                 Origin = Origin(session, r.Section, view, r.Kind),
                 AgentChanged = session.AgentSections.Contains(r.Section),
@@ -202,17 +219,19 @@ internal static class SceneQueries
     }
 
     /// <summary>
-    /// The <c>[system]</c> of the argument <c>system</c>, with its file. The argument is a nickname or a
-    /// <c>system:</c> reference, as the rows of <c>list_systems</c> give it.
+    /// The <c>[system]</c> of a system argument, with its file. The argument is a nickname or a <c>system:</c>
+    /// reference, as the rows of <c>list_systems</c> give it.
     /// </summary>
+    /// <param name="field">The argument, for the error of a reference of another kind.</param>
     /// <exception cref="EditException"><see cref="EditErrorKind.NotFound"/> with the closest names, or
     /// <see cref="EditErrorKind.InvalidArgument"/> for a reference of another kind.</exception>
-    internal static (string Nickname, SectionRef Section, string? Path) System(EditSession session, string text)
+    internal static (string Nickname, SectionRef Section, string? Path) System(EditSession session, string text,
+        string field = "system")
     {
         // No nickname holds a ':' (section 5.6 of the MCP1 design), so a text with one is a reference.
         var reference = text.Contains(':') ? ItemRefs.Parse(text) : new ItemReference(ItemRefKind.System, text);
         if (reference.Kind != ItemRefKind.System)
-            throw ToolInput.Bad("system", AgentTexts.Error("system_ref", ("ref", text)));
+            throw ToolInput.Bad(field, AgentTexts.Error("system_ref", ("name", field), ("ref", text)));
         var section = ItemRefs.ResolveSection(session, reference);
         var key = section.Id.Key ?? reference.Name;
         return (key, section, session.SystemPath(key));
@@ -258,17 +277,17 @@ internal static class SceneQueries
     private static string ObjectRef(string nickname) => ItemRefs.Format(new ItemReference(ItemRefKind.Object, nickname));
 
     /// <summary>
-    /// The object kinds of the objects of one call. An object of a connection type, or with a <c>goto</c>, a
-    /// <c>prev_ring</c> or a <c>next_ring</c> line, is a connection (decision D253). Else the kind follows the template
-    /// of the archetype type. A <c>mission_satellite</c> is a wreck: retail gives wrecks this type (section 7.3 of the
-    /// MCP1 design). The archetype types come from the list once for each archetype of the call.
+    /// The facts of the archetypes of the objects of one call: the object kind and the radius. An object of a connection
+    /// type, or with a <c>goto</c>, a <c>prev_ring</c> or a <c>next_ring</c> line, is a connection (decision D253). Else
+    /// the kind follows the template of the archetype type. A <c>mission_satellite</c> is a wreck: retail gives wrecks
+    /// this type (section 7.3 of the MCP1 design). Each archetype comes from the list once for each call.
     /// </summary>
-    internal sealed class ObjectKinds(EditSession session)
+    internal sealed class Archetypes(EditSession session)
     {
-        private readonly Dictionary<string, string?> types = new(StringComparer.OrdinalIgnoreCase);
-        private readonly ListView? archetypes = session.Lists.List("solar_archetype");
+        private readonly Dictionary<string, SectionView?> solars = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ListView? list = session.Lists.List("solar_archetype");
 
-        public SceneObjectKind Of(SectionView view)
+        public SceneObjectKind KindOf(SectionView view)
         {
             var type = TypeOf(view);
             if (type != null && session.Lists.RuleData.ConnectionTypes.Contains(type))
@@ -295,19 +314,26 @@ internal static class SceneQueries
             };
         }
 
+        /// <summary>The <c>solar_radius</c> of the archetype of an object in meters, or null.</summary>
+        public float? RadiusOf(SectionView view) =>
+            Solar(view) is { } solar && AgentRows.Numbers(solar, "solar_radius") is [var radius, ..] ? radius : null;
+
         /// <summary>The <c>[Solar] type</c> of the archetype of an object in lowercase, or null.</summary>
-        private string? TypeOf(SectionView view)
+        private string? TypeOf(SectionView view) => Solar(view) is { } solar
+            ? SceneSections.Last(solar, "type")?.ToLowerInvariant()
+            : null;
+
+        /// <summary>The <c>[Solar]</c> of the archetype of an object, or null.</summary>
+        private SectionView? Solar(SectionView view)
         {
             if (SceneSections.Last(view, "archetype") is not { } archetype)
                 return null;
-            if (!types.TryGetValue(archetype, out var type))
+            if (!solars.TryGetValue(archetype, out var solar))
             {
-                type = archetypes?.Find(archetype)?.Section is { } solar && session.Get(solar) is { } section
-                    ? SceneSections.Last(section, "type")?.ToLowerInvariant()
-                    : null;
-                types[archetype] = type;
+                solar = list?.Find(archetype)?.Section is { } section ? session.Get(section) : null;
+                solars[archetype] = solar;
             }
-            return type;
+            return solar;
         }
     }
 
@@ -322,7 +348,8 @@ internal static class SceneQueries
 
     /// <summary>A connection with the references of its partners: the <c>goto</c> line of a gate or a hole names the
     /// system and the object, and the ring lines of a trade lane ring name the rings.</summary>
-    private static ConnectionRow Connection(EditSession session, SectionRef section, SectionView view, SceneObjectKind kind)
+    private static ConnectionRow Connection(EditSession session, SectionRef section, SectionView view, SceneObjectKind kind,
+        float? radius)
     {
         var go = view.Lines("goto").LastOrDefault();
         string? Value(int index) =>
@@ -333,6 +360,6 @@ internal static class SceneQueries
             Value(0) is { } system ? SystemRef(system) : null,
             Value(1) is { } partner ? ObjectRef(partner) : null,
             SceneSections.Last(view, "prev_ring") is { } previous ? ObjectRef(previous) : null,
-            SceneSections.Last(view, "next_ring") is { } next ? ObjectRef(next) : null);
+            SceneSections.Last(view, "next_ring") is { } next ? ObjectRef(next) : null, radius);
     }
 }

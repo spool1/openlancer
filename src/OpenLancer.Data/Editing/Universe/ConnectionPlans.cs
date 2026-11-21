@@ -160,24 +160,25 @@ public static class ConnectionPlans
         var ends = new End[2];
         foreach (var (request, i) in new[] { (from, 0), (to, 1) })
         {
+            var part = i == 0 ? "from" : "to";
             if (session.SystemSection(request.System.Trim()) is not { Id.Key: { } system } systemSection)
                 return plan.Refuse(session.UniversePath ?? "", $"No [system] has the nickname {request.System.Trim()}.",
-                    detail: MissionErrors.ItemNotFound);
+                    detail: MissionErrors.ItemNotFound, part: $"{part}.system");
             if (ScenePlans.SystemFileProblem(session, system, out var path) is { } fileProblem)
-                return plan.Refuse(fileProblem.Source, fileProblem.Message, systemSection);
-            ends[i] = new End(request, system, path, systemSection);
+                return plan.Refuse(fileProblem.Source, fileProblem.Message, systemSection, part: $"{part}.system");
+            ends[i] = new End(request, part, system, path, systemSection);
         }
         var same = FLHash.CreateID(ends[0].System) == FLHash.CreateID(ends[1].System);
         if (kind == ConnectionKind.Gate && same)
             return plan.Refuse(ends[1].Path, "A jump gate pair needs two systems. Use the kind jump_hole for a hole inside " +
-                                             "one system.", ends[1].SystemSection, GateSameSystem);
+                                             "one system.", ends[1].SystemSection, GateSameSystem, "to.system");
 
         SectionView? like = null;
         if (options.Like is { } likeRef)
         {
             if (SceneSections.KindOf(session, likeRef) != SceneKind.Object || session.Get(likeRef) is not { } likeView)
                 return plan.Refuse(likeRef.Path, $"{likeRef.Id} is not an object of a system file. Pick a jump gate or a " +
-                                                 "jump hole.", likeRef, MissionErrors.ItemNotFound);
+                                                 "jump hole.", likeRef, MissionErrors.ItemNotFound, "like");
             like = likeView;
         }
         var endRule = rule.For(kind);
@@ -190,7 +191,8 @@ public static class ConnectionPlans
             return plan.Refuse(ends[0].Path, (archetypeType == null
                 ? $"No solar archetype has the name {archetype}."
                 : $"The archetype {archetype} is a {archetypeType.ToUpperInvariant()}.") +
-                $" The kind {kindName} needs an archetype of the type {needed.ToUpperInvariant()}.", detail: KindMismatch);
+                $" The kind {kindName} needs an archetype of the type {needed.ToUpperInvariant()}.", detail: KindMismatch,
+                part: options.Archetype == null && like != null ? "like" : "archetype");
 
         // The existing ends.
         foreach (var end in ends.Where(e => e.Request.Object != null))
@@ -199,26 +201,27 @@ public static class ConnectionPlans
             if (session.Sections(end.Path).FirstOrDefault(s => SceneSections.Is(s.Id.Type, SceneSections.ObjectType) &&
                                                                string.Equals(s.Id.Key, name, StringComparison.OrdinalIgnoreCase))
                 is not { } existing || session.Get(existing) is not { } view)
-                return plan.Refuse(end.Path, $"{end.System} has no object {name}.", detail: MissionErrors.ItemNotFound);
+                return plan.Refuse(end.Path, $"{end.System} has no object {name}.", detail: MissionErrors.ItemNotFound,
+                    part: $"{end.Part}.object");
             if (view.ReadOnlyReason is { } reason)
-                return plan.Refuse(end.Path, $"{existing.Id.Key}: {reason}", existing);
+                return plan.Refuse(end.Path, $"{existing.Id.Key}: {reason}", existing, part: $"{end.Part}.object");
             var type = SceneSections.ArchetypeType(session, view);
             if (type != needed)
                 return plan.Refuse(end.Path, $"{existing.Id.Key} is " + (type == null
                     ? "not an object with an archetype of the solar archetypes."
                     : $"a {type.ToUpperInvariant()}.") + $" The kind {kindName} needs an object of the type " +
-                    $"{needed.ToUpperInvariant()}.", existing, KindMismatch);
+                    $"{needed.ToUpperInvariant()}.", existing, KindMismatch, $"{end.Part}.object");
             if (PartnerOf(session, view) is { } partner && GoesBack(session, partner.View, end.System, existing.Id.Key!))
                 return plan.Refuse(end.Path, $"{existing.Id.Key} already goes to {partner.Section.Id.Key}, and " +
                                              $"{partner.Section.Id.Key} goes back. Pick an object without a pair.", existing,
-                    EndPaired);
+                    EndPaired, $"{end.Part}.object");
             end.Existing = existing;
             end.View = view;
             end.Nickname = existing.Id.Key!;
         }
         if (ends[0].Existing is { } first && first.Equals(ends[1].Existing))
             return plan.Refuse(ends[0].Path, "The two ends name the same object. Pick two objects.", first,
-                MissionErrors.FieldValue);
+                MissionErrors.FieldValue, "to.object");
 
         // The nicknames of the new ends.
         var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -231,15 +234,15 @@ public static class ConnectionPlans
             var name = end.Request.Nickname?.Trim() is { Length: > 0 } wanted ? wanted : Free(session, stem, reserved);
             if (name.Length > MaxNicknameLength)
                 return plan.Refuse(end.Path, $"The nickname {name} has more than {MaxNicknameLength} characters. Give a " +
-                                             "shorter nickname.", detail: MissionErrors.NameInvalid);
+                                             "shorter nickname.", detail: MissionErrors.NameInvalid, part: $"{end.Part}.nickname");
             if (PatchFormatter.KeyError(name, binary) is { } keyError)
-                return plan.Refuse(end.Path, keyError, detail: MissionErrors.NameInvalid);
+                return plan.Refuse(end.Path, keyError, detail: MissionErrors.NameInvalid, part: $"{end.Part}.nickname");
             if (session.Nicknames.Taken(name) is { } taken)
                 return plan.Refuse(end.Path, $"The nickname {name} is taken: {taken.Name} has the same nickname or the " +
-                                             "same FLHash.", taken.Section, MissionErrors.NameTaken);
+                                             "same FLHash.", taken.Section, MissionErrors.NameTaken, $"{end.Part}.nickname");
             if (reserved.Any(r => FLHash.CreateID(r) == FLHash.CreateID(name)))
                 return plan.Refuse(end.Path, $"The two new ends cannot both have the nickname {name}.",
-                    detail: MissionErrors.NameTaken);
+                    detail: MissionErrors.NameTaken, part: $"{end.Part}.nickname");
             reserved.Add(name);
             end.Nickname = name;
         }
@@ -506,9 +509,12 @@ public static class ConnectionPlans
     }
 
     /// <summary>One end of a new pair while the plan reads it.</summary>
-    private sealed class End(ConnectionEnd request, string system, string path, SectionRef systemSection)
+    private sealed class End(ConnectionEnd request, string part, string system, string path, SectionRef systemSection)
     {
         public ConnectionEnd Request { get; } = request;
+
+        /// <summary>The parameter of the end: <c>from</c> or <c>to</c> (see <see cref="ConnectionPlan.RefusedPart"/>).</summary>
+        public string Part { get; } = part;
 
         /// <summary>The nickname of the system as <c>universe.ini</c> writes it.</summary>
         public string System { get; } = system;

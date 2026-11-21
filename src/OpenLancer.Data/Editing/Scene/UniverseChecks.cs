@@ -95,8 +95,7 @@ internal static class UniverseChecks
                     $"The systems {nickname} and {other.Nickname} are at the same place on the nav map. Their stars overlap.");
         }
 
-        if (!session.Routes.Graph.Connections.Any(c => c.TargetSystem.Equals(nickname, StringComparison.OrdinalIgnoreCase) &&
-                                                       !c.System.Equals(nickname, StringComparison.OrdinalIgnoreCase)))
+        if (!session.Routes.Graph.Reached(nickname))
             yield return Warning(section, "nickname",
                 $"No jump gate or jump hole leads to {nickname}. The player can only go there with a mission or a new game " +
                 "start.");

@@ -6,6 +6,7 @@ using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.Editing.Universe;
 using OpenLancer.Data.Thn;
 using OpenLancer.Runtime.Scene;
 using OpenLancer.Studio.Commands;
@@ -95,8 +96,10 @@ internal static partial class ItemEditTools
     /// <summary>
     /// Gives an item a new nickname with each line that names it. An item of a system calls the rename of the Scene
     /// (decisions D12, D231 and D257). A mission item calls the rename of the mission studio (see
-    /// <see cref="RenameMissionItem"/>). Another item calls the rename of the Database, which changes only an item that
-    /// the active mod adds (review finding R4 of MCP1-2). The result gives the old and the new reference.
+    /// <see cref="RenameMissionItem"/>). A <c>[system]</c> of <c>universe.ini</c> calls the rename of a system (see
+    /// <see cref="SystemPlans.Rename"/>), which changes only a system that the active mod adds. Another item calls the
+    /// rename of the Database, which changes only an item that the active mod adds (review finding R4 of MCP1-2). The
+    /// result gives the old and the new reference.
     /// </summary>
     public static ToolStep RenameItem(ToolCall call) => EditTools.Apply(call, scope =>
     {
@@ -114,6 +117,11 @@ internal static partial class ItemEditTools
             return;
         }
         var section = target.Section!;
+        if (session.IsSystemSection(section))
+        {
+            RenameSystem(scope, section, name);
+            return;
+        }
         var scene = SceneSections.KindOf(session, section) != null;
         var item = scene ? ScenePlans.RenameTarget(session, section) : section;
         var from = ItemRefs.Canonical(session, item);
@@ -134,15 +142,22 @@ internal static partial class ItemEditTools
 
     /// <summary>
     /// Deletes items. Items of a system go with the cascade of decision D81: the children, and the lines that a rule
-    /// removes. The other lines that name them show "Missing". The editor has no delete of a data item, so such a
-    /// reference refuses (review finding R4 of MCP1-2). Mission items go with the deletes of the mission studio (see
-    /// <see cref="DeleteMissionItems"/>).
+    /// removes. A jump gate or a jump hole goes with its pair. The other lines that name them show "Missing". A
+    /// <c>[system]</c> of <c>universe.ini</c> goes with its file and the partners of its jump objects (see
+    /// <see cref="SystemPlans.Delete"/>). Each system delete is one plan, and the plan of the other items of a system
+    /// runs after them. An item that went with a deleted system is not in that plan. The editor has no delete of a data
+    /// item, so such a reference refuses (review finding R4 of MCP1-2). Mission items go with the deletes of the mission
+    /// studio (see <see cref="DeleteMissionItems"/>).
     /// </summary>
     public static ToolStep DeleteItems(ToolCall call) => EditTools.Apply(call, scope =>
     {
+        var session = scope.Session;
         var (scene, missions, cutscene) = Split(call, scope, "Delete");
-        if (scene.Count > 0)
-            scope.Run(SceneCommands.Delete(scope.Session, scene), scene);
+        foreach (var system in scene.Where(session.IsSystemSection))
+            scope.Run(SystemPlans.Delete(session, system.Id.Key!), [system]);
+        var items = scene.Where(s => !session.IsSystemSection(s) && session.Get(s) != null).ToList();
+        if (items.Count > 0)
+            scope.Run(SceneCommands.Delete(session, items), items);
         if (missions.Count > 0)
             DeleteMissionItems(call, scope, missions);
         if (cutscene.Count > 0)
@@ -172,6 +187,20 @@ internal static partial class ItemEditTools
         if (cutscene.Count > 0)
             DuplicateCutsceneEvents(scope, cutscene, timeOffset, offset != null);
     });
+
+    /// <summary>Gives a system that the active mod adds a new nickname (see <see cref="SystemPlans.Rename"/>). The
+    /// result gives the old and the new <c>system:</c> reference.</summary>
+    private static void RenameSystem(EditScope scope, SectionRef system, string name)
+    {
+        var session = scope.Session;
+        var from = ItemRefs.Canonical(session, system);
+        var plan = SystemPlans.Rename(session, system.Id.Key!, name);
+        scope.Run(plan, [system]);
+        scope.Report(new EditResult(EditStatus.Applied)
+        {
+            Renames = [new ResultRename(from, ItemRefs.Canonical(session, plan.System!))],
+        });
+    }
 
     /// <summary>Copies items of a system, then moves the copies with a position by the offset.</summary>
     private static void DuplicateSceneItems(EditScope scope, IReadOnlyList<SectionRef> targets, Vector3? offset)
@@ -219,7 +248,10 @@ internal static partial class ItemEditTools
                 ? (g.Any(t => t.Element.Kind == ThnElementKind.Event) ? 1 : 0) +
                   g.Count(t => t.Element.Kind == ThnElementKind.Entity)
                 : 1);
-        if ((scene.Count > 0 ? 1 : 0) + (missions.Count > 0 ? 1 : 0) + cutscenePlans > 1)
+        // A delete runs one plan for each system and one plan for the other items of the systems.
+        var systems = verb == "Delete" ? scene.Count(call.Session.IsSystemSection) : 0;
+        var scenePlans = systems + (scene.Count > systems ? 1 : 0);
+        if (scenePlans + (missions.Count > 0 ? 1 : 0) + cutscenePlans > 1)
             scope.Batch.Label ??= $"{verb} {scene.Count + missions.Count + cutscene.Count} items";
         return (scene, missions, cutscene);
     }

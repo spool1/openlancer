@@ -61,7 +61,7 @@
     },
     "get_system": {
       "title": "Get a star system",
-      "description": "Gives one star system: its fields, the number of items of each kind, its bases, connections, nebulae, asteroid fields and problems. This tool changes nothing. Get the systems from list_systems first."
+      "description": "Gives one star system: its fields, the number of items of each kind, its bases, connections, nebulae, asteroid fields and problems. It also gives the place on the nav map and the jump objects. This tool changes nothing. Get the systems from list_systems first."
     },
     "list_items": {
       "title": "List the items of a system",
@@ -200,7 +200,7 @@
     },
     "set_fields": {
       "title": "Set the fields of an item",
-      "description": "Sets fields of one item: a section by its INI keys, or a cutscene entity or event by its THN paths. The tool makes one Undo step. Use get_item or get_cutscene to see the keys and the values first. A value that a list check refuses applies, and the result gives the new problem. A mission item runs in strict mode, so an edit that adds an error to its script refuses.",
+      "description": "Sets fields of one item: a section by its INI keys, or a cutscene entity or event by its THN paths. The tool makes one Undo step. Use get_item or get_cutscene to see the keys and the values first. The goto line of a jump gate or a jump hole is locked. Use connection_create and delete_items for the pair. A value that a list check refuses applies, and the result gives the new problem. A mission item runs in strict mode, so an edit that adds an error to its script refuses.",
       "fields": {
         "ref": "The reference of the item, for example obj:my_station_1 or list:ship/my_ship. A mission item takes its sec: reference, for example of a ship or an NPC. A trigger refuses. Use the mission tools for its lines. A cutscene entity or event takes its thn: reference, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#event/0.",
         "fields": "The new values by INI key. A text, a number or true or false is one line with one value. An array of values is one line, for example [1, 2, 3]. An array of arrays gives one line for each array. null or [] removes the key. A text cannot hold ','. A mission item takes the field forms of mission_add_item. A cutscene item takes the THN paths and the value forms of get_cutscene, for example \"props.duration\": 2. For props.animation of a START_MOTION event on a character, get the clip names from list_values with the list animation. For a cutscene item, only null removes a key, and [] turns off the named bits of a bits key. A Lua text of a cutscene item can hold ','.",
@@ -221,15 +221,15 @@
       "title": "Rename an item",
       "description": "Gives an item a new nickname and changes each line that names it. A rename of a ship or equipment also changes the templates of the cutscene COMPOUNDs that name it. A cutscene entity gets a new name, and the events of its script that name it change too. The tool makes one Undo step. When the rename warns, cannot change a line that names the item, or other files name it, the tool asks for confirm: true.",
       "fields": {
-        "ref": "The reference of the item, for example obj:my_station_1. A data item must be an item that the active mod adds. A trigger takes its trg: reference, and another mission item its sec: reference. A cutscene entity takes its thn: reference, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#entity/Camera_01.",
+        "ref": "The reference of the item, for example obj:my_station_1. A data item must be an item that the active mod adds. A system takes its system: reference, and it must be a system that the active mod adds. A trigger takes its trg: reference, and another mission item its sec: reference. A cutscene entity takes its thn: reference, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#entity/Camera_01.",
         "new_name": "The new nickname, or the new name of a cutscene entity. A refusal tells why a name is not valid."
       }
     },
     "delete_items": {
       "title": "Delete items",
-      "description": "Deletes items with their children. Other lines that name them show 'Missing'. A cutscene entity goes with the events that name it. A jump gate or a jump hole goes with its pair, its traffic zones and its gate lock lines. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true. Of the parts of a pair, only an end in another file makes it ask.",
+      "description": "Deletes items with their children. Other lines that name them show 'Missing'. A cutscene entity goes with the events that name it. A jump gate or a jump hole goes with its pair, its traffic zones and its gate lock lines. A system that the active mod adds goes with its file and the partners of its jump objects, and always asks for confirm: true. The tool makes one Undo step. When the delete changes more than its targets, the tool asks for confirm: true. Of the parts of a pair, only an end in another file makes it ask.",
       "fields": {
-        "refs": "The references of the items, for example obj:my_station_1. The tool deletes objects, zones, lights, nebulae and asteroid fields of a system. It also deletes triggers, prefab instances and other mission items: trg:, inst: and sec: references. It also deletes cutscene entities and events: thn: references with #entity/ or #event/. studio_status gives the most items of one call.",
+        "refs": "The references of the items, for example obj:my_station_1. The tool deletes objects, zones, lights, nebulae and asteroid fields of a system. It also deletes a system that the active mod adds: its system: reference. It also deletes triggers, prefab instances and other mission items: trg:, inst: and sec: references. It also deletes cutscene entities and events: thn: references with #entity/ or #event/. studio_status gives the most items of one call.",
         "expect_events": "Guards for the cutscene events of refs. Each row names one event of refs with the type and the time that you read.",
         "expect_events.ref": "The reference of an event of refs, for example thn:DATA\\MODS\\my_mod\\CUTSCENES\\my_intro.thn#event/2.",
         "expect_events.expect_type": "The type that the event must have, for example START_SOUND. Another type refuses with RowChanged.",
@@ -240,7 +240,7 @@
       "title": "Copy items",
       "description": "Copies items of a system with their children, mission items and cutscene events. Each copy of an item of a system and each mission copy gets the next free nickname. The copies of cutscene events start at the end of the events. The tool makes one Undo step. The result gives the references of the copies.",
       "fields": {
-        "refs": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. It also copies triggers and other mission items: trg: and sec: references. It also copies cutscene events: thn: references with #event/. studio_status gives the most items of one call.",
+        "refs": "The references of the items to copy, for example obj:my_station_1. The tool copies objects, zones and lights of a system. A jump gate, a jump hole, an airlock gate and a trade lane ring refuse, because a copy has no partner. It also copies triggers and other mission items: trg: and sec: references. It also copies cutscene events: thn: references with #event/. studio_status gives the most items of one call.",
         "offset": "Move each copy and each copy of a child by this offset in meters: X, Y and Z. A copy without a position, a mission copy and a copy of a cutscene event do not move, and the result warns about them. Without it, each copy is at the place of its item.",
         "time_offset": "The seconds from the time of each cutscene event to the time of its copy. 0 refuses, because a copy at the time of its event has the key of the event. Without it, the copies start at the end of the events.",
         "expect_events": "Guards for the cutscene events of refs. Each row names one event of refs with the type and the time that you read.",
@@ -255,7 +255,7 @@
       "fields": {
         "system": "The nickname of the system, for example my_system.",
         "template": "The kind of object. A station archetype with a docking sphere also needs a base.",
-        "archetype": "The solar archetype. Get the values from list_values with the list solar_archetype.",
+        "archetype": "The solar archetype. Get the values from list_values with the list solar_archetype. A jump gate, a jump hole, an airlock gate or a trade lane ring refuses. Use connection_create for a pair.",
         "position": "The position in meters. The editor rounds each value to a whole number.",
         "rotation": "The rotation in degrees about X, Y and Z.",
         "nickname": "The nickname of the new object. Without it, the editor makes the next free nickname. A refusal tells why a nickname is not valid.",
@@ -290,7 +290,7 @@
       "title": "Place an asset in a system",
       "description": "Places an asset of search_assets at a point of a system, as a drop on the Scene does. The tool makes one Undo step. A ship or a model makes a new static prop archetype.",
       "fields": {
-        "asset": "The asset reference from search_assets, for example asset:solar_archetype/my_archetype. Use prop_group_place for a prop group.",
+        "asset": "The asset reference from search_assets, for example asset:solar_archetype/my_archetype. Use prop_group_place for a prop group. A jump gate, a jump hole, an airlock gate or a trade lane ring refuses. Use connection_create for a pair.",
         "position": "The position in meters. The editor rounds each value to a whole number.",
         "parent": "The reference of an object that gets the new object as a child. The object must be in the same system.",
         "base": "The base of a station archetype with a docking sphere. Get the values from list_values with the list base."
@@ -374,6 +374,72 @@
         "density_restrictions": "The density restrictions of the zone. Without it, the zone keeps its density restrictions.",
         "count": "The most ships of the class in the zone.",
         "class": "The class of the ships, as the encounter files name it, for example lawful."
+      }
+    },
+    "system_create": {
+      "title": "Create a star system",
+      "description": "Makes a new star system of the active mod like a template system. It adds the [system] to universe.ini, and a system file with a sun and its death zone. The tool makes one Undo step. No jump gate or jump hole leads to the new system yet. Use connection_create next. The game log gets one line for a system without a voice prefix. This is normal. A new system has no NPC voice lines for its name.",
+      "fields": {
+        "nickname": "The nickname of the new system, for example my_sys01. At most 15 characters. Start it with a short prefix of your mod, so that two mods do not collide.",
+        "name": "The name of the system on the nav map. The editor writes it into the text of the mod.",
+        "infocard": "The text of the infocard. Without it, the infocard shows the name.",
+        "like": "The template system: its nickname or its system: reference. The new system copies its background, music, dust, ambient color, lights, faction, encounter parameters and sun.",
+        "map_pos": "The place on the nav map grid: two whole numbers from 0 to 15, X and Y. get_universe gives the places of the other systems.",
+        "nav_map_scale": "The zoom of the system map, a number above 0. Without it, the new system takes the zoom of like.",
+        "on_map_at_start": "True shows the system on the nav map of a new game. False shows it after the first visit.",
+        "copy": "The parts of like to copy. The new system always copies the [SystemInfo] section. Without it, the new system copies all parts. An empty list copies no part.",
+        "local_faction": "The faction of the system. Get the values from list_values with the list faction. Without it, the new system takes the faction of like.",
+        "sun": "The sun at the center. Without it, the new system copies the first sun of like with its death zone. The sun then gets the name of the system with Sun.",
+        "sun.archetype": "The solar archetype of the sun. Its type must be SUN. Get the values from list_values with the list solar_archetype and the text SUN.",
+        "sun.star": "The star of the sun. Get the values from list_values with the list star.",
+        "sun.name": "The name of the sun. The editor writes it into the text of the mod."
+      }
+    },
+    "connection_create": {
+      "title": "Create a jump gate pair or a jump hole pair",
+      "description": "Makes a jump connection between two systems: a new object at each end, each with a goto line that names the other end. A jump hole pair can stay in one system. The tool makes one Undo step. An end can name an existing object without a partner, and the tool then writes only its goto line. The result tells how the routes change.",
+      "fields": {
+        "kind": "jump_gate or jump_hole. A gate shows on the nav map and has a faction. A hole is hidden until the player finds it.",
+        "from": "The first end of the connection.",
+        "to": "The second end of the connection. A jump gate pair needs another system than from.",
+        "system": "The system of the end: its nickname or its system: reference.",
+        "object": "An existing jump gate or jump hole of the system without a partner: its nickname or its obj: reference. The tool then writes only its goto line. Without it, the end is a new object.",
+        "position": "The position of a new object in meters: X, Y and Z. Without it, the object goes toward the other system on the nav map, out past the farthest object.",
+        "rotation": "The rotation of a new object in degrees about X, Y and Z. Without it, the front of the object looks at the center of the system.",
+        "nickname": "The nickname of a new object. Without it, the object gets the retail form, for example my_sys01_to_my_sys02.",
+        "name": "The name of a new object. Without it, the object gets the name pattern of the rule data with the name of the other system.",
+        "like": "The reference of a jump gate or a jump hole. The new objects copy its archetype, loadout, pilot, behavior, difficulty, jump effect, tunnel and infocard.",
+        "archetype": "The solar archetype of the new objects. Its type must match kind. Get the values from list_values with the list solar_archetype and the text JUMP_GATE or JUMP_HOLE. NPC traffic uses only the archetypes jumpgate and jumphole.",
+        "faction": "The faction of a new jump gate. Get the values from list_values with the list faction. Without it, each gate takes the local faction of its system.",
+        "loadout": "The loadout of a new jump gate. Get the values from list_values with the list loadout. Without it, the gate takes the loadout of like, else the loadout that the gates of its faction have most often.",
+        "pilot": "The pilot of a new jump gate. Get the values from list_values with the list pilot. Without it, the gate takes the pilot of like, else the pilot that the gates of its faction have most often.",
+        "locked": "The lock at the start of a new game: none, player, npc or both. A mission unlocks a gate with Act_LockDock. The route tables leave out a gate that is locked for the player, also after the unlock.",
+        "traffic_zone": "True makes a traffic zone at each new object, where NPCs come and go. Give it encounters with scene_set_encounters."
+      }
+    },
+    "connection_set_lock": {
+      "title": "Lock a jump gate or a jump hole",
+      "description": "Sets the lock of a jump gate or a jump hole at the start of a new game. The tool writes the gate lock lines of the game data. The tool makes one Undo step. A gate of the game or of a lower mod works too. The result tells how the routes change.",
+      "fields": {
+        "object": "The reference of the jump gate or the jump hole, for example obj:my_sys01_to_my_sys02.",
+        "locked": "The lock: none, player, npc or both. A mission unlocks a gate with Act_LockDock. The route tables leave out a gate that is locked for the player, also after the unlock.",
+        "pair": "True also sets the lock of the partner, when the partner goes back to the object."
+      }
+    },
+    "get_universe": {
+      "title": "Get the universe",
+      "description": "Gives the star systems with their places on the nav map, their jump objects and if a connection reaches them. It also gives the jump connections of the systems of the page, and if the build writes route tables. This tool changes nothing.",
+      "fields": {
+        "system": "Show only this system and its connections: its nickname or its system: reference."
+      }
+    },
+    "get_route": {
+      "title": "Get the routes of a system",
+      "description": "Gives the shortest routes from one system, as the route tables of the retail games give them after Ctrl+F5 or an export. The tables leave out each gate that is locked for the player. This tool changes nothing.",
+      "fields": {
+        "from": "The start system: its nickname or its system: reference.",
+        "to": "Show only the route to this system: its nickname or its system: reference. Without it, the result gives the routes to all systems.",
+        "kind": "The route table: all for each connection, gates for the jump gates, holes for the jump holes."
       }
     },
     "prop_group_place": {
@@ -1373,7 +1439,7 @@
     "list_no_system": "The list {list} is not a list of one system. Remove the argument 'system'.",
     "list_no_script": "The list {list} is not a list of one mission script. Remove the argument 'script'.",
     "script_none": "The edit view has no mission script {script}. Use list_missions to find the scripts.",
-    "system_ref": "The argument 'system' takes a nickname or a system: reference, not {ref}.",
+    "system_ref": "The argument '{name}' takes a nickname or a system: reference, not {ref}.",
     "tool_failed": "The tool {tool} stopped because of an error of the server: {reason} The tool changed nothing.",
     "wait_editing": "The user edits a field or drags an item now.",
     "wait_renaming": "The user renames an item in the Hierarchy now.",
@@ -1472,7 +1538,7 @@
     "redo_nothing": "The history has no step to redo.",
     "undo_user_entry": "The last edit is an edit of the user: {label}. The agent can undo only its own edits.",
     "redo_user_entry": "The next step to redo is an edit of the user: {label}. The agent can redo only its own edits.",
-    "rename_kind": "The tool can rename an item of a system. It can also rename a ship, equipment or a good that the active mod adds. {ref} is not such an item, so the editor cannot rename it.",
+    "rename_kind": "The tool can rename an item of a system. It can also rename a system, a ship, equipment or a good that the active mod adds. {ref} is not such an item, so the editor cannot rename it.",
     "undo_recovery_entry": "The last step restored the unsaved edits of an earlier session: {label}. The agent can undo only its own edits.",
     "redo_recovery_entry": "The next step to redo restores the unsaved edits of an earlier session: {label}. The agent can redo only its own edits.",
     "redo_user_undid": "The user undid this edit: {label}. The agent cannot redo it.",
@@ -1540,6 +1606,9 @@
     "component_no_value": "A remove takes no value.",
     "component_value_text": "The value of a component is one nickname. It cannot hold a comma, a semicolon or a line break.",
     "component_value_none": "The list {list} has no entry {value}. Get the values from list_values with the list {list}.",
+    "system_save_to_open": "Save the mod to open the new system in the Scene.",
+    "connection_end_existing": "{end}.object names an existing object, and the tool writes only its goto line. Remove {end}.{member}.",
+    "connection_end_system": "{ref} is not an object of the system {system}. Give an object of that system.",
     "place_errors": "Some lines of {group} name entries that this profile does not have. To place the group without these lines, call again with leave_out_error_lines: true. The lines: {lines}",
     "group_members": "The group has {count} members: {members}.",
     "group_member": "The group has 1 member: {members}.",
@@ -1840,12 +1909,16 @@
     "SystemView.nebulae": "The nebula: references of the nebulae of the system.",
     "SystemView.asteroid_fields": "The field: references of the asteroid fields of the system.",
     "SystemView.problems": "The problems of the [system] section.",
+    "SystemView.map_pos": "The place on the nav map grid, X and Y, as the pos line gives it, or none.",
+    "SystemView.nav_map_scale": "The zoom of the system map, or none when the system has no NavMapScale line.",
+    "SystemView.jump_objects": "The jump objects of the system file: the objects with a goto line.",
     "ConnectionRow.ref": "The obj: reference of the gate, the hole or the ring.",
     "ConnectionRow.kind": "gate for a jump gate, hole for a jump hole, lane_ring for a trade lane ring.",
     "ConnectionRow.to_system": "The system: reference of the partner of a gate or a hole, or none.",
     "ConnectionRow.to_object": "The obj: reference of the partner of a gate or a hole, or none.",
     "ConnectionRow.previous": "The obj: reference of the previous ring of a trade lane ring, or none.",
     "ConnectionRow.next": "The obj: reference of the next ring of a trade lane ring, or none.",
+    "ConnectionRow.radius": "The solar_radius of the archetype in meters, or none.",
     "SceneItemRow.ref": "The reference of the item: obj:, zone:, light:, nebula: or field:.",
     "SceneItemRow.nickname": "The nickname of the item, or the zone of a nebula or an asteroid field.",
     "SceneItemRow.kind": "The kind of the item: object, zone, light, nebula or field.",
@@ -1854,6 +1927,7 @@
     "SceneItemRow.pos": "The position in meters, X, Y and Z, as the pos line gives it, or none.",
     "SceneItemRow.rotate": "The rotation in degrees about X, Y and Z, as the rotate line gives it, or none.",
     "SceneItemRow.size": "The size of a zone, as the size line gives it, or none.",
+    "SceneItemRow.radius": "The solar_radius of the archetype of an object in meters, or none.",
     "SceneItemRow.components": "The components of an object, for example base_object or dockable_station.",
     "SceneItemRow.agent_changed": "True when an edit of an agent changed the item after the last save. An undo of that edit clears it.",
     "ItemView.kind": "The kind of the item. The view of that kind is the one view that the result has.",
@@ -2342,6 +2416,46 @@
     "MissionTraceChange.sequence": "The number of the change in its play, from 1.",
     "MissionTraceChange.time": "The time of the change since the game loaded the mission, in seconds.",
     "MissionTraceChange.trigger": "The trg: reference of the trigger with its name in the editor now, also after a rename. When the editor does not know the script, the tool gives the nickname in the game.",
-    "MissionTraceChange.change": "What the trigger did: started (it became active), ran (it ran its actions) or stopped."
+    "MissionTraceChange.change": "What the trigger did: started (it became active), ran (it ran its actions) or stopped.",
+    "JumpSlots.used": "The objects with a goto line in the system file.",
+    "JumpSlots.max": "The most jump objects that one system can have. The game crashes with more.",
+    "UniverseView.systems": "The star systems of this page, in the order of universe.ini.",
+    "UniverseView.connections": "The jump gates, the jump holes and the airlock gates of the systems of this page, in the order of each system file.",
+    "UniverseView.route_files_change": "True when the route tables of the mods differ from the route tables of the game without mods. Ctrl+F5 and an export for a retail game then write the route files.",
+    "UniverseSystemRow.ref": "The system: reference.",
+    "UniverseSystemRow.file": "The install path of the system file, or none when the system names no file.",
+    "UniverseSystemRow.map_pos": "The place on the nav map grid, X and Y, as the pos line gives it, or none.",
+    "UniverseSystemRow.nav_map_scale": "The zoom of the system map, or none when the system has no NavMapScale line.",
+    "UniverseSystemRow.visit": "The visit flags of the system. Bit 0 shows the system on the nav map of a new game.",
+    "UniverseSystemRow.jump_objects": "The jump objects of the system file: the objects with a goto line.",
+    "UniverseSystemRow.reachable": "True when a jump gate, a jump hole or an airlock gate of another system goes to the system. A lock does not count.",
+    "UniverseConnectionRow.ref": "The obj: reference of the object with the goto line.",
+    "UniverseConnectionRow.kind": "jump_gate, jump_hole or airlock_gate, from the type of the archetype.",
+    "UniverseConnectionRow.system": "The system: reference of the system of the object.",
+    "UniverseConnectionRow.to_system": "The system: reference that the goto line names.",
+    "UniverseConnectionRow.to_object": "The obj: reference of the object that the goto line names, or none.",
+    "UniverseConnectionRow.pair_ok": "True when the object that the goto line names goes back to this object. Without a partner, the player cannot jump back.",
+    "UniverseConnectionRow.locked": "The lock at the start of a new game: none, player, npc or both.",
+    "RouteView.routes": "The shortest route to each system that the table reaches, in the order of the table.",
+    "RouteView.unreachable": "The system: references of the systems that no route of the table reaches.",
+    "RouteRow.to": "The system: reference of the last system of the route.",
+    "RouteRow.systems": "The system: references of the systems of the route, from the start system to the last system.",
+    "RouteRow.jumps": "The number of jumps of the route.",
+    "SystemEditResult.system": "The system: reference of the new system.",
+    "SystemEditResult.file": "The install path of the new system file in the folder of the mod.",
+    "SystemEditResult.sun": "The obj: reference of the sun at the center of the new system.",
+    "ConnectionEditResult.pair": "The obj: references of the two ends, in the order of from and to.",
+    "ConnectionEditResult.traffic_zones": "The zone: references of the new traffic zones.",
+    "ConnectionEditResult.loadout": "The loadout of each end of pair, in the same order. none for a jump hole and for an existing end.",
+    "ConnectionEditResult.pilot": "The pilot of each end of pair, in the same order. none for a jump hole and for an existing end.",
+    "ConnectionEditResult.routes": "How the route table of all connections changes with the edit.",
+    "ConnectionEditResult.jump_objects": "The jump objects of the two systems after the edit.",
+    "LockEditResult.routes": "How the route table of all connections changes with the edit.",
+    "RouteChange.new": "The routes between two systems that the edit adds.",
+    "RouteChange.shorter": "The routes that get fewer jumps.",
+    "RouteChange.longer": "The routes that get more jumps.",
+    "RouteChange.lost": "The routes between two systems that the edit removes.",
+    "PairSlots.from": "The jump objects of the system of from.",
+    "PairSlots.to": "The jump objects of the system of to."
   }
 }

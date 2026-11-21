@@ -44,13 +44,24 @@ public sealed class ConnectionPlan : EditPlan
     /// null when the plan refuses.</summary>
     public RouteDiff? Routes { get; internal set; }
 
+    /// <summary>
+    /// The part of the request that the refusal names, or null when the refusal names the request as a whole. The part
+    /// is the name of a parameter of the plan, and for an end the name of a member of <see cref="ConnectionEnd"/> after
+    /// it: for example <c>to.object</c>, <c>from.nickname</c> or <c>archetype</c>. A caller shows the refusal at that
+    /// part.
+    /// </summary>
+    public string? RefusedPart { get; private set; }
+
     /// <summary>Gives the plan a refusal, so it cannot run.</summary>
     /// <param name="detail">The detail code of the error of the refusal, or null for
     /// <see cref="EditPlan.PlanRefused"/>.</param>
-    internal ConnectionPlan Refuse(string path, string message, SectionRef? target = null, string? detail = null)
+    /// <param name="part">The part of the request that the refusal names, or null (see <see cref="RefusedPart"/>).</param>
+    internal ConnectionPlan Refuse(string path, string message, SectionRef? target = null, string? detail = null,
+        string? part = null)
     {
         Command = null;
         Refusals = [Diagnostic.Error(path, message) with { Target = target, Rule = detail }];
+        RefusedPart = part;
         return this;
     }
 }

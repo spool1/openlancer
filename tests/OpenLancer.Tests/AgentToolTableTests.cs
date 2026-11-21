@@ -350,7 +350,9 @@ public sealed class AgentToolTableTests
 
     /// <summary>The edit tools, the tools of the session and the play tools of this build in the order of the table,
     /// with their kinds and hints. The tools of section 7.3 follow the tools of section 7.2. The mission tools of
-    /// section 7.4 follow them, with the mission play, its live trace and play_capture at their end. The tools of
+    /// section 7.4 follow them, with the mission play, its live trace and play_capture at their end. The universe tools
+    /// come after the builders: system_create adds data, connection_create can change an existing end, and
+    /// connection_set_lock sets absolute values, so a second call changes nothing. The tools of
     /// section 7.6 come next. mission_edit can remove triggers and items, so it is destructive. A tool that adds data
     /// is not destructive, and a tool that can change or remove data is (review finding R7 of MCP1-2). So a mission
     /// tool that sets, moves or links lines is destructive. edit_batch can have a step that removes data, so it is
@@ -373,6 +375,11 @@ public sealed class AgentToolTableTests
         ["scene_place_wreck"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["scene_place_patrol_route"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["scene_set_encounters"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+        ["system_create"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["connection_create"] = (ToolKind.Edit, new ToolHints(false, true, false)),
+        ["connection_set_lock"] = (ToolKind.Edit, new ToolHints(false, true, true)),
+        ["get_universe"] = (ToolKind.Query, new ToolHints(true, false, true)),
+        ["get_route"] = (ToolKind.Query, new ToolHints(true, false, true)),
         ["prop_group_place"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["prop_group_save"] = (ToolKind.AssetWrite, new ToolHints(false, false, false)),
         ["prop_group_rename"] = (ToolKind.AssetWrite, new ToolHints(false, true, false)),

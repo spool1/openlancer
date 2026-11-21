@@ -136,6 +136,20 @@ internal sealed class UniverseGraph
     public UniverseSystem? System(string nickname) =>
         Systems.FirstOrDefault(s => s.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>True when a connection of another system goes to the system. A lock does not count, because a mission
+    /// can unlock the gate.</summary>
+    public bool Reached(string system) =>
+        Connections.Any(c => c.TargetSystem.Equals(system, StringComparison.OrdinalIgnoreCase) &&
+                             !c.System.Equals(system, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The connection that a connection goes to, when that connection goes back to it, or null. Without such a
+    /// partner, the player cannot jump back.</summary>
+    public UniverseConnection? PartnerOf(UniverseConnection connection) =>
+        ConnectionsOf(connection.TargetSystem).FirstOrDefault(c =>
+            c.Object.Equals(connection.ExitObject, StringComparison.OrdinalIgnoreCase) &&
+            c.TargetSystem.Equals(connection.System, StringComparison.OrdinalIgnoreCase) &&
+            c.ExitObject.Equals(connection.Object, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Reads the graph of a source.</summary>
     public static UniverseGraph Build(IUniverseSource source)
     {

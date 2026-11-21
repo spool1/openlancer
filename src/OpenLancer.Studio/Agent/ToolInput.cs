@@ -284,25 +284,34 @@ internal sealed class PointsParam(string name, bool required, int minItems, floa
 }
 
 /// <summary>A list of numbers, for example the size of a zone. The list has a fixed range of counts, and each number fits
-/// a <see cref="float"/>.</summary>
-internal sealed class NumbersParam(string name, bool required, int minItems, int maxItems) : ToolParam(name, required)
+/// a <see cref="float"/>. A list of whole numbers, for example a place on the nav map, takes only whole numbers that fit
+/// an <see cref="int"/>.</summary>
+/// <param name="whole">True for a list of whole numbers.</param>
+internal sealed class NumbersParam(string name, bool required, int minItems, int maxItems, bool whole = false)
+    : ToolParam(name, required)
 {
     public override JsonObject Schema(string tool) => new()
     {
         ["type"] = "array",
-        ["items"] = new JsonObject { ["type"] = "number" },
+        ["items"] = new JsonObject { ["type"] = whole ? "integer" : "number" },
         ["minItems"] = minItems,
         ["maxItems"] = maxItems,
     };
 
-    public override string Expected => minItems == maxItems
-        ? $"a list of {minItems} numbers"
-        : $"a list of {minItems} to {maxItems} numbers";
+    public override string Expected
+    {
+        get
+        {
+            var count = minItems == maxItems ? $"{minItems}" : $"{minItems} to {maxItems}";
+            return whole ? $"a list of {count} whole numbers" : $"a list of {count} numbers";
+        }
+    }
 
     public override bool Fits(JsonNode value) =>
         value is JsonArray array && array.Count >= minItems && array.Count <= maxItems && array.All(n =>
-            n?.GetValueKind() == JsonValueKind.Number && n.AsValue().TryGetValue(out double number) &&
-            float.IsFinite((float)number));
+            n?.GetValueKind() == JsonValueKind.Number && (whole
+                ? n.AsValue().TryGetValue(out int _)
+                : n.AsValue().TryGetValue(out double number) && float.IsFinite((float)number)));
 }
 
 /// <summary>
@@ -449,12 +458,16 @@ internal sealed class SchemaParam(string name, bool required, JsonValueKind type
     public override bool Fits(JsonNode value) => value.GetValueKind() == type;
 }
 
-/// <summary>An object with arguments of its own.</summary>
-internal sealed class GroupParam(string name, IReadOnlyList<ToolParam> members) : ToolParam(name, false)
+/// <summary>An object with arguments of its own. The help of a member is the help of <c>&lt;object&gt;.&lt;member&gt;</c>
+/// of the tool when <c>agent-tools.json</c> has it, else the help of the member name, as for the members of a
+/// <see cref="RowsParam"/>.</summary>
+/// <param name="required">True when the call must give the object.</param>
+internal sealed class GroupParam(string name, IReadOnlyList<ToolParam> members, bool required = false)
+    : ToolParam(name, required)
 {
     public IReadOnlyList<ToolParam> Members { get; } = members;
 
-    public override JsonObject Schema(string tool) => ToolInput.ObjectSchema(tool, Members);
+    public override JsonObject Schema(string tool) => ToolInput.ObjectSchema(tool, Members, Name);
 
     public override string Expected => "an object with: " + string.Join(", ", Members.Select(m => m.Name));
 
@@ -494,7 +507,8 @@ internal sealed class ToolInput(params ToolParam[] parameters)
         return schema;
     }
 
-    /// <param name="list">The name of the list of a row, for the help of its members, or null.</param>
+    /// <param name="list">The name of the list of a row or of an object argument, for the help of its members, or
+    /// null.</param>
     internal static JsonObject ObjectSchema(string tool, IReadOnlyList<ToolParam> parameters, string? list = null)
     {
         var properties = new JsonObject();
@@ -620,4 +634,9 @@ internal sealed class ToolArgs(IReadOnlyList<ToolParam> parameters, IReadOnlyDic
     /// <summary>The numbers of a <see cref="NumbersParam"/>, or null when the call does not give the list.</summary>
     public IReadOnlyList<float>? Numbers(string name) =>
         values.TryGetValue(name, out var value) ? value.AsArray().Select(n => n!.GetValue<float>()).ToList() : null;
+
+    /// <summary>The whole numbers of a <see cref="NumbersParam"/> of whole numbers, or null when the call does not give
+    /// the list.</summary>
+    public IReadOnlyList<int>? Wholes(string name) =>
+        values.TryGetValue(name, out var value) ? value.AsArray().Select(n => n!.GetValue<int>()).ToList() : null;
 }

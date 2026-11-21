@@ -332,8 +332,9 @@ public sealed class AgentBuilderTests
 
         Assert.Equal(("refused", "ReadOnlySection"), (set.Code, set.Detail));
         Assert.Equal(("refused", ItemEditTools.NotRenamable), (rename.Code, rename.Detail));
-        Assert.Equal($"The tool can rename an item of a system. It can also rename a ship, equipment or a good that the " +
-                     $"active mod adds. {reference} is not such an item, so the editor cannot rename it.", rename.Message);
+        Assert.Equal($"The tool can rename an item of a system. It can also rename a system, a ship, equipment or a good " +
+                     $"that the active mod adds. {reference} is not such an item, so the editor cannot rename it.",
+            rename.Message);
         Assert.Equal("refused", delete.Code);
         Assert.Null(session.Get(BuilderWorkspace.Loadout("my_loadout")));
     }
