@@ -545,8 +545,7 @@ public static partial class ScenePlans
             if (inSet.Contains(reference.Section) || relinks.Lines.Contains((reference.Section, reference.Key.ToLowerInvariant())))
                 continue;
             refusals.Add(Diagnostic.Error(reference.Section.Path,
-                $"{reference.Section.Id.Key} links to {name} in its {reference.Key} line, but {name} does not link back " +
-                $"to {reference.Section.Id.Key}. Use trade_lane_repair on {reference.Section.Id.Key} first, or keep {name}.") with
+                Universe.LanePlans.OneWayLinkRefusal(session, reference.Section, reference.Key, name)) with
             {
                 Target = reference.Section, Key = reference.Key,
             });

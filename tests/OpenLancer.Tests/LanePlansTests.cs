@@ -291,7 +291,52 @@ public sealed class LanePlansTests
         var last = LaneWorkspace.Vector(Line(session, plan.Rings[^1], "pos")!);
         Assert.Equal(new Vector3(14000, 0, 0), last, new VectorNear(2));
         Assert.Equal("501", Line(session, plan.Rings[^1], "tradelane_space_name"));
+        Assert.Equal(7, plan.Rings.Count);
         Assert.Empty(plan.Warnings);
+    }
+
+    /// <summary>
+    /// The ring count is the length divided by 7500 m, rounded to the nearest whole number, plus one. A half rounds up.
+    /// A length of 43600 m gives 5.81 spacings and 7 rings. A length of 32000 m gives 4.27 spacings and 5 rings.
+    /// </summary>
+    [Theory]
+    [InlineData(18750, 4)]
+    [InlineData(32000, 5)]
+    [InlineData(43600, 7)]
+    public void TheRingCountIsTheRoundedLengthBySpacingPlusOne(float length, int rings)
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+
+        var plan = Run(session, LanePlans.Create(session, "Li01", At(30000, 0, 30000, "A"), At(30000, 0, 30000 + length, "B")));
+
+        Assert.Equal(rings, plan.Rings.Count);
+        Assert.Equal(length / (rings - 1), plan.Spacing!.Value, 0.01f);
+    }
+
+    /// <summary>Two objects that stand closer than their two clearances give ends that pass each other. The start ring
+    /// would then have the name of the end object at the far end. The plan refuses.</summary>
+    [Fact]
+    public void EndsThatPassEachOtherRefuse()
+    {
+        using var ws = LaneWorkspace.Create(LaneWorkspace.Li01Text + """
+
+            [Object]
+            nickname = Li01_buoy
+            ids_name = 506
+            pos = 63000, 0, 0
+            archetype = lane_gate
+            """);
+        var session = ws.Session("act");
+        var gate = new TradeLaneEnd { Near = SceneWorkspace.Object("Li01_to_Li02") };
+        var buoy = new TradeLaneEnd { Near = SceneWorkspace.Object("Li01_buoy") };
+
+        var plan = LanePlans.Create(session, "Li01", gate, buoy);
+
+        Assert.Equal("The ends are too close for the clearance at their objects. The start ring passes the end ring. Give " +
+                     "start and end as points, or pick objects that are farther apart.",
+            Refusal(plan, LanePlans.LaneEnd).Message);
+        Assert.Equal("end_near", plan.RefusedPart);
     }
 
     /// <summary>
@@ -588,6 +633,52 @@ public sealed class LanePlansTests
         Assert.All(plan.Deletes, d => Assert.Null(session.Get(d.Section)));
     }
 
+    /// <summary>
+    /// The game makes a lane only from objects with the ring archetype. A link line of the first ring can name a jump
+    /// gate after a raw edit. The lane then ends at the first ring, so a delete of the lane leaves the gate and its pair.
+    /// </summary>
+    [Fact]
+    public void ALaneDeleteTakesNoObjectThatIsNoRing()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.SetLinesFromText(Ring(1), "prev_ring", ["Li01_to_Li02"]));
+
+        var lane = LanePlans.LaneOf(session, Ring(3))!;
+        var plan = Run(session, LanePlans.Delete(session, Ring(3)));
+
+        Assert.Equal([Ring(1), Ring(2), Ring(3), Ring(4)], lane.Rings);
+        Assert.Equal([Ring(1), Ring(2), Ring(3), Ring(4), LaneWorkspace.Zone], plan.Deletes.Select(d => d.Section));
+        Assert.NotNull(session.Get(SceneWorkspace.Object("Li01_to_Li02")));
+        Assert.NotNull(session.Get(SceneWorkspace.Li02("Object", "Li02_to_Li01")));
+    }
+
+    /// <summary>
+    /// A link to an object that is no ring ends the lane. A delete of the first ring then moves the start name to the
+    /// next ring, and that ring gets no link to the object. A new ring after the last ring becomes the new end, and the
+    /// object gets no link line.
+    /// </summary>
+    [Fact]
+    public void ALinkToAnObjectThatIsNoRingEndsTheLane()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.SetLinesFromText(Ring(1), "prev_ring", ["Li01_sun"]));
+        session.Execute(EditCommand.SetLinesFromText(Ring(4), "next_ring", ["Li01_sun"]));
+
+        Run(session, ScenePlans.Delete(session, [Ring(1)]));
+        var insert = Run(session, LanePlans.InsertRing(session, Ring(4), LanePlace.After));
+
+        Assert.Null(Line(session, Ring(2), "prev_ring"));
+        Assert.Equal("504", Line(session, Ring(2), "tradelane_space_name"));
+        Assert.Equal([Ring(2), Ring(3), Ring(4), insert.Ring!], insert.Rings);
+        Assert.Equal(insert.Ring!.Id.Key, Line(session, Ring(4), "next_ring"));
+        Assert.Null(Line(session, insert.Ring!, "next_ring"));
+        Assert.Equal("505", Line(session, insert.Ring!, "tradelane_space_name"));
+        Assert.Null(Line(session, SceneWorkspace.Object("Li01_sun"), "prev_ring"));
+        Assert.Equal("30000, 0, -20000", Line(session, insert.Ring!, "pos"));
+    }
+
     /// <summary>A lane zone that the editor cannot change stays, and the delete warns and asks.</summary>
     [Fact]
     public void AZoneThatTheEditorCannotChangeStaysWithAWarning()
@@ -635,25 +726,82 @@ public sealed class LanePlansTests
         Assert.Equal([Ring(2), Ring(3), Ring(4)], lane.Rings);
     }
 
-    /// <summary>A one-way link to a ring that goes refuses the delete, and the text names the repair tool.</summary>
+    /// <summary>
+    /// A one-way link to a ring that goes refuses the delete. The stray ring stands off the line of the lane, so a repair
+    /// refuses. The text names the fixes that work: a delete of the stray ring in the same delete, or a change in the
+    /// raw INI block.
+    /// </summary>
     [Fact]
     public void AOneWayLinkToARemovedRingRefuses()
     {
-        using var ws = LaneWorkspace.Create(LaneWorkspace.Li01Text + """
-
-            [Object]
-            nickname = Li01_stray_ring
-            pos = 50000, 0, 50000
-            archetype = Trade_Lane_Ring
-            next_ring = Li01_Trade_Lane_Ring_3
-            """);
+        using var ws = LaneWorkspace.Create(StrayText("50000, 0, 50000", "next_ring"));
         var session = ws.Session("act");
+        var stray = SceneWorkspace.Object("Li01_stray_ring");
 
         var plan = ScenePlans.Delete(session, [Ring(3)]);
 
         Assert.Equal("Li01_stray_ring links to Li01_Trade_Lane_Ring_3 in its next_ring line, but Li01_Trade_Lane_Ring_3 does " +
-                     "not link back to Li01_stray_ring. Use trade_lane_repair on Li01_stray_ring first, or keep " +
-                     "Li01_Trade_Lane_Ring_3.", Assert.Single(plan.Refusals).Message);
+                     "not link back to Li01_stray_ring. Delete Li01_stray_ring in the same delete, remove its next_ring " +
+                     "line in the raw INI block, or keep Li01_Trade_Lane_Ring_3.", Assert.Single(plan.Refusals).Message);
+        Assert.False(LanePlans.Repair(session, stray).CanRun);
+    }
+
+    /// <summary>
+    /// The link of a stray ring to the third ring is no part of the lane, because the third ring links both ways with
+    /// the second ring. So a delete of the stray ring and the third ring, in each order, relinks the lane and takes no
+    /// other ring. A delete of the stray ring alone does not change the lane. The walk of the HUD follows the stray link.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AStrayRingIsNoPartOfTheLaneThatItLinksTo(bool strayFirst)
+    {
+        using var ws = LaneWorkspace.Create(StrayText("-1000, 0, -20000", "next_ring"));
+        var session = ws.Session("act");
+        var stray = SceneWorkspace.Object("Li01_stray_ring");
+
+        var alone = ScenePlans.Delete(session, [stray]);
+        var plan = Run(session, ScenePlans.Delete(session, strayFirst ? [stray, Ring(3)] : [Ring(3), stray]));
+
+        Assert.Equal([stray], alone.Deletes.Select(d => d.Section));
+        Assert.Empty(alone.Changes);
+        Assert.Equal([Ring(1), Ring(2), Ring(4)], LanePlans.LaneOf(session, Ring(1))!.Rings);
+        Assert.Equal(2, plan.Deletes.Count);
+        Assert.Equal(("11250, 0, -20000", "500, 500, 23500"),
+            (Line(session, LaneWorkspace.Zone, "pos"), Line(session, LaneWorkspace.Zone, "size")));
+        session.Undo();
+        Assert.Equal([stray], LanePlans.LaneOf(session, stray)!.Rings);
+        Assert.Equal([stray, Ring(3), Ring(4)], LanePlans.LaneOf(session, stray, strays: true)!.Rings);
+        Assert.Equal([stray], LanePlans.InsertRing(session, stray, LanePlace.After).Changes);
+    }
+
+    /// <summary>The text of the lane of Li01 with a stray ring at a position, with one link line to the third ring.</summary>
+    private static string StrayText(string pos, string key) => LaneWorkspace.Li01Text + $"""
+
+        [Object]
+        nickname = Li01_stray_ring
+        pos = {pos}
+        archetype = Trade_Lane_Ring
+        {key} = Li01_Trade_Lane_Ring_3
+        """;
+
+    /// <summary>A stray ring on the line of the lane can join the lane with a repair. So the text of the one-way link
+    /// names the repair, and the delete runs after the repair.</summary>
+    [Fact]
+    public void AOneWayLinkFromARingOnTheLineNamesTheRepair()
+    {
+        using var ws = LaneWorkspace.Create(StrayText("30000, 0, -20000", "prev_ring"));
+        var session = ws.Session("act");
+        var stray = SceneWorkspace.Object("Li01_stray_ring");
+
+        var plan = ScenePlans.Delete(session, [Ring(3)]);
+
+        Assert.Equal("Li01_stray_ring links to Li01_Trade_Lane_Ring_3 in its prev_ring line, but Li01_Trade_Lane_Ring_3 does " +
+                     "not link back to Li01_stray_ring. Use trade_lane_repair on Li01_stray_ring first, delete " +
+                     "Li01_stray_ring in the same delete, or keep Li01_Trade_Lane_Ring_3.", Assert.Single(plan.Refusals).Message);
+        Run(session, LanePlans.Repair(session, stray));
+        Run(session, ScenePlans.Delete(session, [Ring(3)]));
+        Assert.Equal([Ring(1), Ring(2), Ring(4), stray], LanePlans.LaneOf(session, Ring(1))!.Rings);
     }
 
     /// <summary>A repair writes a broken link again from the order of the rings on the line. A lane with good links
@@ -701,6 +849,60 @@ public sealed class LanePlansTests
         Assert.Equal(("504", null, null, "505"), (Line(session, Ring(1), "tradelane_space_name"),
             Line(session, Ring(2), "tradelane_space_name"), Line(session, Ring(3), "tradelane_space_name"),
             Line(session, Ring(4), "tradelane_space_name")));
+    }
+
+    /// <summary>
+    /// A raw edit can delete a middle ring and leave its neighbors with links to a ring that is not there. A repair from
+    /// either side finds the rings at the other side on the line of the lane, and it links them again.
+    /// </summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public void ARepairJoinsTheRingsAtTheSidesOfARingThatARawEditDeleted(int from)
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.DeleteSection(Ring(2)));
+
+        var plan = Run(session, LanePlans.Repair(session, Ring(from)));
+
+        Assert.Equal([Ring(1), Ring(3), Ring(4)], plan.Rings);
+        Assert.Equal([Ring(1), Ring(3), Ring(4)], LanePlans.LaneOf(session, Ring(4))!.Rings);
+        Assert.Equal(("Li01_Trade_Lane_Ring_3", "Li01_Trade_Lane_Ring_1"),
+            (Line(session, Ring(1), "next_ring"), Line(session, Ring(3), "prev_ring")));
+        Assert.Equal(("504", "505"), (Line(session, Ring(1), "tradelane_space_name"), Line(session, Ring(4), "tradelane_space_name")));
+    }
+
+    /// <summary>
+    /// An end ring without links keeps its end name. It stands past the last ring of the rest of the lane. A repair of
+    /// the lone ring or of the lane joins it at the end. A lone ring more than 20000 m past the end does not join.
+    /// </summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(4)]
+    public void ARepairJoinsALoneEndRingPastTheEndOfTheLane(int from)
+    {
+        using var ws = LaneWorkspace.Create(LaneWorkspace.Li01Text + """
+
+            [Object]
+            nickname = Li01_far_ring
+            pos = 50000, 0, -20000
+            archetype = Trade_Lane_Ring
+            """);
+        var session = ws.Session("act");
+        var far = SceneWorkspace.Object("Li01_far_ring");
+        session.Execute(EditCommand.RemoveName(Ring(4), "prev_ring"));
+        session.Execute(EditCommand.RemoveName(Ring(3), "next_ring"));
+
+        var plan = Run(session, LanePlans.Repair(session, Ring(from)));
+        var alone = LanePlans.Repair(session, far);
+
+        Assert.Equal([Ring(1), Ring(2), Ring(3), Ring(4)], plan.Rings);
+        Assert.Equal([Ring(1), Ring(2), Ring(3), Ring(4)], LanePlans.LaneOf(session, Ring(2))!.Rings);
+        Assert.Equal(("504", "505"), (Line(session, Ring(1), "tradelane_space_name"), Line(session, Ring(4), "tradelane_space_name")));
+        Assert.True(alone.CanRun);
+        Assert.Equal([far], alone.Rings);
+        Assert.Empty(alone.Changes);
     }
 
     /// <summary>A repair keeps the positions, so rings off one line refuse.</summary>

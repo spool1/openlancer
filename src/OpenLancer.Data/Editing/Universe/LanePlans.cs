@@ -149,9 +149,9 @@ public static class LanePlans
     /// The lane zone <c>Zone_&lt;System&gt;_Tradelane_&lt;n&gt;</c> is a box on the lane that meets the lane zone rule.
     /// It holds no encounters.</para>
     /// <para>The plan refuses a system without a file that the editor can change. It refuses an end without a point and
-    /// an object, and an end without a name. It also refuses a template that is not a ring, and a ring count or a spacing outside
-    /// the limits. A spacing outside the retail range and a ring inside a zone with damage or inside an object give
-    /// warnings.</para>
+    /// an object, an end without a name, and two ends that pass each other because their objects are too close. It also
+    /// refuses a template that is not a ring, and a ring count or a spacing outside the limits. A spacing outside the
+    /// retail range and a ring inside a zone with damage or inside an object give warnings.</para>
     /// </remarks>
     public static LanePlan Create(EditSession session, string system, TradeLaneEnd start, TradeLaneEnd end,
         LaneOptions? options = null)
@@ -238,6 +238,13 @@ public static class LanePlans
             points[i] = placement.Clear(anchors[i] + direction * clear, direction, rule.Clearance,
                 toward.Length() - clear);
         }
+        // Two objects closer than their two clearances give ends that pass each other. The start name would then show
+        // at the far end of the lane.
+        if (requests.Any(r => r.Point == null) && Vector3.DistanceSquared(anchors[0], anchors[1]) >= 1 &&
+            Vector3.Dot(points[1] - points[0], anchors[1] - anchors[0]) <= 0)
+            return plan.Refuse(path, "The ends are too close for the clearance at their objects. The start ring passes the " +
+                                     "end ring. Give start and end as points, or pick objects that are farther apart.",
+                detail: LaneEnd, part: requests[1].Point == null ? "end_near" : "start_near");
 
         // The rings.
         var length = Vector3.Distance(points[0], points[1]);
@@ -395,9 +402,12 @@ public static class LanePlans
                 BeforeNotFirst, "before");
         if (view.ReadOnlyReason is { } reason)
             return plan.Refuse(ring.Path, $"{ring.Id.Key}: {reason}", ring, part: part);
-        var objects = ObjectsOf(session, ring.Path);
+        // The neighbors come from the lane, so a link to an object that is no ring and a stray link do not count.
         var prev = place == LanePlace.After ? ring : null;
-        var next = place == LanePlace.After ? Link(objects, view, "next_ring") : ring;
+        var next = place == LanePlace.Before ? ring
+            : at + 1 < lane.Rings.Count ? lane.Rings[at + 1]
+            : lane.Loops ? lane.Rings[0]
+            : null;
         if (next is { } nextRing && session.Get(nextRing)?.ReadOnlyReason is { } nextReason)
             return plan.Refuse(ring.Path, $"{nextRing.Id.Key}: {nextReason}", nextRing, part: part);
         if (SceneSections.Position(view) is not { } at0)
@@ -413,7 +423,8 @@ public static class LanePlans
         else
         {
             // One spacing beyond the end, away from the neighbor of the end ring.
-            var neighbor = place == LanePlace.After ? Link(objects, view, "prev_ring") : Link(objects, view, "next_ring");
+            var neighbor = place == LanePlace.After ? at > 0 ? lane.Rings[at - 1] : null
+                : lane.Rings.Count > 1 ? lane.Rings[1] : null;
             var outward = neighbor != null && PositionOf(session, neighbor) is { } other && Vector3.Distance(at0, other) >= 1
                 ? at0 - other
                 : Forward(view) * (place == LanePlace.After ? 1 : -1) * rule.Spacing;
@@ -515,13 +526,15 @@ public static class LanePlans
 
     /// <summary>
     /// Plans a repair of the links of a lane, as one entry of the edit history. The plan finds the rings of the lane
-    /// from any ring. They are the rings that the links reach in both directions, and the rings with a broken link on
-    /// the line of the two end rings within <see cref="Reach"/>. It sorts them along the line, writes their
-    /// <c>prev_ring</c> and <c>next_ring</c> lines again, and moves the end names to the two end rings. It keeps the
-    /// positions. A lane with good links gives a command that changes nothing.
+    /// from any ring. They are the rings that the links reach in both directions, and the rings with a broken link near
+    /// the line of the two end rings (see <see cref="LineReach"/>). A ring with a broken link brings the rings that its
+    /// own links reach. The plan sorts the rings along the line, writes their <c>prev_ring</c> and <c>next_ring</c> lines
+    /// again, and moves the end names to the two end rings. It keeps the positions. A lane with good links gives a
+    /// command that changes nothing.
     /// </summary>
-    /// <remarks>A ring without links and without a lane near it changes nothing. The plan refuses an object that is not
-    /// a ring of a lane, and rings that do not stand on one line within <see cref="Reach"/>.</remarks>
+    /// <remarks>A ring without links joins the nearest lane whose line passes it. A ring without links and without a
+    /// lane near it changes nothing. The plan refuses an object that is not a ring of a lane, and rings that do not
+    /// stand on one line within <see cref="Reach"/>.</remarks>
     public static LanePlan Repair(EditSession session, SectionRef ring)
     {
         var plan = new LanePlan($"Repair trade lane of {ring.Id.Key}");
@@ -536,24 +549,33 @@ public static class LanePlans
             // A ring without links joins the nearest lane whose line passes it.
             var near = objects.Values.Where(r => !r.Equals(ring) && IsRingObject(session, r))
                 .Select(r => LaneOf(session, r)!).Where(l => l.Rings.Count > 1 && !l.Loops).DistinctBy(l => l.Rings[0])
-                .Select(l => (Lane: l, Distance: PositionOf(session, l.Rings[0]) is { } a &&
-                                                 PositionOf(session, l.Rings[^1]) is { } b
-                    ? SegmentDistance(alone, a, b)
-                    : float.MaxValue))
-                .Where(c => c.Distance <= Reach).OrderBy(c => c.Distance).FirstOrDefault();
-            if (near.Lane != null)
-                set = [.. Linked(session, objects, near.Lane.Rings[0]), ring];
+                .Select(l => (Lane: l, A: PositionOf(session, l.Rings[0]), B: PositionOf(session, l.Rings[^1])))
+                .Where(c => c is { A: not null, B: not null })
+                .Select(c => (c.Lane, Distance: LineReach(alone, c.A!.Value, c.B!.Value),
+                    Segment: SegmentDistance(alone, c.A!.Value, c.B!.Value)))
+                .Where(c => c.Distance <= Reach).OrderBy(c => c.Distance).ThenBy(c => c.Segment)
+                .Select(c => c.Lane).FirstOrDefault();
+            if (near != null)
+                set = [.. Linked(session, objects, near.Rings[0]), ring];
         }
         var positions = new Dictionary<SectionRef, Vector3>();
-        foreach (var item in set)
+        var sorted = new List<SectionRef>();
+        // Adds rings with their positions, or gives the refusal of a ring without a position.
+        LanePlan? Add(IEnumerable<SectionRef> rings)
         {
-            if (PositionOf(session, item) is not { } at)
-                return plan.Refuse(item.Path, $"{item.Id.Key} has no position. Give it a pos line, then repair the lane.",
-                    item, MissionErrors.FieldValue, "ring");
-            positions[item] = at;
+            foreach (var item in rings)
+            {
+                if (PositionOf(session, item) is not { } at)
+                    return plan.Refuse(item.Path, $"{item.Id.Key} has no position. Give it a pos line, then repair the lane.",
+                        item, MissionErrors.FieldValue, "ring");
+                positions[item] = at;
+                sorted.Add(item);
+            }
+            return null;
         }
+        if (Add(set) is { } unplaced)
+            return unplaced;
         var oldLane = LaneOf(session, ring)!;
-        var sorted = set.ToList();
         if (sorted.Count > 1)
         {
             // The two rings that stand farthest apart are the ends of the line.
@@ -568,13 +590,13 @@ public static class LanePlans
             }
             var p1 = positions[e1];
             var p2 = positions[e2];
-            foreach (var other in objects.Values.Where(r => !set.Contains(r) && IsRingObject(session, r)))
+            var broken = objects.Values.Where(r => !set.Contains(r) && IsRingObject(session, r) &&
+                                                   PositionOf(session, r) is { } at && LineReach(at, p1, p2) <= Reach &&
+                                                   Broken(session, objects, r)).ToList();
+            foreach (var other in broken)
             {
-                if (PositionOf(session, other) is { } at && SegmentDistance(at, p1, p2) <= Reach && Broken(session, objects, other))
-                {
-                    sorted.Add(other);
-                    positions[other] = at;
-                }
+                if (Add(Linked(session, objects, other).Where(set.Add).ToList()) is { } joinedUnplaced)
+                    return joinedUnplaced;
             }
             if (sorted.FirstOrDefault(r => LineDistance(positions[r], p1, p2) > Reach) is { } off)
                 return plan.Refuse(ring.Path, $"The rings of the lane of {ring.Id.Key} do not stand on one line. Move the " +
@@ -690,38 +712,48 @@ public static class LanePlans
     /// <summary>
     /// The lane of a ring: the rings that the links reach from it, in order. The walk follows <c>prev_ring</c> back to
     /// the first ring and <c>next_ring</c> on to the last ring, as the HUD does. It stops at a link to an object that the
-    /// file does not have, and at a ring that it finds again. Null for a section that is no object of a system file.
+    /// file does not have, at a link to an object that is no ring, and at a ring that it finds again. It also stops at a
+    /// stray link, unless <paramref name="strays"/> is true. Null for a section that is no object of a system file.
     /// </summary>
-    /// <remarks>This is the one walk of the links of a lane in W. The plans, the checks and the Inspector use it.</remarks>
-    public static LaneChain? LaneOf(EditSession session, SectionRef ring)
+    /// <remarks>
+    /// <para>This is the one walk of the links of a lane in W. The plans, the checks and the Inspector use it. A ring is
+    /// an object with an archetype of the type <c>TRADELANE_RING</c>, because the game makes lanes only from such
+    /// objects. So a link of a ring to a jump gate or a sun does not make the gate or the sun a part of the lane.</para>
+    /// <para>A stray link names a ring that links both ways with another ring on that side. For example, a stray ring
+    /// names the third ring of a lane in its <c>next_ring</c> line, and the third ring names the second ring in its
+    /// <c>prev_ring</c> line. The stray ring is then no part of that lane, and a plan for the stray ring does not change
+    /// the lane.</para>
+    /// </remarks>
+    /// <param name="strays">True to follow a stray link too, as the HUD does. A check for a lane that goes in a circle
+    /// needs it, because a stray link can make the walk of the HUD go in a circle.</param>
+    public static LaneChain? LaneOf(EditSession session, SectionRef ring, bool strays = false)
     {
         if (SceneSections.KindOf(session, ring) != SceneKind.Object || session.Get(ring) is not { } view)
             return null;
         var objects = ObjectsOf(session, ring.Path);
         var seen = new HashSet<SectionRef> { ring };
         var loops = false;
-        var back = new List<SectionRef>();
-        for (var current = view; Link(objects, current, "prev_ring") is { } prev; current = session.Get(prev)!)
+        List<SectionRef> Walk(string key, string back)
         {
-            if (!seen.Add(prev))
+            var result = new List<SectionRef>();
+            for (var (at, atView) = (ring, view); RingLink(session, objects, atView, key) is { } target; )
             {
-                loops = true;
-                break;
+                if (!strays && IsStray(session, objects, at, target, key, back))
+                    break;
+                if (!seen.Add(target))
+                {
+                    loops = true;
+                    break;
+                }
+                result.Add(target);
+                (at, atView) = (target, session.Get(target)!);
             }
-            back.Add(prev);
+            return result;
         }
-        var forward = new List<SectionRef>();
-        for (var current = view; Link(objects, current, "next_ring") is { } next; current = session.Get(next)!)
-        {
-            if (!seen.Add(next))
-            {
-                loops = true;
-                break;
-            }
-            forward.Add(next);
-        }
-        back.Reverse();
-        return new LaneChain(ring.Path, [.. back, ring, .. forward], loops);
+        var before = Walk("prev_ring", "next_ring");
+        var after = Walk("next_ring", "prev_ring");
+        before.Reverse();
+        return new LaneChain(ring.Path, [.. before, ring, .. after], loops);
     }
 
     /// <summary>
@@ -746,6 +778,22 @@ public static class LanePlans
             nearest = distance;
         }
         return best;
+    }
+
+    /// <summary>
+    /// The refusal of a delete when a link line of an object that stays names a ring that goes, and the ring does not
+    /// link back. The relink of the lane does not change such a line. The text names only fixes that work. A repair
+    /// works only when the rings of the object stand on one line, so the text names the repair only then.
+    /// </summary>
+    internal static string OneWayLinkRefusal(EditSession session, SectionRef referrer, string key, string ring)
+    {
+        var own = referrer.Id.Key ?? referrer.Id.ToString();
+        var text = $"{own} links to {ring} in its {key} line, but {ring} does not link back to {own}.";
+        if (session.Get(referrer)?.ReadOnlyReason is { } reason)
+            return $"{text} Keep {ring}, because the editor cannot change {own}: {reason}";
+        return Repair(session, referrer).CanRun
+            ? $"{text} Use trade_lane_repair on {own} first, delete {own} in the same delete, or keep {ring}."
+            : $"{text} Delete {own} in the same delete, remove its {key} line in the raw INI block, or keep {ring}.";
     }
 
     /// <summary>The warning of a ring inside a zone with damage or inside an object.</summary>
@@ -858,9 +906,23 @@ public static class LanePlans
         return result;
     }
 
-    /// <summary>The object that a link line of a ring names, or null when the file has no such object.</summary>
-    internal static SectionRef? Link(IReadOnlyDictionary<string, SectionRef> objects, SectionView view, string key) =>
-        SceneSections.Last(view, key) is { } name && objects.TryGetValue(name, out var target) ? target : null;
+    /// <summary>True when the link of a ring to a target ring is a stray link (see <see cref="LaneOf"/>). The link line
+    /// of the target on the other side names another ring, and that ring links back to the target.</summary>
+    /// <param name="key">The link line of the ring that names the target.</param>
+    /// <param name="back">The link line of the target on the side of the ring.</param>
+    private static bool IsStray(EditSession session, IReadOnlyDictionary<string, SectionRef> objects, SectionRef ring,
+        SectionRef target, string key, string back) =>
+        RingLink(session, objects, session.Get(target)!, back) is { } other &&
+        !string.Equals(other.Id.Key, ring.Id.Key, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(SceneSections.Last(session.Get(other)!, key), target.Id.Key, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The ring that a link line of a ring names, or null when the file has no such object or the object is no
+    /// ring.</summary>
+    private static SectionRef? RingLink(EditSession session, IReadOnlyDictionary<string, SectionRef> objects,
+        SectionView view, string key) =>
+        SceneSections.Last(view, key) is { } name && objects.TryGetValue(name, out var target) && IsRingObject(session, target)
+            ? target
+            : null;
 
     /// <summary>The position of a section of W, or null.</summary>
     internal static Vector3? PositionOf(EditSession session, SectionRef section) =>
@@ -925,7 +987,7 @@ public static class LanePlans
             var reached = new List<SectionRef>();
             foreach (var key in new[] { "prev_ring", "next_ring" })
             {
-                if (Link(objects, view, key) is { } target && IsRingObject(session, target))
+                if (RingLink(session, objects, view, key) is { } target)
                     reached.Add(target);
             }
             reached.AddRange(rings.Where(r => session.Get(r) is { } other &&
@@ -983,6 +1045,20 @@ public static class LanePlans
         var ab = b - a;
         var t = ab.LengthSquared() < 1e-6f ? 0 : Math.Clamp(Vector3.Dot(point - a, ab) / ab.LengthSquared(), 0, 1);
         return Vector3.Distance(point, a + ab * t);
+    }
+
+    /// <summary>
+    /// The distance of a point from the line through the two end rings of a lane, or null when the point stands more
+    /// than <see cref="MaxSpacing"/> beyond an end ring along the line. A ring stands at most that far from its
+    /// neighbor, so a ring farther beyond an end is no part of the lane. The limit also keeps a far lane on the same
+    /// line apart.
+    /// </summary>
+    private static float? LineReach(Vector3 point, Vector3 a, Vector3 b)
+    {
+        var ab = b - a;
+        var length = ab.Length();
+        var along = length < 1e-3f ? 0 : Vector3.Dot(point - a, ab) / length;
+        return along < -MaxSpacing || along > length + MaxSpacing ? null : LineDistance(point, a, b);
     }
 
     /// <summary>The distance of a point from the line through two points.</summary>

@@ -676,7 +676,7 @@ loadout = trade_lane_ring_li_01
 pilot = pilot_solar_hard
 ```
 
-- A ring has the archetype `Trade_Lane_Ring`, of the type `TRADELANE_RING`. The game makes lanes only from objects with that archetype.
+- A ring has the archetype `Trade_Lane_Ring`, of the type `TRADELANE_RING`. The game makes lanes only from objects with that archetype. So the lane tools follow only the links to rings. A link to another object, for example a jump gate, ends the lane. A delete or a repair of the lane never changes that object.
 - `next_ring` names the next ring, and `prev_ring` names the ring before. The first ring has no `prev_ring`, and the last ring has no `next_ring`. The links stay in one system file.
 - The two end rings have `tradelane_space_name`. The HUD shows "<first end name> -> <last end name>". When one end has no name, the HUD shows no lane label.
 - The HUD follows the links to the two ends. A chain that goes in a circle makes the game hang.
@@ -696,10 +696,11 @@ OpenLancer finds the lane zone of a lane. It is a zone that meets these rules, a
 The agent tool `trade_lane_create` makes a lane (see "The universe tools" in `docs/MCP.md`). When OpenLancer makes a lane:
 
 - An end can be a point or an object. An end at an object goes on the line toward the other end. Its distance from the object is the `solar_radius` of the archetype of the object plus 2000 m.
+- When the two end objects stand too close for these distances, the ends pass each other, and the plan stops.
 - When a zone with `damage` holds that place, the end goes farther along the line, to 2000 m past the edge of the zone. So a lane toward a sun ends outside the death zone of the sun.
-- The lane gets one ring each 7500 m, plus one ring. A lane has 2 to 100 rings, and two rings are 1000 to 20000 m apart. A distance outside the retail range gives a warning.
+- The ring count is the length of the lane divided by 7500 m, rounded to a whole number, plus one. A lane has 2 to 100 rings, and two rings are 1000 to 20000 m apart. A distance outside the retail range gives a warning.
 - The rings get the nicknames `<system>_Trade_Lane_Ring_<n>` with the first free numbers. Their lines come in the order of the example.
-- The name `60245` and the infocard `66170` are the texts that the retail rings share. `behavior` and `difficulty_level` come from the rule data.
+- The name `60245` and the infocard `66170` are generic ring texts of both games. All HD Edition rings use that name. `behavior` and `difficulty_level` come from the rule data.
 - The faction is the local faction of the system. The loadout and the pilot come from the rule data for the house of the faction, for example `trade_lane_ring_li_01` for `li_n_grp`.
 - A template ring can give its archetype, name, infocard, behavior, difficulty, faction, loadout and pilot.
 - An end name is a new text in `strings.json`, or the `ids_name` of the object at that end. An end without a name stops the plan.
@@ -715,7 +716,9 @@ The other edits of a lane:
 - A delete of a ring links its neighbors to each other. A removed end ring makes its neighbor the new end, and the end name moves to it. The lane zone follows the new ends and keeps its extra length.
 - The new links, the end name and the zone are parts of the lane, so the delete of a ring does not ask. When one ring or none stays, the whole lane goes with its lane zone, and the delete asks.
 - A delete of a ring of a lane that goes in a circle cuts the circle at that ring.
-- `trade_lane_repair` finds the rings of a lane from any ring. It follows the links in both directions. It also takes the rings with a broken link that stand on the line of the end rings, within 1500 m.
+- A stray ring links to a ring of a lane, but that ring links both ways with another ring. The stray ring is no part of the lane. So a delete of the stray ring does not change the lane.
+- `trade_lane_repair` finds the rings of a lane from any ring. It follows the links in both directions. It also takes the rings with a broken link near the line of the end rings. Such a ring is within 1500 m of the line and at most 20000 m beyond an end ring. It brings the rings that its own links reach.
+- A ring without links joins the nearest lane whose line passes it. So a repair joins a lane again after a raw edit deleted a ring of it.
 - The repair sorts the rings along the line, writes `prev_ring` and `next_ring` again, and moves the end names to the end rings. It keeps the positions, so it stops when the rings do not stand on one line. A lane with good links does not change.
 - `trade_lane_delete` deletes all rings of a lane and its lane zone. It always asks.
 - A lane zone that the editor cannot change stays as it is, with a warning.
@@ -1117,7 +1120,7 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 - A copy leaves out the `base` line, because a base has one object in space. The Console tells it.
 - A text placeholder of the active mod gets a copy of its text with a new key, as New from template does. A numeric text id stays.
 - This version cannot copy nebulae, asteroid fields or the zones that hold them.
-- This version cannot copy connection objects. A copy of a jump gate or a jump hole has no partner, and a copy of a trade lane ring is not a part of the lane.
+- This version cannot copy connection objects. A copy of a jump gate or a jump hole has no partner. A copy of a trade lane ring is not a part of the lane.
 
 #### Delete
 
@@ -1129,7 +1132,7 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 - Another line keeps its value and shows "Missing" (see "Data lists and pickers"). Two cases give such a line. One is a fix of a line that the editor cannot change. The other is a line of a mission script that names a deleted object. The save stops at such a mission line until you fix it.
 - A line whose rule refuses the delete names the line and stops the delete, as Unity RequireComponent does. This version refuses the delete of an airlock gate.
 - A jump gate or a jump hole goes with its pair, because a pair is one connection item. The other end goes when its `goto` line names the end back. The traffic zones that `connection_create` makes for each end go, and so do the `locked_gate` and `npc_locked_gate` lines of each end. A one-way object goes alone. When the other end is in a file that the editor cannot change, the delete stops with the reason. This is an OpenLancer choice: Unity would keep the other end with a "Missing" link.
-- A trade lane ring is a part of its lane, so a delete of a ring links the lane again (see "Trade lanes"). The neighbors of the ring link to each other, and an end name moves to the new end ring. The lane zone follows the new ends. When one ring or none stays, the whole lane goes with its lane zone. A ring can name a ring that goes, while the ring that goes does not name it back. Such a one-way link stops the delete. Repair that lane first with the agent tool `trade_lane_repair`.
+- A trade lane ring is a part of its lane, so a delete of a ring links the lane again (see "Trade lanes"). The neighbors of the ring link to each other, and an end name moves to the new end ring. The lane zone follows the new ends. When one ring or none stays, the whole lane goes with its lane zone. A ring can name a ring that goes, while the ring that goes does not name it back. Such a one-way link stops the delete. Delete that ring in the same delete, or remove its link line in the raw INI block. When its rings stand on one line, the agent tool `trade_lane_repair` also fixes the link.
 - A one-way object whose `goto` line names an end that goes is no part of the pair. Its locked `goto` line stops the delete, and the message names the object. Delete the one-way object first or in the same delete. To keep it, change its `goto` line in the raw INI block. You can also pair it with the jump connection tool `connection_create` of the agent server.
 - A delete of a nebula or an asteroid field removes only its section, as Unity "Remove Component" does. Its zone stays, with its encounters, its music and its damage.
 
