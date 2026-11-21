@@ -454,6 +454,26 @@ public sealed class FieldBindingTests
             new SectionIdentity("Solar", "ring")), "next_ring"));
     }
 
+    /// <summary>The game reads the lane links only on a trade lane ring. So the link rows of another object, for example
+    /// a jump gate, stay read-only, and their reason names the raw INI block, where the line can go.</summary>
+    [Fact]
+    public void TheLinkRowsOfAnObjectThatIsNoRingNameTheRawIniBlock()
+    {
+        using var ws = SceneWorkspace.Create();
+        var session = ws.Session("act");
+        var gate = SceneWorkspace.Object("Li01_to_Li02");
+        session.Execute(EditCommand.SetLinesFromText(gate, "next_ring", ["ring1"]));
+
+        var next = Bind(session, gate, "next_ring");
+
+        Assert.Equal("The game reads this line only on a trade lane ring, but this object is not a trade lane ring. Remove " +
+                     "the line in the raw INI block.", next.ReadOnlyReason);
+        Assert.Empty(SteLint.Problems(next.ReadOnlyReason!, SteLint.InstructionWords));
+        Assert.Equal(FieldBinding.NotRingLinkReason, Bind(session, gate, "prev_ring").ReadOnlyReason);
+        Assert.Equal(FieldBinding.LaneLinkReason, Bind(session, SceneWorkspace.Object("ring1"), "next_ring").ReadOnlyReason);
+        Assert.False(next.CanRevert);
+    }
+
     /// <summary>
     /// A revert of a whole section puts back each line of the lower layer. So it cannot run for a [system] whose file
     /// the active mod sets, for example with a patch that the user wrote: that would move the system to another file,

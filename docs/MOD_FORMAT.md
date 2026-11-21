@@ -724,7 +724,7 @@ The other edits of a lane:
 - A lane zone that the editor cannot change stays as it is, with a warning.
 - A rename of a ring changes the links of its neighbors (see "Create, duplicate, rename and delete").
 
-The Inspector and `set_fields` lock the `prev_ring` and `next_ring` lines, so a change of one ring cannot break the lane. The ring buttons of the Trade lane ring component and the agent tools `trade_lane_insert_ring`, `trade_lane_repair` and `delete_items` change the links. The raw INI block can still change the lines (see "The raw INI block").
+The Inspector and `set_fields` lock the `prev_ring` and `next_ring` lines, so a change of one ring cannot break the lane. The ring buttons of the Trade lane ring component and the agent tools `trade_lane_insert_ring`, `trade_lane_repair` and `delete_items` change the links. The raw INI block can still change the lines (see "The raw INI block"). The game reads these lines only on a trade lane ring. On another object, for example a jump gate, the lock tells you to remove the line in the raw INI block.
 
 The checks of the trade lanes:
 
@@ -1091,7 +1091,7 @@ These keys are locked, and the other keys of the section take edits:
 - The `encounter`, `faction` and `faction_weight` lines of a `[Zone]` (see "Lines that belong together").
 - The `file` of a `[system]` of `universe.ini`, because a change moves all the contents of the system.
 - The `goto` line of an `[Object]`, because it links the two ends of a jump connection. To change the pair, delete one end, and its pair goes too. Then make a new pair with the agent tool `connection_create`. The raw INI block can still change the line.
-- The `prev_ring` and `next_ring` lines of an `[Object]`, because they link the rings of a trade lane. To change the lane, use Insert ring after, Repair lane or Delete ring on the Trade lane ring component. An agent uses `trade_lane_insert_ring`, `trade_lane_repair` and `delete_items`. The raw INI block can still change the lines.
+- The `prev_ring` and `next_ring` lines of an `[Object]`, because they link the rings of a trade lane. To change the lane, use Insert ring after, Repair lane or Delete ring on the Trade lane ring component. An agent uses `trade_lane_insert_ring`, `trade_lane_repair` and `delete_items`. The raw INI block can still change the lines. The game reads these lines only on a trade lane ring, so on another object the lock tells you to remove the line in the raw INI block.
 
 The gizmo also does not show when a line that it reads has an error, for example a `pos` line with text. Correct the line in the Inspector first.
 

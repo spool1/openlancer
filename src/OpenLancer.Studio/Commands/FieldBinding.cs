@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.Editing.Universe;
 
 namespace OpenLancer.Studio.Commands;
 
@@ -35,6 +36,12 @@ internal sealed class FieldBinding
         "This line links the ring to its neighbor in a trade lane. To change the lane, use Insert ring after, Repair " +
         "lane or Delete ring on the Trade lane ring component. An agent uses the tools trade_lane_insert_ring, " +
         "trade_lane_repair and delete_items. The raw INI block can change the line.";
+
+    /// <summary>Why a row and a field edit cannot change a link line of a trade lane on an object that is not a
+    /// ring.</summary>
+    public const string NotRingLinkReason =
+        "The game reads this line only on a trade lane ring, but this object is not a trade lane ring. Remove the line " +
+        "in the raw INI block.";
 
     /// <summary>Why a section of a file without a known schema is read-only (decision D123).</summary>
     public const string NoSchemaReason = "The editor cannot edit this file yet. It reads it for the lists.";
@@ -137,7 +144,8 @@ internal sealed class FieldBinding
     /// so the connection tools change the pair. A change of one ring breaks the links of the trade lane, so the lane
     /// tools and the ring buttons change the lane. The raw INI block does not use this lock, because the raw INI stays
     /// open to each key (editor UI rule 11). The checks of the jump connections and of the trade lanes then tell what a
-    /// raw edit breaks.
+    /// raw edit breaks. The game reads the lane links only on a trade lane ring. So on another object, the lock of a lane
+    /// link names the raw INI block, where the line can go.
     /// </summary>
     internal static string? LinkLock(EditSession session, SectionRef section, string name)
     {
@@ -145,7 +153,9 @@ internal sealed class FieldBinding
             return null;
         if (name.Equals(JumpKey, StringComparison.OrdinalIgnoreCase))
             return JumpLinkReason;
-        return LaneKeys.Contains(name, StringComparer.OrdinalIgnoreCase) ? LaneLinkReason : null;
+        if (!LaneKeys.Contains(name, StringComparer.OrdinalIgnoreCase))
+            return null;
+        return LanePlans.IsRingObject(session, section) ? LaneLinkReason : NotRingLinkReason;
     }
 
     /// <summary>
