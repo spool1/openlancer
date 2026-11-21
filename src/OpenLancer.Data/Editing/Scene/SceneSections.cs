@@ -90,8 +90,8 @@ internal static class SceneSections
 
     /// <summary>
     /// Why the editor refuses an action on a connection object (decision D253). A jump gate or a jump hole cannot get a
-    /// copy, because a copy has no partner. An airlock gate and a trade lane ring take no action of this version but
-    /// the rename. For example: "Li01_to_Li02 is a jump gate. This version cannot copy jump gates or jump holes,
+    /// copy, because a copy has no partner. In this version, an airlock gate and a trade lane ring take only the
+    /// rename. For example: "Li01_to_Li02 is a jump gate. This version cannot copy jump gates or jump holes,
     /// because a copy has no partner. To make a pair, use the jump connection tool connection_create of the agent
     /// server."
     /// </summary>

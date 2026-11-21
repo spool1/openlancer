@@ -54,8 +54,11 @@ public sealed class ObjectComponentsTests
     {
         Assert.Equal("Solar: Each object needs an archetype.",
             Assert.Throws<InvalidOperationException>(() => ObjectComponents.Remove(Object("x"), ObjectComponent.Solar)).Message);
-        Assert.NotNull(ObjectComponents.RemoveProblem(ObjectComponent.JumpConnection));
-        Assert.NotNull(ObjectComponents.RemoveProblem(ObjectComponent.TradeLaneRing));
+        // A delete of the object deletes the pair, so the remove of the goto line names the delete.
+        Assert.Equal("The goto line links the object to its partner. To delete a jump gate pair or a jump hole pair, " +
+                     "delete one of its objects.", ObjectComponents.RemoveProblem(ObjectComponent.JumpConnection));
+        Assert.Equal("This version cannot change the links of trade lane rings.",
+            ObjectComponents.RemoveProblem(ObjectComponent.TradeLaneRing));
         Assert.Null(ObjectComponents.RemoveProblem(ObjectComponent.PlanetRing));
         // The agent tool scene_set_encounters edits the encounter lines, so only the Inspector cannot remove them.
         Assert.Equal("The Inspector cannot edit the encounters of a zone.",
