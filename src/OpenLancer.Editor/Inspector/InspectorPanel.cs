@@ -174,7 +174,7 @@ internal sealed class InspectorPanel : IDisposable
         if (window.SectionOf(item) is { } itemSection)
         {
             SaveErrors(itemSection);
-            UniverseChecks(itemSection);
+            CheckStrip(itemSection);
         }
 
         // The sections have no window padding, so their headers run from edge to edge.
@@ -515,17 +515,19 @@ internal sealed class InspectorPanel : IDisposable
     }
 
     /// <summary>
-    /// The problems of a <c>[Base]</c> or a <c>[system]</c> of <c>universe.ini</c>, or of a <c>[locked_gates]</c>
-    /// section of the gate locks. A base warns when no object of its system docks with it, or no object of its system is
-    /// its object in space (decision D254 of the M3 design). The checks of the universe tell, for example, that no jump
-    /// gate leads to a system, or that a system names no file. A gate lock warns when it names no jump gate or jump
-    /// hole.
+    /// The component checks of a section without a components strip: a <c>[Base]</c> or a <c>[system]</c> of
+    /// <c>universe.ini</c>, a <c>[locked_gates]</c> section of the gate locks, or a zone. A base warns when no object of
+    /// its system docks with it, or no object of its system is its object in space (decision D254 of the M3 design). The
+    /// checks of the universe tell, for example, that no jump gate leads to a system, or that a system names no file. A
+    /// gate lock warns when it names no jump gate or jump hole. A zone gives the error of a nickname that another zone
+    /// has, and a lane zone warns when it does not cover its trade lane.
     /// </summary>
-    private void UniverseChecks(SectionRef section)
+    private void CheckStrip(SectionRef section)
     {
         if (!section.Id.Type.Equals("Base", StringComparison.OrdinalIgnoreCase) &&
             !section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase) &&
-            !section.Id.Type.Equals("locked_gates", StringComparison.OrdinalIgnoreCase) || window.Session is not { } session)
+            !section.Id.Type.Equals("locked_gates", StringComparison.OrdinalIgnoreCase) &&
+            !section.Id.Type.Equals("zone", StringComparison.OrdinalIgnoreCase) || window.Session is not { } session)
         {
             return;
         }
@@ -533,7 +535,7 @@ internal sealed class InspectorPanel : IDisposable
         var problems = Data.Editing.Scene.ObjectComponents.Checks(session.Edits, section);
         if (problems.Count > 0)
         {
-            Strip("##universe-checks", () =>
+            Strip("##section-checks", () =>
             {
                 foreach (var problem in problems)
                 {

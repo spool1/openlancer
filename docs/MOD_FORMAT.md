@@ -742,7 +742,7 @@ The circle check follows the links as the HUD does, also a stray link. The circl
 
 Each text names a fix: the button Repair lane and the agent tool `trade_lane_repair`, a delete, the Lane name row and `set_text`, or a move. A repair sorts the rings along their line, so a ring off the line stops it. The text then names the move or the delete of that ring. The zone warning comes after a move of an end ring, or after a raw edit that adds a ring beyond an end.
 
-The Inspector shows the link problems and the name problems in the Trade lane ring component of the ring. It shows the placement warning at the position of the ring, and the zone warning at the size of the zone. A ring of the game or of a lower mod gets no placement warning. The raw INI block marks the line of each problem. The agent tools `get_item` and `check` give them too.
+The Inspector shows the circle, link and name problems in the Trade lane ring component of the ring. The placement warning shows at the position of the ring, in the Solar component. The zone warning shows above the sections of the zone. A ring of the game or of a lower mod gets no placement warning. The raw INI block marks the line of each problem. The agent tools `get_item` and `check` give them too.
 
 The retail lanes of vanilla 1.1 and HD Edition 0.7.1 give one warning. The lane under construction in Bw10 has no name at its start, because its first rings are not there yet.
 
