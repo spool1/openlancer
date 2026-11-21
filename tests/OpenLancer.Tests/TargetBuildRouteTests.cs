@@ -165,6 +165,32 @@ public sealed class TargetBuildRouteTests
         Assert.Contains(errors, e => e.Source.Equals(AllPath, StringComparison.OrdinalIgnoreCase));
     }
 
+    [Theory]
+    [InlineData(1023, false)]
+    [InlineData(1024, true)]
+    public void ARouteLineOfMoreThan1023BytesIsAnError(int bytes, bool error)
+    {
+        // The longest line is "Path = a, c, a, b, c": 15 bytes, a and c two times, and b one time. The mod adds E with
+        // a gate to A, so that the build makes the tables.
+        var (a, c) = (new string('a', 250), new string('c', 250));
+        var b = new string('b', bytes - 15 - 2 * a.Length - 2 * c.Length);
+        using var game = new RouteWorld()
+            .System("A", $"gate {a}")
+            .System(a, "gate A", $"gate {b}")
+            .System(b, $"gate {a}", $"gate {c}")
+            .System(c, $"gate {b}")
+            .WriteInto(new ExportGame());
+
+        var files = RouteWorld.Build(game, RouteWorld.ConnectionMod(game));
+
+        var lines = Text(files.File(AllPath)!).Split("\r\n");
+        Assert.Equal(bytes, lines.Max(l => l.Length));
+        // The routes go through jump gates only, so the table of gates has the same lines.
+        string[] expected = error ? [GatesPath, AllPath] : [];
+        Assert.Equal(expected, files.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error)
+            .Select(d => d.Source).Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void TheChecklistNamesTheChangedRoutesAndTheNewSystemsThatNoRouteReaches()
     {

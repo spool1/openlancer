@@ -176,6 +176,25 @@ public sealed class RouteTablesTests
         Assert.Empty(new RouteWorld().System("A", "gate B").System("B", "gate A").Tables().All.TooLong);
     }
 
+    [Theory]
+    [InlineData(1023, false)]
+    [InlineData(1024, true)]
+    public void TheReaderReadsALineOf1023BytesInOnePiece(int bytes, bool tooLong)
+    {
+        // The longest line is "Path = a, c, a, b, c": 15 bytes, a and c two times, and b one time.
+        var (a, c) = (new string('a', 250), new string('c', 250));
+        var b = new string('b', bytes - 15 - 2 * a.Length - 2 * c.Length);
+        var tables = new RouteWorld()
+            .System(a, $"gate {b}")
+            .System(b, $"gate {a}", $"gate {c}")
+            .System(c, $"gate {b}")
+            .Tables();
+
+        Assert.Equal(bytes, tables.All.Routes.Max(r => r.Line.Length));
+        string[] expected = tooLong ? [$"Path = {a}, {c}, {a}, {b}, {c}", $"Path = {c}, {a}, {c}, {b}, {a}"] : [];
+        Assert.Equal(expected, tables.All.TooLong.Select(r => r.Line));
+    }
+
     [Fact]
     public void TheDiffCountsNewShorterLongerAndLostRoutes()
     {
