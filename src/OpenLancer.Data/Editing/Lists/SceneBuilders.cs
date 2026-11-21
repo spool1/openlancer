@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using OpenLancer.Data.Editing.Universe;
 
 namespace OpenLancer.Data.Editing.Lists;
 
@@ -50,11 +51,55 @@ internal sealed record SunZoneRule(float Size, float AtmosphereMargin, IReadOnly
 }
 
 /// <summary>
-/// The rule data of the builders of the agent tools (milestone MCP1-2): the wreck, the route templates and the death
-/// zone of the sun of a new system of <c>list-rules.json</c>. Section 9.3 of the MCP1 design names that file as the
-/// source of the builders.
+/// The rules of the new ends of a jump connection of one kind: the archetype, the infocard, the name and the lines of
+/// each new end, and the traffic zone at the end.
 /// </summary>
-internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTemplate> Routes, SunZoneRule? SunZone)
+/// <param name="Archetype">The solar archetype of a new end when the request and its template give none.</param>
+/// <param name="Infocard">The id of the infocard that the retail ends of this kind share.</param>
+/// <param name="Name">The pattern of the name of a new end. <c>{system}</c> is the name of the system at the other
+/// end.</param>
+/// <param name="Lines">The lines of a new end that the template object does not give, each with a value. Only the keys
+/// of <see cref="ConnectionRule.EndKeys"/> can occur.</param>
+/// <param name="TrafficSize">The radius of the traffic zone at a new end, in meters.</param>
+/// <param name="Traffic">The lines of the traffic zone after its <c>size</c> line, each with a value.</param>
+internal sealed record JumpEndRule(string Archetype, int Infocard, string Name, IReadOnlyList<BuilderLine> Lines,
+    float TrafficSize, IReadOnlyList<BuilderLine> Traffic);
+
+/// <summary>The loadout and the pilot of a new jump gate of a house, when no gate of the same faction gives
+/// them.</summary>
+/// <param name="House">The start of the faction nickname before the first <c>_</c>, for example <c>li</c>.</param>
+internal sealed record JumpHouse(string House, string Loadout, string Pilot);
+
+/// <summary>
+/// The rules of a new jump connection: the tunnel of the <c>goto</c> line, the smallest distance of a new end from the
+/// center of its system, the rules of each kind and the loadout and the pilot of a gate by house.
+/// </summary>
+/// <param name="Tunnel">Value 2 of the <c>goto</c> line of a new end.</param>
+/// <param name="MinRadius">The smallest distance of a new end from the center of its system, in meters.</param>
+internal sealed record ConnectionRule(string Tunnel, float MinRadius, JumpEndRule Gate, JumpEndRule Hole,
+    IReadOnlyList<JumpHouse> Houses)
+{
+    /// <summary>The keys of the lines of a new end that the rule data or a template object can give. The builder
+    /// writes each other line itself.</summary>
+    public static readonly IReadOnlyList<string> EndKeys = ["jump_effect", "behavior", "difficulty_level", "visit"];
+
+    /// <summary>The rules of the ends of a kind: a jump hole, or else a jump gate.</summary>
+    public JumpEndRule For(ConnectionKind kind) => kind == ConnectionKind.Hole ? Hole : Gate;
+
+    /// <summary>The house of a faction nickname, or null.</summary>
+    public JumpHouse? HouseOf(string? faction) =>
+        faction?.Split('_')[0] is { Length: > 0 } house
+            ? Houses.FirstOrDefault(h => h.House.Equals(house, StringComparison.OrdinalIgnoreCase))
+            : null;
+}
+
+/// <summary>
+/// The rule data of the builders of the agent tools (milestone MCP1-2): the wreck, the route templates, the death
+/// zone of the sun of a new system and the new jump connections of <c>list-rules.json</c>. Section 9.3 of the MCP1
+/// design names that file as the source of the builders.
+/// </summary>
+internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTemplate> Routes, SunZoneRule? SunZone,
+    ConnectionRule? Connection)
 {
     /// <summary>The key of the label and the leg number of a route zone.</summary>
     public const string PathLabel = "path_label";
@@ -63,7 +108,7 @@ internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTempla
     public const string Usage = "usage";
 
     /// <summary>The rule data without builders.</summary>
-    public static readonly SceneBuilders None = new(null, [], null);
+    public static readonly SceneBuilders None = new(null, [], null, null);
 
     /// <summary>The keys that a builder writes itself. A template cannot give them.</summary>
     private static readonly string[] BuilderKeys =
@@ -88,8 +133,8 @@ internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTempla
                 Lines(w, "wreck"), Text(w, "name"), Text(w, "info"));
             if (wreck.Types.Count == 0)
                 throw new FormatException("The wreck builder needs one or more types.");
-            if (wreck.Types.FirstOrDefault(connectionTypes.Contains) is { } connection)
-                throw new FormatException($"The wreck builder has the connection type '{connection}'.");
+            if (wreck.Types.FirstOrDefault(connectionTypes.Contains) is { } connectionType)
+                throw new FormatException($"The wreck builder has the connection type '{connectionType}'.");
             if (wreck.Lines.FirstOrDefault(l => l.Value == null) is { } empty)
                 throw new FormatException($"The line '{empty.Key}' of the wreck builder needs a value.");
         }
@@ -129,7 +174,50 @@ internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTempla
             if (sunZone.Lines.FirstOrDefault(l => l.Value == null) is { } empty)
                 throw new FormatException($"The line '{empty.Key}' of the sun death zone needs a value.");
         }
-        return new SceneBuilders(wreck, routes, sunZone);
+        var connection = e.TryGetProperty("connection", out var c) ? ReadConnection(c) : null;
+        return new SceneBuilders(wreck, routes, sunZone, connection);
+    }
+
+    /// <summary>Reads the rules of a new jump connection.</summary>
+    private static ConnectionRule ReadConnection(JsonElement e)
+    {
+        var tunnel = Text(e, "tunnel");
+        if (tunnel.Any(c => c is ',' or ';' || char.IsControl(c)))
+            throw new FormatException("The tunnel of the connection builder is not one value.");
+        var radius = e.GetProperty("minRadius").GetSingle();
+        if (!float.IsFinite(radius) || radius < 1)
+            throw new FormatException("The connection builder needs a minRadius of 1 or more.");
+        var houses = e.TryGetProperty("houses", out var array)
+            ? array.EnumerateArray().Select(h => new JumpHouse(Text(h, "house"), Text(h, "loadout"), Text(h, "pilot")))
+                .ToList()
+            : [];
+        if (houses.GroupBy(h => h.House, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1) is { } twice)
+            throw new FormatException($"The connection builder has the house '{twice.Key}' more than one time.");
+        return new ConnectionRule(tunnel, radius, ReadEnd(e.GetProperty("gate"), "jump gate"),
+            ReadEnd(e.GetProperty("hole"), "jump hole"), houses);
+    }
+
+    /// <summary>Reads the rules of the ends of one kind of a new jump connection.</summary>
+    private static JumpEndRule ReadEnd(JsonElement e, string kind)
+    {
+        var infocard = e.GetProperty("infocard").GetInt32();
+        var traffic = e.GetProperty("traffic");
+        var size = traffic.GetProperty("size").GetSingle();
+        if (infocard < 1 || !float.IsFinite(size) || size < 1)
+            throw new FormatException($"The {kind} builder needs an infocard of 1 or more and a traffic zone size of 1 or " +
+                                      "more.");
+        var name = Text(e, "name");
+        if (!name.Contains("{system}", StringComparison.Ordinal))
+            throw new FormatException($"The name of the {kind} builder needs the part {{system}}.");
+        var lines = Lines(e, $"{kind} builder");
+        if (lines.FirstOrDefault(l => l.Value == null || !ConnectionRule.EndKeys.Contains(l.Key, StringComparer.OrdinalIgnoreCase))
+            is { } bad)
+            throw new FormatException($"The line '{bad.Key}' of the {kind} builder needs a value and one of the keys " +
+                                      $"{string.Join(", ", ConnectionRule.EndKeys)}.");
+        var trafficLines = Lines(traffic, $"{kind} traffic zone");
+        if (trafficLines.FirstOrDefault(l => l.Value == null) is { } empty)
+            throw new FormatException($"The line '{empty.Key}' of the {kind} traffic zone needs a value.");
+        return new JumpEndRule(Text(e, "archetype"), infocard, name, lines, size, trafficLines);
     }
 
     /// <summary>The lines of a template. Each key occurs once, and no key is a key that the builder writes

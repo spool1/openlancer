@@ -61,6 +61,14 @@ public sealed partial class EditSession
         }
     }
 
+    /// <summary>
+    /// The route tables of W in which some files have other sections, for example the files after the command of a
+    /// plan that does not run yet. The session does not keep them.
+    /// </summary>
+    /// <param name="files">The sections of each changed file, by install path.</param>
+    internal RouteTables RoutesWith(IReadOnlyDictionary<string, List<Section>> files) =>
+        RouteTables.Build(UniverseGraph.Build(new ChangedUniverse(new WorkingUniverse(this), files)));
+
     /// <summary>True when the route tables of W differ from the route tables of the game data without mods. Play in
     /// the game and the export of a retail target then write route tables.</summary>
     internal bool RouteFilesChange => !Routes.Tables.SameRoutes(GameRoutes.Tables);
@@ -102,6 +110,20 @@ public sealed partial class EditSession
         public IReadOnlyList<string> LockPaths => session.DataFiles.Paths(UniverseGraph.LockRole);
 
         public IReadOnlyList<Section>? Sections(string path) => session.WorkingSections(path);
+    }
+
+    /// <summary>A source that gives other sections for some files.</summary>
+    private sealed class ChangedUniverse(IUniverseSource source, IReadOnlyDictionary<string, List<Section>> files)
+        : IUniverseSource
+    {
+        public string? UniversePath => source.UniversePath;
+
+        public IReadOnlyList<string> SolarPaths => source.SolarPaths;
+
+        public IReadOnlyList<string> LockPaths => source.LockPaths;
+
+        public IReadOnlyList<Section>? Sections(string path) =>
+            files.TryGetValue(path, out var changed) ? changed : source.Sections(path);
     }
 
     /// <summary>A source that records each read and the section list that it gave.</summary>

@@ -132,7 +132,9 @@ public static partial class TargetChecks
         files.Files.Any(f => f.Kind == TargetFileKind.Ini && f.Path.StartsWith(@"DATA\", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Runs the checks on a view, and gives the findings that the data with the mods adds.</summary>
-    internal static IReadOnlyList<Diagnostic> Run(CheckView view)
+    /// <param name="jumpCount">False to leave out the count of the jump objects of each system. The save gate leaves
+    /// it out, because the jump connection checks of the editor give that error for each data mod.</param>
+    internal static IReadOnlyList<Diagnostic> Run(CheckView view, bool jumpCount = true)
     {
         var changed = view.ChangedPaths.Select(p => VfsPath.Normalize(p) ?? p).ToHashSet(VfsPath.Comparer);
         if (changed.Count == 0)
@@ -140,12 +142,12 @@ public static partial class TargetChecks
         var without = new Side(view, false);
         var with = new Side(view, true);
         var scope = new Scope(view, changed, without, with);
-        var known = Findings(without, scope).Select(f => f.Key).ToHashSet(StringComparer.Ordinal);
-        return Findings(with, scope).Where(f => !known.Contains(f.Key)).Select(f => f.Problem).ToList();
+        var known = Findings(without, scope, jumpCount).Select(f => f.Key).ToHashSet(StringComparer.Ordinal);
+        return Findings(with, scope, jumpCount).Where(f => !known.Contains(f.Key)).Select(f => f.Problem).ToList();
     }
 
-    private static IEnumerable<Finding> Findings(Side side, Scope scope) =>
-        Systems(side, scope)
+    private static IEnumerable<Finding> Findings(Side side, Scope scope, bool jumpCount) =>
+        Systems(side, scope, jumpCount)
             .Concat(Prices(side, scope))
             .Concat(Ammo(side, scope))
             .Concat(Triggers(side, scope))
@@ -155,7 +157,7 @@ public static partial class TargetChecks
 
     /// <summary>The jump objects, the solar objects and the asteroid zones of each system that the mods can
     /// change.</summary>
-    private static IEnumerable<Finding> Systems(Side side, Scope scope)
+    private static IEnumerable<Finding> Systems(Side side, Scope scope, bool jumpCount)
     {
         foreach (var nickname in scope.Systems)
         {
@@ -165,7 +167,7 @@ public static partial class TargetChecks
             var key = nickname.ToLowerInvariant();
             var objects = sections.Where(s => Is(s.Name, "Object")).ToList();
             var jumps = objects.Count(o => ItemIndex.First(o, "goto") != null);
-            if (jumps > MaxJumpObjects)
+            if (jumpCount && jumps > MaxJumpObjects)
                 yield return new($"jumps|{key}", Diagnostic.Error(path,
                     $"{label} has {jumps} jump holes and jump gates. The game crashes with more than {MaxJumpObjects} " +
                     $"in one system. Remove {jumps - MaxJumpObjects} of them."));

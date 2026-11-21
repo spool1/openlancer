@@ -411,7 +411,7 @@
     { "id": "models", "label": "Models", "list": "model", "split": "folder" },
     { "id": "prefabs", "label": "Mission prefabs", "kind": "missionPrefabs" }
   ],
-  "// sceneBuilders": "The builders of the agent tools (milestone MCP1-2, decisions D730 and D731). 'wreck' gives a new wreck: the [Solar] types of its archetype, its lines, and its name and info texts. 'routes' gives the zones of a route for each usage, with the default radius and the lines of each zone in their order. A line without a value is a line that the builder fills: path_label and usage. The values follow counts over the retail system files. 146 of the 160 retail wreck objects have visit = 16. 3036 of the 3038 retail route zones have a radius of 750, and the other values are the most frequent values of each usage. 'system' gives the death zone of the sun of a new star system, when the sun that the system copies has none. 27 of the 43 first suns of the vanilla 1.1 system files have a SPHERE zone with damage at the sun. Its radius is the atmosphere_range of the sun less 1000 in 25 of the 27, and 10000 is the most frequent radius (9 of 27). The lines are the most frequent values: damage = 10000 (25 of 27), sort = 99.5 (22 of 27), density = 0 and relief_time = 0 (26 of 27).",
+  "// sceneBuilders": "The builders of the agent tools (milestone MCP1-2, decisions D730 and D731). 'wreck' gives a new wreck: the [Solar] types of its archetype, its lines, and its name and info texts. 'routes' gives the zones of a route for each usage, with the default radius and the lines of each zone in their order. A line without a value is a line that the builder fills: path_label and usage. The values follow counts over the retail system files. 146 of the 160 retail wreck objects have visit = 16. 3036 of the 3038 retail route zones have a radius of 750, and the other values are the most frequent values of each usage. 'system' gives the death zone of the sun of a new star system, when the sun that the system copies has none. 27 of the 43 first suns of the vanilla 1.1 system files have a SPHERE zone with damage at the sun. Its radius is the atmosphere_range of the sun less 1000 in 25 of the 27, and 10000 is the most frequent radius (9 of 27). The lines are the most frequent values: damage = 10000 (25 of 27), sort = 99.5 (22 of 27), density = 0 and relief_time = 0 (26 of 27). 'connection' gives the new ends of a jump gate pair or a jump hole pair. The 232 retail objects with goto in the vanilla 1.1 system files give the values: each one has the tunnel gate_tunnel_bretonia. Of the 86 jump gates, 84 use the archetype jumpgate, 79 the infocard 66145, 86 jump_effect_bretonia, 83 behavior = NOTHING, and 17 difficulty_level = 10, the most frequent value. Of the 140 jump holes, 72 use the archetype jumphole, 129 the infocard 66146, 140 jump_effect_hole and 122 visit = 0. The traffic zones are the zones with pop_type = jumpgate (65) or wormhole (108): SPHERE, size 4000 (52 of 65 and 95 of 108), density 10 (65 of 65) or 9 (108 of 108), repop_time = 10 (64 of 65 and 108 of 108), max_battle_size = 4 and relief_time = 15 (all of them). The houses give the most frequent loadout and pilot of the gates of the factions of each house: li 9 of 24, br 5 of 20, ku 10 of 18, rh 9 of 16 and co 2 of 4. A new end goes at least minRadius from the center of its system. The median distance of the retail ends is 41394 m.",
   "sceneBuilders": {
     "wreck": {
       "help": "A wreck is a solar of the type mission_satellite with a loadout of a ship. The player shoots it to free its cargo.",
@@ -447,6 +447,38 @@
           { "key": "relief_time", "value": "0" }
         ]
       }
+    },
+    "connection": {
+      "tunnel": "gate_tunnel_bretonia",
+      "minRadius": 50000,
+      "gate": {
+        "archetype": "jumpgate", "infocard": 66145, "name": "{system} Jump Gate",
+        "lines": [
+          { "key": "jump_effect", "value": "jump_effect_bretonia" }, { "key": "behavior", "value": "NOTHING" },
+          { "key": "difficulty_level", "value": "10" }
+        ],
+        "traffic": { "size": 4000, "lines": [
+          { "key": "density", "value": "10" }, { "key": "repop_time", "value": "10" },
+          { "key": "max_battle_size", "value": "4" }, { "key": "pop_type", "value": "jumpgate" },
+          { "key": "relief_time", "value": "15" }
+        ] }
+      },
+      "hole": {
+        "archetype": "jumphole", "infocard": 66146, "name": "{system} Jump Hole",
+        "lines": [ { "key": "jump_effect", "value": "jump_effect_hole" }, { "key": "visit", "value": "0" } ],
+        "traffic": { "size": 4000, "lines": [
+          { "key": "density", "value": "9" }, { "key": "repop_time", "value": "10" },
+          { "key": "max_battle_size", "value": "4" }, { "key": "pop_type", "value": "wormhole" },
+          { "key": "relief_time", "value": "15" }
+        ] }
+      },
+      "houses": [
+        { "house": "li", "loadout": "jumpgate_li_01", "pilot": "pilot_solar_hard" },
+        { "house": "br", "loadout": "jumpgate_br_02", "pilot": "pilot_solar_easiest" },
+        { "house": "ku", "loadout": "jumpgate_ku_02", "pilot": "pilot_solar_easiest" },
+        { "house": "rh", "loadout": "jumpgate_rh_01", "pilot": "pilot_solar_easy" },
+        { "house": "co", "loadout": "jumpgate_co_02", "pilot": "pilot_solar_hardest" }
+      ]
     }
   }
 }

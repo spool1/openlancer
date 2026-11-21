@@ -36,8 +36,9 @@ internal sealed record Route(string From, string To, IReadOnlyList<string> Syste
 
 /// <summary>The counts of the routes that a change of a route table adds, makes shorter, makes longer and removes. The
 /// route of a system to itself does not count.</summary>
-internal sealed record RouteDiff(int New, int Shorter, int Longer, int Lost)
+public sealed record RouteDiff(int New, int Shorter, int Longer, int Lost)
 {
+    /// <summary>True when the change adds, changes and removes no route.</summary>
     public bool IsEmpty => New == 0 && Shorter == 0 && Longer == 0 && Lost == 0;
 }
 

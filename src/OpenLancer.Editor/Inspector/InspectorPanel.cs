@@ -515,14 +515,17 @@ internal sealed class InspectorPanel : IDisposable
     }
 
     /// <summary>
-    /// The problems of a <c>[Base]</c> or a <c>[system]</c> of <c>universe.ini</c>. A base warns when no object of its
-    /// system docks with it, or no object of its system is its object in space (decision D254 of the M3 design). The
-    /// checks of the universe tell, for example, that no jump gate leads to a system, or that a system names no file.
+    /// The problems of a <c>[Base]</c> or a <c>[system]</c> of <c>universe.ini</c>, or of a <c>[locked_gates]</c>
+    /// section of the gate locks. A base warns when no object of its system docks with it, or no object of its system is
+    /// its object in space (decision D254 of the M3 design). The checks of the universe tell, for example, that no jump
+    /// gate leads to a system, or that a system names no file. A gate lock warns when it names no jump gate or jump
+    /// hole.
     /// </summary>
     private void UniverseChecks(SectionRef section)
     {
         if (!section.Id.Type.Equals("Base", StringComparison.OrdinalIgnoreCase) &&
-            !section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase) || window.Session is not { } session)
+            !section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase) &&
+            !section.Id.Type.Equals("locked_gates", StringComparison.OrdinalIgnoreCase) || window.Session is not { } session)
         {
             return;
         }

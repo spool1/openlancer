@@ -61,7 +61,7 @@ internal sealed class FileUniverseSource : IUniverseSource
 
 /// <summary>The kind of a jump connection. The <c>type</c> of the <c>[Solar]</c> archetype of the object gives
 /// it.</summary>
-internal enum ConnectionKind
+public enum ConnectionKind
 {
     /// <summary>A jump gate (<c>JUMP_GATE</c>).</summary>
     Gate,

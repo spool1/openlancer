@@ -81,10 +81,12 @@ internal static class AgentRows
 
     /// <summary>The diagnostics of the field checks and the list checks of a section, each with a target. A
     /// <c>[system]</c> or a <c>[Base]</c> of <c>universe.ini</c> also gets the problems of the universe checks (see
-    /// <see cref="UniverseChecks"/>).</summary>
+    /// <see cref="UniverseChecks"/>). An object with a <c>goto</c> line and a <c>[locked_gates]</c> section also get
+    /// the problems of the jump connection checks (see <see cref="ConnectionChecks"/>).</summary>
     public static IReadOnlyList<Diagnostic> DiagnosticsOf(EditSession session, SectionRef section) =>
         session.Check(section).Concat(session.Lists.Problems(section).Select(p => p.Diagnostic))
             .Concat(UniverseChecks.Check(session, section))
+            .Concat(ConnectionChecks.Check(session, section))
             .Select(d => d with { Target = d.Target ?? section }).ToList();
 
     /// <summary>The problems of the field checks and the list checks of a section.</summary>

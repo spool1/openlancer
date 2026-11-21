@@ -9,13 +9,14 @@ namespace OpenLancer.Data.Editing.Scene;
 /// The component checks (layer 3 of roadmap section 5.4, section 5.5 of the M3 design). They give problems of a section
 /// with a target, a key, a severity and a consequence, as the list checks do. A zone nickname that another zone of any
 /// system has, also by FLHash, is an error: retail drops one of the two zones (decision D240). The errors of the
-/// universe checks also stop the save (see <see cref="UniverseChecks"/>). The other checks are warnings until a retail
-/// comparison proves an effect (decision D254).
+/// universe checks and of the jump connection checks also stop the save (see <see cref="UniverseChecks"/> and
+/// <see cref="ConnectionChecks"/>). The other checks are warnings until a retail comparison proves an effect (decision
+/// D254).
 /// </summary>
 internal static class ComponentChecks
 {
-    /// <summary>The problems of a section of a system file, or of a <c>[Base]</c> or a <c>[system]</c> of
-    /// <c>universe.ini</c>.</summary>
+    /// <summary>The problems of a section of a system file, of a <c>[Base]</c> or a <c>[system]</c> of
+    /// <c>universe.ini</c>, or of a <c>[locked_gates]</c> section of the gate locks.</summary>
     /// <param name="onlyActiveMod">True to check the section only when the active mod adds or changes it. The retail
     /// tests check each section.</param>
     public static IReadOnlyList<Diagnostic> Check(EditSession session, SectionRef section, bool onlyActiveMod = true)
@@ -30,6 +31,7 @@ internal static class ComponentChecks
             result.AddRange(UniverseChecks.Check(session, section));
             return result;
         }
+        result.AddRange(ConnectionChecks.Check(session, section));
         switch (SceneSections.KindOf(session, section))
         {
             case SceneKind.Zone:
@@ -66,8 +68,9 @@ internal static class ComponentChecks
 
     /// <summary>
     /// The errors of layer 3 for the save gate: the zone nickname collisions of the zones that the active mod adds or
-    /// changes in the system files that it changes. Then the errors of the universe checks of the <c>[system]</c>
-    /// sections that the active mod adds or changes, when it changes <c>universe.ini</c>.
+    /// changes in the system files that it changes, and the errors of the jump connections of these files. Then the
+    /// errors of the universe checks of the <c>[system]</c> sections that the active mod adds or changes, when it changes
+    /// <c>universe.ini</c>.
     /// </summary>
     public static IEnumerable<Diagnostic> SaveErrors(EditSession session)
     {
@@ -77,6 +80,7 @@ internal static class ComponentChecks
         {
             foreach (var section in session.Sections(path).Where(s => SceneSections.Is(s.Id.Type, SceneSections.ZoneType)))
                 result.AddRange(Check(session, section).Where(p => p.Severity == DiagnosticSeverity.Error));
+            result.AddRange(ConnectionChecks.SaveErrors(session, path));
         }
         if (session.UniversePath is { } universe && paths.Contains(universe, VfsPath.Comparer))
             result.AddRange(UniverseChecks.SaveErrors(session));
