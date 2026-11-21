@@ -186,8 +186,8 @@ public static class ObjectComponents
     /// an object, a zone, a <c>[Base]</c> or a <c>[system]</c> of <c>universe.ini</c>, and a <c>[locked_gates]</c>
     /// section. A zone nickname that another zone has is an error, and so are three universe checks of a line of the
     /// active mod (see <see cref="UniverseChecks"/>). So are two checks of the jump connections (see
-    /// <see cref="ConnectionChecks"/>). The Inspector shows the problems of a base, a system and the gate locks here,
-    /// because they have no components strip.
+    /// <see cref="ConnectionChecks"/>) and a trade lane that goes in a circle (see <see cref="LaneChecks"/>). The
+    /// Inspector shows the problems of a base, a system and the gate locks here, because they have no components strip.
     /// </summary>
     public static IReadOnlyList<Diagnostic> Checks(EditSession session, SectionRef section) =>
         ComponentChecks.Check(session, section, onlyActiveMod: false);

@@ -27,6 +27,15 @@ internal sealed class FieldBinding
         "This line links the two ends of a jump connection. To change the pair, delete one end, and its pair goes too. " +
         $"Then make a new pair with {SceneSections.PairTool}. The raw INI block can change the line.";
 
+    /// <summary>The keys of an <c>[Object]</c> of a system file that link a trade lane ring to its neighbors.</summary>
+    private static readonly string[] LaneKeys = ["prev_ring", "next_ring"];
+
+    /// <summary>Why a row and a field edit cannot change a link of a trade lane.</summary>
+    public const string LaneLinkReason =
+        "This line links the ring to its neighbor in a trade lane. To change the lane, use Insert ring after, Repair " +
+        "lane or Delete ring on the Trade lane ring component. An agent uses the tools trade_lane_insert_ring, " +
+        "trade_lane_repair and delete_items. The raw INI block can change the line.";
+
     /// <summary>Why a section of a file without a known schema is read-only (decision D123).</summary>
     public const string NoSchemaReason = "The editor cannot edit this file yet. It reads it for the lists.";
 
@@ -123,16 +132,21 @@ internal sealed class FieldBinding
     }
 
     /// <summary>
-    /// Why a row and a field edit cannot change a key that links two items, or null: the <c>goto</c> line of an
-    /// <c>[Object]</c> of a system file. A change of one end breaks the jump connection, so the connection tools change
-    /// the pair. The raw INI block does not use this lock, because the raw INI stays open to each key (editor UI rule
-    /// 11). The checks of the jump connections then tell what a raw edit breaks.
+    /// Why a row and a field edit cannot change a key that links two items, or null: the <c>goto</c>, <c>prev_ring</c>
+    /// and <c>next_ring</c> lines of an <c>[Object]</c> of a system file. A change of one end breaks the jump connection,
+    /// so the connection tools change the pair. A change of one ring breaks the links of the trade lane, so the lane
+    /// tools and the ring buttons change the lane. The raw INI block does not use this lock, because the raw INI stays
+    /// open to each key (editor UI rule 11). The checks of the jump connections and of the trade lanes then tell what a
+    /// raw edit breaks.
     /// </summary>
-    internal static string? LinkLock(EditSession session, SectionRef section, string name) =>
-        name.Equals(JumpKey, StringComparison.OrdinalIgnoreCase) &&
-        section.Id.Type.Equals("Object", StringComparison.OrdinalIgnoreCase) && session.IsSystemFile(section.Path)
-            ? JumpLinkReason
-            : null;
+    internal static string? LinkLock(EditSession session, SectionRef section, string name)
+    {
+        if (!section.Id.Type.Equals("Object", StringComparison.OrdinalIgnoreCase) || !session.IsSystemFile(section.Path))
+            return null;
+        if (name.Equals(JumpKey, StringComparison.OrdinalIgnoreCase))
+            return JumpLinkReason;
+        return LaneKeys.Contains(name, StringComparer.OrdinalIgnoreCase) ? LaneLinkReason : null;
+    }
 
     /// <summary>
     /// Why a revert of a whole section cannot run, or null. A revert puts back all the lines of the lower layer, also

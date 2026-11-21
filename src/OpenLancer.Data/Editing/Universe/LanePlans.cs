@@ -806,20 +806,20 @@ public static class LanePlans
     /// not cover both rings within <see cref="Reach"/>. The axis is the z axis of the zone after its rotation. A ring is
     /// covered when it is near the axis and within the length of the zone plus <see cref="Reach"/>.
     /// </summary>
-    internal static float? Cover(UniverseSchema.Zone zone, Vector3 first, Vector3 last)
+    internal static float? Cover(UniverseSchema.Zone zone, Vector3 first, Vector3 last) =>
+        AxisDistance(zone, first) is { } a && AxisDistance(zone, last) is { } b ? a + b : null;
+
+    /// <summary>
+    /// The distance of a point from the axis of a box zone, or null when the zone does not cover the point within
+    /// <see cref="Reach"/>. The axis is the z axis of the zone after its rotation. The zone covers a point near the axis
+    /// and within the length of the zone plus <see cref="Reach"/>.
+    /// </summary>
+    internal static float? AxisDistance(UniverseSchema.Zone zone, Vector3 point)
     {
         var inverse = Matrix4x4.Transpose(ZoneShapes.RotationOf(zone.Rotate));
-        var half = (zone.Size ?? Vector3.One).Z / 2;
-        var total = 0f;
-        foreach (var point in new[] { first, last })
-        {
-            var local = Vector3.TransformNormal(point - (zone.Pos ?? Vector3.Zero), inverse);
-            var off = MathF.Sqrt(local.X * local.X + local.Y * local.Y);
-            if (off > Reach || MathF.Abs(local.Z) > half + Reach)
-                return null;
-            total += off;
-        }
-        return total;
+        var local = Vector3.TransformNormal(point - (zone.Pos ?? Vector3.Zero), inverse);
+        var off = MathF.Sqrt(local.X * local.X + local.Y * local.Y);
+        return off > Reach || MathF.Abs(local.Z) > (zone.Size ?? Vector3.One).Z / 2 + Reach ? null : off;
     }
 
     /// <summary>
@@ -966,8 +966,9 @@ public static class LanePlans
         return -1;
     }
 
-    /// <summary>True for an object with an archetype of the type <c>TRADELANE_RING</c>.</summary>
-    private static bool IsRingObject(EditSession session, SectionRef section) =>
+    /// <summary>True for an object with an archetype of the type <c>TRADELANE_RING</c>. The game makes lanes only from
+    /// such objects.</summary>
+    internal static bool IsRingObject(EditSession session, SectionRef section) =>
         session.Get(section) is { } view && SceneSections.ArchetypeType(session, view) == RingType;
 
     /// <summary>

@@ -9,9 +9,9 @@ namespace OpenLancer.Data.Editing.Scene;
 /// The component checks (layer 3 of roadmap section 5.4, section 5.5 of the M3 design). They give problems of a section
 /// with a target, a key, a severity and a consequence, as the list checks do. A zone nickname that another zone of any
 /// system has, also by FLHash, is an error: retail drops one of the two zones (decision D240). The errors of the
-/// universe checks and of the jump connection checks also stop the save (see <see cref="UniverseChecks"/> and
-/// <see cref="ConnectionChecks"/>). The other checks are warnings until a retail comparison proves an effect (decision
-/// D254).
+/// universe checks, of the jump connection checks and of the trade lane checks also stop the save (see
+/// <see cref="UniverseChecks"/>, <see cref="ConnectionChecks"/> and <see cref="LaneChecks"/>). The other checks are
+/// warnings until a retail comparison proves an effect (decision D254).
 /// </summary>
 internal static class ComponentChecks
 {
@@ -32,6 +32,7 @@ internal static class ComponentChecks
             return result;
         }
         result.AddRange(ConnectionChecks.Check(session, section));
+        result.AddRange(LaneChecks.Check(session, section));
         switch (SceneSections.KindOf(session, section))
         {
             case SceneKind.Zone:
@@ -68,9 +69,9 @@ internal static class ComponentChecks
 
     /// <summary>
     /// The errors of layer 3 for the save gate: the zone nickname collisions of the zones that the active mod adds or
-    /// changes in the system files that it changes, and the errors of the jump connections of these files. Then the
-    /// errors of the universe checks of the <c>[system]</c> sections that the active mod adds or changes, when it changes
-    /// <c>universe.ini</c>.
+    /// changes in the system files that it changes, and the errors of the jump connections and of the trade lanes of
+    /// these files. Then the errors of the universe checks of the <c>[system]</c> sections that the active mod adds or
+    /// changes, when it changes <c>universe.ini</c>.
     /// </summary>
     public static IEnumerable<Diagnostic> SaveErrors(EditSession session)
     {
@@ -81,6 +82,7 @@ internal static class ComponentChecks
             foreach (var section in session.Sections(path).Where(s => SceneSections.Is(s.Id.Type, SceneSections.ZoneType)))
                 result.AddRange(Check(session, section).Where(p => p.Severity == DiagnosticSeverity.Error));
             result.AddRange(ConnectionChecks.SaveErrors(session, path));
+            result.AddRange(LaneChecks.SaveErrors(session, path));
         }
         if (session.UniversePath is { } universe && paths.Contains(universe, VfsPath.Comparer))
             result.AddRange(UniverseChecks.SaveErrors(session));
