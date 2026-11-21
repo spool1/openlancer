@@ -105,26 +105,6 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         $"{problem.Message}\n\n{(readOnlyReason == null ? GateStopsText : $"{NotCheckedText} {readOnlyReason}")} " +
         "Click to select the element.";
 
-    /// <summary>The note of the Problems section for a cutscene that the active mod does not change (see
-    /// <see cref="LowerProblemsNote"/>).</summary>
-    internal const string LowerProblemsText =
-        "The active mod does not change this cutscene. A change of the active mod in the game data, for example an " +
-        "INI edit, deletes, renames or breaks an item of the cutscene. An animation file of the active mod can also " +
-        "remove a clip. Undo that change, or pick another item or clip.";
-
-    /// <summary>
-    /// The note of the Problems section, or null. A cutscene that the active mod does not change has the script of the
-    /// lower layer. So only a change of the active mod in the game data gives it a problem. The note tells that cause
-    /// and the fix. A lower cutscene with unsaved edits has the kind <see cref="ThnFileKind.Lower"/> until the save
-    /// writes its patch, so it gets no note.
-    /// </summary>
-    /// <param name="source">Where the edit view gets the cutscene from (see
-    /// <see cref="EditSession.CutsceneSource"/>).</param>
-    /// <param name="unsavedEdits">True when the cutscene has unsaved edits (see
-    /// <see cref="EditSession.HasUnsavedCutsceneEdits"/>).</param>
-    internal static string? LowerProblemsNote(ThnFileSource source, bool unsavedEdits) =>
-        source.Kind == ThnFileKind.Lower && !unsavedEdits ? LowerProblemsText : null;
-
     public void Draw(object item)
     {
         var workspace = window.Cutscenes;
@@ -202,7 +182,7 @@ internal sealed class ThnPage(EditorWindow window, PropertyGrid grid)
         if (errors.Count > 0 &&
             grid.BeginSection("Thn.Problems", EditorIcons.ExclamationTriangle, $"Problems ({errors.Count})"))
         {
-            if (LowerProblemsNote(edits.CutsceneSource(path), edits.HasUnsavedCutsceneEdits(path)) is { } note)
+            if (edits.CutsceneProblemsNote(path) is { } note)
             {
                 grid.NoteRow(note);
             }

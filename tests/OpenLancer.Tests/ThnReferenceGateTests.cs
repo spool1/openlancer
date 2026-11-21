@@ -49,9 +49,9 @@ public sealed class ThnReferenceGateTests
             .Select(p => ((string?)p!["ref"], (string?)p!["message"])),
     ];
 
-    /// <summary>The note of the Problems section of the Cutscene page for the fixture script.</summary>
-    private static string? Note(EditSession session, string path = ScriptPath) =>
-        ThnPage.LowerProblemsNote(session.CutsceneSource(path), session.HasUnsavedCutsceneEdits(path));
+    /// <summary>The note of the Problems section of the Cutscene page and of the agent results for the fixture
+    /// script.</summary>
+    private static string? Note(EditSession session, string path = ScriptPath) => session.CutsceneProblemsNote(path);
 
     /// <summary>
     /// A delete of a costume that only the unchanged lower script names stops the save. The script is a cutscene that
@@ -150,8 +150,8 @@ public sealed class ThnReferenceGateTests
         Assert.Equal([(LowScript, TrentMissing.Replace("\"Man\"", "\"Guard\"")), (ScriptPath, TrentMissing)],
             CutsceneErrors(session.GateRefusal()!).Select(e => (e.Source, e.Message)));
         Assert.False(session.Save().Saved);
-        Assert.Equal(ThnPage.LowerProblemsText, Note(session, LowScript));
-        Assert.Equal(ThnPage.LowerProblemsText, Note(session));
+        Assert.Equal(EditSession.UnchangedCutsceneNote, Note(session, LowScript));
+        Assert.Equal(EditSession.UnchangedCutsceneNote, Note(session));
     }
 
     /// <summary>
@@ -226,24 +226,81 @@ public sealed class ThnReferenceGateTests
         Assert.Equal("The active mod does not change this cutscene. A change of the active mod in the game data, for " +
                      "example an INI edit, deletes, renames or breaks an item of the cutscene. An animation file of " +
                      "the active mod can also remove a clip. Undo that change, or pick another item or clip.",
-            ThnPage.LowerProblemsText);
-        Assert.Empty(SteLint.Problems(ThnPage.LowerProblemsText));
-        Assert.Equal(ThnPage.LowerProblemsText, ThnPage.LowerProblemsNote(new ThnFileSource(ThnFileKind.Lower, false), false));
-        Assert.Equal(ThnPage.LowerProblemsText, ThnPage.LowerProblemsNote(new ThnFileSource(ThnFileKind.Lower, true), false));
-        Assert.Null(ThnPage.LowerProblemsNote(new ThnFileSource(ThnFileKind.Lower, false), true));
+            EditSession.UnchangedCutsceneNote);
+        Assert.Empty(SteLint.Problems(EditSession.UnchangedCutsceneNote));
+        Assert.Equal(EditSession.UnchangedCutsceneNote,
+            EditSession.UnchangedNote(new ThnFileSource(ThnFileKind.Lower, false), false));
+        Assert.Equal(EditSession.UnchangedCutsceneNote,
+            EditSession.UnchangedNote(new ThnFileSource(ThnFileKind.Lower, true), false));
+        Assert.Null(EditSession.UnchangedNote(new ThnFileSource(ThnFileKind.Lower, false), true));
         foreach (var kind in new[] { ThnFileKind.PatchedHere, ThnFileKind.WholeFileHere, ThnFileKind.NewHere })
         {
-            Assert.Null(ThnPage.LowerProblemsNote(new ThnFileSource(kind, false), false));
-            Assert.Null(ThnPage.LowerProblemsNote(new ThnFileSource(kind, true), true));
+            Assert.Null(EditSession.UnchangedNote(new ThnFileSource(kind, false), false));
+            Assert.Null(EditSession.UnchangedNote(new ThnFileSource(kind, true), true));
         }
 
         using var ws = ThnDataWorkspace.Create();
         var session = ws.Session("act");
         session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
-        Assert.Equal(ThnPage.LowerProblemsText, Note(session));
+        Assert.Equal(EditSession.UnchangedCutsceneNote, Note(session));
         session.Execute(ThnEdits.Set(Entity(session, "Cam"), new ThnPath("cameraprops.fovh"), new ThnNumber(20)));
         Assert.Equal(ThnFileKind.Lower, session.CutsceneSource(ScriptPath).Kind);
         Assert.Null(Note(session));
+    }
+
+    /// <summary>
+    /// The agent results give the note of the Problems section for an error of a cutscene that the active mod does not
+    /// change (#87): <c>check</c>, <c>get_cutscene</c>, the new problems of an edit, and the message of
+    /// <c>save_blocked</c> one time. The user deleted the costume, and the agent removes the model line of the
+    /// equipment. After an edit of the base script, the active mod changes it, so its errors have no note. The script
+    /// of the lower mod keeps the note.
+    /// </summary>
+    [Fact]
+    public void TheAgentResultsGiveTheNoteOfTheProblemsSection()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        ws.Mod("low", new()
+        {
+            [@"files\" + LowScript] = """
+                duration = 5
+                entities = { { entity_name = "Guard", type = DEFORMABLE, template_name = "trent" } }
+                events = {}
+                """,
+        });
+        ws.WriteProfile("low", "act");
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        var gear = AgentCalls.Json($"sec:{ThnDataWorkspace.EquipmentPath}#Thruster/thruster1");
+        var script = AgentCalls.Json($"thn:{ScriptPath}");
+        static List<string?> Notes(JsonObject result, string key) =>
+        [
+            .. result[key]!.AsArray()
+                .Where(p => ((string?)p!["ref"])?.StartsWith("thn:", System.StringComparison.Ordinal) == true)
+                .Select(p => (string?)p!["note"]),
+        ];
+        session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
+
+        var broken = AgentCalls.Ok(host, "set_fields", $$"""{ "ref": {{gear}}, "fields": { "DA_archetype": null } }""");
+        var check = AgentCalls.Ok(host, "check", """{ "scope": "all" }""");
+        var cutscene = AgentCalls.Ok(host, "get_cutscene", $$"""{ "ref": {{script}} }""");
+        var (code, _, message) = AgentCalls.Error(host, "save");
+
+        const string note = EditSession.UnchangedCutsceneNote;
+        Assert.Equal([note], Notes(broken, "new_problems"));
+        Assert.Equal([note, note, note], Notes(check, "problems"));
+        Assert.Equal([note, note], Notes(cutscene, "problems"));
+        Assert.Equal("save_blocked", code);
+        Assert.StartsWith("The save stopped. 3 errors block it.", message);
+        Assert.EndsWith($". {note}", message);
+        Assert.Equal(2, message.Split(note).Length);
+
+        var cam = AgentCalls.Json($"thn:{ScriptPath}#entity/Cam");
+        AgentCalls.Ok(host, "set_fields", $$"""{ "ref": {{cam}}, "fields": { "cameraprops.fovh": 20 } }""");
+        var changed = AgentCalls.Ok(host, "get_cutscene", $$"""{ "ref": {{script}} }""");
+
+        Assert.Equal([null, null], Notes(changed, "problems"));
+        var lower = AgentCalls.Json($"thn:{LowScript}");
+        Assert.Equal([note], Notes(AgentCalls.Ok(host, "get_cutscene", $$"""{ "ref": {{lower}} }"""), "problems"));
     }
 
     /// <summary>
@@ -327,7 +384,7 @@ public sealed class ThnReferenceGateTests
         Assert.Contains(problem, CutsceneProblems(check, "problems"));
         Assert.Equal("save_blocked", code);
         Assert.Equal($"The save stopped. 1 error blocks it. Correct it, then save again. {NoModel} The error is in " +
-                     $"thn:{ScriptPath}#entity/Gear.", message);
+                     $"thn:{ScriptPath}#entity/Gear. {EditSession.UnchangedCutsceneNote}", message);
 
         var mended = AgentCalls.Ok(host, "set_fields",
             $$"""{ "ref": {{gear}}, "fields": { "DA_archetype": "equipment\\thruster1.3db" } }""");

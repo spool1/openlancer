@@ -125,7 +125,9 @@ internal static class SaveTools
 
     /// <summary>The error <c>save_blocked</c> with the messages of the first errors. The target is the item of the first
     /// error. The message of a cutscene error says "this cutscene", so the text adds the reference of its place (see
-    /// <see cref="CutsceneQueries.RefOf"/>).</summary>
+    /// <see cref="CutsceneQueries.RefOf"/>). When a shown error is in a cutscene that the active mod does not change, the
+    /// message also gives the note of the Problems section of the Cutscene page one time (see
+    /// <see cref="AgentRows.NoteOf"/>).</summary>
     /// <param name="detail"><c>Gate</c> for the errors of the save gate, <c>SaveFailed</c> for a save that wrote
     /// nothing for another reason.</param>
     private static EditException Blocked(EditSession session, string detail, IReadOnlyList<Diagnostic> problems)
@@ -138,6 +140,8 @@ internal static class SaveTools
             : e.Message));
         var key = detail != "Gate" ? "save_failed" : errors.Count == 1 ? "save_blocked_one" : "save_blocked";
         var message = AgentTexts.Error(key, ("count", errors.Count), ("errors", shown));
+        foreach (var note in errors.Take(ShownErrors).Select(e => AgentRows.NoteOf(session, e)).OfType<string>().Distinct())
+            message += " " + note;
         if (errors.Count > ShownErrors)
             message += " " + AgentTexts.Error("save_blocked_more");
         return new EditException(new EditError(EditErrorKind.SaveBlocked, detail, message)

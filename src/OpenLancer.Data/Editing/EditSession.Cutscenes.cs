@@ -142,6 +142,31 @@ public sealed partial class EditSession
     /// design). A name problem does not crash the game, so its message does not start with it.</summary>
     public const string CutsceneCrash = "The game crashes when it plays this cutscene.";
 
+    /// <summary>The note of the problems of a cutscene that the active mod does not change (see
+    /// <see cref="CutsceneProblemsNote"/>).</summary>
+    public const string UnchangedCutsceneNote =
+        "The active mod does not change this cutscene. A change of the active mod in the game data, for example an " +
+        "INI edit, deletes, renames or breaks an item of the cutscene. An animation file of the active mod can also " +
+        "remove a clip. Undo that change, or pick another item or clip.";
+
+    /// <summary>
+    /// The note of the problems of a cutscene, or null. A cutscene that the active mod does not change has the script of
+    /// the lower layer. So only a change of the active mod in the game data gives it a problem (see
+    /// <see cref="CutsceneErrors"/>). The note tells that cause and the fix. The Problems section of the Cutscene page
+    /// and the problems of the agent results show it, so both give one text.
+    /// </summary>
+    /// <param name="path">The install path of the cutscene. Another path gives null.</param>
+    public string? CutsceneProblemsNote(string path) =>
+        InstallPaths.TryParse(path) is { } normal && normal.EndsWith(".thn", StringComparison.OrdinalIgnoreCase)
+            ? UnchangedNote(CutsceneSource(normal), HasUnsavedCutsceneEdits(normal))
+            : null;
+
+    /// <summary>The rule of <see cref="CutsceneProblemsNote"/>: the note for a cutscene that the edit view gets from the
+    /// lower layer, without unsaved edits. A lower cutscene with unsaved edits has the kind
+    /// <see cref="ThnFileKind.Lower"/> until the save writes its patch, so it gets no note.</summary>
+    internal static string? UnchangedNote(ThnFileSource source, bool unsavedEdits) =>
+        source.Kind == ThnFileKind.Lower && !unsavedEdits ? UnchangedCutsceneNote : null;
+
     /// <summary>
     /// The problems of the checks of a cutscene (<see cref="ThnChecks.Check"/>) that W has and B does not have, with
     /// the game data of W (decision D137 and section 12.1 of the M8b design, decisions D96 and D120 of the M21 design).

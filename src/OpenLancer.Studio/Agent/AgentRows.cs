@@ -72,12 +72,21 @@ internal static class AgentRows
 
     /// <summary>A diagnostic of a check as a problem of a result, with the reference of its section, or of its place in a
     /// cutscene (see <see cref="CutsceneQueries.RefOf"/>). The reference takes the letter case of the file in the
-    /// session.</summary>
+    /// session. An error of a cutscene gets the note of the Problems section of the Cutscene page (see
+    /// <see cref="NoteOf"/>).</summary>
     public static Problem ProblemOf(EditSession session, Diagnostic diagnostic) =>
         Problem.From(diagnostic, diagnostic.Target is { } target
             ? ItemRefs.Canonical(session, session.OpenedDocument(target.Path) is { } document ? target with { Path = document.Path } : target)
             : diagnostic.Cutscene is { } place ? CutsceneQueries.RefOf(session, place)
-            : null);
+            : null) with { Note = NoteOf(session, diagnostic) };
+
+    /// <summary>The note of an error of a cutscene, as the Problems section of the Cutscene page shows it, or null. Only
+    /// a cutscene that the active mod does not change has a note (see
+    /// <see cref="EditSession.CutsceneProblemsNote"/>).</summary>
+    public static string? NoteOf(EditSession session, Diagnostic diagnostic) =>
+        diagnostic is { Severity: DiagnosticSeverity.Error, Target: null, Cutscene: { } place }
+            ? session.CutsceneProblemsNote(place.Path)
+            : null;
 
     /// <summary>The diagnostics of the field checks and the list checks of a section, each with a target. A
     /// <c>[system]</c> or a <c>[Base]</c> of <c>universe.ini</c> also gets the problems of the universe checks (see

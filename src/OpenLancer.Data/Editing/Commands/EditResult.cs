@@ -66,6 +66,11 @@ public sealed record Problem(DiagnosticSeverity Severity, string Message)
     /// <summary>The ids of the fixes of the problem.</summary>
     public IReadOnlyList<string> Fixes { get; init; } = [];
 
+    /// <summary>What causes the problem and how to correct it, or null. A problem of a cutscene that the active mod does
+    /// not change has the note of the Problems section of the Cutscene page (see
+    /// <see cref="EditSession.CutsceneProblemsNote"/>).</summary>
+    public string? Note { get; init; }
+
     /// <summary>The problem of a diagnostic of a check. An origin that waits for the comparison with the base game
     /// (<see cref="OriginKind.Pending"/>) is not known yet, so the problem gives <see cref="OriginKind.Unknown"/>.
     /// Section 4.0.6 of the M6b design has no pending origin.</summary>

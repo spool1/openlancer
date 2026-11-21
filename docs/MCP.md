@@ -623,11 +623,13 @@ The result also gives the problems of the cutscene checks that the call adds and
 
 A template that names no item of the data lists is a problem too. An example is a costume or an effect that the game data does not have. The message of a template that does not crash the game tells what the scene does without the item. When the lists have the name but the game cannot use the item, the message tells why.
 
-The check reads the data lists with the unsaved edits. So a change of the active mod in the game data that deletes, renames or breaks the item also gives the problem. The result of a call with such a change, for example an INI edit, gives the problems of each cutscene that the save gate checks. These are the cutscenes that the active mod changes. They are also the cutscenes of the edit view that name an item that such a change deletes, renames or breaks. An example is a retail cutscene that the call and the active mod do not change.
+The check reads the data lists with the unsaved edits. So a change of the active mod in the game data that deletes, renames or breaks the item also gives the problem. The result of a call with such a change, for example an INI edit, gives the problems of each cutscene that the save gate checks. These are the cutscenes that the active mod changes. They are also the cutscenes of the edit view that use an item that such a change deletes, renames or breaks. An example is a retail cutscene that the call and the active mod do not change.
 
 `check` with the scope `all` lists each problem of these cutscenes. `save` refuses the save and gives the text of the save gate of the editor. A call that changes only cutscenes gives no problem of another cutscene.
 
-A change of the active mod in the game data can break a cutscene. To find such a cutscene, the save gate looks for the item name in the cutscene file. So it does not find a template that the Lua text of a script joins from parts, for example with `..`. The save then passes, and the game can crash when it plays that cutscene. `get_cutscene` of such a cutscene can give the problem, but `save` does not stop for it.
+To find these cutscenes, the save gate reads an index of the templates and the clips that each script uses. The index runs each script, so it also finds a template that the Lua text of a script joins from parts, for example with `..`. The server builds the index when it opens the profile. Until the index is complete, the first call after such a change waits for it.
+
+A problem of a cutscene that the active mod does not change has the field `note`. It is the note of the Problems section of the Cutscene page: a change of the active mod in the game data causes the problem, and you correct it with an undo of that change or with another item or clip. `check`, `get_cutscene` and the problems of a call result give the note. The error `save_blocked` adds it one time after the messages of the errors. A problem of a cutscene that the active mod changes, or that has unsaved edits, has no note.
 
 `list_values` gives the names of the data lists of the templates:
 
