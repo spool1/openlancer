@@ -15,8 +15,8 @@ using Xunit;
 namespace OpenLancer.DataTests;
 
 /// <summary>
-/// Retail proof of the checks of the jump connections and of the rule data of a new connection: each jump object of
-/// the game passes the checks, no system has more than 9 jump objects, and the infocards of the rule data are texts of
+/// Retail proof of the checks of the jump connections and of the rule data of a new connection. Each jump object of
+/// the game passes the checks, and no system has more than 9 jump objects. The infocards of the rule data are texts of
 /// both games. The checks find the six gate locks of vanilla 1.1 that name no object.
 /// </summary>
 public sealed class ConnectionRetailTests(ITestOutputHelper output)
@@ -68,8 +68,8 @@ public sealed class ConnectionRetailTests(ITestOutputHelper output)
         }
     }
 
-    /// <summary>The count of the jump objects, the most of one system, and the problems of the checks of each jump
-    /// object and each gate lock section of a game.</summary>
+    /// <summary>The count of the jump objects of a game and the most of one system. Also the problems of the checks of
+    /// each jump object and each gate lock section.</summary>
     private (int Jumps, int Most, List<Diagnostic> Problems) Check(string root)
     {
         using var workspace = new RetailWorkspace(root, "olconnect");

@@ -7,8 +7,8 @@ namespace OpenLancer.Data.Editing.Universe;
 
 /// <summary>
 /// The sections of the files that a plan changes, as they are after its command, while the plan does not run yet. A
-/// plan of the jump connections gives its route changes with them, also inside a batch of the agent, where the plan
-/// cannot run its command to read the result. Each file starts as W has it.
+/// plan of the jump connections gives its route changes with them. This works also inside a batch of the agent, where
+/// the plan cannot run its command to read the result. Each file starts as W has it.
 /// </summary>
 internal sealed class PlannedSections(EditSession session)
 {

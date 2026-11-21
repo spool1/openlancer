@@ -16,10 +16,10 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// A synthetic install for the jump connections, on top of <see cref="NewSystemWorkspace"/>. It adds the system Li03
-/// with a faction of another house, a station far from the center, and a jump gate and a jump hole without a goto
-/// line. The archetypes of a jump hole and an airlock gate, a gate of Li02 with a faction, a loadout and a pilot, and
-/// the loadouts and pilots of the houses complete it. The Li01 gate to Li02 has a player lock, and both gates have an
-/// NPC lock. All names and values are invented.
+/// with a faction of another house and a station far from the center. Li03 also has a jump gate and a jump hole
+/// without a goto line. The install has the archetypes of a jump hole and an airlock gate. The gate of Li02 has a
+/// faction, a loadout and a pilot, and the lists have the loadouts and pilots of the houses. The Li01 gate to Li02 has a
+/// player lock, and both gates have an NPC lock. All names and values are invented.
 /// </summary>
 internal static class ConnectionWorkspace
 {
@@ -135,8 +135,8 @@ internal static class ConnectionWorkspace
 }
 
 /// <summary>
-/// The plans of the jump connections: a new jump gate pair or jump hole pair with its traffic zones, an existing end,
-/// the refusals, and the gate locks. Each plan is one entry of the edit history. The data is invented.
+/// The plans of the jump connections: a new pair with its traffic zones, an existing end, the refusals and the gate
+/// locks. Each plan is one entry of the edit history. The data is invented.
 /// </summary>
 public sealed class ConnectionPlansTests
 {
@@ -156,8 +156,9 @@ public sealed class ConnectionPlansTests
     }
 
     /// <summary>
-    /// A jump gate pair between two systems: each end has the lines in the retail order, a name from the pattern of the
-    /// rule data, the generic infocard and a goto line to its partner. Each end gets a traffic zone without encounters.
+    /// A jump gate pair between two systems. Each end has the lines in the retail order and a name from the pattern of
+    /// the rule data. It has the generic infocard and a goto line to its partner. Each end gets a traffic zone without
+    /// encounters.
     /// The ends go toward the other system on the nav map, and their front looks at the center. One undo takes back
     /// both files and the texts.
     /// </summary>
@@ -207,7 +208,7 @@ public sealed class ConnectionPlansTests
         Assert.Null(ConnectionWorkspace.TextOf(session, (lines[1].Text)));
     }
 
-    /// <summary>A jump hole pair can stay in one system. Its two ends have no direction on the nav map, so they go to
+    /// <summary>A jump hole pair can stay in one system. Its two ends have no direction on the nav map. So they go to
     /// the two sides of the center, at the distance of the farthest object. The second end takes the next free
     /// nickname.</summary>
     [Fact]
@@ -235,8 +236,8 @@ public sealed class ConnectionPlansTests
     }
 
     /// <summary>
-    /// Two systems at one place of the nav map have no direction either. A system between them on a slant gives each
-    /// end the direction to the other system, with x of the nav map on the x axis and y on the z axis.
+    /// Two systems at one place of the nav map have no direction either. Two systems on a slant give each end the
+    /// direction to the other system. The x of the nav map goes on the x axis, and its y on the z axis.
     /// </summary>
     [Fact]
     public void TheDefaultPlaceFollowsTheNavMap()
@@ -280,8 +281,8 @@ public sealed class ConnectionPlansTests
         Assert.Equal(new JumpObjectCount("Li03", 10, 10), gate.JumpObjects[0]);
     }
 
-    /// <summary>The plan refuses a gate pair inside one system, an archetype of another kind, an existing object of
-    /// another kind, an airlock gate, an unknown system and a system without a file.</summary>
+    /// <summary>The plan refuses a gate pair inside one system and an archetype or an existing object of another kind.
+    /// It also refuses an airlock gate and an unknown system.</summary>
     [Fact]
     public void ThePlanRefusesAWrongKindAndAGatePairInOneSystem()
     {

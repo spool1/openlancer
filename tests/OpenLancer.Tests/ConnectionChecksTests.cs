@@ -39,8 +39,8 @@ public sealed class ConnectionChecksTests
         Assert.Single(ObjectComponents.Checks(session, section), p => p.Message.StartsWith(start));
 
     /// <summary>
-    /// More than 10 jump objects in one system crash the game. The save gate gives one error for the file, also for a
-    /// data mod with a retail target, whose content checks count the jump objects too. A data mod with only the target
+    /// More than 10 jump objects in one system crash the game. The save gate gives one error for the file. This is also
+    /// true for a data mod with a retail target, whose content checks count the jump objects too. A data mod with only the target
     /// OpenLancer gets the same error. A mod of tier 2 gets a warning, because only OpenLancer runs it.
     /// </summary>
     [Theory]
@@ -74,8 +74,8 @@ public sealed class ConnectionChecksTests
             Assert.DoesNotContain(problems, p => p.Message.Contains("jump objects"));
     }
 
-    /// <summary>A file of the lower layer with more than 10 jump objects gives a warning only, also when the active mod
-    /// changes another object of the file.</summary>
+    /// <summary>A file of the lower layer with more than 10 jump objects gives a warning only. This is also true when
+    /// the active mod changes another object of the file.</summary>
     [Fact]
     public void TooManyJumpObjectsOfTheLowerLayerAreAWarning()
     {

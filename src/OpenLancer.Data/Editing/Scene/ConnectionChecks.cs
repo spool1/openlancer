@@ -12,9 +12,9 @@ namespace OpenLancer.Data.Editing.Scene;
 
 /// <summary>
 /// The checks of the jump connections: the objects with a <c>goto</c> line and the gate locks of
-/// <c>[locked_gates]</c>. Two errors stop the save, because the game crashes or records a wrong jump: more than 10
-/// jump objects in one system, and a <c>goto</c> line before the <c>nickname</c> line. The other checks are
-/// warnings.
+/// <c>[locked_gates]</c>. Two errors stop the save, because the game crashes or records a wrong jump. One is more
+/// than 10 jump objects in one system. The other is a <c>goto</c> line before the <c>nickname</c> line. The other
+/// checks are warnings.
 /// </summary>
 /// <remarks>
 /// <para>Retail facts: each object with a <c>goto</c> line becomes one connection of its system, also an airlock gate.
@@ -33,8 +33,8 @@ internal static class ConnectionChecks
 
     private const string LockSection = "locked_gates";
 
-    /// <summary>The problems of an object of a system file, or of a <c>[locked_gates]</c> section of the files of
-    /// the role <c>groups</c>, also of the lower layer. Empty for another section.</summary>
+    /// <summary>The problems of an object of a system file or of a <c>[locked_gates]</c> section, also of the lower
+    /// layer. Empty for another section.</summary>
     public static IReadOnlyList<Diagnostic> Check(EditSession session, SectionRef section)
     {
         if (session.Get(section) is not { } view)
@@ -60,9 +60,9 @@ internal static class ConnectionChecks
     }
 
     /// <summary>
-    /// The errors of the jump connections for the save gate, in the system files that the active mod changes: one
-    /// error for each file with more than 10 jump objects, and the order error of each object that the active mod adds
-    /// or changes.
+    /// The errors of the jump connections for the save gate, in a system file that the active mod changes. A file with
+    /// more than 10 jump objects gives one error. Each object that the active mod adds or changes can give the order
+    /// error.
     /// </summary>
     public static IEnumerable<Diagnostic> SaveErrors(EditSession session, string path)
     {
@@ -177,7 +177,7 @@ internal static class ConnectionChecks
     }
 
     /// <summary>The warnings of a <c>[locked_gates]</c> section: each lock line that names no jump object of the jump
-    /// graph, that is no jump gate, jump hole or airlock gate with a <c>goto</c> line.</summary>
+    /// graph. A jump object is a jump gate, a jump hole or an airlock gate with a <c>goto</c> line.</summary>
     private static IEnumerable<Diagnostic> Locks(EditSession session, SectionRef section, SectionView view)
     {
         var gates = session.Routes.Graph.Connections.Select(c => FLHash.CreateID(c.Object)).ToHashSet();

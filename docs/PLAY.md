@@ -96,7 +96,7 @@ A character of a play is an admin. These chat commands work:
 
 The game window shows the debug view. Its Debug window shows the position of the player.
 
-OpenLancer Play does not lock gates. The gate locks of `InitialWorld.ini` lock a jump gate or a jump hole in a new game of the retail game, but in OpenLancer Play each gate and hole is open.
+OpenLancer Play does not lock gates. In a new game of the retail game, the gate locks of `InitialWorld.ini` lock some jump gates and jump holes. In OpenLancer Play, each gate and hole is open.
 
 ## The status of the game
 

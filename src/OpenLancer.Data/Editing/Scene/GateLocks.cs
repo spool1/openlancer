@@ -60,8 +60,8 @@ internal static class GateLocks
     /// <summary>
     /// The edit that gives gates a player lock (<c>locked_gate</c>) and an NPC lock (<c>npc_locked_gate</c>), or
     /// removes them. A lock line of a gate goes into the first <c>[locked_gates]</c> section of the files of the role
-    /// <c>groups</c>, or into a new section of the first such file. Each other line of the gates goes, also from
-    /// another section. The other lines keep their place.
+    /// <c>groups</c>. Without such a section, it goes into a new section of the first such file. Each other line of the
+    /// gates goes, also from another section. The other lines keep their place.
     /// </summary>
     /// <param name="gates">The nicknames of the gates and holes.</param>
     /// <param name="player">True to lock the gates for the player, false to remove that lock.</param>

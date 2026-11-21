@@ -16,7 +16,7 @@ namespace OpenLancer.Data.Editing.Scene;
 internal static class ComponentChecks
 {
     /// <summary>The problems of a section of a system file, of a <c>[Base]</c> or a <c>[system]</c> of
-    /// <c>universe.ini</c>, or of a <c>[locked_gates]</c> section of the gate locks.</summary>
+    /// <c>universe.ini</c>, or of a <c>[locked_gates]</c> section.</summary>
     /// <param name="onlyActiveMod">True to check the section only when the active mod adds or changes it. The retail
     /// tests check each section.</param>
     public static IReadOnlyList<Diagnostic> Check(EditSession session, SectionRef section, bool onlyActiveMod = true)

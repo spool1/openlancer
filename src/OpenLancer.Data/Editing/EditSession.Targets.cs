@@ -17,8 +17,8 @@ public sealed partial class EditSession
     /// The problems of the format checks and of the content checks of the retail targets (section 9.2 of the M11
     /// design), for the save gate. They run only for a tier-1 mod that names a retail target. They compare W with B, so
     /// they report only what the active mod adds. They do not merge on the files of each target game: the export and
-    /// Play in the game do that. The count of the jump objects of a system is not part of them, because the jump
-    /// connection checks give that error at each save of a tier-1 mod (see <see cref="Scene.ConnectionChecks"/>).
+    /// Play in the game do that. The count of the jump objects of a system is not part of them. The jump connection
+    /// checks give that error at each save of a tier-1 mod (see <see cref="Scene.ConnectionChecks"/>).
     /// </summary>
     internal IReadOnlyList<Diagnostic> TargetProblems()
     {

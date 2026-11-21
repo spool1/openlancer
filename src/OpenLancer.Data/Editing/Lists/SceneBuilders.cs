@@ -51,8 +51,8 @@ internal sealed record SunZoneRule(float Size, float AtmosphereMargin, IReadOnly
 }
 
 /// <summary>
-/// The rules of the new ends of a jump connection of one kind: the archetype, the infocard, the name and the lines of
-/// each new end, and the traffic zone at the end.
+/// The rules of the new ends of a jump connection of one kind. They give the archetype, the infocard, the name and the
+/// lines of each new end, and the traffic zone at the end.
 /// </summary>
 /// <param name="Archetype">The solar archetype of a new end when the request and its template give none.</param>
 /// <param name="Infocard">The id of the infocard that the retail ends of this kind share.</param>
@@ -71,8 +71,9 @@ internal sealed record JumpEndRule(string Archetype, int Infocard, string Name, 
 internal sealed record JumpHouse(string House, string Loadout, string Pilot);
 
 /// <summary>
-/// The rules of a new jump connection: the tunnel of the <c>goto</c> line, the smallest distance of a new end from the
-/// center of its system, the rules of each kind and the loadout and the pilot of a gate by house.
+/// The rules of a new jump connection. They give the tunnel of the <c>goto</c> line and the smallest distance of a new
+/// end from the center of its system. They also give the rules of each kind, and the loadout and the pilot of a gate
+/// for each house.
 /// </summary>
 /// <param name="Tunnel">Value 2 of the <c>goto</c> line of a new end.</param>
 /// <param name="MinRadius">The smallest distance of a new end from the center of its system, in meters.</param>
@@ -94,9 +95,9 @@ internal sealed record ConnectionRule(string Tunnel, float MinRadius, JumpEndRul
 }
 
 /// <summary>
-/// The rule data of the builders of the agent tools (milestone MCP1-2): the wreck, the route templates, the death
-/// zone of the sun of a new system and the new jump connections of <c>list-rules.json</c>. Section 9.3 of the MCP1
-/// design names that file as the source of the builders.
+/// The rule data of the builders of the agent tools in <c>list-rules.json</c> (milestone MCP1-2). It gives the wreck,
+/// the route templates, the death zone of the sun of a new system and the new jump connections. Section 9.3 of the
+/// MCP1 design names that file as the source of the builders.
 /// </summary>
 internal sealed record SceneBuilders(WreckRule? Wreck, IReadOnlyList<RouteTemplate> Routes, SunZoneRule? SunZone,
     ConnectionRule? Connection)

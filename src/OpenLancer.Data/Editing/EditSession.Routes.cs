@@ -62,8 +62,8 @@ public sealed partial class EditSession
     }
 
     /// <summary>
-    /// The route tables of W in which some files have other sections, for example the files after the command of a
-    /// plan that does not run yet. The session does not keep them.
+    /// The route tables of W in which some files have other sections. An example is the files after the command of a
+    /// plan that does not run yet. The session does not keep these tables.
     /// </summary>
     /// <param name="files">The sections of each changed file, by install path.</param>
     internal RouteTables RoutesWith(IReadOnlyDictionary<string, List<Section>> files) =>

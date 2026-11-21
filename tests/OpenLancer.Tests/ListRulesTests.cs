@@ -391,10 +391,10 @@ public sealed class ListRulesTests
     }
 
     /// <summary>
-    /// The rule data of a new jump connection: the tunnel, the smallest distance from the center, the lines and the
-    /// traffic zone of each kind, and the loadout and the pilot of each house. Each line is a key of the engine schema.
-    /// A name pattern without the system part, a line that the builder writes, a traffic zone without a size and a house
-    /// that repeats do not load.
+    /// The rule data of a new jump connection: the tunnel and the smallest distance from the center. It also has the
+    /// lines and the traffic zone of each kind, and the loadout and the pilot of each house. Each line is a key of the
+    /// engine schema. A name pattern without the system part does not load. Nor does a line that the builder writes, a
+    /// traffic zone without a size or a house that repeats.
     /// </summary>
     [Fact]
     public void TheConnectionBuilderRulesParse()

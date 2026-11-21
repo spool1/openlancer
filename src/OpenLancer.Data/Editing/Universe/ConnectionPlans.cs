@@ -54,9 +54,8 @@ public sealed record ConnectionEnd(string System)
 /// <summary>The options of a new jump connection (see <see cref="ConnectionPlans.CreatePair"/>).</summary>
 public sealed record ConnectionOptions
 {
-    /// <summary>A jump gate or a jump hole whose lines the new objects copy: the archetype, the infocard, the jump
-    /// effect, the behavior, the difficulty, the visit flag, the loadout, the pilot and the tunnel. Null for the rule
-    /// data.</summary>
+    /// <summary>A jump gate or a jump hole whose lines the new objects copy, or null for the rule data. The copy takes
+    /// its archetype, infocard, jump effect, behavior, difficulty, visit flag, loadout, pilot and tunnel.</summary>
     public SectionRef? Like { get; init; }
 
     /// <summary>The solar archetype of the new objects, or null for the archetype of <see cref="Like"/> or of the rule
@@ -66,8 +65,8 @@ public sealed record ConnectionOptions
     /// <summary>The faction of a new jump gate, or null for the local faction of its system.</summary>
     public string? Faction { get; init; }
 
-    /// <summary>The loadout of a new jump gate, or null for the loadout of <see cref="Like"/>, of the gates of the same
-    /// faction, or of the house of the faction.</summary>
+    /// <summary>The loadout of a new jump gate, or null. Null takes the loadout of <see cref="Like"/>, else of the
+    /// gates of the same faction, else of the house of the faction.</summary>
     public string? Loadout { get; init; }
 
     /// <summary>The pilot of a new jump gate, or null as for <see cref="Loadout"/>.</summary>
@@ -86,12 +85,12 @@ public sealed record ConnectionOptions
 
 /// <summary>
 /// The plans of the jump connections: a new jump gate pair or jump hole pair, and the gate locks of a gate. Each plan
-/// gives one command, which runs as one entry of the edit history, also when it changes two system files, the gate locks
-/// and the text of the mod. The agent tools and the hand tools call the same plans.
+/// gives one command, which runs as one entry of the edit history. This is also true when it changes two system files,
+/// the gate locks and the text of the mod. The agent tools and the hand tools call the same plans.
 /// </summary>
 /// <remarks>
 /// <para>Retail facts: an object with <c>goto = &lt;system&gt;, &lt;exit object&gt;, &lt;tunnel&gt;</c> is one jump
-/// connection of its system, and the type of its solar archetype gives the kind. Each pair of the game goes both ways
+/// connection of its system. The type of its solar archetype gives the kind. Each pair of the game goes both ways
 /// and has one kind. The game crashes with more than 10 objects with <c>goto</c> in one system. Most retail gates have
 /// the nickname <c>&lt;A&gt;_to_&lt;B&gt;</c> and most holes <c>&lt;A&gt;_to_&lt;B&gt;_hole</c>. The ends of one kind
 /// share one infocard. The loadout of a gate follows the house of its faction, and without a loadout the gate has no
@@ -133,13 +132,13 @@ public static class ConnectionPlans
     /// pair can stay in one system.
     /// </summary>
     /// <remarks>
-    /// <para>Each new end gets the lines of <see cref="LineOrder"/> that it needs, a name in the text of the active mod
-    /// and, with <see cref="ConnectionOptions.TrafficZones"/>, a traffic zone <c>Zone_&lt;object&gt;_traffic</c> without
-    /// encounters. An end that names an existing object without a working pair gets only the missing <c>goto</c>
+    /// <para>Each new end gets the lines of <see cref="LineOrder"/> that it needs and a name in the text of the active
+    /// mod. With <see cref="ConnectionOptions.TrafficZones"/>, it also gets a traffic zone
+    /// <c>Zone_&lt;object&gt;_traffic</c> without encounters. An end that names an existing object without a working pair gets only the missing <c>goto</c>
     /// line.</para>
-    /// <para>The plan refuses a system without a file that the editor can change, a jump gate pair inside one system,
-    /// an archetype or an existing object of another kind, an existing object with a working pair, a nickname that is
-    /// taken, and a system that would have more than 10 jump objects.</para>
+    /// <para>The plan refuses a system without a file that the editor can change and a jump gate pair inside one
+    /// system. It refuses an archetype or an existing object of another kind, and an existing object with a working
+    /// pair. It also refuses a nickname that is taken and a system that would have more than 10 jump objects.</para>
     /// </remarks>
     public static ConnectionPlan CreatePair(EditSession session, ConnectionKind kind, ConnectionEnd from,
         ConnectionEnd to, ConnectionOptions? options = null)
@@ -322,10 +321,10 @@ public static class ConnectionPlans
                 reputation = options.Faction?.Trim() is { Length: > 0 } faction ? faction : LocalFaction(session, end.Path);
                 var frequent = Frequent(session, reputation);
                 var house = rule.HouseOf(reputation);
-                loadout = options.Loadout?.Trim() is { Length: > 0 } l ? l
+                loadout = options.Loadout?.Trim() is { Length: > 0 } givenLoadout ? givenLoadout
                     : like != null && SceneSections.Last(like, "loadout") is { } likeLoadout ? likeLoadout
                     : frequent.Loadout ?? house?.Loadout;
-                pilot = options.Pilot?.Trim() is { Length: > 0 } p ? p
+                pilot = options.Pilot?.Trim() is { Length: > 0 } givenPilot ? givenPilot
                     : like != null && SceneSections.Last(like, "pilot") is { } likePilot ? likePilot
                     : frequent.Pilot ?? house?.Pilot;
                 foreach (var (key, value) in new[] { ("reputation", reputation), ("loadout", loadout), ("pilot", pilot) })
@@ -355,8 +354,7 @@ public static class ConnectionPlans
             if (ScenePlans.Entries(zoneLines, session.IsBinaryFile(end.Path), out var zoneError) is not { } zoneEntries)
                 return plan.Refuse(end.Path, zoneError!);
             zones.Add(EditCommand.AddSection(end.Path, SceneSections.ZoneType, zoneEntries));
-            var zone = new SectionRef(end.Path, new SectionIdentity(SceneSections.ZoneType, zoneName));
-            trafficZones.Add(zone);
+            trafficZones.Add(new SectionRef(end.Path, new SectionIdentity(SceneSections.ZoneType, zoneName)));
         }
         if (problems.Count > 0)
             return plan.Refuse(ends[0].Path, problems[0]);
@@ -371,8 +369,7 @@ public static class ConnectionPlans
             commands.AddRange(lockEdit.Commands);
             changes.AddRange(lockEdit.Changes);
             if (options.Lock is JumpLock.Player or JumpLock.Both)
-                warnings.AddRange(ends.Select(e => LockWarning(e.Existing ?? results[Array.IndexOf(ends, e)].Object,
-                    e.View is { IsNew: false })));
+                warnings.AddRange(results.Select((r, i) => LockWarning(r.Object, ends[i].View is { IsNew: false })));
         }
 
         plan.Ends = results;
@@ -450,10 +447,10 @@ public static class ConnectionPlans
         Diagnostic.Warning(gate.Path, ConnectionChecks.LockText(gate.Id.Key!, lowerGate)) with { Target = gate, Key = "goto" };
 
     /// <summary>
-    /// The default positions of the new ends: toward the other system on the nav map, at the distance of the farthest
-    /// object of the system from the center, and at least <paramref name="minRadius"/>. A hole pair inside one system,
-    /// and two systems at one place of the nav map, have no direction. Their ends go to the two sides of the center on
-    /// the X axis.
+    /// The default positions of the new ends: toward the other system on the nav map. The distance from the center is
+    /// the distance of the farthest object of the system, and at least <paramref name="minRadius"/>. A hole pair inside
+    /// one system has no direction, and neither do two systems at one place of the nav map. Their ends go to the two
+    /// sides of the center on the X axis.
     /// </summary>
     private static Vector3[] DefaultPlaces(EditSession session, End[] ends, bool same, float minRadius)
     {
