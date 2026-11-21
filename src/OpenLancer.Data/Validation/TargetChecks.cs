@@ -587,12 +587,14 @@ public static partial class TargetChecks
         private readonly Dictionary<string, IReadOnlyList<Section>?> read = new(VfsPath.Comparer);
         private FileSystem? merged;
 
+        /// <summary>A generated file, for example a route table, has no merged document. The checks read the file of the
+        /// game at its path.</summary>
         public override IReadOnlyCollection<string> ChangedPaths { get; } =
-            files.Files.Where(f => f.Kind == TargetFileKind.Ini).Select(f => f.Path).ToList();
+            files.Files.Where(f => f is { Kind: TargetFileKind.Ini, Generated: false }).Select(f => f.Path).ToList();
 
         public override IReadOnlyList<Section>? Sections(string path, bool withMods)
         {
-            if (files.File(path) is { Kind: TargetFileKind.Ini } file)
+            if (files.File(path) is { Kind: TargetFileKind.Ini, Generated: false } file)
                 return withMods ? file.Merged?.Sections : file.BaseDocument?.Sections;
             // The mods do not change the file, so both sides read the file of the game.
             if (!read.TryGetValue(path, out var sections))

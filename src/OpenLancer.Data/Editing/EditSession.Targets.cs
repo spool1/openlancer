@@ -45,28 +45,24 @@ public sealed partial class EditSession
     /// data, so the view gives the file of the edit view.</remarks>
     internal sealed class SessionCheckView(EditSession session, Mod active) : CheckView
     {
-        private readonly Dictionary<(string, bool), IReadOnlyList<Section>?> wholeFiles = new();
+        private readonly Dictionary<string, IReadOnlyList<Section>?> lowerFiles = new(VfsPath.Comparer);
         private FileSystem? editView;
 
         public override IReadOnlyCollection<string> ChangedPaths { get; } = session.ActiveChangedPaths();
 
         public override IReadOnlyList<Section>? Sections(string path, bool withMods)
         {
+            if (withMods)
+                return session.WorkingSections(path);
             if (VfsPath.Normalize(path) is not { } normal)
                 return null;
             if (active.Files.ContainsKey(normal) || session.OpenedDocument(normal) is { IsWholeFile: true })
             {
-                if (withMods && session.OpenDocument(normal) is { IsWholeFile: true } whole)
-                    return whole.State.Exists ? whole.Working : null;
-                var key = (normal.ToLowerInvariant(), withMods);
-                if (!wholeFiles.TryGetValue(key, out var sections))
-                {
-                    sections = withMods ? Read(EditView, normal) : session.lowerView.Document(normal)?.Sections;
-                    wholeFiles[key] = sections;
-                }
+                if (!lowerFiles.TryGetValue(normal, out var sections))
+                    lowerFiles[normal] = sections = session.lowerView.Document(normal)?.Sections;
                 return sections;
             }
-            return session.OpenDocument(normal) is { } document ? withMods ? document.Working : document.Base : null;
+            return session.OpenDocument(normal)?.Base;
         }
 
         public override IReadOnlyList<string> Folders(string path) => EditView.GetDirectories(path);

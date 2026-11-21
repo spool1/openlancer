@@ -53,6 +53,14 @@ public sealed class TargetFile
     /// <summary>True when the file is a whole file of a mod, which no patch changes.</summary>
     public bool IsModFile { get; internal init; }
 
+    /// <summary>True for a file that OpenLancer makes for the target game, for example a route table. It has no merged
+    /// document and no difference of sections, so the format checks and the section lines of the checklist do not
+    /// read it.</summary>
+    public bool Generated { get; internal init; }
+
+    /// <summary>What a generated route table changes, or null for another file.</summary>
+    internal RouteFileChange? Routes { get; init; }
+
     /// <summary>The parsed base file of an INI file, or null.</summary>
     internal IniDocument? BaseDocument { get; init; }
 
@@ -122,14 +130,19 @@ public sealed class TargetFiles
 /// <item>A changed cutscene is Lua text with the numbers of the Librelancer-only names
 /// (<see cref="ThnRetailNames"/>).</item>
 /// <item>A hidden, system or temporary file of a mod is not part of the result (<see cref="PackageRules.SkipReason"/>).</item>
+/// <item>A build for a retail game adds the three route tables of the game when the mods change the routes
+/// (<see cref="TargetRoutes"/>).</item>
 /// </list>
 /// </remarks>
 public static class TargetBuild
 {
     /// <param name="stringsDllName">The file name of the text DLL in the EXE folder.</param>
     /// <param name="keepPlaceholders">True to keep the text placeholders as strings, for the FLMM package.</param>
+    /// <param name="routeTables">True to make the route tables of the retail game when the mods change the routes (see
+    /// <see cref="TargetRoutes"/>). The packages and the play copy of a retail game need them. OpenLancer computes its
+    /// own routes, so the checklist of the target OpenLancer does not use them.</param>
     public static TargetFiles Run(GameBase gameBase, IReadOnlyList<Mod> mods, string stringsDllName,
-        IStringResourceWriter stringWriter, IThnEvaluator thn, bool keepPlaceholders = false)
+        IStringResourceWriter stringWriter, IThnEvaluator thn, bool keepPlaceholders = false, bool routeTables = false)
     {
         var options = new OverlayOptions
         {
@@ -141,10 +154,15 @@ public static class TargetBuild
         var overlay = ModOverlay.Build(gameBase, mods, stringWriter, thn, options);
         var diagnostics = overlay.Diagnostics.ToList();
         var baseFs = overlay.Base.OpenFileSystem();
+        var routes = routeTables ? TargetRoutes.Of(overlay, baseFs, mods) : null;
         var files = new List<TargetFile>();
         foreach (var file in overlay.Files.OrderBy(f => f.Path, StringComparer.OrdinalIgnoreCase))
         {
             var path = file.Path;
+            // A route file of a mod goes to the game only when the build makes no route tables.
+            var isRoute = routes?.Holds(path) == true;
+            var into = isRoute ? routes!.ModFiles : files;
+            var problems = isRoute ? routes!.ModProblems : diagnostics;
             var owner = mods.LastOrDefault(m => m.Files.ContainsKey(path));
             var patched = owner != null
                 ? mods.SkipWhile(m => m != owner).Any(m => m.Patches.ContainsKey(path))
@@ -153,7 +171,7 @@ public static class TargetBuild
             if (isModFile && owner!.Files[path] is var disk &&
                 PackageRules.SkipReason(disk, System.IO.Path.GetRelativePath(owner.Folder, disk)) is { } skip)
             {
-                diagnostics.Add(Diagnostic.Warning(disk, PackageRules.SkippedText(path, skip)));
+                problems.Add(Diagnostic.Warning(disk, PackageRules.SkippedText(path, skip)));
                 continue;
             }
 
@@ -161,13 +179,14 @@ public static class TargetBuild
             var result = VfsPath.Comparer.Equals(path, options.StringsDllPath)
                 ? new TargetFile(path, TargetFileKind.TextDll, file.ReadAllBytes())
                 : path.EndsWith(".ini", StringComparison.OrdinalIgnoreCase)
-                    ? Ini(overlay, baseFs, file, hasBase, isModFile, diagnostics)
+                    ? Ini(overlay, baseFs, file, hasBase, isModFile, problems)
                     : path.EndsWith(".thn", StringComparison.OrdinalIgnoreCase)
-                        ? Cutscene(baseFs, file, hasBase, isModFile, thn, diagnostics)
+                        ? Cutscene(baseFs, file, hasBase, isModFile, thn, problems)
                         : new TargetFile(path, TargetFileKind.ModFile, file.ReadAllBytes()) { HasBase = hasBase, IsModFile = true };
             if (result != null)
-                files.Add(result);
+                into.Add(result);
         }
+        routes?.Finish(files, diagnostics);
         return new TargetFiles(overlay.Base, overlay, files, diagnostics);
     }
 

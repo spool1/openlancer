@@ -95,6 +95,11 @@ internal sealed partial class FlmmScript
             case TargetFileKind.TextDll:
                 // FLMM makes its own text DLL from the macros.
                 return;
+            case TargetFileKind.Ini when file.Generated:
+                // The game has a file at this path, but the package copies the generated file as a whole file. It
+                // holds no mod text.
+                files.Add((DiskPath(file.Path), file.Bytes));
+                return;
             case TargetFileKind.Ini when VfsPath.Comparer.Equals(file.Path, ModOverlay.FreelancerIniPath):
                 AddFreelancerIni(file);
                 return;

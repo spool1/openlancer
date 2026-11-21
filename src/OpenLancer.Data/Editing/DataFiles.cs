@@ -108,6 +108,14 @@ internal sealed class DataFiles
     /// <summary>False when retail reads the files of the role but the fork does not.</summary>
     public bool Engine(string role) => !rules.Roles.TryGetValue(role, out var definition) || definition.Engine;
 
+    /// <summary>The install paths of a role with a fixed set of files in a <c>freelancer.ini</c>, as the engine finds
+    /// them, or none for a role whose files come from other files. The jump graph of a target build reads the solar
+    /// archetype files and the gate lock files with it.</summary>
+    public static IReadOnlyList<string> FixedPaths(IReadOnlyList<Section> freelancerIni, ListRules rules, string role) =>
+        rules.Roles.TryGetValue(role, out var definition) && !definition.Dynamic
+            ? Resolve(freelancerIni, DataPaths.Entries(freelancerIni).ToList(), definition)
+            : [];
+
     /// <summary>The paths of a role with a fixed set of files, as the engine finds them.</summary>
     private static IReadOnlyList<string> Resolve(IReadOnlyList<Section> freelancerIni,
         IReadOnlyList<(string Name, string Path)> entries, RoleDefinition role)

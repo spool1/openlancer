@@ -61,6 +61,18 @@ internal sealed class SystemFiles
             .Select(e => (string?)e.Path)
             .LastOrDefault();
 
+    /// <summary>The value of the last <c>file</c> line of a <c>[system]</c> section that has a value, or null. The
+    /// engine reads only that line.</summary>
+    public static string? FileValue(Section system) =>
+        system.LastOrDefault(e => e.Name.Equals("file", StringComparison.OrdinalIgnoreCase) && e.Count > 0)?[0].ToString();
+
+    /// <summary>The install path of the file that a <c>[system] file</c> value names, or null when the path leaves the
+    /// install root. The game joins the folder of <c>universe.ini</c> and the value, so a <c>..</c> part goes up from
+    /// that folder.</summary>
+    /// <param name="universePath">The install path of <c>universe.ini</c>.</param>
+    public static string? FilePath(string universePath, string fileValue) =>
+        VfsPath.Normalize($@"{VfsPath.Parent(universePath)}\{fileValue}");
+
     /// <summary>The install path of the file of a system, or null when no <c>[system]</c> or more than one has the
     /// nickname, or when the system has no <c>file</c>.</summary>
     public string? PathOf(string nickname) => One(nickname)?.Path;
@@ -126,17 +138,14 @@ internal sealed class SystemFiles
         ordered = [];
         if (document == null)
             return;
-        // The folder of Folder, in the letter case of the files.
-        var folder = VfsPath.Parent(document.Path);
         for (var i = 0; i < document.Working.Count; i++)
         {
             var id = document.IdentityAt(i);
             // A [system] without exactly one nickname line has no key, so nothing can find it.
             if (!id.Type.Equals("system", StringComparison.OrdinalIgnoreCase) || id.Key == null)
                 continue;
-            var file = document.Working[i].LastOrDefault(e => e.Name.Equals("file", StringComparison.OrdinalIgnoreCase) &&
-                                                               e.Count > 0)?[0].ToString();
-            var path = file == null ? null : VfsPath.Normalize($@"{folder}\{file}");
+            // The path of the document has the letter case of the files.
+            var path = FileValue(document.Working[i]) is { } file ? FilePath(document.Path, file) : null;
             if (path != null && files.Add(path))
                 ordered.Add(path);
             (byNickname.TryGetValue(id.Key, out var named) ? named : byNickname[id.Key] = [])

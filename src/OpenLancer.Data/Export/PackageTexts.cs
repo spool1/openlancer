@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Universe;
 using OpenLancer.Data.Ini;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Mods;
@@ -459,6 +460,14 @@ public static class PackageTexts
                 yield return file.HasBase ? $"The mod replaces {file.Path}." : $"New file {file.Path}.";
                 yield break;
         }
+        if (file.Routes is { } routes)
+        {
+            yield return RouteLine(routes.Diff);
+            if (routes.Unreached.Count > 0)
+                yield return $"No route of this table reaches the new {Plural.Count(routes.Unreached.Count, "system")} " +
+                             $"{string.Join(", ", routes.Unreached)}.";
+            yield break;
+        }
         if (file.Diff is not { } diff)
             yield break;
         if (!file.HasBase)
@@ -496,6 +505,11 @@ public static class PackageTexts
             yield return $"New {Label(diff.MergedSections, m)}.";
         }
     }
+
+    /// <summary>The line of a route table that the build makes: the counts of the routes that change.</summary>
+    private static string RouteLine(RouteDiff diff) =>
+        $"OpenLancer makes this route table from the merged data: {diff.New} new, {diff.Shorter} shorter, " +
+        $"{diff.Longer} longer and {diff.Lost} lost routes.";
 
     /// <summary>The line of a changed cutscene: the number of changed, new and removed entities and events.</summary>
     private static string Cutscene(TargetFile file)

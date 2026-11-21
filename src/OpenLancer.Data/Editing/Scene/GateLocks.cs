@@ -47,6 +47,25 @@ internal static class GateLocks
         return result;
     }
 
+    /// <summary>The hashes that the gate locks of the sections of a file hold: the player locks (<c>locked_gate</c>)
+    /// and the NPC locks (<c>npc_locked_gate</c>). The jump graph of the route tables reads them.</summary>
+    public static void Read(IReadOnlyList<Section> sections, ISet<uint> player, ISet<uint> npc)
+    {
+        foreach (var section in sections)
+        {
+            if (!section.Name.Equals(Section, StringComparison.OrdinalIgnoreCase))
+                continue;
+            foreach (var entry in section)
+            {
+                var into = entry.Name.Equals(Keys[0], StringComparison.OrdinalIgnoreCase) ? player
+                    : entry.Name.Equals(Keys[1], StringComparison.OrdinalIgnoreCase) ? npc
+                    : null;
+                if (into != null && entry.Count > 0 && HashOf(entry[0]) is { } hash)
+                    into.Add(hash);
+            }
+        }
+    }
+
     /// <summary>The value of a gate lock for a nickname: its FLHash as an unsigned decimal number.</summary>
     public static ValueBase ValueOf(string nickname) => new Int32Value(unchecked((int)FLHash.CreateID(nickname)), unsigned: true);
 

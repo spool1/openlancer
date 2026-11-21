@@ -448,6 +448,7 @@ public static class ModExport
         var mod = request.Mod;
         if (request.OpenLancerBase is { } openLancerBase)
         {
+            // OpenLancer computes its own route tables, so the build makes none.
             var build = TargetBuild.Run(openLancerBase, [mod], ModOverlay.StringsDllName, request.StringWriter, request.Thn);
             prepared.SetBuild(target, build);
             prepared.AddBlock(target, PackageTexts.Checklist(build));
@@ -484,7 +485,8 @@ public static class ModExport
         targetProblems.AddRange(target.BaseWarnings(report!).Select(w => Diagnostic.Warning(report!.Root!, w)));
         targetProblems.AddRange(PackageRules.RefusedFiles(mod));
         var gameBase = GameBase.Standard(report!.Root!);
-        var files = TargetBuild.Run(gameBase, [mod], DllName(mod.Id), request.StringWriter, request.Thn);
+        var files = TargetBuild.Run(gameBase, [mod], DllName(mod.Id), request.StringWriter, request.Thn,
+            routeTables: true);
         prepared.SetBuild(target, files);
         targetProblems.AddRange(files.Diagnostics);
         targetProblems.AddRange(FormatChecks.Run(files));
@@ -524,7 +526,7 @@ public static class ModExport
         if (request.Forms.HasFlag(ExportForms.Flmm))
         {
             var placeholders = TargetBuild.Run(gameBase, [mod], DllName(mod.Id), request.StringWriter, request.Thn,
-                keepPlaceholders: true);
+                keepPlaceholders: true, routeTables: true);
             var flmm = FlmmPackage.Plan(placeholders, mod, prepared.Texts, target, request.FlmmProbe, null);
             prepared.AddRange(flmm.Problems);
             targetProblems.AddRange(flmm.Problems);

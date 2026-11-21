@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using LibreLancer;
 using LibreLancer.Data.GameData.World;
-using Universe = LibreLancer.Data.Schema.Universe;
+using UniverseSchema = LibreLancer.Data.Schema.Universe;
 
 namespace OpenLancer.Data.Editing.Scene;
 
@@ -32,7 +32,8 @@ public static class ZoneShapes
     private const float Tiny = 1e-4f;
 
     /// <summary>The shape of a zone. A zone without a shape is a sphere (GameItemDb.cs:1663).</summary>
-    public static ShapeKind ShapeOf(Universe.ZoneShape? shape) => (ShapeKind)(int)(shape ?? Universe.ZoneShape.SPHERE);
+    public static ShapeKind ShapeOf(UniverseSchema.ZoneShape? shape) =>
+        (ShapeKind)(int)(shape ?? UniverseSchema.ZoneShape.SPHERE);
 
     /// <summary>
     /// The size of a zone as the engine keeps it (GameItemDb.cs:1664-1673): (1, 1, 1) without a line. A ring has the
@@ -52,12 +53,12 @@ public static class ZoneShapes
 
     /// <summary>A <c>[zone]</c> of W as the engine reads its lines (see <see cref="EditSession.Parse{T}"/>). Null when
     /// the edit view has no such section, or when the section has a check error.</summary>
-    internal static Universe.Zone? Read(EditSession session, SectionRef zone) =>
-        session.Parse<Universe.Zone>(zone, Universe.Zone.TryParse);
+    internal static UniverseSchema.Zone? Read(EditSession session, SectionRef zone) =>
+        session.Parse<UniverseSchema.Zone>(zone, UniverseSchema.Zone.TryParse);
 
     /// <summary>True when the shape of the zone holds the point, as OpenLancer Play finds it
     /// (<see cref="Zone.ContainsPoint"/>). A point on the edge is inside.</summary>
-    internal static bool Contains(Universe.Zone zone, Vector3 point) => Build(zone).ContainsPoint(point);
+    internal static bool Contains(UniverseSchema.Zone zone, Vector3 point) => Build(zone).ContainsPoint(point);
 
     /// <summary>
     /// How deep a point is in the zone, with the retail rule. The value is 1 from the start of the fade band inward,
@@ -71,7 +72,7 @@ public static class ZoneShapes
     /// <para>Retail logs a data error for a nebula hole when the immersion of the nebula zone at the hole center is
     /// below 1. At 0, retail skips the hole.</para>
     /// </remarks>
-    internal static float Immersion(Universe.Zone zone, Vector3 point)
+    internal static float Immersion(UniverseSchema.Zone zone, Vector3 point)
     {
         var built = Build(zone);
         var bound = BoundingRadius(built);
@@ -86,7 +87,7 @@ public static class ZoneShapes
     /// The width (X), the height (Y) and the depth (Z) of the shape of the zone in meters, along the axes of the zone.
     /// A sphere, an ellipsoid, a cylinder and a ring are as wide as two radii. A box is its three lengths.
     /// </summary>
-    internal static Vector3 Extent(Universe.Zone zone)
+    internal static Vector3 Extent(UniverseSchema.Zone zone)
     {
         var built = Build(zone);
         var size = built.Size;
@@ -106,17 +107,17 @@ public static class ZoneShapes
     /// A cylinder and a ring take the larger of the width and the depth. A ring gets the inner radius 0.
     /// </summary>
     /// <param name="extent">The width, the height and the depth in meters.</param>
-    internal static IReadOnlyList<float> SizeFor(Universe.ZoneShape shape, Vector3 extent) => shape switch
+    internal static IReadOnlyList<float> SizeFor(UniverseSchema.ZoneShape shape, Vector3 extent) => shape switch
     {
-        Universe.ZoneShape.SPHERE => [MathF.Max(extent.X, MathF.Max(extent.Y, extent.Z)) / 2],
-        Universe.ZoneShape.ELLIPSOID => [extent.X / 2, extent.Y / 2, extent.Z / 2],
-        Universe.ZoneShape.BOX => [extent.X, extent.Y, extent.Z],
-        Universe.ZoneShape.CYLINDER => [MathF.Max(extent.X, extent.Z) / 2, extent.Y],
+        UniverseSchema.ZoneShape.SPHERE => [MathF.Max(extent.X, MathF.Max(extent.Y, extent.Z)) / 2],
+        UniverseSchema.ZoneShape.ELLIPSOID => [extent.X / 2, extent.Y / 2, extent.Z / 2],
+        UniverseSchema.ZoneShape.BOX => [extent.X, extent.Y, extent.Z],
+        UniverseSchema.ZoneShape.CYLINDER => [MathF.Max(extent.X, extent.Z) / 2, extent.Y],
         _ => [MathF.Max(extent.X, extent.Z) / 2, 0, extent.Y],
     };
 
     /// <summary>The shape, the size, the rotation and the position of a zone, as the engine builds them.</summary>
-    private static Zone Build(Universe.Zone zone)
+    private static Zone Build(UniverseSchema.Zone zone)
     {
         var shape = ShapeOf(zone.Shape);
         return new Zone

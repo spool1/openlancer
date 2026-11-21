@@ -36,11 +36,12 @@ public static class PlayBuild
     }
 
     /// <summary>Merges the mods on the files of the game and runs the format checks and the content checks of its
-    /// target. The merge only reads the game folder.</summary>
+    /// target. The files get the route tables of the game when the mods change the routes. The merge only reads the
+    /// game folder.</summary>
     public static PlayBuildResult Run(GameReport game, IReadOnlyList<Mod> mods, IStringResourceWriter stringWriter,
         IThnEvaluator thn)
     {
-        var files = TargetBuild.Run(game.Base!, mods, ModOverlay.StringsDllName, stringWriter, thn);
+        var files = TargetBuild.Run(game.Base!, mods, ModOverlay.StringsDllName, stringWriter, thn, routeTables: true);
         return new PlayBuildResult(files, [.. files.Diagnostics, .. FormatChecks.Run(files), .. TargetChecks.Run(files)]);
     }
 }
