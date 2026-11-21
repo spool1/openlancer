@@ -58,7 +58,7 @@ public sealed class SystemEntryTests
 
         var file = Binding(session, entry, "file");
         Assert.NotNull(file.ReadOnlyReason);
-        Assert.Equal(@"..\MODSct\SYSTEMS\Av01\Av01.ini", file.Text, ignoreCase: true);
+        Assert.Equal(@"..\MODS\act\SYSTEMS\Av01\Av01.ini", file.Text, ignoreCase: true);
         Assert.NotNull(Binding(session, entry, "nickname").ReadOnlyReason);
         Assert.All(AllRows.Where(r => r.Kind is not (SystemEntryRows.RowKind.Nickname or SystemEntryRows.RowKind.File)),
             r => Assert.Null(Binding(session, entry, r.Key).ReadOnlyReason));
