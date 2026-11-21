@@ -28,6 +28,10 @@ public sealed class LaneChecksTests
     private static Diagnostic[] Lane(EditSession session, SectionRef section) =>
         LaneChecks.Check(session, section).ToArray();
 
+    /// <summary>The circle problems of a ring.</summary>
+    private static Diagnostic[] Circle(EditSession session, SectionRef section) =>
+        Lane(session, section).Where(p => p.Message.Contains("goes in a circle")).ToArray();
+
     private static void AddRing(EditSession session, string nickname, string pos, params (string Key, string Value)[] lines) =>
         session.Execute(EditCommand.AddSection(SceneWorkspace.Li01Path, "Object",
         [
@@ -60,9 +64,10 @@ public sealed class LaneChecksTests
 
     /// <summary>
     /// A hand-made circle of the active mod is an error on each ring of the circle. The save gate gives one error and
-    /// refuses the save. The error names the first ring of the file whose link line the active mod writes. The Trade
-    /// lane ring component, the raw INI block and the agent check show it. A repair of the lane ends the circle, and the
-    /// save then runs.
+    /// refuses the save. The error names the first ring of the circle in the file whose link line the active mod writes.
+    /// The text names the repair and the delete of that ring. The Trade lane ring component, the raw INI block and the
+    /// agent check show it. A repair of the lane ends the circle, and the save then runs. A delete of the ring that the
+    /// text names ends the circle too.
     /// </summary>
     [Fact]
     public void ACircleOfTheActiveModStopsTheSaveAndNamesTheRing()
@@ -73,8 +78,8 @@ public sealed class LaneChecksTests
         session.Execute(EditCommand.SetLinesFromText(Ring(4), "next_ring", ["Li01_Trade_Lane_Ring_1"]));
         session.Execute(EditCommand.SetLinesFromText(Ring(1), "prev_ring", ["Li01_Trade_Lane_Ring_4"]));
         const string circle = "The trade lane of Li01_Trade_Lane_Ring_1 goes in a circle. The game hangs when the HUD " +
-                              "reads the lane. Repair the lane with the button Repair lane in the Inspector, or delete a " +
-                              "ring of the circle. An agent uses trade_lane_repair or delete_items.";
+                              "reads the lane. Repair the lane with the button Repair lane in the Inspector, or delete " +
+                              "Li01_Trade_Lane_Ring_1. An agent uses trade_lane_repair or delete_items.";
 
         var problem = Assert.Single(Lane(session, Ring(1)));
         var error = Assert.Single(session.SaveProblems(), p => p.Message.Contains("goes in a circle"));
@@ -97,6 +102,118 @@ public sealed class LaneChecksTests
 
         Run(session, LanePlans.Repair(session, Ring(1)));
         Assert.All(Enumerable.Range(1, 4), n => Assert.Empty(Lane(session, Ring(n))));
+        Assert.True(session.Save().Saved);
+
+        session.Undo();
+        Assert.NotEmpty(Circle(session, Ring(2)));
+        Run(session, ScenePlans.Delete(session, [Ring(1)]));
+        Assert.All(Enumerable.Range(2, 3), n => Assert.Empty(Circle(session, Ring(n))));
+        Assert.DoesNotContain(session.SaveProblems(), p => p.Message.Contains("goes in a circle"));
+    }
+
+    /// <summary>
+    /// The game walks each direction of a lane alone. A walk to next_ring that comes to a ring of the walk to prev_ring
+    /// is no circle, so it gives no circle problem and the save runs. The one-way links still warn.
+    /// </summary>
+    [Fact]
+    public void AWalkThatComesToTheOtherWalkIsNoCircle()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.RemoveName(Ring(1), "next_ring"));
+        session.Execute(EditCommand.SetLinesFromText(Ring(4), "next_ring", ["Li01_Trade_Lane_Ring_1"]));
+
+        var walk = LanePlans.LaneOf(session, Ring(2), strays: true)!;
+
+        Assert.False(walk.Loops);
+        Assert.Equal([Ring(1), Ring(2), Ring(3), Ring(4)], walk.Rings);
+        Assert.All(Enumerable.Range(1, 4), n => Assert.Null(LanePlans.CircleOf(session, Ring(n))));
+        Assert.All(Enumerable.Range(1, 4), n => Assert.Empty(Circle(session, Ring(n))));
+        Assert.Contains(Lane(session, Ring(4)), p => p.Message.Contains("do not link both ways") && p.Key == "next_ring");
+        Assert.Contains(Lane(session, Ring(2)), p => p.Message.Contains("do not link both ways") && p.Key == "prev_ring");
+        Assert.DoesNotContain(session.SaveProblems(), p => p.Message.Contains("goes in a circle"));
+        Assert.True(session.Save().Saved);
+    }
+
+    /// <summary>
+    /// The circle error of the save gate goes on a ring of the circle, at a link line that the active mod writes. A ring
+    /// before the circle comes first in the file. Its removed link line does not count, and its changed link line does
+    /// not take the error either. The ring before the circle gets the problem only when its own walk goes round the
+    /// circle.
+    /// </summary>
+    [Fact]
+    public void TheCircleErrorGoesOnARingOfTheCircle()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.SetLinesFromText(Ring(4), "next_ring", ["Li01_Trade_Lane_Ring_2"]));
+        session.Execute(EditCommand.RemoveName(Ring(1), "next_ring"));
+        const string circle = "The trade lane of Li01_Trade_Lane_Ring_4 goes in a circle. The game hangs when the HUD " +
+                              "reads the lane. Repair the lane with the button Repair lane in the Inspector, or delete " +
+                              "Li01_Trade_Lane_Ring_4. An agent uses trade_lane_repair or delete_items.";
+
+        var error = Assert.Single(session.SaveProblems(), p => p.Message.Contains("goes in a circle"));
+
+        Assert.Equal((circle, Ring(4), "next_ring"), (error.Message, error.Target, error.Key));
+        Assert.Equal(circle, Assert.Single(Circle(session, Ring(4))).Message);
+        Assert.Empty(Circle(session, Ring(1)));
+        Assert.All(new[] { 2, 3 }, n => Assert.Equal((DiagnosticSeverity.Error, "next_ring"),
+            (Assert.Single(Circle(session, Ring(n))).Severity, Assert.Single(Circle(session, Ring(n))).Key)));
+
+        session.Execute(EditCommand.SetLinesFromText(Ring(1), "next_ring", ["Li01_Trade_Lane_Ring_3"]));
+        var tail = Assert.Single(Circle(session, Ring(1)));
+        error = Assert.Single(session.SaveProblems(), p => p.Message.Contains("goes in a circle"));
+
+        Assert.Equal((DiagnosticSeverity.Error, "next_ring"), (tail.Severity, tail.Key));
+        Assert.Equal((circle, Ring(4)), (error.Message, error.Target));
+        Assert.False(session.Save().Saved);
+
+        Run(session, ScenePlans.Delete(session, [Ring(4)]));
+        Assert.All(Enumerable.Range(1, 3), n => Assert.Empty(Circle(session, Ring(n))));
+        Assert.DoesNotContain(session.SaveProblems(), p => p.Message.Contains("goes in a circle"));
+    }
+
+    /// <summary>
+    /// A stray link of the active mod can make a circle that only the walk of the HUD sees. It is an error and stops the
+    /// save. The relink of a delete does not follow the stray link, so a delete of another ring of the circle keeps the
+    /// circle. The text names the ring with the stray link, and its delete ends the circle. When a ring off the line
+    /// stops the repair, the text names only that delete.
+    /// </summary>
+    [Fact]
+    public void AStrayLinkOfTheActiveModMakesACircleThatStopsTheSave()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.SetLinesFromText(Ring(4), "next_ring", ["Li01_Trade_Lane_Ring_2"]));
+
+        var error = Assert.Single(session.SaveProblems(), p => p.Message.Contains("goes in a circle"));
+
+        Assert.False(LanePlans.LaneOf(session, Ring(3))!.Loops);
+        Assert.Equal("The trade lane of Li01_Trade_Lane_Ring_4 goes in a circle. The game hangs when the HUD reads the " +
+                     "lane. Repair the lane with the button Repair lane in the Inspector, or delete Li01_Trade_Lane_Ring_4. " +
+                     "An agent uses trade_lane_repair or delete_items.", error.Message);
+        AssertSte(error);
+        Assert.Equal((Ring(4), "next_ring", DiagnosticSeverity.Error), (error.Target, error.Key, error.Severity));
+        Assert.All(new[] { 2, 3, 4 }, n => Assert.Equal(DiagnosticSeverity.Error, Assert.Single(Circle(session, Ring(n))).Severity));
+        // The walk of the HUD from the first ring goes round the circle too.
+        Assert.Equal((DiagnosticSeverity.Error, "next_ring"),
+            (Assert.Single(Circle(session, Ring(1))).Severity, Assert.Single(Circle(session, Ring(1))).Key));
+        Assert.False(session.Save().Saved);
+
+        Run(session, ScenePlans.Delete(session, [Ring(3)]));
+        Assert.NotEmpty(Circle(session, Ring(2)));
+        session.Undo();
+
+        AddRing(session, "Li01_Trade_Lane_Ring_5", "11250, 0, -10000", ("next_ring", "Li01_Trade_Lane_Ring_3"));
+        var stopped = Assert.Single(Circle(session, Ring(2)));
+        Assert.False(LanePlans.Repair(session, Ring(2)).CanRun);
+        Assert.Equal("The trade lane of Li01_Trade_Lane_Ring_2 goes in a circle. The game hangs when the HUD reads the " +
+                     "lane. Delete Li01_Trade_Lane_Ring_4. An agent uses delete_items.", stopped.Message);
+        AssertSte(stopped);
+
+        Run(session, ScenePlans.Delete(session, [Ring(4)]));
+        Assert.All(new[] { 1, 2, 3, 5 }, n => Assert.Empty(Circle(session, Ring(n))));
+        Assert.DoesNotContain(session.SaveProblems(), p => p.Message.Contains("goes in a circle"));
         Assert.True(session.Save().Saved);
     }
 
@@ -208,8 +325,9 @@ public sealed class LaneChecksTests
 
     /// <summary>
     /// A ring with a lane name and no links warns. On the line of a lane, the text names the repair that joins it. Far
-    /// from each lane, the text names the delete and the move. A ring without a name and without links, and a ring that
-    /// another ring links to, give no such warning.
+    /// from each lane, the text names the delete and the move. A link of an object that is no ring does not make a lane,
+    /// so the warning stays. A ring without a name and without links, and a ring that another ring links to, give no such
+    /// warning.
     /// </summary>
     [Fact]
     public void ARingWithANameAndNoLinksWarns()
@@ -231,6 +349,9 @@ public sealed class LaneChecksTests
         AssertSte(lone);
         AssertSte(far);
         Assert.Empty(Lane(session, SceneWorkspace.Object("Li01_quiet")));
+
+        session.Execute(EditCommand.SetLinesFromText(SceneWorkspace.Object("Li01_to_Li02"), "next_ring", ["Li01_lone"]));
+        Assert.Equal(lone.Message, Assert.Single(Lane(session, SceneWorkspace.Object("Li01_lone"))).Message);
 
         session.Execute(EditCommand.SetLinesFromText(Ring(4), "next_ring", ["Li01_far"]));
         Assert.DoesNotContain(Lane(session, SceneWorkspace.Object("Li01_far")), p => p.Message.Contains("without a lane"));
@@ -289,6 +410,51 @@ public sealed class LaneChecksTests
 
         session.Undo();
         Assert.Empty(ObjectComponents.Checks(session, LaneWorkspace.Zone));
+    }
+
+    /// <summary>A lane zone whose axis passes no ring gives no warning, also when a lane without a zone is in the
+    /// system.</summary>
+    [Fact]
+    public void ALaneZoneFarFromALaneWithoutAZoneGivesNoWarning()
+    {
+        using var ws = LaneWorkspace.Create(LaneWorkspace.Li01Text + """
+
+            [zone]
+            nickname = Zone_Li01_Tradelane_2
+            pos = -50000, 0, 20000
+            rotate = 0, -90, 0
+            shape = BOX
+            size = 500, 500, 23500
+            pop_type = major_tradelane
+            """);
+        var session = ws.Session("act");
+        AddRing(session, "Li01_far_1", "0, 0, 70000", ("next_ring", "Li01_far_2"), ("tradelane_space_name", "506"));
+        AddRing(session, "Li01_far_2", "7500, 0, 70000", ("prev_ring", "Li01_far_1"), ("tradelane_space_name", "507"));
+        var far = SceneWorkspace.Zone("Zone_Li01_Tradelane_2");
+
+        Assert.NotNull(LaneZones.Read(session, far));
+        Assert.Null(LanePlans.ZoneOf(session, LanePlans.LaneOf(session, SceneWorkspace.Object("Li01_far_1"))!));
+        Assert.Empty(Lane(session, far));
+        Assert.Empty(Lane(session, LaneWorkspace.Zone));
+    }
+
+    /// <summary>A lane zone that covers its own lane gives no warning for a crossing lane without a zone, also when a ring
+    /// of that lane stands on the axis of the zone.</summary>
+    [Fact]
+    public void TheZoneOfALaneGivesNoWarningForACrossingLane()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        AddRing(session, "Li01_cross_1", "11250, 0, -19000", ("next_ring", "Li01_cross_2"), ("tradelane_space_name", "506"));
+        AddRing(session, "Li01_cross_2", "11250, 0, -5000", ("prev_ring", "Li01_cross_1"), ("tradelane_space_name", "507"));
+        var cross = LanePlans.LaneOf(session, SceneWorkspace.Object("Li01_cross_1"))!;
+
+        Assert.Equal(2, cross.Rings.Count);
+        Assert.Null(LanePlans.ZoneOf(session, cross));
+        Assert.NotNull(LanePlans.AxisDistance(LaneZones.Read(session, LaneWorkspace.Zone)!,
+            LanePlans.PositionOf(session, cross.Rings[0])!.Value));
+        Assert.Equal(LaneWorkspace.Zone, LanePlans.ZoneOf(session, LanePlans.LaneOf(session, Ring(1))!));
+        Assert.Empty(Lane(session, LaneWorkspace.Zone));
     }
 
     /// <summary>An object that is no ring gets no lane problem, also with a next_ring line. The ring that it names gets

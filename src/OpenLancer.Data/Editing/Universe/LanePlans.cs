@@ -61,10 +61,21 @@ public sealed record LaneOptions
 /// <summary>The rings of one trade lane in W, from the first ring to the last ring (see
 /// <see cref="LanePlans.LaneOf"/>).</summary>
 /// <param name="Path">The install path of the system file of the lane.</param>
-/// <param name="Rings">The rings in order. A ring without links is a lane of one ring.</param>
-/// <param name="Loops">True when the links go in a circle. The walk then stops at the first ring that it finds again,
-/// and the lane has no first ring and no last ring.</param>
+/// <param name="Rings">The rings in order, each ring once. A ring without links is a lane of one ring.</param>
+/// <param name="Loops">True when the links go in a circle: the walk in one direction finds a ring of that walk again.
+/// The game walks each direction alone, so only such a circle makes the HUD hang. The lane then has no first ring and no
+/// last ring. A walk that reaches a ring of the walk in the other direction is no circle. The chain then stops at that
+/// ring.</param>
 public sealed record LaneChain(string Path, IReadOnlyList<SectionRef> Rings, bool Loops);
+
+/// <summary>A circle of the links of a lane, as the walk of the HUD goes round it (see
+/// <see cref="LanePlans.CircleOf"/>).</summary>
+/// <param name="Rings">The rings of the circle in the order of the links.</param>
+/// <param name="Key">The link line that goes round the circle: <c>next_ring</c> or <c>prev_ring</c>.</param>
+/// <param name="Strays">The rings of the circle whose link line <paramref name="Key"/> is a stray link (see
+/// <see cref="LanePlans.LaneOf"/>). The relink of a delete does not follow a stray link. So when the circle has such a
+/// ring, only the delete of such a ring cuts the circle.</param>
+internal sealed record LaneCircle(IReadOnlyList<SectionRef> Rings, string Key, IReadOnlyList<SectionRef> Strays);
 
 /// <summary>
 /// The plans of the trade lanes: a new lane with its lane zone, a new ring, a repair of the links, the remove of rings
@@ -711,9 +722,9 @@ public static class LanePlans
 
     /// <summary>
     /// The lane of a ring: the rings that the links reach from it, in order. The walk follows <c>prev_ring</c> back to
-    /// the first ring and <c>next_ring</c> on to the last ring, as the HUD does. It stops at a link to an object that the
-    /// file does not have or that is no ring. It also stops at a ring that it finds again, and at a stray link unless
-    /// <paramref name="strays"/> is true. Null for a section that is no object of a system file.
+    /// the first ring and <c>next_ring</c> on to the last ring, each direction alone, as the HUD does. It stops at a link
+    /// to an object that the file does not have or that is no ring. It also stops at a ring of its own walk, and at a
+    /// stray link unless <paramref name="strays"/> is true. Null for a section that is no object of a system file.
     /// </summary>
     /// <remarks>
     /// <para>This is the one walk of the links of a lane in W. The plans, the checks and the Inspector use it. A ring is
@@ -731,29 +742,60 @@ public static class LanePlans
         if (SceneSections.KindOf(session, ring) != SceneKind.Object || session.Get(ring) is not { } view)
             return null;
         var objects = ObjectsOf(session, ring.Path);
-        var seen = new HashSet<SectionRef> { ring };
-        var loops = false;
-        List<SectionRef> Walk(string key, string back)
-        {
-            var result = new List<SectionRef>();
-            for (var (at, atView) = (ring, view); RingLink(session, objects, atView, key) is { } target; )
-            {
-                if (!strays && IsStray(session, objects, at, target, key, back))
-                    break;
-                if (!seen.Add(target))
-                {
-                    loops = true;
-                    break;
-                }
-                result.Add(target);
-                (at, atView) = (target, session.Get(target)!);
-            }
-            return result;
-        }
-        var before = Walk("prev_ring", "next_ring");
-        var after = Walk("next_ring", "prev_ring");
+        var (before, backLoop) = Walk(session, objects, ring, view, "prev_ring", strays);
+        var (after, onLoop) = Walk(session, objects, ring, view, "next_ring", strays);
+        // Each ring is once in the chain, so the part after the ring stops at a ring of the part before it.
+        var behind = before.ToHashSet();
         before.Reverse();
-        return new LaneChain(ring.Path, [.. before, ring, .. after], loops);
+        return new LaneChain(ring.Path, [.. before, .. after.Skip(1).TakeWhile(r => !behind.Contains(r))],
+            backLoop >= 0 || onLoop >= 0);
+    }
+
+    /// <summary>
+    /// The circle that the walk of the HUD goes round from a ring, also with the stray links, or null. The walk to
+    /// <c>next_ring</c> counts first, then the walk to <c>prev_ring</c>. A ring before the circle gives the circle that its
+    /// walk goes into. Null for a section that is no object of a system file, and for a lane without a circle.
+    /// </summary>
+    internal static LaneCircle? CircleOf(EditSession session, SectionRef ring)
+    {
+        if (SceneSections.KindOf(session, ring) != SceneKind.Object || session.Get(ring) is not { } view)
+            return null;
+        var objects = ObjectsOf(session, ring.Path);
+        foreach (var (key, back) in new[] { ("next_ring", "prev_ring"), ("prev_ring", "next_ring") })
+        {
+            var (walk, loop) = Walk(session, objects, ring, view, key, strays: true);
+            if (loop < 0)
+                continue;
+            var rings = walk.Skip(loop).ToList();
+            var stray = rings.Where((r, i) => IsStray(session, objects, r, rings[(i + 1) % rings.Count], key, back)).ToList();
+            return new LaneCircle(rings, key, stray);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The walk of the links of a ring in one direction: the ring, then each ring that its link lines
+    /// <paramref name="key"/> reach. The walk stops at a link to an object that is no ring, at a stray link unless
+    /// <paramref name="strays"/> is true, and at a ring of its own walk. Loop is the index of that ring in the walk, or -1
+    /// when the walk does not go in a circle.
+    /// </summary>
+    private static (List<SectionRef> Rings, int Loop) Walk(EditSession session,
+        IReadOnlyDictionary<string, SectionRef> objects, SectionRef ring, SectionView view, string key, bool strays)
+    {
+        var back = key == "next_ring" ? "prev_ring" : "next_ring";
+        var rings = new List<SectionRef> { ring };
+        var index = new Dictionary<SectionRef, int> { [ring] = 0 };
+        for (var (at, atView) = (ring, view); RingLink(session, objects, atView, key) is { } target;
+             (at, atView) = (target, session.Get(target)!))
+        {
+            if (!strays && IsStray(session, objects, at, target, key, back))
+                break;
+            if (index.TryGetValue(target, out var loop))
+                return (rings, loop);
+            index[target] = rings.Count;
+            rings.Add(target);
+        }
+        return (rings, -1);
     }
 
     /// <summary>

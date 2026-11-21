@@ -7,17 +7,18 @@ namespace OpenLancer.Data.Editing.Scene;
 
 /// <summary>
 /// The checks of the trade lanes: the rings of a system file and their lane zones. One error stops the save: a lane that
-/// goes in a circle, when the active mod writes a link line of the circle. The game hangs when the HUD reads such a lane.
-/// The other checks are warnings. Each text names a fix that works.
+/// goes in a circle, when the active mod writes a link line of a ring of the circle. The game hangs when the HUD reads
+/// such a lane. The other checks are warnings. Each text names a fix that works.
 /// </summary>
 /// <remarks>
 /// <para>Retail facts: the game makes a lane only from objects with an archetype of the type <c>TRADELANE_RING</c>. A
 /// ship on the lane follows <c>next_ring</c> forward and <c>prev_ring</c> back. The HUD follows the links to the two end
 /// rings, also a stray link, and shows their <c>tradelane_space_name</c>. Lane traffic spawns in the lane zone (see
 /// <see cref="LaneZones"/>).</para>
-/// <para>The checks walk the lanes only with <see cref="LanePlans.LaneOf"/>, as the HUD walks them, with the stray
-/// links. A link line that names no object gets the error of the data lists, so these checks skip it. The placement
-/// warning comes only for a ring that the active mod places, as the spacing warning of the jump objects.</para>
+/// <para>The checks walk the lanes only with <see cref="LanePlans.LaneOf"/> and <see cref="LanePlans.CircleOf"/>, as the
+/// HUD walks them, with the stray links. A link line that names no object gets the error of the data lists, so these
+/// checks skip it. The placement warning comes only for a ring that the active mod places, as the spacing warning of the
+/// jump objects.</para>
 /// </remarks>
 internal static class LaneChecks
 {
@@ -41,31 +42,31 @@ internal static class LaneChecks
 
     /// <summary>
     /// The errors of the trade lanes for the save gate, in a system file that the active mod changes. A lane that goes in
-    /// a circle gives an error when the active mod writes a link line of the circle. Each circle gives one error, on the
-    /// first ring of the file whose link line the active mod writes.
+    /// a circle gives an error when the active mod writes a link line of a ring of the circle. Each circle gives one
+    /// error. The error goes on the first ring of the circle in the file whose link line the active mod writes.
     /// </summary>
     public static IEnumerable<Diagnostic> SaveErrors(EditSession session, string path)
     {
-        var named = new HashSet<(SectionRef, string)>();
+        var named = new HashSet<SectionRef>();
         foreach (var ring in Rings(session, path))
         {
-            if (LanePlans.LaneOf(session, ring, strays: true) is { Loops: true } lane &&
-                Written(session, lane) is { } written && named.Add(written))
-                yield return LoopProblem(session, written.Ring, written.Key, DiagnosticSeverity.Error);
+            if (LanePlans.CircleOf(session, ring) is not { } circle || circle.Rings.Any(named.Contains))
+                continue;
+            named.UnionWith(circle.Rings);
+            if (Written(session, circle) is { } written)
+                yield return LoopProblem(session, circle, written.Ring, written.Key, DiagnosticSeverity.Error);
         }
     }
 
     /// <summary>The problems of a ring.</summary>
     private static IEnumerable<Diagnostic> Ring(EditSession session, SectionRef ring, SectionView view, string name)
     {
-        // The walk of the HUD, with the stray links.
+        // The walk of the HUD, with the stray links. A ring before a circle gets the problem too, because the walk of
+        // the HUD from it goes round the circle.
         var walk = LanePlans.LaneOf(session, ring, strays: true)!;
-        if (walk.Loops)
-        {
-            var key = Written(session, ring) ?? (SceneSections.Last(view, Next) != null ? Next : Prev);
-            yield return LoopProblem(session, ring, key,
-                Written(session, walk) != null ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning);
-        }
+        if (LanePlans.CircleOf(session, ring) is { } circle)
+            yield return LoopProblem(session, circle, ring, Written(session, ring) ?? circle.Key,
+                Written(session, circle) != null ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning);
 
         var objects = LanePlans.ObjectsOf(session, ring.Path);
         var links = 0;
@@ -94,7 +95,8 @@ internal static class LaneChecks
                 $"shows no lane label. Set the name in the Lane name row of {name}. An agent uses set_text with the field " +
                 $"{EndName}.");
 
-        if (links == 0 && hasName && !objects.Values.Any(o => LinksTo(session, o, name)))
+        if (links == 0 && hasName &&
+            !objects.Values.Any(o => LanePlans.IsRingObject(session, o) && LinksTo(session, o, name)))
             yield return Warning(ring, EndName, $"{name} is a trade lane ring without a lane. " + Lone(session, ring));
 
         if (session.Origin(ring, "pos").Origin == ValueOrigin.ActiveMod && SceneSections.Position(view) is { } at &&
@@ -137,17 +139,31 @@ internal static class LaneChecks
         }
     }
 
-    /// <summary>The problem of a lane that goes in a circle.</summary>
-    private static Diagnostic LoopProblem(EditSession session, SectionRef ring, string key, DiagnosticSeverity severity) =>
-        new(severity, ring.Path,
+    /// <summary>The problem of a lane that goes in a circle, on a ring. The fix is a repair, or the delete of the ring
+    /// that cuts the circle (see <see cref="Cut"/>).</summary>
+    private static Diagnostic LoopProblem(EditSession session, LaneCircle circle, SectionRef ring, string key,
+        DiagnosticSeverity severity)
+    {
+        var cut = Cut(session, circle).Id.Key;
+        return new Diagnostic(severity, ring.Path,
             $"The trade lane of {ring.Id.Key} goes in a circle. The game hangs when the HUD reads the lane. " +
             (RepairStops(session, ring) is null
-                ? "Repair the lane with the button Repair lane in the Inspector, or delete a ring of the circle. An agent " +
-                  "uses trade_lane_repair or delete_items."
-                : "Delete a ring of the circle. An agent uses delete_items."))
+                ? $"Repair the lane with the button Repair lane in the Inspector, or delete {cut}. An agent uses " +
+                  "trade_lane_repair or delete_items."
+                : $"Delete {cut}. An agent uses delete_items."))
         {
             Target = ring, Key = key,
         };
+    }
+
+    /// <summary>
+    /// The ring whose delete cuts a circle. It is the first ring in the file with a stray link in the circle, because the
+    /// relink of a delete does not follow a stray link. Else the delete of each ring of the circle cuts it. Then it is the
+    /// ring of the save error, or the first ring of the circle in the file.
+    /// </summary>
+    private static SectionRef Cut(EditSession session, LaneCircle circle) =>
+        InFile(session, circle.Strays).FirstOrDefault() ?? Written(session, circle)?.Ring ??
+        InFile(session, circle.Rings).First();
 
     /// <summary>The fix of a broken link of a ring: the repair of its lane. When a ring stops the repair, the fix is the
     /// move or the delete of that ring.</summary>
@@ -175,21 +191,32 @@ internal static class LaneChecks
             : null;
 
     /// <summary>The first link line of a ring that the active mod writes: <c>next_ring</c>, then <c>prev_ring</c>, or
-    /// null.</summary>
+    /// null. Only a line of W counts, so a line that the active mod removes does not count.</summary>
     private static string? Written(EditSession session, SectionRef ring) =>
-        new[] { Next, Prev }.FirstOrDefault(k => session.Origin(ring, k).Origin == ValueOrigin.ActiveMod);
+        session.Get(ring) is { } view
+            ? new[] { Next, Prev }.FirstOrDefault(k => view.Lines(k).Count > 0 &&
+                                                     session.Origin(ring, k).Origin == ValueOrigin.ActiveMod)
+            : null;
 
-    /// <summary>The first ring of a lane in file order whose link line the active mod writes, with that line, or
+    /// <summary>The first ring of a circle in the file whose link line the active mod writes, with that line, or
     /// null.</summary>
-    private static (SectionRef Ring, string Key)? Written(EditSession session, LaneChain lane)
+    private static (SectionRef Ring, string Key)? Written(EditSession session, LaneCircle circle)
     {
-        var rings = lane.Rings.ToHashSet();
-        foreach (var section in session.Sections(lane.Path))
+        foreach (var ring in InFile(session, circle.Rings))
         {
-            if (rings.Contains(section) && Written(session, section) is { } key)
-                return (section, key);
+            if (Written(session, ring) is { } key)
+                return (ring, key);
         }
         return null;
+    }
+
+    /// <summary>Rings of one system file in file order.</summary>
+    private static IEnumerable<SectionRef> InFile(EditSession session, IReadOnlyList<SectionRef> rings)
+    {
+        if (rings.Count == 0)
+            return [];
+        var set = rings.ToHashSet();
+        return session.Sections(rings[0].Path).Where(set.Contains);
     }
 
     /// <summary>The rings of a system file in file order.</summary>
