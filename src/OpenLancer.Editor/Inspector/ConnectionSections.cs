@@ -40,12 +40,28 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
         (JumpLock.Both, "Locked for the player and NPCs"),
     ];
 
-    private const string LockHelp =
+    /// <summary>The help of the lock dropdown.</summary>
+    internal const string LockHelp =
         "The lock at the start of a new game. A mission can unlock the gate with Act_LockDock. The route tables leave out " +
         "a gate that the player cannot use, also after the unlock. A change also locks the partner.";
 
-    private const string LaneNameHelp =
+    /// <summary>The help of the "Lane name" row of an end ring.</summary>
+    internal const string LaneNameHelp =
         "The name of this end of the lane. The HUD shows the lane as the start name, an arrow and the end name.";
+
+    /// <summary>The tooltip of "Insert ring after".</summary>
+    internal const string InsertTip = "Adds a ring after this ring. The links, the end name and the lane zone follow.";
+
+    /// <summary>The tooltip of "Repair lane".</summary>
+    internal const string RepairTip =
+        "Writes the links of the lane again in the order of the rings on the line, and moves the end names to the end " +
+        "rings. The positions stay.";
+
+    /// <summary>The tooltip of "Delete ring".</summary>
+    internal const string DeleteTip = "Deletes this ring, as the Delete key does. Its neighbors link to each other.";
+
+    /// <summary>The tooltip of "Go to partner".</summary>
+    internal const string PartnerTip = "Opens the system of the partner in the Scene and selects the partner.";
 
     private Page? page;
 
@@ -148,7 +164,7 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
                     jump.Partner == null ? null : GoToPartner, missing: jump.Partner == null);
             }
 
-            grid.Help("Opens the system of the partner in the Scene and selects the partner.");
+            grid.Help(PartnerTip);
             grid.Row("Partner", () =>
             {
                 ImGui.BeginDisabled(jump.Partner == null);
@@ -288,23 +304,19 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
         var editor = window.Session?.NoEditReason ?? (window.IsEditing ? "Wait until the field edit ends." : null);
         grid.FullRow(() =>
         {
-            if (Button("Insert ring after", editor ?? ring.InsertUnavailable,
-                    "Adds a ring after this ring. The links, the end name and the lane zone follow."))
+            if (Button("Insert ring after", editor ?? ring.InsertUnavailable, InsertTip))
             {
                 window.SceneEdits.InsertRingAfter(section);
             }
 
             ImGui.SameLine();
-            if (Button("Repair lane", editor ?? ring.RepairUnavailable,
-                    "Writes the links of the lane again in the order of the rings on the line, and moves the end names to " +
-                    "the end rings. The positions stay."))
+            if (Button("Repair lane", editor ?? ring.RepairUnavailable, RepairTip))
             {
                 window.SceneEdits.RepairLane(section);
             }
 
             ImGui.SameLine();
-            if (Button("Delete ring", editor ?? ring.DeleteUnavailable,
-                    "Deletes this ring, as the Delete key does. Its neighbors link to each other."))
+            if (Button("Delete ring", editor ?? ring.DeleteUnavailable, DeleteTip))
             {
                 window.SceneEdits.Delete(section);
             }

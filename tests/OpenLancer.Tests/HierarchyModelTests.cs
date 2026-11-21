@@ -437,6 +437,31 @@ public sealed class HierarchyModelTests
         Assert.True(after.IsOpen(Group(after, "stations")));
     }
 
+    /// <summary>
+    /// A new jump gate and the rings of a new lane show as rows in the next tree of the open system: the scene builds
+    /// their items at once (milestone C3), and the tree of the new index has the gate in the gates and the lane as one
+    /// node with its rings in lane order. The open groups stay.
+    /// </summary>
+    [Fact]
+    public void ANewGateAndTheRingsOfANewLaneShowAtOnce()
+    {
+        var system = System();
+        var model = HierarchyModel.For(new SystemIndex(system, system), 1, IdText, null);
+        model.SetOpen(Group(model, "lanes"), true);
+
+        var gate = Object("gate_new", ArchetypeType.jump_gate, 4);
+        gate.Dock = new DockAction { Kind = DockKinds.Jump, Target = "li02", Exit = "gate_back" };
+        system.Objects.AddRange([gate, Ring("new_1", "new_2", null, 2), Ring("new_2", "new_3", "new_1"),
+            Ring("new_3", null, "new_2", 3)]);
+        var after = HierarchyModel.For(new SystemIndex(system, system), 1, IdText, model);
+
+        Assert.Contains(after.NodeOf(gate)!, Group(after, "gates").Children);
+        var lanes = Group(after, "lanes").Children;
+        Assert.Equal(2, lanes.Count);
+        Assert.Contains(lanes, lane => lane.Children.Select(c => c.Detail).SequenceEqual(["new_1", "new_2", "new_3"]));
+        Assert.True(after.IsOpen(Group(after, "lanes")));
+    }
+
     /// <summary>The plain tree of ForList: a node without a search text matches its name and its detail as before. A
     /// node with a search text also matches a word of that text. A "t:" word matches nothing, and a new tree with the
     /// same identity keeps the open groups (section 4.4 of the cutscene categories design).</summary>
