@@ -229,15 +229,19 @@ public sealed class AgentLaneToolTests
     }
 
     /// <summary>trade_lane_repair writes a missing link again and gives the rings in order. A second repair finds good
-    /// links and gives no_change.</summary>
+    /// links and gives no_change. A call with the revision before the repair gives stale_revision.</summary>
     [Fact]
     public void TradeLaneRepairWritesTheLinksAgainAndASecondRepairChangesNothing()
     {
         var (ws, session, host) = Lanes(BrokenLink);
         using var _ = ws;
+        var before = (string)Ok(host, "get_trade_lane", """{ "ring": "obj:Li01_Trade_Lane_Ring_1" }""")["rev"]!;
 
         var result = Ok(host, "trade_lane_repair", """{ "ring": "obj:Li01_Trade_Lane_Ring_1" }""");
         var again = Ok(host, "trade_lane_repair", """{ "ring": "obj:Li01_Trade_Lane_Ring_3" }""");
+        var stale = Failure(host, "trade_lane_repair", $$"""{ "ring": "obj:Li01_Trade_Lane_Ring_3", "if_revision": "{{before}}" }""");
+
+        Assert.Equal("stale_revision", (string?)stale["code"]);
 
         string[] rings = [.. Enumerable.Range(1, 4).Select(n => $"obj:Li01_Trade_Lane_Ring_{n}")];
         Assert.Equal(rings, Texts(result["rings"]));
