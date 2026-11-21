@@ -307,8 +307,8 @@ Play in the game then does these steps:
 
 1. It checks each mod of the profile. A tier-2 mod, or a mod whose `mod.json` does not name the target of the game, stops Play.
 2. It saves the active mod and waits for the validation of the save. Validation errors stop Play. When the validation cannot run, Play goes on with a warning.
-3. It merges all mods of the profile on the files of the game, with the rules of the retail game. The format checks of the export and the content checks of the retail game run on the result. See "Export" and "Content checks of the retail game" in [MOD_FORMAT.md](MOD_FORMAT.md). Errors stop Play, and the Console lists them.
-4. It makes the play copy of the game when it does not exist. The first make takes some seconds. Then it installs the merged files into the play copy. An install writes only the files that changed.
+3. It merges all mods of the profile on the files of the game, with the rules of the retail game. When the mods change the routes between the systems, the merge also makes the three route tables of the game. The format checks of the export and the content checks of the retail game run on the result. See "Export", "Route tables" and "Content checks of the retail game" in [MOD_FORMAT.md](MOD_FORMAT.md). Errors stop Play, and the Console lists them.
+4. It makes the play copy of the game when it does not exist. The first make takes some seconds. Then it installs the merged files and the route tables into the play copy. An install writes only the files that changed.
 5. It starts the game program of the play copy, with the program folder of the play copy as its working folder.
 
 The Console then says, for example, "Play in HD Edition 0.7.1: OpenLancer installed 12 files. The game starts." Start a new game or load a save in the main menu of the game.

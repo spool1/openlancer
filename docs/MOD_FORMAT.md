@@ -1328,7 +1328,7 @@ A boolean line without a value, for example `separable =` of a `[CollisionGroup]
 | `oltool dump <profile.json\|folder> <out.json>` | Write a sorted JSON dump of the data that the engine resolves. |
 | `oltool thn <profile.json\|folder> <install path>` | Print a cutscene script (`.thn`) as canonical Lua text. The script comes from the merged view, so the text shows the changes of the mods. |
 | `oltool thn roundtrip <profile.json\|folder> [<install path>]` | Check the canonical text of each `.thn` file of the source, or of one file. The text must give the same tables, with exact numbers and the same key order, and the text of the result must be the same text. Each problem names the first value that differs. |
-| `oltool validate <profile.json> --target <hde-0.7.1\|vanilla-1.1> [--game <folder>] [--json]` | Merge all mods of the profile on the files of the target game. Report the problems of the format checks and of the content checks of the retail game (see "Content checks of the retail game"). `--game` names the game folder of the target. Without it, the base of the profile must give the target. For HD Edition 0.7.1, the command also lists the changed lines of HD Edition that the mods replace. This needs a profile on Freelancer 1.0 or 1.1. A mod that changes data under `DATA` gets the note "Single player, or a server with the same mod." The command only reads the game folder. |
+| `oltool validate <profile.json> --target <hde-0.7.1\|vanilla-1.1> [--game <folder>] [--json]` | Merge all mods of the profile on the files of the target game. Report the problems of the format checks, of the content checks of the retail game (see "Content checks of the retail game") and of the route tables (see "Route tables"). `--game` names the game folder of the target. Without it, the base of the profile must give the target. For HD Edition 0.7.1, the command also lists the changed lines of HD Edition that the mods replace. This needs a profile on Freelancer 1.0 or 1.1. A mod that changes data under `DATA` gets the note "Single player, or a server with the same mod." The command only reads the game folder. |
 | `oltool export <profile.json> --mod <id> --target <target> [--target <target>]... [--game <folder>]... [--format dropin\|flmm\|all] [--out <folder>] [--checklist] [--flmm-probe] [--same-version]` | Make the packages of one mod for its targets (see "Export"). Repeat `--target` for more targets. `--game` names the game folder of a retail target. Repeat it for each retail target: the export uses each folder for the target of its game. Without it, the base of the profile must give the target. `--format` picks the package forms of a retail target, all by default. `--out` names the exact output folder, `exports\<mod id>\<version>` next to the profiles folder by default. `--checklist` prints the checklist and writes no file. `--flmm-probe` writes only the probe of the FLMM check, which is not for players. The probe does not change `nexus-page.txt`, `CHECKLIST.txt` and the screenshots of the folder. The export records its packages and its checks in the publish history. An export of a version that the history has with other game files exits 1. `--same-version` replaces that version when it does not have the mark "published". The replace needs each target and form of the earlier exports of the version, so give all their targets in one command. A history file that does not load stops the export with exit 2. |
 | `oltool publish <profile.json> --mod <id> [--json]` | Print the publish checklist of a mod: each step with `done` or what is missing, and the recommended items. It reads the publish history, the last checks and the base of the profile, and runs no check. With `--json`, write only one JSON object. Exit 0 when all steps are complete, 1 when a step is missing, 2 when the command cannot run. |
 | `oltool verify-base <folder>` | Check that a folder is the unchanged, read-only retail data. |
@@ -1379,6 +1379,7 @@ A package holds only the files of the mod and the merged files that the mod chan
 - A changed INI file is text. A text file of the game keeps its comments and its other lines. Only the changed lines change. A binary file of the game becomes canonical text.
 - A file whose sections do not change is not in the package, also when its bytes change.
 - A changed cutscene is Lua text. The export writes the number of each THN name that only Librelancer defines, for example `SUBTITLE`. A whole cutscene file of the mod goes into the package as it is.
+- When the mod changes the routes between the systems, a package of a retail target holds the three route tables of the game (see "Route tables").
 - The text of the mod goes into `EXE\ol_<mod id>.dll`. Its index follows the rule of the retail game: 1 plus the number of `DLL` lines in all `[Resources]` sections. A line counts also when its DLL does not exist. On HD Edition 0.7.1 the index is 8, and on the retail game it is 7. The new `DLL` line goes after the last `DLL` line of the last `[Resources]` section.
 - The package leaves out hidden and system files, names that start with `.`, `Thumbs.db`, `desktop.ini`, `*.oltmp`, `*.tmp` and names that end with `~`. The export gives a warning for each.
 
@@ -1389,6 +1390,23 @@ The export refuses these files:
 - A file with the bytes of a file of a build manifest (`data-manifest`).
 
 A whole INI file or cutscene of the mod that replaces a file of the game with changes gives a warning. It undoes the changes of HD Edition and of other mods in that file.
+
+### Route tables
+
+The retail game reads three route tables at its start. `DATA\UNIVERSE\systems_shortest_path.ini` has the routes through all jump connections, `shortest_legal_path.ini` the routes through jump gates, and `shortest_illegal_path.ini` the routes through jump holes. The NPC routes, the mission targets and the routes of the nav map use them. The game makes new tables only when the first file does not open. A drop-in zip cannot delete a file of the game, so the tables must change with the jump connections.
+
+A mod does not hold route tables. OpenLancer makes them when it builds the mods for a retail game: for the drop-in zip, the FLMM package and the play copy of Play in the game (Ctrl+F5).
+
+- The build compares the routes of the merged data with the routes of the game data without mods. When they differ, the build adds the three tables as text files. When they are the same, the build adds no table.
+- The routes can change only when the mods change `universe.ini`, a system file, a solar archetype file or `initialworld.ini`. Else the build does not read the jump connections.
+- The tables follow the rules of the retail game. Each system with an open jump connection gets one section, with the shortest path to each system that it reaches. The first shortest path in the order of the system files wins.
+- A `locked_gate` line of `initialworld.ini` closes its jump gate or jump hole for the tables. An `npc_locked_gate` line has no effect on the tables. An airlock gate counts only in `systems_shortest_path.ini`.
+- The tables come from the data of each target game. HD Edition 0.7.1 locks a jump hole of Ku07, so its tables have no section for Ku07. The route files that HD Edition ships still have that section.
+- A path line longer than 1,023 bytes is an error, because the game reads only the first 1,023 bytes of a line. Use shorter system nicknames, or add a connection that makes the route shorter.
+- When a mod has its own route files, as whole files or as patches, a warning tells it. When the build makes tables, they replace the files of the mod. When the build makes no tables, the files of the mod go to the game as they are, and they can be out of date.
+- The checklist names each table with the counts of its new, shorter, longer and lost routes. It also names each new system that no route of the table reaches.
+- The export of the target OpenLancer makes no tables. OpenLancer Play computes its routes from the jump connections when it loads the game data.
+- An FLMM package holds the tables of the target game with this mod. The connections of another mod are not in them.
 
 ### Format checks
 
@@ -1412,7 +1430,7 @@ The content checks of the retail game also run on each export (see "Content chec
 
 ### Drop-in zip
 
-`<mod id>-<version>-<target>.zip` has the folders `DATA` and `EXE` at its top, with the letter case of the folders of the game, and the README. The player copies the files of the list to a backup folder, then extracts the zip into the game folder. A drop-in zip replaces whole files, so it does not combine with other mods that change the same files.
+`<mod id>-<version>-<target>.zip` has the folders `DATA` and `EXE` at its top, with the letter case of the folders of the game, and the README. The player copies the files of the list to a backup folder, then extracts the zip into the game folder. A drop-in zip replaces whole files, so it does not combine with other mods that change the same files. When the mod changes the routes, the zip holds the three route tables (see "Route tables").
 
 When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod adds, with its place. A player can add these lines to their own file, and keep the options of their installer. Two OpenLancer mods with text do not work together as drop-in zips, because both use the same text index.
 
@@ -1425,6 +1443,7 @@ When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod
 - The text of the mod becomes `GENERATESTRRES("<text>")` and `GENERATEXMLRES("<text>")`. FLMM makes its own text DLL. A text with `"` or with a character outside ASCII refuses the change, because no known FLMM rule can hold it.
 - A change that the operations cannot express puts the whole merged file into the package, with a warning. Examples are a removed line or section, and an anchor that is not unique in the file. A whole file cannot hold the text of the mod, so such a change with text refuses the package.
 - A new whole INI file of the mod with mod text refuses the package, because FLMM reads its text macros only in script operations.
+- The route tables are whole files. The package copies them with no operation and no warning (see "Route tables").
 - A new `[Base]` of `universe.ini` refuses the package. The game needs each `[Base]` before the `[system]` sections (see "universe.ini"), and an `append` puts the section at the end of the file. FLMM has no tested operation that puts a section before the first `[system]` yet.
 - Each refusal names the drop-in zip. The drop-in zip always carries the new content.
 - `oltool export --flmm-probe` writes the text of the mod as it is. The probe is for the FLMM check only. It writes only its package.
