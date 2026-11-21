@@ -438,6 +438,48 @@ public sealed class ListRulesTests
             Assert.Throws<InvalidDataException>(() => ListRules.Parse(With(bad)));
     }
 
+    /// <summary>
+    /// The rule data of a new trade lane: the archetype, the name and the infocard of a ring, the spacing with the retail
+    /// range, the clearance, the lines of a ring, the lane zone, and the loadout and the pilot of each house. Each line is
+    /// a key of the engine schema. A spacing outside the retail range does not load. Nor does a line that the builder
+    /// writes, a ring line of another key, a zone without a width or a house that repeats.
+    /// </summary>
+    [Fact]
+    public void TheLaneBuilderRulesParse()
+    {
+        var lane = Rules.Builders.Lane!;
+
+        Assert.Equal(("Trade_Lane_Ring", 60245, 66170), (lane.Archetype, lane.Name, lane.Infocard));
+        Assert.Equal((7500f, 5165f, 9445f, 2000f), (lane.Spacing, lane.RetailMin, lane.RetailMax, lane.Clearance));
+        Assert.Equal([new BuilderLine("behavior", "NOTHING"), new BuilderLine("difficulty_level", "10")], lane.Lines);
+        Assert.Equal((1000f, 500f), (lane.ZoneMargin, lane.ZoneWidth));
+        Assert.Equal("major_tradelane", lane.Zone.Single(l => l.Key == "pop_type").Value);
+        Assert.Equal(new HouseLoadout("li", "trade_lane_ring_li_01", "pilot_solar_hard"), lane.HouseOf("li_n_grp"));
+        Assert.Equal("trade_lane_ring_co_01", lane.HouseOf("gd_bh_grp")!.Loadout);
+        Assert.Null(lane.HouseOf("fc_x_grp"));
+        Assert.All(lane.Lines, l => Assert.True(Knows("system", "Object", l.Key), l.Key));
+        Assert.All(lane.Zone, l => Assert.True(Knows("system", "zone", l.Key), l.Key));
+
+        string With(string builder) => FilesRules("""{ "files": ".ini" }""", "")[..^1].TrimEnd() +
+                                       $$""", "connectionTypes": ["jump_gate"], "sceneBuilders": { "lane": {{builder}} } }""";
+        const string head = "\"archetype\": \"r\", \"name\": 1, \"infocard\": 2, \"spacing\": 10, \"clearance\": 0";
+        const string zone = "\"zone\": { \"margin\": 0, \"width\": 1 }";
+        Assert.Equal(10f, ListRules.Parse(With($$"""{ {{head}}, "retailRange": [5, 20], {{zone}} }""")).Builders.Lane!.Spacing);
+        foreach (var bad in new[]
+                 {
+                     $$"""{ {{head}}, "retailRange": [11, 20], {{zone}} }""",
+                     $$"""{ {{head}}, "retailRange": [5], {{zone}} }""",
+                     $$"""{ {{head.Replace("\"name\": 1", "\"name\": 0")}}, "retailRange": [5, 20], {{zone}} }""",
+                     $$"""{ {{head.Replace("\"clearance\": 0", "\"clearance\": -1")}}, "retailRange": [5, 20], {{zone}} }""",
+                     $$"""{ {{head}}, "retailRange": [5, 20], "zone": { "margin": 0, "width": 0 } }""",
+                     $$"""{ {{head}}, "retailRange": [5, 20], {{zone}}, "lines": [ { "key": "pilot", "value": "p" } ] }""",
+                     $$"""{ {{head}}, "retailRange": [5, 20], {{zone}}, "lines": [ { "key": "visit", "value": "0" } ] }""",
+                     $$"""{ {{head}}, "retailRange": [5, 20], "zone": { "margin": 0, "width": 1, "lines": [ { "key": "lane_id", "value": "1" } ] } }""",
+                     $$"""{ {{head}}, "retailRange": [5, 20], {{zone}}, "houses": [ { "house": "li", "loadout": "a", "pilot": "b" }, { "house": "LI", "loadout": "a", "pilot": "b" } ] }""",
+                 })
+            Assert.Throws<InvalidDataException>(() => ListRules.Parse(With(bad)));
+    }
+
     [Fact]
     public void FolderAndFileClassParse()
     {

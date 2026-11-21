@@ -564,6 +564,35 @@ public sealed class SystemPlansTests
             s => Assert.NotNull(session.Get(s)));
     }
 
+    /// <summary>
+    /// A delete of a system takes the trade lanes of its file with the file. A ring that goes with its file gets no
+    /// lane part, so its links do not refuse the delete and the delete changes no other ring.
+    /// </summary>
+    [Fact]
+    public void ADeleteOfASystemTakesTheLanesOfItsFile()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        NewSystemWorkspace.CreateAv01(session);
+        var lane = LanePlans.Create(session, "Av01",
+            new TradeLaneEnd { Point = new System.Numerics.Vector3(30000, 0, 0), Name = "Inner" },
+            new TradeLaneEnd { Point = new System.Numerics.Vector3(60000, 0, 0), Name = "Outer" },
+            new LaneOptions { Like = SceneWorkspace.Object("ring1") });
+        Assert.True(lane.CanRun, string.Join("\n", lane.Refusals.Select(r => r.Message)));
+        session.Execute(lane.Command!);
+
+        var plan = SystemPlans.Delete(session, "Av01");
+
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        Assert.Equal([Av01], plan.Deletes.Select(d => d.Section));
+        Assert.Empty(plan.Fixes);
+        session.Execute(plan.Command!);
+        Assert.All([.. lane.Rings, lane.Zone!], s => Assert.Null(session.Get(s)));
+        session.Undo();
+        Assert.All([.. lane.Rings, lane.Zone!], s => Assert.NotNull(session.Get(s)));
+        Assert.Equal(lane.Rings, LanePlans.LaneOf(session, lane.Rings[1])!.Rings);
+    }
+
     /// <summary>A system with a base refuses the delete, because this version has no delete of a base. A system of the
     /// game and a system that does not exist refuse too.</summary>
     [Fact]
