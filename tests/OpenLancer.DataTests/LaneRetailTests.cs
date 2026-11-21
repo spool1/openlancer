@@ -134,7 +134,8 @@ public sealed class LaneRetailTests(ITestOutputHelper output)
                                           view.Lines("prev_ring").Count == 0);
 
     /// <summary>True when the front of each ring of a lane is within the tolerance of the front of the rotation rule.
-    /// The rule gets the direction from the first to the last ring.</summary>
+    /// The rule gets the direction from the first to the last ring. A ring without a <c>rotate</c> line has no rotation,
+    /// as in the engine. One lane of Rh01 has such rings, and it runs along the negative z axis.</summary>
     private static bool Fits(EditSession session, LaneChain lane)
     {
         var first = SceneSections.Position(session.Get(lane.Rings[0])!)!.Value;
@@ -142,11 +143,15 @@ public sealed class LaneRetailTests(ITestOutputHelper output)
         var rule = Front(LanePlans.RotationOf(last - first));
         foreach (var ring in lane.Rings)
         {
-            var rotate = session.Get(ring)!.Lines("rotate").LastOrDefault()?.Values;
-            if (rotate is not { Count: 3 } || !rotate[0].TryToSingle(out var x) || !rotate[1].TryToSingle(out var y) ||
-                !rotate[2].TryToSingle(out var z))
-                return false;
-            var angle = Math.Acos(Math.Clamp(Vector3.Dot(Front(new Vector3(x, y, z)), rule), -1, 1)) * 180 / Math.PI;
+            var degrees = Vector3.Zero;
+            if (session.Get(ring)!.Lines("rotate").LastOrDefault()?.Values is { } rotate)
+            {
+                if (rotate is not { Count: 3 } || !rotate[0].TryToSingle(out var x) || !rotate[1].TryToSingle(out var y) ||
+                    !rotate[2].TryToSingle(out var z))
+                    return false;
+                degrees = new Vector3(x, y, z);
+            }
+            var angle = Math.Acos(Math.Clamp(Vector3.Dot(Front(degrees), rule), -1, 1)) * 180 / Math.PI;
             if (angle > Tolerance)
                 return false;
         }

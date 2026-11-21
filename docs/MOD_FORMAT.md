@@ -676,7 +676,7 @@ loadout = trade_lane_ring_li_01
 pilot = pilot_solar_hard
 ```
 
-- The archetype of a ring has the type `TRADELANE_RING`. The game makes lanes only from rings with that archetype.
+- A ring has the archetype `Trade_Lane_Ring`, of the type `TRADELANE_RING`. The game makes lanes only from objects with that archetype.
 - `next_ring` names the next ring, and `prev_ring` names the ring before. The first ring has no `prev_ring`, and the last ring has no `next_ring`. The links stay in one system file.
 - The two end rings have `tradelane_space_name`. The HUD shows "<first end name> -> <last end name>". When one end has no name, the HUD shows no lane label.
 - The HUD follows the links to the two ends. A chain that goes in a circle makes the game hang.

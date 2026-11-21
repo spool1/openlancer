@@ -424,13 +424,119 @@ public static partial class ScenePlans
         // The link lines of a trade lane that name a ring that goes. The lane parts write most of them again. Each
         // other one refuses the delete.
         var laneLinks = new List<(ListReference Reference, string Name)>();
-        Drain();
+        // When the queue is empty, a lane that keeps one ring or none adds its last ring and its lane zone, and the
+        // loop reads them too.
         var lanes = new Universe.LaneParts(session);
-        while (lanes.Wholes(inSet, queued, goneSet, warnings) is { Count: > 0 } wholes)
+        bool LaneWholes()
         {
-            foreach (var (section, cause) in wholes)
+            foreach (var (section, cause) in lanes.Wholes(inSet, queued, goneSet, warnings))
                 Enqueue(section, DeleteReason.Cascade, cause);
-            Drain();
+            return queue.Count > 0;
+        }
+        while (queue.TryDequeue(out var next) || LaneWholes() && queue.TryDequeue(out next))
+        {
+            var (section, why, cause) = next;
+            if (!inSet.Add(section) || session.Get(section) is not { } view)
+                continue;
+            var isGone = goneSet.Contains(section);
+            if (!isGone && why == DeleteReason.Cascade)
+            {
+                if (NoDelete(session, section, view) is { } connection)
+                {
+                    refusals.Add(Diagnostic.Error(section.Path, $"{section.Id.Key} goes with {cause}, but {connection}") with
+                    {
+                        Target = section,
+                    });
+                    continue;
+                }
+                if (view.ReadOnlyReason is { } reason)
+                {
+                    refusals.Add(Diagnostic.Error(section.Path, partners.TryGetValue(section, out var jump)
+                        ? $"{section.Id.Key} in {SceneSections.FileName(section.Path)} is the partner of {jump}, and a " +
+                          $"jump connection goes as one item. The editor cannot delete {section.Id.Key}: {reason}"
+                        : $"{section.Id} goes with {cause}, but the editor cannot delete it: {reason}") with
+                    {
+                        Target = section,
+                    });
+                    continue;
+                }
+            }
+            if (!isGone)
+                deletes.Add(new PlannedDelete(section, session.ChildCount(section), why, cause));
+            if (Universe.ConnectionPlans.PairParts(session, section, view) is { } pair)
+            {
+                pairEnds.Add(section);
+                if (pair.Partner is { } partner && !queued.Contains(partner))
+                {
+                    partners[partner] = section.Id.Key!;
+                    if (VfsPath.Comparer.Equals(partner.Path, section.Path))
+                        quiet.Add(partner);
+                    Enqueue(partner, DeleteReason.Cascade, pair.PartnerLine);
+                }
+                foreach (var zone in pair.Zones.Where(z => !queued.Contains(z)))
+                {
+                    quiet.Add(zone);
+                    Enqueue(zone, DeleteReason.Cascade, $"traffic zone of {section.Id.Key}");
+                }
+                LockFixes(session, section.Id.Key!, fixes, quietFixes, warnings);
+            }
+            foreach (var (list, name, scope) in NamesOf(session, section))
+            {
+                // Another section that stays still gives the name.
+                if (session.Sections(section.Path).Any(s => !queued.Contains(s) && SceneSections.Is(s.Id.Type, section.Id.Type) &&
+                                                            string.Equals(s.Id.Key, name, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                foreach (var reference in session.Lists.ReferencesTo(list, name, scope))
+                {
+                    if (queued.Contains(reference.Section))
+                        continue;
+                    var referrer = session.Get(reference.Section);
+                    switch (reference.Rule.OnDelete)
+                    {
+                        case DeleteAction.Cascade:
+                            Enqueue(reference.Section, DeleteReason.Cascade, $"{reference.Key} = {name}");
+                            break;
+                        case DeleteAction.Refuse when Universe.LanePlans.IsLink(reference.Key) &&
+                                                      Universe.LanePlans.RingView(session, section) != null:
+                            laneLinks.Add((reference, name));
+                            break;
+                        case DeleteAction.Refuse:
+                            refusals.Add(Diagnostic.Error(reference.Section.Path,
+                                Universe.ConnectionPlans.OneWayRefusal(session, reference.Section, referrer, reference.Key,
+                                    name) ??
+                                $"{reference.Section.Id} names {name} in its '{reference.Key}' line. " +
+                                $"{reference.Rule.ConsequenceText} Remove that line first, or keep {name}.") with
+                            {
+                                Target = reference.Section, Key = reference.Key,
+                            });
+                            break;
+                        case DeleteAction.Clear or DeleteAction.ClearHole when referrer?.ReadOnlyReason is { } reason:
+                            missing.Add(new MissingReference(reference, $"The editor cannot change this line: {reason}",
+                                reference.Rule.Closed));
+                            break;
+                        case DeleteAction.Clear:
+                            if (LineIndex(referrer!, reference.Key, reference.Line) is >= 0 and var at)
+                                AddFix(fixes, reference.Section, at, 1, reference.Key,
+                                    $"{SceneSections.FileName(reference.Section.Path)}: the '{reference.Key}' line of " +
+                                    $"{reference.Section.Id.Key ?? reference.Section.Id.ToString()}");
+                            break;
+                        case DeleteAction.ClearHole:
+                            // A hole of a file with another owner system that has the zone still serves that system. One
+                            // section can name the zone more than one time, and its runs go once.
+                            if (OtherOwnerHasZone(session, reference.Section.Path, section.Path, name) ||
+                                !holes.Add((reference.Section, name.ToLowerInvariant())))
+                                break;
+                            foreach (var (first, count) in ExclusionHoles.Runs(session.WorkingSection(reference.Section)!, name))
+                                AddFix(fixes, reference.Section, first, count, reference.Key,
+                                    $"{SceneSections.FileName(reference.Section.Path)}: the hole of {name} ({count} " +
+                                    (count == 1 ? "line)" : "lines)"));
+                            break;
+                        default:
+                            missing.Add(new MissingReference(reference, reference.Rule.ConsequenceText, reference.Rule.Closed));
+                            break;
+                    }
+                }
+            }
         }
         var relinks = lanes.Relink(inSet, goneSet);
         refusals.AddRange(relinks.Refusals);
@@ -447,115 +553,6 @@ public static partial class ScenePlans
         }
         if (refusals.Count > 0)
             return Refused(plan, refusals.DistinctBy(r => r.Message).ToArray());
-
-        void Drain()
-        {
-            while (queue.TryDequeue(out var next))
-            {
-                var (section, why, cause) = next;
-                if (!inSet.Add(section) || session.Get(section) is not { } view)
-                    continue;
-                var isGone = goneSet.Contains(section);
-                if (!isGone && why == DeleteReason.Cascade)
-                {
-                    if (NoDelete(session, section, view) is { } connection)
-                    {
-                        refusals.Add(Diagnostic.Error(section.Path, $"{section.Id.Key} goes with {cause}, but {connection}") with
-                        {
-                            Target = section,
-                        });
-                        continue;
-                    }
-                    if (view.ReadOnlyReason is { } reason)
-                    {
-                        refusals.Add(Diagnostic.Error(section.Path, partners.TryGetValue(section, out var jump)
-                            ? $"{section.Id.Key} in {SceneSections.FileName(section.Path)} is the partner of {jump}, and a " +
-                              $"jump connection goes as one item. The editor cannot delete {section.Id.Key}: {reason}"
-                            : $"{section.Id} goes with {cause}, but the editor cannot delete it: {reason}") with
-                        {
-                            Target = section,
-                        });
-                        continue;
-                    }
-                }
-                if (!isGone)
-                    deletes.Add(new PlannedDelete(section, session.ChildCount(section), why, cause));
-                if (Universe.ConnectionPlans.PairParts(session, section, view) is { } pair)
-                {
-                    pairEnds.Add(section);
-                    if (pair.Partner is { } partner && !queued.Contains(partner))
-                    {
-                        partners[partner] = section.Id.Key!;
-                        if (VfsPath.Comparer.Equals(partner.Path, section.Path))
-                            quiet.Add(partner);
-                        Enqueue(partner, DeleteReason.Cascade, pair.PartnerLine);
-                    }
-                    foreach (var zone in pair.Zones.Where(z => !queued.Contains(z)))
-                    {
-                        quiet.Add(zone);
-                        Enqueue(zone, DeleteReason.Cascade, $"traffic zone of {section.Id.Key}");
-                    }
-                    LockFixes(session, section.Id.Key!, fixes, quietFixes, warnings);
-                }
-                foreach (var (list, name, scope) in NamesOf(session, section))
-                {
-                    // Another section that stays still gives the name.
-                    if (session.Sections(section.Path).Any(s => !queued.Contains(s) && SceneSections.Is(s.Id.Type, section.Id.Type) &&
-                                                                string.Equals(s.Id.Key, name, StringComparison.OrdinalIgnoreCase)))
-                        continue;
-                    foreach (var reference in session.Lists.ReferencesTo(list, name, scope))
-                    {
-                        if (queued.Contains(reference.Section))
-                            continue;
-                        var referrer = session.Get(reference.Section);
-                        switch (reference.Rule.OnDelete)
-                        {
-                            case DeleteAction.Cascade:
-                                Enqueue(reference.Section, DeleteReason.Cascade, $"{reference.Key} = {name}");
-                                break;
-                            case DeleteAction.Refuse when Universe.LanePlans.IsLink(reference.Key) &&
-                                                          Universe.LanePlans.RingView(session, section) != null:
-                                laneLinks.Add((reference, name));
-                                break;
-                            case DeleteAction.Refuse:
-                                refusals.Add(Diagnostic.Error(reference.Section.Path,
-                                    Universe.ConnectionPlans.OneWayRefusal(session, reference.Section, referrer, reference.Key,
-                                        name) ??
-                                    $"{reference.Section.Id} names {name} in its '{reference.Key}' line. " +
-                                    $"{reference.Rule.ConsequenceText} Remove that line first, or keep {name}.") with
-                                {
-                                    Target = reference.Section, Key = reference.Key,
-                                });
-                                break;
-                            case DeleteAction.Clear or DeleteAction.ClearHole when referrer?.ReadOnlyReason is { } reason:
-                                missing.Add(new MissingReference(reference, $"The editor cannot change this line: {reason}",
-                                    reference.Rule.Closed));
-                                break;
-                            case DeleteAction.Clear:
-                                if (LineIndex(referrer!, reference.Key, reference.Line) is >= 0 and var at)
-                                    AddFix(fixes, reference.Section, at, 1, reference.Key,
-                                        $"{SceneSections.FileName(reference.Section.Path)}: the '{reference.Key}' line of " +
-                                        $"{reference.Section.Id.Key ?? reference.Section.Id.ToString()}");
-                                break;
-                            case DeleteAction.ClearHole:
-                                // A hole of a file with another owner system that has the zone still serves that system. One
-                                // section can name the zone more than one time, and its runs go once.
-                                if (OtherOwnerHasZone(session, reference.Section.Path, section.Path, name) ||
-                                    !holes.Add((reference.Section, name.ToLowerInvariant())))
-                                    break;
-                                foreach (var (first, count) in ExclusionHoles.Runs(session.WorkingSection(reference.Section)!, name))
-                                    AddFix(fixes, reference.Section, first, count, reference.Key,
-                                        $"{SceneSections.FileName(reference.Section.Path)}: the hole of {name} ({count} " +
-                                        (count == 1 ? "line)" : "lines)"));
-                                break;
-                            default:
-                                missing.Add(new MissingReference(reference, reference.Rule.ConsequenceText, reference.Rule.Closed));
-                                break;
-                        }
-                    }
-                }
-            }
-        }
 
         foreach (var end in pairEnds)
             warnings.AddRange(TrafficLeft(session, end, inSet));

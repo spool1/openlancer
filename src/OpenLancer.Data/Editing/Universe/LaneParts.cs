@@ -103,7 +103,6 @@ internal sealed class LaneParts(EditSession session)
                         ? EditCommand.RemoveName(ring, key)
                         : EditCommand.SetLinesFromText(ring, key, [wanted.Id.Key!]));
                     result.Lines.Add((ring, key));
-                    result.Changes.Add(ring);
                     result.Fixes.Add(new PlannedFix(ring, key, wanted == null
                         ? $"{SceneSections.FileName(ring.Path)}: the {key} line of {ring.Id.Key} goes"
                         : $"{SceneSections.FileName(ring.Path)}: the {key} line of {ring.Id.Key} names {wanted.Id.Key}"));
@@ -130,6 +129,7 @@ internal sealed class LaneParts(EditSession session)
                 }
             }
         }
+        // Each section that a command changes has a fix, in the order of the fixes.
         result.Changes.Clear();
         result.Changes.AddRange(result.Fixes.Select(f => f.Section).Distinct());
         return result;
