@@ -149,11 +149,26 @@ internal sealed class FakeFollowView : IFollowView
         return true;
     }
 
+    /// <summary>The new systems that the loaded game data of the test does not have. The Scene shows their save card in
+    /// place of an item.</summary>
+    public System.Collections.Generic.HashSet<string> NewSystems { get; } = new(System.StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Each request to show the save card of a new system.</summary>
+    public System.Collections.Generic.List<string> SaveCards { get; } = [];
+
+    public bool ShowNewSystem(string system)
+    {
+        if (!NewSystems.Contains(system))
+            return false;
+        SaveCards.Add(system);
+        return true;
+    }
+
     public bool ShowInScene(SectionRef section, string system, bool select)
     {
         if (Fails)
             throw new System.InvalidOperationException("The test Scene fails.");
-        if (!CanShow)
+        if (!CanShow || NewSystems.Contains(system))
             return false;
         Shown.Add((section, system, select));
         if (select)

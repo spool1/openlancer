@@ -343,6 +343,58 @@ public sealed class FollowModeTests
         Assert.Equal(SceneWorkspace.Zone("Zone_test_01"), editor.FollowView.Selection);
     }
 
+    /// <summary>
+    /// The Scene opens a new system only after the save and the reload of the game data. So an agent edit in a new system
+    /// shows the save card of the Scene and selects the <c>[system]</c> of the system. A create in the system and a change
+    /// of its sun do the same, also when the user selected another item. A system of the loaded game data still shows its
+    /// item in the Scene.
+    /// </summary>
+    [Fact]
+    public void AnAgentEditInANewSystemShowsTheSaveCardAndSelectsItsSystem()
+    {
+        var (ws, _, editor, host) = Editor(NewSystemWorkspace.Create());
+        using var _ = ws;
+        var view = editor.FollowView;
+        view.NewSystems.Add("Av01");
+        var entry = NewSystemWorkspace.System("Av01");
+
+        Ok(host, "system_create", """{ "nickname": "Av01", "name": "Avalon", "like": "Li02", "map_pos": [4, 5] }""");
+
+        Assert.Equal(["Av01"], view.SaveCards);
+        Assert.Equal(entry, view.Selection);
+        Assert.Empty(view.Shown);
+
+        view.Selection = new FakeSceneItem(Hole);
+        Ok(host, "scene_create_zone",
+            """{ "system": "Av01", "shape": "sphere", "position": [0, 0, 0], "nickname": "Zone_av01_test" }""");
+        Assert.Equal(entry, view.Selection);
+        view.Selection = new FakeSceneItem(Hole);
+        Ok(host, "set_fields", """{ "ref": "obj:Av01_sun", "fields": { "pos": [1, 2, 3] } }""");
+        Assert.Equal(entry, view.Selection);
+        Assert.Equal(["Av01", "Av01", "Av01"], view.SaveCards);
+
+        Ok(host, "set_fields", """{ "ref": "obj:Li01_dock", "fields": { "pos": [1, 2, 3] } }""");
+        Assert.Equal([(Dock, "Li01", false)], view.Shown);
+        Assert.Equal(3, view.SaveCards.Count);
+    }
+
+    /// <summary>With follow mode off, an agent edit in a new system shows no save card and keeps the selection.</summary>
+    [Fact]
+    public void WithFollowModeOffAnEditInANewSystemShowsNoSaveCard()
+    {
+        var (ws, _, editor, host) = Editor(NewSystemWorkspace.Create());
+        using var _ = ws;
+        editor.Follow.Set(false);
+        var view = editor.FollowView;
+        view.NewSystems.Add("Av01");
+        view.Selection = new FakeSceneItem(Hole);
+
+        Ok(host, "system_create", """{ "nickname": "Av01", "name": "Avalon", "like": "Li02", "map_pos": [4, 5] }""");
+
+        Assert.Empty(view.SaveCards);
+        Assert.Equal(new FakeSceneItem(Hole), view.Selection);
+    }
+
     /// <summary>A preview, a question and a refused edit change nothing of the view. Only the refusal adds a Console
     /// entry.</summary>
     [Fact]

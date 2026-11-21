@@ -30,6 +30,14 @@ internal interface IFollowView
     /// <returns>False when the Scene cannot show the item, for example while the game data loads again.</returns>
     bool ShowInScene(SectionRef section, string system, bool select);
 
+    /// <summary>
+    /// Shows the save card of a new system in the Scene, and shows the Scene. A new system is a system that the edit view
+    /// has and the loaded game data does not have yet. The Scene opens it after the save and the reload of the game
+    /// data.
+    /// </summary>
+    /// <returns>False for a system of the loaded game data, or for a system that the edit view does not have.</returns>
+    bool ShowNewSystem(string system);
+
     /// <summary>True while the Mission tab shows a prefab in prefab mode (section 8.6 of the M6b design). Follow mode does
     /// not leave prefab mode, so an agent edit of a mission then shows only in the Console.</summary>
     bool InPrefabMode { get; }
@@ -92,7 +100,8 @@ internal readonly record struct FollowFrame(
 /// selects the cutscene. An item without a place in the Scene, for example a loadout, shows in the Inspector, and the
 /// view does not change. Follow mode does not leave prefab mode, as Unity keeps prefab mode open when the scene changes.
 /// An edit of a mission then shows only in the Console. A camera input, a pan or a zoom of the mission graph, or a
-/// selection of the user stops follow mode until the user turns it on again. With follow mode off, the agent never
+/// selection of the user stops follow mode until the user turns it on again. An edit in a new system that the loaded game
+/// data does not have yet shows the save card of the Scene and selects the <c>[system]</c> of the system. With follow mode off, the agent never
 /// changes the view or the selection. Only a selection of a section that an agent edit removed goes, as after an undo. A
 /// selected item keeps its item when an agent edit renames it or moves its row.
 /// </summary>
@@ -229,9 +238,10 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
 
     /// <summary>
     /// Shows the first item of an edit: in the Cutscene tab for a cutscene or an element of a cutscene, in the Mission
-    /// tab for an item of a mission script, in the Scene for an item of a system, else in the Inspector. An item that the
-    /// Mission tab or the Scene cannot show also shows in the Inspector, for example a section of a ship build file. In
-    /// prefab mode, an item of a mission file does not show.
+    /// tab for an item of a mission script, in the Scene for an item of a system, else in the Inspector. An item of a new
+    /// system that the loaded game data does not have yet shows the save card of the Scene, and the Inspector shows the
+    /// <c>[system]</c> of the system. An item that the Mission tab or the Scene cannot show also shows in the Inspector,
+    /// for example a section of a ship build file. In prefab mode, an item of a mission file does not show.
     /// </summary>
     /// <param name="select">True to select an item of the Cutscene tab, the Scene or the Mission tab. In the Cutscene
     /// tab, the selection is that of all the elements of the cutscene in <paramref name="references"/> (see
@@ -258,10 +268,16 @@ internal sealed class AgentFollow(AgentSettings settings, IFollowView view)
             }
             if (SectionOf(reference) is not { } section)
                 continue;
-            if (session!.IsSystemFile(section.Path) && session.SystemNicknameOf(section.Path) is { } system &&
-                view.ShowInScene(section, system, select))
+            if (session!.IsSystemFile(section.Path) && session.SystemNicknameOf(section.Path) is { } system)
             {
-                return;
+                if (view.ShowInScene(section, system, select))
+                    return;
+                // The Scene opens a new system only after the save, so the Inspector shows its [system].
+                if (view.ShowNewSystem(system) && session.SystemSection(system) is { } entry)
+                {
+                    view.Selection = entry;
+                    return;
+                }
             }
             inspector ??= section;
         }

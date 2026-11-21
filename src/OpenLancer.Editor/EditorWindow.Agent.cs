@@ -162,6 +162,19 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
         return true;
     }
 
+    /// <summary>Follow mode of the agent edits: shows the save card of a new system in the Scene, and shows the
+    /// Scene.</summary>
+    bool IFollowView.ShowNewSystem(string system)
+    {
+        if (!ShowSaveCard(system, null))
+        {
+            return false;
+        }
+
+        ShowPanel(SceneView.PanelId);
+        return true;
+    }
+
     /// <summary>Prefab mode of the Mission tab. Follow mode does not leave it.</summary>
     bool IFollowView.InPrefabMode => Missions.OpenPrefab != null;
 

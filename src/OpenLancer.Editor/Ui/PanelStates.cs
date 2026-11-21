@@ -94,6 +94,45 @@ internal static class PanelStates
     /// </summary>
     public static bool MessageWithLink(EmptyState state) => Lines(state.Message, null, state.Next, true);
 
+    /// <summary>
+    /// Draws the message of an empty state, its next action and a button below them, all centered in the free space. An
+    /// example is the save card of a new system in the Scene. Returns true when the user clicks the button.
+    /// </summary>
+    /// <param name="button">The text of the button.</param>
+    /// <param name="disabled">Why the button cannot run, or null. A reason disables the button, and its tooltip tells
+    /// the reason.</param>
+    public static bool MessageWithButton(EmptyState state, string button, string? disabled)
+    {
+        var gap = MathF.Truncate(LineGap * ImGuiHelper.Scale / 2);
+        var messageSize = ImGui.CalcTextSize(state.Message);
+        ImGui.PushFont(null, EditorTheme.CaptionSize);
+        var nextSize = ImGui.CalcTextSize(state.Next);
+        ImGui.PopFont();
+        var buttonSize = new Vector2(ImGui.CalcTextSize(button).X + 2 * ImGui.GetStyle().FramePadding.X,
+            ImGui.GetFrameHeight());
+        var (start, avail) = (ImGui.GetCursorPos(), ImGui.GetContentRegionAvail());
+        var top = start.Y + MathF.Max(0,
+            MathF.Truncate((avail.Y - messageSize.Y - nextSize.Y - buttonSize.Y - 3 * gap) / 2));
+
+        ImGui.SetCursorPos(new Vector2(Centered(start.X, avail.X, messageSize.X), top));
+        ImGui.TextDisabled(state.Message);
+        var y = top + messageSize.Y + gap;
+        ImGui.PushFont(null, EditorTheme.CaptionSize);
+        ImGui.SetCursorPos(new Vector2(Centered(start.X, avail.X, nextSize.X), y));
+        ImGui.TextDisabled(state.Next);
+        ImGui.PopFont();
+        ImGui.SetCursorPos(new Vector2(Centered(start.X, avail.X, buttonSize.X), y + nextSize.Y + 2 * gap));
+        ImGui.BeginDisabled(disabled != null);
+        var clicked = ImGui.Button(button, buttonSize);
+        ImGui.EndDisabled();
+        if (disabled != null && ImGui.IsItemHovered(ImGuiHoveredFlags.ForTooltip | ImGuiHoveredFlags.AllowWhenDisabled))
+        {
+            ImGui.SetTooltip(disabled);
+        }
+
+        return clicked;
+    }
+
     /// <summary>Draws a message, a reason when there is one, and the next action. The reason and the next action are
     /// in the caption size. The reason is dim, and the next action is a dim hint or a link.</summary>
     private static bool Lines(string message, string? reason, string next, bool isLink)

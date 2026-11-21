@@ -26,7 +26,7 @@ public sealed class EmptyStateTests
 {
     /// <summary>The verbs that start the next action of an empty state.</summary>
     private static readonly HashSet<string> Actions =
-        ["Open", "Select", "Double-click", "Click", "Right-click", "Pick", "Press", "Clear", "Turn", "Read"];
+        ["Open", "Select", "Double-click", "Click", "Right-click", "Pick", "Press", "Clear", "Turn", "Read", "Save"];
 
     /// <summary>Each empty state field of the editor, with the type that holds it.</summary>
     private static List<(Type Owner, string Name, EmptyState State)> States() =>

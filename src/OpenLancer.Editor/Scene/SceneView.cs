@@ -10,6 +10,7 @@ using LibreLancer.Render.Cameras;
 using LibreLancer.World;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Logs;
 using OpenLancer.Editor.Play;
 using OpenLancer.Editor.Ui;
@@ -53,6 +54,9 @@ internal sealed class SceneView : IDisposable
 
     // The section to select when the scene shows its item (see SelectWhenShown), or null.
     private SectionRef? pendingSelection;
+
+    // The new system whose save card shows in place of a system, and the section to select when it opens, or null.
+    private (string System, SectionRef? Select)? saveCard;
     private Vector2 dragStart;
 
     // The scene button was active in the last frame: an orbit, a pan, a fly or a click is in progress.
@@ -103,6 +107,10 @@ internal sealed class SceneView : IDisposable
     ];
 
     public StarSystem? System => stage?.System;
+
+    /// <summary>The new system whose save card the Scene shows, and the section to select when the system opens after
+    /// the save, or null (see <see cref="SaveCard"/>).</summary>
+    public (string System, SectionRef? Select)? SaveCardTarget => saveCard;
 
     /// <summary>The world of the open system, or null when no system is open. The agent renders its images of the open
     /// system with it.</summary>
@@ -275,11 +283,24 @@ internal sealed class SceneView : IDisposable
     }
 
     /// <summary>
-    /// Closes the open system. It also forgets the system list of the game data, because a closed profile closes its
-    /// system.
+    /// Shows the save card of a new system that the loaded game data does not have, in place of the open system (see
+    /// <see cref="SaveCard"/>). The open system closes, as at the open of another system.
+    /// </summary>
+    /// <param name="select">The section of an item of the system to select when the system opens after the save, or
+    /// null.</param>
+    public void ShowSaveCard(string system, SectionRef? select)
+    {
+        Close();
+        saveCard = (system, select);
+    }
+
+    /// <summary>
+    /// Closes the open system or the save card. It also forgets the system list of the game data, because a closed
+    /// profile closes its system.
     /// </summary>
     public void Close()
     {
+        saveCard = null;
         // A drag ends before the scene stops following W, so that W keeps the line of its last frame.
         transform.End();
         stage?.Dispose();
@@ -341,6 +362,12 @@ internal sealed class SceneView : IDisposable
         if (window.Session?.GameData == null)
         {
             PanelStates.NoGameData(window.Session);
+            return;
+        }
+
+        if (saveCard is { } card)
+        {
+            DrawSaveCard(card.System);
             return;
         }
 
@@ -802,6 +829,26 @@ internal sealed class SceneView : IDisposable
 
     /// <summary>Draws the stage of the open system in the draw-list callback of the panel, with the camera, the
     /// selection and the hover of the user.</summary>
+    /// <summary>
+    /// Draws the save card of a new system: the text and the Save button, or a spinner while the game data loads. The
+    /// window opens the system when the loaded game data has it (see <see cref="SaveCard"/>).
+    /// </summary>
+    private void DrawSaveCard(string system)
+    {
+        var session = window.Session!;
+        var loaded = session.GameData?.Items.Systems.Get(system) != null;
+        if (SaveCard.StateOf(session.Edits, system, session.IsBusy, loaded) != SaveCardState.New)
+        {
+            PanelStates.Loading(SaveCard.Reloading);
+            return;
+        }
+
+        if (PanelStates.MessageWithButton(SaveCard.NewSystem, SaveCard.SaveButton, session.NoEditReason))
+        {
+            SaveCommand.Run(window);
+        }
+    }
+
     private void DrawWorld(int x, int y, int width, int height) =>
         stage?.Draw(x, y, width, height,
             new StagePass(camera, sky, window.Settings.ShowZones, window.Selection, hovered, PanelLines: true));

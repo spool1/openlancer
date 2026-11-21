@@ -679,17 +679,25 @@ internal sealed partial class EditorWindow : Game
 
     /// <summary>
     /// Opens a system by its nickname, when the Scene does not show it, and selects a section of it when the Scene shows
-    /// its item. "Go to partner" of a jump connection and the "Go to" of a completeness step use it. A system that the
-    /// loaded game data does not have, for example a new system that the mod has not saved, does not open. The Console
-    /// then tells why.
+    /// its item. "Go to partner" of a jump connection, the "Go to" of a completeness step, the Database and the page of a
+    /// <c>[system]</c> use it. A new system that the mod has not saved shows the save card of the Scene, and its
+    /// <c>[system]</c> gets the selection, as in follow mode of the agent. The Scene opens the system after the save and
+    /// the reload of the game data, and it then selects the section.
     /// </summary>
     /// <param name="select">The section of an item of the system to select, or null.</param>
     public void OpenSystem(string nickname, SectionRef? select)
     {
         if (Session?.GameData?.Items.Systems.Get(nickname) is not { } system)
         {
-            Log.Add(ConsoleSeverity.Info, EditorSource, $"The loaded game data has no system {nickname}. A new system opens " +
-                                                        "in the Scene after the save and the reload of the game data.");
+            if (ShowSaveCard(nickname, select) && Session?.Edits.SystemSection(nickname) is { } entry)
+            {
+                Selection = entry;
+            }
+            else
+            {
+                Log.Add(ConsoleSeverity.Info, EditorSource, $"The game data and the mod have no system {nickname}.");
+            }
+
             return;
         }
 
@@ -701,6 +709,61 @@ internal sealed partial class EditorWindow : Game
         if (select != null && IsSceneSystem(nickname))
         {
             Scene.SelectWhenShown(select);
+        }
+    }
+
+    /// <summary>
+    /// Shows the save card of a new system in the Scene: a system that the edit view has and the loaded game data does
+    /// not have yet (see <see cref="SaveCard"/>). The Console tells it once for each card.
+    /// </summary>
+    /// <param name="select">The section of an item of the system to select when the system opens, or null.</param>
+    /// <returns>False for a system of the loaded game data, or for a system that the edit view does not have.</returns>
+    internal bool ShowSaveCard(string nickname, SectionRef? select)
+    {
+        if (Session is not { GameData: { } data } session || data.Items.Systems.Get(nickname) != null ||
+            session.Edits.SystemSection(nickname) == null)
+        {
+            return false;
+        }
+
+        if (Scene.SaveCardTarget?.System.Equals(nickname, StringComparison.OrdinalIgnoreCase) != true)
+        {
+            Log.Add(ConsoleSeverity.Info, EditorSource,
+                $"The system {nickname} is new. Save the mod to open it in the Scene.");
+        }
+
+        Scene.ShowSaveCard(nickname, select);
+        return true;
+    }
+
+    /// <summary>
+    /// Opens the new system of the save card of the Scene when the game data of a save has it, and selects the section
+    /// that waited for the open. The card closes when the edit view no longer has the system, for example after an undo
+    /// of its create. The open waits until no field edit and no drag runs, as the open after a reload does.
+    /// </summary>
+    private void FollowSaveCard()
+    {
+        if (Scene.SaveCardTarget is not { } card || Session is not { GameData: { } data } session)
+        {
+            return;
+        }
+
+        var system = data.Items.Systems.Get(card.System);
+        switch (SaveCard.StateOf(session.Edits, card.System, session.IsBusy, system != null))
+        {
+            case SaveCardState.Open when !IsEditing && !AssetDrag.IsDragging:
+                Scene.Open(system!, session);
+                if (card.Select != null)
+                {
+                    Scene.SelectWhenShown(card.Select);
+                }
+
+                Log.Add(ConsoleSeverity.Info, EditorSource,
+                    $"Opened the new system {session.ItemName(system)} ({system!.Nickname}) with the game data of the save.");
+                break;
+            case SaveCardState.Gone:
+                Scene.Close();
+                break;
         }
     }
 
@@ -801,6 +864,7 @@ internal sealed partial class EditorWindow : Game
 
         RefreshOnFocus();
         ReopenAfterReload();
+        FollowSaveCard();
         // The marks follow the session of the open profile before an agent call can change it.
         AgentMarks.Track(Session?.Edits);
         AgentFollow.Track(Session?.Edits);
