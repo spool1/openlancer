@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using LibreLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Editing.Universe;
 using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Studio.Agent;
@@ -224,6 +225,40 @@ public sealed class AgentUniverseToolTests
         Assert.Equal("Agent: Create jump gate pair Li03 to Li02", (string?)result["undo_label"]);
     }
 
+    /// <summary>
+    /// The options of connection_create reach the plan. With like, each new gate takes the loadout and the pilot of the
+    /// template gate, also the gate in Li03 of another house. A loadout and a pilot of the call win over the gates of the
+    /// faction, and the tool writes them as their lists spell them. Without a traffic zone, the result and the adds have
+    /// no zone.
+    /// </summary>
+    [Fact]
+    public void ConnectionCreateTakesTheTemplateTheLoadoutThePilotAndNoTrafficZone()
+    {
+        var (ws, session, host) = Universe();
+        using var _ = ws;
+
+        var like = Ok(host, "connection_create", """
+            { "kind": "jump_gate", "from": { "system": "Li01" }, "to": { "system": "Li03" }, "like": "obj:Li02_to_Li01",
+              "preview": true }
+            """);
+        var given = Ok(host, "connection_create", """
+            { "kind": "jump_gate", "from": { "system": "Li02" }, "to": { "system": "Li03" }, "loadout": "JUMPGATE_BR_02",
+              "pilot": "Pilot_Solar_Easiest", "traffic_zone": false }
+            """);
+
+        static (string?, string?) Ends(JsonNode? values) => ((string?)values!["from"], (string?)values["to"]);
+        Assert.Equal(("jumpgate_li_test", "jumpgate_li_test"), Ends(like["loadout"]));
+        Assert.Equal(("pilot_test", "pilot_test"), Ends(like["pilot"]));
+        Assert.Equal(("jumpgate_br_02", "jumpgate_br_02"), Ends(given["loadout"]));
+        Assert.Equal(("pilot_solar_easiest", "pilot_solar_easiest"), Ends(given["pilot"]));
+        var li02 = SceneWorkspace.Li02("Object", "Li02_to_Li03");
+        Assert.Equal(("jumpgate_br_02", "pilot_solar_easiest"), (Line(session, li02, "loadout"), Line(session, li02, "pilot")));
+        Assert.Empty(given["traffic_zones"]!.AsArray());
+        Assert.Equal(["obj:Li02_to_Li03", "obj:Li03_to_Li02"], Texts(given["adds"]));
+        Assert.DoesNotContain(session.Sections(ConnectionWorkspace.Li03Path),
+            s => SceneSections.Is(s.Id.Type, SceneSections.ZoneType));
+    }
+
     /// <summary>A preview of connection_create gives the pair and the patch of each system file that the edit changes,
     /// and changes nothing. A hole pair inside one system gives two ends in one file.</summary>
     [Fact]
@@ -420,6 +455,38 @@ public sealed class AgentUniverseToolTests
         Assert.True((bool)after["systems"]![0]!["reachable"]!);
         var hole = Assert.Single(after["connections"]!.AsArray())!;
         Assert.Equal(("jump_hole", true, "none"), ((string?)hole["kind"], (bool)hole["pair_ok"]!, (string?)hole["locked"]));
+    }
+
+    /// <summary>
+    /// get_universe tells a one-way connection: Li03_gate goes to Li01_to_Li02, but Li01_to_Li02 goes back to its own
+    /// partner, so pair_ok is false. connection_set_lock with pair false sets the player lock of Li01_to_Li02 only, and
+    /// its partner keeps its NPC lock. get_universe then gives the lock player for Li01_to_Li02 and npc for its partner.
+    /// </summary>
+    [Fact]
+    public void GetUniverseTellsAOneWayConnectionAndALockOfOneEnd()
+    {
+        var (ws, session, host) = Universe(setup: w => w.WriteBase(ConnectionWorkspace.Li03Path,
+            ConnectionWorkspace.Li03Text.Replace("archetype = jumpgate",
+                "archetype = jumpgate\ngoto = Li01, Li01_to_Li02, gate_tunnel_bretonia", StringComparison.Ordinal)));
+        using var _ = ws;
+
+        var li03 = Ok(host, "get_universe", """{ "system": "Li03" }""");
+        var locked = Ok(host, "connection_set_lock", """{ "object": "obj:Li01_to_Li02", "locked": "player", "pair": false }""");
+        var all = Ok(host, "get_universe");
+
+        var oneWay = Assert.Single(li03["connections"]!.AsArray())!;
+        Assert.Equal(("obj:Li03_gate", "system:Li01", "obj:Li01_to_Li02", false, "none"),
+            ((string?)oneWay["ref"], (string?)oneWay["to_system"], (string?)oneWay["to_object"], (bool)oneWay["pair_ok"]!,
+                (string?)oneWay["locked"]));
+        Assert.Equal(("applied", "Agent: Lock Li01_to_Li02"), ((string?)locked["status"], (string?)locked["undo_label"]));
+        Assert.Equal([FLHash.CreateID("Li01_to_Li02")], ConnectionWorkspace.LockLines(session, "locked_gate"));
+        Assert.Equal([FLHash.CreateID("Li02_to_Li01")], ConnectionWorkspace.LockLines(session, "npc_locked_gate"));
+        var connections = all["connections"]!.AsArray().ToDictionary(c => (string)c!["ref"]!, c => c!);
+        (string?, bool) LockAndPair(string reference) =>
+            ((string?)connections[reference]["locked"], (bool)connections[reference]["pair_ok"]!);
+        Assert.Equal(("player", true), LockAndPair("obj:Li01_to_Li02"));
+        Assert.Equal(("npc", true), LockAndPair("obj:Li02_to_Li01"));
+        Assert.Equal(("none", false), LockAndPair("obj:Li03_gate"));
     }
 
     /// <summary>
