@@ -9,7 +9,8 @@ using OpenLancer.Editor.Ui;
 namespace OpenLancer.Editor.Inspector;
 
 /// <summary>
-/// The Inspector page of a system object: the components strip, identity, transform, archetype and loadout, docking,
+/// The Inspector page of a system object: the components strip, the completeness panel of a jump gate, a jump hole or a
+/// trade lane ring, identity, transform, archetype and loadout, docking, the jump connection and the trade lane ring,
 /// faction, behaviors, visit flags and appearance, and the lines that name the object. With the section of the object in
 /// W, the rows edit its keys, and the page ends with the keys that no row shows, and the panel adds the raw INI block
 /// (see <see cref="SectionExtras"/>).
@@ -19,12 +20,12 @@ namespace OpenLancer.Editor.Inspector;
 /// of the archetype, do not bind.</remarks>
 internal sealed class SystemObjectPage(EditorWindow window, PropertyGrid grid)
 {
-    private static readonly string[] DockingKeys = ["dock_with", "goto", "next_ring", "prev_ring", "tradelane_space_name"];
     private static readonly string[] LaneKeys = ["next_ring", "prev_ring", "tradelane_space_name"];
     private static readonly string[] AppearanceKeys = ["atmosphere_range", "burn_color", "ambient_color", "ambient", "ring"];
 
     private readonly SectionExtras extras = new(window, grid);
     private readonly ComponentStrip strip = new(window, grid);
+    private readonly ConnectionSections connections = new(window, grid);
     private readonly UsedBySection usedBy = new(window, grid);
     private readonly MissionUsesRows missionRows = new(window, grid);
 
@@ -37,6 +38,7 @@ internal sealed class SystemObjectPage(EditorWindow window, PropertyGrid grid)
         if (section != null)
         {
             strip.Draw(section);
+            connections.Completeness(section);
         }
 
         using (grid.Bind(section))
@@ -44,7 +46,10 @@ internal sealed class SystemObjectPage(EditorWindow window, PropertyGrid grid)
             Identity(obj);
             Transform(obj);
             ArchetypeAndLoadout(obj);
-            Docking(obj);
+            var rows = DockingRows(grid.Layout, obj.Dock);
+            Docking(obj, rows.Base);
+            connections.Jump(obj, section, rows.Jump);
+            connections.Lane(obj, section, rows.Lane);
             FactionAndReputation(obj);
             Behaviors(obj, section);
             Visit(obj);
@@ -142,74 +147,27 @@ internal sealed class SystemObjectPage(EditorWindow window, PropertyGrid grid)
         grid.EndSection();
     }
 
-    /// <summary>
-    /// The dock of the object: the base of a station, the destination of a jump gate or a jump hole, or the lane of a
-    /// trade lane ring.
-    /// </summary>
-    private void Docking(SystemObject obj)
+    /// <summary>The base that the object docks with. The jump connection and the trade lane ring have their own
+    /// sections (see <see cref="ConnectionSections"/>).</summary>
+    /// <param name="show">True when the page shows the section (see <see cref="DockingRows"/>).</param>
+    private void Docking(SystemObject obj, bool show)
     {
-        var dock = obj.Dock;
-        var (showBase, showJump, showLane) = DockingRows(grid.Layout, dock);
-        if (!(showBase || showJump || showLane) ||
-            !grid.BeginSection("SystemObject.Docking", EditorIcons.LifeRing, "Docking"))
+        if (!show || !grid.BeginSection("SystemObject.Docking", EditorIcons.LifeRing, "Docking"))
         {
             return;
         }
 
-        if (dock != null)
-        {
-            grid.Enum("Kind", dock.Kind);
-        }
-
+        var dock = obj.Dock;
         var items = window.Session?.GameData?.Items;
-        if (showBase)
-        {
-            grid.Text("Docks with", dock is { Kind: DockKinds.Base, Target: { } target }
-                ? Named(items?.Bases.Get(target)) ?? target
-                : null, "dock_with");
-        }
-
-        if (showJump)
-        {
-            var target = dock?.Kind == DockKinds.Jump ? dock.Target : null;
-            var system = target == null ? null : items?.Systems.Get(target);
-            if (grid.IsBound)
-            {
-                // One line has the three values.
-                grid.SetNextNote("The destination system, the object where the ship comes out, and the tunnel effect.");
-                grid.Reference("Destination", ObjectKinds.StarSystem, target, Name(system), system, "goto");
-            }
-            else
-            {
-                grid.Reference("Destination system", ObjectKinds.StarSystem, target, Name(system), system, "goto");
-                grid.Text("Exit object", dock?.Exit, "goto");
-                grid.Text("Tunnel effect", dock?.Tunnel, "goto");
-            }
-        }
-
-        if (showLane)
-        {
-            var lane = dock?.Kind == DockKinds.Tradelane ? dock : null;
-            Ring("Next ring", lane?.Target, "next_ring");
-            Ring("Previous ring", lane?.TargetLeft, "prev_ring");
-            grid.Ids("Lane name", obj.TradelaneSpaceName, "tradelane_space_name");
-            if (lane != null)
-            {
-                // The engine gives these names in a walk over the lanes of the system.
-                using (grid.Bind(null))
-                {
-                    grid.Ids("Left name", obj.IdsLeft, "ids_left");
-                    grid.Ids("Right name", obj.IdsRight, "ids_right");
-                }
-            }
-        }
-
+        grid.Text("Docks with", dock is { Kind: DockKinds.Base, Target: { } target }
+            ? Named(items?.Bases.Get(target)) ?? target
+            : null, "dock_with");
         grid.EndSection();
     }
 
     /// <summary>
-    /// The rows of the docking section: the base, the destination and the lane. Without a bound section, the dock of the
-    /// game data decides. In a bound scope, only the lines of the keys decide (see
+    /// The sections of the docks of the object: the base of the docking section, the Jump connection section and the
+    /// Trade lane ring section. Without a bound section, the dock of the game data decides. In a bound scope, only the lines of the keys decide (see
     /// <see cref="PropertyGrid.Shows(bool, string[])"/>), because an edit of <c>dock_with</c> or <c>goto</c> changes
     /// the dock of the scene item at once. A row would then come while the field of its key is open in "More keys",
     /// and that field would end.
@@ -358,13 +316,6 @@ internal sealed class SystemObjectPage(EditorWindow window, PropertyGrid grid)
         }
 
         grid.EndSection();
-    }
-
-    /// <summary>A link to a trade lane ring of the open system.</summary>
-    private void Ring(string label, string? nickname, string iniKey)
-    {
-        var ring = Object(nickname);
-        grid.Reference(label, ObjectKinds.TradeLaneRing, nickname, Name(ring), ring, iniKey);
     }
 
     /// <summary>An object of the open system by nickname, or null.</summary>

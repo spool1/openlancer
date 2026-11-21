@@ -589,7 +589,7 @@ public static class ConnectionPlans
 
     /// <summary>The partner that the last <c>goto</c> line of an object names, or null when its system or its object
     /// does not exist.</summary>
-    private static (SectionRef Section, SectionView View)? PartnerOf(EditSession session, SectionView view)
+    internal static (SectionRef Section, SectionView View)? PartnerOf(EditSession session, SectionView view)
     {
         if (view.Lines("goto").LastOrDefault(l => l.Values.Count > 1) is not { } line ||
             session.SystemPath(line.Values[0].ToString().Trim()) is not { } path)
@@ -609,7 +609,7 @@ public static class ConnectionPlans
         line.Values[1].ToString().Trim().Equals(exit, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>True when the partner goes back to the object of a system.</summary>
-    private static bool GoesBack(EditSession session, SectionView partner, string system, string exit) =>
+    internal static bool GoesBack(EditSession session, SectionView partner, string system, string exit) =>
         GoesTo(partner, system, exit) || session.SystemSection(system) is { Id.Key: { } canonical } &&
         GoesTo(partner, canonical, exit);
 

@@ -5,6 +5,32 @@ using OpenLancer.Data.Editing.Universe;
 
 namespace OpenLancer.Data.Editing.Scene;
 
+/// <summary>The kind of a problem of a trade lane (see <see cref="LaneChecks"/>). The completeness of a lane reads
+/// it.</summary>
+internal enum LaneProblem
+{
+    /// <summary>The links of the lane go in a circle.</summary>
+    Circle,
+
+    /// <summary>A link does not go both ways.</summary>
+    OneWay,
+
+    /// <summary>A link names an object that is not a trade lane ring.</summary>
+    NotRing,
+
+    /// <summary>An end ring has no end name.</summary>
+    NoEndName,
+
+    /// <summary>A ring with an end name is in no lane.</summary>
+    Lone,
+
+    /// <summary>A ring stands inside a zone with damage or inside an object.</summary>
+    Placement,
+
+    /// <summary>A lane zone does not cover its lane.</summary>
+    Zone,
+}
+
 /// <summary>
 /// The checks of the trade lanes: the rings of a system file and their lane zones. One error stops the save: a lane that
 /// goes in a circle, when the active mod writes a link line of a ring of the circle. The game hangs when the HUD reads
@@ -34,7 +60,8 @@ internal static class LaneChecks
             return [];
         return SceneSections.KindOf(session, section) switch
         {
-            SceneKind.Object when LanePlans.IsRingObject(session, section) => Ring(session, section, view, name).ToList(),
+            SceneKind.Object when LanePlans.IsRingObject(session, section) =>
+                Ring(session, section, view, name).Select(p => p.Problem).ToList(),
             SceneKind.Zone => Zone(session, section).Select(p => p.Problem).ToList(),
             _ => [],
         };
@@ -45,15 +72,23 @@ internal static class LaneChecks
     /// cover the lane (see <see cref="Zone"/>). The zone of a lane covers the lane, so it gives no problem. A zone that
     /// misses the lane is not the zone of the lane, so the check reads each zone of the file.
     /// </summary>
-    public static IReadOnlyList<Diagnostic> Lane(EditSession session, LaneChain lane)
+    public static IReadOnlyList<Diagnostic> Lane(EditSession session, LaneChain lane) =>
+        Problems(session, lane).Select(p => p.Problem).ToList();
+
+    /// <summary>The problems of a lane as <see cref="Lane"/> gives them, each with its kind.</summary>
+    public static IReadOnlyList<(LaneProblem Kind, Diagnostic Problem)> Problems(EditSession session, LaneChain lane)
     {
         var rings = lane.Rings.ToHashSet();
         var zones = session.Sections(lane.Path)
             .Where(s => SceneSections.KindOf(session, s) == SceneKind.Zone)
             .SelectMany(z => Zone(session, z))
             .Where(p => p.Lane.Rings.Any(rings.Contains))
-            .Select(p => p.Problem);
-        return lane.Rings.SelectMany(r => Check(session, r)).Concat(zones).ToList();
+            .Select(p => (LaneProblem.Zone, p.Problem));
+        return lane.Rings
+            .SelectMany(r => session.Get(r) is { } view && r.Id.Key is { } name && LanePlans.IsRingObject(session, r)
+                ? Ring(session, r, view, name)
+                : [])
+            .Concat(zones).ToList();
     }
 
     /// <summary>
@@ -74,15 +109,16 @@ internal static class LaneChecks
         }
     }
 
-    /// <summary>The problems of a ring.</summary>
-    private static IEnumerable<Diagnostic> Ring(EditSession session, SectionRef ring, SectionView view, string name)
+    /// <summary>The problems of a ring, each with its kind.</summary>
+    private static IEnumerable<(LaneProblem Kind, Diagnostic Problem)> Ring(EditSession session, SectionRef ring,
+        SectionView view, string name)
     {
         // The walk of the HUD, with the stray links. A ring before a circle gets the problem too, because the walk of
         // the HUD from it goes round the circle.
         var walk = LanePlans.LaneOf(session, ring, strays: true)!;
         if (LanePlans.CircleOf(session, ring) is { } circle)
-            yield return LoopProblem(session, circle, ring, Written(session, ring) ?? circle.Key,
-                Written(session, circle) != null ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning);
+            yield return (LaneProblem.Circle, LoopProblem(session, circle, ring, Written(session, ring) ?? circle.Key,
+                Written(session, circle) != null ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning));
 
         var objects = LanePlans.ObjectsOf(session, ring.Path);
         var links = 0;
@@ -94,30 +130,31 @@ internal static class LaneChecks
             if (!objects.TryGetValue(other, out var target) || session.Get(target) is not { } targetView)
                 continue;
             if (!LanePlans.IsRingObject(session, target))
-                yield return Warning(ring, key,
+                yield return (LaneProblem.NotRing, Warning(ring, key,
                     $"{name} links to {other}, but {other} is not a trade lane ring" +
                     (SceneSections.Last(targetView, "archetype") is { } archetype ? $". Its archetype is {archetype}." : ".") +
-                    $" The game does not count {other} in the lane. {Fix(session, ring)}");
+                    $" The game does not count {other} in the lane. {Fix(session, ring)}"));
             else if (!string.Equals(SceneSections.Last(targetView, back), name, StringComparison.OrdinalIgnoreCase))
-                yield return Warning(ring, key,
+                yield return (LaneProblem.OneWay, Warning(ring, key,
                     $"The rings {name} and {other} do not link both ways. Ships on the lane can stop or go the wrong way. " +
-                    Fix(session, ring));
+                    Fix(session, ring)));
         }
 
         var hasName = SceneSections.Last(view, EndName) != null;
         if (!walk.Loops && walk.Rings.Count > 1 && !hasName && (walk.Rings[0].Equals(ring) || walk.Rings[^1].Equals(ring)))
-            yield return Warning(ring, EndName,
+            yield return (LaneProblem.NoEndName, Warning(ring, EndName,
                 $"The trade lane of {name} has no name at its {(walk.Rings[0].Equals(ring) ? "start" : "end")}. The HUD " +
                 $"shows no lane label. Set the name in the Lane name row of {name}. An agent uses set_text with the field " +
-                $"{EndName}.");
+                $"{EndName}."));
 
         if (links == 0 && hasName &&
             !objects.Values.Any(o => LanePlans.IsRingObject(session, o) && LinksTo(session, o, name)))
-            yield return Warning(ring, EndName, $"{name} is a trade lane ring without a lane. " + Lone(session, ring));
+            yield return (LaneProblem.Lone,
+                Warning(ring, EndName, $"{name} is a trade lane ring without a lane. " + Lone(session, ring)));
 
         if (session.Origin(ring, "pos").Origin == ValueOrigin.ActiveMod && SceneSections.Position(view) is { } at &&
             new LanePlacement(session, ring.Path).Inside(at, ring) is { } inside)
-            yield return LanePlans.PlacementWarning(ring, inside);
+            yield return (LaneProblem.Placement, LanePlans.PlacementWarning(ring, inside));
     }
 
     /// <summary>

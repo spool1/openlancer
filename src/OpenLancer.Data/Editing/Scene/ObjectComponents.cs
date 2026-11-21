@@ -106,10 +106,8 @@ public static class ObjectComponents
                 Add(present, ObjectComponent.DockableStation, view.Lines("dock_with").Count > 0);
                 Add(present, ObjectComponent.BaseObject, view.Lines("base").Count > 0);
                 Add(present, ObjectComponent.FactionMember, view.Lines("reputation").Count > 0);
-                Add(present, ObjectComponent.JumpConnection, view.Lines("goto").Count > 0 ||
-                                                             type is "jump_gate" or "jump_hole" or "jumphole" or "airlock_gate");
-                Add(present, ObjectComponent.TradeLaneRing, view.Lines("prev_ring").Count > 0 ||
-                                                            view.Lines("next_ring").Count > 0 || type == "tradelane_ring");
+                Add(present, ObjectComponent.JumpConnection, HasJumpConnection(view, type));
+                Add(present, ObjectComponent.TradeLaneRing, HasTradeLaneRing(view, type));
                 Add(present, ObjectComponent.PlanetRing, view.Lines("ring").Count > 0);
                 break;
             case SceneKind.Nebula or SceneKind.Asteroids:
@@ -192,6 +190,18 @@ public static class ObjectComponents
     /// </summary>
     public static IReadOnlyList<Diagnostic> Checks(EditSession session, SectionRef section) =>
         ComponentChecks.Check(session, section, onlyActiveMod: false);
+
+    /// <summary>True for an object with the Jump connection component: a <c>goto</c> line, or an archetype of a jump
+    /// type.</summary>
+    /// <param name="type">The <c>[Solar] type</c> of the archetype in lowercase, or null.</param>
+    internal static bool HasJumpConnection(SectionView view, string? type) =>
+        view.Lines("goto").Count > 0 || type is "jump_gate" or "jump_hole" or "jumphole" or "airlock_gate";
+
+    /// <summary>True for an object with the Trade lane ring component: a <c>prev_ring</c> or <c>next_ring</c> line, or
+    /// an archetype of the type <c>tradelane_ring</c>.</summary>
+    /// <param name="type">The <c>[Solar] type</c> of the archetype in lowercase, or null.</param>
+    internal static bool HasTradeLaneRing(SectionView view, string? type) =>
+        view.Lines("prev_ring").Count > 0 || view.Lines("next_ring").Count > 0 || type == "tradelane_ring";
 
     /// <summary>True when the archetype of an object has a <c>docking_sphere</c> line in W.</summary>
     internal static bool HasDockingSphere(EditSession session, SectionView view) =>

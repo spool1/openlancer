@@ -139,20 +139,33 @@ internal static class GateLocks
     /// <paramref name="lower"/>, the call reads the lower layer: the base data with the mods that load before the
     /// active mod.
     /// </summary>
-    public static bool PlayerLocked(EditSession session, string nickname, bool lower = false)
+    public static bool PlayerLocked(EditSession session, string nickname, bool lower = false) =>
+        LockOf(session, nickname, lower) is JumpLock.Player or JumpLock.Both;
+
+    /// <summary>
+    /// The lock of a gate at the start of a new game: the <c>locked_gate</c> and <c>npc_locked_gate</c> lines of the
+    /// files of the role <c>groups</c> that name its nickname by its FLHash. With <paramref name="lower"/>, the call
+    /// reads the lower layer: the base data with the mods that load before the active mod.
+    /// </summary>
+    public static JumpLock LockOf(EditSession session, string nickname, bool lower = false)
     {
         var hash = FLHash.CreateID(nickname);
+        var player = new HashSet<uint>();
+        var npc = new HashSet<uint>();
         foreach (var path in session.DataFiles.Paths(UniverseGraph.LockRole))
         {
             var sections = lower
                 ? session.OpenDocument(path)?.Base ?? []
                 : session.WorkingSections(path) ?? [];
-            var locked = new HashSet<uint>();
-            Read(sections, locked, new HashSet<uint>());
-            if (locked.Contains(hash))
-                return true;
+            Read(sections, player, npc);
         }
-        return false;
+        return (player.Contains(hash), npc.Contains(hash)) switch
+        {
+            (true, true) => JumpLock.Both,
+            (true, false) => JumpLock.Player,
+            (false, true) => JumpLock.Npc,
+            _ => JumpLock.None,
+        };
     }
 
     /// <summary>The hashes that the gate locks of the sections of a file hold: the player locks (<c>locked_gate</c>)

@@ -133,7 +133,7 @@ internal static class ConnectionChecks
     /// The problem of a system file with more than 10 jump objects, on a section, or null. It is an error when the active
     /// mod is a data mod and the file of the lower layer has at most 10 jump objects. Else it is a warning.
     /// </summary>
-    private static Diagnostic? CountProblem(EditSession session, SectionRef target)
+    internal static Diagnostic? CountProblem(EditSession session, SectionRef target)
     {
         var count = JumpObjects(session.WorkingSections(target.Path) ?? []);
         if (count <= MaxJumpObjects)
@@ -171,17 +171,25 @@ internal static class ConnectionChecks
         var back = partnerView.Lines("goto").LastOrDefault(l => l.Values.Count > 1)?.Values;
         if (own == null || back == null || !Same(back[0], own) || !Same(back[1], name))
         {
-            yield return Warning(section, $"{name} goes to {exit} in {system}, but {exit} does not go back. The player " +
-                                          "cannot jump back. To write the missing goto line, use " +
-                                          $"{SceneSections.PairTool} with {name} as one end.");
+            yield return Warning(section, NoReturnText(name, exit, system));
             yield break;
         }
         var other = KindWords(SceneSections.ArchetypeType(session, partnerView));
         if (kind != null && other != null && kind != other)
-            yield return Warning(section, $"{name} is a {kind} and its partner {exit} is a {other}. The game counts each " +
-                                          "end in another route table. Delete one end, and its pair goes too. Then make " +
-                                          $"the pair again with {SceneSections.PairTool}.");
+            yield return Warning(section, KindText(name, kind, exit, other));
     }
+
+    /// <summary>The text of an object whose partner does not go back. The completeness of a jump connection shows it
+    /// too.</summary>
+    internal static string NoReturnText(string name, string exit, string system) =>
+        $"{name} goes to {exit} in {system}, but {exit} does not go back. The player cannot jump back. To write the " +
+        $"missing goto line, use {SceneSections.PairTool} with {name} as one end.";
+
+    /// <summary>The text of an object whose partner is another kind. The completeness of a jump connection shows it
+    /// too.</summary>
+    internal static string KindText(string name, string kind, string exit, string other) =>
+        $"{name} is a {kind} and its partner {exit} is a {other}. The game counts each end in another route table. Delete " +
+        $"one end, and its pair goes too. Then make the pair again with {SceneSections.PairTool}.";
 
     /// <summary>
     /// The warning of a jump object of the active mod near another jump object of its system, or null. The active mod

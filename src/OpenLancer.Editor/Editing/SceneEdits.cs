@@ -10,6 +10,7 @@ using OpenLancer.Data.Editing.Assets;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.Editing.Universe;
 using OpenLancer.Editor.Assets;
 using OpenLancer.Editor.Dialogs;
 using OpenLancer.Editor.Logs;
@@ -439,6 +440,33 @@ internal sealed class SceneEdits(EditorWindow window)
     /// <summary>Removes a component of an object (decision D244). One remove is one entry of the edit history.</summary>
     public void RemoveComponent(SectionRef section, ObjectComponent kind) =>
         window.Commands.Run(edits => SceneCommands.SetComponent(edits, section, kind, null));
+
+    /// <summary>
+    /// Sets the lock of a jump gate or a jump hole at the start of a new game, and of its partner, with the plan of the
+    /// agent tool connection_set_lock (see <see cref="ConnectionPlans.SetLock"/>). The lock dropdown of the Jump
+    /// connection section calls it. One change is one entry of the edit history.
+    /// </summary>
+    public void SetLock(SectionRef gate, JumpLock locked) =>
+        window.Commands.Run(edits => ConnectionPlans.SetLock(edits, gate, locked));
+
+    /// <summary>
+    /// Adds a ring after a ring of a trade lane, with the plan of the agent tool trade_lane_insert_ring (see
+    /// <see cref="LanePlans.InsertRing"/>). The new ring is selected, as a Create selects its item (decision D249). The
+    /// button "Insert ring after" calls it. One insert is one entry of the edit history.
+    /// </summary>
+    public void InsertRingAfter(SectionRef ring)
+    {
+        if (window.Session is not { } session)
+            return;
+        var plan = LanePlans.InsertRing(session.Edits, ring, LanePlace.After);
+        if (window.Commands.Run(plan).Status == EditStatus.Applied && plan.Ring is { } added)
+            window.Scene.SelectWhenShown(added);
+    }
+
+    /// <summary>Writes the links of the lane of a ring again, with the plan of the agent tool trade_lane_repair (see
+    /// <see cref="LanePlans.Repair"/>). The button "Repair lane" and the fix of the completeness panel call it. One repair
+    /// is one entry of the edit history.</summary>
+    public void RepairLane(SectionRef ring) => window.Commands.Run(edits => LanePlans.Repair(edits, ring));
 
     /// <summary>Copies an item with its children (decisions D241 and D262). Unity does not ask, so the warnings go to the
     /// Console.</summary>

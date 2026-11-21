@@ -677,6 +677,33 @@ internal sealed partial class EditorWindow : Game
         Log.Add(ConsoleSeverity.Info, EditorSource, $"Opened system {Session.ItemName(system)} ({system.Nickname}).");
     }
 
+    /// <summary>
+    /// Opens a system by its nickname, when the Scene does not show it, and selects a section of it when the Scene shows
+    /// its item. "Go to partner" of a jump connection and the "Go to" of a completeness step use it. A system that the
+    /// loaded game data does not have, for example a new system that the mod has not saved, does not open. The Console
+    /// then tells why.
+    /// </summary>
+    /// <param name="select">The section of an item of the system to select, or null.</param>
+    public void OpenSystem(string nickname, SectionRef? select)
+    {
+        if (Session?.GameData?.Items.Systems.Get(nickname) is not { } system)
+        {
+            Log.Add(ConsoleSeverity.Info, EditorSource, $"The loaded game data has no system {nickname}. A new system opens " +
+                                                        "in the Scene after the save and the reload of the game data.");
+            return;
+        }
+
+        if (!IsSceneSystem(nickname))
+        {
+            OpenSystem(system);
+        }
+
+        if (select != null && IsSceneSystem(nickname))
+        {
+            Scene.SelectWhenShown(select);
+        }
+    }
+
     private void DataLoaded(EditorSession session, GameDataManager data)
     {
         session.LoadEnded(data);

@@ -24,8 +24,8 @@ internal sealed class ComponentStrip(EditorWindow window, PropertyGrid grid)
         [ObjectComponent.DockableStation] = "SystemObject.Docking",
         [ObjectComponent.BaseObject] = "SystemObject.Identity",
         [ObjectComponent.FactionMember] = "SystemObject.Faction",
-        [ObjectComponent.JumpConnection] = "SystemObject.Docking",
-        [ObjectComponent.TradeLaneRing] = "SystemObject.Docking",
+        [ObjectComponent.JumpConnection] = ConnectionSections.JumpKey,
+        [ObjectComponent.TradeLaneRing] = ConnectionSections.RingKey,
         [ObjectComponent.PlanetRing] = "SystemObject.Appearance",
     };
 
