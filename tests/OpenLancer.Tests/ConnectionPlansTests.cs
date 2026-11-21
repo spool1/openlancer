@@ -480,6 +480,76 @@ public sealed class ConnectionPlansTests
                 ConnectionPlans.NotConnection).Message);
     }
 
+    /// <summary>
+    /// A lock line can already name the nickname of a new end, as six lines of vanilla 1.1 do. The new end then gets
+    /// the lock of the request: a pair without a lock removes the line, and an NPC lock keeps it once. An existing end
+    /// keeps its locks when the request has no lock, and it gets the lock of the request when the request has one.
+    /// </summary>
+    [Fact]
+    public void ALockLineOfANewNicknameFollowsTheRequest()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var newEnd = FLHash.CreateID("Li01_to_Li03_hole");
+        var existing = FLHash.CreateID("Li03_hole");
+        ws.WriteBase(ListWorkspace.GroupsPath,
+            "[Group]\nnickname = li_n_grp\n[Group]\nnickname = li_p_grp\n[Group]\nnickname = br_n_grp\n" +
+            $"[locked_gates]\nnpc_locked_gate = {newEnd}\nlocked_gate = {existing}\n");
+        var session = ws.Session("act");
+        ConnectionPlan Create(JumpLock locked) => Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Hole,
+            new ConnectionEnd("Li01"), new ConnectionEnd("Li03") { Object = "Li03_hole" }, new ConnectionOptions { Lock = locked }));
+
+        var plan = Create(JumpLock.None);
+
+        Assert.Equal(SceneWorkspace.Object("Li01_to_Li03_hole"), plan.Ends[0].Object);
+        Assert.Empty(ConnectionWorkspace.LockLines(session, "npc_locked_gate"));
+        Assert.Equal([existing], ConnectionWorkspace.LockLines(session, "locked_gate"));
+        Assert.Contains(ConnectionWorkspace.Locks, plan.Changes);
+        Assert.Empty(plan.Warnings);
+        session.Undo();
+        Assert.Equal([newEnd], ConnectionWorkspace.LockLines(session, "npc_locked_gate"));
+
+        plan = Create(JumpLock.Npc);
+        Assert.Equal([newEnd, existing], ConnectionWorkspace.LockLines(session, "npc_locked_gate"));
+        Assert.Empty(ConnectionWorkspace.LockLines(session, "locked_gate"));
+        Assert.Empty(plan.Warnings);
+    }
+
+    /// <summary>A new end gets the msg_id_prefix of the system that it goes to, directly after its archetype. The end
+    /// that goes to a system without a prefix gets no such line.</summary>
+    [Fact]
+    public void ANewEndGetsTheMessagePrefixOfTheSystemThatItGoesTo()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.SetLinesFromText(NewSystemWorkspace.System("Li03"), "msg_id_prefix", ["msg_test_li03"]));
+
+        var plan = Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Gate, new ConnectionEnd("Li01"),
+            new ConnectionEnd("Li03")));
+
+        var lines = ConnectionWorkspace.Lines(session, plan.Ends[0].Object);
+        Assert.Equal(("msg_id_prefix", "msg_test_li03"), lines[lines.FindIndex(l => l.Name == "archetype") + 1]);
+        Assert.DoesNotContain(ConnectionWorkspace.Lines(session, plan.Ends[1].Object), l => l.Name == "msg_id_prefix");
+    }
+
+    /// <summary>The lock of a one-way gate does not lock the object that its goto line names, because that object
+    /// does not go back. That object keeps its own pair and its locks.</summary>
+    [Fact]
+    public void TheLockOfAOneWayGateLeavesTheObjectThatItGoesTo()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        var gate = ConnectionWorkspace.Li03("Object", "Li03_gate");
+        session.Execute(EditCommand.SetLinesFromText(gate, "goto", ["Li02, Li02_to_Li01, gate_tunnel_bretonia"]));
+
+        var plan = Run(session, ConnectionPlans.SetLock(session, gate, JumpLock.Player));
+
+        Assert.Equal([FLHash.CreateID("Li01_to_Li02"), FLHash.CreateID("Li03_gate")],
+            ConnectionWorkspace.LockLines(session, "locked_gate"));
+        Assert.Equal([FLHash.CreateID("Li02_to_Li01"), FLHash.CreateID("Li01_to_Li02")],
+            ConnectionWorkspace.LockLines(session, "npc_locked_gate"));
+        Assert.Equal(gate, Assert.Single(plan.Warnings).Target);
+    }
+
     /// <summary>A profile without a <c>[locked_gates]</c> section gets a new one in the gate lock file.</summary>
     [Fact]
     public void ALockWithoutALockSectionAddsTheSection()

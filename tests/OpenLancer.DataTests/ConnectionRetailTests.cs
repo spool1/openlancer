@@ -52,6 +52,49 @@ public sealed class ConnectionRetailTests(ITestOutputHelper output)
         Assert.Empty(problems);
     }
 
+    /// <summary>
+    /// The six NPC locks of vanilla 1.1 that name no object hold the FLHash of the plain nicknames of three hole pairs.
+    /// The system files do not have these holes. A new hole pair with such a nickname gets the lock of the request, so a
+    /// pair without a lock removes the lines of its two ends.
+    /// </summary>
+    [Fact]
+    public void ANewHolePairWithTheNicknameOfAVanillaLockGetsTheLockOfTheRequest()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "olconnect");
+        var session = workspace.Open();
+        var holes = new[]
+        {
+            "Li01_to_Ew01_hole", "Ew01_to_Li01_hole", "Li04_to_Bw05_hole", "Bw05_to_Li04_hole", "Li05_to_St01_hole",
+            "St01_to_Li05_hole",
+        }.Select(FLHash.CreateID).ToList();
+        Assert.Equal(holes.Order(), LocksOfNoObject(session).Order());
+
+        var plan = ConnectionPlans.CreatePair(session, ConnectionKind.Hole, new ConnectionEnd("Li01"), new ConnectionEnd("Ew01"));
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        session.Execute(plan.Command!);
+
+        Assert.Equal(holes.Take(2), plan.Ends.Select(e => FLHash.CreateID(e.Object.Id.Key!)));
+        Assert.Equal(holes.Skip(2).Order(), LocksOfNoObject(session).Order());
+        Assert.Empty(GateLocks.Of(session, "Li01_to_Ew01_hole"));
+        Assert.Empty(plan.Warnings);
+    }
+
+    /// <summary>The hashes of the gate lock lines that name no jump object.</summary>
+    private static List<uint> LocksOfNoObject(EditSession session)
+    {
+        var result = new List<uint>();
+        foreach (var path in session.DataFiles.Paths(UniverseGraph.LockRole))
+        {
+            foreach (var section in session.Sections(path).Where(s => s.Id.Type.Equals("locked_gates", StringComparison.OrdinalIgnoreCase)))
+            {
+                var view = session.Get(section)!;
+                result.AddRange(ConnectionChecks.Check(session, section)
+                    .Select(p => GateLocks.HashOf(view.Entries[p.EntryIndex].Values[0])!.Value));
+            }
+        }
+        return result;
+    }
+
     /// <summary>The infocard of a new jump gate and of a new jump hole is a text of both games.</summary>
     [Fact]
     public void TheInfocardsOfTheRuleDataAreTextsOfBothGames()

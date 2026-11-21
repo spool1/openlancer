@@ -117,7 +117,8 @@ public sealed class ConnectionChecksTests
     }
 
     /// <summary>
-    /// A partner that does not go back gives a warning that names the fix. A pair of two kinds and a goto line on an
+    /// A partner that does not go back gives a warning that names the fix. This is also true for a partner that goes
+    /// back to another object of the same system. A pair of two kinds and a goto line on an
     /// archetype that is no jump give warnings too. A partner that does not exist gives no warning here, because the list
     /// checks report it. The agent check of the item gives the warning.
     /// </summary>
@@ -136,6 +137,10 @@ public sealed class ConnectionChecksTests
             nickname = Li03_mixed
             archetype = jumphole
             goto = Li02, Li02_mixed, gate_tunnel_bretonia
+            [Object]
+            nickname = Li03_other
+            archetype = jumphole
+            goto = Li02, Li02_mixed, gate_tunnel_bretonia
             """);
         ws.WriteBase(ListWorkspace.Li02Path, NewSystemWorkspace.Li02Text +
                                              "\n[Object]\nnickname = Li02_mixed\narchetype = jumpgate\ngoto = Li03, Li03_mixed, t\n");
@@ -146,6 +151,9 @@ public sealed class ConnectionChecksTests
                               "the agent server with Li03_oneway as one end.";
 
         Assert.Equal(oneWay, One(session, Li03("Li03_oneway"), "Li03_oneway goes").Message);
+        // Li02_mixed goes back to Li03, but to another object of Li03.
+        Assert.StartsWith("Li03_other goes to Li02_mixed in Li02, but Li02_mixed does not go back.",
+            One(session, Li03("Li03_other"), "Li03_other goes").Message);
         Assert.Equal("Li03_mixed is a jump hole and its partner Li02_mixed is a jump gate. The game counts each end in another " +
                      "route table. Delete the pair with the agent tool delete_items, and make it again with connection_create.",
             One(session, Li03("Li03_mixed"), "Li03_mixed is").Message);

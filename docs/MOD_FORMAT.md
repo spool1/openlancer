@@ -612,6 +612,7 @@ When OpenLancer makes a jump gate pair or a jump hole pair:
 - A gate gets the local faction of its system as `reputation`. Its loadout and its pilot come from the gates with the same faction. Without such a gate, they come from the rule data for the house of the faction, for example `li` for `li_n_grp`. A gate without a loadout has no lights.
 - Each new end gets a traffic zone, `Zone_<object>_traffic`: a `SPHERE` of 4000 m with `pop_type = jumpgate` or `pop_type = wormhole`. NPCs come and go at the end only when the zone has encounters.
 - An end can name an existing object without a pair. Then OpenLancer writes only the `goto` line of that object. This fixes a one-way object of a lower mod or of a raw edit.
+- Each new end gets the lock that the request asks for. A lock line of `InitialWorld.ini` can already name the nickname of a new end. OpenLancer then keeps or removes that line, as the request asks. An existing end keeps its locks when the request asks for no lock.
 - The new pair is one entry of the edit history, also when it changes two system files, the gate locks and `strings.json`.
 
 The gate locks are in the `[locked_gates]` section of `InitialWorld.ini`:
@@ -637,7 +638,7 @@ The checks of the jump connections:
 | The other end does not name the object in its `goto` line. | Warning | The player cannot jump back. |
 | The two ends of a pair have two kinds. | Warning | The game counts each end in another route table. |
 | An object with `goto` has an archetype that is no jump gate, jump hole or airlock gate. | Warning | The player cannot use the object as a jump. |
-| A gate lock names no jump gate, jump hole or airlock gate. | Warning | The game ignores the line. Vanilla 1.1 has six such lines. |
+| A gate lock names no jump gate, jump hole or airlock gate. | Warning | The game ignores the line. Vanilla 1.1 has six such lines. They name the plain nicknames of three hole pairs that the system files do not have. |
 | The active mod gives a gate a player lock. | Warning | The route tables leave out the gate. |
 
 The count error stops the save of a data mod (tier 1) when the active mod makes the count go above 10. The order error stops the save when the active mod writes the `goto` line. Each other case is a warning. A `goto` line that names a system or an object that does not exist gets the error of the data lists. The Inspector shows the problems in the Jump connection component of the object, and above the sections of `[locked_gates]`. The raw INI block marks the line of each problem. The agent tools `get_item` and `check` give them too.

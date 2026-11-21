@@ -72,7 +72,8 @@ public sealed record ConnectionOptions
     /// <summary>The pilot of a new jump gate, or null as for <see cref="Loadout"/>.</summary>
     public string? Pilot { get; init; }
 
-    /// <summary>The lock of both ends at the start of a new game.</summary>
+    /// <summary>The lock of both ends at the start of a new game. A lock line that already names a new end goes when
+    /// the lock does not ask for it. An existing end keeps its locks when the lock is <see cref="JumpLock.None"/>.</summary>
     public JumpLock Lock { get; init; }
 
     /// <summary>True to add a traffic zone at each new object, where NPCs come and go.</summary>
@@ -359,18 +360,20 @@ public static class ConnectionPlans
         if (problems.Count > 0)
             return plan.Refuse(ends[0].Path, problems[0]);
 
-        var warnings = new List<Diagnostic>();
-        if (options.Lock != JumpLock.None)
-        {
-            var lockEdit = GateLocks.Set(session, [ends[0].Nickname, ends[1].Nickname],
-                options.Lock is JumpLock.Player or JumpLock.Both, options.Lock is JumpLock.Npc or JumpLock.Both, planned);
-            if (lockEdit.Refusal is { } lockProblem)
-                return plan.Refuse("", lockProblem);
-            commands.AddRange(lockEdit.Commands);
-            changes.AddRange(lockEdit.Changes);
-            if (options.Lock is JumpLock.Player or JumpLock.Both)
-                warnings.AddRange(results.Select((r, i) => LockWarning(r.Object, ends[i].View is { IsNew: false })));
-        }
+        // The new ends always get the lock of the request, because a lock line can already hold the FLHash of a new
+        // nickname. Vanilla 1.1 has such lines for three hole pairs that its system files do not have. An existing end
+        // keeps its locks when the request has no lock.
+        var player = options.Lock is JumpLock.Player or JumpLock.Both;
+        var lockEdit = GateLocks.Set(session,
+            ends.Where(e => e.Existing == null || options.Lock != JumpLock.None).Select(e => e.Nickname).ToList(), player,
+            options.Lock is JumpLock.Npc or JumpLock.Both, planned);
+        if (lockEdit.Refusal is { } lockProblem)
+            return plan.Refuse("", lockProblem);
+        commands.AddRange(lockEdit.Commands);
+        changes.AddRange(lockEdit.Changes);
+        var warnings = player
+            ? results.Select((r, i) => LockWarning(r.Object, ends[i].View is { IsNew: false })).ToList()
+            : new List<Diagnostic>();
 
         plan.Ends = results;
         plan.TrafficZones = trafficZones;
@@ -387,8 +390,8 @@ public static class ConnectionPlans
 
     /// <summary>
     /// Plans the locks of a jump gate or a jump hole at the start of a new game, as one entry of the edit history. With
-    /// <paramref name="pair"/>, the partner that its <c>goto</c> line names gets the same locks. A gate of the game or of
-    /// a lower mod works too: the patch of the gate lock file changes.
+    /// <paramref name="pair"/>, the partner that its <c>goto</c> line names gets the same locks, when the partner goes
+    /// back to the gate. A gate of the game or of a lower mod works too: the patch of the gate lock file changes.
     /// </summary>
     /// <remarks>A player lock gives a warning, because the route tables leave out the gate, also after a mission unlocks
     /// it. For a gate of the game or of a lower mod, the warning tells that the story can depend on the lock.</remarks>
@@ -403,7 +406,8 @@ public static class ConnectionPlans
                 NotConnection);
         var gates = new List<SectionRef> { gate };
         if (pair && PartnerOf(session, view) is { } partner &&
-            SceneSections.ArchetypeType(session, partner.View) is "jump_gate" or "jump_hole")
+            SceneSections.ArchetypeType(session, partner.View) is "jump_gate" or "jump_hole" &&
+            session.SystemNicknameOf(gate.Path) is { } system && GoesBack(session, partner.View, system, name))
             gates.Add(partner.Section);
         var player = locked is JumpLock.Player or JumpLock.Both;
         var planned = new PlannedSections(session);
