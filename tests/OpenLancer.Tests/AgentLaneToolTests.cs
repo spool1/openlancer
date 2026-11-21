@@ -126,9 +126,9 @@ public sealed class AgentLaneToolTests
     /// <summary>Each refusal of the lane tools gives its error kind, its detail and its argument, and changes
     /// nothing.</summary>
     [Theory]
-    [InlineData("trade_lane_create", """{ "system": "Li01", "start": [0, 0, 30000], "end": [30000, 0, 30000], "start_name": "a", "end_name": "b", "rings": 101 }""",
+    [InlineData("trade_lane_create", """{ "system": "Li01", "start": [0, 0, 30000], "end": [150000, 0, 30000], "start_name": "a", "end_name": "b", "rings": 101 }""",
         "invalid_value", LanePlans.LaneRings, "rings")]
-    [InlineData("trade_lane_create", """{ "system": "Li01", "start": [0, 0, 30000], "end": [30000, 0, 30000], "start_name": "a", "end_name": "b", "rings": 4294967298 }""",
+    [InlineData("trade_lane_create", """{ "system": "Li01", "start": [0, 0, 30000], "end": [150000, 0, 30000], "start_name": "a", "end_name": "b", "rings": 4294967298 }""",
         "invalid_value", LanePlans.LaneRings, "rings")]
     [InlineData("trade_lane_create", """{ "system": "Li01", "start": [0, 0, 30000], "end": [30000, 0, 30000], "start_name": "a", "end_name": "b", "rings": 1 }""",
         "invalid_argument", ToolInput.BadArgument, "rings")]
@@ -169,6 +169,26 @@ public sealed class AgentLaneToolTests
         Assert.Equal((code, detail, field), ((string?)error["code"], (string?)error["detail"], (string?)error["field"]));
         Assert.Equal(0, session.Revision);
         Assert.False(session.CanUndo);
+    }
+
+    /// <summary>
+    /// The lane of 150000 m of the ring count refusals takes 100 rings, about 1515 m apart. So a count above 100 on
+    /// that lane refuses only for the count, also a count too large for a whole number of 32 bits.
+    /// </summary>
+    [Fact]
+    public void ALongLaneTakesAHundredRings()
+    {
+        var (ws, session, host) = Lanes();
+        using var _ = ws;
+
+        var preview = Ok(host, "trade_lane_create", """
+            { "system": "Li01", "start": [0, 0, 30000], "end": [150000, 0, 30000], "start_name": "a", "end_name": "b",
+              "rings": 100, "preview": true }
+            """);
+
+        Assert.Equal(100, preview["rings"]!.AsArray().Count);
+        Assert.InRange((double)preview["spacing"]!, LanePlans.MinSpacing, LanePlans.MaxSpacing);
+        Assert.Equal(0, session.Revision);
     }
 
     /// <summary>A repair of rings that do not stand on one line refuses with the argument ring. The texts of the
