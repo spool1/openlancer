@@ -132,11 +132,12 @@ public sealed class ScenePlansDeleteTests
 
     /// <summary>
     /// A delete of a jump gate deletes its pair: the partner in the other system file and the gate lock lines of both
-    /// ends. The partner is in another file, so the editor asks. A trade lane ring and an airlock gate still refuse
-    /// the delete, and Unavailable gives the same reason as the plan.
+    /// ends. The partner is in another file, so the editor asks. A delete of a ring of a lane of two rings takes the
+    /// whole lane, and the editor asks. An airlock gate still refuses the delete, and Unavailable gives the same reason
+    /// as the plan.
     /// </summary>
     [Fact]
-    public void AGateGoesWithItsPairAndARingAndAnAirlockGateAreRefused()
+    public void AGateGoesWithItsPairARingTakesItsLaneAndAnAirlockGateIsRefused()
     {
         using var ws = Create();
         ws.WriteBase(ListWorkspace.SolarPath, Solars + "\n[Solar]\nnickname = airlock\ntype = AIRLOCK_GATE\n");
@@ -156,9 +157,11 @@ public sealed class ScenePlansDeleteTests
             "initialworld.ini: the npc_locked_gate line of Li02_to_Li01"], gate.Fixes.Select(f => f.Text).Order());
         Assert.True(gate.NeedsConfirmation);
         Assert.Null(ScenePlans.Unavailable(session, SceneAction.Delete, Object("Li01_to_Li02")));
-        Assert.Equal("ring2 is a trade lane ring. This version cannot delete trade lane rings. Its neighbor rings ring1 " +
-                     "must change with it.", Assert.Single(ring.Refusals).Message);
-        Assert.Equal(Assert.Single(ring.Refusals).Message, ScenePlans.Unavailable(session, SceneAction.Delete, Object("ring2")));
+        Assert.True(ring.CanRun, string.Join("\n", ring.Refusals.Select(r => r.Message)));
+        Assert.Equal([("ring2", DeleteReason.Target, null), ("ring1", DeleteReason.Cascade, "the trade lane of ring2")],
+            ring.Deletes.Select(d => (d.Section.Id.Key!, d.Why, d.Cause)));
+        Assert.True(ring.NeedsConfirmation);
+        Assert.Null(ScenePlans.Unavailable(session, SceneAction.Delete, Object("ring2")));
         Assert.Equal("Li02_airlock is an airlock gate. This version cannot delete airlock gates.",
             Assert.Single(airlock.Refusals).Message);
         Assert.Equal(Assert.Single(airlock.Refusals).Message,
@@ -173,8 +176,9 @@ public sealed class ScenePlansDeleteTests
         Assert.NotNull(session.Get(Li02("Object", "Li02_to_Li01")));
     }
 
+    /// <summary>A ring that goes with its parent takes its lane of two rings, as a delete of the ring does.</summary>
     [Fact]
-    public void AConnectionChildIsRefused()
+    public void AConnectionChildTakesItsLane()
     {
         using var ws = Create();
         var session = ws.Session("act");
@@ -182,7 +186,10 @@ public sealed class ScenePlansDeleteTests
 
         var plan = ScenePlans.Delete(session, [Object("Li01_dock")]);
 
-        Assert.StartsWith("ring1 goes with parent = Li01_dock, but ring1 is a trade lane ring.", Assert.Single(plan.Refusals).Message);
+        Assert.True(plan.CanRun, string.Join("\n", plan.Refusals.Select(r => r.Message)));
+        Assert.Equal([("Li01_dock", DeleteReason.Target, null), ("ring1", DeleteReason.Cascade, "parent = Li01_dock"),
+            ("ring2", DeleteReason.Cascade, "the trade lane of ring1")], plan.Deletes.Select(d => (d.Section.Id.Key!, d.Why, d.Cause)));
+        Assert.True(plan.NeedsConfirmation);
     }
 
     /// <summary>A light of a file whose nickname repeats is read-only, so its delete is refused (review finding R4).</summary>
@@ -710,11 +717,12 @@ public sealed class ScenePlansDuplicateTests
 
     /// <summary>
     /// A copy of a jump gate or a jump hole would have no partner, so Duplicate refuses it and names the tool that makes
-    /// a pair. An airlock gate and a trade lane ring refuse too. The Delete menu takes a gate and a hole, because a
-    /// delete takes the pair, and it refuses an airlock gate and a ring. The menu and the plan give one reason.
+    /// a pair. A copy of a trade lane ring would not be a part of the lane, so Duplicate names the lane tools. An airlock
+    /// gate refuses too. The Delete menu takes a gate and a hole, because a delete takes the pair. It takes a ring,
+    /// because a delete relinks the lane. It refuses an airlock gate. The menu and the plan give one reason.
     /// </summary>
     [Fact]
-    public void ACopyOfAConnectionObjectIsRefusedAndTheDeleteMenuTakesAGateAndAHole()
+    public void ACopyOfAConnectionObjectIsRefusedAndTheDeleteMenuTakesAGateAHoleAndARing()
     {
         using var ws = Create();
         ws.WriteBase(ListWorkspace.SolarPath, Solars + "\n[Solar]\nnickname = jumphole\ntype = JUMP_HOLE\n" +
@@ -735,12 +743,16 @@ public sealed class ScenePlansDuplicateTests
             ScenePlans.Unavailable(session, SceneAction.Duplicate, hole));
         Assert.Equal("Li02_airlock is an airlock gate. This version cannot copy airlock gates.",
             Assert.Single(ScenePlans.Duplicate(session, [airlock]).Refusals).Message);
-        Assert.Equal("ring2 is a trade lane ring. This version cannot copy trade lane rings. Its neighbor rings ring1 " +
-                     "must change with it.", ScenePlans.Unavailable(session, SceneAction.Duplicate, Object("ring2")));
+        Assert.Equal("ring2 is a trade lane ring. This version cannot copy trade lane rings, because a copy is not a part " +
+                     "of the lane. To make a lane or to add a ring to a lane, use the trade lane tools trade_lane_create " +
+                     "and trade_lane_insert_ring of the agent server.",
+            ScenePlans.Unavailable(session, SceneAction.Duplicate, Object("ring2")));
+        Assert.Equal(ScenePlans.Unavailable(session, SceneAction.Duplicate, Object("ring2")),
+            Assert.Single(ScenePlans.Duplicate(session, [Object("ring2")]).Refusals).Message);
         Assert.Null(ScenePlans.Unavailable(session, SceneAction.Delete, gate));
         Assert.Null(ScenePlans.Unavailable(session, SceneAction.Delete, hole));
         Assert.NotNull(ScenePlans.Unavailable(session, SceneAction.Delete, airlock));
-        Assert.NotNull(ScenePlans.Unavailable(session, SceneAction.Delete, Object("ring2")));
+        Assert.Null(ScenePlans.Unavailable(session, SceneAction.Delete, Object("ring2")));
         Assert.Equal([hole], ScenePlans.Delete(session, [hole]).Deletes.Select(d => d.Section));
     }
 }
