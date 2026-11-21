@@ -192,10 +192,10 @@ public sealed class ThnReferenceGateTests
     }
 
     /// <summary>
-    /// The save gate does not start the word index after an edit that keeps each answer of the game data. So the gate
-    /// stays cheap when no change of the active mod breaks an item. The index belongs to one edit view, and a save that
-    /// writes a file makes a new edit view. So the test reads the index after a gate call before the save, and after a
-    /// gate call on the new edit view. The saved patch is then a file of the active mod.
+    /// The save gate does not start the index of the cutscene uses after an edit that keeps each answer of the game
+    /// data. So the gate stays cheap when no change of the active mod breaks an item. The index belongs to one edit
+    /// view, and a save that writes a file makes a new edit view. So the test reads the index after a gate call before
+    /// the save, and after a gate call on the new edit view. The saved patch is then a file of the active mod.
     /// </summary>
     [Fact]
     public void TheSaveGateDoesNotStartTheWordIndexWithoutABrokenItem()
@@ -206,12 +206,12 @@ public sealed class ThnReferenceGateTests
         session.Execute(EditCommand.SetLinesFromText(Ship1, "hit_pts", ["900"]));
 
         Assert.Null(session.GateRefusal());
-        Assert.False(session.Mentions.IsStarted);
+        Assert.False(session.Uses.IsStarted);
         var view = session.EditView;
         AssertSaved(session.Save());
         Assert.NotSame(view, session.EditView);
         Assert.Null(session.GateRefusal());
-        Assert.False(session.Mentions.IsStarted);
+        Assert.False(session.Uses.IsStarted);
     }
 
     /// <summary>
@@ -377,7 +377,7 @@ public sealed class ThnReferenceGateTests
     /// A call that changes only a cutscene reads no other cutscene. The user deleted the costume, so the base script and
     /// the script of a lower mod both have the costume error. An agent edit of the camera of the base script gives no
     /// problem. The base script had the error before the call. The call does not read the script of the lower mod.
-    /// So the call does not start the word index.
+    /// So the call does not start the index of the cutscene uses.
     /// </summary>
     [Fact]
     public void ACutsceneCallAfterABreakGivesNoProblemOfAnotherCutscene()
@@ -402,7 +402,7 @@ public sealed class ThnReferenceGateTests
         Assert.Equal("applied", (string?)result["status"]);
         Assert.Empty(result["new_problems"]!.AsArray());
         Assert.Empty(result["fixed_problems"]!.AsArray());
-        Assert.False(session.Mentions.IsStarted);
+        Assert.False(session.Uses.IsStarted);
         Assert.Equal([ScriptPath, LowScript], session.GateCutscenes());
     }
 

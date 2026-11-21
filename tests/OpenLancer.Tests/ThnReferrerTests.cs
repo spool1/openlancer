@@ -10,16 +10,16 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// The search for the cutscenes that a change of the active mod breaks (#81). It gives the items whose answer the
-/// active mod makes other than Ready, and the cutscenes of the edit view that name such an item. The fixture script
+/// active mod makes other than Ready, and the cutscenes of the edit view that use such an item. The fixture script
 /// names a costume, equipment, an effect and a room that the script of space does not name. The active mod does not
 /// change the script, so only a change of the game data can give the script an error. Each such cutscene is in the
-/// result. A change that keeps each answer gives none, and does not start the word index.
+/// result. A change that keeps each answer gives none, and does not start the index of the cutscene uses.
 /// </summary>
 public sealed class ThnReferrerTests
 {
     /// <summary>A change that keeps each answer of the game data gives no item and no cutscene. It does not start the
-    /// word index. The changes are no edit, a new value of the ship, and a new ship from the template of the
-    /// ship.</summary>
+    /// index of the cutscene uses. The changes are no edit, a new value of the ship, and a new ship from the template
+    /// of the ship.</summary>
     [Fact]
     public void AChangeThatKeepsEachAnswerGivesNoCutsceneAndDoesNotStartTheIndex()
     {
@@ -35,7 +35,7 @@ public sealed class ThnReferrerTests
 
         Assert.Empty(session.BrokenCutsceneItems());
         Assert.Empty(session.ReferrerCutscenes());
-        Assert.False(session.Mentions.IsStarted);
+        Assert.False(session.Uses.IsStarted);
         AssertInvariant(session);
     }
 
@@ -282,8 +282,8 @@ public sealed class ThnReferrerTests
         }
     }
 
-    /// <summary>Two calls at one revision search the referrer errors one time and look up the word index one time. A
-    /// new revision searches again.</summary>
+    /// <summary>Two calls at one revision search the referrer errors one time and look up the index of the cutscene
+    /// uses one time. A new revision searches again.</summary>
     [Fact]
     public void TheResultIsCachedForEachRevision()
     {
@@ -304,8 +304,8 @@ public sealed class ThnReferrerTests
     }
 
     /// <summary>The Problems section of the Cutscene page reads the errors of a cutscene in each frame. So the errors
-    /// of an unchanged script come without the search. The delete of the costume gives the error, and the word index
-    /// does not start.</summary>
+    /// of an unchanged script come without the search. The delete of the costume gives the error, and the index of
+    /// the cutscene uses does not start.</summary>
     [Fact]
     public void TheErrorsOfACutsceneDoNotStartTheSearch()
     {
@@ -318,8 +318,106 @@ public sealed class ThnReferrerTests
                       "is not in the game data. A DEFORMABLE without userprops.Actor needs it."],
             session.CutsceneErrors(ScriptPath).Select(e => e.Message));
         Assert.NotEmpty(session.CutsceneChecks(ScriptPath));
-        Assert.False(session.Mentions.IsStarted);
+        Assert.False(session.Uses.IsStarted);
         Assert.Equal(0, session.ReferrerLookups);
+    }
+
+    private const string WordScript = @"DATA\SCRIPTS\word_trent.thn";
+    private const string JoinedScript = @"DATA\SCRIPTS\joined_trent.thn";
+
+    /// <summary>
+    /// The search reads the index of the cutscene uses (#87), not the words of the files. A script that holds "trent"
+    /// only as a word does not use the costume: the costume of a DEFORMABLE with an Actor, the name of an entity and a
+    /// SOUND. So the search leaves it out, and the gate does not open it. A script that joins the costume from parts
+    /// uses it, and the search finds it. The word index finds the first script and does not find the second one.
+    /// </summary>
+    [Fact]
+    public void TheSearchFindsTheCutscenesThatUseTheItemAndNotTheCutscenesThatHoldItsName()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        ws.WriteBase(WordScript, """
+            duration = 5
+            entities = {
+                { entity_name = "trent", type = DEFORMABLE, template_name = "trent", userprops = { Actor = "trent" } },
+                { entity_name = "Voice", type = SOUND, template_name = "trent" }
+            }
+            events = {}
+            """);
+        ws.WriteBase(JoinedScript, """
+            duration = 5
+            entities = { { entity_name = "Hero", type = DEFORMABLE, template_name = "tr" .. "ent" } }
+            events = {}
+            """);
+        var session = ws.Session("act");
+
+        session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
+
+        Assert.Equal([JoinedScript, ScriptPath], session.ReferrerCutscenes());
+        Assert.Equal([JoinedScript, ScriptPath], session.GateCutscenes().Order(System.StringComparer.OrdinalIgnoreCase));
+        Assert.Equal([WordScript, ScriptPath], session.Mentions.Cutscenes("trent"));
+        Assert.Equal(2, session.GateRefusal()!.Problems.Count);
+        Assert.DoesNotContain(WordScript, session.OpenCutscenes, VfsPath.Comparer);
+        Assert.Contains("\"Hero\"", Assert.Single(session.CutsceneErrors(JoinedScript)).Message);
+        Assert.Empty(session.CutsceneErrors(WordScript));
+        AssertInvariant(session);
+    }
+
+    /// <summary>
+    /// The index reads the files of the edit view, so it does not have an unsaved edit of a cutscene. The gate reads
+    /// each cutscene that the active mod changes too. So an edit that makes the script of space use the deleted costume
+    /// gives the error of that script, also before the save.
+    /// </summary>
+    [Fact]
+    public void AnEditThatMakesACutsceneUseABrokenItemGetsItsErrorBeforeTheSave()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
+        Assert.Equal([ScriptPath], session.ReferrerCutscenes());
+
+        session.Execute(ThnEdits.AddEntity(ThnDataWorkspace.SpaceScript,
+            ThnTemplates.NewEntity("DEFORMABLE", "Pilot", "trent", null, null)));
+
+        Assert.Equal([ScriptPath], session.ReferrerCutscenes());
+        Assert.Contains(ThnDataWorkspace.SpaceScript, session.GateCutscenes(), VfsPath.Comparer);
+        Assert.Contains(session.GateRefusal()!.Problems,
+            p => p.Source.Equals(ThnDataWorkspace.SpaceScript, System.StringComparison.OrdinalIgnoreCase) &&
+                 p.Message.Contains("\"Pilot\"", System.StringComparison.Ordinal));
+        AssertInvariant(session);
+    }
+
+    /// <summary>
+    /// The index keeps the uses of each file by its content hash. The first build runs each script of the edit view. A
+    /// save makes a new edit view, and the session starts the build for it at once. After a save of an INI edit, that
+    /// build runs no script. After a save of a cutscene edit, it runs only the changed script, and the search finds the
+    /// new use of that script.
+    /// </summary>
+    [Fact]
+    public void TheIndexKeepsTheUsesOfEachFileAcrossASave()
+    {
+        using var ws = ThnDataWorkspace.Create();
+        var session = ws.Session("act");
+        var scripts = VfsFiles.Find(session.EditView.CreateFileSystem(), ".thn").Count();
+        Assert.False(session.Uses.IsStarted);
+
+        session.StartCutsceneUses();
+        Assert.Equal(scripts, session.Uses.LastBuild.Runs);
+        Assert.True(session.Uses.IsReady);
+        session.Execute(EditCommand.SetLinesFromText(new SectionRef(@"DATA\SHIPS\shiparch.ini",
+            new SectionIdentity("Ship", "ship1")), "hit_pts", ["900"]));
+        AssertSaved(session.Save());
+
+        Assert.True(session.Uses.IsStarted);
+        Assert.Equal(0, session.Uses.LastBuild.Runs);
+        session.Execute(ThnEdits.AddEntity(ThnDataWorkspace.SpaceScript,
+            ThnTemplates.NewEntity("DEFORMABLE", "Pilot", "trent", null, null)));
+        AssertSaved(session.Save());
+
+        Assert.Equal(1, session.Uses.LastBuild.Runs);
+        session.Execute(EditCommand.DeleteSection(ThnDataWorkspace.Costume("trent")));
+        Assert.Equal([ThnDataWorkspace.SpaceScript, ScriptPath],
+            session.ReferrerCutscenes().Order(System.StringComparer.OrdinalIgnoreCase));
+        AssertInvariant(session);
     }
 
     /// <summary>

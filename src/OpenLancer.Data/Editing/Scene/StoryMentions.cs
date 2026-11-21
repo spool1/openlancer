@@ -75,9 +75,10 @@ internal sealed class StoryMentions(EditSession session)
 
     /// <summary>
     /// The cutscene scripts (<c>.thn</c>) of the edit view that hold a name as a word, without letter case. They are
-    /// install paths in normal form, in path order. Unlike <see cref="Of"/>, the result skips no file. The save gate
-    /// reads it to find the cutscenes that name an item that a change of the active mod breaks. A match in a script is
-    /// not always a use of the item, so the caller checks each script. Waits for the index when its build runs.
+    /// install paths in normal form, in path order. Unlike <see cref="Of"/>, the result skips no file. A rename of an
+    /// item reads it to find the templates that name the item (see <see cref="EditSession.CutscenesThatCanName"/>). A
+    /// match in a script is not always a use of the item, so the caller checks each script. Waits for the index when
+    /// its build runs.
     /// </summary>
     public IReadOnlyList<string> Cutscenes(string name)
     {

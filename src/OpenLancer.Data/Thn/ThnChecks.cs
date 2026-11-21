@@ -176,6 +176,37 @@ public static class ThnChecks
     public static ThnCheckResult Check(string path, ThnTable globals, IThnEvaluator evaluator, IThnGameData? data = null) =>
         new Checker(path, evaluator, data).Run(globals);
 
+    /// <summary>
+    /// The items that the checks of a script ask the game data for (see <see cref="IThnGameData.Item"/>): each kind
+    /// with the template or the clip as the script writes it. The checks ask for an item because of the script only,
+    /// never because of an earlier answer. So the result holds each item that <see cref="Check"/> asks for, with any
+    /// game data. It can hold more, because it also has the items of the entities that a key error stops. The save
+    /// gate reads it to find the cutscenes that use an item that a change of the active mod breaks.
+    /// </summary>
+    /// <remarks>The walk reads only the entities and the START_MOTION events. It runs no key check, so it reads no
+    /// motion path text.</remarks>
+    public static IReadOnlySet<(ThnItemKind Kind, string Template)> ItemUses(ThnTable globals, IThnEvaluator evaluator)
+    {
+        var uses = new ItemRecorder();
+        new Checker("", evaluator, uses).Uses(globals);
+        return uses.Items;
+    }
+
+    /// <summary>The game data of <see cref="ItemUses"/>: it keeps each item that the checks ask for, and it cannot
+    /// tell a state, so the checks find no template problem.</summary>
+    private sealed class ItemRecorder : IThnGameData
+    {
+        public HashSet<(ThnItemKind Kind, string Template)> Items { get; } = [];
+
+        public ThnItemState? Item(ThnItemKind kind, string template)
+        {
+            Items.Add((kind, template));
+            return null;
+        }
+
+        public bool MakesCompounds => true;
+    }
+
     /// <summary>An element of the <c>entities</c> or the <c>events</c> table.</summary>
     /// <param name="Index">The place in the list, from 0, or -1 for an element in the record part of the table.</param>
     /// <param name="Label">The element in a message: the entity name, the event key, or the place.</param>
@@ -206,21 +237,47 @@ public static class ThnChecks
                 if (!EntityReads(entity))
                     broken.Add(entity);
             }
-            // The engine keeps the last entity of each name (ThnScript.cs:107, :132-136), and the scene does not make a
-            // REFERENCE entity (ThnScriptInstance.cs:70-71).
+            var made = Made(entities, broken);
+            foreach (var entity in made.Values)
+                Build(entity);
+            foreach (var ev in events)
+                EventReads(ev, made);
+            return new ThnCheckResult(errors, names);
+        }
+
+        /// <summary>The walk of <see cref="ItemUses"/>: the build of each entity that the scene can make, and the clip
+        /// of each START_MOTION event, as <see cref="Run"/> reads them. It runs no key check, so it also builds an
+        /// entity with a key error.</summary>
+        public void Uses(ThnTable globals)
+        {
+            var entities = Elements(globals, ThnElementKind.Entity, ThnScriptModel.EntitiesGlobal);
+            entityTables = entities.Select(e => e.Table).ToList();
+            foreach (var entity in Made(entities, new HashSet<Element>()).Values)
+                Build(entity);
+            foreach (var ev in Elements(globals, ThnElementKind.Event, ThnScriptModel.EventsGlobal))
+            {
+                // EventReads calls Motion only for a START_MOTION with a table of at least one target.
+                var list = ev.Table.List;
+                if (list.Length > 2 && TryName(list[1], EventGroup, out var type) && type == "START_MOTION" &&
+                    list[2] is ThnTable { List.Length: > 0 } targets)
+                    Motion(ev, targets, list.Length > ThnElementPaths.PropsSlot ? list[ThnElementPaths.PropsSlot] as ThnTable : null);
+            }
+        }
+
+        /// <summary>The entities that the scene makes, by name. The engine keeps the last entity of each name
+        /// (ThnScript.cs:107, :132-136), and the scene does not make a REFERENCE entity (ThnScriptInstance.cs:70-71).
+        /// An entity with a key that stops the engine is not made either.</summary>
+        /// <param name="broken">The entities with a key that stops the engine.</param>
+        private Dictionary<string, Element> Made(List<Element> entities, IReadOnlySet<Element> broken)
+        {
             var named = new Dictionary<string, Element>(StringComparer.OrdinalIgnoreCase);
             foreach (var entity in entities)
             {
                 if (ThnScriptModel.NameOf(entity.Table) is { } name)
                     named[name] = entity;
             }
-            var made = named.Where(n => !broken.Contains(n.Value) && !ThnFlags.IsReference(n.Value.Table, symbols))
+            return named.Where(n => !broken.Contains(n.Value) && !ThnFlags.IsReference(n.Value.Table, symbols))
                 .ToDictionary(n => n.Key, n => n.Value, StringComparer.OrdinalIgnoreCase);
-            foreach (var entity in made.Values)
-                Build(entity);
-            foreach (var ev in events)
-                EventReads(ev, made);
-            return new ThnCheckResult(errors, names);
         }
 
         /// <summary>The elements of a global, in the order of the engine: the list and then the record part

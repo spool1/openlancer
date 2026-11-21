@@ -133,6 +133,8 @@ public sealed class HeadlessHost : AgentHost, IDisposable
         var session = EditSession.OpenReadOnly(profile, modId, DllStringResourceWriter.Instance, ThornEvaluator.Instance,
             AgentTexts.Error("headless_read_only", ("mod", modId)));
         session.Missions.Coverage = EngineCoverage.Instance;
+        // The index of the cutscene uses builds in a worker task, so the first check after a break does not wait.
+        session.StartCutsceneUses();
         return new HeadlessHost(session, AgentTools.ReadOnly, new HeadlessOptions { WritesRecovery = false });
     }
 
@@ -155,6 +157,8 @@ public sealed class HeadlessHost : AgentHost, IDisposable
         try
         {
             session.Missions.Coverage = EngineCoverage.Instance;
+            // The index of the cutscene uses builds in a worker task, so the first check after a break does not wait.
+            session.StartCutsceneUses();
             IReadOnlyList<StudioTool> tools = options.NoSave
                 ? [.. AgentTools.All.Where(t => !SaveTools.Contains(t.Name))]
                 : AgentTools.All;

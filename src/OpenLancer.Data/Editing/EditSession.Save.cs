@@ -204,7 +204,7 @@ public sealed partial class EditSession
     /// have, and each whole cutscene file of the active mod that does not evaluate (decision D137 and section 12.1 of
     /// the M8b design, see <see cref="CutsceneErrors"/>). The game crashes when it plays a cutscene with an error. A
     /// template that names no item of the data lists is a problem too. The gate also checks each cutscene of the edit
-    /// view that names an item that a change of the active mod removes or breaks. This is true also when the active mod
+    /// view that uses an item that a change of the active mod removes or breaks. This is true also when the active mod
     /// does not change the cutscene (see <see cref="CutsceneGateErrors"/>).</item>
     /// </list>
     /// <para>Each list error tells what the game does with the data, for example "The game stops loading with this
@@ -584,6 +584,8 @@ public sealed partial class EditSession
             var before = EditView;
             EditView = BuildEditView(ActiveMod!);
             problems.AddRange(Diagnostic.NewIn(before.Diagnostics, EditView.Diagnostics).Where(IsError));
+            // The index of the cutscene uses follows the new edit view, so the next gate does not wait for it.
+            cutsceneUses?.Follow();
         }
         if (!HasRecovery)
         {

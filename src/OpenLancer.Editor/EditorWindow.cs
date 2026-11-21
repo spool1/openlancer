@@ -514,6 +514,8 @@ internal sealed partial class EditorWindow : Game
             var session = new EditorSession(edits, new GameResourceManager(this, fileSystem), repo, this);
             Session = session;
             edits = null;
+            // The index of the cutscene uses builds in a worker task, so the first save after a break does not wait.
+            session.Edits.StartCutsceneUses();
             Log.Origins = new EngineLineOrigins(session.Edits);
             Log.Add(ConsoleSeverity.Info, EditorSource,
                 $"Opened profile {profile.Name} ({profile.Mods.Count} mods). " +

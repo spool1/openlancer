@@ -626,6 +626,65 @@ public sealed class ThnChecksTests
     public void OnlySomeEquipmentSectionTypesGetAModel(string type, bool motor, ThnItemState state) =>
         Assert.Equal(state, ThnTemplateRules.EquipmentModel(type, motor));
 
+    /// <summary>
+    /// The items of a script for the search of the save gate (#87): each item that the checks ask the game data for.
+    /// The checks ask for the same items with each answer, so an answer never adds an item. These are not items: the
+    /// costume of a DEFORMABLE with an Actor, a SOUND, PlayerShip and PlayerShipEngines, a COMPOUND of a category that
+    /// the engine does not know, an entity that a later entity hides, a REFERENCE entity, and the clip of a COMPOUND.
+    /// An entity with a key that stops the engine is an item, so the result can hold more than the checks ask for.
+    /// </summary>
+    [Fact]
+    public void TheItemUsesHoldEachItemThatTheChecksAskFor()
+    {
+        var globals = Globals("""
+            { entity_name = "Man", type = DEFORMABLE, template_name = "trent" },
+            { entity_name = "Juni", type = DEFORMABLE, template_name = "juni", userprops = { Actor = "Juni" } },
+            { entity_name = "Ship", type = COMPOUND, template_name = "ship1", userprops = { category = "Spaceship" } },
+            { entity_name = "Player", type = COMPOUND, template_name = "PlayerShip", userprops = { category = "ship" } },
+            { entity_name = "Box", type = COMPOUND, template_name = "box1", userprops = { category = "box" } },
+            { entity_name = "Ref", type = COMPOUND, flags = REFERENCE, template_name = "ref1", userprops = { category = "ship" } },
+            { entity_name = "Fx", type = PSYS, template_name = "fx1" },
+            { entity_name = "Engines", type = PSYS, template_name = "PlayerShipEngines" },
+            { entity_name = "Voice", type = SOUND, template_name = "voice1" },
+            { entity_name = "Twin", type = PSYS, template_name = "hidden_fx" },
+            { entity_name = "Twin", type = MARKER },
+            { entity_name = "Lamp", type = PSYS, template_name = "lamp_fx", lightprops = { type = L_POINT } }
+            """, """
+            { 1, START_MOTION, { "Man" }, { animation = "Sc_walk", duration = 1 } },
+            { 1, START_MOTION, { "Ship" }, { animation = "Sc_open", duration = 1 } }
+            """);
+
+        var uses = ThnChecks.ItemUses(globals, Evaluator);
+
+        (ThnItemKind, string)[] asked =
+        [
+            (ThnItemKind.Costume, "trent"), (ThnItemKind.Ship, "ship1"), (ThnItemKind.Effect, "fx1"),
+            (ThnItemKind.Animation, "Sc_walk"),
+        ];
+        Assert.Equal(asked.Append((ThnItemKind.Effect, "lamp_fx")).Order(), uses.Order());
+        foreach (var state in new ThnItemState?[] { ThnItemState.Missing, ThnItemState.NoModel, ThnItemState.Ready, null })
+        {
+            var data = new AskedData(state);
+            ThnChecks.Check(Script, globals, Evaluator, data);
+            Assert.Equal(asked.Order(), data.Items.Order());
+        }
+    }
+
+    /// <summary>The game data of a test that keeps each item that the checks ask for, and gives one answer to
+    /// each.</summary>
+    private sealed class AskedData(ThnItemState? state) : IThnGameData
+    {
+        public HashSet<(ThnItemKind, string)> Items { get; } = [];
+
+        public bool MakesCompounds => true;
+
+        public ThnItemState? Item(ThnItemKind kind, string template)
+        {
+            Items.Add((kind, template));
+            return state;
+        }
+    }
+
     /// <summary>The game data around a script: each listed item has its state, and each other item is missing.</summary>
     private sealed class FakeData(params (ThnItemKind Kind, string Name, ThnItemState State)[] items) : IThnGameData
     {

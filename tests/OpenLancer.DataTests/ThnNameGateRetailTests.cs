@@ -129,11 +129,16 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
     /// oracle, and each error names the costume.
     /// </summary>
     /// <remarks>
-    /// The first gate call includes the build of the word index and the check of each cutscene that the search finds.
-    /// Measured on 2026-11-19: 19 cutscenes load the costume, and the search finds 851 cutscenes in each game. Most of
-    /// them name the costume on a DEFORMABLE with <c>userprops.Actor</c>, which does not load it. The first call took
-    /// 4.5 to 4.6 s for the retail game and 5.0 to 5.1 s for HD Edition. The second call took 6 ms. The budget is about
-    /// two times the measured time, and at most 10 s.
+    /// <para>The search reads the index of the cutscene uses (#87). The hosts start its build when a profile opens, so
+    /// the test measures the gate after the build. Before #87, the gate searched the words of the files: it found 851
+    /// cutscenes in each game, and the first call took 4.5 to 5.1 s. Most of these cutscenes name the costume on a
+    /// DEFORMABLE with <c>userprops.Actor</c>, which does not load it.</para>
+    /// <para>Measured on 2026-11-21: the build ran 1,497 scripts of the retail game and 1,515 scripts of HD Edition, in
+    /// 1.7 to 2.2 s. In each game, the search finds the 19 cutscenes that load the costume. The cutscene part of the
+    /// first call took 0.3 to 0.4 s: the broken items, the search, and the open and the check of the 19 cutscenes. The
+    /// other parts took about 0.65 s. Most of it is the check of each mission script, because the mod removes a name of
+    /// the game data (decision D81). The second call took 4 ms. The budget of the cutscene part is 1 s, and the budget
+    /// of the whole first call is 2 s.</para>
     /// </remarks>
     [Fact]
     [Trait(Timing.Category, Timing.Performance)]
@@ -177,7 +182,7 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
         CheckARenamedShip(GameDataPaths.RequireHde(), "m8drenamehde");
 
     /// <summary>A patch that changes a value of each retail ship and each costume keeps each answer of the game data. So
-    /// the save gate adds no cutscene error, opens no cutscene and does not start the word index.</summary>
+    /// the save gate adds no cutscene error, opens no cutscene and does not start the index of the cutscene uses.</summary>
     [Fact]
     public void APatchThatKeepsEachAnswerOfTheRetailDataOpensNoCutscene() =>
         CheckAPatchThatKeepsEachAnswer(GameDataPaths.RequireBase(), "m8dsame");
@@ -195,21 +200,36 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
         WritePatch(workspace, section.Path, $"[{section.Id.Type}]\nnickname = {costume}\nol.delete = true\n");
         reader.Dispose();
         var session = workspace.Open();
+        // The hosts start the index when the profile opens, so the first save comes after its build.
+        session.StartCutsceneUses();
+        var build = session.Uses.LastBuild;
 
+        // The cutscene part of the first gate call: the broken items, the search and the check of each cutscene that
+        // it finds. Then the other parts of the gate, which do not depend on the cutscenes.
+        var cutscenes = Timing.Measure(() =>
+        {
+            foreach (var path in session.GateCutscenes())
+                session.CutsceneErrors(path);
+        });
         SaveResult? refusal = null;
-        var first = Timing.Measure(() => refusal = session.GateRefusal());
+        var rest = Timing.Measure(() => refusal = session.GateRefusal());
+        var first = cutscenes + rest;
         Assert.NotNull(refusal);
         var gate = CutsceneErrors(refusal.Problems);
         var second = new TimingGates().WarmGate(TimeSpan.FromMilliseconds(100), 3, () => session.GateRefusal());
-        output.WriteLine($"The costume \"{costume}\" of {scripts} scripts: the search finds " +
-                         $"{session.ReferrerCutscenes().Count} cutscenes, {gate.Count} gate errors in " +
-                         $"{gate.Select(e => e.Source).Distinct().Count()} cutscenes, first gate call " +
-                         $"{first.TotalSeconds:0.00} s, second {second.TotalMilliseconds:0} ms.");
+        output.WriteLine($"The costume \"{costume}\" of {scripts} scripts: the index ran {build.Runs} scripts in " +
+                         $"{build.Time.TotalSeconds:0.00} s. The search finds {session.ReferrerCutscenes().Count} " +
+                         $"cutscenes, the word index {session.Mentions.Cutscenes(costume).Count}. {gate.Count} gate " +
+                         $"errors in {gate.Select(e => e.Source).Distinct().Count()} cutscenes. First gate call " +
+                         $"{first.TotalSeconds:0.00} s: the cutscene part {cutscenes.TotalSeconds:0.00} s, the other parts " +
+                         $"{rest.TotalSeconds:0.00} s. Second gate call {second.TotalMilliseconds:0} ms.");
 
         Assert.Equal(Oracle(session), gate.Order());
         Assert.True(gate.Select(e => e.Source).Distinct().Count() >= 2);
         Assert.All(gate, e => Assert.Contains($"\"{costume}\"", e.Message));
-        Assert.True(first < TimeSpan.FromSeconds(10), $"The first gate call took {first.TotalSeconds:0.00} s.");
+        Assert.True(cutscenes < TimeSpan.FromSeconds(1),
+            $"The cutscene part of the first gate call took {cutscenes.TotalSeconds:0.00} s.");
+        Assert.True(first < TimeSpan.FromSeconds(2), $"The first gate call took {first.TotalSeconds:0.00} s.");
         Assert.True(second < TimeSpan.FromMilliseconds(100), $"The second gate call took {second.TotalMilliseconds:0} ms.");
     }
 
@@ -309,7 +329,7 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
         Assert.Empty(CutsceneErrors(problems));
         Assert.Empty(session.BrokenCutsceneItems());
         Assert.Empty(session.OpenCutscenes);
-        Assert.False(session.Mentions.IsStarted);
+        Assert.False(session.Uses.IsStarted);
     }
 
     /// <summary>The errors of the save gate that a cutscene gives, as their sources and messages.</summary>
@@ -407,7 +427,11 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
         _ => false,
     };
 
-    /// <summary>Checks each cutscene of a game with the data of a session, as the save gate does.</summary>
+    /// <summary>
+    /// Checks each cutscene of a game with the data of a session, as the save gate does. The index of the cutscene uses
+    /// of the gate must hold each item that a check asks for (see <see cref="ThnChecks.ItemUses"/>), so the test also
+    /// compares the two for each cutscene.
+    /// </summary>
     private (int Files, List<Diagnostic> Errors, List<Diagnostic> NameProblems) CheckEachCutscene(string game, string modId)
     {
         using var workspace = new RetailWorkspace(game, modId);
@@ -416,20 +440,44 @@ public sealed class ThnNameGateRetailTests(ITestOutputHelper output)
         var evaluator = ThornEvaluator.Instance;
         var clock = Stopwatch.StartNew();
         var (files, errors, names) = (0, new List<Diagnostic>(), new List<Diagnostic>());
+        var (asked, missed) = (0, new List<string>());
         foreach (var file in VfsFiles.Find(view, ".thn"))
         {
             files++;
-            var result = ThnChecks.Check(file, evaluator.Evaluate(view.ReadAllBytes(file), file), evaluator,
-                new SessionThnData(session, file));
+            var globals = evaluator.Evaluate(view.ReadAllBytes(file), file);
+            var data = new AskedData(new SessionThnData(session, file));
+            var result = ThnChecks.Check(file, globals, evaluator, data);
             errors.AddRange(result.Errors);
             names.AddRange(result.NameProblems);
+            var uses = ThnChecks.ItemUses(globals, evaluator);
+            asked += data.Items.Count;
+            missed.AddRange(data.Items.Where(i => !uses.Contains(i)).Select(i => $"{file}: {i.Kind} {i.Template}"));
         }
 
         output.WriteLine($"{files} files: {errors.Count} errors and {names.Count} name problems with the data of a session " +
-                         $"in {clock.Elapsed.TotalSeconds:0.0} s.");
+                         $"in {clock.Elapsed.TotalSeconds:0.0} s. The checks asked for {asked} items.");
         foreach (var problem in errors.Concat(names).Take(40))
             output.WriteLine(problem.ToString());
+        Assert.True(asked > 0);
+        Assert.Empty(missed);
         return (files, errors, names);
+    }
+
+    /// <summary>Game data that keeps each item that the checks ask for, and gives the answers of other game
+    /// data.</summary>
+    private sealed class AskedData(IThnGameData data) : IThnGameData
+    {
+        public HashSet<(ThnItemKind Kind, string Template)> Items { get; } = [];
+
+        public bool MakesCompounds => data.MakesCompounds;
+
+        public ThnItemState? Item(ThnItemKind kind, string template)
+        {
+            Items.Add((kind, template));
+            return data.Item(kind, template);
+        }
+
+        public string? Reason(ThnItemKind kind, string template) => data.Reason(kind, template);
     }
 
     /// <summary>The petalDB lists hold the rooms, the props and the carts of the engine, and the asteroid lists

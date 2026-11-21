@@ -41,6 +41,9 @@ public sealed partial class EditSession
     /// them.</summary>
     private (int Revision, IReadOnlyList<string> Paths)? referrerCutscenes;
 
+    /// <summary>The index of the items that the cutscenes of the edit view use, made at the first use.</summary>
+    private CutsceneUses? cutsceneUses;
+
     /// <summary>The install paths of the cutscene scripts that the session opened, in normal form. A new cutscene that
     /// does not exist now, before New cutscene or after an undo of it, is not in the list.</summary>
     public IReadOnlyCollection<string> OpenCutscenes =>
@@ -364,17 +367,19 @@ public sealed partial class EditSession
     }
 
     /// <summary>
-    /// The cutscenes of the edit view that hold the name of an item of <see cref="BrokenCutsceneItems"/> as a word. They
-    /// are install paths in normal form, in path order. A cutscene that the active mod does not change has the same
-    /// script in W and in B. So only an answer that the active mod causes can give it an error (see
-    /// <see cref="CutsceneErrors"/>). The result holds each such cutscene with an error. A match is not always a use of
-    /// the item, so the caller checks each cutscene.
+    /// The cutscenes of the edit view whose checks use an item of <see cref="BrokenCutsceneItems"/>: a template or a
+    /// clip that the checks read, of the same kind of item (see <see cref="ThnChecks.ItemUses"/>). They are install
+    /// paths in normal form, in path order. A cutscene that the active mod does not change has the same script in W and
+    /// in B. So only an answer that the active mod causes can give it an error (see <see cref="CutsceneErrors"/>). The
+    /// result holds each such cutscene with an error. The index compares the names without letter case, so the caller
+    /// checks each cutscene.
     /// </summary>
     /// <remarks>
-    /// <para>The search uses the word index of the story mentions: one build for each edit view, in a worker task. The
-    /// call waits for the build. The session keeps the result for each <see cref="CacheRevision"/>. Without an active
-    /// mod or without a broken item, the result is empty and the call does not start the build.</para>
-    /// <para>The index finds a name only when a file holds it as one word. So it does not find a template that a text
+    /// <para>The search uses the index of the cutscene uses (see <see cref="CutsceneUses"/>): one build for each edit
+    /// view, in a worker task, which keeps the uses of each file by its content hash. The call waits for the build (see
+    /// <see cref="CutsceneGateWaits"/>). The session keeps the result for each <see cref="CacheRevision"/>. Without an
+    /// active mod or without a broken item, the result is empty and the call does not start the build.</para>
+    /// <para>The index reads the globals that each script gives when it runs. So it also finds a template that a text
     /// script makes from parts.</para>
     /// <para>The Problems section of the Cutscene page reads <see cref="CutsceneErrors"/> in each frame. So
     /// <see cref="CutsceneErrors"/> and <see cref="CutsceneChecks"/> do not call this method.</para>
@@ -387,18 +392,31 @@ public sealed partial class EditSession
         if (BrokenCutsceneItems() is { Count: > 0 } items)
         {
             ReferrerLookups++;
-            paths = items.Select(i => i.Name).Distinct(StringComparer.OrdinalIgnoreCase)
-                .SelectMany(Mentions.Cutscenes)
-                .Distinct(VfsPath.Comparer)
-                .Order(StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            paths = Uses.Using(items);
         }
         referrerCutscenes = (CacheRevision, paths);
         return paths;
     }
 
-    /// <summary>The number of searches of <see cref="ReferrerCutscenes"/> in the word index. A test reads it to check
-    /// the cache.</summary>
+    /// <summary>The index of the items that the cutscenes of the edit view use (see <see cref="CutsceneUses"/>).</summary>
+    internal CutsceneUses Uses => cutsceneUses ??= new CutsceneUses(this);
+
+    /// <summary>Starts the build of the index of the cutscene uses in a worker task, when it does not run or exist. The
+    /// hosts call it when a profile opens, so that the first save gate after a change that breaks an item does not wait.
+    /// After a save, the session starts the build for the new edit view itself.</summary>
+    public void StartCutsceneUses() => Uses.Start();
+
+    /// <summary>
+    /// True when the next save gate waits for the build of the index of the cutscene uses: a change of the active mod
+    /// breaks an item, and the index of the edit view is not complete (see <see cref="ReferrerCutscenes"/>). The editor
+    /// then shows a status line before the save and Play.
+    /// </summary>
+    public bool CutsceneGateWaits =>
+        ActiveMod != null && !Uses.IsReady && referrerCutscenes?.Revision != CacheRevision &&
+        BrokenCutsceneItems().Count > 0;
+
+    /// <summary>The number of searches of <see cref="ReferrerCutscenes"/> in the index of the cutscene uses. A test
+    /// reads it to check the cache.</summary>
     internal int ReferrerLookups { get; private set; }
 
     /// <summary>
@@ -436,7 +454,7 @@ public sealed partial class EditSession
     /// <summary>
     /// The cutscenes whose errors the save gate gives (see <see cref="CutsceneGateErrors"/>), as install paths in
     /// normal form. These are the cutscenes that the active mod changes. They are also the cutscenes of the edit view
-    /// that name an item that a change of the active mod removes or breaks (see <see cref="ReferrerCutscenes"/>). The
+    /// that use an item that a change of the active mod removes or breaks (see <see cref="ReferrerCutscenes"/>). The
     /// editor can change each cutscene of the result. Empty without an active mod. An agent batch that changes an INI
     /// file compares their errors before and after the batch.
     /// </summary>
@@ -451,7 +469,7 @@ public sealed partial class EditSession
     /// The cutscene errors of the save gate: the errors of each cutscene of <see cref="GateCutscenes"/> (see
     /// <see cref="CutsceneErrors"/>). The gate reads the cutscenes that the active mod changes: the files that a
     /// command changed, and the patches and whole files of the mod. It also reads the cutscenes of the edit view that
-    /// name an item that a change of the active mod removes or breaks. Examples are a retail cutscene, a cutscene of a
+    /// use an item that a change of the active mod removes or breaks. Examples are a retail cutscene, a cutscene of a
     /// lower mod and a cutscene that no INI line names. The game crashes or shows less when it plays such a cutscene,
     /// also when the active mod does not change its script.
     /// </summary>
