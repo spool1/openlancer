@@ -336,8 +336,9 @@ public sealed class ListRulesTests
     /// <summary>
     /// The rule data of the builders of the agent tools (decisions D730 and D731 of the MCP1 design, section 9.3). The
     /// wreck takes the archetypes of the type mission_satellite, and each route template gives the keys of a zone of the
-    /// engine schema. The texts pass the STE lint, because the agent reads them. A template that gives a line that the
-    /// builder writes, or that has no place for the label or the usage, does not load.
+    /// engine schema. So does the death zone of the sun of a new system. The texts pass the STE lint, because the agent
+    /// reads them. A template that gives a line that the builder writes, or that has no place for the label or the
+    /// usage, does not load. Nor does a death zone without a size.
     /// </summary>
     [Fact]
     public void TheBuilderRulesParseAndTheirTextsPassTheSteLint()
@@ -353,6 +354,11 @@ public sealed class ListRulesTests
         Assert.Null(builders.Route("mining"));
         Assert.All(wreck.Lines, l => Assert.True(Knows("system", "Object", l.Key), l.Key));
         Assert.All(builders.Routes.SelectMany(r => r.Lines), l => Assert.True(Knows("system", "zone", l.Key), l.Key));
+        var sunZone = builders.SunZone!;
+        Assert.Equal((10000f, 1000f), (sunZone.Size, sunZone.AtmosphereMargin));
+        Assert.Equal([new BuilderLine("damage", "10000"), new BuilderLine("sort", "99.5"), new BuilderLine("density", "0"),
+            new BuilderLine("relief_time", "0")], sunZone.Lines);
+        Assert.All(sunZone.Lines, l => Assert.True(Knows("system", "zone", l.Key), l.Key));
         var texts = new[] { wreck.Help, wreck.Name, wreck.Info }.Concat(builders.Routes.Select(r => r.Help));
         Assert.Empty(texts.SelectMany(t => SteLint.Problems(t).Select(p => $"{p}: {t}")));
 
@@ -375,6 +381,11 @@ public sealed class ListRulesTests
                      """{ "wreck": { "help": "A.", "types": ["jump_gate"], "name": "W", "info": "I." } }""",
                      """{ "wreck": { "help": "A.", "types": ["x"], "name": "W", "info": "I.", "lines": [ { "key": "visit" } ] } }""",
                      """{ "wreck": { "help": "A.", "types": ["x"], "name": "W", "info": "I.", "lines": [ { "key": "loadout", "value": "a" } ] } }""",
+                     """{ "system": { "sunDeathZone": { "size": 0, "atmosphereMargin": 1000 } } }""",
+                     """{ "system": { "sunDeathZone": { "size": 10, "atmosphereMargin": -1 } } }""",
+                     """{ "system": { "sunDeathZone": { "size": 10, "atmosphereMargin": 0, "lines": [ { "key": "damage" } ] } } }""",
+                     """{ "system": { "sunDeathZone": { "size": 10, "atmosphereMargin": 0, "lines": [ { "key": "size", "value": "1" } ] } } }""",
+                     """{ "system": { } }""",
                  })
             Assert.Throws<InvalidDataException>(() => ListRules.Parse(With(bad)));
     }
