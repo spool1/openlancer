@@ -150,7 +150,7 @@ internal static class SceneQueries
             Fields = ItemQueries.Fields(session, section, view, AgentRows.DiagnosticsOf(session, section)),
             MapPos = AgentRows.Numbers(view, "pos"),
             NavMapScale = AgentRows.Numbers(view, "NavMapScale") is [var scale, ..] ? scale : null,
-            JumpObjects = UniverseQueries.Slots(session, path),
+            JumpObjects = UniverseRows.Slots(session, path),
             Counts = Enum.GetValues<SceneItemKind>().ToDictionary(Name, k => items.Count(i => KindOf(i.Kind) == k)),
             ObjectKinds = objects.GroupBy(o => o.Kind).ToDictionary(g => Name(g.Key), g => g.Count()),
             Bases = objects.Select(o => SceneSections.Last(o.View, "base")).OfType<string>()
