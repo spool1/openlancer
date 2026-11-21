@@ -366,7 +366,7 @@ Without `rings`, the lane gets one ring for each 7500 m of length, plus one. Wit
 
 `trade_lane_delete` always needs `confirm: true`. The question names the lane zone that goes with the rings. To delete one ring and relink the lane, use `delete_items` (see "The edit tools").
 
-`get_trade_lane` gives the lane of any ring. Each ring row has its position and the distance to the next ring. `start_name` and `end_name` give the text that the HUD shows and the value of the `tradelane_space_name` line. `zone` is null for a lane without a lane zone. `problems` gives the problems of the lane checks on the rings and on the lane zone.
+`get_trade_lane` gives the lane of any ring. Each ring row has its position and the distance to the next ring. `start_name` and `end_name` give the text that the HUD shows and the value of the `tradelane_space_name` line. `zone` is null when no lane zone covers the first and the last ring. `problems` gives the problems of the lane checks on the rings. It also gives the problem of each lane zone that does not cover the lane, for example after the move of an end ring with `set_fields`.
 
 The refusals of the trade lane tools are:
 

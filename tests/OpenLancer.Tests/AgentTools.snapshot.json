@@ -20674,7 +20674,7 @@
               "string",
               "null"
             ],
-            "description": "The zone: reference of the lane zone, or none. A lane without a lane zone has no lane traffic."
+            "description": "The zone: reference of the lane zone that covers the first and the last ring, or none. Without such a zone, the lane has no lane traffic. A lane zone that misses the lane gives a problem."
           },
           "length": {
             "type": [
@@ -20751,7 +20751,7 @@
                 "message"
               ]
             },
-            "description": "The problems of the trade lane checks on the rings and on the lane zone."
+            "description": "The problems of the trade lane checks on the rings, and on each lane zone that does not cover the lane."
           },
           "rev": {
             "type": "string",

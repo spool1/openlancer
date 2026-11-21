@@ -60,10 +60,12 @@ internal sealed record LaneEndText(string Text, string Key);
 /// <param name="Rings">The rings from the first ring to the last ring.</param>
 /// <param name="StartName">The name of the first ring, or null.</param>
 /// <param name="EndName">The name of the last ring, or null.</param>
-/// <param name="Zone">The <c>zone:</c> reference of the lane zone, or null.</param>
+/// <param name="Zone">The <c>zone:</c> reference of the lane zone, or null when no lane zone covers the first and the
+/// last ring (see <see cref="LanePlans.ZoneOf"/>).</param>
 /// <param name="Length">The distance from the first ring to the last ring along the rings in meters, or null when a ring
 /// has no position.</param>
-/// <param name="Problems">The problems of the trade lane checks on the rings and on the lane zone.</param>
+/// <param name="Problems">The problems of the trade lane checks on the rings, and on each lane zone that does not cover
+/// the lane (see <see cref="LaneChecks.Lane"/>).</param>
 internal sealed record LaneView(string? System, IReadOnlyList<LaneRingRow> Rings, LaneEndText? StartName,
     LaneEndText? EndName, string? Zone, float? Length, IReadOnlyList<Problem> Problems);
 
@@ -210,11 +212,7 @@ internal static class LaneTools
             i + 1 < lane.Rings.Count && positions[i] is { } a && positions[i + 1] is { } b ? Vector3.Distance(a, b) : null))
             .ToList();
         var zone = LanePlans.ZoneOf(session, lane);
-        var problems = lane.Rings.Concat(zone is { } own ? [own] : [])
-            .SelectMany(s => LaneChecks.Check(session, s).Select(d => d with { Target = d.Target ?? s }))
-            .DistinctBy(d => (d.Target, d.Key, d.Message))
-            .Select(d => AgentRows.ProblemOf(session, d))
-            .ToList();
+        var problems = LaneChecks.Lane(session, lane).Select(d => AgentRows.ProblemOf(session, d)).ToList();
         return ToolResult.Of(new LaneView(
             session.SystemNicknameOf(ring.Path) is { } system ? SceneQueries.SystemRef(system) : null,
             rows,

@@ -35,9 +35,25 @@ internal static class LaneChecks
         return SceneSections.KindOf(session, section) switch
         {
             SceneKind.Object when LanePlans.IsRingObject(session, section) => Ring(session, section, view, name).ToList(),
-            SceneKind.Zone => Zone(session, section).ToList(),
+            SceneKind.Zone => Zone(session, section).Select(p => p.Problem).ToList(),
             _ => [],
         };
+    }
+
+    /// <summary>
+    /// The problems of a lane: the problems of its rings, and the problem of each lane zone of its file that does not
+    /// cover the lane (see <see cref="Zone"/>). The zone of a lane covers the lane, so it gives no problem. A zone that
+    /// misses the lane is not the zone of the lane, so the check reads each zone of the file.
+    /// </summary>
+    public static IReadOnlyList<Diagnostic> Lane(EditSession session, LaneChain lane)
+    {
+        var rings = lane.Rings.ToHashSet();
+        var zones = session.Sections(lane.Path)
+            .Where(s => SceneSections.KindOf(session, s) == SceneKind.Zone)
+            .SelectMany(z => Zone(session, z))
+            .Where(p => p.Lane.Rings.Any(rings.Contains))
+            .Select(p => p.Problem);
+        return lane.Rings.SelectMany(r => Check(session, r)).Concat(zones).ToList();
     }
 
     /// <summary>
@@ -108,9 +124,10 @@ internal static class LaneChecks
     /// The problem of a lane zone that does not cover its lane. The zone does not cover the first and the last ring of a
     /// lane, but its axis passes one or more rings of that lane. This is the case after a move of an end ring, or after
     /// a raw edit that adds a ring. A zone that covers the ends of a lane near it is the zone of that lane, and it gives
-    /// no problem. A lane that has another zone gives no problem either.
+    /// no problem. A lane that has another zone gives no problem either. Each problem comes with the lane that it
+    /// names.
     /// </summary>
-    private static IEnumerable<Diagnostic> Zone(EditSession session, SectionRef zone)
+    private static IEnumerable<(LaneChain Lane, Diagnostic Problem)> Zone(EditSession session, SectionRef zone)
     {
         if (LaneZones.Read(session, zone) is not { } read)
             yield break;
@@ -132,10 +149,10 @@ internal static class LaneChecks
         for (var i = 0; i < lanes.Count; i++)
         {
             if (zones[i] == null)
-                yield return Warning(zone, "size",
+                yield return (lanes[i], Warning(zone, "size",
                     $"The lane zone {zone.Id.Key} does not cover the trade lane of {lanes[i].Rings[0].Id.Key}. Lane " +
                     "traffic spawns away from the lane. Change the position, the rotation or the size of the zone so that " +
-                    "it covers each ring of the lane. An agent uses set_fields.");
+                    "it covers each ring of the lane. An agent uses set_fields."));
         }
     }
 

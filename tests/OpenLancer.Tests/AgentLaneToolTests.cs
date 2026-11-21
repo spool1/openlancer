@@ -315,6 +315,27 @@ public sealed class AgentLaneToolTests
     }
 
     /// <summary>
+    /// After a move of the end ring with set_fields, the lane zone does not cover the lane. get_trade_lane then gives no
+    /// zone, and its problems give the warning of the lane zone, as check does on the zone.
+    /// </summary>
+    [Fact]
+    public void GetTradeLaneGivesTheWarningOfALaneZoneThatMissesTheLane()
+    {
+        var (ws, session, host) = Lanes();
+        using var _ = ws;
+        Ok(host, "set_fields", """{ "ref": "obj:Li01_Trade_Lane_Ring_4", "fields": { "pos": [40000, 0, -20000] } }""");
+
+        var lane = Ok(host, "get_trade_lane", """{ "ring": "obj:Li01_Trade_Lane_Ring_2" }""");
+
+        Assert.Null(lane["zone"]);
+        var problem = Assert.Single(lane["problems"]!.AsArray(), p => (string?)p!["ref"] == "zone:Zone_Li01_Tradelane_1");
+        Assert.Equal("warning", (string?)problem!["severity"]);
+        Assert.StartsWith("The lane zone Zone_Li01_Tradelane_1 does not cover the trade lane of Li01_Trade_Lane_Ring_1.",
+            (string?)problem["message"]);
+        Assert.Contains(LaneChecks.Check(session, LaneWorkspace.Zone), d => d.Message == (string?)problem["message"]);
+    }
+
+    /// <summary>
     /// delete_items on a middle ring relinks the lane without a question: the neighbors link to each other. On a lane of
     /// two rings, the whole lane goes with its zone, so the delete asks first.
     /// </summary>
