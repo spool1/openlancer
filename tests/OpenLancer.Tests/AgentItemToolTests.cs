@@ -6,6 +6,8 @@ using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.Editing.Universe;
+using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Studio.Agent;
 using OpenLancer.Studio.Commands;
 using Xunit;
@@ -456,7 +458,104 @@ public sealed class AgentItemToolTests
         var first = ItemRefs.ResolveSection(session, ItemRefs.Parse(Texts(copy["adds"])[0]));
         Assert.Equal("100, 0, 0", Line(session, first, "pos"));
         Assert.Equal("refused", gate.Code);
+        Assert.Equal("Li01_to_Li02 is a jump gate. This version cannot copy jump gates or jump holes, because a copy has no " +
+                     "partner. To make a pair, use the jump connection tool connection_create of the agent server.", gate.Message);
         Assert.Equal(1, session.Revision);
+    }
+
+    /// <summary>A new object of a jump archetype refuses in scene_create_object and scene_spawn_asset, because it would
+    /// have no partner, and the text names connection_create. set_fields refuses the goto line of a gate, because it
+    /// links the pair.</summary>
+    [Fact]
+    public void TheSceneToolsRefuseAGateAloneAndSetFieldsRefusesItsGotoLine()
+    {
+        var (ws, session, host) = Scene();
+        using var _ = ws;
+
+        var create = Error(host, "scene_create_object",
+            """{ "system": "Li01", "template": "solar", "archetype": "jumpgate", "position": [0, 0, 0] }""");
+        var spawn = Error(host, "scene_spawn_asset",
+            """{ "system": "Li01", "asset": "asset:solar_archetype/jumpgate", "position": [0, 0, 0] }""");
+        var jump = Error(host, "set_fields", """{ "ref": "obj:Li01_to_Li02", "fields": { "goto": "Li02, Li02_01, x" } }""");
+
+        Assert.Equal(("invalid_value", SceneEditTools.ArchetypeTemplate), (create.Code, create.Detail));
+        Assert.Equal("refused", spawn.Code);
+        foreach (var message in new[] { create.Message, spawn.Message })
+        {
+            Assert.StartsWith("The archetype jumpgate is a jump gate.", message);
+            Assert.Contains("use the jump connection tool connection_create of the agent server", message);
+        }
+        Assert.Equal(("refused", MissionErrors.FieldNotWritable), (jump.Code, jump.Detail));
+        Assert.Contains("connection_create", jump.Message);
+        Assert.Equal(0, session.Revision);
+    }
+
+    /// <summary>
+    /// delete_items takes a system that the active mod adds. The delete always asks, and it takes the system file and
+    /// the gate of Li02 that goes to the system. A call can also name an item of the system, which goes with its
+    /// system. Undo puts back all of it. A system of the game refuses with the reason.
+    /// </summary>
+    [Fact]
+    public void DeleteItemsDeletesASystemOfTheActiveModWithItsPartners()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        var av01 = NewSystemWorkspace.System("Av01");
+        var partner = new SectionRef(ListWorkspace.Li02Path, new SectionIdentity("Object", "Li02_to_Av01"));
+        Ok(host, "system_create", """{ "nickname": "Av01", "name": "Avalon", "like": "Li02", "map_pos": [4, 5] }""");
+        Ok(host, "connection_create", """{ "kind": "jump_gate", "from": { "system": "Av01" }, "to": { "system": "Li02" } }""");
+
+        var asks = Error(host, "delete_items", """{ "refs": ["system:Av01"] }""");
+        var game = Error(host, "delete_items", """{ "refs": ["system:Li01"], "confirm": true }""");
+        var done = Ok(host, "delete_items", """{ "refs": ["system:Av01", "obj:Av01_sun"], "confirm": true }""");
+
+        Assert.Equal(("needs_confirmation", EditTools.ConfirmChanges), (asks.Code, asks.Detail));
+        Assert.Contains("obj:Li02_to_Av01", asks.Message);
+        Assert.Equal(("refused", SystemPlans.GameSystem), (game.Code, game.Detail));
+        Assert.Equal("Li01 is a system of the game or of a lower mod. This version deletes only systems that the active mod " +
+                     "adds.", game.Message);
+        var deletes = done["deletes"]!.AsArray().Select(d => (string)d!["ref"]!).ToList();
+        Assert.Contains("system:Av01", deletes);
+        Assert.Contains("obj:Li02_to_Av01", deletes);
+        Assert.Equal("Agent: Delete 2 items", (string?)done["undo_label"]);
+        Assert.Null(session.Get(av01));
+        Assert.Null(session.Get(partner));
+        Assert.False(session.OpenDocument(NewSystemWorkspace.NewPath)!.State.Exists);
+
+        Ok(host, "undo");
+        Assert.NotNull(session.Get(av01));
+        Assert.NotNull(session.Get(partner));
+        Assert.True(session.OpenDocument(NewSystemWorkspace.NewPath)!.State.Exists);
+    }
+
+    /// <summary>rename_item takes a system that the active mod adds. A mission script names the system, so the rename
+    /// asks first, and then it changes the mission line too. The result gives the old and the new system: reference.
+    /// A system of the game refuses with the reason.</summary>
+    [Fact]
+    public void RenameItemRenamesASystemOfTheActiveMod()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        var host = new TestAgentHost(session);
+        Ok(host, "system_create", """{ "nickname": "Av01", "name": "Avalon", "like": "Li02", "map_pos": [4, 5] }""");
+
+        var asks = Error(host, "rename_item", """{ "ref": "system:Av01", "new_name": "Av02" }""");
+        var game = Error(host, "rename_item", """{ "ref": "system:Li01", "new_name": "Li09", "confirm": true }""");
+        var done = Ok(host, "rename_item", """{ "ref": "system:Av01", "new_name": "Av02", "confirm": true }""");
+
+        Assert.Equal(("needs_confirmation", EditTools.ConfirmChanges), (asks.Code, asks.Detail));
+        Assert.Equal(("refused", SystemPlans.GameSystem), (game.Code, game.Detail));
+        Assert.Equal("Li01 is a system of the game or of a lower mod. This version renames only systems that the active mod " +
+                     "adds.", game.Message);
+        var rename = Assert.Single(done["renames"]!.AsArray())!;
+        Assert.Equal(("system:Av01", "system:Av02"), ((string?)rename["from"], (string?)rename["to"]));
+        Assert.Equal(("Agent: Rename Av01 to Av02", "system:Av02"), ((string?)done["undo_label"], (string?)done["select"]));
+        Assert.Contains(done["warnings"]!.AsArray(), w => ((string)w!["message"]!).StartsWith(
+            "A save game in Av01 does not find the system after the rename.", StringComparison.Ordinal));
+        Assert.NotNull(session.Get(NewSystemWorkspace.System("Av02")));
+        var trigger = new SectionRef(NewSystemWorkspace.MissionPath, new SectionIdentity("Trigger", "ol_enter"));
+        Assert.Equal("Av02", Line(session, trigger, "Cnd_SystemEnter"));
     }
 
     /// <summary>The command through the command runner of the editor and the tool give the same W (section 13.1, item

@@ -650,6 +650,7 @@ public sealed partial class AgentMissionToolTests
             ("scene_set_component", Component("sec:prefab:mod:ol_gate#Trigger/spawn")),
             ("scene_set_component", Component("prefab:mod:ol_gate")),
             ("scene_set_encounters", $$"""{ "zone": "{{Ship1}}", "encounters": [] }"""),
+            ("connection_set_lock", $$"""{ "object": "{{Ship1}}", "locked": "npc" }"""),
             ("prop_group_save", $$"""{ "refs": [ "{{End}}" ], "confirm": true }"""),
             ("create_from_template", $$"""{ "kind": "ship", "template": "sec:{{B}}#NPCShipArch/ol_build_1", "nickname": "ol_x" }"""),
         ];
