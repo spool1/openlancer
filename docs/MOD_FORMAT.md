@@ -724,6 +724,28 @@ The other edits of a lane:
 - A lane zone that the editor cannot change stays as it is, with a warning.
 - A rename of a ring changes the links of its neighbors (see "Create, duplicate, rename and delete").
 
+The Inspector and `set_fields` lock the `prev_ring` and `next_ring` lines, so a change of one ring cannot break the lane. The ring buttons of the Trade lane ring component and the agent tools `trade_lane_insert_ring`, `trade_lane_repair` and `delete_items` change the links. The raw INI block can still change the lines (see "The raw INI block").
+
+The checks of the trade lanes:
+
+| Problem | Severity | What the game does |
+|---|---|---|
+| The links of a lane go in a circle. | Error | The game hangs when the HUD reads the lane. |
+| A ring links to a ring that does not link back. | Warning | Ships on the lane can stop or go the wrong way. |
+| An end ring has no `tradelane_space_name`. | Warning | The HUD shows no lane label. |
+| A ring links to an object that is not a trade lane ring. | Warning | The game does not count the object in the lane. |
+| A ring has a lane name, but it has no links and no ring links to it. | Warning | The ring is no part of a lane. |
+| The active mod places a ring inside a zone with `damage` or inside the `solar_radius` of an object. | Warning | Ships on the lane can take damage or hit the object. |
+| A lane zone does not cover the first and the last ring of a lane near it, and the lane has no other lane zone. | Warning | Lane traffic spawns away from the lane. |
+
+The circle check follows the links as the HUD does, also a stray link. The circle error stops the save when the active mod writes a link line of the circle. A circle of the game or of a lower mod is a warning. The save gate gives one error for each circle, on the first ring of the file whose link line the active mod writes. A link line that names no object of the file gets the error of the data lists.
+
+Each text names a fix: the button Repair lane and the agent tool `trade_lane_repair`, a delete, the Lane name row and `set_text`, or a move. A repair sorts the rings along their line, so a ring off the line stops it. The text then names the move or the delete of that ring. The zone warning comes after a move of an end ring, or after a raw edit that adds a ring beyond an end.
+
+The Inspector shows the link problems and the name problems in the Trade lane ring component of the ring. It shows the placement warning at the position of the ring, and the zone warning at the size of the zone. A ring of the game or of a lower mod gets no placement warning. The raw INI block marks the line of each problem. The agent tools `get_item` and `check` give them too.
+
+The retail lanes of vanilla 1.1 and HD Edition 0.7.1 give one warning. The lane under construction in Bw10 has no name at its start, because its first rings are not there yet.
+
 ## Prop groups
 
 A prop group is a set of separate objects, zones and lights. The editor saves it in the `props/` folder of a mod, as Unity saves a prefab asset. The editor places a group again in any system, and each member becomes a separate item. The merge, the game, `oltool deploy` and the validation ignore the folder. So a group changes no game data until you place it.
@@ -997,7 +1019,7 @@ The swatch is disabled, and its tooltip tells why, when the line has fewer than 
 
 Each change of the text shows at once. While a field is active, it stays in its place, also when its text adds or removes the key. After the field ends, the key moves to its list, for example from "Unset keys" to "Keys". Two kinds of field change the data only when the field ends: the text of a key that holds a text id, for example a name, and a market line.
 
-A blue label marks a value that the active mod sets. The tooltip of the label names the layer that sets the value: the base data, a mod that loads before the active mod, or the active mod. A lock tells why a row cannot change, for example the key of a section, or a section that a patch cannot change.
+A blue label marks a value that the active mod sets. The tooltip of the label names the layer that sets the value: the base data, a mod that loads before the active mod, or the active mod. A lock tells why a row cannot change, for example the key of a section, or a section that a patch cannot change. The `goto` line of a jump gate and the `prev_ring` and `next_ring` lines of a trade lane ring are locked rows. Their lock names the tools that change the pair or the lane, and the raw INI block can still change these lines.
 
 Revert, in the menu of a row or in the item menu, puts back the lines of the lower layer: the base data with the mods that load before the active mod. The next save then writes no line for them. A section that the active mod adds has no lower lines, so it has no Revert. A key of a group of lines that belong together (see "Lines that belong together") reverts only with its whole section. When the active mod sets the `file` of a `[system]` of `universe.ini`, the Revert of the whole item is not available, because the revert would move the contents of the system to another file.
 
@@ -1069,6 +1091,7 @@ These keys are locked, and the other keys of the section take edits:
 - The `encounter`, `faction` and `faction_weight` lines of a `[Zone]` (see "Lines that belong together").
 - The `file` of a `[system]` of `universe.ini`, because a change moves all the contents of the system.
 - The `goto` line of an `[Object]`, because it links the two ends of a jump connection. To change the pair, delete one end, and its pair goes too. Then make a new pair with the agent tool `connection_create`. The raw INI block can still change the line.
+- The `prev_ring` and `next_ring` lines of an `[Object]`, because they link the rings of a trade lane. To change the lane, use Insert ring after, Repair lane or Delete ring on the Trade lane ring component. An agent uses `trade_lane_insert_ring`, `trade_lane_repair` and `delete_items`. The raw INI block can still change the lines.
 
 The gizmo also does not show when a line that it reads has an error, for example a `pos` line with text. Correct the line in the Inspector first.
 
@@ -1321,7 +1344,7 @@ Each Inspector page that edits sections ends with "Loaded values (read-only)" an
 
 The block refuses an edit and keeps nothing when the text has a problem: a second header, a comment, a line without `=`, a changed nickname line, a line that the type of its key cannot hold, or a key that no row can change. The Console line then holds the problem and your whole text, so you can copy it back. When the section changed while you typed, for example by an undo, the block also refuses the edit. A value outside its list does not stop the edit: the row above then shows the error. The block is read-only when the section is read-only.
 
-The `goto` line of an `[Object]` is an exception to the keys that no row can change. No row changes it, because it links the two ends of a jump connection, but the block takes an edit of it. A raw edit that breaks a pair gets the warnings of "Jump connections and gate locks".
+The `goto`, `prev_ring` and `next_ring` lines of an `[Object]` are exceptions to the keys that no row can change. No row changes them, because they link the two ends of a jump connection or the rings of a trade lane. The block takes an edit of them. A raw edit that breaks a pair gets the warnings of "Jump connections and gate locks". A raw edit that breaks a lane gets the checks of "Trade lanes".
 
 #### Raw edits of mission files
 
@@ -1354,6 +1377,7 @@ Each save runs the save gate first, also a save with nothing to write, and also 
   | A required key without a line, for example `da_archetype` of a `[Ship]` | The game drops this section. |
 - A zone of the active mod with the nickname or the FLHash of another zone of any system. The game drops one of the two zones.
 - A system file that the active mod changes, with more than 10 objects with `goto`. The game crashes. The error comes for each data mod (tier 1), also without a retail target, when the active mod makes the count go above 10. An `[Object]` of the active mod with its `goto` line before its `nickname` line is an error too. The game then records the jump under another object (see "Jump connections and gate locks").
+- A trade lane whose links go in a circle, in a system file that the active mod changes. The error comes only when the active mod writes a link line of the circle. The game hangs when the HUD reads the lane (see "Trade lanes").
 - A `[system]` of `universe.ini` that the active mod adds or changes, with one of three errors (see "New systems"). Its `file` line comes before its `nickname` line, so the game loads the system under another id. Another system has its nickname, so the game drops one of the two. Its `file` line names no file, so the game loads it without objects and zones and can crash. The error comes only from a line of the active mod.
 - An error of the format checks of the export or of the content checks of the retail game, when the active mod adds it. See "Format checks" and "Content checks of the retail game". These checks run only for a tier-1 mod that names a retail target. They compare the data with the active mod with the data of the mods that load before it. They do not merge on the files of each target game. Play in the game and the export do that. For example, a good with the price 0 blocks the save, because the retail game can crash when a player buys or sells it.
 - An error of the mission checks in a mission script that the active mod changes. Examples are a trigger without a condition (rule M01) and two triggers whose names have one game id (rule M27). A line of any script that names a name that the active mod removes or renames is an error too. A mission problem that the base game or a lower mod also has is a warning, so it does not block the save.

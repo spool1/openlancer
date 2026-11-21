@@ -193,7 +193,7 @@ A rename of a ship or equipment also changes the template of each cutscene COMPO
 
 A value never holds a comma. A value that a list check refuses still applies, as in the Inspector. The result gives the problem in `new_problems`.
 
-The key line, a key of linked lines, the `file` of a system and the `goto` line of an object are locked. `get_item` marks them. The `goto` line links the two ends of a jump connection, so it gives `refused` with the detail `FieldNotWritable`. Use `rename_item` for the nickname. Use `scene_set_encounters` for the `encounter`, `faction` and `faction_weight` lines of a zone.
+The key line, a key of linked lines, the `file` of a system, and the `goto`, `prev_ring` and `next_ring` lines of an object are locked. `get_item` marks them. The `goto` line links the two ends of a jump connection, and `prev_ring` and `next_ring` link the rings of a trade lane. So these lines give `refused` with the detail `FieldNotWritable`. Use `trade_lane_insert_ring`, `trade_lane_repair` or `delete_items` to change the links of a lane. Use `rename_item` for the nickname. Use `scene_set_encounters` for the `encounter`, `faction` and `faction_weight` lines of a zone.
 
 A mission item takes the field forms of `mission_add_item` in place of these forms, and it runs in strict mode. See "The generic tools on mission items". A cutscene item takes THN paths and the value forms of "The generic tools on cutscene items".
 
