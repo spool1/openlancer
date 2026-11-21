@@ -1018,7 +1018,7 @@ The Scene adds, copies, renames and deletes the objects, zones and lights of the
 
 The keys work only when no text field is active and no field edit or drag is open. A disabled menu item tells why in its tooltip.
 
-Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has a `goto`, a `prev_ring` or a `next_ring` line, or an archetype of such a type. The Create menu and Duplicate cannot make them, because each one needs a partner or a lane. The jump connection tool `connection_create` of the agent server makes a jump gate pair or a jump hole pair (see "Jump connections and gate locks"). A delete of a jump gate or a jump hole deletes its pair, but this version cannot delete an airlock gate or a trade lane ring. A rename of a connection object works.
+Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has a `goto`, a `prev_ring` or a `next_ring` line, or an archetype of such a type. The Create menu and Duplicate cannot make them, because each one needs a partner or a lane. The jump connection tool `connection_create` of the agent server makes a jump gate pair or a jump hole pair (see "Jump connections and gate locks"). A delete of a jump gate or a jump hole deletes its pair. This version cannot delete an airlock gate or a trade lane ring. A rename of a connection object works.
 
 #### Create
 
@@ -1066,11 +1066,14 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 - A one-way object whose `goto` line names an end that goes is no part of the pair. Its locked `goto` line stops the delete, and the message names the object. Delete the one-way object first or in the same delete. To keep it, change its `goto` line in the raw INI block. You can also pair it with the jump connection tool `connection_create` of the agent server.
 - A delete of a nebula or an asteroid field removes only its section, as Unity "Remove Component" does. Its zone stays, with its encounters, its music and its damage.
 
-A delete that removes only the item and its child sections runs at once. So does the delete of a jump connection in one file: its other end, its traffic zones and its lock lines are parts of the item. Another delete opens a dialog. It lists the items that go too, the lines that change and the lines that show "Missing". For a jump gate pair, the list names the other end and its file. The dialog also lists the files that name the item as text, and these warnings:
+A delete that removes only the item and its child sections runs at once. So does the delete of a jump connection in one file. Its other end, the traffic zones that `connection_create` made for it and its lock lines are parts of the item.
+
+Another delete opens a dialog. It lists the items that go too, the lines that change and the lines that show "Missing". For a jump gate pair, the list names the other end and its file. The dialog also lists the files that name the item as text, and these warnings:
 
 - A base that loses the last object of its system that docks with it. The game then puts the player at the center of the system after a launch.
 - A base that loses the last object of its system with `base = <base>`. The navigation map then does not list the base, and its rooms show no planet.
 - A mod that loads later and changes a section that goes. Its patch cannot find the section after the delete.
+- A jump traffic zone with another name (`pop_type = jumpgate` or `pop_type = wormhole`) that stays at an end that goes. When the zone has encounters, NPC ships still come and go at that place. This warning also makes the delete of a jump connection in one file open the dialog.
 
 A delete of a read-only section is refused with the reason, for example a light of the St02c file whose nickname another light also has.
 
@@ -1546,7 +1549,7 @@ A whole INI file or cutscene of the mod that replaces a file of the game with ch
 
 The retail game reads three route tables at its start. `DATA\UNIVERSE\systems_shortest_path.ini` has the routes through all jump connections, `shortest_legal_path.ini` the routes through jump gates, and `shortest_illegal_path.ini` the routes through jump holes. The NPC routes, the mission targets and the routes of the nav map use them. The game makes new tables only when the first file does not open. A drop-in zip cannot delete a file of the game, so the tables must change with the jump connections.
 
-A mod does not hold route tables. OpenLancer makes them when it builds the mods for a retail game: for the drop-in zip, the FLMM package and the play copy of Play in the game (Ctrl+F5).
+A mod does not hold route tables. OpenLancer makes them when it builds the mods for a retail game. It makes them for the drop-in zip, the FLMM package and the play copy of Play in the game (Ctrl+F5).
 
 - The build compares the routes of the merged data with the routes of the game data without mods. When they differ, the build adds the three tables as text files. When they are the same, the build adds no table.
 - The routes can change only when the mods change `universe.ini`, a system file, a solar archetype file or `initialworld.ini`. Else the build does not read the jump connections.

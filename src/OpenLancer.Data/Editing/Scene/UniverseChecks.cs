@@ -64,8 +64,8 @@ internal static class UniverseChecks
         if (fileAt >= 0 && fileAt < IndexOf(entries, "nickname"))
             yield return Error(session, section, "file",
                 $"The [system] {nickname} has its file line before its nickname line. The game then loads the system under " +
-                "another id. In a text editor, put the nickname line first in the file of its mod. Then open the profile " +
-                "again.");
+                "another id. In a text editor, put the nickname line of this [system] before its file line. Then open " +
+                "the profile again.");
 
         var others = Systems(session).Where(s => !s.Section.Equals(section)).ToList();
         // Two different names with one FLHash are a collision of the hash list "system". The list checks report it, so

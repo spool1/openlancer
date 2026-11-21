@@ -40,8 +40,8 @@ public sealed class UniverseChecksTests
 
         Assert.Equal((DiagnosticSeverity.Error, "file"), (problem.Severity, problem.Key));
         Assert.Equal("The [system] Av01 has its file line before its nickname line. The game then loads the system under " +
-                     "another id. In a text editor, put the nickname line first in the file of its mod. Then open the profile " +
-                     "again.", problem.Message);
+                     "another id. In a text editor, put the nickname line of this [system] before its file line. Then open " +
+                     "the profile again.", problem.Message);
         Assert.Empty(SteLint.Problems(problem.Message));
         Assert.False(saved.Saved);
         Assert.Contains(saved.Problems, p => p.Severity == DiagnosticSeverity.Error && p.Message == problem.Message);
