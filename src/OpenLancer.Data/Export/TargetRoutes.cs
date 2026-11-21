@@ -58,7 +58,16 @@ internal sealed class TargetRoutes
             if (DataPaths.Resolve(freelancerIni, RouteTables.DataPath(kind)) is { } path)
                 paths[path] = kind;
         }
+        GameSource = new FileUniverseSource(Base, ListRules.Retail);
+        MergedSource = new FileUniverseSource(Merged, ListRules.Retail);
     }
+
+    /// <summary>The jump graph source of the game data without mods.</summary>
+    internal FileUniverseSource GameSource { get; }
+
+    /// <summary>The jump graph source of the merged data: the merged files, and the files of the game that no mod
+    /// changes.</summary>
+    internal FileUniverseSource MergedSource { get; }
 
     /// <summary>The files of the mods at the paths of the tables. The build adds them only when it makes no
     /// tables.</summary>
@@ -104,13 +113,10 @@ internal sealed class TargetRoutes
     /// <summary>The generated files of the tables, or none when the mods do not change the routes.</summary>
     private List<TargetFile> Make(List<Diagnostic> diagnostics)
     {
-        var rules = ListRules.Retail;
-        var game = new FileUniverseSource(Base, rules);
-        var merged = new FileUniverseSource(Merged, rules);
-        if (paths.Count == 0 || !MayChange(game, merged))
+        if (!MayChange())
             return [];
-        var gameGraph = UniverseGraph.Build(game);
-        var mergedGraph = UniverseGraph.Build(merged);
+        var gameGraph = UniverseGraph.Build(GameSource);
+        var mergedGraph = UniverseGraph.Build(MergedSource);
         var before = RouteTables.Build(gameGraph);
         var after = RouteTables.Build(mergedGraph);
         if (after.SameRoutes(before))
@@ -139,9 +145,13 @@ internal sealed class TargetRoutes
         return result;
     }
 
-    /// <summary>True when a file of the merge can change the routes.</summary>
-    private bool MayChange(FileUniverseSource game, FileUniverseSource merged)
+    /// <summary>True when a file of the merge can change the routes: <c>universe.ini</c>, a system file, a solar
+    /// archetype file or a gate lock file. Else the build reads no graph.</summary>
+    internal bool MayChange()
     {
+        var (game, merged) = (GameSource, MergedSource);
+        if (paths.Count == 0)
+            return false;
         if (!VfsPath.Comparer.Equals(game.UniversePath ?? "", merged.UniversePath ?? "") ||
             !game.SolarPaths.SequenceEqual(merged.SolarPaths, VfsPath.Comparer) ||
             !game.LockPaths.SequenceEqual(merged.LockPaths, VfsPath.Comparer))

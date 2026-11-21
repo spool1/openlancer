@@ -464,7 +464,7 @@ public static class PackageTexts
         {
             yield return RouteLine(routes.Diff);
             if (routes.Unreached.Count > 0)
-                yield return $"No route of this table reaches the new {Plural.Count(routes.Unreached.Count, "system")} " +
+                yield return $"No route of this table reaches the new {(routes.Unreached.Count == 1 ? "system" : "systems")} " +
                              $"{string.Join(", ", routes.Unreached)}.";
             yield break;
         }

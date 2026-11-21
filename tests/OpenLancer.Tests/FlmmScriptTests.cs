@@ -314,4 +314,25 @@ public sealed class FlmmScriptTests
         Assert.Contains("Probe for the FLMM check. Do not publish.", readme.ReadToEnd());
         Assert.False(FlmmPackage.Checked);
     }
+
+    /// <summary>The game has the route tables, but the package copies a generated table as a whole file, with no
+    /// operation and no warning.</summary>
+    [Fact]
+    public void AGeneratedRouteTableIsAPlainCopy()
+    {
+        using var game = new RouteWorld().System("A", "gate B").System("B", "gate A").WriteInto(new ExportGame());
+        var mod = RouteWorld.ConnectionMod(game);
+        var files = RouteWorld.Build(game, mod, keepPlaceholders: true);
+
+        var script = FlmmScript.Build(files, mod, FlmmHeader.Of(PublishTexts.Of(mod.Manifest), game.Target), false);
+
+        Assert.Empty(script.Problems);
+        foreach (var route in RouteWorld.RouteFiles(files))
+        {
+            Assert.True(route.HasBase);
+            var copy = Assert.Single(script.Files, f => f.Path.EndsWith(route.Path[route.Path.LastIndexOf('\\')..]));
+            Assert.Equal(route.Bytes, copy.Bytes);
+            Assert.DoesNotContain(route.Path[(route.Path.LastIndexOf('\\') + 1)..], script.Xml);
+        }
+    }
 }

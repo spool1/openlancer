@@ -491,6 +491,38 @@ public sealed class ModExportTests
             Assert.DoesNotContain(DateTime.Now.Year.ToString(CultureInfo.InvariantCulture), text);
         }
     }
+
+    /// <summary>A mod that changes the routes gets the route tables in each package of a retail target. OpenLancer
+    /// computes its own routes, so the checklist of the target OpenLancer names no route file.</summary>
+    [Fact]
+    public void TheRetailPackagesHoldTheRouteTablesAndTheOpenLancerChecklistNamesNone()
+    {
+        using var game = new RouteWorld().System("A", "gate B").System("B", "gate A").WriteInto(new ExportGame());
+        var mod = RouteWorld.ConnectionMod(game);
+        // The fake game has the folder DATA\universe, so the entries have that letter case.
+        string[] routes = ["DATA/universe/shortest_illegal_path.ini", "DATA/universe/shortest_legal_path.ini",
+                           "DATA/universe/systems_shortest_path.ini"];
+
+        var prepared = ModExport.Prepare(game.Request(mod, ExportTarget.Vanilla, ExportTarget.OpenLancer) with
+        {
+            OpenLancerBase = game.Base,
+        });
+        var result = ModExport.Write(prepared, []);
+
+        Assert.True(result.Succeeded, string.Join("\n", result.Problems));
+        var dropIn = Entries(result.Packages.Single(p => p.Form == PackageForm.DropIn).Path!);
+        Assert.Subset(dropIn.ToHashSet(), routes.ToHashSet());
+        Assert.Contains("DATA/MODS/conn/SYSTEMS/E/E.ini", dropIn);
+        using (var outer = ZipFile.OpenRead(result.Packages.Single(p => p.Form == PackageForm.Flmm).Path!))
+        using (var flmod = new ZipArchive(outer.GetEntry("conn.flmod")!.Open()))
+            Assert.Subset(flmod.Entries.Select(e => e.FullName).ToHashSet(), routes.ToHashSet());
+        var vanilla = prepared.ChecklistBlocks.Single(b => b.Target == ExportTarget.Vanilla).Lines;
+        var openLancer = prepared.ChecklistBlocks.Single(b => b.Target == ExportTarget.OpenLancer).Lines;
+        Assert.Contains(vanilla, l => l.EndsWith("systems_shortest_path.ini", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(openLancer, l => l.Contains("SYSTEMS", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(openLancer, l => l.Contains("_path.ini", StringComparison.OrdinalIgnoreCase) ||
+                                               l.Contains("route table", StringComparison.OrdinalIgnoreCase));
+    }
 }
 
 /// <summary><c>oltool export</c> and <c>oltool game --write-manifest</c> on a fake game (section 7.14 of the M11

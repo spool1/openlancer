@@ -122,6 +122,26 @@ public sealed class PlayCopyTests : IDisposable
         Assert.Equal("test.json", copy.Record.Installed[ModelPath].Profile);
     }
 
+    /// <summary>Play in the game merges with the route tables of the game, so the play copy gets the tables of the
+    /// mods when they change the routes.</summary>
+    [Fact]
+    public void ThePlayBuildGivesTheRouteTablesToThePlayCopy()
+    {
+        new RouteWorld().System("A", "gate B").System("B", "gate A").WriteInto(game.Export);
+        var mod = RouteWorld.ConnectionMod(game.Export);
+        using var copy = game.Make();
+
+        var play = PlayBuild.Run(game.Export.Report(), [mod], TestWorkspace.FakeDllWriter.Instance, ThnScripts.Evaluator);
+        var result = copy.Install(play.Files, null);
+
+        Assert.False(play.HasErrors, string.Join("\n", play.Problems));
+        Assert.Empty(result.Problems);
+        Assert.Equal(3, play.Files.Files.Count(f => f.Generated));
+        foreach (var name in new[] { "systems_shortest_path.ini", "shortest_legal_path.ini", "shortest_illegal_path.ini" })
+            Assert.True(copy.Record.Installed.ContainsKey($@"DATA\UNIVERSE\{name}"), name);
+        Assert.Contains("Path = A, E, A, E", File.ReadAllText(game.CopyPath(@"DATA\UNIVERSE\systems_shortest_path.ini")));
+    }
+
     [Fact]
     public void TheSourceKeepsItsAttributesAndTimes()
     {

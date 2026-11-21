@@ -170,4 +170,32 @@ public sealed class DropInPackageTests
         Assert.Contains(result.Problems, p => p.Message.StartsWith(@"A whole EXE\freelancer.ini replaces the lines of the game."));
         Assert.False(Directory.Exists(result.OutputFolder));
     }
+
+    /// <summary>The zip holds the generated route tables in the folder of the game, and the README lists them.</summary>
+    [Fact]
+    public void TheZipHoldsTheGeneratedRouteTables()
+    {
+        using var game = new RouteWorld().System("A", "gate B").System("B", "gate A").WriteInto(new ExportGame());
+        var mod = RouteWorld.ConnectionMod(game);
+        var files = RouteWorld.Build(game, mod);
+
+        var package = DropInPackage.Write(files, mod.Manifest, game.Target);
+
+        using var zip = Open(package);
+        // The fake game has the folder DATA\universe, so the entries have that letter case.
+        var all = zip.GetEntry("DATA/universe/systems_shortest_path.ini");
+        Assert.True(all != null, string.Join(", ", zip.Entries.Select(e => e.FullName)));
+        Assert.Equal(files.File(@"DATA\UNIVERSE\systems_shortest_path.ini")!.Bytes, ReadBytes(all!));
+        Assert.NotNull(zip.GetEntry("DATA/universe/shortest_legal_path.ini"));
+        Assert.NotNull(zip.GetEntry("DATA/universe/shortest_illegal_path.ini"));
+        Assert.Contains(@"- DATA\universe\shortest_legal_path.ini", Entry(zip, "conn README.txt"));
+    }
+
+    private static byte[] ReadBytes(ZipArchiveEntry entry)
+    {
+        using var stream = entry.Open();
+        using var copy = new MemoryStream();
+        stream.CopyTo(copy);
+        return copy.ToArray();
+    }
 }
