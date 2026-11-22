@@ -121,7 +121,7 @@ Connect the agent program to the editor first (see "Connect an agent to the edit
 12. In the game, fly to the new jump hole in Li02, and jump to Av01.
 13. Dock with the first ring of the lane. The HUD shows the two end names of the lane, and the ride goes to the last ring.
 
-Before the save, the Database, the Universe panel and the Inspector show the new system. The Scene shows a card that asks for the save (see "What you see in the editor"). The agent can do steps 2 to 5 in one `edit_batch`, so one undo takes back the whole system.
+Before the save, the Database, the Universe panel and the Inspector show the new system. The Scene shows a card that asks for the save (see "What you see in the editor"). The agent can make the system, the pair and the lane in one `edit_batch`, so one undo takes them back.
 
 The known limits of this version:
 
