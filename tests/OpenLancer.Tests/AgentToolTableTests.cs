@@ -220,8 +220,9 @@ public sealed class AgentToolTableTests
         Assert.Equal(["render_cutscene", "save"], cutscene.OptionalTools);
         Assert.Equal(["name"], cutscene.Arguments.Select(a => a.Name));
         var system = Assert.Single(AgentPrompts.All, p => p.Name == "new_system");
-        Assert.Equal(["studio_status", "list_values", "check", "scene_place_patrol_route", "scene_set_encounters",
-            "system_create", "connection_create", "trade_lane_create", "get_universe", "get_trade_lane"], system.Tools);
+        Assert.Equal(["studio_status", "list_values", "get_raw_ini", "check", "scene_place_patrol_route",
+            "scene_set_encounters", "system_create", "connection_create", "trade_lane_create", "get_universe",
+            "get_trade_lane"], system.Tools);
         Assert.Equal(["render_scene", "save"], system.OptionalTools);
         Assert.Equal(["nickname", "neighbor"], system.Arguments.Select(a => a.Name));
         Assert.Equal([mission, cutscene, system], AgentPrompts.For(AgentTools.All));

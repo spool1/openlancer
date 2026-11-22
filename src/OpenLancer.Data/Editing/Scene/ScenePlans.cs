@@ -46,7 +46,7 @@ public static partial class ScenePlans
     public const string NoNewConnections =
         "The editor cannot make a jump gate, a jump hole, an airlock gate or a trade lane ring alone. Each one needs a " +
         "partner or a lane. For a jump gate pair or a jump hole pair, use " + SceneSections.PairTool + ". For a trade " +
-        "lane, use " + SceneSections.LaneTool + ".";
+        "lane, use " + SceneSections.LaneTool + ". " + SceneSections.InsertRingHint;
 
     /// <summary>The value of <c>pos</c> of a new item: whole numbers (decision D234).</summary>
     internal static string PositionText(Vector3 position) => string.Join(", ",
@@ -491,7 +491,13 @@ public static partial class ScenePlans
                     if (queued.Contains(reference.Section))
                         continue;
                     var referrer = session.Get(reference.Section);
-                    switch (reference.Rule.OnDelete)
+                    // The game reads a link line of a lane only on a ring. So a link line of another object, for example
+                    // a jump gate, goes like a line that the item can do without. It does not stop the delete.
+                    var onDelete = Universe.LanePlans.IsLink(reference.Key) &&
+                                   !Universe.LanePlans.IsRingObject(session, reference.Section)
+                        ? DeleteAction.Clear
+                        : reference.Rule.OnDelete;
+                    switch (onDelete)
                     {
                         case DeleteAction.Cascade:
                             Enqueue(reference.Section, DeleteReason.Cascade, $"{reference.Key} = {name}");
@@ -607,7 +613,12 @@ public static partial class ScenePlans
         }
         plan.Deletes = deletes;
         plan.Changes = relinks.Changes;
-        plan.Fixes = [.. fixes.SelectMany(f => f.Value.Select(r => new PlannedFix(f.Key, r.Key, r.Text))), .. relinks.Fixes];
+        plan.Fixes =
+        [
+            .. fixes.SelectMany(f => f.Value.Select(r => new PlannedFix(f.Key, r.Key, r.Text,
+                quietFixes.Contains((f.Key, r.First))))),
+            .. relinks.Fixes,
+        ];
         plan.Missing = missing;
         // Two objects that go can give the same base warning.
         warnings = warnings.DistinctBy(w => w.Message).ToList();

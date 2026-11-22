@@ -139,7 +139,7 @@ internal sealed class SceneEdits(EditorWindow window)
         if (MenuItems.Item(ObjectKinds.Light.Icon, "Light", unavailable))
             Create(SceneTemplate.Light, row);
         ImGui.Separator();
-        // The text has three sentences, so it wraps to keep the menu narrow.
+        // The text has more than one sentence, so it wraps to keep the menu narrow.
         ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + ImGui.GetFontSize() * 22);
         ImGui.TextDisabled(ScenePlans.NoNewConnections);
         ImGui.PopTextWrapPos();

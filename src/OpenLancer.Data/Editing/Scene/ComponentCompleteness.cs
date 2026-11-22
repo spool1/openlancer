@@ -84,8 +84,8 @@ public static class ComponentCompleteness
 
         CompletenessStep Links()
         {
-            if (problems.FirstOrDefault(p => p.Kind is LaneProblem.Circle or LaneProblem.OneWay or LaneProblem.NotRing) is
-                { Problem: { } link })
+            if (problems.FirstOrDefault(p => p.Kind is LaneProblem.Circle or LaneProblem.OneWay or LaneProblem.NotRing or
+                    LaneProblem.Break) is { Problem: { } link })
                 return new CompletenessStep("Links go both ways", CompletenessState.Missing, LinkReason, link.Message,
                     link.Target, repair, link.Severity == DiagnosticSeverity.Error);
             return lane.Rings.Count < 2
@@ -96,9 +96,14 @@ public static class ComponentCompleteness
 
         CompletenessStep Names()
         {
-            if (problems.FirstOrDefault(p => p.Kind == LaneProblem.NoEndName) is { Problem: { } missing })
+            // A break at an end ring without a name misses the name too, and the repair is its fix.
+            if (problems.FirstOrDefault(p => p.Kind == LaneProblem.NoEndName ||
+                                             p.Kind == LaneProblem.Break && p.Problem.Target is { } end &&
+                                             session.Get(end) is { } view &&
+                                             SceneSections.Last(view, "tradelane_space_name") == null) is
+                { Problem: { } missing } named)
                 return new CompletenessStep("Names at both ends", CompletenessState.Missing, NameReason, missing.Message,
-                    missing.Target);
+                    missing.Target, named.Kind == LaneProblem.Break ? repair : null);
             return ring.Loops || lane.Rings.Count < 2
                 ? new CompletenessStep("Names at both ends", CompletenessState.Missing, NameReason, NoEnds(ring))
                 : new CompletenessStep("Names at both ends", CompletenessState.Done, NameReason);

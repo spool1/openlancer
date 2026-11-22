@@ -53,7 +53,9 @@ public sealed record PlannedDelete(SectionRef Section, int Children, DeleteReaso
 /// <param name="Key">The key of the first line, for example <c>ring</c> or <c>exclusion</c>.</param>
 /// <param name="Text">What the fix does, for example "Bw05_Crow_nebula.ini: the hole of Zone_Bw05_01_exclusion (6
 /// lines)".</param>
-public sealed record PlannedFix(SectionRef Section, string Key, string Text);
+/// <param name="Part">True for a fix that is a part of the item that goes: a new link of a trade lane, or a gate lock
+/// line of a jump connection. Such a fix alone does not make the editor ask.</param>
+public sealed record PlannedFix(SectionRef Section, string Key, string Text, bool Part = false);
 
 /// <summary>A line that keeps a name of an item that goes, and shows "Missing" after the delete.</summary>
 /// <param name="Reference">The line.</param>

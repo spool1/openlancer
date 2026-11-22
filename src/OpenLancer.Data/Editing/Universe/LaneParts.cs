@@ -105,7 +105,8 @@ internal sealed class LaneParts(EditSession session)
                     result.Lines.Add((ring, key));
                     result.Fixes.Add(new PlannedFix(ring, key, wanted == null
                         ? $"{SceneSections.FileName(ring.Path)}: the {key} line of {ring.Id.Key} goes"
-                        : $"{SceneSections.FileName(ring.Path)}: the {key} line of {ring.Id.Key} names {wanted.Id.Key}"));
+                        : $"{SceneSections.FileName(ring.Path)}: the {key} line of {ring.Id.Key} names {wanted.Id.Key}",
+                        Part: true));
                 }
             }
             if (lane.Loops)
@@ -125,7 +126,8 @@ internal sealed class LaneParts(EditSession session)
                 {
                     result.Commands.AddRange(commands);
                     result.Fixes.Add(new PlannedFix(zone, "size",
-                        $"{SceneSections.FileName(zone.Path)}: the lane zone {zone.Id.Key} follows the new ends of its lane"));
+                        $"{SceneSections.FileName(zone.Path)}: the lane zone {zone.Id.Key} follows the new ends of its lane",
+                        Part: true));
                 }
             }
         }
@@ -151,7 +153,7 @@ internal sealed class LaneParts(EditSession session)
         result.Commands.Add(EditCommand.SetLinesFromText(newEnd, "tradelane_space_name",
             [string.Join(", ", name.Values.Select(v => v.ToString()!.Trim()))]));
         result.Fixes.Add(new PlannedFix(newEnd, "tradelane_space_name",
-            $"{SceneSections.FileName(newEnd.Path)}: {newEnd.Id.Key} gets the end name of {end.Id.Key}"));
+            $"{SceneSections.FileName(newEnd.Path)}: {newEnd.Id.Key} gets the end name of {end.Id.Key}", Part: true));
     }
 
     /// <summary>The lanes of the rings that go, once each, with the first ring of each lane that goes. A ring that goes

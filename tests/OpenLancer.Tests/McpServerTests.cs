@@ -240,6 +240,7 @@ public sealed class McpServerTests
         Assert.Contains("A mission opens it with Act_LockDock and unlock.", rule);
         Assert.Contains("A system with life:", rule);
         Assert.Contains("prop_group_save", rule);
+        Assert.Contains("An encounter spawns NPCs only when its faction has ships for the ship classes of the encounter.", rule);
         await Assert.ThrowsAsync<McpProtocolException>(() => client.ReadResourceAsync("openlancer://none", cancellationToken: Token).AsTask());
     }
 
@@ -555,6 +556,9 @@ public sealed class McpServerTests
         Assert.Contains("3. Call system_create with the nickname my_sys01, a name, like Li01", text);
         Assert.Contains("4. Call connection_create with the kind jump_gate, from the system my_sys01 and to the system Li01.", text);
         Assert.Contains("5. Call trade_lane_create with the system my_sys01, start_near the new gate and end_near the sun.", text);
+        Assert.Contains("6. Call list_values with the list zone_of_system and the system Li01.", text);
+        Assert.Contains("Copy the encounter lines and the faction lines of each zone.", text);
+        Assert.Contains("An encounter spawns NPCs only when its faction has ships for the ship classes of the encounter.", text);
         Assert.Contains("10. Tell the user what you added. Do not call save until the user asks for it.", text);
         Assert.Contains("11. After a save, wait until studio_status shows data_load ready.", text);
         Assert.DoesNotContain("{nickname}", text);

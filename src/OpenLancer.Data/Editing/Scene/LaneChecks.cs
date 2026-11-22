@@ -21,6 +21,10 @@ internal enum LaneProblem
     /// <summary>An end ring has no end name.</summary>
     NoEndName,
 
+    /// <summary>A ring of another part of the lane links to an end ring, but the end ring does not link back. So the
+    /// lane breaks at that end ring, for example after a raw edit removed its link line.</summary>
+    Break,
+
     /// <summary>A ring with an end name is in no lane.</summary>
     Lone,
 
@@ -141,11 +145,21 @@ internal static class LaneChecks
         }
 
         var hasName = SceneSections.Last(view, EndName) != null;
-        if (!walk.Loops && walk.Rings.Count > 1 && !hasName && (walk.Rings[0].Equals(ring) || walk.Rings[^1].Equals(ring)))
-            yield return (LaneProblem.NoEndName, Warning(ring, EndName,
-                $"The trade lane of {name} has no name at its {(walk.Rings[0].Equals(ring) ? "start" : "end")}. The HUD " +
-                $"shows no lane label. Set the name in the Lane name row of {name}. An agent uses set_text with the field " +
-                $"{EndName}."));
+        var isStart = walk.Rings[0].Equals(ring);
+        if (!walk.Loops && walk.Rings.Count > 1 && (isStart || walk.Rings[^1].Equals(ring)))
+        {
+            // At a break, the repair is the fix, also for the missing end name.
+            if (BreakAt(session, walk, ring, view, isStart) is { } link)
+                yield return (LaneProblem.Break, Warning(ring, isStart ? Prev : Next,
+                    $"{link.Ring} links to {name} in its {link.Key} line, but {name} does not link back to {link.Ring}. " +
+                    $"Ships on the lane can stop at {name}" + (hasName ? ". " : ", and the HUD shows no lane label. ") +
+                    Fix(session, ring)));
+            else if (!hasName)
+                yield return (LaneProblem.NoEndName, Warning(ring, EndName,
+                    $"The trade lane of {name} has no name at its {(isStart ? "start" : "end")}. The HUD shows no lane " +
+                    $"label. Set the name in the Lane name row of {name}. An agent uses set_text with the field " +
+                    $"{EndName}."));
+        }
 
         if (links == 0 && hasName &&
             !objects.Values.Any(o => LanePlans.IsRingObject(session, o) && LinksTo(session, o, name)))
@@ -191,6 +205,28 @@ internal static class LaneChecks
                     "traffic spawns away from the lane. Change the position, the rotation or the size of the zone so that " +
                     "it covers each ring of the lane. An agent uses set_fields."));
         }
+    }
+
+    /// <summary>
+    /// The ring that links to an end ring of a walk from outside the walk, with its link line, or null. At the start
+    /// ring, that ring names the start ring in its <c>next_ring</c> line. At the end ring, it names the end ring in its
+    /// <c>prev_ring</c> line. The end ring does not name it back. The first such ring in the file counts.
+    /// </summary>
+    private static (string Ring, string Key)? BreakAt(EditSession session, LaneChain walk, SectionRef ring,
+        SectionView view, bool isStart)
+    {
+        var (key, own) = isStart ? (Next, Prev) : (Prev, Next);
+        var back = SceneSections.Last(view, own);
+        var inWalk = walk.Rings.ToHashSet();
+        foreach (var other in Rings(session, ring.Path))
+        {
+            if (inWalk.Contains(other) || other.Id.Key is not { } otherName ||
+                !string.Equals(SceneSections.Last(session.Get(other)!, key), ring.Id.Key, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(back, otherName, StringComparison.OrdinalIgnoreCase))
+                continue;
+            return (otherName, key);
+        }
+        return null;
     }
 
     /// <summary>The problem of a lane that goes in a circle, on a ring. The fix is a repair, or the delete of the ring

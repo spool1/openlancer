@@ -409,6 +409,59 @@ public sealed class AgentLaneToolTests
         Assert.Contains((string)made["zone"]!, Deletes(gone));
     }
 
+    /// <summary>
+    /// A sun with a link line to the first ring is no ring, because the game makes lanes only from objects with the ring
+    /// archetype. So each lane tool refuses the sun with the detail NotLaneRing and changes nothing. trade_lane_delete on
+    /// a ring of the lane never takes the sun.
+    /// </summary>
+    [Theory]
+    [InlineData("trade_lane_insert_ring", """{ "after": "obj:Li01_sun" }""", "after")]
+    [InlineData("trade_lane_insert_ring", """{ "before": "obj:Li01_sun" }""", "before")]
+    [InlineData("trade_lane_repair", """{ "ring": "obj:Li01_sun" }""", "ring")]
+    [InlineData("trade_lane_delete", """{ "ring": "obj:Li01_sun", "confirm": true }""", "ring")]
+    [InlineData("get_trade_lane", """{ "ring": "obj:Li01_sun" }""", "ring")]
+    public void TheLaneToolsRefuseAnObjectWithALinkLineThatIsNoRing(string tool, string arguments, string field)
+    {
+        var (ws, session, host) = Lanes(LanePlansTests.SunLinkText());
+        using var _ = ws;
+
+        var error = Failure(host, tool, arguments);
+
+        Assert.Equal(("invalid_value", LanePlans.NotLaneRing, field),
+            ((string?)error["code"], (string?)error["detail"], (string?)error["field"]));
+        Assert.Equal(0, session.Revision);
+        var lane = Ok(host, "trade_lane_delete", """{ "ring": "obj:Li01_Trade_Lane_Ring_1", "confirm": true }""");
+        Assert.DoesNotContain("obj:Li01_sun", Deletes(lane));
+        Assert.NotNull(session.Get(SceneWorkspace.Object("Li01_sun")));
+    }
+
+    /// <summary>
+    /// A delete of a ring that another file names as text asks for that mention. The question gives the mention first.
+    /// The new links of the neighbor rings come last, as parts of the lane that alone do not ask. A ring without a
+    /// mention does not ask.
+    /// </summary>
+    [Fact]
+    public void TheQuestionOfARingDeleteGivesTheMentionBeforeTheNewLinks()
+    {
+        using var ws = LaneWorkspace.Create();
+        ws.WriteBase(@"DATA\SCRIPTS\story.ini", "[Note]\nobject = Li01_Trade_Lane_Ring_2\n");
+        var host = new TestAgentHost(ws.Session("act"));
+        const string parts = "As parts of a trade lane or a jump connection, it also changes the lines of " +
+                             "obj:Li01_Trade_Lane_Ring_1, obj:Li01_Trade_Lane_Ring_3. These changes alone do not ask.";
+
+        var (code, _, message) = Error(host, "delete_items", """{ "refs": ["obj:Li01_Trade_Lane_Ring_2"] }""");
+        var quiet = Ok(host, "delete_items", """{ "refs": ["obj:Li01_Trade_Lane_Ring_3"] }""");
+
+        Assert.Equal("needs_confirmation", code);
+        Assert.StartsWith("The edit 'Delete Li01_Trade_Lane_Ring_2' changes more than its targets. These files name the " +
+                          "item as text: ", message);
+        Assert.Contains("story.ini", message);
+        Assert.Contains(parts, message);
+        Assert.True(message!.IndexOf("story.ini", StringComparison.Ordinal) < message.IndexOf(parts, StringComparison.Ordinal));
+        Assert.DoesNotContain("that name the targets", message);
+        Assert.Equal("applied", (string?)quiet["status"]);
+    }
+
     /// <summary>rename_item on a ring keeps the rename of the Scene: the link lines of the neighbors name the new
     /// nickname. Undo gives the old links back.</summary>
     [Fact]

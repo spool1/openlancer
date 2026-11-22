@@ -87,6 +87,10 @@ internal static class SceneSections
     /// <summary>The tools that make a trade lane and add a ring to one, as the texts of the editor name them.</summary>
     public const string LaneTool = "the trade lane tools trade_lane_create and trade_lane_insert_ring of the agent server";
 
+    /// <summary>How a user of the editor adds a ring to a lane, as the texts of the editor tell it.</summary>
+    public const string InsertRingHint =
+        "To add a ring to a lane in the editor, select a ring and click Insert ring after in the Inspector.";
+
     /// <summary>The kind of a trade lane ring in plain words (see <see cref="ConnectionKind"/>).</summary>
     public const string LaneRingKind = "trade lane ring";
 
@@ -105,10 +109,6 @@ internal static class SceneSections
             return "jump gate";
         return view.Lines("prev_ring").Count > 0 || view.Lines("next_ring").Count > 0 ? LaneRingKind : null;
     }
-
-    /// <summary>True for a trade lane ring (see <see cref="ConnectionKind"/>). It is an object with an archetype of the
-    /// type <c>TRADELANE_RING</c>, or with a <c>prev_ring</c> or a <c>next_ring</c> line and no other connection.</summary>
-    public static bool IsLaneRing(EditSession session, SectionView view) => ConnectionKind(session, view) == LaneRingKind;
 
     /// <summary>The kind of a connection type of the rule data in plain words, for example "jump hole" for
     /// <c>jumphole</c>.</summary>
@@ -145,7 +145,7 @@ internal static class SceneSections
                    $"partner. To make a pair, use {PairTool}.";
         if (kind == LaneRingKind)
             return $"{name} is a trade lane ring. This version cannot {verb} trade lane rings, because a copy is not a " +
-                   $"part of the lane. To make a lane or a ring, use {LaneTool}.";
+                   $"part of the lane. To make a lane or a ring, use {LaneTool}. {InsertRingHint}";
         return $"{name} is {WithArticle(kind)}. This version cannot {verb} {kind}s.";
     }
 

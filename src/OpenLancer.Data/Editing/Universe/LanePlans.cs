@@ -388,7 +388,7 @@ public static class LanePlans
     /// <remarks>After the last ring or before the first ring, the lane gets longer. The end name moves to the new end
     /// ring, and the lane zone follows the new ends. The default position is the middle between the two rings, or one
     /// spacing beyond the end. The plan refuses an object that is not a ring of a lane, and a ring before that is not
-    /// the first ring.</remarks>
+    /// the first ring. For a ring without a position, the plan needs <paramref name="position"/>.</remarks>
     /// <param name="ring">The ring that the new ring goes after or before.</param>
     /// <param name="position">The position of the new ring, or null for the default position.</param>
     /// <param name="nickname">The nickname of the new ring, or null for the next free ring nickname.</param>
@@ -418,8 +418,11 @@ public static class LanePlans
             : null;
         if (next is { } nextRing && session.Get(nextRing)?.ReadOnlyReason is { } nextReason)
             return plan.Refuse(ring.Path, $"{nextRing.Id.Key}: {nextReason}", nextRing, part: part);
-        if (SceneSections.Position(view) is not { } at0)
-            return plan.Refuse(ring.Path, $"{ring.Id.Key} has no position. Give the position of the new ring.", ring,
+        // A given position needs no position of the ring. The rotation then comes from the neighbors of the place.
+        var at0 = SceneSections.Position(view);
+        if (position == null && at0 == null)
+            return plan.Refuse(ring.Path, $"{ring.Id.Key} has no position. Give it a pos line, then insert the ring. An " +
+                                          "agent can also give the position of the new ring.", ring,
                 MissionErrors.FieldValue, "position");
 
         // The position of the new ring.
@@ -427,16 +430,17 @@ public static class LanePlans
         if (position is { } given)
             placeAt = given;
         else if (place == LanePlace.After && next != null && PositionOf(session, next) is { } nextAt)
-            placeAt = (at0 + nextAt) / 2;
+            placeAt = (at0!.Value + nextAt) / 2;
         else
         {
             // One spacing beyond the end, away from the neighbor of the end ring.
+            var end = at0!.Value;
             var neighbor = place == LanePlace.After ? at > 0 ? lane.Rings[at - 1] : null
                 : lane.Rings.Count > 1 ? lane.Rings[1] : null;
-            var outward = neighbor != null && PositionOf(session, neighbor) is { } other && Vector3.Distance(at0, other) >= 1
-                ? at0 - other
+            var outward = neighbor != null && PositionOf(session, neighbor) is { } other && Vector3.Distance(end, other) >= 1
+                ? end - other
                 : Forward(view) * (place == LanePlace.After ? 1 : -1) * rule.Spacing;
-            placeAt = at0 + outward;
+            placeAt = end + outward;
         }
         placeAt = Round(placeAt);
 
@@ -959,10 +963,12 @@ public static class LanePlans
     internal static bool IsLink(string key) =>
         key.Equals("prev_ring", StringComparison.OrdinalIgnoreCase) || key.Equals("next_ring", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>The ring of a lane that a section is, with its view, or null for another section.</summary>
+    /// <summary>The ring of a lane that a section is, with its view, or null for another section. A ring is an object of
+    /// a system file with an archetype of the type <c>TRADELANE_RING</c> (see <see cref="IsRingObject"/>). So an object
+    /// of another type with a link line, for example a sun, is no ring, and each plan refuses it.</summary>
     internal static SectionView? RingView(EditSession session, SectionRef ring) =>
         SceneSections.KindOf(session, ring) == SceneKind.Object && session.Get(ring) is { } view &&
-        SceneSections.IsLaneRing(session, view)
+        SceneSections.ArchetypeType(session, view) == RingType
             ? view
             : null;
 

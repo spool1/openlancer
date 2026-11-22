@@ -183,7 +183,8 @@ public sealed class AssetCatalogTests
         Assert.Equal("The editor cannot make a jump gate, a jump hole, an airlock gate or a trade lane ring alone. Each " +
                      "one needs a partner or a lane. For a jump gate pair or a jump hole pair, use the jump connection " +
                      "tool connection_create of the agent server. For a trade lane, use the trade lane tools " +
-                     "trade_lane_create and trade_lane_insert_ring of the agent server.",
+                     "trade_lane_create and trade_lane_insert_ring of the agent server. To add a ring to a lane in the " +
+                     "editor, select a ring and click Insert ring after in the Inspector.",
             AssetWorkspace.Row(session, "solars/connections", "jumpgate").NotPlaceable);
         var odd = AssetWorkspace.Row(session, "solars", "odd");
         Assert.Equal("solars/solar", odd.CategoryId);

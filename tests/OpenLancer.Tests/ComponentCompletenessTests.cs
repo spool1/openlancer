@@ -391,6 +391,31 @@ public sealed class ComponentCompletenessTests
         Assert.True(ComponentCompleteness.Of(session, Ring(1))!.Complete);
     }
 
+    /// <summary>
+    /// A lost next_ring line in the middle of a lane breaks the lane at that ring. The link step counts the next ring
+    /// that still names it. So the link step and the name step both miss with the text of the break, go to the ring, and
+    /// have the fix "Repair lane". The repair makes the lane complete.
+    /// </summary>
+    [Fact]
+    public void ALostLinkInTheMiddleMissesTheLinkStepAndTheNameStepWithTheRepairFix()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.RemoveName(Ring(2), "next_ring"));
+
+        var links = Step(session, Ring(1), 0);
+        var names = Step(session, Ring(1), 1);
+
+        var text = Check(session, Ring(2), "Li01_Trade_Lane_Ring_3 links to Li01_Trade_Lane_Ring_2 in its prev_ring line");
+        Assert.Equal((CompletenessState.Missing, text, (object?)Ring(2), ComponentCompleteness.RepairFix),
+            (links.State, links.Detail, links.GoTo, links.Fix));
+        Assert.Equal((CompletenessState.Missing, text, (object?)Ring(2), ComponentCompleteness.RepairFix),
+            (names.State, names.Detail, names.GoTo, names.Fix));
+        Assert.Equal("Ring 2 of 2", ConnectionComponents.Ring(session, Ring(2))!.Place);
+        Run(session, LanePlans.Repair(session, Ring(2)));
+        Assert.True(ComponentCompleteness.Of(session, Ring(1))!.Complete);
+    }
+
     /// <summary>An end without a name misses the name step and goes to that end ring.</summary>
     [Fact]
     public void AnEndWithoutANameGoesToItsRing()

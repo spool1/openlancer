@@ -952,6 +952,213 @@ public sealed class LanePlansTests
         Assert.Equal("36.87, -90, 0", LanePlans.RotationText(LanePlans.RotationOf(new Vector3(4, 3, 0))));
     }
 
+    /// <summary>The text of the lane of Li01 with a link line on the sun that names the first ring.</summary>
+    internal static string SunLinkText() => LaneWorkspace.Li01Text.Replace("archetype = lane_sun\n",
+        "archetype = lane_sun\nnext_ring = Li01_Trade_Lane_Ring_1\n", StringComparison.Ordinal);
+
+    /// <summary>
+    /// The game makes lanes only from objects with the ring archetype. So a sun with a link line is no ring: each lane
+    /// plan refuses it, and the lane of a ring does not take it. A delete of the lane takes only the rings and the zone.
+    /// A delete of the sun deletes only the sun.
+    /// </summary>
+    [Fact]
+    public void AnObjectWithALinkLineThatIsNoRingIsNoPartOfTheLane()
+    {
+        var text = SunLinkText();
+        Assert.Contains("next_ring = Li01_Trade_Lane_Ring_1\n[Object]\nnickname = Li01_to_Li02", text);
+        using var ws = LaneWorkspace.Create(text);
+        var session = ws.Session("act");
+        var sun = SceneWorkspace.Object("Li01_sun");
+
+        Assert.Equal("Li01_sun is not a ring of a trade lane.",
+            Refusal(LanePlans.InsertRing(session, sun, LanePlace.After), LanePlans.NotLaneRing).Message);
+        Refusal(LanePlans.InsertRing(session, sun, LanePlace.Before), LanePlans.NotLaneRing);
+        Refusal(LanePlans.Repair(session, sun), LanePlans.NotLaneRing);
+        Refusal(LanePlans.Delete(session, sun), LanePlans.NotLaneRing);
+        Refusal(LanePlans.RemoveRings(session, [sun]), LanePlans.NotLaneRing);
+        Assert.Equal([Ring(1), Ring(2), Ring(3), Ring(4)], LanePlans.LaneOf(session, Ring(1))!.Rings);
+        Assert.Equal([sun], Run(session, ScenePlans.Delete(session, [sun])).Deletes.Select(d => d.Section));
+        Assert.Empty(session.Get(Ring(1))!.Lines("prev_ring"));
+        session.Undo();
+
+        var lane = Run(session, LanePlans.Delete(session, Ring(2)));
+
+        Assert.Equal([Ring(1), Ring(2), Ring(3), Ring(4), LaneWorkspace.Zone], lane.Deletes.Select(d => d.Section));
+        Assert.NotNull(session.Get(sun));
+        Assert.Null(Line(session, sun, "next_ring"));
+    }
+
+    /// <summary>
+    /// The game reads a link line only on a ring. A link line of a jump gate that names a ring that goes does not stop
+    /// the delete. The line goes with the ring, and the delete asks. The gate and its partner stay, and the lane links
+    /// again.
+    /// </summary>
+    [Fact]
+    public void ALinkLineOfAnObjectThatIsNoRingGoesWithTheRing()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        var gate = SceneWorkspace.Object("Li01_to_Li02");
+        session.Execute(EditCommand.SetLinesFromText(gate, "next_ring", ["Li01_Trade_Lane_Ring_2"]));
+
+        var plan = Run(session, ScenePlans.Delete(session, [Ring(2)]));
+
+        Assert.Equal([Ring(2)], plan.Deletes.Select(d => d.Section));
+        Assert.True(plan.NeedsConfirmation);
+        var fix = Assert.Single(plan.Fixes, f => f.Section.Equals(gate));
+        Assert.Equal(("next_ring", "li01.ini: the 'next_ring' line of Li01_to_Li02", false), (fix.Key, fix.Text, fix.Part));
+        Assert.All(plan.Fixes.Where(f => !f.Section.Equals(gate)), f => Assert.True(f.Part));
+        Assert.Null(Line(session, gate, "next_ring"));
+        Assert.Equal("Li02, Li02_to_Li01, gate_tunnel_bretonia", Line(session, gate, "goto"));
+        Assert.NotNull(session.Get(SceneWorkspace.Li02("Object", "Li02_to_Li01")));
+        Assert.Equal([Ring(1), Ring(3), Ring(4)], LanePlans.LaneOf(session, Ring(1))!.Rings);
+        session.Undo();
+        Assert.Equal("Li01_Trade_Lane_Ring_2", Line(session, gate, "next_ring"));
+    }
+
+    /// <summary>
+    /// A new ring after the end at a place off the axis turns the end of the lane. The lane zone turns with the lane, so
+    /// it still covers the lane and gives no warning.
+    /// </summary>
+    [Fact]
+    public void AnInsertThatTurnsTheLaneTurnsItsZone()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+
+        var plan = Run(session, LanePlans.InsertRing(session, Ring(4), LanePlace.After, new Vector3(30000, 0, -10000),
+            "Li01_turn"));
+
+        Assert.Equal(LaneWorkspace.Zone, plan.Zone);
+        Assert.Equal(("15000, 0, -15000", "0, -108.43, 0", "500, 500, 32623"), (Line(session, LaneWorkspace.Zone, "pos"),
+            Line(session, LaneWorkspace.Zone, "rotate"), Line(session, LaneWorkspace.Zone, "size")));
+        Assert.Equal(LaneWorkspace.Zone, LanePlans.ZoneOf(session, LanePlans.LaneOf(session, Ring(1))!));
+        Assert.Empty(LaneChecks.Check(session, LaneWorkspace.Zone));
+    }
+
+    /// <summary>
+    /// A lane zone keeps its width only while the zone meets the lane zone rule. A lane of 1500 m gets a zone of 2500 m,
+    /// so its width and height become one eleventh of that. The zone stays the zone of the lane.
+    /// </summary>
+    [Fact]
+    public void AShorterLaneMakesItsZoneNarrower()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        Run(session, LanePlans.InsertRing(session, Ring(1), LanePlace.After, new Vector3(1500, 0, -20000), "Li01_near"));
+
+        Run(session, ScenePlans.Delete(session, [Ring(2), Ring(3), Ring(4)]));
+
+        Assert.Equal(("750, 0, -20000", "227, 227, 2500"),
+            (Line(session, LaneWorkspace.Zone, "pos"), Line(session, LaneWorkspace.Zone, "size")));
+        var lane = LanePlans.LaneOf(session, Ring(1))!;
+        Assert.Equal([Ring(1), SceneWorkspace.Object("Li01_near")], lane.Rings);
+        Assert.Equal(LaneWorkspace.Zone, LanePlans.ZoneOf(session, lane));
+        Assert.True(LaneZones.IsLaneZone(session, LaneWorkspace.Zone));
+    }
+
+    /// <summary>Of two lane zones that cover the lane, the zone nearer to the axis of the lane is its zone, also when the
+    /// farther zone comes first in the file.</summary>
+    [Fact]
+    public void TheNearerOfTwoZonesIsTheZoneOfTheLane()
+    {
+        const string far = """
+            [zone]
+            nickname = Zone_Li01_Tradelane_0
+            pos = 11250, 0, -19000
+            rotate = 0, -90, 0
+            shape = BOX
+            size = 500, 500, 23500
+            pop_type = major_tradelane
+
+            """;
+        using var ws = LaneWorkspace.Create(LaneWorkspace.Li01Text.Replace("[zone]\nnickname = Zone_Li01_Tradelane_1",
+            far + "[zone]\nnickname = Zone_Li01_Tradelane_1", StringComparison.Ordinal));
+        var session = ws.Session("act");
+        var farZone = SceneWorkspace.Zone("Zone_Li01_Tradelane_0");
+        Assert.True(session.Sections(SceneWorkspace.Li01Path).ToList().IndexOf(farZone) <
+                    session.Sections(SceneWorkspace.Li01Path).ToList().IndexOf(LaneWorkspace.Zone));
+
+        Assert.Equal(LaneWorkspace.Zone, LanePlans.ZoneOf(session, LanePlans.LaneOf(session, Ring(1))!));
+    }
+
+    /// <summary>A lane whose links go in a circle has no first ring, so before refuses also on the ring at the start of
+    /// the walk.</summary>
+    [Fact]
+    public void BeforeRefusesOnALaneInACircle()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.SetLinesFromText(Ring(1), "prev_ring", ["Li01_sun"]));
+        session.Execute(EditCommand.SetLinesFromText(Ring(4), "next_ring", ["Li01_Trade_Lane_Ring_1"]));
+        var lane = LanePlans.LaneOf(session, Ring(1))!;
+        Assert.True(lane.Loops);
+        Assert.Equal(Ring(1), lane.Rings[0]);
+
+        Refusal(LanePlans.InsertRing(session, Ring(1), LanePlace.Before), LanePlans.BeforeNotFirst);
+    }
+
+    /// <summary>A delete of an end ring moves its end name only to a new end ring without a name. A neighbor with a name
+    /// keeps its name.</summary>
+    [Fact]
+    public void ANewEndRingWithANameKeepsItsName()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.SetLinesFromText(Ring(3), "tradelane_space_name", ["506"]));
+
+        var plan = Run(session, ScenePlans.Delete(session, [Ring(4)]));
+
+        Assert.Equal("506", Line(session, Ring(3), "tradelane_space_name"));
+        Assert.DoesNotContain(plan.Fixes, f => f.Key == "tradelane_space_name");
+    }
+
+    /// <summary>
+    /// A repair whose links go forward as often as back has no direction from the links. The ring without a prev_ring
+    /// line then becomes the first ring, because the first ring of a lane has no prev_ring line.
+    /// </summary>
+    [Fact]
+    public void ARepairOfLinksWithoutADirectionStartsAtTheRingWithoutAPreviousRing()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.RemoveName(Ring(1), "next_ring"));
+        session.Execute(EditCommand.SetLinesFromText(Ring(1), "prev_ring", ["Li01_Trade_Lane_Ring_2"]));
+        session.Execute(EditCommand.RemoveName(Ring(2), "prev_ring"));
+        session.Execute(EditCommand.RemoveName(Ring(3), "prev_ring"));
+        session.Execute(EditCommand.RemoveName(Ring(3), "next_ring"));
+        session.Execute(EditCommand.RemoveName(Ring(4), "prev_ring"));
+
+        var plan = Run(session, LanePlans.Repair(session, Ring(1)));
+
+        Assert.Equal([Ring(4), Ring(3), Ring(2), Ring(1)], plan.Rings);
+        Assert.Equal([Ring(4), Ring(3), Ring(2), Ring(1)], LanePlans.LaneOf(session, Ring(2))!.Rings);
+        Assert.Equal(("505", "504"), (Line(session, Ring(4), "tradelane_space_name"), Line(session, Ring(1), "tradelane_space_name")));
+    }
+
+    /// <summary>
+    /// A ring without a position takes a new ring when the call gives the position. The rotation of the new ring then
+    /// looks toward its next ring. Without a position, the plan refuses with a fix that works.
+    /// </summary>
+    [Fact]
+    public void ARingWithoutAPositionTakesANewRingAtAGivenPosition()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.RemoveName(Ring(2), "pos"));
+
+        var unplaced = LanePlans.InsertRing(session, Ring(2), LanePlace.After);
+        var refused = Refusal(unplaced, MissionErrors.FieldValue);
+        var plan = Run(session, LanePlans.InsertRing(session, Ring(2), LanePlace.After, new Vector3(11250, 0, -20000)));
+
+        Assert.Equal("Li01_Trade_Lane_Ring_2 has no position. Give it a pos line, then insert the ring. An agent can also " +
+                     "give the position of the new ring.", refused.Message);
+        Assert.Equal("position", unplaced.RefusedPart);
+        Assert.Equal([Ring(1), Ring(2), plan.Ring!, Ring(3), Ring(4)], plan.Rings);
+        Assert.Equal(("11250, 0, -20000", "0, -90, 0"), (Line(session, plan.Ring!, "pos"), Line(session, plan.Ring!, "rotate")));
+        Assert.Equal(plan.Ring!.Id.Key, Line(session, Ring(2), "next_ring"));
+    }
+
     /// <summary>Two vectors that differ by at most a tolerance on each axis.</summary>
     private sealed class VectorNear(float tolerance) : System.Collections.Generic.IEqualityComparer<Vector3>
     {

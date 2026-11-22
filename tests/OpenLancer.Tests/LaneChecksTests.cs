@@ -84,6 +84,9 @@ public sealed class LaneChecksTests
         var problem = Assert.Single(Lane(session, Ring(1)));
         var error = Assert.Single(session.SaveProblems(), p => p.Message.Contains("goes in a circle"));
 
+        // Each circle gives one error, not one error for each ring of the circle.
+        var saveError = Assert.Single(LaneChecks.SaveErrors(session, SceneWorkspace.Li01Path));
+        Assert.Equal((circle, Ring(1)), (saveError.Message, saveError.Target));
         Assert.Equal(circle, problem.Message);
         AssertSte(problem);
         Assert.Equal((DiagnosticSeverity.Error, "prev_ring"), (problem.Severity, problem.Key));
@@ -297,6 +300,40 @@ public sealed class LaneChecksTests
 
         session.Execute(ItemEdits.SetText(session, Ring(4), "tradelane_space_name", "Far Point"));
         Assert.Empty(Lane(session, Ring(4)));
+    }
+
+    /// <summary>
+    /// A raw edit can remove the next_ring line of a middle ring. The walk from the first ring then stops at that ring,
+    /// but the ring is no real end, because the next ring still names it. So the ring gets the repair as its fix, not
+    /// the end name. A name does not end the warning. A repair does.
+    /// </summary>
+    [Fact]
+    public void ALostLinkInTheMiddleOfALaneNamesTheRepair()
+    {
+        using var ws = LaneWorkspace.Create();
+        var session = ws.Session("act");
+        session.Execute(EditCommand.RemoveName(Ring(2), "next_ring"));
+
+        var ring2 = Assert.Single(Lane(session, Ring(2)));
+
+        Assert.Equal("Li01_Trade_Lane_Ring_3 links to Li01_Trade_Lane_Ring_2 in its prev_ring line, but " +
+                     "Li01_Trade_Lane_Ring_2 does not link back to Li01_Trade_Lane_Ring_3. Ships on the lane can stop at " +
+                     "Li01_Trade_Lane_Ring_2, and the HUD shows no lane label. Repair the lane of Li01_Trade_Lane_Ring_2 " +
+                     "with the button Repair lane in the Inspector. An agent uses trade_lane_repair.", ring2.Message);
+        AssertSte(ring2);
+        Assert.Equal((DiagnosticSeverity.Warning, "next_ring"), (ring2.Severity, ring2.Key));
+        Assert.Contains(Lane(session, Ring(3)), p => p.Message.Contains("do not link both ways") && p.Key == "prev_ring");
+        Assert.Equal([ring2.Message],
+            LaneChecks.Lane(session, LanePlans.LaneOf(session, Ring(1))!).Select(p => p.Message));
+
+        session.Execute(ItemEdits.SetText(session, Ring(2), "tradelane_space_name", "Middle"));
+        Assert.StartsWith("Li01_Trade_Lane_Ring_3 links to Li01_Trade_Lane_Ring_2 in its prev_ring line, but " +
+                          "Li01_Trade_Lane_Ring_2 does not link back to Li01_Trade_Lane_Ring_3. Ships on the lane can stop " +
+                          "at Li01_Trade_Lane_Ring_2. Repair the lane", Assert.Single(Lane(session, Ring(2))).Message);
+        session.Undo();
+
+        Run(session, LanePlans.Repair(session, Ring(1)));
+        Assert.All(Enumerable.Range(1, 4), n => Assert.Empty(Lane(session, Ring(n))));
     }
 
     /// <summary>A link to an object that is no ring warns with the archetype of the object. A repair removes the link,

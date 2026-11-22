@@ -610,8 +610,9 @@ internal static class EditTools
             .Select(d => Ref(d.Section)).ToList();
         if (cascade.Count > 0)
             parts.Add(AgentTexts.Error("confirm_cascade", ("refs", Shown(cascade))));
-        if (plan.Fixes.Count > 0)
-            parts.Add(AgentTexts.Error("confirm_fixes", ("refs", Shown(plan.Fixes.Select(f => Ref(f.Section)).Distinct().ToList()))));
+        // A fix that is a part of the item does not ask. So the text names it last, after the reasons of the question.
+        if (plan.Fixes.Where(f => !f.Part).Select(f => Ref(f.Section)).Distinct().ToList() is { Count: > 0 } asking)
+            parts.Add(AgentTexts.Error("confirm_fixes", ("refs", Shown(asking))));
         // A rename also changes the mission lines that name the item. The question names their sections and scripts.
         var missions = plan.Changes.Where(c => SectionKeys.IsMissionFile(c.Path)).ToList();
         if (missions.Count > 0)
@@ -636,6 +637,8 @@ internal static class EditTools
         if (plan.Mentions.Count > 0)
             parts.Add(AgentTexts.Error("confirm_mentions", ("files", Shown(plan.Mentions.Select(m => m.Path).Distinct().ToList()))));
         parts.AddRange(plan.Warnings.Select(w => w.Message).Distinct());
+        if (plan.Fixes.Where(f => f.Part).Select(f => Ref(f.Section)).Distinct().ToList() is { Count: > 0 } relinked)
+            parts.Add(AgentTexts.Error("confirm_parts", ("refs", Shown(relinked))));
         return string.Join(" ", parts);
     }
 
