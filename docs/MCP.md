@@ -111,7 +111,7 @@ Connect the agent program to the editor first (see "Connect an agent to the edit
 2. Ask the agent: "Make the system Av01 like Li02, next to Li02 on the nav map." The agent calls `get_universe` to find a free place, then `system_create`.
 3. Ask the agent: "Connect Av01 and Li02 with a jump hole pair." The agent calls `connection_create` with the kind `jump_hole`.
 4. Ask the agent: "Make a trade lane from the new jump hole toward the sun." The agent calls `trade_lane_create` with `start_near` and `end_near`. The last ring stays outside the death zone of the sun.
-5. Ask the agent: "Give the lane zone and the jump hole traffic zone the encounters of Li02." The agent calls `list_values` and `scene_set_encounters`.
+5. Ask the agent: "Give the new lane zone and traffic zone the encounters and factions of the Li02 zones." The agent reads the lane zones and the traffic zones of Li02, then calls `scene_set_encounters`.
 6. Ask the agent: "Check the mod and the lane, and tell me the problems." The agent calls `check` and `get_trade_lane`. An error stops the save. A warning does not stop it.
 7. Click **File > Save**, or ask the agent to save.
 8. Wait until the editor loads the game data again. The agent waits until `studio_status` gives `data_load: ready`.
@@ -127,11 +127,12 @@ Before the save, the Database, the Universe panel and the Inspector show the new
 The known limits of this version:
 
 - The Scene and `render_scene` open a new system only after the save and the reload of the game data.
-- The FLMM package refuses a mod with a new system file, because the file holds the text of the mod. The drop-in zip holds the new system. Give `export_mod` the format `drop_in` to make only the zip.
+- The FLMM package refuses a mod with a new system file, because the file holds the text of the mod. The drop-in zip holds the new system. Give `export_mod` the argument `"formats": ["drop_in"]` to make only the zip.
 - OpenLancer Play (F5) does not lock gates. A gate that a new game of the retail game locks is open in OpenLancer Play.
 - A new system has no `msg_id_prefix`. NPC speech that names the system is silent.
 - The editor renames and deletes only a system that the active mod adds. A system with a base cannot go in this version.
-- A system holds at most 10 jump gates and jump holes. In vanilla 1.1, Li01 has 9 of them and Li02 has 5. So Li01 takes only one more.
+- A system holds at most 10 jump gates, jump holes and airlock gates. In vanilla 1.1, Li01 has 9 of them and Li02 has 5. So Li01 takes only one more.
+- An encounter spawns NPCs only when its faction has ships for the ship classes of the encounter. The check does not test this. So use the encounter and the faction of a retail zone of the same kind.
 - The Universe panel is read-only. The editor has no hand tools that make a system, a jump connection or a lane. The agent tools make them. The Inspector has the "Lock at start" choice of a jump connection and the ring buttons of a lane.
 
 ## The tools

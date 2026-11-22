@@ -40,6 +40,9 @@ IMPERATIVES = {"ask", "attach", "click", "close", "copy", "correct", "do", "dock
                "repair", "run", "select", "start", "type", "wait", "write"}
 # The sections of the other pages whose numbered steps must have one command each.
 STEP_SECTIONS = (("docs/MCP.md", "## Make a new system with an agent"),)
+AGENT_TOOLS = "src/OpenLancer.Studio/Agent/agent-tools.json"
+# An argument of an agent tool in a help text, for example: Give `export_mod` the argument `"formats": ["drop_in"]`.
+TOOL_ARGUMENT = re.compile(r'`(\w+)` the argument `"(\w+)":')
 # The Play sections that must give the Play support of Freelancer 1.0, because their steps can start the 1.0 program.
 PLAY_STEPS = (("docs/GETTING_STARTED.md", "## Play the change in your game (Ctrl+F5)"),
               ("docs/PLAY.md", "## Play in the game"))
@@ -414,6 +417,21 @@ class HelpPageTests(unittest.TestCase):
             steps = numbered_steps(section(read(page), heading) or "")
             self.assertTrue(steps, f"{page}: no steps under {heading}")
             self.assertEqual([], [step for step in steps if actions(step) != 1], page)
+
+    def test_the_limits_of_the_new_system_help_name_the_real_arguments_and_rules(self):
+        """The export limit names the argument of export_mod as the tool table has it. The jump limit counts airlock
+        gates too, as the save check does (MOD_FORMAT.md). The encounter limit tells that a faction needs ships for the
+        encounter."""
+        text = section(read("docs/MCP.md"), "## Make a new system with an agent") or ""
+        tools = json.loads(read(AGENT_TOOLS))["tools"]
+        arguments = TOOL_ARGUMENT.findall(text)
+        self.assertIn(("export_mod", "formats"), arguments)
+        self.assertEqual([], [(tool, name) for tool, name in arguments
+                              if name not in (tools.get(tool) or {}).get("fields", {})])
+        jump_limit = next((line for line in text.splitlines() if "at most 10" in line), "")
+        self.assertIn("airlock gates", jump_limit)
+        self.assertIn("airlock gates count too", read("docs/MOD_FORMAT.md").lower())
+        self.assertIn("only when its faction has ships for the ship classes of the encounter", text)
 
     def test_the_commands_of_a_step_are_counted(self):
         for step, expected in (("Press Ctrl+F5.", 1),
