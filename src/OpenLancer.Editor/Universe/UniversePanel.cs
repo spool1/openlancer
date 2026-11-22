@@ -88,15 +88,92 @@ internal readonly record struct UniverseFrame(Vector2 Origin, float Scale, Vecto
             yield return (start + along * at, start + along * MathF.Min(at + dash, length));
         }
     }
+
+    /// <summary>
+    /// The top left corner of the label of each system, or null for a label that does not show. The labels of
+    /// <paramref name="first"/> always show under their dots. Each other label shows under its dot, else over it, when
+    /// that box is in the canvas and hits no label that shows and no dot of another system. The other labels take their
+    /// places in the order of the systems. So at a small zoom, the labels do not cover each other or the dots, and the
+    /// tooltip of a dot gives each name.
+    /// </summary>
+    /// <param name="dots">The screen point of the dot of each system, or null for a system without a place.</param>
+    /// <param name="sizes">The size of the label of each system, in pixels.</param>
+    /// <param name="dotRadius">The radius of a dot, in pixels.</param>
+    /// <param name="offset">The pixels from the middle of a dot to its label.</param>
+    /// <param name="canvas">The smallest and the largest corner of the canvas.</param>
+    /// <param name="first">The indexes of the systems whose labels always show: the selected and the hovered
+    /// system.</param>
+    public static Vector2?[] Labels(IReadOnlyList<Vector2?> dots, IReadOnlyList<Vector2> sizes, float dotRadius,
+        float offset, (Vector2 Min, Vector2 Max) canvas, IReadOnlyCollection<int> first)
+    {
+        var places = new Vector2?[dots.Count];
+        var shown = new List<(Vector2 Min, Vector2 Max)>();
+        foreach (var i in first)
+        {
+            if (dots[i] is { } dot)
+            {
+                places[i] = Below(dot, sizes[i], offset);
+                shown.Add((places[i]!.Value, places[i]!.Value + sizes[i]));
+            }
+        }
+
+        for (var i = 0; i < dots.Count; i++)
+        {
+            if (dots[i] is not { } dot || first.Contains(i))
+            {
+                continue;
+            }
+
+            foreach (var place in new[] { Below(dot, sizes[i], offset), Above(dot, sizes[i], offset) })
+            {
+                var box = (Min: place, Max: place + sizes[i]);
+                if (Inside(box, canvas) && !shown.Any(s => Hits(s, box)) && !HitsDot(box, dots, i, dotRadius))
+                {
+                    places[i] = place;
+                    shown.Add(box);
+                    break;
+                }
+            }
+        }
+
+        return places;
+    }
+
+    private static Vector2 Below(Vector2 dot, Vector2 size, float offset) =>
+        new(MathF.Round(dot.X - size.X / 2), MathF.Round(dot.Y + offset));
+
+    private static Vector2 Above(Vector2 dot, Vector2 size, float offset) =>
+        new(MathF.Round(dot.X - size.X / 2), MathF.Round(dot.Y - offset - size.Y));
+
+    private static bool Inside((Vector2 Min, Vector2 Max) box, (Vector2 Min, Vector2 Max) canvas) =>
+        box.Min.X >= canvas.Min.X && box.Min.Y >= canvas.Min.Y && box.Max.X <= canvas.Max.X && box.Max.Y <= canvas.Max.Y;
+
+    private static bool Hits((Vector2 Min, Vector2 Max) a, (Vector2 Min, Vector2 Max) b) =>
+        a.Min.X < b.Max.X && a.Max.X > b.Min.X && a.Min.Y < b.Max.Y && a.Max.Y > b.Min.Y;
+
+    /// <summary>True when a box hits the dot of a system other than the system <paramref name="own"/>.</summary>
+    private static bool HitsDot((Vector2 Min, Vector2 Max) box, IReadOnlyList<Vector2?> dots, int own, float radius)
+    {
+        var half = new Vector2(radius);
+        for (var j = 0; j < dots.Count; j++)
+        {
+            if (j != own && dots[j] is { } dot && Hits(box, (dot - half, dot + half)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
 
 /// <summary>
 /// The read-only Universe panel: the systems of the edit view on the nav map grid, and their jump connections as lines.
 /// A pair of jump gates is a solid line, and a pair of jump holes is a dashed line. A player lock makes a line red, and
 /// an arrow points along a jump whose other end does not go back. A dot marks a new system that the mod has not saved.
-/// A click selects a system, as a row of the Systems table of the Database does, and a double-click opens it in the
-/// Scene. A selection in another view puts the ring on its system. The panel takes no edit. The agent tool
-/// <c>capture_panel</c> gives an image of it.
+/// A label shows only where it has space. A click selects a system, as a row of the Systems table of the Database does,
+/// and a double-click opens it in the Scene. A selection in another view puts the ring on its system. The panel takes no
+/// edit. The agent tool <c>capture_panel</c> gives an image of it.
 /// </summary>
 internal sealed class UniversePanel(EditorWindow window)
 {
@@ -108,8 +185,9 @@ internal sealed class UniversePanel(EditorWindow window)
         "A map of the systems of the edit view on the nav map grid, with their jump connections. The panel is " +
         "read-only. A solid line is a pair of jump gates, and a dashed line is a pair of jump holes. A red line has a " +
         "player lock in a new game. An arrow points along a jump whose other end does not go back. A blue dot marks a " +
-        "new system that the mod has not saved. A click selects a system, and a double-click opens it in the Scene. " +
-        "When you select an object of a system in another view, the system gets a ring.",
+        "new system that the mod has not saved. A name shows only where it has space. Hold the mouse on a dot to see " +
+        "its name, or make the panel larger. A click selects a system, and a double-click opens it in the Scene. When " +
+        "you select an object of a system in another view, the system gets a ring.",
         "Nothing. The place of a system is the pos line of its [system] in universe.ini. Change it in the Inspector of " +
         "the system. The agent tools system_create and connection_create add systems and connections.");
 
@@ -128,7 +206,9 @@ internal sealed class UniversePanel(EditorWindow window)
     private const float DashSpace = 4;
     private const float ArrowSize = 6;
     private const float MarkRadius = 2.5f;
-    private const float LabelGap = 3;
+    // From the middle of a dot to its label. The label stays out of the ring.
+    private const float LabelOffset = 11;
+    private const float LabelPadding = 2;
     private const float NotePadding = 6;
 
     private UniverseMap map = new();
@@ -185,15 +265,12 @@ internal sealed class UniversePanel(EditorWindow window)
             Line(drawList, frame, model, line, highlight.IsWide(line));
         }
 
-        // The labels use the caption font.
-        ImGui.PushFont(null, EditorTheme.CaptionSize);
         foreach (var system in model.Systems)
         {
-            System(drawList, frame, system, highlight.HasRing(system), ReferenceEquals(system, target));
+            Dot(drawList, frame, system, highlight.HasRing(system), ReferenceEquals(system, target));
         }
 
-        ImGui.PopFont();
-
+        Labels(drawList, frame, model, (canvasMin, canvasMin + canvasSize), highlight, target);
         Note(drawList, model, canvasMin, canvasSize);
         drawList.PopClipRect();
 
@@ -284,10 +361,9 @@ internal sealed class UniversePanel(EditorWindow window)
         }
     }
 
-    /// <summary>Draws the dot of a placed system and its label in the current font. A ring marks the highlighted system
-    /// and the system under the mouse, and a blue dot marks a new system.</summary>
-    private static void System(ImDrawListPtr drawList, UniverseFrame frame, UniverseMapSystem system, bool ring,
-        bool hovered)
+    /// <summary>Draws the dot of a placed system. A ring marks the highlighted system and the system under the mouse,
+    /// and a blue dot marks a new system.</summary>
+    private static void Dot(ImDrawListPtr drawList, UniverseFrame frame, UniverseMapSystem system, bool ring, bool hovered)
     {
         if (system.Place is not { } place)
         {
@@ -309,13 +385,49 @@ internal sealed class UniversePanel(EditorWindow window)
 
         if (system.IsNew)
         {
-            var mark = MarkRadius * scale;
-            drawList.AddCircleFilled(center + new Vector2(radius, -radius), mark, ImGui.GetColorU32(EditorTheme.AccentText));
+            drawList.AddCircleFilled(center + new Vector2(radius, -radius), MarkRadius * scale,
+                ImGui.GetColorU32(EditorTheme.AccentText));
+        }
+    }
+
+    /// <summary>
+    /// Draws the labels in the caption font where they have space (see <see cref="UniverseFrame.Labels"/>). The labels of
+    /// the highlighted system and of the system under the mouse always show. They draw last, on a box of the panel
+    /// color, so that the lines and the dots do not cover them.
+    /// </summary>
+    private static void Labels(ImDrawListPtr drawList, UniverseFrame frame, UniverseModel model,
+        (Vector2 Min, Vector2 Max) canvas, UniverseHighlight highlight, UniverseMapSystem? target)
+    {
+        var scale = ImGuiHelper.Scale;
+        ImGui.PushFont(null, EditorTheme.CaptionSize);
+        var systems = model.Systems;
+        var dots = systems.Select(s => s.Place is { } place ? frame.ToScreen(place) : (Vector2?)null).ToList();
+        var sizes = systems.Select(s => ImGui.CalcTextSize(s.Label)).ToList();
+        var first = Enumerable.Range(0, systems.Count)
+            .Where(i => highlight.HasRing(systems[i]) || ReferenceEquals(systems[i], target))
+            .ToList();
+        var places = UniverseFrame.Labels(dots, sizes, DotRadius * scale, LabelOffset * scale, canvas, first);
+        var text = ImGui.GetColorU32(EditorTheme.Text);
+        for (var i = 0; i < systems.Count; i++)
+        {
+            if (places[i] is { } place && !first.Contains(i))
+            {
+                drawList.AddText(place, text, systems[i].Label);
+            }
         }
 
-        var size = ImGui.CalcTextSize(system.Label);
-        drawList.AddText(new Vector2(MathF.Round(center.X - size.X / 2), MathF.Round(center.Y + radius + LabelGap * scale)),
-            ImGui.GetColorU32(EditorTheme.Text), system.Label);
+        var padding = new Vector2(LabelPadding * scale);
+        foreach (var i in first)
+        {
+            if (places[i] is { } place)
+            {
+                drawList.AddRectFilled(place - padding, place + sizes[i] + padding, ImGui.GetColorU32(EditorTheme.Panel),
+                    LabelPadding * scale);
+                drawList.AddText(place, ImGui.GetColorU32(EditorTheme.TextBright), systems[i].Label);
+            }
+        }
+
+        ImGui.PopFont();
     }
 
     /// <summary>Names the systems without a place on the map, at the bottom left of the canvas.</summary>

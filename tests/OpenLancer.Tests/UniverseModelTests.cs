@@ -16,7 +16,7 @@ namespace OpenLancer.Tests;
 /// <summary>
 /// The model of the read-only Universe panel without a window: the places and the names of the systems, the lines of
 /// the jump connections, the red lock, a new system before the save, the map that keeps the model, the highlight of a
-/// selection, and the fit of the map into the canvas. The install is <see cref="ConnectionWorkspace"/>.
+/// selection, the labels, and the fit of the map into the canvas. The install is <see cref="ConnectionWorkspace"/>.
 /// Li01 at 7, 8 and Li02 at 6, 9 have a jump gate pair with a player lock on the Li01 gate. Li03 at 9, 8 has a gate and
 /// a hole without a goto line. The data is invented.
 /// </summary>
@@ -377,6 +377,43 @@ public sealed class UniverseModelTests
 
         Assert.Equal(default, map.Highlight(session, null));
         Assert.Equal(default, map.Highlight(session, "text"));
+    }
+
+    /// <summary>
+    /// A label shows under its dot, else over it, only where it hits no label and no dot of another system and stays in
+    /// the canvas. A label that has no space does not show. The labels of the selected and the hovered system always
+    /// show under their dots, and the other labels give way to them.
+    /// </summary>
+    [Fact]
+    public void ALabelShowsOnlyWhereItHasSpace()
+    {
+        Vector2?[] dots =
+        [
+            new Vector2(100, 100), new Vector2(110, 100), new Vector2(300, 100), new Vector2(200, 200),
+            new Vector2(200, 215), null, new Vector2(390, 395),
+        ];
+        var sizes = Enumerable.Repeat(new Vector2(30, 10), dots.Length).ToList();
+        var canvas = (Vector2.Zero, new Vector2(400, 400));
+
+        var places = UniverseFrame.Labels(dots, sizes, 5, 11, canvas, []);
+
+        Assert.Equal(new Vector2?[]
+        {
+            // Under A. B is too near, so its label goes over its dot.
+            new Vector2(85, 111), new Vector2(95, 79),
+            // C has space under its dot.
+            new Vector2(285, 111),
+            // Under D is the dot of E, so the label of D goes over its dot.
+            new Vector2(185, 179), new Vector2(185, 226),
+            // A system without a place has no label. At the corner of the canvas, neither place is in the canvas.
+            null, null,
+        }, places);
+
+        var selected = UniverseFrame.Labels(dots, sizes, 5, 11, canvas, [1, 6]);
+
+        Assert.Equal(new Vector2(95, 111), selected[1]);
+        Assert.Equal(new Vector2(85, 79), selected[0]);
+        Assert.Equal(new Vector2(375, 406), selected[6]);
     }
 
     /// <summary>The texts of the panel pass the STE lint.</summary>

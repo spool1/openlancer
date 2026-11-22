@@ -52072,7 +52072,7 @@
               "console",
               "universe"
             ],
-            "description": "The panel to capture. Its tab must show in the editor. universe is the Universe panel: the systems on the nav map grid and their jump connections."
+            "description": "The panel to capture. Its tab must show in the editor. universe is the Universe panel: the systems on the nav map grid and their jump connections. A name on the map shows only where it has space. get_universe gives each name."
           }
         },
         "additionalProperties": false,
