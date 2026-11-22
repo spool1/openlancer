@@ -6,7 +6,6 @@ using ImGuiNET;
 using LibreLancer;
 using LibreLancer.Data.GameData.World;
 using LibreLancer.ImUI;
-using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Fields;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Editor.Ui.Fields;
@@ -96,7 +95,8 @@ internal readonly record struct UniverseFrame(Vector2 Origin, float Scale, Vecto
 /// A pair of jump gates is a solid line, and a pair of jump holes is a dashed line. A player lock makes a line red, and
 /// an arrow points along a jump whose other end does not go back. A dot marks a new system that the mod has not saved.
 /// A click selects a system, as a row of the Systems table of the Database does, and a double-click opens it in the
-/// Scene. The panel takes no edit. The agent tool <c>capture_panel</c> gives an image of it.
+/// Scene. A selection in another view puts the ring on its system. The panel takes no edit. The agent tool
+/// <c>capture_panel</c> gives an image of it.
 /// </summary>
 internal sealed class UniversePanel(EditorWindow window)
 {
@@ -108,7 +108,8 @@ internal sealed class UniversePanel(EditorWindow window)
         "A map of the systems of the edit view on the nav map grid, with their jump connections. The panel is " +
         "read-only. A solid line is a pair of jump gates, and a dashed line is a pair of jump holes. A red line has a " +
         "player lock in a new game. An arrow points along a jump whose other end does not go back. A blue dot marks a " +
-        "new system that the mod has not saved. A click selects a system, and a double-click opens it in the Scene.",
+        "new system that the mod has not saved. A click selects a system, and a double-click opens it in the Scene. " +
+        "When you select an object of a system in another view, the system gets a ring.",
         "Nothing. The place of a system is the pos line of its [system] in universe.ini. Change it in the Inspector of " +
         "the system. The agent tools system_create and connection_create add systems and connections.");
 
@@ -170,21 +171,25 @@ internal sealed class UniversePanel(EditorWindow window)
         var scale = ImGuiHelper.Scale;
         var frame = UniverseFrame.Fit(model.Bounds, canvasMin, canvasSize);
         var target = hovered ? frame.Hit(model.Systems, ImGui.GetMousePos(), HitRadius * scale) : null;
-        var selected = SelectedSystem(session.Edits);
+        // An item of the Scene gives the section that it shows.
+        var selection = window.Selection is SystemObject or Zone or LightSource or Nebula or AsteroidField
+            ? window.Scene.SectionOf(window.Selection)
+            : window.Selection;
+        var highlight = map.Highlight(session.Edits, selection);
 
         var drawList = ImGui.GetWindowDrawList();
         drawList.PushClipRect(canvasMin, canvasMin + canvasSize, true);
         Grid(drawList, frame);
         foreach (var line in model.Lines)
         {
-            Line(drawList, frame, model, line, selected);
+            Line(drawList, frame, model, line, highlight.IsWide(line));
         }
 
         // The labels use the caption font.
         ImGui.PushFont(null, EditorTheme.CaptionSize);
         foreach (var system in model.Systems)
         {
-            System(drawList, frame, system, selected, ReferenceEquals(system, target));
+            System(drawList, frame, system, highlight.HasRing(system), ReferenceEquals(system, target));
         }
 
         ImGui.PopFont();
@@ -221,15 +226,6 @@ internal sealed class UniversePanel(EditorWindow window)
     private UniverseModel ModelOf(EditorSession session, GameDataManager data) =>
         map.Of(session.Edits, session.Texts, session.Version, data, nickname => data.Items.Systems.Get(nickname));
 
-    /// <summary>The nickname of the selected system: a system of the loaded game data or a <c>[system]</c> of the edit
-    /// view. Null for each other selection.</summary>
-    private string? SelectedSystem(EditSession edits) => window.Selection switch
-    {
-        StarSystem system => system.Nickname,
-        SectionRef section when edits.IsSystemSection(section) => section.Id.Key,
-        _ => null,
-    };
-
     /// <summary>Draws a line at each whole number of the nav map grid, and its border.</summary>
     private static void Grid(ImDrawListPtr drawList, UniverseFrame frame)
     {
@@ -251,9 +247,9 @@ internal sealed class UniversePanel(EditorWindow window)
             ImGui.GetColorU32(EditorTheme.GridLine));
     }
 
-    /// <summary>Draws a line between two placed systems. The lines of the selected system are wider.</summary>
+    /// <summary>Draws a line between two placed systems. A highlighted line is wider.</summary>
     private static void Line(ImDrawListPtr drawList, UniverseFrame frame, UniverseModel model, UniverseMapLine line,
-        string? selected)
+        bool wide)
     {
         if (model.System(line.From)?.Place is not { } from || model.System(line.To)?.Place is not { } to)
         {
@@ -263,9 +259,7 @@ internal sealed class UniversePanel(EditorWindow window)
         var scale = ImGuiHelper.Scale;
         var (start, end) = UniverseFrame.Segment(line, frame.ToScreen(from), frame.ToScreen(to), LineGap * scale);
         var color = EditorTheme.ToAbgr(line.PlayerLocked ? EditorTheme.Error : ObjectKinds.JumpGate.Color);
-        var touches = selected != null && (line.From.Equals(selected, StringComparison.OrdinalIgnoreCase) ||
-                                           line.To.Equals(selected, StringComparison.OrdinalIgnoreCase));
-        var width = (touches ? SelectedLineWidth : LineWidth) * scale;
+        var width = (wide ? SelectedLineWidth : LineWidth) * scale;
         if (line.Dashed)
         {
             foreach (var (a, b) in UniverseFrame.Dashes(start, end, Dash * scale, DashSpace * scale))
@@ -290,9 +284,9 @@ internal sealed class UniversePanel(EditorWindow window)
         }
     }
 
-    /// <summary>Draws the dot of a placed system and its label in the current font. A ring marks the selected system and
-    /// the system under the mouse, and a blue dot marks a new system.</summary>
-    private static void System(ImDrawListPtr drawList, UniverseFrame frame, UniverseMapSystem system, string? selected,
+    /// <summary>Draws the dot of a placed system and its label in the current font. A ring marks the highlighted system
+    /// and the system under the mouse, and a blue dot marks a new system.</summary>
+    private static void System(ImDrawListPtr drawList, UniverseFrame frame, UniverseMapSystem system, bool ring,
         bool hovered)
     {
         if (system.Place is not { } place)
@@ -304,7 +298,7 @@ internal sealed class UniversePanel(EditorWindow window)
         var center = frame.ToScreen(place);
         var radius = DotRadius * scale;
         drawList.AddCircleFilled(center, radius, ObjectKinds.Sun.Abgr);
-        if (system.Nickname.Equals(selected, StringComparison.OrdinalIgnoreCase))
+        if (ring)
         {
             drawList.AddCircle(center, RingRadius * scale, ImGui.GetColorU32(EditorTheme.AccentText), 0, 2 * scale);
         }

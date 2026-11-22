@@ -60,11 +60,16 @@ internal sealed class UniverseModel
 
     private readonly Dictionary<string, UniverseMapSystem> byNickname;
 
-    private UniverseModel(IReadOnlyList<UniverseMapSystem> systems, IReadOnlyList<UniverseMapLine> lines)
+    // The line of each end of a connection, by the obj: reference of the end.
+    private readonly Dictionary<string, UniverseMapLine> byEnd;
+
+    private UniverseModel(IReadOnlyList<UniverseMapSystem> systems, IReadOnlyList<UniverseMapLine> lines,
+        Dictionary<string, UniverseMapLine> byEnd)
     {
         Systems = systems;
         Lines = lines;
         byNickname = systems.ToDictionary(s => s.Nickname, StringComparer.OrdinalIgnoreCase);
+        this.byEnd = byEnd;
     }
 
     /// <summary>The systems in the order of <c>universe.ini</c>.</summary>
@@ -96,6 +101,10 @@ internal sealed class UniverseModel
     /// <summary>The system with a nickname, in any letter case, or null.</summary>
     public UniverseMapSystem? System(string nickname) => byNickname.GetValueOrDefault(nickname);
 
+    /// <summary>The line of a jump object, by its <c>obj:</c> reference in any letter case, or null when the object makes
+    /// no line.</summary>
+    public UniverseMapLine? LineOf(string end) => byEnd.GetValueOrDefault(end);
+
     /// <summary>The model of the rows of the jump graph.</summary>
     /// <param name="isNew">True for the nickname of a new system that the mod has not saved.</param>
     public static UniverseModel Of(IReadOnlyList<UniverseSystemRow> systems, IReadOnlyList<UniverseConnectionRow> connections,
@@ -112,7 +121,14 @@ internal sealed class UniverseModel
                     .Select(c => ConnectionText(c, TargetText(c.ToSystem)))
                     .ToList()))
             .ToList();
-        return new UniverseModel(mapSystems, LinesOf(connections, byRef));
+        var (lines, ends) = LinesOf(connections, byRef);
+        var byEnd = new Dictionary<string, UniverseMapLine>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (end, line) in ends)
+        {
+            byEnd.TryAdd(end, lines[line]);
+        }
+
+        return new UniverseModel(mapSystems, lines, byEnd);
     }
 
     /// <summary>The text of a connection in the tooltip of its system, for example "Jump gate to New York (Li01).
@@ -137,12 +153,14 @@ internal sealed class UniverseModel
     /// <summary>
     /// The lines of the connections: one line for each pair, and one line with a direction for each one-way connection.
     /// A connection to its own system or to a system that the universe does not have makes no line. The lines between
-    /// the same two systems get offsets, so that each one shows, also two pairs of one kind.
+    /// the same two systems get offsets, so that each one shows, also two pairs of one kind. The ends give the index of
+    /// the line of each connection that makes a line.
     /// </summary>
-    private static List<UniverseMapLine> LinesOf(IReadOnlyList<UniverseConnectionRow> connections,
-        Dictionary<string, UniverseSystemRow> byRef)
+    private static (List<UniverseMapLine> Lines, List<(string End, int Line)> Ends) LinesOf(
+        IReadOnlyList<UniverseConnectionRow> connections, Dictionary<string, UniverseSystemRow> byRef)
     {
         var lines = new List<UniverseMapLine>();
+        var ends = new List<(string End, int Line)>();
         // The first end of each pair whose other end did not come yet, with the index of its line.
         var waiting = new List<(UniverseConnectionRow End, int Line)>();
         foreach (var connection in connections)
@@ -160,6 +178,7 @@ internal sealed class UniverseModel
                 var at = waiting[match].Line;
                 lines[at] = lines[at] with { PlayerLocked = lines[at].PlayerLocked || locked };
                 waiting.RemoveAt(match);
+                ends.Add((connection.Ref, at));
                 continue;
             }
 
@@ -168,6 +187,7 @@ internal sealed class UniverseModel
                 waiting.Add((connection, lines.Count));
             }
 
+            ends.Add((connection.Ref, lines.Count));
             lines.Add(new UniverseMapLine(from.Nickname, to.Nickname, connection.Kind == JumpKind.JumpHole, locked,
                 !connection.PairOk, 0));
         }
@@ -181,7 +201,7 @@ internal sealed class UniverseModel
             }
         }
 
-        return lines;
+        return (lines, ends);
     }
 
     /// <summary>True when a connection is the other end of a pair: it goes back to the system of the first end, it draws

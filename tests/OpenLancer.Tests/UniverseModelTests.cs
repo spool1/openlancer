@@ -15,8 +15,8 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// The model of the read-only Universe panel without a window: the places and the names of the systems, the lines of
-/// the jump connections, the red lock, a new system before the save, the map that keeps the model, and the fit of the
-/// map into the canvas. The install is <see cref="ConnectionWorkspace"/>.
+/// the jump connections, the red lock, a new system before the save, the map that keeps the model, the highlight of a
+/// selection, and the fit of the map into the canvas. The install is <see cref="ConnectionWorkspace"/>.
 /// Li01 at 7, 8 and Li02 at 6, 9 have a jump gate pair with a player lock on the Li01 gate. Li03 at 9, 8 has a gate and
 /// a hole without a goto line. The data is invented.
 /// </summary>
@@ -341,6 +341,42 @@ public sealed class UniverseModelTests
         Assert.Equal(new Vector2(2, 2), after.System("Li01")!.Place);
         Assert.Same(after, map.Of(session, texts, version, Data, LoadedSystem));
         Assert.NotSame(after, map.Of(session, texts, version, new object(), LoadedSystem));
+    }
+
+    /// <summary>
+    /// A selected system gets the ring, and its lines are wider. A selected object of a system file gives the ring to its
+    /// system. A selected end of a jump pair also makes the line of the pair wider, and another object makes no line
+    /// wider.
+    /// </summary>
+    [Fact]
+    public void ASelectionPutsTheRingOnItsSystemAndWidensTheLineOfAJump()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        var map = new UniverseMap();
+        var model = map.Of(session, Texts(session), 0, Data, LoadedSystem);
+        var line = Assert.Single(model.Lines);
+
+        var system = map.Highlight(session, Loaded[0]);
+        Assert.Equal(new UniverseHighlight("Li01", null, true), system);
+        Assert.True(system.HasRing(model.System("Li01")!));
+        Assert.True(system.IsWide(line));
+
+        var section = map.Highlight(session, session.SystemSection("Li02"));
+        Assert.True(section.HasRing(model.System("Li02")!));
+        Assert.True(section.IsWide(line));
+
+        Assert.Equal(new UniverseHighlight("Li01", line, false), map.Highlight(session, Gate));
+        var otherEnd = ListWorkspace.Object(ListWorkspace.Li02Path, "Li02_to_Li01");
+        Assert.Equal(new UniverseHighlight("Li02", line, false), map.Highlight(session, otherEnd));
+
+        var station = map.Highlight(session, ListWorkspace.Object(ConnectionWorkspace.Li03Path, "Li03_station"));
+        Assert.Equal(new UniverseHighlight("Li03", null, false), station);
+        Assert.False(station.IsWide(line));
+        Assert.False(station.HasRing(model.System("Li01")!));
+
+        Assert.Equal(default, map.Highlight(session, null));
+        Assert.Equal(default, map.Highlight(session, "text"));
     }
 
     /// <summary>The texts of the panel pass the STE lint.</summary>

@@ -1350,7 +1350,9 @@ The info icon in the toolbar tells what the panel shows. The toolbar also gives 
 - A blue dot at a system marks a new system that the mod has not saved.
 - A system without a `pos` line is not on the map. A note at the bottom left names it.
 
-The tooltip of a system tells its name, its nickname and its jump objects, for example "Jump objects: 3 of 10". It also gives each jump connection of the system with its lock. A click on a system selects it, as a row of the Systems table of the Database does. The Inspector then shows the page of the system, or the page of the `[system]` of a new system. A double-click opens the system in the Scene. A new system shows the save card of the Scene (see "New systems"). The selected system has a blue ring, and its lines are wider.
+The tooltip of a system tells its name, its nickname and its jump objects, for example "Jump objects: 3 of 10". It also gives each jump connection of the system with its lock. A click on a system selects it, as a row of the Systems table of the Database does. The Inspector then shows the page of the system, or the page of the `[system]` of a new system. A double-click opens the system in the Scene. A new system shows the save card of the Scene (see "New systems").
+
+The selected system has a blue ring, and its lines are wider. When you select an object of a system in another view, for example in the Scene or the Hierarchy, that system gets the ring. A selected jump gate or jump hole also makes its line wider.
 
 Change the place of a system in the Inspector of the system. The agent tools `system_create`, `connection_create` and `connection_set_lock` add systems, add connections and change locks. The agent tool `capture_panel` with the panel `universe` gives an image of the panel. While no profile is open or the game data loads, the panel tells it.
 
