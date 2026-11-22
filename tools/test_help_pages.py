@@ -35,9 +35,11 @@ FENCE = re.compile(r"^```.*?^```[ \t]*$", re.M | re.S)
 CODE_SPAN = re.compile(r"`[^`\n]*`")
 CONTRACTION = re.compile(r"(?i)\b(?:\w+n't|\w+'(?:re|ve|ll|m|d)|(?:it|that|there|what|here|let)'s)\b")
 # The verbs that start a command in the steps of the pages.
-IMPERATIVES = {"attach", "click", "close", "copy", "correct", "do", "double-click", "download", "drag", "extract",
-               "fly", "get", "go", "install", "link", "make", "open", "paste", "press", "remove", "repair", "run",
-               "select", "start", "type", "write"}
+IMPERATIVES = {"ask", "attach", "click", "close", "copy", "correct", "do", "dock", "double-click", "download", "drag",
+               "extract", "fly", "get", "go", "install", "link", "make", "open", "paste", "press", "read", "remove",
+               "repair", "run", "select", "start", "type", "wait", "write"}
+# The sections of the other pages whose numbered steps must have one command each.
+STEP_SECTIONS = (("docs/MCP.md", "## Make a new system with an agent"),)
 # The Play sections that must give the Play support of Freelancer 1.0, because their steps can start the 1.0 program.
 PLAY_STEPS = (("docs/GETTING_STARTED.md", "## Play the change in your game (Ctrl+F5)"),
               ("docs/PLAY.md", "## Play in the game"))
@@ -407,6 +409,12 @@ class HelpPageTests(unittest.TestCase):
         for page in PAGES:
             self.assertEqual([], [step for step in numbered_steps(read(page)) if actions(step) != 1], page)
 
+    def test_each_step_of_the_step_sections_has_one_command(self):
+        for page, heading in STEP_SECTIONS:
+            steps = numbered_steps(section(read(page), heading) or "")
+            self.assertTrue(steps, f"{page}: no steps under {heading}")
+            self.assertEqual([], [step for step in steps if actions(step) != 1], page)
+
     def test_the_commands_of_a_step_are_counted(self):
         for step, expected in (("Press Ctrl+F5.", 1),
                                ("Press Ctrl+F5. Or click the Play menu and the item of your game.", 2),
@@ -414,6 +422,10 @@ class HelpPageTests(unittest.TestCase):
                                ("In the editor, click **Help > Report a problem**. The editor copies a text.", 1),
                                ("If Windows shows \"Windows protected your PC\", do the steps of [it](#it).", 1),
                                ("Click **Select game folder...**. Then select the folder.", 2),
+                               ("Ask the agent to run `check`. Read the problems that it gives.", 2),
+                               ("Ask the agent: \"Save the mod.\" The agent calls `save`.", 1),
+                               ("Double-click it in the panel. Or double-click its row in the table.", 2),
+                               ("Wait until the editor loads the data. Then dock with the ring.", 2),
                                ("The editor shows a card.", 0)):
             self.assertEqual(expected, actions(step), step)
 

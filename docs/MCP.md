@@ -112,14 +112,15 @@ Connect the agent program to the editor first (see "Connect an agent to the edit
 3. Ask the agent: "Connect Av01 and Li02 with a jump hole pair." The agent calls `connection_create` with the kind `jump_hole`.
 4. Ask the agent: "Make a trade lane from the new jump hole toward the sun." The agent calls `trade_lane_create` with `start_near` and `end_near`. The last ring stays outside the death zone of the sun.
 5. Ask the agent: "Give the lane zone and the jump hole traffic zone the encounters of Li02." The agent calls `list_values` and `scene_set_encounters`.
-6. Ask the agent to run `check`. Read the problems that it gives. An error stops the save.
+6. Ask the agent: "Check the mod and the lane, and tell me the problems." The agent calls `check` and `get_trade_lane`. An error stops the save. A warning does not stop it.
 7. Click **File > Save**, or ask the agent to save.
 8. Wait until the editor loads the game data again. The agent waits until `studio_status` gives `data_load: ready`.
-9. Double-click Av01 in the Universe panel. Or double-click its row in the Systems table of the Database. The Scene opens the system.
+9. Double-click Av01 in the Universe panel. The Scene opens the system. A double-click on the row of Av01 in the Systems table of the Database also opens it.
 10. Select a ring of the lane in the Scene. The Inspector shows the Trade lane ring section and the completeness panel of the lane.
 11. Press Ctrl+F5 to play the mod in your game.
-12. In the game, fly to the new jump hole in Li02, and jump to Av01.
-13. Dock with the first ring of the lane. The HUD shows the two end names of the lane, and the ride goes to the last ring.
+12. In the game, fly to the new jump hole in Li02.
+13. Dock with the jump hole. The ship jumps to Av01.
+14. Dock with the first ring of the lane. The HUD shows the two end names of the lane, and the ride goes to the last ring.
 
 Before the save, the Database, the Universe panel and the Inspector show the new system. The Scene shows a card that asks for the save (see "What you see in the editor"). The agent can make the system, the pair and the lane in one `edit_batch`, so one undo takes them back.
 
