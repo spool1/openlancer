@@ -15,8 +15,8 @@ namespace OpenLancer.Tests;
 /// <summary>
 /// The model of the read-only Universe panel without a window: the places and the names of the systems, the lines of
 /// the jump connections, the red lock, a new system before the save, and the fit of the map into the canvas. The
-/// install is <see cref="ConnectionWorkspace"/>: Li01 at 7, 8 and Li02 at 6, 9 have a jump gate pair with a player lock
-/// on the Li01 gate, and Li03 at 9, 8 has a gate and a hole without a goto line. The data is invented.
+/// install is <see cref="ConnectionWorkspace"/>. Li01 at 7, 8 and Li02 at 6, 9 have a jump gate pair with a player
+/// lock on the Li01 gate. Li03 at 9, 8 has a gate and a hole without a goto line. The data is invented.
 /// </summary>
 public sealed class UniverseModelTests
 {
@@ -130,8 +130,8 @@ public sealed class UniverseModelTests
 
     /// <summary>
     /// The ends of a pair find each other by their goto lines, not by their order in the files. Here the file of B lists
-    /// the end of the second pair first, and only the end b1 of the first pair has a player lock. So only the first line
-    /// is red.
+    /// the end of the second pair first. Only the end b1 of the first pair has a player lock, so only the first line is
+    /// red.
     /// </summary>
     [Fact]
     public void TheEndsOfAPairFindEachOtherByTheirGotoLines()

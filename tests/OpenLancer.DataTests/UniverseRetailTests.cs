@@ -13,7 +13,7 @@ namespace OpenLancer.DataTests;
 
 /// <summary>
 /// Retail proof of the model of the Universe panel, the same in vanilla 1.1 and in HD Edition 0.7.1. Each of the 53
-/// systems has a name and a place with whole numbers on the nav map grid, so the panel shows the grid and no system
+/// systems has a name and a place with whole numbers on the nav map grid. So the panel shows the grid and no system
 /// off it. Each of the 232 jump objects goes both ways, so no line has a direction. The 116 pairs make 115 lines,
 /// because the hole pair inside Li01 has no line. Two hole pairs join Rh02 and Rh04, and two airlock gate pairs join
 /// St02 and St02c, so these lines show side by side.

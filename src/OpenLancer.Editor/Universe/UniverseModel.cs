@@ -40,7 +40,7 @@ internal sealed record UniverseMapSystem(string Nickname, string Name, Vector2? 
 /// <param name="PlayerLocked">True when an end of the line has a player lock in a new game.</param>
 /// <param name="OneWay">True for a connection whose other end does not go back. The player cannot jump back.</param>
 /// <param name="Offset">The place of the line among the lines between the same two systems, in line gaps from the
-/// middle: 0 for one line, -0.5 and 0.5 for two lines.</param>
+/// middle. One line has 0, and two lines have -0.5 and 0.5.</param>
 internal sealed record UniverseMapLine(string From, string To, bool Dashed, bool PlayerLocked, bool OneWay, float Offset);
 
 /// <summary>
