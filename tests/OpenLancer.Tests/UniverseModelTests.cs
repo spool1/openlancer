@@ -3,6 +3,7 @@ using System.Linq;
 using System.Numerics;
 using LibreLancer.Data.GameData.World;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Universe;
 using OpenLancer.Editor;
 using OpenLancer.Editor.Universe;
@@ -14,27 +15,29 @@ namespace OpenLancer.Tests;
 
 /// <summary>
 /// The model of the read-only Universe panel without a window: the places and the names of the systems, the lines of
-/// the jump connections, the red lock, a new system before the save, and the fit of the map into the canvas. The
-/// install is <see cref="ConnectionWorkspace"/>. Li01 at 7, 8 and Li02 at 6, 9 have a jump gate pair with a player
-/// lock on the Li01 gate. Li03 at 9, 8 has a gate and a hole without a goto line. The data is invented.
+/// the jump connections, the red lock, a new system before the save, the map that keeps the model, and the fit of the
+/// map into the canvas. The install is <see cref="ConnectionWorkspace"/>.
+/// Li01 at 7, 8 and Li02 at 6, 9 have a jump gate pair with a player lock on the Li01 gate. Li03 at 9, 8 has a gate and
+/// a hole without a goto line. The data is invented.
 /// </summary>
 public sealed class UniverseModelTests
 {
     private static readonly SectionRef Gate = SceneWorkspace.Object("Li01_to_Li02");
 
-    /// <summary>The model of a session as the panel makes it. The loaded game data of the test has the systems of the
-    /// install, so a system that a test adds is new.</summary>
-    private static UniverseModel Model(EditSession session)
-    {
-        var loaded = new[] { "Li01", "Li02", "Li03" }
-            .Select(n => new StarSystem { Nickname = n, SourceFile = "" })
-            .ToList();
-        var entries = SystemEntry.All(session,
-                n => loaded.FirstOrDefault(s => s.Nickname.Equals(n, StringComparison.OrdinalIgnoreCase)))
-            .ToDictionary(e => e.Nickname, StringComparer.OrdinalIgnoreCase);
-        var (systems, connections) = UniverseRows.All(session, new ItemTexts(session, _ => "", _ => ""));
-        return UniverseModel.Of(systems, connections, n => entries[n].IsNew);
-    }
+    // The loaded game data of the tests has the systems of the install, so a system that a test adds is new.
+    private static readonly object Data = new();
+    private static readonly StarSystem[] Loaded = new[] { "Li01", "Li02", "Li03" }
+        .Select(n => new StarSystem { Nickname = n, SourceFile = "" })
+        .ToArray();
+
+    private static StarSystem? LoadedSystem(string nickname) =>
+        Loaded.FirstOrDefault(s => s.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase));
+
+    private static ItemTexts Texts(EditSession session) => new(session, _ => "", _ => "");
+
+    /// <summary>The model of a session as the map of the panel makes it.</summary>
+    private static UniverseModel Model(EditSession session) =>
+        new UniverseMap().Of(session, Texts(session), 0, Data, LoadedSystem);
 
     private static void Run(EditSession session, ConnectionPlan plan)
     {
@@ -280,6 +283,64 @@ public sealed class UniverseModelTests
         Assert.Equal(-first.Start.X, second.Start.X, 3);
         Assert.NotEqual(0, first.Start.X, 3);
         Assert.Equal((a, b), UniverseFrame.Segment(pair with { Offset = 0 }, a, b, 4));
+    }
+
+    /// <summary>
+    /// The map marks a new system as the Database does. A click on a saved system selects the system of the loaded game
+    /// data, so that its full page shows. A click on a new system selects its <c>[system]</c>.
+    /// </summary>
+    [Fact]
+    public void TheMapMarksANewSystemAndAClickSelectsItsItem()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        NewSystemWorkspace.CreateAv01(session);
+        var map = new UniverseMap();
+
+        var model = map.Of(session, Texts(session), 0, Data, LoadedSystem);
+
+        Assert.Equal([false, false, false, true], model.Systems.Select(s => s.IsNew));
+        Assert.Same(Loaded[0], map.ItemOf("li01"));
+        Assert.Equal(session.SystemSection("Av01"), map.ItemOf("Av01"));
+        Assert.IsType<SectionRef>(map.ItemOf("Av01"));
+        Assert.Null(map.ItemOf("Zz09"));
+    }
+
+    /// <summary>
+    /// The map keeps its model until the edit view or the loaded game data change. While a gesture is open, it keeps the
+    /// model of the start of the gesture, also when a step moves a system. The end of the gesture makes the model again
+    /// with the new place.
+    /// </summary>
+    [Fact]
+    public void TheMapMakesTheModelAgainAfterAnEditButNotDuringAGesture()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        var texts = Texts(session);
+        // The version of the editor session changes at each change of the edit view.
+        var version = 0;
+        session.Changed += _ => version++;
+        var map = new UniverseMap();
+        var first = map.Of(session, texts, version, Data, LoadedSystem);
+        Assert.Same(first, map.Of(session, texts, version, Data, LoadedSystem));
+        var li01 = session.SystemSection("Li01")!;
+
+        var gesture = CommandTransaction.Begin(session, "Move Li01");
+        foreach (var x in new[] { 1, 2 })
+        {
+            Assert.Equal(EditStatus.Applied, gesture.Apply(_ =>
+                new CommandPlan(EditCommand.SetLinesFromText(li01, "pos", [$"{x}, 2"]), [li01])).Status);
+            Assert.Same(first, map.Of(session, texts, version, Data, LoadedSystem));
+        }
+
+        Assert.Equal(2, version);
+        gesture.Commit();
+
+        var after = map.Of(session, texts, version, Data, LoadedSystem);
+        Assert.NotSame(first, after);
+        Assert.Equal(new Vector2(2, 2), after.System("Li01")!.Place);
+        Assert.Same(after, map.Of(session, texts, version, Data, LoadedSystem));
+        Assert.NotSame(after, map.Of(session, texts, version, new object(), LoadedSystem));
     }
 
     /// <summary>The texts of the panel pass the STE lint.</summary>

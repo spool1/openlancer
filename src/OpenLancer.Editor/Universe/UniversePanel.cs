@@ -10,7 +10,6 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Fields;
 using OpenLancer.Editor.Ui;
 using OpenLancer.Editor.Ui.Fields;
-using OpenLancer.Studio.Agent;
 
 namespace OpenLancer.Editor.Universe;
 
@@ -131,18 +130,10 @@ internal sealed class UniversePanel(EditorWindow window)
     private const float LabelGap = 3;
     private const float NotePadding = 6;
 
-    // The model of the last frame, and what it shows: the session, its version and the loaded game data.
-    private (EditorSession Session, int Version, GameDataManager Data)? shown;
-    private UniverseModel? model;
-    private Dictionary<string, SystemEntry> entries = new(StringComparer.OrdinalIgnoreCase);
+    private UniverseMap map = new();
 
     /// <summary>Forgets the model. Call it when the profile closes.</summary>
-    public void Reset()
-    {
-        shown = null;
-        model = null;
-        entries = new Dictionary<string, SystemEntry>(StringComparer.OrdinalIgnoreCase);
-    }
+    public void Reset() => map = new UniverseMap();
 
     /// <summary>Draws the items of the toolbar strip: the info icon and the count of the systems.</summary>
     public void Toolbar()
@@ -164,8 +155,8 @@ internal sealed class UniversePanel(EditorWindow window)
             return;
         }
 
-        var map = ModelOf(session, data);
-        if (map.Systems.Count == 0)
+        var model = ModelOf(session, data);
+        if (model.Systems.Count == 0)
         {
             PanelStates.Message(NoSystems);
             return;
@@ -177,28 +168,28 @@ internal sealed class UniversePanel(EditorWindow window)
         var hovered = ImGui.IsItemHovered();
         var clicked = ImGui.IsItemClicked(ImGuiMouseButton.Left);
         var scale = ImGuiHelper.Scale;
-        var frame = UniverseFrame.Fit(map.Bounds, canvasMin, canvasSize);
-        var target = hovered ? frame.Hit(map.Systems, ImGui.GetMousePos(), HitRadius * scale) : null;
+        var frame = UniverseFrame.Fit(model.Bounds, canvasMin, canvasSize);
+        var target = hovered ? frame.Hit(model.Systems, ImGui.GetMousePos(), HitRadius * scale) : null;
         var selected = SelectedSystem(session.Edits);
 
         var drawList = ImGui.GetWindowDrawList();
         drawList.PushClipRect(canvasMin, canvasMin + canvasSize, true);
         Grid(drawList, frame);
-        foreach (var line in map.Lines)
+        foreach (var line in model.Lines)
         {
-            Line(drawList, frame, map, line, selected);
+            Line(drawList, frame, model, line, selected);
         }
 
         // The labels use the caption font.
         ImGui.PushFont(null, EditorTheme.CaptionSize);
-        foreach (var system in map.Systems)
+        foreach (var system in model.Systems)
         {
             System(drawList, frame, system, selected, ReferenceEquals(system, target));
         }
 
         ImGui.PopFont();
 
-        Note(drawList, map, canvasMin, canvasSize);
+        Note(drawList, model, canvasMin, canvasSize);
         drawList.PopClipRect();
 
         if (target == null)
@@ -207,9 +198,9 @@ internal sealed class UniversePanel(EditorWindow window)
         }
 
         ItemTooltip.Wrapped(target.Tooltip);
-        if (clicked && entries.TryGetValue(target.Nickname, out var entry))
+        if (clicked && map.ItemOf(target.Nickname) is { } item)
         {
-            window.Selection = entry.Item;
+            window.Selection = item;
         }
 
         if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
@@ -220,30 +211,15 @@ internal sealed class UniversePanel(EditorWindow window)
 
     /// <summary>The text of the toolbar: the count of the systems, and of the new systems that the mod has not
     /// saved.</summary>
-    internal static string CountText(UniverseModel map)
+    internal static string CountText(UniverseModel model)
     {
-        var systems = map.Systems.Count == 1 ? "1 system" : $"{map.Systems.Count} systems";
-        var unsaved = map.Systems.Count(s => s.IsNew);
+        var systems = model.Systems.Count == 1 ? "1 system" : $"{model.Systems.Count} systems";
+        var unsaved = model.Systems.Count(s => s.IsNew);
         return unsaved == 0 ? systems : $"{systems}, {unsaved} new";
     }
 
-    /// <summary>The model of the session. It is made again when the edit view, the texts or the loaded game data
-    /// change.</summary>
-    private UniverseModel ModelOf(EditorSession session, GameDataManager data)
-    {
-        if (model != null && shown is var (s, version, d) && ReferenceEquals(s, session) && version == session.Version &&
-            ReferenceEquals(d, data))
-        {
-            return model;
-        }
-
-        entries = SystemEntry.All(session.Edits, n => data.Items.Systems.Get(n))
-            .ToDictionary(e => e.Nickname, StringComparer.OrdinalIgnoreCase);
-        var (systems, connections) = UniverseRows.All(session.Edits, session.Texts);
-        model = UniverseModel.Of(systems, connections, n => entries.TryGetValue(n, out var e) && e.IsNew);
-        shown = (session, session.Version, data);
-        return model;
-    }
+    private UniverseModel ModelOf(EditorSession session, GameDataManager data) =>
+        map.Of(session.Edits, session.Texts, session.Version, data, nickname => data.Items.Systems.Get(nickname));
 
     /// <summary>The nickname of the selected system: a system of the loaded game data or a <c>[system]</c> of the edit
     /// view. Null for each other selection.</summary>
@@ -276,10 +252,10 @@ internal sealed class UniversePanel(EditorWindow window)
     }
 
     /// <summary>Draws a line between two placed systems. The lines of the selected system are wider.</summary>
-    private static void Line(ImDrawListPtr drawList, UniverseFrame frame, UniverseModel map, UniverseMapLine line,
+    private static void Line(ImDrawListPtr drawList, UniverseFrame frame, UniverseModel model, UniverseMapLine line,
         string? selected)
     {
-        if (map.System(line.From)?.Place is not { } from || map.System(line.To)?.Place is not { } to)
+        if (model.System(line.From)?.Place is not { } from || model.System(line.To)?.Place is not { } to)
         {
             return;
         }
@@ -349,9 +325,9 @@ internal sealed class UniversePanel(EditorWindow window)
     }
 
     /// <summary>Names the systems without a place on the map, at the bottom left of the canvas.</summary>
-    private static void Note(ImDrawListPtr drawList, UniverseModel map, Vector2 canvasMin, Vector2 canvasSize)
+    private static void Note(ImDrawListPtr drawList, UniverseModel model, Vector2 canvasMin, Vector2 canvasSize)
     {
-        var unplaced = map.Unplaced.Select(s => s.Nickname).ToList();
+        var unplaced = model.Unplaced.Select(s => s.Nickname).ToList();
         if (unplaced.Count == 0)
         {
             return;

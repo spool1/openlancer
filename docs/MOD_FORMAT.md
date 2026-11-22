@@ -1337,7 +1337,9 @@ The editor keeps the images in `%LOCALAPPDATA%\OpenLancer\thumbnails`, one `.olt
 
 ### The Universe panel
 
-The Universe tab at the bottom shows the systems of the edit view on the nav map grid, with their jump connections. The panel is read-only. It reads the `[system]` sections of `universe.ini` and the `goto` lines of the system files, as the agent tool `get_universe` does. So each edit shows at once, also an edit of the agent and a new system before the save. The info icon in the toolbar tells what the panel shows. The toolbar also gives the count of the systems and of the new systems.
+The Universe tab at the bottom shows the systems of the edit view on the nav map grid, with their jump connections. The panel is read-only. It reads the `[system]` sections of `universe.ini` and the `goto` lines of the system files, as the agent tool `get_universe` does. So each edit shows at once, also an edit of the agent and a new system before the save. While you drag an item or type in a field, the panel shows the state before the drag or the typing. At the end, it shows the change.
+
+The info icon in the toolbar tells what the panel shows. The toolbar also gives the count of the systems and of the new systems.
 
 - Each system is a dot at its `pos`, with its name below it. A system without a name shows its nickname. The grid goes from 0 to 15 on x and from 0 to 14 on y. A larger y is lower, as on the nav map of the game. A place outside the grid shows outside it, because the nav map of the game shows that system off the map.
 - A solid line is a pair of jump gates, and a dashed line is a pair of jump holes. An airlock gate shows as a gate. Two ends of a pair make one line.
