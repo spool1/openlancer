@@ -108,6 +108,54 @@ public sealed class UniverseModelTests
     }
 
     /// <summary>
+    /// Two gate pairs between the same two systems are two lines side by side. The ends of each pair find each other by
+    /// their goto lines, so only the line of the locked pair is red.
+    /// </summary>
+    [Fact]
+    public void TwoPairsOfOneKindAreTwoLinesWithTheirOwnLocks()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Gate, new ConnectionEnd("Li02"),
+            new ConnectionEnd("Li01")));
+
+        var lines = Model(session).Lines;
+
+        Assert.Equal(
+        [
+            new UniverseMapLine("Li01", "Li02", false, true, false, -0.5f),
+            new UniverseMapLine("Li01", "Li02", false, false, false, 0.5f),
+        ], lines);
+    }
+
+    /// <summary>
+    /// The ends of a pair find each other by their goto lines, not by their order in the files. Here the file of B lists
+    /// the end of the second pair first, and only the end b1 of the first pair has a player lock. So only the first line
+    /// is red.
+    /// </summary>
+    [Fact]
+    public void TheEndsOfAPairFindEachOtherByTheirGotoLines()
+    {
+        static UniverseSystemRow System(string nickname, float x) =>
+            new($"system:{nickname}", nickname, "", null, new ItemOrigin(ValueOrigin.Base, null, false))
+            {
+                MapPos = [x, 1], JumpObjects = new JumpSlots(2, 10),
+            };
+        static UniverseConnectionRow End(string self, string system, string other, string toSystem, JumpLock locked) =>
+            new($"obj:{self}", JumpKind.JumpGate, $"system:{system}", $"system:{toSystem}", $"obj:{other}", true, locked);
+        UniverseConnectionRow[] connections =
+        [
+            End("a1", "A", "b1", "B", JumpLock.None), End("a2", "A", "b2", "B", JumpLock.None),
+            End("b2", "B", "a2", "A", JumpLock.None), End("b1", "B", "a1", "A", JumpLock.Player),
+        ];
+
+        var model = UniverseModel.Of([System("A", 1), System("B", 2)], connections, _ => false);
+
+        Assert.Equal([true, false], model.Lines.Select(l => l.PlayerLocked));
+        Assert.Equal([-0.5f, 0.5f], model.Lines.Select(l => l.Offset));
+    }
+
+    /// <summary>
     /// A new system shows at its place before the save, with the mark of a new system in its tooltip. Its new gate pair
     /// to Li02 is a line. The count of the toolbar names the new system. An undo takes the system and its line away.
     /// </summary>

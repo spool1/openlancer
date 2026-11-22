@@ -1343,7 +1343,8 @@ The Universe tab at the bottom shows the systems of the edit view on the nav map
 - A solid line is a pair of jump gates, and a dashed line is a pair of jump holes. An airlock gate shows as a gate. Two ends of a pair make one line.
 - A red line has a player lock in a new game (`locked_gate`). An NPC lock does not change the line.
 - A jump whose other end does not go back has a line of its own. Its arrow points to the system of its `goto` line. The player cannot jump back.
-- Two lines between the same two systems go side by side, for example a gate pair and a hole pair.
+- Two lines between the same two systems go side by side, for example a gate pair and a hole pair, or two hole pairs.
+- A hole pair inside one system has no line. The tooltip of the system names it.
 - A blue dot at a system marks a new system that the mod has not saved.
 - A system without a `pos` line is not on the map. A note at the bottom left names it.
 

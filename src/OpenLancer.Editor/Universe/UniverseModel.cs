@@ -32,13 +32,13 @@ internal sealed record UniverseMapSystem(string Nickname, string Name, Vector2? 
         }.OfType<string>().Concat(Connections));
 }
 
-/// <summary>A line of the Universe panel: the jump connections of one kind between two systems.</summary>
+/// <summary>A line of the Universe panel: the two ends of a pair, or one connection whose other end does not go
+/// back.</summary>
 /// <param name="From">The nickname of the system at the start of the line.</param>
 /// <param name="To">The nickname of the system at the end of the line. A one-way line points to it.</param>
 /// <param name="Dashed">True for jump holes, false for jump gates and airlock gates.</param>
-/// <param name="PlayerLocked">True when a connection of the line has a player lock in a new game.</param>
-/// <param name="OneWay">True when the line has no connection whose other end goes back. The player cannot jump
-/// back.</param>
+/// <param name="PlayerLocked">True when an end of the line has a player lock in a new game.</param>
+/// <param name="OneWay">True for a connection whose other end does not go back. The player cannot jump back.</param>
 /// <param name="Offset">The place of the line among the lines between the same two systems, in line gaps from the
 /// middle: 0 for one line, -0.5 and 0.5 for two lines.</param>
 internal sealed record UniverseMapLine(string From, string To, bool Dashed, bool PlayerLocked, bool OneWay, float Offset);
@@ -135,15 +135,16 @@ internal sealed class UniverseModel
     }
 
     /// <summary>
-    /// The lines of the connections. The two ends of a pair make one line, and a one-way connection makes a line of its
-    /// own with a direction. A connection to its own system or to a system that the universe does not have makes no
-    /// line. The lines between the same two systems get offsets, so that each one shows.
+    /// The lines of the connections: one line for each pair, and one line with a direction for each one-way connection.
+    /// A connection to its own system or to a system that the universe does not have makes no line. The lines between
+    /// the same two systems get offsets, so that each one shows, also two pairs of one kind.
     /// </summary>
     private static List<UniverseMapLine> LinesOf(IReadOnlyList<UniverseConnectionRow> connections,
         Dictionary<string, UniverseSystemRow> byRef)
     {
         var lines = new List<UniverseMapLine>();
-        var index = new Dictionary<(string, string, bool, bool), int>();
+        // The first end of each pair whose other end did not come yet, with the index of its line.
+        var waiting = new List<(UniverseConnectionRow End, int Line)>();
         foreach (var connection in connections)
         {
             if (!byRef.TryGetValue(connection.System, out var from) || !byRef.TryGetValue(connection.ToSystem, out var to) ||
@@ -152,20 +153,23 @@ internal sealed class UniverseModel
                 continue;
             }
 
-            var dashed = connection.Kind == JumpKind.JumpHole;
-            var oneWay = !connection.PairOk;
-            var (a, b) = (from.Nickname.ToLowerInvariant(), to.Nickname.ToLowerInvariant());
-            // The ends of a pair share one key in either direction. A one-way connection keeps its direction.
-            var key = oneWay || string.CompareOrdinal(a, b) < 0 ? (a, b, dashed, oneWay) : (b, a, dashed, oneWay);
             var locked = connection.Locked is JumpLock.Player or JumpLock.Both;
-            if (index.TryGetValue(key, out var at))
+            var match = connection.PairOk ? waiting.FindIndex(w => IsOtherEnd(w.End, connection)) : -1;
+            if (match >= 0)
             {
+                var at = waiting[match].Line;
                 lines[at] = lines[at] with { PlayerLocked = lines[at].PlayerLocked || locked };
+                waiting.RemoveAt(match);
                 continue;
             }
 
-            index[key] = lines.Count;
-            lines.Add(new UniverseMapLine(from.Nickname, to.Nickname, dashed, locked, oneWay, 0));
+            if (connection.PairOk)
+            {
+                waiting.Add((connection, lines.Count));
+            }
+
+            lines.Add(new UniverseMapLine(from.Nickname, to.Nickname, connection.Kind == JumpKind.JumpHole, locked,
+                !connection.PairOk, 0));
         }
 
         foreach (var group in Enumerable.Range(0, lines.Count).GroupBy(i => PairKey(lines[i])).Where(g => g.Count() > 1))
@@ -179,6 +183,15 @@ internal sealed class UniverseModel
 
         return lines;
     }
+
+    /// <summary>True when a connection is the other end of a pair: it goes back to the system of the first end, it draws
+    /// with the same kind of line, and one end names the other end in its <c>goto</c> line.</summary>
+    private static bool IsOtherEnd(UniverseConnectionRow first, UniverseConnectionRow other) =>
+        Same(first.System, other.ToSystem) && Same(first.ToSystem, other.System) &&
+        (first.Kind == JumpKind.JumpHole) == (other.Kind == JumpKind.JumpHole) &&
+        (Same(first.ToObject, other.Ref) || Same(other.ToObject, first.Ref));
+
+    private static bool Same(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The two systems of a line without their order.</summary>
     private static (string, string) PairKey(UniverseMapLine line)
