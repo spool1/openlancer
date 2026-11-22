@@ -56,7 +56,7 @@ internal sealed class SystemEntryRows(EditorWindow window, PropertyGrid grid)
             $"The place of the system on the nav map grid, from 0 to {SystemPlans.MapMax} on each axis."),
         new("Nav map scale", "navmapscale", RowKind.MapScale,
             "The zoom of the map of the system in the game. A larger value shows a smaller part of the system."),
-        new("Visit", "visit", RowKind.Visit,
+        new("On the nav map", "visit", RowKind.Visit,
             "When the nav map of the game shows the system. \"On the map at start\" shows it in a new game. " +
             "\"After the first visit\" shows it after the player goes there."),
     ];
@@ -65,15 +65,15 @@ internal sealed class SystemEntryRows(EditorWindow window, PropertyGrid grid)
     internal static readonly Row[] AdvancedRows =
     [
         new("Visit flags", "visit", RowKind.VisitFlags,
-            "All the flags of the visit value. The Visit row changes only the flag that shows the system on the map " +
-            "at start."),
+            "All the flags of the visit value. The row On the nav map changes only the flag that shows the system on " +
+            "the map at start."),
         new("Visit value", "visit", RowKind.VisitValue, "The visit value as a whole number. It holds all the flags."),
         new("Message id prefix", "msg_id_prefix", RowKind.MessagePrefix,
             "The prefix of the voice lines that say the name of the system. Without it, NPC speech about the system " +
             "is silent."),
     ];
 
-    /// <summary>The texts of the Visit row: without the flag, and with the flag.</summary>
+    /// <summary>The texts of the row "On the nav map": without the flag, and with the flag.</summary>
     internal static readonly (string Clear, string Set) VisitChoices = ("After the first visit", "On the map at start");
 
     /// <summary>The flag of the visit value that shows the system on the nav map of a new game.</summary>

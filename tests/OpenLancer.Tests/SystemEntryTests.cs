@@ -37,7 +37,7 @@ public sealed class SystemEntryTests
 
         Assert.True(session.IsSystemSection(entry));
         Assert.Equal(["Nickname", "Name", "Infocard", "File"], SystemEntryRows.IdentityRows.Select(r => r.Label));
-        Assert.Equal(["Nav map position", "Nav map scale", "Visit"], SystemEntryRows.NavMapRows.Select(r => r.Label));
+        Assert.Equal(["Nav map position", "Nav map scale", "On the nav map"], SystemEntryRows.NavMapRows.Select(r => r.Label));
         Assert.Equal(["Visit flags", "Visit value", "Message id prefix"], SystemEntryRows.AdvancedRows.Select(r => r.Label));
         Assert.All(AllRows, r =>
         {

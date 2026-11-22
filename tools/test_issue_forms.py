@@ -31,9 +31,9 @@ SETUP_HELP = "https://discord.com/channels/1564795741589737543/15648108652519752
 INVITE = "https://discord.gg/BUh3nucfmP"
 # The areas of the play test plan of the 1.0 scope.
 AREAS = [
-    "Install", "First run and Game link", "Welcome", "Scene", "Hierarchy", "Inspector", "Database", "Assets",
-    "Save gate", "Undo and the close prompt", "F5 and Ctrl+F5", "Mods window and export", "Help menu", "Missions",
-    "Play from a trigger", "Cutscenes", "Agent server", "oltool", "Help pages", "Other",
+    "Install", "First run and Game link", "Welcome", "Scene", "Hierarchy", "Inspector", "Database", "Universe panel",
+    "Assets", "Save gate", "Undo and the close prompt", "F5 and Ctrl+F5", "Mods window and export", "Help menu",
+    "Missions", "Play from a trigger", "Cutscenes", "Agent server", "oltool", "Help pages", "Other",
 ]
 # The keys of a form and of each field type that GitHub accepts.
 FORM_KEYS = {"name", "description", "title", "labels", "assignees", "projects", "type", "body"}

@@ -67,6 +67,35 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
     /// <summary>The tooltip of "Go to partner".</summary>
     internal const string PartnerTip = "Opens the system of the partner in the Scene and selects the partner.";
 
+    /// <summary>The help of the "Kind" row of a jump connection.</summary>
+    internal const string KindHelp =
+        "The kind of the connection object: a jump gate, a jump hole or an airlock gate. The type of the archetype sets " +
+        "it.";
+
+    /// <summary>The help of the "Exit object" row.</summary>
+    internal const string ExitHelp =
+        "The object where the ship comes out in the destination system. It is the partner of this object.";
+
+    /// <summary>The help of a "Traffic zone" row.</summary>
+    internal const string TrafficZoneHelp =
+        "The zone where the NPC traffic of this jump spawns. It needs encounters. An agent gives them with " +
+        "scene_set_encounters.";
+
+    /// <summary>The help of the "Lane zone" row.</summary>
+    internal const string LaneZoneHelp =
+        "The zone where the traffic of the lane spawns. It needs encounters. An agent gives them with " +
+        "scene_set_encounters.";
+
+    /// <summary>The help of the "Left name" row. The engine copies the end name of the last ring to each ring of the
+    /// lane.</summary>
+    internal const string LeftNameHelp =
+        "The end name of the last ring of the lane. The game copies it to each ring for the label of the lane.";
+
+    /// <summary>The help of the "Right name" row. The engine copies the end name of the first ring to each ring of the
+    /// lane.</summary>
+    internal const string RightNameHelp =
+        "The end name of the first ring of the lane. The game copies it to each ring for the label of the lane.";
+
     private Page? page;
 
     /// <summary>Why the controls of the sections take no click now, or null: the profile takes no edit, or a field of
@@ -121,9 +150,9 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
     }
 
     /// <summary>
-    /// The Jump connection section: the kind, the locked <c>goto</c> row, the target system and the exit object as
-    /// links, "Go to partner", the traffic zones and the lock dropdown. Without a section of W, it shows the dock of the
-    /// game data.
+    /// The Jump connection section: the kind, the locked <c>goto</c> row that links to the destination system, the exit
+    /// object as a link, "Go to partner", the traffic zones and the lock dropdown. Without a section of W, it shows the
+    /// dock of the game data.
     /// </summary>
     /// <param name="show">True when the page shows the section (see <see cref="SystemObjectPage.DockingRows"/>).</param>
     public void Jump(SystemObject obj, SectionRef? section, bool show)
@@ -148,12 +177,17 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
 
         if (jump != null)
         {
+            grid.Help(KindHelp);
             grid.Text("Kind", Capitalized(jump.Kind));
         }
 
-        // One line has the three values. The row is locked, and its lock names the tools that change the pair.
+        // One line has the three values. The row is locked, and its lock names the tools that change the pair. Its
+        // button selects the destination system of the edit view, also a new system before the save.
+        var loaded = jump?.System is { } nickname ? window.Session?.GameData?.Items.Systems.Get(nickname) : system;
+        object? destination = (object?)loaded ?? jump?.SystemSection;
         grid.SetNextNote("The destination system, the object where the ship comes out, and the tunnel effect.");
-        grid.Reference("Destination", ObjectKinds.StarSystem, dock?.Target, Name(system), system, "goto");
+        grid.Reference("Destination system", ObjectKinds.StarSystem, jump?.System ?? dock?.Target,
+            loaded != null ? Name(loaded) : jump?.SystemSection is { } entry ? Name(entry) : null, destination, "goto");
         if (jump == null || section == null)
         {
             grid.EndSection();
@@ -162,17 +196,10 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
 
         using (grid.Bind(null))
         {
-            if (jump.System is { } nickname)
-            {
-                var loaded = window.Session?.GameData?.Items.Systems.Get(nickname);
-                grid.Reference("Target system", ObjectKinds.StarSystem, nickname,
-                    loaded != null ? Name(loaded) : jump.SystemSection is { } entry ? Name(entry) : null,
-                    (object?)loaded ?? jump.SystemSection);
-            }
-
             if (jump.Exit is { } exit)
             {
                 var kind = jump.PartnerKind == "jump hole" ? ObjectKinds.JumpHole : ObjectKinds.JumpGate;
+                grid.Help(ExitHelp);
                 grid.ReferenceTo("Exit object", kind, exit, jump.Partner is { } partner ? Name(partner) : null,
                     jump.Partner == null ? null : GoToPartner, missing: jump.Partner == null);
             }
@@ -198,6 +225,7 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
             });
             foreach (var zone in jump.TrafficZones)
             {
+                grid.Help(TrafficZoneHelp);
                 Link("Traffic zone", zone);
             }
 
@@ -255,6 +283,7 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
         {
             if (ring != null)
             {
+                grid.Help(LaneZoneHelp);
                 if (ring.Zone is { } zone)
                 {
                     Link("Lane zone", zone);
@@ -268,7 +297,9 @@ internal sealed class ConnectionSections(EditorWindow window, PropertyGrid grid)
             if (lane != null)
             {
                 // The engine gives these names in a walk over the lanes of the system.
+                grid.Help(LeftNameHelp);
                 grid.Ids("Left name", obj.IdsLeft, "ids_left");
+                grid.Help(RightNameHelp);
                 grid.Ids("Right name", obj.IdsRight, "ids_right");
             }
 

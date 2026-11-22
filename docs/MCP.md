@@ -105,22 +105,26 @@ When another program uses the port, the server does not start. The status bar th
 
 This example makes a new star system next to Li02 with an agent. The system gets a jump hole pair to Li02, a trade lane from the jump hole toward the sun, and NPC traffic. Each request is a message that you type in the agent program. The names in the requests, for example Av01, are examples.
 
-Connect the agent program to the editor first (see "Connect an agent to the editor"). The prompt `new_system` gives the agent similar steps, with a jump gate pair and a patrol (see "Resources and prompts").
+The prompt `new_system` gives the agent similar steps, with a jump gate pair and a patrol (see "Resources and prompts").
 
-1. Open the profile and the mod in the editor.
-2. Ask the agent: "Make the system Av01 like Li02, next to Li02 on the nav map." The agent calls `get_universe` to find a free place, then `system_create`.
-3. Ask the agent: "Connect Av01 and Li02 with a jump hole pair." The agent calls `connection_create` with the kind `jump_hole`.
-4. Ask the agent: "Make a trade lane from the new jump hole toward the sun." The agent calls `trade_lane_create` with `start_near` and `end_near`. The last ring stays outside the death zone of the sun.
-5. Ask the agent: "Give the new lane zone and traffic zone the encounters and factions of the Li02 zones." The agent reads the lane zones and the traffic zones of Li02, then calls `scene_set_encounters`.
-6. Ask the agent: "Check the mod and the lane, and tell me the problems." The agent calls `check` and `get_trade_lane`. An error stops the save. A warning does not stop it.
-7. Click **File > Save**, or ask the agent to save.
-8. Wait until the editor loads the game data again. The agent waits until `studio_status` gives `data_load: ready`.
-9. Double-click Av01 in the Universe panel. The Scene opens the system. A double-click on the row of Av01 in the Systems table of the Database also opens it.
-10. Select a ring of the lane in the Scene. The Inspector shows the Trade lane ring section and the completeness panel of the lane.
-11. Press Ctrl+F5 to play the mod in your game.
-12. In the game, fly to the new jump hole in Li02.
-13. Dock with the jump hole. The ship jumps to Av01.
-14. Dock with the first ring of the lane. The HUD shows the two end names of the lane, and the ride goes to the last ring.
+1. Open the profile in the editor.
+2. If your mod is not the active mod, make it active with **Make active mod** in **Mod > Mods...**.
+3. Start the agent server, and connect the agent program to the editor (see "Connect an agent to the editor").
+4. Ask the agent: "Make the system Av01 like Li02, next to Li02 on the nav map." The agent calls `get_universe` to find a free place, then `system_create`.
+5. Ask the agent: "Connect Av01 and Li02 with a jump hole pair." The agent calls `connection_create` with the kind `jump_hole`.
+6. Ask the agent: "Make a trade lane from the new jump hole toward the sun." The agent calls `trade_lane_create` with `start_near` and `end_near`. The last ring stays outside the death zone of the sun.
+7. Ask the agent: "Give the new lane zone and traffic zone the encounters and factions of the Li02 zones." The agent reads the lane zones and the traffic zones of Li02, then calls `scene_set_encounters`.
+8. Ask the agent: "Check the mod and the lane, and tell me the problems." The agent calls `check` and `get_trade_lane`. An error stops the save. A warning does not stop it.
+9. Click **File > Save**, or ask the agent to save.
+10. Wait until the editor loads the game data again. The agent waits until `studio_status` gives `data_load: ready`.
+11. Double-click Av01 in the Universe panel. The Scene opens the system. A double-click on the row of Av01 in the Systems table of the Database also opens it.
+12. Select a ring of the lane in the Scene. The Inspector shows the Trade lane ring section and the completeness panel of the lane.
+13. Press Ctrl+F5 to play the mod in your game.
+14. In the game, fly to the new jump hole in Li02.
+15. Dock with the jump hole. The expected result: the ship jumps to Av01.
+16. Dock with the first ring of the lane. The expected result: the HUD shows the two end names of the lane, and the ride goes to the last ring.
+
+OpenLancer Play (F5) showed these results in a test. Nobody checked them in the retail games yet.
 
 Before the save, the Database, the Universe panel and the Inspector show the new system. The Scene shows a card that asks for the save (see "What you see in the editor"). The agent can make the system, the pair and the lane in one `edit_batch`, so one undo takes them back.
 
@@ -248,7 +252,7 @@ Each edit tool takes these arguments:
 | `if_revision` | Refuses the edit with `stale_revision` when the edit view changed after this revision. Each result gives the revision as `rev`. A save does not change it. |
 | `confirm` | `rename_item`, `delete_items` and `mission_edit`: applies an edit that changes more than its targets. `trade_lane_delete`: applies the delete of the whole lane, which always asks. The prop group writes: writes the files. |
 
-When you would see a dialog for a delete or a rename, the tool gives `needs_confirmation`, and nothing changes. A delete or a rename that leaves "Missing" lines also needs it. The server tells the agent to show the changes to you and to ask you first. When you agree, the agent calls the tool again with `confirm: true`. A preview tells it in `needs_confirmation`, and the warnings of the preview tell why.
+When you would see a dialog for a delete or a rename, the tool gives `needs_confirmation`, and nothing changes. A delete or a rename that leaves "Missing" lines also needs it. The text of the question gives the reasons first. The new links of a trade lane and the gate lock lines of a jump connection come last, because these parts alone do not ask. The server tells the agent to show the changes to you and to ask you first. When you agree, the agent calls the tool again with `confirm: true`. A preview tells it in `needs_confirmation`, and the warnings of the preview tell why.
 
 The result of an edit gives the new items (`adds`), the changed items (`changes`), the removed items (`deletes`) and the renamed items (`renames`). It also gives the "Missing" lines, the warnings, the text mentions, and the problems that the edit adds and removes. Each reference names the item as it is after the call. So an item that a call adds and then deletes is not in the result, and two renames of one item are one rename. A call that changes nothing gives the status `no_change`, an empty `changes` list and no Undo step.
 
@@ -394,7 +398,7 @@ When a refusal is about one argument, the `field` of the error names it, for exa
 
 Without `rings`, the lane gets one ring for each 7500 m of length, plus one. With `zone: false`, the tool makes no lane zone, and the lane has no lane traffic. The result gives `rings` in order, `zone` and `spacing`. A ring inside a zone with damage or inside an object gives a warning. A spacing outside the retail range of 5165 to 9445 m also gives a warning. Give the lane zone its encounters with `scene_set_encounters`.
 
-`trade_lane_insert_ring` takes `after` or `before`, not both. `before` takes only the first ring of a lane. The new ring takes the links of its place and copies the lines of its neighbor. Without `position`, it goes in the middle between two rings, or one spacing beyond the end. At an end, the end name moves to the new ring, and the lane zone follows the new end. The result gives `ring`, its `place` in the lane from 1, and the ring `count`.
+`trade_lane_insert_ring` takes `after` or `before`, not both. `before` takes only the first ring of a lane. The new ring takes the links of its place and copies the lines of its neighbor. Without `position`, it goes in the middle between two rings, or one spacing beyond the end. A ring without a position needs `position`. At an end, the end name moves to the new ring, and the lane zone follows the new end. The result gives `ring`, its `place` in the lane from 1, and the ring `count`.
 
 `trade_lane_repair` finds the rings of the lane of a ring from their links and from their places on the line. It sorts them along the line, writes their `prev_ring` and `next_ring` lines again, and moves the end names to the two end rings. The positions stay. A ring without links joins the nearest lane whose line passes it. A lane with good links gives `no_change`. The result gives `rings` in the new order.
 
@@ -415,7 +419,7 @@ The refusals of the trade lane tools are:
 | `LaneNotLine` | `invalid_value` | The rings of the lane do not stand on one line, so the repair cannot sort them. |
 | `NameTaken` | `name_taken` | Another object has the nickname of the new ring. |
 | `NameInvalid` | `invalid_value` | An INI line cannot hold `nickname`, for example a nickname with a `;` or a line break. |
-| `FieldValue` | `invalid_value` | An object without a position: `start_near` or `end_near` without a point, the ring of an insert without `position`, or a ring of a repair. |
+| `FieldValue` | `invalid_value` | An object without a position: `start_near` or `end_near` without a point, a ring without a position for an insert without `position`, or a ring of a repair. |
 | `ItemNotFound` | `not_found` | `start_near` or `end_near` names an item that is not an object, for example a zone. |
 | `EndOtherSystem` | `invalid_argument` | `start_near` or `end_near` names an object of another system. |
 
@@ -994,7 +998,7 @@ The server gives three prompts. An agent program shows a prompt as a command. In
 |---|---|---|
 | `two_trigger_mission` | `script`: the `msn:` reference of a mission script. `list_missions` gives the scripts. | The steps to add a pirate ambush with two triggers. The agent adds the ship build, the NPC and the ship with `mission_add_item`. It adds the two triggers and the loot in one `edit_batch`. Then it runs `mission_dry_run` and `check`. The names in the steps are examples. |
 | `short_cutscene` | `name`: the name of the new cutscene script, for example `my_intro`. | The steps to make a short cutscene. The agent makes the script with `cutscene_create`. It adds a second camera, a character with a costume of `list_values` and a marker with `cutscene_add_entity`. It adds a camera move and a cut to the second camera with `cutscene_add_event` and `set_fields`. Then it makes two images with `render_cutscene`, corrects the timing and runs `check`. It does not save until you ask. The names in the steps are examples. |
-| `new_system` | `nickname`: the nickname of the new system. `neighbor`: the nickname of an existing system. | The steps to make a new star system next to the neighbor. The agent finds a free place with `get_universe` and makes the system with `system_create`. It connects the system to the neighbor with `connection_create`, and makes a lane from the new gate toward the sun with `trade_lane_create`. It gives the traffic zone and the lane zone encounters with `scene_set_encounters`, and adds a patrol with `scene_place_patrol_route`. Then it runs `check`. It does not save until you ask. After a save, it waits for `data_load: ready` and makes an image with `render_scene`. |
+| `new_system` | `nickname`: the nickname of the new system. `neighbor`: the nickname of an existing system. | The steps to make a new star system next to the neighbor. The agent finds a free place with `get_universe` and makes the system with `system_create`. It connects the system to the neighbor with `connection_create`, and makes a lane from the new gate toward the sun with `trade_lane_create`. It reads a lane zone and a jump traffic zone of the neighbor with `get_raw_ini`. It gives their pairs of encounter and faction to the new zones with `scene_set_encounters`. It adds a patrol with `scene_place_patrol_route`. Then it runs `check`. It does not save until you ask. After a save, it waits for `data_load: ready` and makes an image with `render_scene`. |
 
 The prompts need the edit tools. So a host that only reads, for example `oltool mcp serve --read-only`, lists no prompt.
 

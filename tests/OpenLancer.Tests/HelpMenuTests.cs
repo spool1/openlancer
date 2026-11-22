@@ -101,18 +101,25 @@ public sealed class HelpMenuTests : IDisposable
     }
 
     /// <summary>Read me first tells what this version can do. A delete of a jump gate or a jump hole deletes its pair,
-    /// and the agent tools make new systems and jump connections. So the file names them, and it does not say that no
-    /// jump gate can go.</summary>
+    /// and a delete of a trade lane ring links the lane again. The agent tools make new systems, jump connections and
+    /// trade lanes, and the Inspector buttons change a lane. The Universe panel shows the systems. So the file names
+    /// them, and it does not say that no jump gate or ring can go.</summary>
     [Fact]
-    public void ReadmeFirstTellsTheAgentToolsOfTheSystemsAndTheJumpConnections()
+    public void ReadmeFirstTellsTheAgentToolsOfTheSystemsTheJumpConnectionsAndTheLanes()
     {
         var readme = Merge(File.ReadAllText(RepoFiles.Of("release", "README-FIRST.txt")));
 
         Assert.DoesNotContain("create or delete jump gates", readme);
+        Assert.DoesNotContain("delete airlock gates and trade lane rings", readme);
         Assert.Contains("A delete of a jump gate or a jump hole deletes its pair.", readme);
+        Assert.Contains("A delete of a trade lane ring links the lane again.", readme);
+        Assert.Contains("You cannot delete airlock gates yet.", readme);
         Assert.Contains("Agent > Start agent server", readme);
         Assert.Contains("system_create makes a new star system", readme);
         Assert.Contains("connection_create", readme);
+        Assert.Contains("trade_lane_create", readme);
+        Assert.Contains("Insert ring after", readme);
+        Assert.Contains("Universe panel", readme);
         Assert.Contains("route tables", readme);
     }
 

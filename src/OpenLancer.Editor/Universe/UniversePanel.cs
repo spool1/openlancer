@@ -180,14 +180,15 @@ internal sealed class UniversePanel(EditorWindow window)
     /// <summary>The id of the panel in the layout. The agent tool <c>capture_panel</c> names the panel with it.</summary>
     public const string PanelId = "universe";
 
-    /// <summary>The text of the info icon of the panel (AGENTS.md UI rule 10).</summary>
+    /// <summary>The text of the info icon of the panel (AGENTS.md UI rule 10). The first paragraph is the legend, and
+    /// the second paragraph tells the labels and the mouse.</summary>
     internal static readonly HelpText Help = new("Universe",
-        "A map of the systems of the edit view on the nav map grid, with their jump connections. The panel is " +
-        "read-only. A solid line is a pair of jump gates, and a dashed line is a pair of jump holes. A red line has a " +
+        "A read-only map of the systems of the edit view on the nav map grid, with their jump connections. A solid " +
+        "line is a pair of jump gates or an airlock gate. A dashed line is a pair of jump holes. A red line has a " +
         "player lock in a new game. An arrow points along a jump whose other end does not go back. A blue dot marks a " +
-        "new system that the mod has not saved. A name shows only where it has space. Hold the mouse on a dot to see " +
-        "its name, or make the panel larger. A click selects a system, and a double-click opens it in the Scene. When " +
-        "you select an object of a system in another view, the system gets a ring.",
+        "new system that the mod has not saved.\n\n" +
+        "A name shows only where it has space. Hold the mouse on a dot to see its name, or make the panel larger. A " +
+        "click selects a system, and a double-click opens it in the Scene. The system of a selected object gets a ring.",
         "Nothing. The place of a system is the pos line of its [system] in universe.ini. Change it in the Inspector of " +
         "the system. The agent tools system_create and connection_create add systems and connections.");
 

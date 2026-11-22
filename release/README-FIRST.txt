@@ -151,8 +151,17 @@ WHAT WORKS IN THIS VERSION
 - Let an AI agent edit your mod with Agent > Start agent server. The
   agent uses the same edits, checks, undo and save as you. Its tool
   system_create makes a new star system, and connection_create connects
-  two systems with a jump gate pair or a jump hole pair. The editor
-  shows the results in the Scene, the Hierarchy and the Inspector.
+  two systems with a jump gate pair or a jump hole pair. The tools
+  trade_lane_create, trade_lane_insert_ring, trade_lane_repair and
+  trade_lane_delete make and change trade lanes.
+- A new system shows at once in the Database, in the Inspector and in
+  the Universe panel. The Scene shows a card with a Save button. After
+  the save, the Scene opens the new system.
+- The Universe panel shows the systems on the nav map grid, with their
+  jump connections. It is read-only.
+- The Inspector of a trade lane ring has the buttons Insert ring after,
+  Repair lane and Delete ring. A delete of a trade lane ring links the
+  lane again.
 - When your mods change the jump connections, the export and Play in
   your own game (Ctrl+F5) make new route tables for the game.
 - oltool checks your game folder, and checks, merges and shows mods from
@@ -179,10 +188,10 @@ WHAT DOES NOT WORK YET
 - Play (F5) does not run the HD Edition plugins.
 - OpenLancer does not support total conversions such as Discovery. The
   editor can open their data, with a warning.
-- The editor cannot create jump gates, jump holes and trade lane rings.
-  The agent tool connection_create makes a jump gate pair or a jump hole
-  pair. A delete of a jump gate or a jump hole deletes its pair. You
-  cannot delete airlock gates and trade lane rings yet.
+- The Create menu and Duplicate cannot make jump gates, jump holes and
+  trade lane rings. The agent tools make jump gate pairs, jump hole pairs
+  and trade lanes. A delete of a jump gate or a jump hole deletes its
+  pair. You cannot delete airlock gates yet.
 - You cannot make new bases, nebulae or asteroid fields yet.
 - You can select only one item at a time.
 - A Play start at a checkpoint restores only the triggers of the
