@@ -4,7 +4,7 @@ OpenLancer has an agent server. An agent program, for example Claude Code, conne
 
 The agent reads the data as the editor shows it. It reads the systems and their items, the data lists, the assets, the missions and the cutscenes. It also reads the raw INI text and the problems of the checks. In the editor, the agent can also open views and select items. It gets images of a system, a cutscene, a panel and the running game.
 
-The agent can also edit the items of the active mod. It sets fields and texts, renames, deletes and copies items, and undoes its own edits. It creates objects, zones and lights, places assets and prop groups, moves items and makes items from templates. It makes new star systems and connects systems with jump gates and jump holes. It also changes the mission scripts with the commands of the mission studio, and the cutscenes with the commands of the Cutscene tab. See "The edit tools", "The Scene and data tools", "The universe tools", "The mission tools" and "The cutscene tools".
+The agent can also edit the items of the active mod. It sets fields and texts, renames, deletes and copies items, and undoes its own edits. It creates objects, zones and lights, places assets and prop groups, moves items and makes items from templates. It makes new star systems, connects systems with jump gates and jump holes, and makes trade lanes (see "Make a new system with an agent"). It also changes the mission scripts with the commands of the mission studio, and the cutscenes with the commands of the Cutscene tab. See "The edit tools", "The Scene and data tools", "The universe tools", "The mission tools" and "The cutscene tools".
 
 Each agent edit goes through the same commands, checks and Undo history as an edit of the user. An edit changes the edit view of the editor. The edit stays unsaved until you or the agent save the mod (see "Save"). In the editor, the agent can also start and stop Play, also a play of a mission from a trigger (see "Play"). The editor marks each agent edit, and you can pause the agent edits (see "What you see in the editor").
 
@@ -100,6 +100,38 @@ When another program uses the port, the server does not start. The status bar th
 | Steps of one batch | 100 | The most steps of one `edit_batch` call, and the most commands of one `mission_edit` call. |
 | Legs of one route | 50 | The most legs of one `scene_place_patrol_route` call. Each leg is one zone. A retail route has at most 12 legs. |
 | Time of an export (min) | 10 | How long one `export_mod` call can take. A longer export gives the error `limit`. A write of the packages that started goes on to its end. |
+
+## Make a new system with an agent
+
+This example makes a new star system next to Li02 with an agent. The system gets a jump hole pair to Li02, a trade lane from the jump hole toward the sun, and NPC traffic. Each request is a message that you type in the agent program. The names in the requests, for example Av01, are examples.
+
+Connect the agent program to the editor first (see "Connect an agent to the editor"). The prompt `new_system` gives the agent similar steps, with a jump gate pair and a patrol (see "Resources and prompts").
+
+1. Open the profile and the mod in the editor.
+2. Ask the agent: "Make the system Av01 like Li02, next to Li02 on the nav map." The agent calls `get_universe` to find a free place, then `system_create`.
+3. Ask the agent: "Connect Av01 and Li02 with a jump hole pair." The agent calls `connection_create` with the kind `jump_hole`.
+4. Ask the agent: "Make a trade lane from the new jump hole toward the sun." The agent calls `trade_lane_create` with `start_near` and `end_near`. The last ring stays outside the death zone of the sun.
+5. Ask the agent: "Give the lane zone and the jump hole traffic zone the encounters of Li02." The agent calls `list_values` and `scene_set_encounters`.
+6. Ask the agent to run `check`. Read the problems that it gives. An error stops the save.
+7. Click **File > Save**, or ask the agent to save.
+8. Wait until the editor loads the game data again. The agent waits until `studio_status` gives `data_load: ready`.
+9. Double-click Av01 in the Universe panel. Or double-click its row in the Systems table of the Database. The Scene opens the system.
+10. Select a ring of the lane in the Scene. The Inspector shows the Trade lane ring section and the completeness panel of the lane.
+11. Press Ctrl+F5 to play the mod in your game.
+12. In the game, fly to the new jump hole in Li02, and jump to Av01.
+13. Dock with the first ring of the lane. The HUD shows the two end names of the lane, and the ride goes to the last ring.
+
+Before the save, the Database, the Universe panel and the Inspector show the new system. The Scene shows a card that asks for the save (see "What you see in the editor"). The agent can do steps 2 to 5 in one `edit_batch`, so one undo takes back the whole system.
+
+The known limits of this version:
+
+- The Scene and `render_scene` open a new system only after the save and the reload of the game data.
+- The FLMM package refuses a mod with a new system file, because the file holds the text of the mod. The drop-in zip holds the new system. Give `export_mod` the format `drop_in` to make only the zip.
+- OpenLancer Play (F5) does not lock gates. A gate that a new game of the retail game locks is open in OpenLancer Play.
+- A new system has no `msg_id_prefix`. NPC speech that names the system is silent.
+- The editor renames and deletes only a system that the active mod adds. A system with a base cannot go in this version.
+- A system holds at most 10 jump gates and jump holes. In vanilla 1.1, Li01 has 9 of them and Li02 has 5. So Li01 takes only one more.
+- The Universe panel is read-only. The editor has no hand tools that make a system, a jump connection or a lane. The agent tools make them. The Inspector has the "Lock at start" choice of a jump connection and the ring buttons of a lane.
 
 ## The tools
 
