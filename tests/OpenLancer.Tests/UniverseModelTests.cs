@@ -380,8 +380,8 @@ public sealed class UniverseModelTests
     }
 
     /// <summary>
-    /// A label shows under its dot, else over it, only where it hits no label and no dot of another system and stays in
-    /// the canvas. A label that has no space does not show. The labels of the selected and the hovered system always
+    /// A label shows under its dot, else over it. It shows only in the canvas, where it hits no label and no dot of
+    /// another system. A label that has no space does not show. The labels of the selected and the hovered system always
     /// show under their dots, and the other labels give way to them.
     /// </summary>
     [Fact]

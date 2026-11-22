@@ -91,10 +91,10 @@ internal readonly record struct UniverseFrame(Vector2 Origin, float Scale, Vecto
 
     /// <summary>
     /// The top left corner of the label of each system, or null for a label that does not show. The labels of
-    /// <paramref name="first"/> always show under their dots. Each other label shows under its dot, else over it, when
-    /// that box is in the canvas and hits no label that shows and no dot of another system. The other labels take their
-    /// places in the order of the systems. So at a small zoom, the labels do not cover each other or the dots, and the
-    /// tooltip of a dot gives each name.
+    /// <paramref name="first"/> always show under their dots. Each other label shows under its dot, else over it. That
+    /// box must be in the canvas, and it must hit no label that shows and no dot of another system. The other labels take
+    /// their places in the order of the systems. So at a small zoom, the labels do not cover each other or the dots, and
+    /// the tooltip of a dot gives each name.
     /// </summary>
     /// <param name="dots">The screen point of the dot of each system, or null for a system without a place.</param>
     /// <param name="sizes">The size of the label of each system, in pixels.</param>
