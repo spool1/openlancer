@@ -23,8 +23,8 @@ namespace OpenLancer.Data.Export;
 /// scripts and a test of FLMM 1.31 with a hand-made package. The owner check of an exported package must confirm them.
 /// Until then, the package is a preview.</para>
 /// <para>FLMM 1.31 reads one tag or one tag end on each line. So each tag and each tag end of the script is on its own
-/// line, and the content of an element is on the lines between them. No line gets an indent from the script. Each
-/// content line of an operation is an INI line as the game file has it. Each attribute value is in quotes.</para>
+/// line, and the content of an element is on the lines between them. The script adds no indent to a line. Each content
+/// line of an operation is an INI line as the game file has it. Each attribute value is in quotes.</para>
 /// <list type="bullet">
 /// <item><c>append</c> without <c>section</c> adds a new section at the end of a file. Its source starts with an empty
 /// line, as the game files have between sections.</item>
@@ -42,9 +42,9 @@ namespace OpenLancer.Data.Export;
 /// <para>A change that the operations cannot express puts the whole merged file into the package. A whole file
 /// cannot hold mod text, so such a change with mod text is a refusal.</para>
 /// <para>A new <c>[Base]</c> of <c>universe.ini</c> is a refusal too. It must go before the <c>[system]</c> sections
-/// (see <see cref="UniverseOrder"/>), and an <c>append</c> puts it at the end of the file. FLMM has no tested
-/// operation that puts a section before the first <c>[system]</c> yet. Each refusal names the drop-in zip, which
-/// always carries the new content.</para>
+/// (see <see cref="UniverseOrder"/>), and an <c>append</c> puts it at the end of the file. This version of the package
+/// cannot put a section before the first <c>[system]</c> yet. Each refusal names the drop-in zip, which always carries
+/// the new content.</para>
 /// </remarks>
 internal sealed partial class FlmmScript
 {
@@ -196,7 +196,8 @@ internal sealed partial class FlmmScript
             var names = bases.Select(m => SectionIdentity.Of(diff.MergedSections, m)).Select(s => s.Key ?? s.ToString());
             Refuse(file.Path, $"the mod adds the new {(bases.Count == 1 ? "base" : "bases")} {string.Join(", ", names)} to " +
                               "universe.ini. The game links a base to its station only when the [Base] comes before the " +
-                              "[system] sections. FLMM has no tested operation that puts a section there yet");
+                              "[system] sections. This version of the FLMM package cannot put a section before the " +
+                              "systems yet");
             return;
         }
         var binary = file.BaseDocument!.IsBinary;

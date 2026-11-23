@@ -1771,7 +1771,7 @@ When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod
 - A change that the operations cannot express puts the whole merged file into the package, with a warning. Examples are a removed line or section, and an anchor that FLMM does not find once in the file. A whole file cannot hold the text of the mod, so such a change with text refuses the package.
 - A new whole INI file of the mod with mod text refuses the package, because FLMM reads its text macros only in script operations.
 - The route tables are whole files. The package copies them with no operation and no warning (see "Route tables").
-- A new `[Base]` of `universe.ini` refuses the package. The game needs each `[Base]` before the `[system]` sections (see "universe.ini"), and an `append` puts the section at the end of the file. FLMM has no tested operation that puts a section before the first `[system]` yet.
+- A new `[Base]` of `universe.ini` refuses the package. The game needs each `[Base]` before the `[system]` sections (see "universe.ini"), and an `append` puts the section at the end of the file. This version of the FLMM package cannot put a section before the first `[system]` yet.
 - Each refusal names the drop-in zip. The drop-in zip always carries the new content.
 - `oltool export --flmm-probe` writes the text of the mod as it is. The probe is for the FLMM check only. It writes only its package.
 

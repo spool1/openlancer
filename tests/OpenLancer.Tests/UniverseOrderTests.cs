@@ -360,8 +360,9 @@ public sealed class UniverseOrderTests
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
         Assert.Equal($"The FLMM package cannot hold this change in {Universe}: the mod adds the new base " +
                      "Ol01_01_Base to universe.ini. The game links a base to its station only when the [Base] comes " +
-                     "before the [system] sections. FLMM has no tested operation that puts a section there yet. " +
-                     "Use the drop-in zip, or change the mod.", error.Message);
+                     "before the [system] sections. This version of the FLMM package cannot put a section before the " +
+                     "systems yet. Use the drop-in zip, or change the mod.", error.Message);
+        Assert.Empty(SteLint.Problems(error.Message));
         Assert.DoesNotContain("<data", script.Xml);
         Assert.Empty(script.Files);
     }
