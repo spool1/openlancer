@@ -569,7 +569,8 @@ public sealed partial class BaseSaveGateTests
         var warning = One(session, "Ol01_02_Base sells ships, but its market has no line", BaseWorkspace.Planet);
 
         Assert.Equal("Ol01_02_Base sells ships, but its market has no line for the ship package ol_ship3_package. The ship " +
-                     "markets of the game list each ship package at each base that sells ships.", warning.Message);
+                     "markets of the game list each ship package at each base that sells ships. Add these lines " +
+                     "only to match that form. They do not change the price or the trade-in of a ship.", warning.Message);
         Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
     }
 

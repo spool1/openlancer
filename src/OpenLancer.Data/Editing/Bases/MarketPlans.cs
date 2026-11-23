@@ -804,7 +804,8 @@ public static class MarketPlans
                 : $"{string.Join(", ", missing.Take(ShownShips))} and {missing.Count - ShownShips} more";
             var count = missing.Count == 1 ? "1 ship package" : $"{missing.Count} ship packages";
             fixes.Add((target, $"{baseNickname} sells ships, so it gets a buy-only line for {count}: {names}. The ship " +
-                               "markets of the game list each ship package at each base that sells ships."));
+                               "markets of the game list each ship package at each base that sells ships. The lines " +
+                               "do not change the price or the trade-in of a ship."));
         }
 
         /// <summary>The command of the draft.</summary>

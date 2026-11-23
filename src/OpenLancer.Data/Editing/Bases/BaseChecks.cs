@@ -73,6 +73,12 @@ internal static class BaseChecks
     /// <summary>The most characters of a base nickname for which the retail game finds the <c>[MBase]</c>.</summary>
     public const int BarDataNameLength = 63;
 
+    /// <summary>The end of the warning of the ship lines check, in the gate and on the targets. The buy-only lines of
+    /// the ship packages keep the vanilla form of the ship markets. The price and the trade-in of a ship come from the
+    /// market line of its hull good (fork commit OL-0080), so the lines do not change them.</summary>
+    internal const string ShipLinesNote =
+        "Add these lines only to match that form. They do not change the price or the trade-in of a ship.";
+
     /// <summary>The nickname prefix of an intro base. The OpenLancer engine shows its rooms in the main menu.</summary>
     private const string IntroPrefix = "intro";
 
@@ -407,7 +413,7 @@ internal static class BaseChecks
             if (ships > 0 && MarketPlans.MissingShipLines(session, view) is { Count: > 0 } missing)
                 Add(false, view.Entry, "nickname",
                     $"{Name} sells ships, but its market has no line for {ShipList(missing)}. The ship markets of the " +
-                    "game list each ship package at each base that sells ships.");
+                    $"game list each ship package at each base that sells ships. {ShipLinesNote}");
         }
 
         /// <summary>The goods of the category of a dealer in plain words, for example "commodities".</summary>

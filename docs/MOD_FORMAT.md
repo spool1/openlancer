@@ -1561,7 +1561,7 @@ The base checks also give warnings, which do not block the save. The Inspector s
 - A base that sells goods without the dealer of their category. The player cannot buy them.
 - A dealer whose category the market does not sell. The dealer shows an empty list.
 - A base of the active mod without an `[MBase]`. Its bar has no characters, and it offers no missions.
-- A base whose market the active mod adds or changes, when the base sells a ship and has no line for each ship package. The check runs only when the ship markets of the game and of the lower mods have buy-only lines, as vanilla has. Vanilla lists each ship package at each base that sells ships. The trade-in value does not come from these lines (see "Markets"). The completeness of the base gives a fix that adds the missing buy-only lines.
+- A base whose market the active mod adds or changes, when the base sells a ship and has no line for each ship package. The check runs only when the ship markets of the game and of the lower mods have buy-only lines, as vanilla has. Vanilla lists each ship package at each base that sells ships. These lines only match that form. They do not change the price or the trade-in of a ship (see "Markets"). The completeness of the base gives a fix that adds the missing buy-only lines.
 - A room scene that shows a `$terrain_*` template, when the base has no `terrain_*` line for it. The room shows no model there.
 - A character of the active mod without a body or a costume, a voice or a name. The game does not show the character.
 
@@ -1923,7 +1923,7 @@ First, the INI checks:
 - A ship package without an engine or a power plant.
 - A market for a base that does not exist, a market good that does not exist, or a market good that the engine ignores (a good without equipment). A line of a hull good is valid: it sets the price of its ship at the base (see "Markets").
 - A market ship whose letter case differs from the ship package. The engine finds ship packages with a case-sensitive match.
-- A ship that a market sells with min = max = 0 (warning: it is not for sale). A line whose transaction type is 1 tells that the base only buys the ship, so it gives no warning. Retail has such a line for each ship of each ship market.
+- A ship that a market sells with min = max = 0 (warning: it is not for sale). A line whose transaction type is 1 tells that the base only buys the ship, so it gives no warning. Vanilla 1.1 has such a line for each ship of each ship market. HD Edition 0.7.1 has none.
 - A market line in which each value after the good has its default value (warning: the games skip it, see "Markets").
 - A duplicate nickname, two nicknames with the same hash, a nickname that is not ASCII, or an equipment section without a nickname. (The engine drops a `[Good]` or `[Ship]` without a nickname and logs `Missing required field nickname`.)
 - A ship or good whose text id has no text.
@@ -1956,7 +1956,7 @@ Librelancer loads some data that the retail game does not accept or does not rea
 | A base nickname with more than 63 characters | Error | It ignores the bar data of the base. |
 | A base with the nickname or the FLHash of another base | Error | It drops one of the two bases. The check reads the bases of the game of each target. So a base of the mod can collide with a base of one target game only. |
 | A fixture of an `[MRoom]` that names no `[GF_NPC]` before it in its `[MBase]` | Error | It shows no character at this place. |
-| A base whose market the mods add or change, when it sells a ship and has no line for each ship package | Warning | Vanilla lists each ship package at each base that sells ships. The trade-in value does not come from these lines. The check runs only for a target whose ship markets have buy-only lines. Vanilla 1.1 has them, and HD Edition 0.7.1 does not. So a mod that you make on HD Edition data can get the warning for the vanilla target. |
+| A base whose market the mods add or change, when it sells a ship and has no line for each ship package | Warning | Vanilla lists each ship package at each base that sells ships. These lines only match that form. They do not change the price or the trade-in of a ship. The check runs only for a target whose ship markets have buy-only lines. Vanilla 1.1 has them, and HD Edition 0.7.1 does not. So a mod that you make on HD Edition data can get the warning for the vanilla target. |
 
 A mod without a retail target gets warnings for the door, the first line, the long nickname and the fixture. The base checks give them (see "The save gate").
 

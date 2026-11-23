@@ -159,8 +159,8 @@ public static partial class TargetChecks
             yield return new($"shiplines|{baseName.ToLowerInvariant()}|{string.Join(",", missing).ToLowerInvariant()}",
                 Problem(false, at.Path, at.Id, "marketgood",
                     $"Base '{baseName}': the base sells ships, but its market has no line for {list}. The ship " +
-                    "markets of this game list each ship package at each base that sells ships. Add a buy-only line " +
-                    "for each ship package."));
+                    "markets of this game list each ship package at each base that sells ships. " +
+                    BaseChecks.ShipLinesNote));
         }
     }
 

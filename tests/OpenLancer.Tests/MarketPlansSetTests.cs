@@ -208,7 +208,8 @@ public sealed class MarketPlansSetTests
         Assert.Equal(["market_misc.ini: 0, -1, 0, 0, 1, 1, 1"], Lines(session, BaseWorkspace.Station, "ol_ship3_package"));
         var fix = Assert.Single(plan.Fixes);
         Assert.Equal("Ol01_01_Base sells ships, so it gets a buy-only line for 2 ship packages: ol_ship2_package, " +
-                     "ol_ship3_package. The ship markets of the game list each ship package at each base that sells ships.",
+                     "ol_ship3_package. The ship markets of the game list each ship package at each base that sells ships. " +
+                     "The lines do not change the price or the trade-in of a ship.",
             fix.Text);
         Assert.Equal(Assert.Single(plan.Adds), fix.Section);
         Assert.Empty(MarketPlans.MissingShipLines(session, session.Base(BaseWorkspace.Station)!));
