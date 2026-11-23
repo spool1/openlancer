@@ -411,7 +411,7 @@ public sealed class AgentBaseToolTests
         Assert.Equal(7, (int)completeness["total"]!);
         Assert.Equal(["Universe entry", "Base file", "Start room", "Rooms", "Characters", "Market", "Dock object"],
             completeness["steps"]!.AsArray().Select(s => (string)s!["name"]!));
-        Assert.Empty(Messages(station["problems"]).Where(m => m.Contains("crash")));
+        Assert.DoesNotContain(Messages(station["problems"]), m => m.Contains("crash"));
 
         var planet = Ok(host, "get_base", """{ "base": "Ol01_02_Base" }""");
         Assert.Equal(["ol_rock_tiny", "ol_rock_sml"], planet["terrain"]!.AsArray().Select(t => (string)t!["archetype"]!));
