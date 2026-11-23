@@ -32,6 +32,9 @@ internal sealed class PlayMenu(EditorWindow window)
     // The Play at base list, made when the list opens.
     private IReadOnlyList<BaseGroup> bases = [];
 
+    // The note of new bases of the edit view that the game data does not have yet, or null (see PlayChecks.NewBases).
+    private string? newBases;
+
     /// <summary>
     /// The bases by system, in the order of the systems of the game data, with the open system first. A base without a
     /// system of the game data is not in the list, because the play starts in the system of the base.
@@ -351,7 +354,11 @@ internal sealed class PlayMenu(EditorWindow window)
         var open = window.Scene.System?.Nickname;
         if (ImGui.IsWindowAppearing())
         {
-            bases = BaseGroups(data!.Items.Systems, data.Items.Bases, open);
+            var items = data!.Items;
+            bases = BaseGroups(items.Systems, items.Bases, open);
+            newBases = PlayChecks.NewBases(
+                window.Session?.Edits.Lists.List("base")?.Entries.Select(e => e.Value) ?? [],
+                b => items.Bases.Get(b) != null);
         }
 
         for (var i = 0; i < bases.Count; i++)
@@ -373,6 +380,11 @@ internal sealed class PlayMenu(EditorWindow window)
         if (bases.Count == 0)
         {
             MenuItems.Note("The game data has no bases");
+        }
+
+        if (newBases != null)
+        {
+            MenuItems.Note(newBases);
         }
 
         ImGui.EndMenu();

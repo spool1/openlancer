@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using LibreLancer.Data;
 using OpenLancer.Runtime.Play;
 
@@ -42,6 +44,21 @@ internal static class PlayChecks
     public static string SaveFirst(string dock) =>
         $"The game data gets the new base '{dock}' after the save. Save the mod, wait until the editor loads the game " +
         "data again, and then start Play again.";
+
+    /// <summary>The note of the Play at base list when the edit view has a base that the game data does not have yet
+    /// (see <see cref="NewBases"/>).</summary>
+    public const string NewBasesNote =
+        "New bases of the mod show here after the save and the reload of the game data.";
+
+    /// <summary>
+    /// The note of the Play at base list, or null. The list shows the bases of the loaded game data. A new base of the
+    /// edit view, for example a base that an agent made, comes into the game data only after the save and the reload.
+    /// So the note tells why the list does not show it yet.
+    /// </summary>
+    /// <param name="editViewBases">The nicknames of the bases of the edit view.</param>
+    /// <param name="gameDataHas">Tells if the game data has a base nickname.</param>
+    public static string? NewBases(IEnumerable<string> editViewBases, Func<string, bool> gameDataHas) =>
+        editViewBases.Any(b => !gameDataHas(b)) ? NewBasesNote : null;
 
     /// <summary>Why no play can start now, or null: no profile is open, or its game data did not load.</summary>
     /// <param name="items">The game data of the profile, or null when it did not load.</param>

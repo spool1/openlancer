@@ -148,6 +148,24 @@ public sealed class PlayMenuTests
             PlayChecks.StartBlock(true, null, null, new PlayStart.AtBase("ol_new_base"), EditView));
     }
 
+    /// <summary>
+    /// Final finding of V1-C4: the Play at base list shows the bases of the loaded game data. When the edit view has a
+    /// base that the game data does not have yet, for example a base that an agent made, a note tells why the list does
+    /// not show it. Without such a base, the list has no note.
+    /// </summary>
+    [Fact]
+    public void ThePlayAtBaseListTellsAboutTheNewBasesBeforeTheSave()
+    {
+        using var ws = new TestWorkspace();
+        var items = Items(ws);
+        bool GameData(string nickname) => items.Bases.Get(nickname) != null;
+
+        Assert.Equal("New bases of the mod show here after the save and the reload of the game data.",
+            PlayChecks.NewBases(["ol_base_01", "ol_new_base"], GameData));
+        Assert.Null(PlayChecks.NewBases(["ol_base_01", "OL_BASE_NOWHERE"], GameData));
+        Assert.Null(PlayChecks.NewBases([], GameData));
+    }
+
     [Fact]
     public void TheTextsOfTheChecksPassTheSteLint()
     {
@@ -155,6 +173,7 @@ public sealed class PlayMenuTests
         [
             PlayChecks.NoProfile, PlayChecks.NoGameData, PlayChecks.NoOpenSystem, PlayChecks.NoSystem("ol_sys"),
             PlayChecks.NotInScene("ol_sys"), PlayChecks.NoBase("ol_base_01"), PlayChecks.SaveFirst("ol_base_02"),
+            PlayChecks.NewBasesNote,
         ];
 
         Assert.Empty(texts.SelectMany(t => SteLint.Problems(t)));

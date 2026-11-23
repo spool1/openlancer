@@ -65,7 +65,7 @@ The check reads the Scene. So Play first lets the Scene show each edit, also whi
 
 Open the Play menu and select Play at base. The list shows the bases of the open system first. The other bases are in one submenu for each system. Click a base. The game starts with the ship docked at that base. Play at base needs no open system.
 
-The list shows the bases of the loaded game data. A new base of the active mod, for example a base of the agent tool `base_create`, gets into the game data only after the save. Save the mod and wait until the editor loads the game data again. Then the new base is in the list.
+The list shows the bases of the loaded game data. A new base of the active mod, for example a base of the agent tool `base_create`, gets into the game data only after the save. Until then, the list ends with the note "New bases of the mod show here after the save and the reload of the game data." Save the mod and wait until the editor loads the game data again. Then the new base is in the list.
 
 ## The ship
 
@@ -98,7 +98,11 @@ A character of a play is an admin. These chat commands work:
 
 The game window shows the debug view. Its Debug window shows the position of the player.
 
-The market of a base keeps the last line of each good, as the retail games do. So a mod can change or remove a market line of the game with a later line. Like the retail games, OpenLancer Play skips a line in which each value after the good has its default value: rank 0, reputation -1, stock 0 and 0, type 0 and price multiplier 1. The ship dealer gives the price of a ship from the market price of its hull good at the base. A market line of the hull good changes that price, and without such a line the price is the price of the hull good. The trade-in value of your ship is that price times 0.8. OpenLancer Play does not use the price variance of a base or the damage of your ship.
+The market of a base keeps the last line of each good, as the retail games do. So a mod can change or remove a market line of the game with a later line. OpenLancer Play skips a line with only default values, as the retail games do. These values are rank 0, reputation -1, min 0, max 0, transaction type 0 and price multiplier 1.
+
+The ship dealer gives the price of a ship from the market price of its hull good at the base. A market line of the hull good changes that price. Without such a line, the price is the price of the hull good. The trade-in value of your ship is that price times 0.8. OpenLancer Play does not use the price variance of a base or the damage of your ship.
+
+At a base where NPC ships launch, the autopilot dock can stop at a closed door. A ship that launches can stay inside the base and keep its dock bay busy. Then the dock request of the player waits, or the server gives the player another dock bay than the one that the autopilot flies to. The autopilot docks at a new station whose dock bays have no NPC launches. To test a base, start Play at the base.
 
 OpenLancer Play does not lock gates. In a new game of the retail game, the gate locks of `InitialWorld.ini` lock some jump gates and jump holes. In OpenLancer Play, each gate and hole is open.
 
