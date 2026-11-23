@@ -212,11 +212,11 @@ public sealed class BasePlansCreateTests
         Assert.Equal("ol_rock_tiny", Value(session, entry, "terrain_tiny"));
         Assert.Equal("Harbor Rock", Text(session, StringKind.String, "ol01_05_base"));
         Assert.Equal(plan.Base, plan.SelectAfter);
-        Assert.Equal(
-        [
-            "The template Ol01_02_Base has no [MBase], so the new base has no bar characters and no dealers.",
-            "No object docks with Ol01_05_Base yet. The player cannot dock there until an object of Ol01 docks with it.",
-        ], plan.Warnings.Select(w => w.Message));
+        // The base checks warn about a base without a dock object, not the plan, so one fault gives one warning.
+        Assert.Equal(["The template Ol01_02_Base has no [MBase], so the new base has no bar characters and no dealers."],
+            plan.Warnings.Select(w => w.Message));
+        Assert.Contains(BaseChecks.Problems(session, New), p => p.Message == "No object docks with Ol01_05_Base. The player " +
+                                                                    "cannot dock there.");
     }
 
     [Fact]
@@ -682,7 +682,7 @@ public sealed class BasePlansCreateTests
         var view = session.Base(New)!;
         Assert.Equal(station, view.NamedObject);
         Assert.Equal(station, Assert.Single(view.DockObjects).Section);
-        Assert.DoesNotContain(plan.Warnings, w => w.Message.StartsWith("No object docks", StringComparison.Ordinal));
+        Assert.DoesNotContain(BaseChecks.Problems(session, New), p => p.Message.StartsWith("No object docks", StringComparison.Ordinal));
     }
 
     /// <summary>

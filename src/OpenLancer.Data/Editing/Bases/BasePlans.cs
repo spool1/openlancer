@@ -93,6 +93,8 @@ public static partial class BasePlans
     /// <see cref="MarketPlans.Set"/>). The plan lists them in its fixes.</item>
     /// <item>The dock objects of the request (see <see cref="DockSpec"/>).</item>
     /// </list>
+    /// <para>The plan does not warn about a base that no object docks with. The base checks give that problem (see
+    /// <see cref="BaseChecks"/>), so one fault gives one warning.</para>
     /// <para>The name goes into the text of the active mod with one key. The <c>strid_name</c> of the base and the
     /// <c>ids_name</c> of the station or the planet share the key. The games link a base to its object only when the two
     /// ids are equal. The infocard goes to the <c>ids_info</c> of that object.</para>
@@ -205,12 +207,6 @@ public static partial class BasePlans
             plan.DockObject = dock.Named;
             plan.Ring = dock.Ring;
         }
-        if (dock is not { Docks: true })
-            warnings.Add(Diagnostic.Warning(universe, $"No object docks with {nickname} yet. The player cannot dock there " +
-                                                      $"until an object of {system} docks with it.") with
-            {
-                Target = plan.Base,
-            });
         plan.File = path;
         plan.Files = files;
         plan.News = news.Adds;

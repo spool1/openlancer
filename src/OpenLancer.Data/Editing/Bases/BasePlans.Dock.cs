@@ -27,10 +27,9 @@ public static partial class BasePlans
         ["nickname", "ids_name", "pos", "rotate", "archetype", "dock_with", "base", "parent"];
 
     /// <summary>The commands of the dock objects of a new base, with the new objects and the changed planet. It also
-    /// holds the object that the games link to the base, the new ring, and true when a new object docks with the
-    /// base.</summary>
+    /// holds the object that the games link to the base and the new ring.</summary>
     private sealed record DockPlan(List<EditCommand> Commands, List<SectionRef> Adds, List<SectionRef> Changes,
-        SectionRef Named, SectionRef? Ring, bool Docks);
+        SectionRef Named, SectionRef? Ring);
 
     /// <summary>
     /// The dock objects of a new base (see <see cref="DockSpec"/>), or null when the request has none. A station gets
@@ -78,8 +77,7 @@ public static partial class BasePlans
             if (ring.Refusal != null)
                 return (null, ring.Refusal);
             commands.AddRange(ring.Commands);
-            return (new DockPlan(commands, ring.Added is { } r ? [r] : [], [planet], planet, ring.Added, ring.Added != null),
-                null);
+            return (new DockPlan(commands, ring.Added is { } r ? [r] : [], [planet], planet, ring.Added), null);
         }
 
         var archetype = dock.Archetype?.Trim() is { Length: > 0 } a ? a
@@ -117,15 +115,15 @@ public static partial class BasePlans
         commands.Add(EditCommand.AddSection(path, SceneSections.ObjectType, entries));
         var added = new SectionRef(path, objectId);
         if (type != "planet")
-            return (new DockPlan(commands, [added], [], added, null, true), null);
+            return (new DockPlan(commands, [added], [], added, null), null);
 
         var newRing = Ring(session, spec, template, path, objectName, position, PlanetRadius(session, archetype), nickname,
             faction, texts);
         if (newRing.Refusal != null)
             return (null, newRing.Refusal);
         commands.AddRange(newRing.Commands);
-        return (new DockPlan(commands, newRing.Added is { } ring2 ? [added, ring2] : [added], [], added, newRing.Added,
-            newRing.Added != null), null);
+        return (new DockPlan(commands, newRing.Added is { } ring2 ? [added, ring2] : [added], [], added, newRing.Added),
+            null);
     }
 
     /// <summary>
