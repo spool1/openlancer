@@ -6,19 +6,19 @@ using LibreLancer.Data.Ini;
 namespace OpenLancer.Data.Editing.Bases;
 
 /// <summary>
-/// The rules of the <c>marketgood</c> lines of a base that the base checks and the market edits share: the buy-only
-/// form, the lines that a dealer sells, the buy-only pattern of the ship markets of a game, and the dealer of each goods
-/// category.
+/// The rules of the <c>marketgood</c> lines of a base that the base checks and the market edits share. They are the
+/// buy-only form, the lines that a dealer sells, the buy-only pattern of the ship markets of a game, and the dealer of
+/// each goods category.
 /// </summary>
 /// <remarks>
 /// <para>Retail facts: each vanilla <c>[BaseGood]</c> of the ship market lists each ship package. A base sells one to
-/// three of them, and the other lines are buy-only lines with the minimum stock 0, the maximum stock 0 and the
-/// transaction type 1. The game gives the trade-in value of the ship of the player from the line of its package at the
-/// base, and 0 without a line. HD Edition 0.7.1 lists only the ships that a base sells, so its ship markets have no
-/// buy-only lines.</para>
-/// <para>The fork sells a ship only when the minimum stock or the maximum stock is not 0, and another good only when
-/// the maximum stock is more than 0 (GameItemDb.cs:559-577). The retail games also do not sell a good of a buy-only
-/// line.</para>
+/// three of them. The other lines are buy-only lines with the minimum stock 0, the maximum stock 0 and the transaction
+/// type 1. The game gives the trade-in value of the ship of the player from the line of its package at the base. Without
+/// a line, the value is 0. HD Edition 0.7.1 lists only the ships that a base sells, so its ship markets have no buy-only
+/// lines.</para>
+/// <para>The fork sells a ship only when the minimum stock or the maximum stock is not 0. It sells another good only
+/// when the maximum stock is more than 0 (GameItemDb.cs:559-577). The retail games also do not sell a good of a
+/// buy-only line.</para>
 /// </remarks>
 public static class BaseMarkets
 {
@@ -43,7 +43,7 @@ public static class BaseMarkets
         Whole(values, MarketLine.MaximumIndex) == 0 &&
         Whole(values, MarketLine.TransactionIndex) == (int)MarketTransaction.BuyOnly;
 
-    /// <summary>True when the dealer of the base sells the good of a line: the line is not buy only, and the stock lets
+    /// <summary>True when the dealer of the base sells the good of a line. The line is not buy only, and the stock lets
     /// the engine sell it.</summary>
     /// <param name="values">The values of the line, from the good.</param>
     /// <param name="ship">True for the line of a ship package.</param>
@@ -57,9 +57,9 @@ public static class BaseMarkets
     }
 
     /// <summary>
-    /// True when the ship markets of a game use the buy-only pattern of vanilla: at least one line of a ship package is
-    /// a buy-only line. A base that sells a ship then needs a line for each ship package, so that a trade-in of each
-    /// ship pays the player. The ship markets of HD Edition 0.7.1 do not use the pattern.
+    /// True when the ship markets of a game use the buy-only pattern of vanilla. At least one line of a ship package is a
+    /// buy-only line. A base that sells a ship then needs a line for each ship package, so that a trade-in of each ship
+    /// pays the player. The ship markets of HD Edition 0.7.1 do not use the pattern.
     /// </summary>
     /// <param name="shipLines">The values of the lines of the ship packages of the game, without the lines of the
     /// active mod.</param>
@@ -91,8 +91,8 @@ public static class BaseMarkets
         _ => "ship dealer",
     };
 
-    /// <summary>The goods category of a good of the goods files of W, for example <c>equipment</c> or <c>ship</c>, or
-    /// null when the good has no category or the data has no such good.</summary>
+    /// <summary>The goods category of a good of the goods files of W, for example <c>equipment</c> or <c>ship</c>. Null
+    /// when the good has no category or the data has no such good.</summary>
     internal static string? CategoryOf(EditSession session, string good) =>
         session.Find(ItemFileKind.Goods, good.Trim()) is { } section && session.Get(section) is { } view &&
         view.Lines("category") is [{ Values: [var value, ..] }, ..]

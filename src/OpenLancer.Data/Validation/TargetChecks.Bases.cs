@@ -16,16 +16,16 @@ namespace OpenLancer.Data.Validation;
 /// the target, and they report only what the mods add.
 /// </summary>
 /// <remarks>
-/// <para>Retail facts: the game makes a room id for each door, also for a room that the base does not have, and one
-/// lookup reads that room without a test. It reads the first line of an <c>[MBase]</c> as its nickname. An
+/// <para>Retail facts: the game makes a room id for each door, also for a room that the base does not have. One lookup
+/// reads that room without a test. The game reads the first line of an <c>[MBase]</c> as its nickname. An
 /// <c>[MBase]</c> whose nickname names no base stops the read of the blocks after it. The game copies the nickname of a
-/// base into a buffer of 64 bytes to find its <c>[MBase]</c>, and it drops a fixture whose character comes later in the
+/// base into a buffer of 64 bytes to find its <c>[MBase]</c>. It drops a fixture whose character comes later in the
 /// block. The id of a base is the FLHash of its nickname, and the game drops a second base with the same id. The game
-/// gives the trade-in value of the ship of the player from the line of its package at the base, and 0 without a
-/// line.</para>
+/// gives the trade-in value of the ship of the player from the line of its package at the base. Without a line, the
+/// value is 0.</para>
 /// <para>The checks give errors, except the trade-in check. It gives a warning, and only when the ship markets of the
-/// target use buy-only lines for the ships that a base does not sell (see
-/// <see cref="BaseMarkets.UsesBuyOnlyShipLines"/>). Vanilla does, and HD Edition 0.7.1 does not.</para>
+/// target use buy-only lines (see <see cref="BaseMarkets.UsesBuyOnlyShipLines"/>). Vanilla does, and HD Edition 0.7.1
+/// does not.</para>
 /// </remarks>
 public static partial class TargetChecks
 {
@@ -131,9 +131,10 @@ public static partial class TargetChecks
     }
 
     /// <summary>
-    /// The trade-in lines of each base that sells a ship and whose market lines the mods add or change, when the ship
-    /// markets of the target use buy-only lines. A ship package without a line at the base gives 0 credits in a trade-in
-    /// there. A new ship package of a mod does not give a finding for each base that the mods do not change.
+    /// The trade-in lines of each base that sells a ship and whose market lines the mods add or change. The check runs
+    /// only when the ship markets of the target use buy-only lines. A ship package without a line at the base gives 0
+    /// credits in a trade-in there. A new ship package of a mod gives no finding for the bases that the mods do not
+    /// change.
     /// </summary>
     private static IEnumerable<Finding> TradeIns(Side side, Scope scope)
     {
@@ -271,9 +272,9 @@ public static partial class TargetChecks
         private HashSet<string>? marketBases;
 
         /// <summary>
-        /// The bases whose doors the checks read on both sides: a base whose <c>[Base]</c> the mods add or change, a base
-        /// whose base file the mods change, and a base whose room file the mods change. Only a changed file with a
-        /// <c>[Hotspot]</c> can change a door, so the checks read the base files of all bases only for such a file.
+        /// The bases whose doors the checks read on both sides. These are the bases whose <c>[Base]</c>, base file or
+        /// room file the mods add or change. Only a changed file with a <c>[Hotspot]</c> can change a door. So the
+        /// checks read the base files of all bases only for such a file.
         /// </summary>
         public IReadOnlySet<string> DoorBases => doorBases ??= FindDoorBases();
 

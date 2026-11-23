@@ -1,15 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using LibreLancer.Data;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Editing.Scene;
-using OpenLancer.Data.Mods;
-using OpenLancer.Data.Validation;
+using OpenLancer.Editor.Inspector;
 using OpenLancer.Studio.Agent;
 using Xunit;
 
@@ -214,9 +211,11 @@ public sealed partial class BaseSaveGateTests
         Assert.Equal((DiagnosticSeverity.Error, BaseWorkspace.Section(session, NewFile, "Room", "Office"), "file"),
             (error.Severity, error.Target, error.Key));
         Assert.Contains(session.SaveProblems(), p => p.Message == error.Message);
-        // The section check of the [Room] shows it, and the [Base] does not.
+        // The section check of the [Room] shows it, and the [Base] does not. The Inspector counts it on the [Room].
         Assert.Contains(ComponentChecks.Check(session, error.Target!), p => p.Message == error.Message);
         Assert.DoesNotContain(ComponentChecks.Check(session, Entry(session)), p => p.Message == error.Message);
+        Assert.Equal(1, InspectorPanel.SaveErrorCount(session, error.Target!, session.Get(error.Target!)!));
+        Assert.Equal(0, InspectorPanel.SaveErrorCount(session, Entry(session), session.Get(Entry(session))!));
     }
 
     /// <summary>A door to a room that the base does not have is a warning of the gate. A door without

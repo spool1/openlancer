@@ -1530,9 +1530,13 @@ The base checks also give warnings, which do not block the save. The Inspector s
 - A door of a room that leads to a room that the base does not have. The retail games can crash when the player uses the door. A door without `room_switch` gives no warning.
 - An `[MBase]` whose first line is not its nickname line. The retail games read the first line as the nickname.
 - A base nickname with more than 63 characters: the retail games ignore the bar data of the base. A nickname with more than 31 characters: a mission condition cannot name the base. A base of the active mod whose nickname starts with "intro": OpenLancer also shows its rooms in the main menu.
-- A fixture of an `[MRoom]` that names no `[GF_NPC]` before it in its `[MBase]`. The retail games show no character at this place. An `npc` line of a `[BaseFaction]` that names no character of its `[MBase]`, and a `room` line or an `[MRoom]` that names no room of the base. The game ignores these lines.
+- A fixture of an `[MRoom]` that names no `[GF_NPC]` before it in its `[MBase]`. The retail games show no character at this place.
+- An `npc` line of a `[BaseFaction]` that names no character of its `[MBase]`. The game ignores the line.
+- A `room` line of a character, or an `[MRoom]`, that names no room of the base. The game ignores the line.
 - A base that no object docks with, and a base without an object with `base = <base>` in its system. An object that docks with a base of another system. A base of the active mod also warns when no object with its base line shows the name of the base. The trade lists of the game then skip the base.
-- A base that sells more ships than the room of its ship dealer shows, a base that sells goods without the dealer of their category, and a dealer whose category the market does not sell. Such a dealer shows an empty list.
+- A base that sells more ships than the room of its ship dealer shows. The game shows only the first ships.
+- A base that sells goods without the dealer of their category. The player cannot buy them.
+- A dealer whose category the market does not sell. The dealer shows an empty list.
 - A base of the active mod without an `[MBase]`. Its bar has no characters, and it offers no missions.
 - A base whose market the active mod adds or changes, when the base sells a ship and has no line for each ship package. The check runs only when the ship markets of the game and of the lower mods have buy-only lines, as vanilla has. The game gives 0 credits for the trade-in of a ship without a line.
 - A room scene that shows a `$terrain_*` template, when the base has no `terrain_*` line for it. The room shows no model there.
@@ -1926,11 +1930,11 @@ Librelancer loads some data that the retail game does not accept or does not rea
 | An `[MBase]` whose nickname names no base | Error | It stops reading the bar data of the bases after the block. |
 | An `[MBase]` whose first line is not its nickname line | Error | It reads the first line as the nickname. |
 | A base nickname with more than 63 characters | Error | It ignores the bar data of the base. |
-| A base with the nickname or the FLHash of another base | Error | It drops one of the two bases. The check reads the bases of the game of each target, so a base of the mod can collide with a base of one target game and not of the other. |
+| A base with the nickname or the FLHash of another base | Error | It drops one of the two bases. The check reads the bases of the game of each target. So a base of the mod can collide with a base of one target game only. |
 | A fixture of an `[MRoom]` that names no `[GF_NPC]` before it in its `[MBase]` | Error | It shows no character at this place. |
 | A base whose market the mods add or change, when it sells a ship and has no line for each ship package | Warning | It gives 0 credits for the trade-in of a ship without a line. The check runs only for a target whose ship markets have buy-only lines. Vanilla 1.1 has them, and HD Edition 0.7.1 does not. So a mod that you make on HD Edition data can get the warning for the vanilla target. |
 
-A mod without a retail target gets the door, the first line of an `[MBase]`, the long nickname and the fixture as warnings of the base checks (see "The save gate").
+A mod without a retail target gets warnings for the door, the first line, the long nickname and the fixture. The base checks give them (see "The save gate").
 
 The save gate does not run the check of the jump holes and jump gates. It gives that error through the checks of the jump connections, for each data mod (see "Jump connections and gate locks"). So the save gate shows one error for one cause. Play in the game, the export and `oltool validate --target` run the content check.
 

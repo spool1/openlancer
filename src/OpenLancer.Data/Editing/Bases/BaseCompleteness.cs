@@ -6,8 +6,8 @@ using OpenLancer.Data.Editing.Scene;
 namespace OpenLancer.Data.Editing.Bases;
 
 /// <summary>
-/// The completeness of a base (AGENTS.md UI rule 12, section C.1 of the bases design): seven steps from its entry in
-/// <c>universe.ini</c> to the object that docks with it. Each step reads W and the base checks (see
+/// The completeness of a base (AGENTS.md UI rule 12, section C.1 of the bases design). Seven steps go from its entry
+/// in <c>universe.ini</c> to the object that docks with it. Each step reads W and the base checks (see
 /// <see cref="BaseChecks"/>), so a missing step shows the text of its check. The base page and the agent tool of a base
 /// show the same report.
 /// </summary>
@@ -85,8 +85,8 @@ public static class BaseCompleteness
             .Concat(UniverseChecks.Check(session, entry))
             .Select(p => p with { Target = p.Target ?? entry });
 
-    /// <summary>True when the base game misses a step too: the base comes from the base game, and no mod changes a
-    /// section of the problems of the step (decision D551).</summary>
+    /// <summary>True when the base game misses a step too (decision D551). The base comes from the base game, and no
+    /// mod changes a section of the problems of the step.</summary>
     private static bool BaseGame(EditSession session, BaseView view, IReadOnlyList<Diagnostic> problems) =>
         view.Origin == ValueOrigin.Base && Unchanged(session, view.Entry) &&
         problems.All(p => p.Target is not { } target || Unchanged(session, target));

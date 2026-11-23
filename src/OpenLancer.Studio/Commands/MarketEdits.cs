@@ -176,9 +176,9 @@ internal static class MarketEdits
             throw new InvalidOperationException("The edit view has no market file.");
     }
 
-    /// <summary>The category of a good, for example <c>equipment</c> or <c>ship</c>, or null.</summary>
-    public static string? Category(EditSession session, string good) =>
-        session.Find(ItemFileKind.Goods, good) is { } section ? First(session.Get(section), "category") : null;
+    /// <summary>The category of a good, for example <c>equipment</c> or <c>ship</c>, or null. The base checks read the
+    /// same category (see <see cref="BaseMarkets.CategoryOf(EditSession, string)"/>).</summary>
+    public static string? Category(EditSession session, string good) => BaseMarkets.CategoryOf(session, good);
 
     private static string? Base(SectionView view) => First(view, "base");
 

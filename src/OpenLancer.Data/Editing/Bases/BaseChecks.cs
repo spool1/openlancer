@@ -39,25 +39,31 @@ internal sealed record BaseProblem(Diagnostic Problem, BaseStep Step);
 
 /// <summary>
 /// The save checks of the bases (section D of the bases design). They read W, so an unsaved edit counts. Four kinds of
-/// problems are errors, because the game can crash: a base without a base file or with a base file that does not exist,
-/// a base file without <c>[BaseInfo]</c>, a <c>[Room]</c> without a nickname or a room file, and a room file that does
-/// not exist. The list rule of <c>start_room</c> gives the error of a start room that the base does not have. Each other
-/// check gives a warning.
+/// problems are errors, because the game can crash:
+/// <list type="bullet">
+/// <item>a base without a base file, or with a base file that does not exist,</item>
+/// <item>a base file without <c>[BaseInfo]</c>,</item>
+/// <item>a <c>[Room]</c> without a nickname or a room file,</item>
+/// <item>a room file that does not exist.</item>
+/// </list>
+/// The list rule of <c>start_room</c> gives the error of a start room that the base does not have. Each other check
+/// gives a warning.
 /// </summary>
 /// <remarks>
-/// <para>An error comes only from a line that the active mod sets or removes, from a section that it adds, or from a
-/// file that it adds, changes or deletes. The same problem of the base game or of a lower mod is a warning, so it does
-/// not stop the save.</para>
+/// <para>An error comes only from the active mod: a line that it sets or removes, a section that it adds, or a file that
+/// it adds, changes or deletes. The same problem of the base game or of a lower mod is a warning, so it does not stop
+/// the save.</para>
 /// <para>The gate reads only the errors (see <see cref="SaveErrors"/>). The warnings show in the checks of each section
 /// (see <see cref="Check"/>) and in the problems of a base (see <see cref="Problems"/>). The checks of the retail
 /// targets give the problems that only the retail games have as errors (see
 /// <see cref="Validation.TargetChecks"/>).</para>
-/// <para>Retail facts: the game makes one room record for each <c>[Room]</c>, and a door to a room that the base does
-/// not have makes a room id with no room. The game reads the first line of an <c>[MBase]</c> as its nickname, and it
-/// copies the nickname of a base into a buffer of 64 bytes to find its <c>[MBase]</c>. It drops a fixture whose
-/// character comes later in the block, and a character without a body, a voice or a name. A room scene fills in each
+/// <para>Retail facts: the game makes one room record for each <c>[Room]</c>. A door to a room that the base does not
+/// have makes a room id with no room. The game reads the first line of an <c>[MBase]</c> as its nickname. It copies the
+/// nickname of a base into a buffer of 64 bytes to find its <c>[MBase]</c>. It drops a fixture whose character comes
+/// later in the block, and a character without a body, a voice or a name. A room scene fills in each
 /// <c>$terrain_*</c> template with the <c>terrain_*</c> line of the base, and shows no model without the line. The trade
-/// lists of the base screens show only a base that an object with its <c>base</c> line and its name text links to.</para>
+/// lists of the base screens show only a base that an object with its <c>base</c> line and its name text links
+/// to.</para>
 /// </remarks>
 internal static class BaseChecks
 {
@@ -91,8 +97,8 @@ internal static class BaseChecks
         session.BaseCheckState.Problems(baseNickname.Trim());
 
     /// <summary>
-    /// The problems of a section, also of a lower layer: a <c>[Base]</c> of <c>universe.ini</c>, a section of a base
-    /// file, a section of <c>mBases.ini</c>, or an object of a system file that docks with a base of another system.
+    /// The problems of a section, also of a lower layer. The section is a <c>[Base]</c> of <c>universe.ini</c>, a section
+    /// of a base file or of <c>mBases.ini</c>, or an object of a system file that docks with a base of another system.
     /// Each problem of a base has one target section, so one fault gives one problem. Empty for another section.
     /// </summary>
     public static IReadOnlyList<Diagnostic> Check(EditSession session, SectionRef section)
@@ -119,8 +125,8 @@ internal static class BaseChecks
         session.IsBaseFile(section.Path) || session.IsMBasesFile(section.Path);
 
     /// <summary>
-    /// The errors of the bases that the active mod adds or changes, for the save gate: each base whose <c>[Base]</c>
-    /// the active mod adds or changes, and each base whose base file or room file the active mod changes. The gate
+    /// The errors of the bases that the active mod adds or changes, for the save gate. These are the bases whose
+    /// <c>[Base]</c> the active mod adds or changes, and the bases whose base file or room file it changes. The gate
     /// reads only errors, so the warnings do not reach it.
     /// </summary>
     public static IEnumerable<Diagnostic> SaveErrors(EditSession session)
@@ -144,7 +150,7 @@ internal static class BaseChecks
     }
 
     /// <summary>
-    /// The warning of an object that docks with a base of another system: after a launch, the game puts the player in
+    /// The warning of an object that docks with a base of another system. After a launch, the game puts the player in
     /// the system of the base. Null for another object.
     /// </summary>
     private static Diagnostic? DockProblem(EditSession session, SectionRef section, SectionView view)
@@ -447,8 +453,8 @@ internal static class BaseChecks
             }
         }
 
-        /// <summary>True when the active mod causes a problem of a key of a section: it sets or removes the lines of the
-        /// key, it adds the section, or it adds, changes or deletes the file that the key names.</summary>
+        /// <summary>True when the active mod causes a problem of a key of a section. The active mod sets or removes the
+        /// lines of the key or adds the section. Or it adds, changes or deletes the file that the key names.</summary>
         private bool Mine(SectionRef section, string key, string? file = null) =>
             session.Origin(section, key).Origin == ValueOrigin.ActiveMod || file != null && state.Changed.Contains(file);
 
