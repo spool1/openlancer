@@ -37,7 +37,9 @@ public static partial class BasePlans
     /// The <c>[MBase]</c> of a new base and its children (see <see cref="Create"/>), or null when the template has no
     /// <c>[MBase]</c>. The new characters get the nicknames <c>&lt;base&gt;_&lt;role&gt;</c> for a fixture and
     /// <c>&lt;base&gt;_npc_&lt;n&gt;</c> for the bar crowd. The fixture lines and the <c>npc</c> lines name them. A
-    /// <c>npc</c> line of a character that the base does not copy goes.
+    /// <c>npc</c> line or a fixture line of a character that the base does not copy goes. The block is one copy of
+    /// <see cref="SectionCopies.CopyTo"/>, which puts the children under the new <c>[MBase]</c>, gives the characters
+    /// their new nicknames and copies the texts of the mods.
     /// </summary>
     /// <remarks>
     /// A retail name text of a character has three lines: the faction, the title and the name of the person. An example
@@ -52,7 +54,6 @@ public static partial class BasePlans
             return null;
         if (session.OpenDocument(path) is { ReadOnlyReason: { } reason })
             return new BarPlan([], [], [], new Refusal(path, $"{SceneSections.FileName(path)}: {reason}"));
-        var binary = session.IsBinaryFile(path);
         var rooms = kept.Select(r => r.Nickname).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var roles = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (var fixture in template.Fixtures.Where(f => rooms.Contains(f.Room)))
@@ -80,64 +81,51 @@ public static partial class BasePlans
         }
 
         var mbaseId = new SectionIdentity("MBase", nickname);
-        var mbaseRef = new SectionRef(path, mbaseId);
         var faction = spec.LocalFaction?.Trim() is { Length: > 0 } given ? given : null;
         var lines = new List<(string, string)> { ("nickname", nickname) };
         if (faction != null)
             lines.Add(("local_faction", faction));
-        if (ScenePlans.Entries(lines, binary, out var error) is not { } entries)
+        if (ScenePlans.Entries(lines, session.IsBinaryFile(path), out var error) is not { } entries)
             return new BarPlan([], [], [], new Refusal(path, error!));
         // The faction of the request takes the place of the faction of the template.
-        entries.AddRange(Copied(mbase, e => SceneSections.Is(e.Name, "local_faction") && faction == null ||
-                                            SceneSections.Is(e.Name, "diff"), binary));
+        entries.AddRange(mbase.Where(e => SceneSections.Is(e.Name, "local_faction") && faction == null ||
+                                          SceneSections.Is(e.Name, "diff")).Select(Line));
 
-        var commands = new List<EditCommand> { EditCommand.AddSection(path, "MBase", entries) };
-        var adds = new List<SectionRef> { mbaseRef };
-        var characters = new List<SectionRef>();
-        var ordinals = new Dictionary<SectionIdentity, int>();
-        void Child(string type, string? key, IReadOnlyList<EntryView> childEntries)
-        {
-            var first = new SectionIdentity(type, key, mbaseId);
-            var ordinal = ordinals.GetValueOrDefault(first);
-            ordinals[first] = ordinal + 1;
-            commands.Add(EditCommand.AddSection(path, type, childEntries, mbaseRef));
-            adds.Add(new SectionRef(path, first with { Ordinal = ordinal }));
-        }
-
+        // A line that names a character stays only when the base copies the character. The copy renames it.
+        bool Named(Entry e, string key) =>
+            !SceneSections.Is(e.Name, key) || e.Count > 0 && names.ContainsKey(e[0].ToString().Trim());
+        var copies = new List<SectionCopy> { new(SectionEdits.Build("MBase", entries)) };
         if (template.Vendor is { } vendor)
-            Child("MVendor", null, Copied(vendor, _ => true, binary).ToList());
-        foreach (var row in template.Factions)
-        {
-            Child("BaseFaction", null, row
-                .Where(e => !MissionLines.Contains(e.Name, StringComparer.OrdinalIgnoreCase))
-                .Where(e => !SceneSections.Is(e.Name, "npc") || e.Count > 0 && names.ContainsKey(e[0].ToString().Trim()))
-                .Select(e => Renamed(e, names, binary))
-                .ToList());
-        }
+            copies.Add(new SectionCopy(vendor));
+        copies.AddRange(template.Factions.Select(row => new SectionCopy(Only(row, e =>
+            !MissionLines.Contains(e.Name, StringComparer.OrdinalIgnoreCase) && Named(e, "npc")))));
         foreach (var (character, role) in copied)
         {
-            var id = new SectionIdentity("GF_NPC", names[character.Nickname], mbaseId);
-            var name = role == null ? null : NameText(session, spec, template, character, role, warnings);
-            var characterEntries = new List<EntryView> { new("nickname", [new StringValue(id.Key!)]) };
-            foreach (var line in character.Section.Where(e => CharacterLines.Contains(e.Name,
-                         StringComparer.OrdinalIgnoreCase)))
-            {
-                characterEntries.Add(SceneSections.Is(line.Name, "individual_name") && name != null &&
-                                     texts.New(StringKind.String, name, id, "individual_name") is { } text
-                    ? new EntryView(line.Name, [text])
-                    : CopiedLine(line, id, texts, binary));
-            }
-            Child("GF_NPC", id.Key, characterEntries);
-            characters.Add(adds[^1]);
+            var key = names[character.Nickname];
+            var source = character.Section;
+            // The new text is not in the text of the mod before the command runs, so the copy keeps its placeholder.
+            if (role != null && NameText(session, spec, template, character, role, warnings) is { } name &&
+                texts.New(StringKind.String, name, new SectionIdentity("GF_NPC", key, mbaseId), "individual_name") is
+                    { } text)
+                source = SectionEdits.WithLines(source, "individual_name", [[text]]);
+            copies.Add(new SectionCopy(source, key, CharacterLines));
         }
-        foreach (var room in template.RoomParts.Where(r => BaseTemplate.Last(r, "nickname") is { } n && rooms.Contains(n)))
+        copies.AddRange(template.RoomParts
+            .Where(r => BaseTemplate.Last(r, "nickname") is { } n && rooms.Contains(n))
+            .Select(room => new SectionCopy(Only(room, e => Named(e, "fixture")))));
+
+        var adds = new List<SectionRef> { new(path, mbaseId) };
+        var ordinals = new Dictionary<SectionIdentity, int>();
+        foreach (var copy in copies.Skip(1))
         {
-            Child("MRoom", BaseTemplate.Last(room, "nickname"), room
-                .Where(e => !SceneSections.Is(e.Name, "fixture") || e.Count > 0 && names.ContainsKey(e[0].ToString().Trim()))
-                .Select(e => Renamed(e, names, binary))
-                .ToList());
+            var key = copy.Key ?? BaseTemplate.Last(copy.Source, "nickname");
+            var first = new SectionIdentity(copy.Source.Name, key, mbaseId);
+            var ordinal = ordinals.GetValueOrDefault(first);
+            ordinals[first] = ordinal + 1;
+            adds.Add(new SectionRef(path, first with { Ordinal = ordinal }));
         }
-        return new BarPlan(commands, adds, characters);
+        return new BarPlan([texts.CopyTo(path, copies, newFile: false)], adds,
+            adds.Where(a => SceneSections.Is(a.Id.Type, "GF_NPC")).ToList());
     }
 
     /// <summary>
@@ -190,15 +178,6 @@ public static partial class BasePlans
             return session.Text(placeholder) is { Length: > 0 } modText ? modText : null;
         return int.TryParse(value, out var id) && session.ModTextOf(id) is { Text.Length: > 0 } found ? found.Text : null;
     }
-
-    /// <summary>A line whose value 0 names a character. The value gets the new nickname of the character when the base
-    /// copies it. The other values stay as a file stores them.</summary>
-    private static EntryView Renamed(Entry entry, IReadOnlyDictionary<string, string> names, bool binary) =>
-        new(entry.Name, entry.Select((v, i) =>
-            i == 0 && (SceneSections.Is(entry.Name, "npc") || SceneSections.Is(entry.Name, "fixture")) &&
-            names.TryGetValue(v.ToString().Trim(), out var renamed)
-                ? new StringValue(renamed)
-                : SectionCopies.Stored(v, binary)).ToList());
 
     /// <summary>A name that no name of the list has, without letter case: the stem, or the stem with <c>_2</c>,
     /// <c>_3</c> and on.</summary>

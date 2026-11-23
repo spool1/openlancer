@@ -490,6 +490,26 @@ public sealed class BasePlansCreateTests
         Assert.Single(plan.Warnings, w => w.Message.Contains("cannot read", StringComparison.Ordinal));
     }
 
+    /// <summary>A character of the crowd with a name text of the mod gets a copy of the text with its own key. The
+    /// character of the template keeps its text.</summary>
+    [Fact]
+    public void ACrowdCharacterWithANameTextOfTheModGetsACopyOfTheText()
+    {
+        using var ws = Workspace();
+        var session = ws.Session("act");
+        var source = BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "GF_NPC", "ol01_01_npc_1");
+        session.Execute(ItemEdits.SetText(session, source, "individual_name", "Guild\nDock Worker\nLee Park"));
+        var sourceName = Value(session, source, "individual_name");
+
+        var plan = Create(session, Spec());
+
+        var crowd = Assert.Single(plan.Characters, c => c.Id.Key == "Ol01_05_Base_npc_1");
+        Assert.Equal("$str:ol01_05_base_npc_1.individual_name", Value(session, crowd, "individual_name"));
+        Assert.Equal("Guild\nDock Worker\nLee Park", Text(session, StringKind.String, "ol01_05_base_npc_1.individual_name"));
+        Assert.Equal(sourceName, Value(session, source, "individual_name"));
+        Assert.NotEqual(sourceName, Value(session, crowd, "individual_name"));
+    }
+
     /// <summary>A fixture character without a name text keeps none.</summary>
     [Fact]
     public void AFixtureWithoutANameKeepsNone()

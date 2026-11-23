@@ -155,7 +155,7 @@ public static partial class BasePlans
         baseEntries.AddRange(Copied(template.Entry, e => SceneSections.Is(e.Name, RunBy) ||
                                                          e.Name.StartsWith(TerrainPrefix, StringComparison.OrdinalIgnoreCase),
             binary));
-        var (files, fileCommands, fixes) = BaseFile(session, active.Id, nickname, path, template, kept, start);
+        var (files, fileCommands, fixes) = BaseFile(session, texts, active.Id, nickname, path, template, kept, start);
         List<EditCommand> commands = [EditCommand.AddSection(universe, "Base", baseEntries), .. fileCommands];
 
         var warnings = new List<Diagnostic>(template.Warnings);
@@ -208,34 +208,34 @@ public static partial class BasePlans
     }
 
     /// <summary>
-    /// The base file of a new base and the copies of its room files (see <see cref="Create"/>). The result holds the new
-    /// files, their commands and a fix for each copy.
+    /// The base file of a new base and the copies of its room files (see <see cref="Create"/>). Each file is one copy of
+    /// <see cref="SectionCopies.CopyTo"/>. The result holds the new files, their commands and a fix for each copy of a
+    /// room file.
     /// </summary>
     private static (List<string> Files, List<EditCommand> Commands, List<PlannedFix> Fixes) BaseFile(EditSession session,
-        string modId, string nickname, string path, BaseTemplate template, IReadOnlyList<TemplateRoom> kept,
-        TemplateRoom start)
+        SectionCopies texts, string modId, string nickname, string path, BaseTemplate template,
+        IReadOnlyList<TemplateRoom> kept, TemplateRoom start)
     {
         var files = new List<string> { path };
         var fixes = new List<PlannedFix>();
-        var copies = new List<EditCommand>();
-        var sections = new List<SectionEntries>
+        var roomCopies = new List<EditCommand>();
+        var copies = new List<SectionCopy>
         {
-            new("BaseInfo",
+            new(SectionEdits.Build("BaseInfo",
             [
                 new EntryView("nickname", [new StringValue(nickname)]),
                 new EntryView("start_room", [new StringValue(start.Nickname)]),
-                .. Copied(template.Info!, e => InfoLines.Contains(e.Name, StringComparer.OrdinalIgnoreCase), false),
-            ]),
+                .. template.Info!.Where(e => InfoLines.Contains(e.Name, StringComparer.OrdinalIgnoreCase)).Select(Line),
+            ])),
         };
         foreach (var room in kept)
         {
-            var lines = room.Section.Where(e => !SceneSections.Is(e.Name, "nickname")).Select(Line).ToList();
-            if (RoomCopy(session, modId, nickname, template, kept, room) is var (copy, copyEntries, gone))
+            var source = room.Section;
+            if (RoomCopy(session, texts, modId, nickname, template, kept, room) is var (copy, copyCommand, gone))
             {
                 files.Add(copy);
-                copies.Add(EditCommand.NewFile(copy, copyEntries));
-                lines = [.. lines.Where(e => !SceneSections.Is(e.Name, "file")),
-                    new EntryView("file", [new StringValue(ContentPaths.DataValue(copy)!)])];
+                roomCopies.Add(copyCommand);
+                source = SectionEdits.WithLines(source, "file", [[new StringValue(ContentPaths.DataValue(copy)!)]]);
                 var oneRoom = gone.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
                 var doors = gone.Count == 1 ? "door" : "doors";
                 fixes.Add(new PlannedFix(new SectionRef(path, new SectionIdentity("Room", room.Nickname)), "file",
@@ -243,9 +243,9 @@ public static partial class BasePlans
                     $"{SceneSections.Join(gone)}, because the base does not keep {(oneRoom ? "that room" : "those rooms")}. " +
                     $"The copy is {copy}."));
             }
-            sections.Add(new SectionEntries("Room", [new EntryView("nickname", [new StringValue(room.Nickname)]), .. lines]));
+            copies.Add(new SectionCopy(source));
         }
-        return (files, [EditCommand.NewFile(path, sections), .. copies], fixes);
+        return (files, [texts.CopyTo(path, copies, newFile: true), .. roomCopies], fixes);
     }
 
     /// <summary>Why a text cannot be the nickname of a new base, or null.</summary>
@@ -286,11 +286,12 @@ public static partial class BasePlans
     /// <summary>
     /// The copy of the room file of a kept room, or null when the room needs no copy. A room needs a copy when its file
     /// has a door to a room of the template that the base does not keep. The result holds the first free place of
-    /// <see cref="ContentPaths.NewRoomFile"/>, the sections of the file without those doors, and the rooms of the
+    /// <see cref="ContentPaths.NewRoomFile"/>, the command of the file without those doors, and the rooms of the
     /// doors.
     /// </summary>
-    private static (string Path, List<SectionEntries> Sections, List<string> Rooms)? RoomCopy(EditSession session,
-        string modId, string nickname, BaseTemplate template, IReadOnlyList<TemplateRoom> kept, TemplateRoom room)
+    private static (string Path, EditCommand Command, List<string> Rooms)? RoomCopy(EditSession session,
+        SectionCopies texts, string modId, string nickname, BaseTemplate template, IReadOnlyList<TemplateRoom> kept,
+        TemplateRoom room)
     {
         bool Dropped(string? target) => target != null && template.Room(target) != null &&
                                         !kept.Any(k => SceneSections.Is(k.Nickname, target));
@@ -298,7 +299,7 @@ public static partial class BasePlans
             session.OpenDocument(file) is not { } document)
             return null;
         var gone = new List<string>();
-        var sections = new List<SectionEntries>();
+        var sections = new List<SectionCopy>();
         foreach (var section in document.Working)
         {
             if (SceneSections.Is(section.Name, "Hotspot") &&
@@ -308,9 +309,10 @@ public static partial class BasePlans
                 gone.Add(target);
                 continue;
             }
-            sections.Add(new SectionEntries(section.Name, section.Select(Line).ToList()));
+            sections.Add(new SectionCopy(section));
         }
-        return (ContentPaths.FreePath(session, ContentPaths.NewRoomFile(modId, nickname, room.Nickname)), sections, gone);
+        var path = ContentPaths.FreePath(session, ContentPaths.NewRoomFile(modId, nickname, room.Nickname));
+        return (path, texts.CopyTo(path, sections, newFile: true), gone);
     }
 
     /// <summary>
@@ -361,4 +363,8 @@ public static partial class BasePlans
 
     /// <summary>A line of a section with its values.</summary>
     private static EntryView Line(Entry entry) => new(entry.Name, entry.ToArray());
+
+    /// <summary>A copy of a section with only the lines that a test keeps, for <see cref="SectionCopies.CopyTo"/>.</summary>
+    private static Section Only(Section section, Func<Entry, bool> keep) =>
+        SectionEdits.Build(section.Name, section.Where(keep).Select(Line));
 }
