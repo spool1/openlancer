@@ -165,7 +165,7 @@ public static partial class ScenePlans
         string? error;
         if (type == SceneSections.ObjectType)
         {
-            if (NewObject(session, path, stem, position, archetype!, parent, dockWith, out error) is not { } made)
+            if (NewObject(session, path, stem, position, archetype!, parent, dockWith, null, null, out error) is not { } made)
                 return Refused(plan, Diagnostic.Error(path, error!));
             return Created(session, plan, path, type, made.Nickname, made.Entries);
         }
@@ -248,23 +248,31 @@ public static partial class ScenePlans
     /// <summary>
     /// The object builder (review finding R9 of the M23 design): the nickname and the lines of a new object of a system
     /// file. The lines are <c>nickname</c>, <c>pos</c> with whole numbers (decision D234) and <c>archetype</c>. Then come
-    /// <c>parent</c> and <c>dock_with</c> when the caller gives them. The nickname is the first free
-    /// <c>&lt;stem&gt;_&lt;n&gt;</c> (decision D235). Create and the static prop archetype use it.
+    /// <c>parent</c>, <c>base</c> and <c>dock_with</c> when the caller gives them, as retail stations have the last two.
+    /// The nickname is the first free <c>&lt;stem&gt;_&lt;n&gt;</c> (decision D235), when the caller gives none. Create,
+    /// the static prop archetype and the dock objects of a new base use it.
     /// </summary>
     /// <param name="stem">The stem of the nickname, for example <c>li01_station</c>.</param>
     /// <param name="parent">The object that gets the new object as a child, or null.</param>
     /// <param name="dockWith">The base of a station, or null.</param>
+    /// <param name="baseLine">The base that the games link to the object, or null. A retail station and a retail planet
+    /// with a base have the line.</param>
+    /// <param name="nickname">The nickname of the object, or null for the first free nickname of the stem. The caller
+    /// checks a nickname that it gives.</param>
     /// <returns>The nickname and the lines, or null when the file cannot hold a line. The error then tells why.</returns>
     internal static (string Nickname, List<EntryView> Entries)? NewObject(EditSession session, string path, string stem,
-        Vector3 position, string archetype, SectionRef? parent, string? dockWith, out string? error)
+        Vector3 position, string archetype, SectionRef? parent, string? dockWith, string? baseLine, string? nickname,
+        out string? error)
     {
-        var nickname = session.Nicknames.FirstFree(stem, 1);
+        nickname ??= session.Nicknames.FirstFree(stem, 1);
         var lines = new List<(string Name, string Text)>
         {
             ("nickname", nickname), ("pos", PositionText(position)), ("archetype", archetype),
         };
         if (parent?.Id.Key is { } parentKey)
             lines.Add(("parent", parentKey));
+        if (baseLine != null)
+            lines.Add(("base", baseLine));
         if (dockWith != null)
             lines.Add(("dock_with", dockWith));
         return Entries(lines, session.IsBinaryFile(path), out error) is { } entries ? (nickname, entries) : null;

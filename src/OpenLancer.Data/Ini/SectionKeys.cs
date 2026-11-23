@@ -45,6 +45,9 @@ internal static class SectionKeys
         ["fuse"] = new(SectionMatchKind.Keyed, "name"),
         // Market files: the engine adds the goods of repeated [BaseGood] sections for one base.
         ["BaseGood"] = new(SectionMatchKind.Append, null),
+        // DATA\MISSIONS\news.ini: the engine keeps each [NewsItem], and a news item has no key. Only news.ini has this
+        // type. So a patch section adds a news item, for example the news of a new base (owner decision of 2026-11-21).
+        ["NewsItem"] = new(SectionMatchKind.Append, null),
         // Star system files
         ["Nebula"] = new(SectionMatchKind.Keyed, "zone"),
         ["Asteroids"] = new(SectionMatchKind.Keyed, "zone"),

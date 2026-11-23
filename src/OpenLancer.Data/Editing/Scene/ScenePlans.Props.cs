@@ -34,7 +34,7 @@ public static partial class ScenePlans
         if (PropArchetypes.Lines(source, archetype, session.IsBinaryFile(solarPath), out var error) is not { } solar)
             return Refused(plan, Diagnostic.Error(solarPath, error!));
         var stemOfObject = $"{system}_{TemplateId(SceneTemplate.Solar)}".ToLowerInvariant();
-        if (NewObject(session, path, stemOfObject, position, archetype, parent, null, out error) is not { } made)
+        if (NewObject(session, path, stemOfObject, position, archetype, parent, null, null, null, out error) is not { } made)
             return Refused(plan, Diagnostic.Error(path, error!));
 
         var added = new SectionRef(path, new SectionIdentity(SceneSections.ObjectType, made.Nickname));

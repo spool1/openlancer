@@ -108,6 +108,9 @@ internal sealed class BaseFiles(EditSession session, Func<IReadOnlyList<Section>
     /// <summary>The install path of <c>mBases.ini</c>, or null when <c>freelancer.ini</c> names no data folder.</summary>
     public string? MBasesPath => DataPaths.Resolve(freelancerIni(), MBasesValue);
 
+    /// <summary>The install path of <c>news.ini</c>, or null when <c>freelancer.ini</c> names no data folder.</summary>
+    public string? NewsPath => DataPaths.Resolve(freelancerIni(), NewsValue);
+
     /// <summary>True for <c>mBases.ini</c>, in any letter case.</summary>
     public bool IsMBasesFile(string path) => IsFixedFile(path, MBasesValue);
 
