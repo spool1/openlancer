@@ -21,6 +21,12 @@ public sealed class BaseChecksRetailTests(ITestOutputHelper output)
     /// <summary>The number of bases whose room scenes show a <c>$terrain_*</c> template, in both games.</summary>
     private const int TerrainBases = 50;
 
+    /// <summary>The number of bases of vanilla 1.1 that sell a ship.</summary>
+    private const int VanillaShipBases = 59;
+
+    /// <summary>The number of bases of HD Edition 0.7.1 that sell a ship.</summary>
+    private const int HdShipBases = 58;
+
     /// <summary>The kinds of the warnings, by the start of their text.</summary>
     private static readonly (string Kind, Func<Diagnostic, bool> Is)[] Kinds =
     [
@@ -46,8 +52,9 @@ public sealed class BaseChecksRetailTests(ITestOutputHelper output)
     /// Vanilla 1.1 gives these warnings of the base game: 15 bases that no object docks with, 15 bases without an object
     /// with their base line in their system, 18 objects that dock with a base of another system, 16 bases that sell goods
     /// without the dealer (15 miner bases and one base that sells a ship without a ship dealer), 4 dealers without goods
-    /// and 2 ship dealers without a place for a ship. The trade-in check gives no warning, because each base that sells a
-    /// ship lists each ship package.
+    /// and 2 ship dealers without a place for a ship. The trade-in check reads only a market that the active mod changes,
+    /// so it gives no warning here. The ship markets use the buy-only pattern, and each of the 59 bases that sell a ship
+    /// lists each ship package.
     /// </summary>
     [Fact]
     public void TheVanillaDataGivesNoBaseError()
@@ -59,6 +66,53 @@ public sealed class BaseChecksRetailTests(ITestOutputHelper output)
             ["no dock object"] = 15, ["no base line"] = 15, ["dock object in another system"] = 18,
             ["goods without dealer"] = 16, ["dealer without goods"] = 4, ["ship places"] = 2,
         }, counts);
+    }
+
+    /// <summary>The retail facts of the trade-in check. In vanilla 1.1, the ship markets have buy-only lines, and each
+    /// base that sells a ship has a line for each ship package. In HD Edition 0.7.1, the ship markets have no buy-only
+    /// lines, and the bases that sell a ship list only their own ships.</summary>
+    [Fact]
+    public void EachVanillaBaseThatSellsAShipListsEachShipPackage()
+    {
+        using (var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "c4tradein"))
+        {
+            var session = workspace.Open();
+            Assert.True(session.BaseCheckState.UsesBuyOnlyShipLines);
+            var (selling, missing) = ShipLines(session);
+            Assert.Equal(VanillaShipBases, selling);
+            Assert.Empty(missing);
+        }
+        using (var workspace = new RetailWorkspace(GameDataPaths.RequireHde(), "c4tradein"))
+        {
+            var session = workspace.Open();
+            Assert.False(session.BaseCheckState.UsesBuyOnlyShipLines);
+            var (selling, missing) = ShipLines(session);
+            Assert.Equal(HdShipBases, selling);
+            Assert.Equal(HdShipBases, missing.Count);
+        }
+    }
+
+    /// <summary>The number of bases that sell a ship, and the bases that sell a ship and have no line for one or more
+    /// ship packages. The game keeps the last line of a good.</summary>
+    private (int Selling, IReadOnlyList<string> Missing) ShipLines(EditSession session)
+    {
+        var state = session.BaseCheckState;
+        var selling = 0;
+        var missing = new List<string>();
+        foreach (var view in session.Bases.Nicknames.Select(b => session.Base(b)!))
+        {
+            var sells = view.Market.GroupBy(r => r.Good, StringComparer.OrdinalIgnoreCase).Select(g => g.Last())
+                .Any(r => BaseMarkets.Ship.Equals(state.Category(r.Good), StringComparison.OrdinalIgnoreCase) &&
+                          BaseMarkets.Sells(r.Line.Values, ship: true));
+            if (!sells)
+                continue;
+            selling++;
+            var listed = view.Market.Select(r => r.Good).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (state.ShipPackages.Any(p => !listed.Contains(p)))
+                missing.Add(view.Nickname);
+        }
+        output.WriteLine($"{selling} bases sell a ship, {missing.Count} of them miss a ship package line");
+        return (selling, missing);
     }
 
     /// <summary>HD Edition 0.7.1 gives one more base that no object docks with and one more object of another system.
