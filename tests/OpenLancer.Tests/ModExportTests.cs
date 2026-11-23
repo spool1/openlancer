@@ -225,10 +225,10 @@ public sealed class ModExportTests
         var result = ModExport.Run(game.Request(mod) with { Publish = texts, Forms = ExportForms.Flmm });
         var script = Script(result.Packages[0].Path!, "m");
 
-        Assert.Contains("    <author>Ann - Bob, Zo?</author>\r\n", script);
-        Assert.Contains("    <description>Version 1.2.0 for Freelancer 1.1.\r\nA fast ship.\r\n\r\nThe ship\r\n\r\n- Fast.\r\n" +
-                        "- Cheap.\r\n\r\nSee the thread (https://example.org/t).</description>\r\n" +
-                        "    <modurl>https://example.org/mods/1</modurl>\r\n  </header>\r\n", script);
+        Assert.Contains("\r\n<author>\r\nAnn - Bob, Zo?\r\n</author>\r\n", script);
+        Assert.Contains("\r\n<description>\r\nVersion 1.2.0 for Freelancer 1.1.\r\nA fast ship.\r\n\r\nThe ship\r\n\r\n" +
+                        "- Fast.\r\n- Cheap.\r\n\r\nSee the thread (https://example.org/t).\r\n</description>\r\n" +
+                        "<modurl>\r\nhttps://example.org/mods/1\r\n</modurl>\r\n</header>\r\n", script);
         Assert.Contains(result.Problems, p => p.Message == PublishMessages.FlmmCharacter(((char)0xEB).ToString(), "the authors"));
         Assert.DoesNotContain("<modurl>", Script(ModExport.Run(game.Request(mod) with { Forms = ExportForms.Flmm }).Packages[0].Path!, "m"));
     }

@@ -97,7 +97,7 @@ public sealed class HdeExportRetailTests(ITestOutputHelper output)
             output.WriteLine(problem.ToString());
         Assert.DoesNotContain(script.Problems, p => p.Message.Contains("anchor") || p.Message.Contains("not unique"));
         Assert.Contains("method=\"sectionreplace\"", script.Xml);
-        Assert.Contains("GENERATESTRRES(\"Starrunner\")", script.Xml);
+        Assert.Contains("= 0 ;GENERATESTRRES(\"Starrunner\")\r\n", script.Xml);
     }
 
     [Fact]

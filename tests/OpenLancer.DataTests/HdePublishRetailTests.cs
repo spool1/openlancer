@@ -76,8 +76,8 @@ public sealed class HdePublishRetailTests(ITestOutputHelper output) : IDisposabl
         Assert.NotNull(plan.Make);
         var script = Script(plan.Make!());
         Assert.Contains("<header name=\"Starrunner - HD\">", script);
-        Assert.Contains("<author>Zo?</author>", script);
-        Assert.Contains("<description>Version 1.0.0 for HD Edition 0.7.1.\r\n", script);
+        Assert.Contains("\r\n<author>\r\nZo?\r\n</author>\r\n", script);
+        Assert.Contains("\r\n<description>\r\nVersion 1.0.0 for HD Edition 0.7.1.\r\n", script);
         Assert.All(script, c => Assert.True(c < 128));
         Assert.Contains(plan.Problems, p => p.Message == PublishMessages.FlmmCharacter(((char)0xEB).ToString(), "the authors"));
     }

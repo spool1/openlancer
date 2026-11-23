@@ -40,7 +40,7 @@ public sealed class ModChecksTests
              "FLMM script header: Freelancer 1.1", ModExport.ChecklistFile],
             result.Previews.Select(p => p.Name));
         Assert.StartsWith("Mod m\r\nVersion 1.2.0 for Freelancer 1.1. Mod id: m.", result.Previews[0].Text);
-        Assert.StartsWith("  <header name=\"Mod m\">", result.Previews[3].Text);
+        Assert.StartsWith("<header name=\"Mod m\">\r\n<scriptversion>\r\n1.31\r\n</scriptversion>\r\n", result.Previews[3].Text);
         Assert.Contains("- Good 'lf_hull': price 6600 -> 5600.", result.Previews[4].Text);
         var recorded = PublishHistory.Load(history, "m").History;
         Assert.Equal(result.Content, recorded.CheckOf("vanilla-1.1")!.Content);

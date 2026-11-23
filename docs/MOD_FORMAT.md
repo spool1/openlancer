@@ -1761,10 +1761,14 @@ When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod
 
 `<mod id>-<version>-<target>-flmm.zip` holds `<mod id>.zip.flmod` and the README. The `.zip.flmod` file is a zip with `script.xml` and the files of the mod, for the Freelancer Mod Manager (FLMM). FLMM 1.31 unpacks only a file whose name ends in `.zip.flmod`. OpenLancer did not check an exported package with FLMM yet. Check it with FLMM before you publish it.
 
-- A new section is an `append` operation. A new line is a `sectionappend` after the header line and the key line of its section. A changed value is a `sectionreplace` of the raw line of the game file.
+- FLMM 1.31 reads one tag or one tag end on each line of `script.xml`. So each tag and each tag end is on its own line, and the content of an element is on the lines between them. Each attribute value is in quotes.
+- Each content line of an operation is an INI line as the game file has it. The script adds no indent.
+- A new section is an `append` operation at the end of the file. A new line is a `sectionappend` after the header line and the key line of its section. A changed value is a `sectionreplace`: the raw line of the game file and the new line. FLMM changes only the lines below the header of the section.
+- FLMM uses the first match of an anchor. So the header line and the key line must occur once in the file as whole lines. Their first match as text must also be these lines. For example, the anchor of `ring_1` is not valid when the section of `ring_10` comes first. The same rule holds for a changed line in its section.
 - A new `[BaseGood]` adds its lines to the `[BaseGood]` of the same base. A new `[Data]` line goes after the last line of its key.
-- The text of the mod becomes `GENERATESTRRES("<text>")` and `GENERATEXMLRES("<text>")`. FLMM makes its own text DLL. A text with `"` or with a character outside ASCII refuses the change, because no known FLMM rule can hold it.
-- A change that the operations cannot express puts the whole merged file into the package, with a warning. Examples are a removed line or section, and an anchor that is not unique in the file. A whole file cannot hold the text of the mod, so such a change with text refuses the package.
+- The text of the mod becomes `<key> = 0 ;GENERATESTRRES("<text>")` and `<key> = 0 ;GENERATEXMLRES("<text>")`. FLMM makes its own text DLL and writes the id of the text in the line. The game reads the text after the semicolon as a comment. So the text must be the last value of its line, and a line can hold only one text. Else the export refuses the change.
+- A text with `"`, with a line end or with a character outside ASCII refuses the change, because no known FLMM rule can hold it.
+- A change that the operations cannot express puts the whole merged file into the package, with a warning. Examples are a removed line or section, and an anchor that FLMM does not find once in the file. A whole file cannot hold the text of the mod, so such a change with text refuses the package.
 - A new whole INI file of the mod with mod text refuses the package, because FLMM reads its text macros only in script operations.
 - The route tables are whole files. The package copies them with no operation and no warning (see "Route tables").
 - A new `[Base]` of `universe.ini` refuses the package. The game needs each `[Base]` before the `[system]` sections (see "universe.ini"), and an `append` puts the section at the end of the file. FLMM has no tested operation that puts a section before the first `[system]` yet.

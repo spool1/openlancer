@@ -3,17 +3,20 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 using OpenLancer.Data;
 using OpenLancer.Data.Export;
 using OpenLancer.Data.Mods;
+using OpenLancer.Data.Publishing;
 using Xunit;
 using static OpenLancer.Tests.ExportGame;
 
 namespace OpenLancer.Tests;
 
-/// <summary>The script of the FLMM package (section 7.11 of the M11 design).</summary>
-public sealed class FlmmScriptTests
+/// <summary>The script of the FLMM package (section 7.11 of the M11 design, and the line form that FLMM 1.31
+/// reads).</summary>
+public sealed partial class FlmmScriptTests
 {
     private const string Goods = @"DATA\EQUIPMENT\goods.ini";
 
@@ -24,11 +27,15 @@ public sealed class FlmmScriptTests
     private static FlmmScript Script(ExportGame game, string patch, string strings = "{}") =>
         Script(game, game.Mod("m", new() { ["strings.json"] = strings, [@"patches\" + GoodsPath] = patch }));
 
-    private static string Op(string method, string? section, string? dest, string source, string file = Goods) =>
-        $"  <data file=\"{file}\" method=\"{method}\">\r\n" +
-        (section == null ? "" : $"    <section>{section}</section>\r\n") +
-        (dest == null ? "" : $"    <dest>{dest}</dest>\r\n") +
-        $"    <source>{source}</source>\r\n  </data>\r\n";
+    /// <summary>The text of one operation: each tag, each tag end and each content line on its own line.</summary>
+    private static string Op(string method, string[]? section, string? dest, string[] source, string file = Goods) =>
+        $"<data file=\"{file}\" method=\"{method}\">\r\n" +
+        (section == null ? "" : Element("section", section)) +
+        (dest == null ? "" : Element("dest", [dest])) +
+        Element("source", source) + "</data>\r\n";
+
+    private static string Element(string name, string[] lines) =>
+        $"<{name}>\r\n" + string.Concat(lines.Select(l => l + "\r\n")) + $"</{name}>\r\n";
 
     [Fact]
     public void TheScriptHasNoXmlDeclaration()
@@ -37,9 +44,12 @@ public sealed class FlmmScriptTests
 
         var script = Script(game, "[Good]\nnickname = g2\nprice = 1\n");
 
-        Assert.StartsWith("<script>\r\n  <header name=\"Mod m\">\r\n    <scriptversion>1.31</scriptversion>\r\n", script.Xml);
+        Assert.StartsWith("<script>\r\n<header name=\"Mod m\">\r\n<scriptversion>\r\n1.31\r\n</scriptversion>\r\n" +
+                          "<author>\r\n</author>\r\n<description>\r\nVersion 1.2.0 for Freelancer 1.1.\r\n</description>\r\n" +
+                          "</header>\r\n", script.Xml);
         Assert.EndsWith("</script>\r\n", script.Xml);
         Assert.All(script.Xml, c => Assert.True(c < 128));
+        Assert.Empty(ScriptFormProblems(script.Xml));
     }
 
     [Fact]
@@ -49,7 +59,7 @@ public sealed class FlmmScriptTests
 
         var script = Script(game, "[Good]\nol.new = true\nnickname = n\nprice = 5\n");
 
-        Assert.Contains(Op("append", null, null, "\r\n[Good]\r\nnickname = n\r\nprice = 5\r\n"), script.Xml);
+        Assert.Contains(Op("append", null, null, ["", "[Good]", "nickname = n", "price = 5"]), script.Xml);
         Assert.Empty(script.Problems);
         Assert.Empty(script.Files);
     }
@@ -61,7 +71,7 @@ public sealed class FlmmScriptTests
 
         var script = Script(game, "[Good]\nnickname = g2\nvolume = 2\n");
 
-        Assert.Contains(Op("sectionappend", "[Good]\r\nnickname = g2", null, "\r\nvolume = 2"), script.Xml);
+        Assert.Contains(Op("sectionappend", ["[Good]", "nickname = g2"], null, ["volume = 2"]), script.Xml);
     }
 
     [Fact]
@@ -71,8 +81,20 @@ public sealed class FlmmScriptTests
 
         var script = Script(game, "[Good]\nnickname = lf_hull\nprice = 5600\n");
 
-        Assert.Contains(Op("sectionreplace", "[Good]\r\nnickname = lf_hull", "price = 6600 ; the Patriot hull",
-            "price = 5600 ; the Patriot hull"), script.Xml);
+        Assert.Contains(Op("sectionreplace", ["[Good]", "nickname = lf_hull"], "price = 6600 ; the Patriot hull",
+            ["price = 5600 ; the Patriot hull"]), script.Xml);
+    }
+
+    /// <summary>The content lines keep the indent of the game file and get no indent from the script.</summary>
+    [Fact]
+    public void AContentLineKeepsTheIndentOfTheGameFile()
+    {
+        using var game = new ExportGame();
+        game.Game.Write(GoodsPath, "[Good]\nnickname = g2\n\tprice = 200\n");
+
+        var script = Script(game, "[Good]\nnickname = g2\nprice = 5\n");
+
+        Assert.Contains(Op("sectionreplace", ["[Good]", "nickname = g2"], "\tprice = 200", ["\tprice = 5"]), script.Xml);
     }
 
     [Fact]
@@ -86,8 +108,8 @@ public sealed class FlmmScriptTests
 
         var script = Script(game, mod);
 
-        Assert.Contains(Op("sectionappend", "[BaseGood]\r\nbase = li01_01_base", null,
-            "\r\nmarketgood = g2, 0, -1, 1, 1, 0, 1, 1", @"DATA\EQUIPMENT\market_ships.ini"), script.Xml);
+        Assert.Contains(Op("sectionappend", ["[BaseGood]", "base = li01_01_base"], null,
+            ["marketgood = g2, 0, -1, 1, 1, 0, 1, 1"], @"DATA\EQUIPMENT\market_ships.ini"), script.Xml);
     }
 
     [Fact]
@@ -103,7 +125,7 @@ public sealed class FlmmScriptTests
         var script = Script(game, mod);
 
         Assert.Empty(script.Problems);
-        Assert.Contains(Op("sectionappend", @"goods = equipment\goods.ini", null, "\r\ngoods = MODS\\m\\goods.ini",
+        Assert.Contains(Op("sectionappend", [@"goods = equipment\goods.ini"], null, [@"goods = MODS\m\goods.ini"],
             @"EXE\freelancer.ini"), script.Xml);
         Assert.Equal([@"DATA\MODS\m\goods.ini"], script.Files.Select(f => f.Path));
     }
@@ -117,10 +139,78 @@ public sealed class FlmmScriptTests
             """{ "strings": { "name": "Starrunner" } }""");
 
         Assert.Empty(script.Problems);
-        Assert.Contains("ids_name = GENERATESTRRES(\"Starrunner\")", script.Xml);
+        Assert.Contains("\r\nids_name = 0 ;GENERATESTRRES(\"Starrunner\")\r\n", script.Xml);
         // FLMM makes its own text DLL, so the package has no DLL and no freelancer.ini.
         Assert.Empty(script.Files);
         Assert.DoesNotContain("freelancer.ini", script.Xml);
+    }
+
+    [Fact]
+    public void AnInfocardBecomesAnXmlMacroOfTheSameForm()
+    {
+        using var game = new ExportGame();
+        var mod = game.Mod("m", new()
+        {
+            ["strings.json"] = """{ "infocards": { "info": "<RDL><TEXT>x</TEXT></RDL>" } }""",
+            [@"patches\" + GoodsPath] = "[Good]\nnickname = g2\nids_info = $ifc:info\n",
+        });
+
+        var script = Script(game, mod);
+
+        Assert.Empty(script.Problems);
+        Assert.Contains(Op("sectionappend", ["[Good]", "nickname = g2"], null,
+            ["ids_info = 0 ;GENERATEXMLRES(\"&lt;RDL&gt;&lt;TEXT&gt;x&lt;/TEXT&gt;&lt;/RDL&gt;\")"]), script.Xml);
+    }
+
+    /// <summary>The macro comes after a semicolon, so a comment after the text of a changed line goes away.</summary>
+    [Fact]
+    public void AMacroReplacesTheCommentOfAChangedLine()
+    {
+        using var game = new ExportGame();
+        game.Game.Write(GoodsPath, "[Good]\nnickname = g2\nids_name = 100 ; the old name\n");
+
+        var script = Script(game, "[Good]\nnickname = g2\nids_name = $str:n\n", """{ "strings": { "n": "Name" } }""");
+
+        Assert.Empty(script.Problems);
+        Assert.Contains(Op("sectionreplace", ["[Good]", "nickname = g2"], "ids_name = 100 ; the old name",
+            ["ids_name = 0 ;GENERATESTRRES(\"Name\")"]), script.Xml);
+    }
+
+    /// <summary>The game reads the text after a semicolon as a comment. So a text that is not the last value of its
+    /// line, and a second text in one line, refuse the operation.</summary>
+    [Theory]
+    [InlineData("ids_name = $str:n, 5", "the text '$str:n' is not the last value of the line 'ids_name = $str:n, 5'. " +
+                                        "FLMM writes a text after a semicolon, and the game reads the rest of the line " +
+                                        "as a comment")]
+    [InlineData("ids_name = $str:n, $str:m", "the line 'ids_name = $str:n, $str:m' has more than one text. FLMM writes " +
+                                             "a text after a semicolon, so a line can hold only one text, as its last value")]
+    public void ATextThatIsNotTheLastValueOfItsLineIsRefused(string line, string reason)
+    {
+        using var game = new ExportGame();
+
+        var script = Script(game, $"[Good]\nol.new = true\nnickname = n\n{line}\n",
+            """{ "strings": { "n": "Name", "m": "More" } }""");
+
+        var error = Assert.Single(script.Problems);
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Equal($"The FLMM package cannot hold this change in {Goods}: {reason}. Use the drop-in zip, or change the " +
+                     "mod.", error.Message);
+        Assert.Empty(SteLint.Problems(error.Message));
+        Assert.DoesNotContain("<data", script.Xml);
+    }
+
+    [Fact]
+    public void ATextWithALineEndIsRefused()
+    {
+        using var game = new ExportGame();
+
+        var script = Script(game, "[Good]\nol.new = true\nnickname = n\nids_name = $str:n\n",
+            """{ "strings": { "n": "One\nTwo" } }""");
+
+        var error = Assert.Single(script.Problems);
+        Assert.Equal($"The FLMM package cannot hold this change in {Goods}: the text of '$str:n' has a line end. FLMM reads " +
+                     "a text macro only on one line. Use the drop-in zip, or change the mod.", error.Message);
+        Assert.Empty(SteLint.Problems(error.Message));
     }
 
     [Fact]
@@ -141,8 +231,8 @@ public sealed class FlmmScriptTests
         Assert.Equal($"The FLMM package cannot hold this change in {Goods}: the text of '$ifc:info' has a quote, and " +
                      "FLMM has no known escape for it. Use the drop-in zip, or change the mod.", error.Message);
         Assert.Empty(probe.Problems);
-        Assert.Contains("ids_info = GENERATEXMLRES(\"&lt;?xml version=\"1.0\"?&gt;&lt;RDL&gt;&lt;TEXT&gt;x&lt;/TEXT&gt;" +
-                        "&lt;/RDL&gt;\")", probe.Xml);
+        Assert.Contains("\r\nids_info = 0 ;GENERATEXMLRES(\"&lt;?xml version=\"1.0\"?&gt;&lt;RDL&gt;&lt;TEXT&gt;x" +
+                        "&lt;/TEXT&gt;&lt;/RDL&gt;\")\r\n", probe.Xml);
     }
 
     [Fact]
@@ -189,18 +279,61 @@ public sealed class FlmmScriptTests
         Assert.Empty(script.Files);
     }
 
+    /// <summary>The anchor of g2 is also the start of the text of the section of g22. The section of g2 comes first, so
+    /// the first text match of its anchor is the anchor itself.</summary>
     [Fact]
-    public void AKeyThatStartsAnotherKeyGetsTheLineEndInItsAnchor()
+    public void AKeyThatStartsALaterKeyAnchorsWithItsLines()
     {
         using var game = new ExportGame();
-        // The anchor of g2 is also the start of the anchor of g22. With its line end, it is unique.
         game.Game.Write(GoodsPath, ExportGame.Goods + "\n[Good]\nnickname = g22\nprice = 1\n");
 
         var script = Script(game, "[Good]\nnickname = g2\nprice = 5\nvolume = 2\n");
 
         Assert.Empty(script.Problems);
-        Assert.Contains(Op("sectionreplace", "[Good]\r\nnickname = g2\r\n", "price = 200", "price = 5"), script.Xml);
-        Assert.Contains(Op("sectionappend", "[Good]\r\nnickname = g2\r\n", null, "volume = 2\r\n"), script.Xml);
+        Assert.Contains(Op("sectionreplace", ["[Good]", "nickname = g2"], "price = 200", ["price = 5"]), script.Xml);
+        Assert.Contains(Op("sectionappend", ["[Good]", "nickname = g2"], null, ["volume = 2"]), script.Xml);
+    }
+
+    /// <summary>The anchor of ring_1 occurs once as whole lines. But its first text match is in the section of ring_10,
+    /// which comes first, and FLMM takes the first match. So the package holds the whole file.</summary>
+    [Fact]
+    public void AKeyThatStartsAnEarlierKeyFallsBack()
+    {
+        using var game = new ExportGame();
+        game.Game.Write(GoodsPath, "[Good]\nnickname = ring_10\nprice = 1\n\n[Good]\nnickname = ring_1\nprice = 2\n");
+
+        var script = Script(game, "[Good]\nnickname = ring_1\nprice = 5\n");
+
+        Assert.Contains("because OpenLancer finds no unique anchor for [Good]", Assert.Single(script.Problems).Message);
+        Assert.DoesNotContain("<data", script.Xml);
+        Assert.Equal([Goods], script.Files.Select(f => f.Path), System.StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>FLMM takes the first match of the dest line below the header. A comment before the line holds its text,
+    /// so the package holds the whole file.</summary>
+    [Fact]
+    public void ADestLineWhoseTextComesEarlierInItsSectionFallsBack()
+    {
+        using var game = new ExportGame();
+        game.Game.Write(GoodsPath, "[Good]\nnickname = g2\n; price = 200 is the old price\nprice = 200\n");
+
+        var script = Script(game, "[Good]\nnickname = g2\nprice = 5\n");
+
+        Assert.Contains("because the line 'price = 200' is not unique in its section", Assert.Single(script.Problems).Message);
+        Assert.DoesNotContain("<data", script.Xml);
+    }
+
+    /// <summary>A later text match of the dest line does not matter, because FLMM takes the first match.</summary>
+    [Fact]
+    public void ADestLineWhoseTextComesLaterInItsSectionIsASectionReplace()
+    {
+        using var game = new ExportGame();
+        game.Game.Write(GoodsPath, "[Good]\nnickname = g2\nprice = 200\n; price = 2000 is the next price\n");
+
+        var script = Script(game, "[Good]\nnickname = g2\nprice = 5\n");
+
+        Assert.Empty(script.Problems);
+        Assert.Contains(Op("sectionreplace", ["[Good]", "nickname = g2"], "price = 200", ["price = 5"]), script.Xml);
     }
 
     /// <summary>A file with a section and a comment that holds its header.</summary>
@@ -282,10 +415,86 @@ public sealed class FlmmScriptTests
         Assert.Empty(script.Problems);
         var xml = new XmlDocument();
         xml.LoadXml(script.Xml);
-        Assert.Equal("ids_info = GENERATEXMLRES(\"<RDL><TEXT>A &amp; B</TEXT></RDL>\")",
+        Assert.Equal("ids_info = 0 ;GENERATEXMLRES(\"<RDL><TEXT>A &amp; B</TEXT></RDL>\")",
             xml.SelectSingleNode("/script/data/source")!.InnerText.Trim());
         Assert.Equal("Mod m", xml.SelectSingleNode("/script/header/@name")!.Value);
     }
+
+    /// <summary>The script of an exported package with each kind of operation and a text macro has the line form of
+    /// FLMM 1.31: one tag or tag end on each line, and each attribute value in quotes.</summary>
+    [Fact]
+    public void TheScriptOfAnExportHasOneTagOnEachLine()
+    {
+        using var game = new ExportGame();
+        var mod = game.Mod("m", new()
+        {
+            ["strings.json"] = """{ "strings": { "n": "Starrunner" }, "infocards": { "i": "<RDL><TEXT>x</TEXT></RDL>" } }""",
+            [@"patches\" + GoodsPath] = "[Good]\nnickname = lf_hull\nprice = 5600\n\n[Good]\nnickname = g2\nvolume = 2\n" +
+                                       "ids_info = $ifc:i\n\n[Good]\nol.new = true\nnickname = n\nids_name = $str:n\n",
+            [@"patches\" + MarketPath] = "[BaseGood]\nbase = li01_01_base\nmarketgood = n, 0, -1, 1, 1, 0, 1, 1\n",
+            [@"patches\EXE\freelancer.ini"] = "[Data]\nol.append = true\ngoods = MODS\\m\\goods.ini\n",
+            [@"files\DATA\MODS\m\goods.ini"] = "[Good]\nnickname = new_good\nprice = 1\n",
+        });
+
+        var result = ModExport.Run(game.Request(mod) with { Publish = PublishSettings.Empty with { Authors = ["Ann"] },
+            Forms = ExportForms.Flmm });
+
+        Assert.True(result.Succeeded, string.Join("\n", result.Problems));
+        using var outer = ZipFile.OpenRead(result.Packages.Single().Path!);
+        using var flmod = new ZipArchive(outer.GetEntry("m.zip.flmod")!.Open());
+        using var reader = new StreamReader(flmod.GetEntry("script.xml")!.Open());
+        var script = reader.ReadToEnd();
+        Assert.Empty(ScriptFormProblems(script));
+        foreach (var method in new[] { "append", "sectionappend", "sectionreplace" })
+            Assert.Contains($" method=\"{method}\">\r\n", script);
+        Assert.Contains("\r\n<author>\r\nAnn\r\n</author>\r\n", script);
+        Assert.Contains("\r\nids_name = 0 ;GENERATESTRRES(\"Starrunner\")\r\n", script);
+        Assert.Contains("\r\nids_info = 0 ;GENERATEXMLRES(\"&lt;RDL&gt;&lt;TEXT&gt;x&lt;/TEXT&gt;&lt;/RDL&gt;\")\r\n", script);
+        Assert.DoesNotContain("\n ", script);
+        new XmlDocument().LoadXml(script);
+    }
+
+    /// <summary>The form check of the test finds the two faults of the first FLMM test package.</summary>
+    [Fact]
+    public void TheFormCheckFindsTwoTagsOnOneLineAndAnAttributeWithoutQuotes()
+    {
+        Assert.Equal(["line 2: more than one tag"],
+            ScriptFormProblems("<script>\r\n<scriptversion>1.31</scriptversion>\r\n</script>\r\n"));
+        Assert.Equal(["line 2: an attribute value without quotes"],
+            ScriptFormProblems("<script>\r\n<data file=\"a.ini\" numTimes=1>\r\n</data>\r\n</script>\r\n"));
+        Assert.Equal(["line 1: text and a tag"], ScriptFormProblems("<script>x\r\n</script>\r\n"));
+        Assert.Empty(ScriptFormProblems("<script>\r\n<data file=\"a.ini\" method=\"append\">\r\n<source>\r\n[Good]\r\n" +
+                                        "</source>\r\n</data>\r\n</script>\r\n"));
+    }
+
+    /// <summary>
+    /// The faults of the line form of a script that FLMM 1.31 reads: a line with more than one tag, a line with text and
+    /// a tag, and a tag with an attribute value without quotes. Each line that holds <c>&lt;</c> or <c>&gt;</c> must be
+    /// one whole tag or tag end.
+    /// </summary>
+    private static List<string> ScriptFormProblems(string xml)
+    {
+        var problems = new List<string>();
+        var lines = xml.Split("\r\n");
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            var tags = line.Count(c => c == '<');
+            if (tags == 0 && !line.Contains('>'))
+                continue;
+            var fault = tags > 1 ? "more than one tag"
+                : !line.StartsWith('<') || !line.EndsWith('>') ? "text and a tag"
+                : !TagLine().IsMatch(line) ? "an attribute value without quotes"
+                : null;
+            if (fault != null)
+                problems.Add($"line {i + 1}: {fault}");
+        }
+        return problems;
+    }
+
+    /// <summary>A tag with its attributes in quotes, or a tag end.</summary>
+    [GeneratedRegex("""^(?:<[A-Za-z]+(?: [A-Za-z]+="[^"<>]*")*>|</[A-Za-z]+>)$""")]
+    private static partial Regex TagLine();
 
     [Fact]
     public void TwoExportsGiveTheSameBytes()

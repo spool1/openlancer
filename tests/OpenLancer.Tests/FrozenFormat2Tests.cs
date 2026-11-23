@@ -269,16 +269,18 @@ public sealed partial class FrozenFormat2Tests
         return lines;
     }
 
-    /// <summary>The data of an FLMM script: the script with its scriptversion line in place of its header element.
+    /// <summary>The data of an FLMM script: the script with its scriptversion element in place of its header element.
     /// FLMM reads the script version as data. The other elements of the header are the texts of the package.</summary>
     private static string ScriptData(string xml) => Header().Replace(xml, m => ScriptVersion().Match(m.Value).Value);
 
-    /// <summary>The header element of an FLMM script, with its line end.</summary>
-    [GeneratedRegex(@"  <header [^\n]*\n(?:[^\n]*\n)*?  </header>\r?\n")]
+    /// <summary>The header element of an FLMM script, from the line of its tag to the line of its tag end, with the
+    /// line end.</summary>
+    [GeneratedRegex(@"(?m)^<header [^\n]*\n(?:[^\n]*\n)*?</header>\r?\n")]
     private static partial Regex Header();
 
-    /// <summary>The scriptversion line of the header of an FLMM script, with its line end.</summary>
-    [GeneratedRegex(@"    <scriptversion>[^<\n]*</scriptversion>\r?\n")]
+    /// <summary>The scriptversion element of the header of an FLMM script: its tag, its value and its tag end, each on
+    /// its own line, with the line ends.</summary>
+    [GeneratedRegex(@"(?m)^<scriptversion>\r?\n[^<\n]*\n</scriptversion>\r?\n")]
     private static partial Regex ScriptVersion();
 
     private static string Sha256(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));

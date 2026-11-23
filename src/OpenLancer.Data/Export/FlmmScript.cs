@@ -19,16 +19,26 @@ namespace OpenLancer.Data.Export;
 /// files of the game, and the whole files that the package holds.
 /// </summary>
 /// <remarks>
-/// <para>No official schema of the script exists. The rules come from the FLMM tutorial, community posts and working
-/// scripts, so the FLMM check of the M11 manual test must confirm them. Until then, the package is a preview.</para>
+/// <para>No official schema of the script exists. The rules come from the FLMM tutorial, community posts, working
+/// scripts and a test of FLMM 1.31 with a hand-made package. The owner check of an exported package must confirm them.
+/// Until then, the package is a preview.</para>
+/// <para>FLMM 1.31 reads one tag or one tag end on each line. So each tag and each tag end of the script is on its own
+/// line, and the content of an element is on the lines between them. No line gets an indent from the script. Each
+/// content line of an operation is an INI line as the game file has it. Each attribute value is in quotes.</para>
 /// <list type="bullet">
-/// <item><c>append</c> without <c>section</c> adds a new section at the end of a file.</item>
-/// <item><c>sectionappend</c> finds the text of <c>section</c> and adds <c>source</c> after it. The anchor is the
-/// header line and the key line of a section, and the source starts with a line end.</item>
-/// <item><c>sectionreplace</c> replaces the text of <c>dest</c> in the block that <c>section</c> finds.</item>
-/// <item><c>GENERATESTRRES("text")</c> and <c>GENERATEXMLRES("text")</c> give the id of a new string or infocard in
-/// a text DLL of FLMM.</item>
+/// <item><c>append</c> without <c>section</c> adds a new section at the end of a file. Its source starts with an empty
+/// line, as the game files have between sections.</item>
+/// <item><c>sectionappend</c> finds the lines of <c>section</c> and adds the lines of <c>source</c> after them. The
+/// anchor is the header line and the key line of a section.</item>
+/// <item><c>sectionreplace</c> finds the line of <c>dest</c> below the header of the section that <c>section</c>
+/// finds. It replaces that line with the line of <c>source</c>. FLMM changes only the lines below the header.</item>
+/// <item><c>key = 0 ;GENERATESTRRES("text")</c> and <c>key = 0 ;GENERATEXMLRES("text")</c> give the id of a new
+/// string or infocard in a text DLL of FLMM. The macro comes after <c>;</c>, so it must be the last value of its
+/// line.</item>
 /// </list>
+/// <para>FLMM takes the first match of an anchor. The test did not show if FLMM matches whole lines or text. So an
+/// anchor must occur once as a run of whole lines, and its first match as text must be the anchor itself. The same
+/// rule holds for the line of <c>dest</c> below the header of its section.</para>
 /// <para>A change that the operations cannot express puts the whole merged file into the package. A whole file
 /// cannot hold mod text, so such a change with mod text is a refusal.</para>
 /// <para>A new <c>[Base]</c> of <c>universe.ini</c> is a refusal too. It must go before the <c>[system]</c> sections
@@ -43,6 +53,7 @@ internal sealed partial class FlmmScript
 
     private const string ScriptName = "script.xml";
     private const string DataSection = "Data";
+    private const string LineEnd = "\r\n";
 
     private readonly List<string> operations = [];
     private readonly List<(string Path, byte[] Bytes)> files = [];
@@ -58,7 +69,8 @@ internal sealed partial class FlmmScript
         this.probe = probe;
     }
 
-    /// <summary>The text of <c>script.xml</c>: ASCII, with CR LF line ends, without an XML declaration.</summary>
+    /// <summary>The text of <c>script.xml</c>: ASCII, one tag on each line, with CR LF line ends, without an XML
+    /// declaration.</summary>
     public string Xml { get; private set; } = "";
 
     /// <summary>The text of <c>script.xml</c> without its <c>header</c> element. The guard digest of the package uses
@@ -149,8 +161,7 @@ internal sealed partial class FlmmScript
             return;
         }
 
-        var text = Join(raw);
-        var eol = raw.LineEnd;
+        var text = new RawText(raw);
         foreach (var group in data.GroupBy(d => d.Key, StringComparer.OrdinalIgnoreCase))
         {
             // The anchor is the raw last line of the key in [Data].
@@ -158,15 +169,14 @@ internal sealed partial class FlmmScript
                 .Where((s, k) => diff.BaseSections[k].Name.Equals(DataSection, StringComparison.OrdinalIgnoreCase))
                 .SelectMany(s => s.Entries)
                 .LastOrDefault(line => raw.RawKey(line).Equals(group.Key, StringComparison.OrdinalIgnoreCase), -1);
-            if (last < 0 || !Unique(text, raw.Lines[last]))
+            if (last < 0 || !text.Finds(0, raw.Lines.Count - 1, last, last))
             {
                 Refuse(file.Path, last < 0
                     ? $"[Data] has no {group.Key} line, so FLMM has no place for the new line"
                     : $"the line '{raw.Lines[last]}' is not unique in freelancer.ini, so FLMM cannot find its place");
                 return;
             }
-            var source = eol + string.Join(eol, group.Select(d => d.Line));
-            Operation(file.Path, "sectionappend", raw.Lines[last], null, source);
+            Operation(file.Path, new Op("sectionappend", [raw.Lines[last]], null, [.. group.Select(d => d.Line)]));
         }
     }
 
@@ -198,7 +208,7 @@ internal sealed partial class FlmmScript
         var reason = raw == null ? "OpenLancer cannot read the lines of the file"
             : raw.Sections.Count != diff.BaseSections.Count ? "OpenLancer cannot match the lines of the file with its sections"
             : null;
-        var ops = new List<(string Method, string Section, string? Dest, string Source)>();
+        var ops = new List<Op>();
         if (reason == null)
             reason = Operations(file.Path, raw!, diff, ops);
         if (reason != null)
@@ -207,18 +217,17 @@ internal sealed partial class FlmmScript
             return;
         }
         foreach (var op in ops)
-            Operation(file.Path, op.Method, op.Section, op.Dest, op.Source);
+            Operation(file.Path, op);
     }
 
     /// <summary>Adds the operations of the changes of a file to the list. Returns the reason why an operation cannot
     /// express a change, or null.</summary>
     /// <param name="path">The install path of the file.</param>
-    private string? Operations(string path, RawIni raw, FileDiff diff, List<(string, string, string?, string)> ops)
+    private static string? Operations(string path, RawIni raw, FileDiff diff, List<Op> ops)
     {
         if (diff.Removed.Count > 0)
             return "the mod removes a section";
-        var text = Join(raw);
-        var eol = raw.LineEnd;
+        var text = new RawText(raw);
         var lastMatched = diff.Matched.Count > 0 ? diff.Matched.Max(m => m.Merged) : -1;
 
         foreach (var pair in diff.Changed)
@@ -233,22 +242,22 @@ internal sealed partial class FlmmScript
                 return $"the mod changes lines of [{section.Name}] that belong together";
             if (pair.Inserted.Any() && SectionKeys.IsOrderSensitive(section.Name, path))
                 return $"the game reads the lines of [{section.Name}] in order, and FLMM adds lines after the key line";
-            if (Anchor(raw, pair.Base, diff.BaseSections[pair.Base], text) is not { } anchor)
+            if (Anchor(text, pair.Base, diff.BaseSections[pair.Base]) is not { } anchor)
                 return $"OpenLancer finds no unique anchor for [{section.Name}]";
 
-            var block = raw.Join(rawSection.Header, raw.SectionEnd(pair.Base));
+            // FLMM finds the line of dest only below the header of the section.
+            var end = raw.SectionEnd(pair.Base);
             foreach (var i in pair.Changed)
             {
                 var line = rawSection.Entries[i];
-                if (!Unique(block, raw.Lines[line]))
+                if (!text.Finds(rawSection.Header + 1, end, line, line))
                     return $"the line '{raw.Lines[line]}' is not unique in its section";
                 var merged = section[pair.MergedOf[i]];
-                ops.Add(("sectionreplace", anchor.Text, raw.Lines[line],
-                    raw.Indent(line) + IniLines.Line(raw.RawKey(line), merged) + raw.Comment(line)));
+                ops.Add(new Op("sectionreplace", anchor, raw.Lines[line],
+                    [raw.Indent(line) + IniLines.Line(raw.RawKey(line), merged) + raw.Comment(line)]));
             }
             if (pair.Inserted.Any())
-                ops.Add(("sectionappend", anchor.Text, null,
-                    anchor.Source(pair.Inserted.Select(j => IniLines.Line(section[j].Name, section[j])), eol)));
+                ops.Add(new Op("sectionappend", anchor, null, [.. pair.Inserted.Select(j => IniLines.Line(section[j].Name, section[j]))]));
         }
 
         foreach (var m in diff.Added)
@@ -256,62 +265,50 @@ internal sealed partial class FlmmScript
             var section = diff.MergedSections[m];
             if (m < lastMatched)
                 return $"the mod adds [{section.Name}] between other sections";
-            if (MarketAnchor(raw, diff, section, text) is { } market)
+            if (MarketAnchor(text, diff, section) is { } market)
             {
-                ops.Add(("sectionappend", market.Text, null, market.Source(
-                    section.Where(e => !e.Name.Equals("base", StringComparison.OrdinalIgnoreCase))
-                        .Select(e => IniLines.Line(e.Name, e)), eol)));
+                ops.Add(new Op("sectionappend", market, null,
+                [
+                    .. section.Where(e => !e.Name.Equals("base", StringComparison.OrdinalIgnoreCase))
+                        .Select(e => IniLines.Line(e.Name, e)),
+                ]));
                 continue;
             }
-            ops.Add(("append", "", null, eol + string.Join(eol, IniLines.SectionLines(section)) + eol));
+            ops.Add(new Op("append", [], null, ["", .. IniLines.SectionLines(section)]));
         }
         return null;
     }
 
-    /// <summary>The text that a <c>section</c> element of FLMM finds.</summary>
-    /// <param name="Text">The raw text of the anchor.</param>
-    /// <param name="EndsWithLine">True when the text ends with the line end of its last line.</param>
-    private sealed record AnchorText(string Text, bool EndsWithLine)
-    {
-        /// <summary>The source of a <c>sectionappend</c> after the anchor: the lines, with the line ends that put them
-        /// after the last line of the anchor.</summary>
-        public string Source(IEnumerable<string> lines, string eol) =>
-            EndsWithLine ? string.Concat(lines.Select(l => l + eol)) : eol + string.Join(eol, lines);
-    }
+    /// <summary>One operation of the script, with the text placeholders of the mod still in its source.</summary>
+    /// <param name="Method">The method of the <c>data</c> element.</param>
+    /// <param name="Section">The lines of the <c>section</c> element, or no lines for no element.</param>
+    /// <param name="Dest">The line of the <c>dest</c> element, or null for no element.</param>
+    /// <param name="Source">The lines of the <c>source</c> element.</param>
+    private sealed record Op(string Method, IReadOnlyList<string> Section, string? Dest, IReadOnlyList<string> Source);
 
     /// <summary>
     /// The anchor of a section: its raw header line and the raw line of its key, when the key line directly follows the
     /// header. A section without a key has its header line alone. Null when the key line does not follow the header, or
-    /// when the anchor does not occur once in the file.
+    /// when FLMM cannot find the anchor (<see cref="RawText.Finds"/>).
     /// </summary>
-    /// <remarks>A key can be the start of another key, for example <c>Li01_08</c> and <c>Li01_08_depot</c>. Then the
-    /// anchor also holds the line end after the key line, which makes it unique.</remarks>
-    private static AnchorText? Anchor(RawIni raw, int index, Section section, string text)
+    /// <remarks>A key can be the start of another key, for example <c>Li01_08</c> and <c>Li01_08_depot</c>. The anchor
+    /// of the shorter key is then valid only when its section comes first in the file.</remarks>
+    private static IReadOnlyList<string>? Anchor(RawText text, int index, Section section)
     {
-        var rawSection = raw.Sections[index];
+        var rawSection = text.Raw.Sections[index];
         var match = SectionKeys.For(section.Name);
         if (match.Kind != SectionMatchKind.Keyed || !SectionKeys.HasKeyLine(section, match))
-            return UniqueAnchor(raw, rawSection.Header, rawSection.Header, text);
+            return text.AnchorOf(rawSection.Header, rawSection.Header);
         var key = section.ToList().FindIndex(e => e.Name.Equals(match.KeyEntry, StringComparison.OrdinalIgnoreCase));
         return key < 0 || rawSection.Entries[key] != rawSection.Header + 1
             ? null
-            : UniqueAnchor(raw, rawSection.Header, rawSection.Header + 1, text);
-    }
-
-    /// <summary>The raw lines as an anchor when they occur once in the file. Else the raw lines with the line end of the
-    /// last line, when that text occurs once. Else null.</summary>
-    private static AnchorText? UniqueAnchor(RawIni raw, int from, int to, string text)
-    {
-        var anchor = raw.Join(from, to);
-        if (Unique(text, anchor))
-            return new AnchorText(anchor, false);
-        return raw.Ends[to].Length > 0 && Unique(text, anchor + raw.Ends[to]) ? new AnchorText(anchor + raw.Ends[to], true) : null;
+            : text.AnchorOf(rawSection.Header, rawSection.Header + 1);
     }
 
     /// <summary>The anchor of the <c>[BaseGood]</c> section of the base of a new <c>[BaseGood]</c>, or null. The engine
     /// adds the goods of each <c>[BaseGood]</c> of a base, so the new lines can go into the section of the game
     /// file.</summary>
-    private static AnchorText? MarketAnchor(RawIni raw, FileDiff diff, Section section, string text)
+    private static IReadOnlyList<string>? MarketAnchor(RawText text, FileDiff diff, Section section)
     {
         if (!section.Name.Equals("BaseGood", StringComparison.OrdinalIgnoreCase) ||
             section.FirstOrDefault(e => e.Name.Equals("base", StringComparison.OrdinalIgnoreCase)) is not { Count: 1 } line)
@@ -323,10 +320,10 @@ internal sealed partial class FlmmScript
                 !old[0].Name.Equals("base", StringComparison.OrdinalIgnoreCase) || old[0].Count != 1 ||
                 !old[0][0].ToString().Equals(line[0].ToString(), StringComparison.OrdinalIgnoreCase))
                 continue;
-            var rawSection = raw.Sections[k];
+            var rawSection = text.Raw.Sections[k];
             if (rawSection.Entries.Count == 0 || rawSection.Entries[0] != rawSection.Header + 1)
                 return null;
-            return UniqueAnchor(raw, rawSection.Header, rawSection.Header + 1, text);
+            return text.AnchorOf(rawSection.Header, rawSection.Header + 1);
         }
         return null;
     }
@@ -350,53 +347,72 @@ internal sealed partial class FlmmScript
         problems.Add(Diagnostic.Error(path, $"The FLMM package cannot hold this change in {path}: {reason}. Use the " +
                                             "drop-in zip, or change the mod."));
 
-    /// <summary>Adds one operation. The texts get the text macros of the mod text, and the operation is refused when a
-    /// text is not ASCII.</summary>
-    private void Operation(string path, string method, string section, string? dest, string source)
+    /// <summary>Adds one operation. The source lines get the text macros of the mod text, and the operation is refused
+    /// when a macro cannot hold a text or when a line is not ASCII.</summary>
+    private void Operation(string path, Op op)
     {
-        string resolved;
+        List<string> source;
         try
         {
-            resolved = Macros(source);
+            source = [.. op.Source.Select(Macro)];
         }
         catch (FlmmTextException e)
         {
             Refuse(path, e.Message);
             return;
         }
-        foreach (var text in new[] { section, dest ?? "", resolved })
+        foreach (var line in op.Section.Concat(op.Dest == null ? Array.Empty<string>() : [op.Dest]).Concat(source))
         {
-            if (text.FirstOrDefault(c => c > 127) is var c and not '\0')
+            if (line.FirstOrDefault(c => c > 127) is var c and not '\0')
             {
                 problems.Add(Diagnostic.Error(path, $"The FLMM package cannot hold the character U+{(int)c:X4} in " +
                                                     $"{path}. Use the drop-in zip."));
                 return;
             }
         }
-        var op = new StringBuilder();
-        op.Append($"  <data file=\"{EscapeAttribute(DiskPath(path))}\" method=\"{method}\">\r\n");
-        if (section.Length > 0)
-            op.Append($"    <section>{Escape(section)}</section>\r\n");
-        if (dest != null)
-            op.Append($"    <dest>{Escape(dest)}</dest>\r\n");
-        op.Append($"    <source>{Escape(resolved)}</source>\r\n");
-        op.Append("  </data>\r\n");
-        operations.Add(op.ToString());
+        var xml = new StringBuilder();
+        Tag(xml, $"<data file=\"{EscapeAttribute(DiskPath(path))}\" method=\"{op.Method}\">");
+        if (op.Section.Count > 0)
+            Element(xml, "section", op.Section);
+        if (op.Dest != null)
+            Element(xml, "dest", [op.Dest]);
+        Element(xml, "source", source);
+        Tag(xml, "</data>");
+        operations.Add(xml.ToString());
     }
 
-    /// <summary>The text with a text macro of FLMM in place of each text placeholder.</summary>
-    /// <exception cref="FlmmTextException">A text has a quote, and the script is not a probe.</exception>
-    private string Macros(string text) => Placeholder().Replace(text, match =>
+    /// <summary>The line with a text macro of FLMM in place of its text placeholder: <c>key = $str:x</c> becomes
+    /// <c>key = 0 ;GENERATESTRRES("text")</c>. A line without a placeholder stays as it is.</summary>
+    /// <remarks>The macro comes after <c>;</c>, so the game reads the rest of the line as a comment. So the placeholder
+    /// must be the last value of the line. A comment after the placeholder goes away.</remarks>
+    /// <exception cref="FlmmTextException">The line has more than one placeholder, the placeholder is not its last
+    /// value, or the macro cannot hold the text.</exception>
+    private string Macro(string line)
     {
+        var matches = Placeholder().Matches(line);
+        if (matches.Count == 0)
+            return line;
+        if (matches.Count > 1)
+            throw new FlmmTextException($"the line '{line}' has more than one text. FLMM writes a text after a " +
+                                        "semicolon, so a line can hold only one text, as its last value");
+        var match = matches[0];
+        var rest = line[(match.Index + match.Length)..].TrimStart(' ', '\t');
+        if (rest.Length > 0 && rest[0] != ';')
+            throw new FlmmTextException($"the text '{match.Value}' is not the last value of the line '{line}'. FLMM " +
+                                        "writes a text after a semicolon, and the game reads the rest of the line as a " +
+                                        "comment");
         StringPlaceholder.TryParse(match.Value, out var placeholder);
         var table = placeholder.Kind == StringKind.String ? strings.Strings : strings.Infocards;
         if (!table.TryGetValue(placeholder.Key, out var content))
             throw new FlmmTextException($"'{placeholder}' is not in strings.json");
         if (content.Contains('"') && !probe)
             throw new FlmmTextException($"the text of '{placeholder}' has a quote, and FLMM has no known escape for it");
+        if (content.Contains('\n') || content.Contains('\r'))
+            throw new FlmmTextException($"the text of '{placeholder}' has a line end. FLMM reads a text macro only on " +
+                                        "one line");
         var macro = placeholder.Kind == StringKind.String ? "GENERATESTRRES" : "GENERATEXMLRES";
-        return $"{macro}(\"{content}\")";
-    });
+        return $"{line[..match.Index]}0 ;{macro}(\"{content}\")";
+    }
 
     /// <summary>A text placeholder in a line. A key has letters, digits, '_', '-' and '.' only (see
     /// <c>strings.json</c>).</summary>
@@ -408,28 +424,44 @@ internal sealed partial class FlmmScript
     private string Write(FlmmHeader? header)
     {
         var xml = new StringBuilder();
-        xml.Append("<script>\r\n");
+        Tag(xml, "<script>");
         if (header != null)
             xml.Append(HeaderXml(header));
         foreach (var op in operations)
             xml.Append(op);
-        xml.Append("</script>\r\n");
+        Tag(xml, "</script>");
         return xml.ToString();
     }
 
-    /// <summary>The header element of a script, as the script holds it: ASCII, indented, with CR LF line ends. The
-    /// Preview tab of the Mods window shows it.</summary>
+    /// <summary>The header element of a script, as the script holds it: ASCII, one tag on each line, with CR LF line
+    /// ends. The Preview tab of the Mods window shows it.</summary>
     public static string HeaderXml(FlmmHeader header)
     {
         var xml = new StringBuilder();
-        xml.Append($"  <header name=\"{EscapeAttribute(Ascii(header.Name))}\">\r\n");
-        xml.Append($"    <scriptversion>{ScriptVersion}</scriptversion>\r\n");
-        xml.Append($"    <author>{Escape(Ascii(header.Author))}</author>\r\n");
-        xml.Append($"    <description>{Escape(Ascii(header.Description)).Replace("\n", "\r\n")}</description>\r\n");
+        Tag(xml, $"<header name=\"{EscapeAttribute(Ascii(header.Name))}\">");
+        Element(xml, "scriptversion", [ScriptVersion]);
+        Element(xml, "author", Lines(Ascii(header.Author)));
+        Element(xml, "description", Lines(Ascii(header.Description)));
         if (header.ModUrl.Length > 0)
-            xml.Append($"    <modurl>{Escape(Ascii(header.ModUrl))}</modurl>\r\n");
-        xml.Append("  </header>\r\n");
+            Element(xml, "modurl", [Ascii(header.ModUrl)]);
+        Tag(xml, "</header>");
         return xml.ToString();
+    }
+
+    /// <summary>The lines of a header text: no lines for an empty text.</summary>
+    private static IEnumerable<string> Lines(string text) => text.Length == 0 ? [] : text.Split('\n');
+
+    /// <summary>Writes a tag or a tag end on its own line.</summary>
+    private static void Tag(StringBuilder xml, string tag) => xml.Append(tag).Append(LineEnd);
+
+    /// <summary>Writes an element: its tag, each content line with the XML escapes, and its tag end, each on its own
+    /// line.</summary>
+    private static void Element(StringBuilder xml, string name, IEnumerable<string> lines)
+    {
+        Tag(xml, $"<{name}>");
+        foreach (var line in lines)
+            xml.Append(Escape(line)).Append(LineEnd);
+        Tag(xml, $"</{name}>");
     }
 
     /// <summary>The name of the script file in the package.</summary>
@@ -445,25 +477,64 @@ internal sealed partial class FlmmScript
     /// <summary>Escapes the characters that an XML attribute in quotes cannot hold.</summary>
     private static string EscapeAttribute(string text) => Escape(text).Replace("\"", "&quot;");
 
-    /// <summary>True when the text occurs once in the file, with exact letter case and also with any letter
-    /// case.</summary>
-    private static bool Unique(string text, string part) =>
-        part.Length > 0 && Count(text, part, StringComparison.Ordinal) == 1 &&
-        Count(text, part, StringComparison.OrdinalIgnoreCase) == 1;
-
-    private static int Count(string text, string part, StringComparison comparison)
-    {
-        var count = 0;
-        for (var i = text.IndexOf(part, comparison); i >= 0; i = text.IndexOf(part, i + 1, comparison))
-            count++;
-        return count;
-    }
-
-    /// <summary>The whole text of the raw lines, with their line ends.</summary>
-    private static string Join(RawIni raw) => string.Concat(raw.Lines.Zip(raw.Ends, (l, e) => l + e));
-
     private static bool HasPlaceholder(IEnumerable<Section> sections) =>
         sections.SelectMany(s => s).SelectMany(e => e).Any(v => StringPlaceholder.TryParse(v, out _));
+
+    /// <summary>The raw text of a file, with the start of each line, for the anchor rule of FLMM.</summary>
+    private sealed class RawText
+    {
+        private static readonly StringComparison[] Comparisons = [StringComparison.Ordinal, StringComparison.OrdinalIgnoreCase];
+        private readonly string text;
+        private readonly int[] starts;
+
+        public RawText(RawIni raw)
+        {
+            Raw = raw;
+            starts = new int[raw.Lines.Count];
+            var all = new StringBuilder();
+            for (var i = 0; i < raw.Lines.Count; i++)
+            {
+                starts[i] = all.Length;
+                all.Append(raw.Lines[i]).Append(raw.Ends[i]);
+            }
+            text = all.ToString();
+        }
+
+        public RawIni Raw { get; }
+
+        /// <summary>The raw lines <paramref name="from"/> to <paramref name="to"/> when FLMM finds them in the whole
+        /// file, else null.</summary>
+        public IReadOnlyList<string>? AnchorOf(int from, int to) =>
+            Finds(0, Raw.Lines.Count - 1, from, to) ? Raw.Lines.GetRange(from, to - from + 1) : null;
+
+        /// <summary>
+        /// True when FLMM finds the raw lines <paramref name="from"/> to <paramref name="to"/> in the lines
+        /// <paramref name="first"/> to <paramref name="last"/>, if it matches whole lines and also if it matches text.
+        /// The lines must occur once there as a run of whole lines. The first text match of their text must be the
+        /// lines themselves, because FLMM takes the first match. Both rules hold with exact letter case and with any
+        /// letter case.
+        /// </summary>
+        public bool Finds(int first, int last, int from, int to)
+        {
+            var count = to - from + 1;
+            var anchor = Raw.Join(from, to);
+            if (anchor.Length == 0 || first > from || to > last)
+                return false;
+            var region = text[starts[first]..(starts[last] + Raw.Lines[last].Length)];
+            foreach (var comparison in Comparisons)
+            {
+                var runs = 0;
+                for (var p = first; p + count - 1 <= last; p++)
+                {
+                    if (Enumerable.Range(0, count).All(i => Raw.Lines[p + i].Equals(Raw.Lines[from + i], comparison)))
+                        runs++;
+                }
+                if (runs != 1 || region.IndexOf(anchor, comparison) != starts[from] - starts[first])
+                    return false;
+            }
+            return true;
+        }
+    }
 
     private sealed class FlmmTextException(string message) : Exception(message);
 }
