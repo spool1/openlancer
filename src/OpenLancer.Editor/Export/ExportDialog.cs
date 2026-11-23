@@ -112,10 +112,19 @@ internal sealed class ExportDialog : ModalDialog
 
             (dropIn, flmm) = saved == null ? (true, true) : (saved.DropIn, saved.Flmm);
             folder = saved?.Folder is { Length: > 0 } path ? path : PublishHistory.FolderOf(workspace, loaded.Id);
+            // A mod that no open profile holds cannot export (#89). The Console gets the reason when the dialog opens,
+            // as it gets the other refusals of an export.
+            if (NoGateReason(loaded) is { } noGate)
+                window.Log.Add(ConsoleSeverity.Error, Source, noGate);
         }
 
         Open();
     }
+
+    /// <summary>Why the dialog cannot export the mod, or null: no open profile holds the mod, so the export cannot run
+    /// its save gate (see <see cref="ExportGate.NoGateReason"/>).</summary>
+    private string? NoGateReason(Mod exported) =>
+        ExportGate.NoGateReason(window.Session?.Edits, exported.Folder, exported.Id);
 
     /// <summary>Loads the mod from its folder, with the applied name, version and targets, and reads the texts of the
     /// header.</summary>
@@ -227,23 +236,28 @@ internal sealed class ExportDialog : ModalDialog
         var versionProblem = ModVersion.SafeProblem(mod.Manifest.Version);
         if (versionProblem == null)
             CardLayout.Dim($"This export writes to {ModExport.VersionFolder(folder, mod.Manifest)}.");
+        // The dialog cannot export a mod that no open profile holds (#89), so it tells why before a click.
+        var noGate = NoGateReason(mod);
+        Problem(noGate);
         Problem(versionProblem ?? error);
         ImGui.Spacing();
 
         var retail = targets.Any(id => ExportTarget.Find(id)!.IsRetail);
-        var ready = targets.Count > 0 && (!retail || dropIn || flmm) && versionProblem == null;
+        var ready = targets.Count > 0 && (!retail || dropIn || flmm) && versionProblem == null && noGate == null;
         if (Button("Export", primary: true, enabled: ready))
             Start(mod, play: null);
+        if (noGate != null)
+            ImGui.SetItemTooltip(noGate);
         // Export and play needs a checked retail target whose base has a game program.
         if (PlayTargetOf() is { } play)
         {
             ImGui.SameLine();
             if (Button("Export and play", enabled: ready && !window.GamePlay.Busy))
                 Start(mod, play);
-            ImGui.SetItemTooltip(window.GamePlay.Busy
+            ImGui.SetItemTooltip(noGate ?? (window.GamePlay.Busy
                 ? "A game or the test server of a play copy runs. Stop it first."
                 : $"Export, then install the export for {play.Name} into the play copy of {play.BaseIn(bases)!.Root} " +
-                  "and start the game. The play copy then holds this mod alone.");
+                  "and start the game. The play copy then holds this mod alone."));
         }
         ImGui.SameLine();
         if (Button("Cancel"))
@@ -340,7 +354,8 @@ internal sealed class ExportDialog : ModalDialog
     /// Saves the choices and prepares the export on a worker thread. The save gate of the mod runs first (#87, see
     /// <see cref="ExportGate"/>). When the open session holds the saved mod, its gate runs on the UI thread, as a save
     /// does. Else the worker opens the profile with the mod active, as <c>oltool export</c> does. The dialog refuses a
-    /// mod that no open profile holds, also when no profile is open (#89). It then writes no package and starts no
+    /// mod that no open profile holds, also when no profile is open (#89). The buttons are not available for such a mod
+    /// (see <see cref="NoGateReason"/>), and this refusal stays as the guard. It then writes no package and starts no
     /// prepare, and the dialog and the Console show the refusal. This also applies to Export and play. The dialog
     /// refuses before it makes the request, so the Console gets no publish warning for an export that does not run.
     /// <see cref="ExportRun.Prepare"/> also refuses such a gate run. The guard runs when the prepare ends.

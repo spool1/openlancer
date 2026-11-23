@@ -998,7 +998,7 @@ A row shows the display name, the id and the version. A blue dot marks unsaved o
 
 The page of the selected mod has these parts:
 
-- The header: the display name, the id, the version, the authors and the chips of the state. The tooltip of a chip tells more. **Export...** opens the Export dialog of the mod. The dialog refuses the export of a mod that the open profile does not hold (see "Export"). **Play** plays the mod alone in a linked game (see "Play in the game" in [PLAY.md](PLAY.md)). The **...** menu has Make active mod, Duplicate..., Rename..., Add to profile or Remove from profile, Open folder, Open export folder and Show in Console.
+- The header: the display name, the id, the version, the authors and the chips of the state. The tooltip of a chip tells more. **Export...** opens the Export dialog of the mod. The dialog refuses the export of a mod that the open profile does not hold (see "Export"). The tooltip of **Export...** then tells why. **Play** plays the mod alone in a linked game (see "Play in the game" in [PLAY.md](PLAY.md)). The **...** menu has Make active mod, Duplicate..., Rename..., Add to profile or Remove from profile, Open folder, Open export folder and Show in Console.
 - The publish checklist: for example "4 of 6 steps complete", and one row for each step. A missing step tells what is missing and why. Its buttons go to the field or fix the step. The recommended items do not count.
 - The tab **Settings**: the display name, the version and the target games of `mod.json`, and the publish settings. Each list has Add, Remove, Move up, Move down and a drag handle. Increase version gives the next patch, minor or major version, and adds a changelog entry for it. **Add entry** adds a changelog entry at the top, because the changelog lists the newest version first. The entry of a version with the mark "published" is read-only: you cannot change, move or remove it.
 - The tab **Preview**: the parts of the Nexus page in the order of the page, each with Copy. Copy copies the text of the field in `nexus-page.txt`. The README of each package, the header of the FLMM script and `CHECKLIST.txt` come from the last check. Click **Check now** to make them.
@@ -1758,7 +1758,15 @@ Each export runs the save gate of the mod first (see "The save gate"). When the 
 
 - The dialog and the agent tool use the save gate of the editor when the mod is the active mod and has no unsaved edits.
 - Else the export opens the profile with the mod active, only to read the saved files. The dialog does this for another mod of the profile, and `oltool export` always does it.
-- The dialog refuses a mod that no open profile holds, because it cannot run the save gate of such a mod. It then writes no package, and the dialog and the Console show this text: "The export of mod '<id>' stopped. The open profile does not hold mod '<id>', so the export cannot run the save gate of the mod. Open a profile that holds the mod, then export again." When no profile is open, the dialog also refuses the mod, and the second sentence of the text is "No profile is open, so the export cannot run the save gate of the mod." Export and play refuses the mod in the same way.
+- The dialog refuses a mod that no open profile holds, because it cannot run the save gate of such a mod. When the dialog opens, it shows the reason, and **Export** and **Export and play** are not available. The Console gets the same text:
+
+  "The Export dialog cannot export mod '<id>'. The open profile does not hold mod '<id>', so the export cannot run the save gate of the mod. Open a profile that holds the mod, then export it."
+
+  When no profile is open, the second sentence is:
+
+  "No profile is open, so the export cannot run the save gate of the mod."
+
+  The tooltip of **Export...** in the Mods window gives the same reason. The dialog writes no package for such a mod.
 - `oltool export --checklist` and `--flmm-probe` do not run the save gate. `oltool validate` does not run it either.
 
 When you close the Export dialog while the export runs, the export goes on without the dialog. An export that still checks the mod then stops and writes no package. An export that writes its packages completes, records them in the publish history and writes the result to the Console. Export and play then does not start the game.

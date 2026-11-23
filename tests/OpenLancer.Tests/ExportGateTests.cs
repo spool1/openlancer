@@ -122,6 +122,34 @@ public sealed class ExportGateTests
     }
 
     /// <summary>
+    /// Final finding of V1-C4 (#89): the Export dialog reads the reason when it opens, so it shows the reason and
+    /// disables Export before a click. The Mods window gives the same reason in the tooltip of Export.... A mod of the
+    /// open profile has no reason, with or without unsaved edits.
+    /// </summary>
+    [Fact]
+    public void TheExportDialogReadsTheReasonOfAModWithoutAGateWhenItOpens()
+    {
+        using var game = new ExportGame();
+        var profile = Profile(game);
+        using var own = Open(profile);
+        string? Reason(EditSession? session, string id) =>
+            ExportGate.NoGateReason(session, Path.Combine(game.ModsFolder, id), id);
+
+        Assert.Null(Reason(own, "ol-test"));
+        Assert.Null(Reason(own, "other"));
+        Assert.Equal("The Export dialog cannot export mod 'outside'. The open profile does not hold mod 'outside', so " +
+                     "the export cannot run the save gate of the mod. Open a profile that holds the mod, then export it.",
+            Reason(own, "outside"));
+        Assert.Equal("The Export dialog cannot export mod 'ol-test'. No profile is open, so the export cannot run the " +
+                     "save gate of the mod. Open a profile that holds the mod, then export it.", Reason(null, "ol-test"));
+        Assert.Empty(SteLint.Problems(Reason(own, "outside")!));
+        Assert.Empty(SteLint.Problems(Reason(null, "ol-test")!));
+        own.Execute(EditCommand.SetLinesFromText(new SectionRef(ExportGame.GoodsPath, new SectionIdentity("Good", "g2")),
+            "price", ["400"]));
+        Assert.Null(Reason(own, "ol-test"));
+    }
+
+    /// <summary>
     /// A session that only reads the profile with the mod active gives the gate of a writable session for the same
     /// saved mod. So the Export dialog and <c>oltool export</c> refuse what a save refuses. The gate of the other mod of
     /// the profile has no error.

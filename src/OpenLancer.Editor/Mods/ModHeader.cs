@@ -3,6 +3,7 @@ using System.Linq;
 using System.Numerics;
 using ImGuiNET;
 using LibreLancer.ImUI;
+using OpenLancer.Data.Export;
 using OpenLancer.Data.Games;
 using OpenLancer.Data.Publishing;
 using OpenLancer.Editor.Games;
@@ -82,8 +83,12 @@ internal sealed class ModHeader(EditorWindow window, ModsWindow mods)
             mods.Export(row.Folder);
         }
 
+        // The Export dialog cannot export a mod that no open profile holds (#89), and the tooltip tells it first.
+        const string exportTip = "Make the packages of this mod for its target games, and the texts of the Nexus page.";
         ItemTooltip.Show(exportBlock ??
-                         "Make the packages of this mod for its target games, and the texts of the Nexus page.");
+                         (ExportGate.NoGateReason(window.Session?.Edits, row.Folder, manifest.Id) is { } noGate
+                             ? $"{exportTip}\n\n{noGate}"
+                             : exportTip));
         ImGui.SameLine();
         if (ImGui.Button($"{EditorIcons.Play}  Play {EditorIcons.CaretDown}"))
         {

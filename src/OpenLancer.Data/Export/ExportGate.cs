@@ -139,7 +139,24 @@ public static class ExportGate
     /// the mod, so it writes no package.</summary>
     /// <param name="profileOpen">True when a profile is open.</param>
     public static string NoProfileRefusal(string modId, bool profileOpen) =>
-        $"The export of mod '{modId}' stopped. " +
+        $"The export of mod '{modId}' stopped. {NoGateCause(modId, profileOpen)} Open a profile that holds the mod, " +
+        "then export again.";
+
+    /// <summary>
+    /// Why the Export dialog cannot export the mod in a folder, or null when an open profile holds the mod (see
+    /// <see cref="SourceOf"/>). The dialog reads it when it opens: it shows the reason and disables its export
+    /// buttons (#89). The Mods window gives it in the tooltip of Export.... The export itself still refuses such a mod
+    /// with <see cref="NoProfileRefusal"/>.
+    /// </summary>
+    /// <param name="session">The open session, or null.</param>
+    public static string? NoGateReason(EditSession? session, string modFolder, string modId) =>
+        SourceOf(session, modFolder) == ExportGateSource.None
+            ? $"The Export dialog cannot export mod '{modId}'. {NoGateCause(modId, session != null)} Open a profile " +
+              "that holds the mod, then export it."
+            : null;
+
+    /// <summary>Why an export cannot run the save gate of a mod that no open profile holds.</summary>
+    private static string NoGateCause(string modId, bool profileOpen) =>
         $"{(profileOpen ? $"The open profile does not hold mod '{modId}'" : "No profile is open")}, so the export " +
-        "cannot run the save gate of the mod. Open a profile that holds the mod, then export again.";
+        "cannot run the save gate of the mod.";
 }
