@@ -52,6 +52,7 @@ public static class AgentTools
         new PointParam("position", false, BuilderTools.MaxCoordinate),
         new PointParam("rotation", false),
         new TextParam("nickname", false, null, null),
+        new FieldsParam("fields", false),
         new TextParam("planet", false, null, null),
         new GroupParam("ring", [
             new TextParam("archetype", false, null, null),

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Bases;
@@ -229,6 +230,7 @@ internal static class BaseTools
                              market.Equals(MarketNone, StringComparison.OrdinalIgnoreCase)
                 ? null
                 : EditTools.At("market", () => Nickname(session, market, "market"));
+            var dockGroup = args.Group("dock_object");
             var values = new RowValues(session);
             var faction = UniverseTools.Listed(values, args.Text("local_faction"), "local_faction", "faction");
             values.ThrowIfAny();
@@ -239,16 +241,19 @@ internal static class BaseTools
                 StartRoom = args.Text("start_room"),
                 Characters = Enum.Parse<CharacterCopy>(args.Text("characters")!, ignoreCase: true),
                 LocalFaction = faction,
-                Dock = Dock(args.Group("dock_object")),
+                Dock = Dock(dockGroup),
                 MarketFrom = marketFrom,
                 NoMarket = market.Equals(MarketNone, StringComparison.OrdinalIgnoreCase),
             };
             var plan = BaseCommands.Create(session, spec, call.Texts);
             UniverseTools.Run(scope, plan,
                 error => (Refusals.GetValueOrDefault(error.Detail ?? "", error.Kind), plan.RefusedPart));
+            // The fields of the dock object go to the object in the same batch, so the call stays one Undo step.
+            if (dockGroup?.Node("fields") is JsonObject fields && plan.DockObject is { } docked)
+                DockFields(scope, docked, fields);
             // The references take the form that they have while the new items exist, also in a preview.
             var made = ItemRefs.Canonical(session, plan.Base!);
-            var dock = plan.DockObject is { } docked ? ItemRefs.Canonical(session, docked) : null;
+            var dock = plan.DockObject is { } named ? ItemRefs.Canonical(session, named) : null;
             var ring = plan.Ring is { } added ? ItemRefs.Canonical(session, added) : null;
             finish = result => new BaseEditResult(result) { Base = made, File = plan.File, DockObject = dock, Ring = ring };
         }, result => finish(result));
@@ -460,6 +465,20 @@ internal static class BaseTools
             Planet = group.Text("planet"),
             Ring = ring == null ? null : new RingSpec(ring.Text("archetype"), ring.Point("position"), ring.Point("rotation")),
         };
+    }
+
+    /// <summary>Sets the fields of <c>dock_object</c> on the dock object of the new base. Each error names its field,
+    /// for example <c>dock_object.fields.loadout</c>.</summary>
+    private static void DockFields(EditScope scope, SectionRef dockObject, JsonObject fields)
+    {
+        try
+        {
+            SceneEditTools.Fields(scope, dockObject, fields);
+        }
+        catch (EditException e)
+        {
+            throw new EditException(e.Error with { Field = $"dock_object.{e.Error.Field}" });
+        }
     }
 
     /// <summary>A number of a market line, or null when the line does not have it.</summary>

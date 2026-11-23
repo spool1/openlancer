@@ -25328,6 +25328,11 @@
                 "maxLength": 1024,
                 "description": "The nickname of a new station or a new planet. Without it, the next free nickname of the system."
               },
+              "fields": {
+                "type": "object",
+                "minProperties": 1,
+                "description": "More keys of the new station or the planet, by INI key, as set_fields takes them. The tool sets them after the lines of the template, in the same Undo step. Use get_item to see the keys."
+              },
               "planet": {
                 "type": "string",
                 "minLength": 1,

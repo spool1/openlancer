@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Studio.Agent;
 using Xunit;
 using static OpenLancer.Tests.AgentCalls;
@@ -42,7 +43,7 @@ public sealed class AgentBaseToolTests
     private static string[] Texts(JsonNode? array) => array!.AsArray().Select(t => (string)t!).ToArray();
 
     private static string[] Messages(JsonNode? problems) =>
-        problems!.AsArray().Select(p => (string)p!["message"]!).ToArray();
+        problems?.AsArray().Select(p => (string)p!["message"]!).ToArray() ?? [];
 
     private static SectionRef Entry(string nickname) =>
         new(BaseWorkspace.UniversePath, new SectionIdentity("Base", nickname));
@@ -82,6 +83,51 @@ public sealed class AgentBaseToolTests
         Assert.Null(session.Get(Entry(NewBase)));
         Assert.False(session.HasFile(NewFile));
         Assert.False(session.IsDirty);
+    }
+
+    /// <summary>
+    /// The fields of dock_object go to the new station after the lines of the template, in the same Undo step. One undo
+    /// takes back the base, the station and the fields.
+    /// </summary>
+    [Fact]
+    public void TheFieldsOfTheDockObjectGoToTheNewStationInTheSameUndoStep()
+    {
+        var (ws, session, host) = Bases();
+        using var _ = ws;
+        var station = new SectionRef(BaseWorkspace.Ol01Path, new SectionIdentity("Object", "ol01_station_1"));
+
+        Ok(host, "base_create", """
+            { "nickname": "Ol01_05_Base", "system": "Ol01", "template": "Ol01_01_Base", "name": "Harbor Rock",
+              "dock_object": { "position": [5000, 0, -3000], "fields": { "difficulty_level": 5, "visit": 16 } } }
+            """);
+
+        Assert.Equal("5", Assert.Single(EditSessionTests.Values(session, station, "difficulty_level")));
+        Assert.Equal("16", Assert.Single(EditSessionTests.Values(session, station, "visit")));
+        Assert.Equal(NewBase, Assert.Single(EditSessionTests.Values(session, station, "dock_with")));
+        Assert.Single(host.Edits);
+
+        Ok(host, "undo");
+
+        Assert.Null(session.Get(station));
+        Assert.Null(session.Get(Entry(NewBase)));
+        Assert.False(session.IsDirty);
+    }
+
+    /// <summary>A base without a dock object gives one warning of the fault: the problem of the base checks in
+    /// new_problems. The plan does not warn about it a second time.</summary>
+    [Fact]
+    public void ABaseWithoutADockObjectGivesOneWarningOfTheFault()
+    {
+        var (ws, session, host) = Bases();
+        using var _ = ws;
+
+        var result = Ok(host, "base_create", """
+            { "nickname": "Ol01_05_Base", "system": "Ol01", "template": "Ol01_01_Base", "name": "Harbor Rock" }
+            """);
+
+        Assert.Equal(["No object docks with Ol01_05_Base. The player cannot dock there."],
+            Messages(result["warnings"]).Concat(Messages(result["new_problems"]))
+                .Where(m => m.StartsWith("No object docks", System.StringComparison.Ordinal)));
     }
 
     /// <summary>A preview with with_patch changes nothing and gives the text that the save writes for each file. The
@@ -139,7 +185,11 @@ public sealed class AgentBaseToolTests
         yield return Row($$"""{ "nickname": "Ol01_05_Base", {{Base}}, "dock_object": {} }""",
             "invalid_argument", BasePlans.DockPlace, "dock_object.position");
         yield return Row($$"""{ "nickname": "Ol01_05_Base", {{Base}}, "local_faction": "ol_nobody" }""",
-            "invalid_value", null, "local_faction");
+            "invalid_value", MissionErrors.FieldValue, "local_faction");
+        yield return Row("""{ "nickname": "Ol01_05_Base", "system": "Ol01", "template": "Ol01_01_Base", "name": "   " }""",
+            "invalid_value", MissionErrors.FieldValue, "name");
+        yield return Row($$"""{ "nickname": "Ol01_05_Base", {{Base}}, "dock_object": { "position": [0, 0, 0], "fields": { "pos": "x" } } }""",
+            "invalid_value", null, "dock_object.fields.pos");
         yield return Row($$"""{ "nickname": "Ol01_05_Base", {{Base}}, "market": "Ol09_09_Base" }""",
             "not_found", ItemRefs.NotFound, "market");
     }
@@ -278,17 +328,29 @@ public sealed class AgentBaseToolTests
             ((string?)station["ref"], (string?)station["system"], (string?)station["kind"]));
         Assert.Equal(["Deck", "Bar"], Texts(station["rooms"]));
         Assert.Equal((3, 2, 1), ((int)station["characters"]!, (int)station["goods"]!, (int)station["dock_objects"]!));
+        // The planet has the base line and the ring docks with the base. Only the ring counts.
+        Assert.Equal(1, (int)all[1]!["dock_objects"]!);
         Assert.Equal([BaseWorkspace.Pirate], Names("""{ "system": "Ol02" }"""));
         Assert.Equal([BaseWorkspace.Planet], Names("""{ "text": "ol01_02" }"""));
         Assert.Equal([BaseWorkspace.Planet], Names("""{ "has_rooms": ["shipdealer"] }"""));
         Assert.Equal([BaseWorkspace.Station, BaseWorkspace.Pirate], Names("""{ "has_rooms": ["Deck", "Bar"] }"""));
+        Assert.Empty(Names("""{ "has_rooms": ["Deck", "ShipDealer"] }"""));
         Assert.Equal([BaseWorkspace.Planet], Names("""{ "kind": "planet" }"""));
         Assert.Empty(Names("""{ "active_mod_only": true }"""));
 
         Ok(host, "base_create", $$"""{ {{Harbor}} }""");
 
         Assert.Equal([NewBase], Names("""{ "active_mod_only": true }"""));
-        Assert.Equal("Harbor Rock", (string?)Ok(host, "list_bases", """{ "active_mod_only": true }""")["rows"]![0]!["name"]);
+        Assert.Equal([NewBase], Names("""{ "text": "harbor" }"""));
+        // The counts read the new bar data and the new market lines, not the state before the edit.
+        var made = Ok(host, "list_bases", """{ "active_mod_only": true }""")["rows"]![0]!;
+        Assert.Equal(("Harbor Rock", 3, 2, 1), ((string?)made["name"], (int)made["characters"]!, (int)made["goods"]!,
+            (int)made["dock_objects"]!));
+
+        Ok(host, "undo");
+
+        Assert.Empty(Names("""{ "active_mod_only": true }"""));
+        Assert.Equal(3, Ok(host, "list_bases")["rows"]!.AsArray().Count);
     }
 
     /// <summary>The intro bases of the main menu are not in the list of the bases, and not in the bases of their
@@ -397,6 +459,52 @@ public sealed class AgentBaseToolTests
         var system = Ok(host, "get_system", """{ "system": "Ol01" }""");
 
         Assert.Equal(["base:Ol01_01_Base", "base:Ol01_02_Base", "base:Ol01_05_Base"], Texts(system["bases"]));
+    }
+
+    /// <summary>get_system also gives a base whose system line names another system, when an object of the system
+    /// names it. Such a base comes after the bases of the system lines.</summary>
+    [Fact]
+    public void GetSystemGivesABaseThatOnlyAnObjectOfTheSystemNames()
+    {
+        var (ws, session, host) = Bases(fullSystem: false, setup: w => w.WriteBase(BaseWorkspace.Ol01Path,
+            BaseWorkspace.Ol01 + """
+
+                [Object]
+                nickname = Ol01_outpost
+                pos = 30000, 0, 0
+                archetype = ol_station
+                base = Ol02_01_Base
+                """));
+        using var _ = ws;
+
+        var system = Ok(host, "get_system", """{ "system": "Ol01" }""");
+
+        Assert.Equal(["base:Ol01_01_Base", "base:Ol01_02_Base", "base:Ol02_01_Base"], Texts(system["bases"]));
+    }
+
+    /// <summary>
+    /// get_base marks the line that the games keep for each good: the last line of the good. The earlier line of the
+    /// same good is not kept. A [BaseGood] whose base line has another letter case is a market of the same base.
+    /// </summary>
+    [Fact]
+    public void GetBaseKeepsOnlyTheLastLineOfAGood()
+    {
+        var (ws, session, host) = Bases(setup: w => w.WriteBase(BaseWorkspace.CommodityMarketPath, """
+            [BaseGood]
+            base = Ol01_01_Base
+            marketgood = ol_water, 0, -1, 150, 500, 0, 1
+            [BaseGood]
+            base = OL01_01_BASE
+            marketgood = ol_water, 0, -1, 100, 300, 0, 1.2
+            """));
+        using var _ = ws;
+
+        var market = Ok(host, "get_base", """{ "base": "Ol01_01_Base" }""")["market"]!.AsArray();
+        var row = Ok(host, "list_bases", """{ "text": "ol01_01" }""")["rows"]![0]!;
+
+        Assert.Equal([("ol_gun", true, 10), ("ol_water", false, 500), ("ol_water", true, 300)],
+            market.Select(m => ((string)m!["good"]!, (bool)m["kept"]!, (int)m["max_stock"]!)));
+        Assert.Equal(2, (int)row["goods"]!);
     }
 
     /// <summary>

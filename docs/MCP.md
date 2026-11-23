@@ -141,13 +141,13 @@ The known limits of this version:
 
 ## Make a new base with an agent
 
-This example makes a new station in New York with an agent. The station copies the rooms, the bar characters, the dealers, the news and the market of the Manhattan base. Each request is a message that you type in the agent program. The names in the requests, for example ol_harbor_base, are examples.
+This example makes a new station in New York with an agent. The station copies the rooms, the bar characters, the dealers, the news and the market of the Rochester base, a station of New York. Each request is a message that you type in the agent program. The names in the requests, for example ol_harbor_base, are examples.
 
 1. Open the profile in the editor.
 2. If your mod is not the active mod, make it active with **Make active mod** in **Mod > Mods...**.
 3. Start the agent server, and connect the agent program to the editor (see "Connect an agent to the editor").
 4. Ask the agent: "Which bases can be a template for a station?" The agent reads `openlancer://catalog/base-templates`, or calls `list_bases` with `kind: station`.
-5. Ask the agent: "Make the base ol_harbor_base in Li01 like Li01_01_Base. Name it Harbor Rock, and put a new station near Manhattan." The agent calls `get_system` to find a free place, then `base_create` with `dock_object`.
+5. Ask the agent: "Make the base ol_harbor_base in Li01 like Li01_13_Base. Name it Harbor Rock, and put a new station near Rochester." The agent calls `get_system` to find a free place, then `base_create` with `dock_object`.
 6. Ask the agent: "Check the new base, and tell me the problems." The agent calls `get_base` and `check`. An error stops the save. A warning does not stop it.
 7. Click **File > Save**, or ask the agent to save.
 8. Wait until the editor loads the game data again. The agent waits until `studio_status` gives `data_load: ready`.
@@ -481,7 +481,7 @@ These tools make a new base and read the bases of the edit view. They work in bo
 
 `base_create` takes `nickname`, `system`, `template` and `name`. The nickname has 1 to 31 letters, digits or `_`, and starts with a letter. A mission condition holds at most 31 characters of a base nickname. It cannot start with `intro`, because the OpenLancer engine shows such a base in the main menu. `rooms` picks the rooms of the template that the base keeps, and `start_room` the room where the player lands. `characters` is `template`, `dealers` or `none`. `local_faction` sets the faction that owns the base and the reputation of each new dock object. `market` is `template`, `none` or the nickname of another base whose market the base copies.
 
-`dock_object` makes the object that docks with the base. For a station, give `position`. `archetype` gives a station archetype with a docking sphere, and without it the station has the archetype of the dock object of the template. For a planet base, give `planet` for a planet of the system, or `archetype` and `position` for a new planet. `ring` gives the docking ring of the planet. Without `ring`, the ring copies the ring of the template, at the same height above the surface. Without `dock_object`, no object docks with the base, and the result warns.
+`dock_object` makes the object that docks with the base. For a station, give `position`. `archetype` gives a station archetype with a docking sphere, and without it the station has the archetype of the dock object of the template. For a planet base, give `planet` for a planet of the system, or `archetype` and `position` for a new planet. `fields` gives more keys of the new station or the planet, as `set_fields` takes them. The tool sets them after the lines of the template, in the same Undo step. `ring` gives the docking ring of the planet. Without `ring`, the ring copies the ring of the template, at the same height above the surface. Without `dock_object`, no object docks with the base. The result then gives the problem of the base checks in `new_problems`.
 
 The result gives `base`, `file`, `dock_object` and `ring`. `select` is the dock object, or the base without one. The refusals are:
 
@@ -490,6 +490,7 @@ The result gives `base`, `file`, `dock_object` and `ring`. `select` is the dock 
 | `NameInvalid` | `invalid_value` | A nickname that starts with `intro`, or a nickname of `dock_object` that an INI line cannot hold. The input schema refuses another form with `invalid_argument`. |
 | `NameTaken` | `name_taken` | Another base has the nickname or its FLHash, an `[MBase]` has the nickname, or another object has the nickname of `dock_object`. |
 | `ReferenceNotFound` | `not_found` | `system`, `template` or `market` names an item that the edit view does not have. |
+| `FieldValue` | `invalid_value` | `name` has only spaces, or `local_faction` names a faction that the list `faction` does not have. |
 | `IntroTemplate` | `refused` | The template is a scene of the main menu. |
 | `NoBaseFile` | `refused` | The template has no base file with rooms. |
 | `RoomUnknown` | `invalid_value` | `rooms` names a room that the template does not have. |
@@ -499,7 +500,7 @@ The result gives `base`, `file`, `dock_object` and `ring`. `select` is the dock 
 | `NotAPlanet` | `invalid_value` | `planet` is not a planet of the system, or another base uses it. |
 | `DockPlace` | `invalid_argument` | A new station, a new planet or a new ring without a position. |
 
-When a refusal is about one argument, the `field` of the error names it, for example `dock_object.archetype`. The message is the text that the editor shows for the same refusal.
+When a refusal is about one argument, the `field` of the error names it, for example `dock_object.archetype`. An error of a key of `dock_object.fields` has the error of `set_fields`, and its `field` names the key, for example `dock_object.fields.loadout`. The message is the text that the editor shows for the same refusal.
 
 `list_values` gives the parts of one base with the argument `base`. The list `room_of_base` gives the rooms of its base file, and the list `character_of_base` gives the characters of its `[MBase]`. Each other list refuses `base`. `get_system` gives each base whose `system` line names the system, also a new base before its dock object. Then it gives the other bases that an object of the system names. `find_references` on a `base:` reference also gives the mission lines that name the base.
 

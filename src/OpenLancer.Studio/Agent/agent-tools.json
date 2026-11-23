@@ -590,6 +590,7 @@
         "dock_object.position": "The position of a new station or a new planet in meters: X, Y and Z.",
         "dock_object.rotation": "The rotation of a new station or a new planet in degrees about X, Y and Z.",
         "dock_object.nickname": "The nickname of a new station or a new planet. Without it, the next free nickname of the system.",
+      "dock_object.fields": "More keys of the new station or the planet, by INI key, as set_fields takes them. The tool sets them after the lines of the template, in the same Undo step. Use get_item to see the keys.",
         "dock_object.planet": "An existing planet of the system that gets the base and its name. The planet must not be the dock object of another base.",
         "dock_object.ring": "The docking ring of a planet base. A value that it does not give comes from the ring of the template.",
         "ring.archetype": "The solar archetype of the docking ring. It needs a docking sphere.",
