@@ -71,9 +71,10 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
         PlayChecks.CameraBlock(Session != null, Session?.GameData?.Items, camera);
 
     /// <summary>Why Play cannot start at a start now, or null. The Play menu and the agent tool play share the checks
-    /// (<see cref="PlayChecks.StartBlock"/>).</summary>
-    internal string? PlayStartBlock(PlayStart start) =>
-        PlayChecks.StartBlock(Session != null, Session?.GameData?.Items, Scene.System?.Nickname, start);
+    /// (<see cref="PlayChecks.StartBlock"/>). A new base of the edit view needs a save first.</summary>
+    internal PlayBlock? PlayStartBlock(PlayStart start) =>
+        PlayChecks.StartBlock(Session != null, Session?.GameData?.Items, Scene.System?.Nickname, start,
+            Session is { } session ? session.Edits.HasBase : null);
 
     ConsoleLog IPlayHost.Log => Log;
 
@@ -262,7 +263,7 @@ internal sealed partial class EditorWindow : IPlayEditor, IGamePlayHost, IMissio
 
     bool IAgentPlayEditor.GameRuns => GamePlay.GameRuns;
 
-    string? IAgentPlayEditor.StartBlock(PlayStart start) => PlayStartBlock(start);
+    PlayBlock? IAgentPlayEditor.StartBlock(PlayStart start) => PlayStartBlock(start);
 
     Task<PlayRequestResult> IAgentPlayEditor.Request(PlayStart start, PlaySaveRule save) =>
         Play.Request(start, PlayPackage, save, EditOrigin.Agent);

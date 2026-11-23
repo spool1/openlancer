@@ -411,9 +411,9 @@ internal sealed class PlayMenu(EditorWindow window)
     /// <summary>Asks for a play after the checks that the agent tool play shares (<see cref="PlayChecks"/>).</summary>
     private void Request(PlayStart start)
     {
-        if (window.PlayStartBlock(start) is { } reason)
+        if (window.PlayStartBlock(start) is { } block)
         {
-            Log(ConsoleSeverity.Warning, $"Play is not available: {reason}");
+            Log(ConsoleSeverity.Warning, $"Play is not available: {block.Reason}");
             return;
         }
 

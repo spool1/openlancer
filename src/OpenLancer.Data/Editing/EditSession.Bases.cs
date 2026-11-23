@@ -34,6 +34,10 @@ public sealed partial class EditSession
     /// </summary>
     public BaseView? Base(string nickname) => BaseView.Of(this, nickname);
 
+    /// <summary>True when a <c>[Base]</c> of W of <c>universe.ini</c> has the nickname, in any letter case. An unsaved
+    /// new base counts, so a check can tell a base that the game data gets only after the save.</summary>
+    public bool HasBase(string nickname) => Bases.Has(nickname);
+
     /// <summary>The checks of the bases at the current state of W. A change of W starts a new state, so the checks of a
     /// base run once for each state.</summary>
     internal BaseChecks.State BaseCheckState =>

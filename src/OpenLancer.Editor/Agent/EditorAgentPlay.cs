@@ -25,7 +25,7 @@ internal interface IAgentPlayEditor : IAgentPlayHost
 
     /// <summary>Why Play cannot start at a start now, or null: the checks of the Play menu
     /// (<see cref="PlayChecks.StartBlock"/>).</summary>
-    string? StartBlock(PlayStart start);
+    PlayBlock? StartBlock(PlayStart start);
 
     /// <summary>Asks Play for a play of an agent at a start, with the ship of the Play menu
     /// (<see cref="PlayController.Request"/>).</summary>
@@ -65,6 +65,10 @@ internal sealed class EditorAgentPlay(IAgentPlayEditor editor) : IAgentPlay
 
     /// <summary>The detail code of a start that the checks of the Play menu refuse.</summary>
     public const string StartBlockedDetail = "StartBlocked";
+
+    /// <summary>The detail code of a start at a new base that the game data gets only after the save
+    /// (<see cref="PlayBlock.SaveFirst"/>).</summary>
+    public const string SaveFirstDetail = "SaveFirst";
 
     /// <summary>The detail code of a capture while no game of Play in OpenLancer runs.</summary>
     public const string NoGameDetail = "NoGame";
@@ -242,6 +246,8 @@ internal sealed class EditorAgentPlay(IAgentPlayEditor editor) : IAgentPlay
         var status = editor.PlayStatus;
         if (status != PlayStatus.Idle || editor.GameRuns)
             return PlayRequestResult.Refused(status, OtherPlayDetail, OtherPlayReason);
-        return editor.StartBlock(start) is { } block ? PlayRequestResult.Refused(status, StartBlockedDetail, block) : null;
+        return editor.StartBlock(start) is { } block
+            ? PlayRequestResult.Refused(status, block.SaveFirst ? SaveFirstDetail : StartBlockedDetail, block.Reason)
+            : null;
     }
 }

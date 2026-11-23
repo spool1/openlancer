@@ -424,6 +424,29 @@ public sealed partial class AgentPlayToolTests : IDisposable
         Assert.Empty(editor.Requests);
     }
 
+    /// <summary>
+    /// A start at a new base that the edit view has and the loaded game data does not have gives refused with the
+    /// detail SaveFirst (section E.5 of the bases design). The text is the text of the Play menu. A base that the edit
+    /// view does not have either keeps the detail StartBlocked. No request reaches Play.
+    /// </summary>
+    [Fact]
+    public void AStartAtANewBaseBeforeTheSaveGivesSaveFirst()
+    {
+        using var data = new TestWorkspace();
+        var items = PlayMenuTests.Items(data);
+        var (host, editor) = Editor();
+        editor.Check = start => PlayChecks.StartBlock(true, items, "ol_sys", start, b => b == "ol_new_base");
+
+        var (code, detail, message) = Refusal(host, """{ "start": "base", "base": "base:ol_new_base" }""");
+        var gone = Refusal(host, """{ "start": "base", "base": "ol_gone_base" }""");
+
+        Assert.Equal(("refused", EditorAgentPlay.SaveFirstDetail), (code, detail));
+        Assert.Equal(PlayChecks.SaveFirst("ol_new_base"), message);
+        Assert.Equal(("refused", EditorAgentPlay.StartBlockedDetail), (gone.Code, gone.Detail));
+        Assert.Equal(PlayChecks.NoBase("ol_gone_base"), gone.Message);
+        Assert.Empty(editor.Requests);
+    }
+
     /// <summary>The texts of the Play of the agent pass the STE lint. Each group of the agent settings has its
     /// tooltip. So do the data notice and the tooltips of the limits that play_capture uses.</summary>
     [Fact]
@@ -497,7 +520,7 @@ public sealed partial class AgentPlayToolTests : IDisposable
         public bool GameRuns { get; set; }
 
         /// <summary>The checks of the Play menu. The default lets each start pass.</summary>
-        public Func<PlayStart, string?> Check { get; set; } = _ => null;
+        public Func<PlayStart, PlayBlock?> Check { get; set; } = _ => null;
 
         public List<(PlayStart Start, PlaySaveRule Save)> Requests { get; } = [];
 
@@ -512,7 +535,7 @@ public sealed partial class AgentPlayToolTests : IDisposable
 
         public int Stops { get; private set; }
 
-        public string? StartBlock(PlayStart start) => Check(start);
+        public PlayBlock? StartBlock(PlayStart start) => Check(start);
 
         public Task<PlayRequestResult> Request(PlayStart start, PlaySaveRule save)
         {

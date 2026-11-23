@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Numerics;
 using LibreLancer;
@@ -90,17 +91,19 @@ public sealed class PlayMenuTests
         var items = Items(ws);
         PlayStart Space(string system) => new PlayStart.InSpace(system, Vector3.Zero, Quaternion.Identity);
 
-        Assert.Equal("No profile is open.", PlayChecks.StartBlock(false, null, null, Space("ol_sys")));
-        Assert.Equal("The game data of the profile did not load.", PlayChecks.StartBlock(true, null, null, Space("ol_sys")));
+        Assert.Equal(new PlayBlock("No profile is open."), PlayChecks.StartBlock(false, null, null, Space("ol_sys")));
+        Assert.Equal(new PlayBlock("The game data of the profile did not load."),
+            PlayChecks.StartBlock(true, null, null, Space("ol_sys")));
         Assert.Null(PlayChecks.StartBlock(true, items, "OL_SYS", Space("ol_sys")));
-        Assert.Equal("The game data of the profile has no system 'ol_gone'.",
+        Assert.Equal(new PlayBlock("The game data of the profile has no system 'ol_gone'."),
             PlayChecks.StartBlock(true, items, "ol_gone", Space("ol_gone")));
-        Assert.Equal("The Scene does not show the system 'ol_sys', so Play cannot check the start point. Open the system " +
-                     "in the Scene first.", PlayChecks.StartBlock(true, items, "ol_other", Space("ol_sys")));
+        Assert.Equal(new PlayBlock("The Scene does not show the system 'ol_sys', so Play cannot check the start point. " +
+                                   "Open the system in the Scene first."),
+            PlayChecks.StartBlock(true, items, "ol_other", Space("ol_sys")));
         Assert.Null(PlayChecks.StartBlock(true, items, null, new PlayStart.AtBase("OL_BASE_01")));
         foreach (var dock in new[] { "ol_gone_base", "ol_base_nowhere", "ol_base_lost" })
         {
-            Assert.Equal($"The game data of the profile has no base '{dock}' in one of its systems.",
+            Assert.Equal(new PlayBlock($"The game data of the profile has no base '{dock}' in one of its systems."),
                 PlayChecks.StartBlock(true, items, "ol_sys", new PlayStart.AtBase(dock)));
         }
         Assert.Equal("The game data of the profile did not load.", PlayChecks.DataBlock(true, null));
@@ -119,13 +122,39 @@ public sealed class PlayMenuTests
             .SelectMany(g => g.Bases).Select(b => b.Nickname));
     }
 
+    /// <summary>
+    /// A new base that the edit view has and the loaded game data does not have needs a save first (section E.5 of the
+    /// bases design). The block tells it, so the Play menu and the agent tool give the same text. A base that neither
+    /// has gets the reason of a missing base. A base of the game data starts, whatever the edit view has.
+    /// </summary>
+    [Fact]
+    public void ANewBaseOfTheEditViewNeedsASaveFirst()
+    {
+        using var ws = new TestWorkspace();
+        var items = Items(ws);
+        bool EditView(string nickname) => nickname.Equals("ol_new_base", StringComparison.OrdinalIgnoreCase) ||
+                                          nickname.Equals("ol_base_01", StringComparison.OrdinalIgnoreCase);
+
+        var block = PlayChecks.StartBlock(true, items, null, new PlayStart.AtBase("OL_NEW_BASE"), EditView);
+
+        Assert.Equal(new PlayBlock("The game data gets the new base 'OL_NEW_BASE' after the save. Save the mod, wait " +
+                                   "until the editor loads the game data again, and then start Play again.", SaveFirst: true),
+            block);
+        Assert.Equal(new PlayBlock(PlayChecks.NoBase("ol_gone_base")),
+            PlayChecks.StartBlock(true, items, null, new PlayStart.AtBase("ol_gone_base"), EditView));
+        Assert.Null(PlayChecks.StartBlock(true, items, null, new PlayStart.AtBase("ol_base_01"), EditView));
+        // Without a profile and without game data, the data reasons come first.
+        Assert.Equal(new PlayBlock(PlayChecks.NoGameData),
+            PlayChecks.StartBlock(true, null, null, new PlayStart.AtBase("ol_new_base"), EditView));
+    }
+
     [Fact]
     public void TheTextsOfTheChecksPassTheSteLint()
     {
         string[] texts =
         [
             PlayChecks.NoProfile, PlayChecks.NoGameData, PlayChecks.NoOpenSystem, PlayChecks.NoSystem("ol_sys"),
-            PlayChecks.NotInScene("ol_sys"), PlayChecks.NoBase("ol_base_01"),
+            PlayChecks.NotInScene("ol_sys"), PlayChecks.NoBase("ol_base_01"), PlayChecks.SaveFirst("ol_base_02"),
         ];
 
         Assert.Empty(texts.SelectMany(t => SteLint.Problems(t)));

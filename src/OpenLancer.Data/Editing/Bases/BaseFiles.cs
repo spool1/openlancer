@@ -71,6 +71,9 @@ internal sealed class BaseFiles(EditSession session, Func<IReadOnlyList<Section>
     /// <summary>The nicknames of the bases, in the order of <c>universe.ini</c>, each one time.</summary>
     public IReadOnlyList<string> Nicknames => Current.Nicknames;
 
+    /// <summary>True when a <c>[Base]</c> of <c>universe.ini</c> has the nickname, in any letter case.</summary>
+    public bool Has(string baseNickname) => Current.Bases.ContainsKey(baseNickname.Trim());
+
     /// <summary>True when a <c>[Base]</c> of <c>universe.ini</c> names the file.</summary>
     public bool IsBaseFile(string path) => VfsPath.Normalize(path) is { } normal && Current.FileSet.Contains(normal);
 
