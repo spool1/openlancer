@@ -157,7 +157,9 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
         }, ToolbarItems.IconWidth + spacing);
 
         ImGui.SameLine(0, spacing);
-        if (ToolbarItems.Button("remove", EditorIcons.TrashAlt, RemoveTip(line, lower)))
+        // A buy-only line with a lower line already has the result of a remove.
+        var noRemove = MarketPlans.NoRemoveReason(window.Session!.Edits, line);
+        if (ToolbarItems.Button("remove", EditorIcons.TrashAlt, noRemove ?? RemoveTip(line, lower), noRemove == null))
         {
             window.Commands.Run(edits => MarketCommands.SetLine(edits, line, null));
         }

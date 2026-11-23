@@ -474,6 +474,48 @@ public sealed class MarketPlansTests
         Assert.Null(MarketPlans.NoEffectReason(session, hull, Field(MarketLine.PriceIndex)));
     }
 
+    /// <summary>
+    /// Review finding of step 7: the remove button of a buy-only line that replaces a lower line stayed active, and a
+    /// click changed nothing. A buy-only line with a lower line already has the result of a remove, so the remove is not
+    /// available, and the reason tells why. A line of a lower layer that sells the good and a buy-only line without a
+    /// lower line take a remove.
+    /// </summary>
+    [Fact]
+    public void ABuyOnlyLineWithALowerLineHasNoRemove()
+    {
+        using var ws = TwoMarkets();
+        ws.WriteBase(ShipMarketPath, """
+            [BaseGood]
+            base = b1
+            marketgood = s1_package, 0, -1, 1, 1, 0, 1, 1
+            [BaseGood]
+            base = b2
+            marketgood = s1_package, 0, -1, 0, 0, 1, 1, 1
+            """);
+        var session = ws.Session("act");
+        var lower = session.MarketLines("gun1")[0];
+        Assert.Null(MarketPlans.NoRemoveReason(session, lower));
+
+        session.Execute(MarketPlans.SetLine(session, lower, null));
+
+        var own = session.MarketLines("gun1")[1];
+        var reason = MarketPlans.NoRemoveReason(session, own);
+        Assert.Equal("The line already stops the sale of the good. b1 only buys it. Revert removes the line of the active " +
+                     "mod, and the line of the lower layer counts again.", reason);
+        Assert.Throws<InvalidOperationException>(() => MarketPlans.SetLine(session, own, null));
+
+        var buyOnly = session.MarketLines("s1_package").Single(l => l.Base == "b2");
+        Assert.Equal("The line already stops the sale of the good. b2 only buys it.",
+            MarketPlans.NoRemoveReason(session, buyOnly));
+        Assert.Throws<InvalidOperationException>(() => MarketPlans.SetLine(session, buyOnly, null));
+        Assert.All([reason!, MarketPlans.NoRemoveReason(session, buyOnly)!],
+            t => Assert.True(SteLint.Problems(t).Count == 0, $"{t}: {string.Join(", ", SteLint.Problems(t))}"));
+
+        // A buy-only line of the active mod without a lower line goes.
+        var added = AddedLine(session, "eng1", "0, -1, 0, 0, 1, 1");
+        Assert.Null(MarketPlans.NoRemoveReason(session, added));
+    }
+
     /// <summary>A line of a lower mod names the mod in its change.</summary>
     [Fact]
     public void TheChangeOfALineOfALowerModNamesTheMod()

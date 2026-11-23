@@ -255,6 +255,23 @@ public static class MarketPlans
     }
 
     /// <summary>
+    /// Why a remove of a line changes nothing, or null when it changes the market. A remove of a line with a lower line
+    /// writes the buy-only form (see <see cref="SetLine"/>). So a buy-only line with a lower line already has the result
+    /// of a remove: a buy-only line of a lower layer, or a buy-only line of the active mod that replaces a lower line.
+    /// </summary>
+    public static string? NoRemoveReason(EditSession session, MarketLine line)
+    {
+        if (!BaseMarkets.IsBuyOnly(line.Values) ||
+            !session.Items.BaseMarketLines(line.Base).Any(l =>
+                Is(Good(l), Good(line)) && !Own(session, l) && !BaseMarkets.IsSkipped(l.Values)))
+            return null;
+        var text = $"The line already stops the sale of the good. {line.Base} only buys it.";
+        return Own(session, line)
+            ? text + " Revert removes the line of the active mod, and the line of the lower layer counts again."
+            : text;
+    }
+
+    /// <summary>
     /// The edit that removes each line of the active mod of the good of a line at its base, so the line of the lower
     /// layer counts again (see <see cref="Override"/>).
     /// </summary>
