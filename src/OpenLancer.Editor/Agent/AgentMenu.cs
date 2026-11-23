@@ -206,7 +206,7 @@ internal sealed class AgentMenu(EditorWindow window, AgentController controller)
     /// <summary>The tooltip of the check box of a tool group.</summary>
     internal static string GroupTip(ToolGroup group) => group switch
     {
-        ToolGroup.Scene => "The tools of the star systems, their items, the assets and the prop groups.",
+        ToolGroup.Scene => "The tools of the star systems, their items and their bases, the assets and the prop groups.",
         ToolGroup.Missions => "The tools of the mission scripts.",
         ToolGroup.Cutscenes => "The tools of the cutscene scripts.",
         ToolGroup.Play => "The tools that start and stop a play in OpenLancer, and the image of the running game.",

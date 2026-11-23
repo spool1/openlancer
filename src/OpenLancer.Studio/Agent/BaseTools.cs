@@ -338,12 +338,13 @@ internal static class BaseTools
     /// <summary>
     /// The bases of a system for <c>get_system</c>, as <c>base:</c> references: first each <c>[Base]</c> of W whose
     /// <c>system</c> line names the system, in the order of <c>universe.ini</c>, then each other base that a
-    /// <c>base</c> line of an object of the system names. So a new base shows at once, also before its dock object.
+    /// <c>base</c> line of an object of the system names. So a new base shows at once, also before its dock object. An
+    /// intro base of the main menu is not a base of its system, as in <c>list_bases</c>.
     /// </summary>
     /// <param name="objectBases">The values of the <c>base</c> lines of the objects of the system, in file order.</param>
     internal static IReadOnlyList<string> OfSystem(EditSession session, string system, IEnumerable<string> objectBases)
     {
-        var names = Entries(session, intro: true)
+        var names = Entries(session)
             .Where(e => session.Get(e) is { } view && SceneSections.Is(SceneSections.Last(view, "system") ?? "", system))
             .Select(e => e.Id.Key!)
             .Concat(objectBases)
@@ -402,9 +403,9 @@ internal static class BaseTools
         SceneSections.Is(section.Id.Type, "Base") && session.UniversePath is { } universe &&
         VfsPath.Comparer.Equals(section.Path, universe);
 
-    /// <summary>The first <c>[Base]</c> of W of <c>universe.ini</c> for each nickname, in file order. The intro bases
-    /// are not in the result unless <paramref name="intro"/> is true.</summary>
-    private static IEnumerable<SectionRef> Entries(EditSession session, bool intro = false)
+    /// <summary>The first <c>[Base]</c> of W of <c>universe.ini</c> for each nickname, in file order, without the intro
+    /// bases.</summary>
+    private static IEnumerable<SectionRef> Entries(EditSession session)
     {
         if (session.UniversePath is not { } universe)
             yield break;
@@ -413,7 +414,7 @@ internal static class BaseTools
         {
             if (!SceneSections.Is(section.Id.Type, "Base") || section.Id.Key is not { } key || !seen.Add(key))
                 continue;
-            if (intro || !key.StartsWith(IntroPrefix, StringComparison.OrdinalIgnoreCase))
+            if (!key.StartsWith(IntroPrefix, StringComparison.OrdinalIgnoreCase))
                 yield return section;
         }
     }

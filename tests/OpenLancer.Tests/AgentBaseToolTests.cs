@@ -291,9 +291,10 @@ public sealed class AgentBaseToolTests
         Assert.Equal("Harbor Rock", (string?)Ok(host, "list_bases", """{ "active_mod_only": true }""")["rows"]![0]!["name"]);
     }
 
-    /// <summary>The intro bases of the main menu are not in the list of the bases.</summary>
+    /// <summary>The intro bases of the main menu are not in the list of the bases, and not in the bases of their
+    /// system.</summary>
     [Fact]
-    public void ListBasesLeavesOutTheIntroBases()
+    public void ListBasesAndGetSystemLeaveOutTheIntroBases()
     {
         using var ws = BasePlansCreateTests.Workspace();
         ws.WriteBase(BaseWorkspace.UniversePath, BaseWorkspace.Universe.Replace("[system]\nnickname = Ol01",
@@ -302,9 +303,11 @@ public sealed class AgentBaseToolTests
         var host = new TestAgentHost(ws.Session("act"));
 
         var rows = Ok(host, "list_bases")["rows"]!.AsArray();
+        var system = Ok(host, "get_system", """{ "system": "Ol01" }""");
 
         Assert.DoesNotContain(rows, r => (string?)r!["nickname"] == "Intro1_Base");
         Assert.Equal(3, rows.Count);
+        Assert.Equal(["base:Ol01_01_Base", "base:Ol01_02_Base"], Texts(system["bases"]));
     }
 
     /// <summary>
