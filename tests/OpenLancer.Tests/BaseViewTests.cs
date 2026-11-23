@@ -100,6 +100,45 @@ public sealed class BaseViewTests
     }
 
     /// <summary>
+    /// Two <c>[MBase]</c> blocks with one nickname: the fork keeps the last block, so the view and the part pickers read
+    /// the last block. Only a whole copy of mBases.ini can have two blocks, because a patch finds a block by its
+    /// nickname.
+    /// </summary>
+    [Fact]
+    public void TheLastMBaseBlockOfANicknameCounts()
+    {
+        var copy = BaseWorkspace.MBases + """
+
+            [MBase]
+            nickname = Ol01_01_Base
+            local_faction = ol_pirates
+            [GF_NPC]
+            nickname = dup_npc
+            affiliation = ol_pirates
+            voice = ol_voice
+            [MRoom]
+            nickname = Bar
+            fixture = dup_npc, Zs/NPC/Bartender/01/A/Stand, scripts\vendors\ol_bartender_fidget.thn, bartender
+            """;
+        using var ws = BaseWorkspace.Create(activeFiles: new() { ["files\\" + BaseWorkspace.MBasesPath] = copy });
+        var session = ws.Session("act");
+        var blocks = session.Sections(BaseWorkspace.MBasesPath)
+            .Where(s => s.Id.Type == "MBase" && s.Id.Key == BaseWorkspace.Station).ToList();
+        Assert.Equal(2, blocks.Count);
+
+        var view = session.Base(BaseWorkspace.Station)!;
+
+        Assert.Equal(blocks[1], view.MBase);
+        Assert.Equal(["GF_NPC", "MRoom"], view.MBaseParts.Select(p => p.Id.Type));
+        var character = Assert.Single(view.Characters);
+        Assert.Equal(("dup_npc", "bartender", "Bar", "ol_pirates"),
+            (character.Nickname, character.Role, character.Room, character.Affiliation));
+        var room = view.MBaseParts[1];
+        var parts = FieldBinding.Create(session, room, session.Get(room)!, "fixture").Parts!;
+        Assert.Equal([("dup_npc", 1)], parts.List.Entries.Select(e => (e.Value, parts.UsedBy(e))));
+    }
+
+    /// <summary>
     /// The view reads W: a new market line of the active mod can change, a new start room shows at once, a new room
     /// file of the active mod is its own, and a new base of the active mod has the active mod as its origin. The market
     /// rule of the view is the rule of the Inspector.
