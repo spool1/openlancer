@@ -13,6 +13,10 @@ namespace OpenLancer.Data.Editing.Bases;
 /// </summary>
 public static class BaseCompleteness
 {
+    /// <summary>The subject of the fix of the market step: the buy-only lines of the ship packages that the base does not
+    /// list (see <see cref="MarketPlans.ShipLines"/>).</summary>
+    public const string ShipLinesFix = "ship-lines";
+
     private const string EntryReason =
         "The game knows a base only by its [Base] in universe.ini. The entry names the system and the base file.";
 
@@ -51,7 +55,10 @@ public static class BaseCompleteness
             if (found.Count == 0 && missing == null)
                 return new CompletenessStep(name, CompletenessState.Done, reason);
             var first = found.FirstOrDefault(p => p.Severity == DiagnosticSeverity.Error) ?? found.FirstOrDefault();
-            var state = BaseGame(session, view, found) ? CompletenessState.Hidden : CompletenessState.Missing;
+            // A market that the active mod changes is not a market of the base game, also when its problem names the
+            // [Base].
+            var changedMarket = step == BaseStep.Market && view.Market.Any(r => r.Origin == ValueOrigin.ActiveMod);
+            var state = BaseGame(session, view, found) && !changedMarket ? CompletenessState.Hidden : CompletenessState.Missing;
             if (state == CompletenessState.Hidden)
                 hidden += found.Count == 0 ? 1 : found.Count;
             // A problem of the [Base] goes to the place of the step, for example the system of a missing dock object.
@@ -72,12 +79,18 @@ public static class BaseCompleteness
                 view.Info != null && view.Rooms.Count == 0 ? view.Info : null),
             Step("Characters", BaseStep.Characters, CharactersReason,
                 view.MBase == null ? $"{view.Nickname} has no [MBase]. Its bar has no characters." : null, view.Entry),
-            Step("Market", BaseStep.Market, MarketReason),
+            Market(Step("Market", BaseStep.Market, MarketReason), session, view),
             Step("Dock object", BaseStep.DockObject, DockReason, null,
                 view.System is { } system ? session.SystemSection(system) : null),
         };
         return new CompletenessReport("Base", steps) { HiddenMessages = hidden };
     }
+
+    /// <summary>The market step with the fix of the ship lines, when the base misses them.</summary>
+    private static CompletenessStep Market(CompletenessStep step, EditSession session, BaseView view) =>
+        step.State == CompletenessState.Missing && MarketPlans.MissingShipLines(session, view).Count > 0
+            ? step with { Fix = ShipLinesFix }
+            : step;
 
     /// <summary>The problems of the field checks, the list checks and the universe checks of the <c>[Base]</c>.</summary>
     private static IEnumerable<Diagnostic> EntryProblems(EditSession session, SectionRef entry) =>

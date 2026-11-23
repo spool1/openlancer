@@ -546,6 +546,64 @@ public sealed class BasePlansCreateTests
         Assert.Equal(["2001", "2005"], plan.News.Select(n => Value(session, n, "headline")));
     }
 
+    /// <summary>The station sells a ship too, so its market has lines in each of the three market files.</summary>
+    private const string ShipMarket = """
+        [BaseGood]
+        base = Ol01_02_Base
+        marketgood = ol_ship_package, 0, -1, 1, 1, 0, 1, 1
+        [BaseGood]
+        base = Ol01_01_Base
+        marketgood = ol_ship_package, 2, -1, 1, 1, 0, 1, 1
+        """;
+
+    /// <summary>The market lines of a base as "file: line", in load order.</summary>
+    private static string[] MarketOf(EditSession session, string baseNickname) =>
+        session.Items.BaseMarketLines(baseNickname)
+            .Select(l => $"{l.Section.Path[(l.Section.Path.LastIndexOf('\\') + 1)..]}: {string.Join(", ", l.Values)}")
+            .ToArray();
+
+    /// <summary>A new base copies the last line of each good of the template, with one new section in each market file
+    /// in which the template sells (owner check of 2026-11-23: market_misc.ini too).</summary>
+    [Fact]
+    public void TheMarketOfTheTemplateIsCopiedIntoEachMarketFile()
+    {
+        using var ws = Workspace();
+        ws.WriteBase(BaseWorkspace.ShipMarketPath, ShipMarket);
+        var session = ws.Session("act");
+
+        var plan = Create(session, Spec());
+
+        Assert.Equal(["market_misc.ini: ol_gun, 0, -1, 10, 10, 0, 1", "market_ships.ini: ol_ship_package, 2, -1, 1, 1, 0, 1, 1",
+            "market_commodities.ini: ol_water, 0, -1, 150, 500, 0, 1"], MarketOf(session, New));
+        var markets = plan.Adds.Where(a => a.Id.Type == "BaseGood").ToList();
+        Assert.Equal([BaseWorkspace.MiscMarketPath, BaseWorkspace.ShipMarketPath, BaseWorkspace.CommodityMarketPath],
+            markets.Select(m => m.Path), StringComparer.OrdinalIgnoreCase);
+        Assert.All(markets, m => Assert.Equal(New, Value(session, m, "base")));
+        Assert.DoesNotContain(BaseChecks.Problems(session, New), p => p.Message.Contains("shows an empty list"));
+    }
+
+    /// <summary>The request can copy the market of another base, or give the base no market.</summary>
+    [Fact]
+    public void TheRequestCopiesTheMarketOfAnotherBaseOrNone()
+    {
+        using var ws = Workspace();
+        var session = ws.Session("act");
+
+        Create(session, Spec() with { MarketFrom = BaseWorkspace.Pirate });
+        Assert.Equal(["market_misc.ini: ol_gun, 0, -1, 5, 5, 0, 1.5"], MarketOf(session, New));
+        session.Undo();
+
+        var plan = Create(session, Spec() with { NoMarket = true, MarketFrom = BaseWorkspace.Pirate });
+        Assert.Empty(MarketOf(session, New));
+        Assert.DoesNotContain(plan.Adds, a => a.Id.Type == "BaseGood");
+        session.Undo();
+
+        var refused = BasePlans.Create(session, Spec() with { MarketFrom = "Ol09_09_Base" });
+        Assert.False(refused.CanRun);
+        Assert.Equal(("market", "No [Base] of universe.ini has the nickname Ol09_09_Base. Get the bases from list_bases."),
+            (refused.RefusedPart, Assert.Single(refused.Refusals).Message));
+    }
+
     /// <summary>A save writes the news items as patch sections. The merge adds each one, because a news item has no
     /// key.</summary>
     [Fact]
@@ -841,7 +899,8 @@ public sealed class BasePlansCreateTests
     {
         using var ws = Workspace(fullSystem: true);
         var session = ws.Session("act");
-        string[] paths = [BaseWorkspace.UniversePath, BaseWorkspace.MBasesPath, BaseWorkspace.NewsPath, BaseWorkspace.Ol01Path];
+        string[] paths = [BaseWorkspace.UniversePath, BaseWorkspace.MBasesPath, BaseWorkspace.NewsPath, BaseWorkspace.Ol01Path,
+            BaseWorkspace.MiscMarketPath, BaseWorkspace.CommodityMarketPath];
         var before = paths.Select(p => Dump(session, p)).ToList();
 
         var plan = Create(session, Station() with { Rooms = ["Deck"], Text = Texts(session) });

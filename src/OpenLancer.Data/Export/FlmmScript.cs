@@ -310,28 +310,42 @@ internal sealed partial class FlmmScript
         return key < 0 || rawSection.Entries[key] != rawSection.Header + 1 ? null : (rawSection.Header, rawSection.Header + 1);
     }
 
-    /// <summary>The anchor of the <c>[BaseGood]</c> section of the base of a new <c>[BaseGood]</c>, or null. The engine
-    /// adds the goods of each <c>[BaseGood]</c> of a base, so the new lines can go into the section of the game
-    /// file.</summary>
+    /// <summary>
+    /// The anchor of the <c>[BaseGood]</c> section of the base of a new <c>[BaseGood]</c>, or null. The games add the
+    /// goods of each <c>[BaseGood]</c> of a base, so the lines of new goods can go into the section of the game file.
+    /// </summary>
+    /// <remarks>The games keep the last line of a good at a base. A line after the header of the game section comes
+    /// before the line of the game. So a new section with a good that the game sections of the base sell gets no anchor.
+    /// An <c>append</c> puts it at the end of the file, after the line of the game, as the merge does. An example is a
+    /// line that changes or removes a line of the game.</remarks>
     private static IReadOnlyList<string>? MarketAnchor(RawText text, FileDiff diff, Section section)
     {
         if (!section.Name.Equals("BaseGood", StringComparison.OrdinalIgnoreCase) ||
             section.FirstOrDefault(e => e.Name.Equals("base", StringComparison.OrdinalIgnoreCase)) is not { Count: 1 } line)
             return null;
-        for (var k = 0; k < diff.BaseSections.Count; k++)
-        {
-            var old = diff.BaseSections[k];
-            if (!old.Name.Equals("BaseGood", StringComparison.OrdinalIgnoreCase) || old.Count == 0 ||
-                !old[0].Name.Equals("base", StringComparison.OrdinalIgnoreCase) || old[0].Count != 1 ||
-                !old[0][0].ToString().Equals(line[0].ToString(), StringComparison.OrdinalIgnoreCase))
-                continue;
-            var rawSection = text.Raw.Sections[k];
-            if (rawSection.Entries.Count == 0 || rawSection.Entries[0] != rawSection.Header + 1)
-                return null;
-            return text.AnchorOf(rawSection.Header, rawSection.Header + 1);
-        }
-        return null;
+        var baseName = line[0].ToString();
+        var games = Enumerable.Range(0, diff.BaseSections.Count).Where(k => IsMarketOf(diff.BaseSections[k], baseName)).ToList();
+        if (games.Count == 0)
+            return null;
+        var sold = games.SelectMany(k => Goods(diff.BaseSections[k])).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (Goods(section).Any(sold.Contains))
+            return null;
+        var rawSection = text.Raw.Sections[games[0]];
+        if (rawSection.Entries.Count == 0 || rawSection.Entries[0] != rawSection.Header + 1)
+            return null;
+        return text.AnchorOf(rawSection.Header, rawSection.Header + 1);
     }
+
+    /// <summary>True for a <c>[BaseGood]</c> whose first line names the base.</summary>
+    private static bool IsMarketOf(Section section, string baseName) =>
+        section.Name.Equals("BaseGood", StringComparison.OrdinalIgnoreCase) && section.Count > 0 &&
+        section[0].Name.Equals("base", StringComparison.OrdinalIgnoreCase) && section[0].Count == 1 &&
+        section[0][0].ToString().Equals(baseName, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The goods of the <c>marketgood</c> lines of a <c>[BaseGood]</c>.</summary>
+    private static IEnumerable<string> Goods(Section section) =>
+        section.Where(e => e.Name.Equals("marketgood", StringComparison.OrdinalIgnoreCase) && e.Count > 0)
+            .Select(e => e[0].ToString()!.Trim());
 
     /// <summary>Puts the whole merged file into the package, or refuses the change when the file holds mod
     /// text.</summary>

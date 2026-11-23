@@ -78,6 +78,13 @@ public sealed record BaseSpec(string Nickname, string System, string Template, s
     /// <summary>The object that docks with the base, or null for no dock object.</summary>
     public DockSpec? Dock { get; init; }
 
+    /// <summary>The base whose market the new base copies, or null for the market of the template. See
+    /// <see cref="NoMarket"/>.</summary>
+    public string? MarketFrom { get; init; }
+
+    /// <summary>True for a base without market lines. Then <see cref="MarketFrom"/> does not count.</summary>
+    public bool NoMarket { get; init; }
+
     /// <summary>
     /// Gives the text of a text key of a section of W, for example the <c>individual_name</c> of a character, or null.
     /// The host knows the texts of the game. Without it, the plan knows only the texts of the mods.

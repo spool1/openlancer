@@ -86,12 +86,16 @@ public static partial class BasePlans
     /// of the kept rooms (see <see cref="CharacterCopy"/>). Each copied fixture character gets its own name text.</item>
     /// <item>One <c>[NewsItem]</c> at the end of <c>news.ini</c> for each news item of the template, with the new base
     /// in place of its <c>base</c> lines.</item>
+    /// <item>The market: one new <c>[BaseGood]</c> of the new base in each market file in which the template sells, with
+    /// the last line of each good of the template (owner check of 2026-11-23: each of the market files). The request can
+    /// name another base to copy, or no market (see <see cref="BaseSpec.MarketFrom"/>). When the base sells a ship and
+    /// the ship markets of the game use buy-only lines, each ship package without a line gets one (see
+    /// <see cref="MarketPlans.Set"/>). The plan lists them in its fixes.</item>
     /// <item>The dock objects of the request (see <see cref="DockSpec"/>).</item>
     /// </list>
     /// <para>The name goes into the text of the active mod with one key. The <c>strid_name</c> of the base and the
     /// <c>ids_name</c> of the station or the planet share the key. The games link a base to its object only when the two
     /// ids are equal. The infocard goes to the <c>ids_info</c> of that object.</para>
-    /// <para>The market lines of the template stay out of this version of the plan.</para>
     /// </remarks>
     public static BasePlan Create(EditSession session, BaseSpec spec)
     {
@@ -175,6 +179,17 @@ public static partial class BasePlans
             return plan.Refuse(newsRefusal.Path, newsRefusal.Message);
         commands.AddRange(news.Commands);
         adds.AddRange(news.Adds);
+        var (market, marketRefusal) = MarketOf(session, spec, template, nickname);
+        if (marketRefusal != null)
+            return plan.Refuse(marketRefusal.Path, marketRefusal.Message, marketRefusal.Target, marketRefusal.Detail,
+                marketRefusal.Part);
+        if (market != null)
+        {
+            commands.AddRange(market.Steps);
+            adds.AddRange(market.Adds);
+            fixes.AddRange(market.Fixes);
+            warnings.AddRange(market.Warnings);
+        }
         var (dock, dockRefusal) = DockCommands(session, spec, template, system, nickname, nameValue, texts);
         if (dockRefusal != null)
             return plan.Refuse(dockRefusal.Path, dockRefusal.Message, dockRefusal.Target, dockRefusal.Detail, dockRefusal.Part);
@@ -346,6 +361,29 @@ public static partial class BasePlans
             adds.Add(new SectionRef(path, new SectionIdentity(BaseTemplate.NewsType, null, null, next++)));
         }
         return (commands, adds, null);
+    }
+
+    /// <summary>
+    /// The market lines of a new base: a copy of the market of the template, or of the base of
+    /// <see cref="BaseSpec.MarketFrom"/>, by the rules of <see cref="MarketPlans.Set"/>. Null for no market, also when
+    /// the base to copy has no market lines.
+    /// </summary>
+    private static (MarketPlan? Plan, Refusal? Refusal) MarketOf(EditSession session, BaseSpec spec, BaseTemplate template,
+        string nickname)
+    {
+        if (spec.NoMarket)
+            return (null, null);
+        var source = spec.MarketFrom?.Trim() is { Length: > 0 } from ? from : template.Nickname;
+        if (session.Base(source) is not { } view)
+            return (null, new Refusal("", $"No [Base] of universe.ini has the nickname {source}. Get the bases from " +
+                                          "list_bases.", MissionErrors.ItemNotFound, "market"));
+        if (view.Market.Count == 0)
+            return (null, null);
+        var market = MarketPlans.Plan(session, new MarketPlan($"Set market of {nickname}"), nickname, [], [], view.Nickname,
+            false, null);
+        return market.Refusals is [{ } refusal, ..] && refusal.Rule != MarketPlans.NoChange
+            ? (null, new Refusal(refusal.Source, refusal.Message, refusal.Rule, "market"))
+            : (market, null);
     }
 
     /// <summary>The lines of a section that a test keeps, with their values, as a file stores a new value (see

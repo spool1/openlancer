@@ -51,7 +51,8 @@ public sealed class BaseViewTests
         Assert.Equal(["ol_gun", "ol_water"], view.Market.Select(m => m.Good));
         Assert.Equal([BaseWorkspace.MiscMarketPath, BaseWorkspace.CommodityMarketPath],
             view.Market.Select(m => m.Line.Section.Path), System.StringComparer.OrdinalIgnoreCase);
-        Assert.All(view.Market, m => Assert.Equal((ValueOrigin.Base, false), (m.Origin, m.CanChange)));
+        // A line of the base data changes through a later line of the active mod (fork commit OL-0080).
+        Assert.All(view.Market, m => Assert.Equal((ValueOrigin.Base, true), (m.Origin, m.CanChange)));
 
         var dock = Assert.Single(view.DockObjects);
         Assert.Equal(("Ol01_01", true, true), (dock.Section.Id.Key, dock.DocksWith, dock.HasBaseLine));
@@ -152,7 +153,7 @@ public sealed class BaseViewTests
         var bar = BaseWorkspace.Section(session, BaseWorkspace.StationPath, "Room", "Bar");
         var copy = ContentPaths.NewRoomFile("act", BaseWorkspace.Station, "Bar");
 
-        session.Execute(MarketEdits.AddToBase(session, "ol_ship_package", BaseWorkspace.Station, "0, -1, 1, 1, 0, 1, 1"));
+        session.Execute(MarketPlans.AddToBase(session, "ol_ship_package", BaseWorkspace.Station, "0, -1, 1, 1, 0, 1, 1"));
         session.Execute(EditCommand.SetLinesFromText(info, "start_room", ["Bar"]));
         session.Execute(EditCommand.NewFile(copy, ContentPathsTests.Sections("[Room_Info]\nset_script = Scripts\\Bases\\ol_bar_set.thn\n")));
         session.Execute(EditCommand.SetLinesFromText(bar, "file", [ContentPaths.DataValue(copy)!]));
@@ -165,7 +166,7 @@ public sealed class BaseViewTests
 
         var row = view.Market.Single(m => m.Good == "ol_ship_package");
         Assert.Equal((ValueOrigin.ActiveMod, "act", true), (row.Origin, row.ModId, row.CanChange));
-        Assert.Equal(row.CanChange, MarketEdits.CanChange(session, row.Line));
+        Assert.Equal(row.CanChange, MarketPlans.CanChange(session, row.Line));
         Assert.Equal(("Bar", BaseKind.Other), (view.StartRoom, view.Kind));
         var room = view.Rooms.Single(r => r.Nickname == "Bar");
         Assert.Equal((true, false), (room.Own, room.Shared));

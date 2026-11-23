@@ -176,11 +176,11 @@ public sealed class BaseView
     public string? OriginMod { get; private init; }
 
     /// <summary>
-    /// True when the editor can change a market line: the active mod adds its <c>[BaseGood]</c>, and the section takes
-    /// edits. A line of a lower layer is read-only.
+    /// True when the editor can change a market line. A line of the active mod changes in its place. A line of a lower
+    /// layer changes through a later line of the active mod in the same market file (see
+    /// <see cref="MarketPlans.CanChange"/>).
     /// </summary>
-    public static bool CanChange(EditSession session, MarketLine line) =>
-        session.Get(line.Section) is { IsNew: true, ReadOnlyReason: null };
+    public static bool CanChange(EditSession session, MarketLine line) => MarketPlans.CanChange(session, line);
 
     /// <summary>The view of a base, or null when no <c>[Base]</c> of W of <c>universe.ini</c> has the nickname. When
     /// two sections have it, the first one counts.</summary>

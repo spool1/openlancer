@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using ImGuiNET;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Ui;
@@ -12,16 +14,29 @@ using OpenLancer.Studio.Commands;
 namespace OpenLancer.Editor.Inspector;
 
 /// <summary>
-/// The "Markets" section of a good: each <c>marketgood</c> line of all market files that names it, by base. Each line
-/// has a named field for each of its values (see <see cref="MarketEdits.Fields"/>) and a "Buys or sells" dropdown for
-/// its transaction type. A line of a <c>[BaseGood]</c> that the active mod adds can change or go. A patch cannot change
-/// a line of a lower layer, so such a line is read-only. "Add to base" makes one more base sell the good (see
-/// <see cref="MarketEdits"/>).
+/// The "Markets" section of a good: for each base that has a <c>marketgood</c> line of the good, the last line, which the
+/// games keep. The line has a named field for each of its values (see <see cref="MarketPlans.Fields"/>) and a "Buys or
+/// sells" dropdown for its transaction type. A line of a <c>[BaseGood]</c> that the active mod adds changes or goes. An
+/// edit of a line of a lower layer writes a later line of the active mod, and a row under the line shows that result in
+/// plain words (see <see cref="MarketPlans.Override"/>). "Add to base" makes one more base sell the good (see
+/// <see cref="MarketPlans"/>).
 /// </summary>
 internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
 {
-    private const string LowerLineReason =
-        "A market line of a lower layer. A patch cannot change or remove it. Use a whole-file override for that.";
+    /// <summary>The tooltip end of a field of a line of a lower layer.</summary>
+    internal const string LowerLineTip =
+        "This line comes from a lower layer. An edit writes a later line of the active mod in the same market file. " +
+        "The games keep the last line of a good at a base.";
+
+    /// <summary>The label of the row of a line that replaces a lower line.</summary>
+    private const string OverrideLabel = "Change";
+
+    internal const string OverrideNote =
+        "The active mod replaces the market line of a lower layer with a later line. The games keep the last line of " +
+        "a good at a base. Revert removes the line of the active mod, and the line of the lower layer counts again.";
+
+    internal const string RevertTip =
+        "Revert: remove the line of the active mod. Then the line of the lower layer counts again.";
 
     /// <summary>The hint of a field of a value that the line does not have.</summary>
     private const string NotSet = "Not set";
@@ -38,9 +53,9 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
     /// <summary>The transaction types in the order of the dropdown.</summary>
     private static readonly MarketTransaction[] Transactions = Enum.GetValues<MarketTransaction>();
 
-    /// <summary>The labels of the value fields of a line, in the order of <see cref="MarketEdits.Fields"/>.</summary>
+    /// <summary>The labels of the value fields of a line, in the order of <see cref="MarketPlans.Fields"/>.</summary>
     private static readonly PropertyGrid.ComponentLabel[] Labels =
-        MarketEdits.Fields.Select(f => new PropertyGrid.ComponentLabel(f.Name, EditorTheme.Label)).ToArray();
+        MarketPlans.Fields.Select(f => new PropertyGrid.ComponentLabel(f.Name, EditorTheme.Label)).ToArray();
 
     private readonly FilterList<string> bases = new();
     private ListView? basesList;
@@ -60,14 +75,18 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
             grid.Row("Bases", () => PropertyGrid.Field(null, hint: "No base sells it"));
         }
 
-        foreach (var line in lines)
+        foreach (var line in LastLines(lines))
         {
-            var reason = session.CanEdit && MarketEdits.CanChange(session.Edits, line)
-                ? null
-                : session.NoEditReason ?? LowerLineReason;
-            grid.Row(line.Base, () => Values(line, reason));
+            var reason = session.NoEditReason ?? MarketPlans.NoChangeReason(session.Edits, line);
+            var lower = session.Edits.Get(line.Section) is not { IsNew: true };
+            grid.Row(line.Base, () => Values(line, reason, lower));
             grid.SetNextNote(TransactionTip);
             grid.Row(TransactionLabel, () => Transaction(line, reason));
+            if (MarketPlans.Override(session.Edits, line) is { } change)
+            {
+                grid.SetNextNote(OverrideNote);
+                grid.Row(OverrideLabel, () => Override(change, reason));
+            }
         }
 
         grid.Row("Add to base", () => AddToBase(session, good));
@@ -75,20 +94,36 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
     }
 
     /// <summary>
+    /// The last line of each base, in the order of the first line of the base. The games keep the last line of a good
+    /// at a base, so the section shows only that line.
+    /// </summary>
+    internal static IReadOnlyList<MarketLine> LastLines(IReadOnlyList<MarketLine> lines) =>
+        lines.GroupBy(l => l.Base.Trim(), StringComparer.OrdinalIgnoreCase).Select(g => g.Last()).ToList();
+
+    /// <summary>The tooltip of the remove button of a line.</summary>
+    /// <param name="lower">True for a line of a lower layer.</param>
+    internal static string RemoveTip(MarketLine line, bool lower) => lower
+        ? "Remove the line. The save writes a later line of the active mod with the minimum stock 0, the maximum " +
+          $"stock 0 and the type 1. Then {line.Base} only buys the good."
+        : $"Remove the line. Then {line.Base} does not buy or sell the good. When the line replaces a line of a lower " +
+          "layer, it gets the minimum stock 0, the maximum stock 0 and the type 1. Then the base only buys the good.";
+
+    /// <summary>
     /// The values of a line that have a field: a named field for each value and a remove button, or read-only fields
     /// with a lock. Each field edits only its own value, so each value keeps its place in the line.
     /// </summary>
     /// <param name="reason">Why the line cannot change, or null when it can.</param>
-    private void Values(MarketLine line, string? reason)
+    /// <param name="lower">True for a line of a lower layer. An edit then writes a later line of the active mod.</param>
+    private void Values(MarketLine line, string? reason, bool lower)
     {
         var spacing = ImGui.GetStyle().ItemInnerSpacing.X;
-        var texts = MarketEdits.Fields.Select(f => MarketEdits.FieldText(line, f)).ToArray();
+        var texts = MarketPlans.Fields.Select(f => MarketPlans.FieldText(line, f)).ToArray();
         if (reason != null)
         {
             PropertyGrid.ComponentFields(texts, Labels, (index, text, width) =>
             {
                 PropertyGrid.Field(text, width, NotSet);
-                ImGui.SetItemTooltip(MarketEdits.Fields[index].Tip + "\n\n" + reason);
+                ImGui.SetItemTooltip(MarketPlans.Fields[index].Tip + "\n\n" + reason);
             }, ToolbarItems.IconWidth + spacing);
             Lock(spacing);
             return;
@@ -96,26 +131,42 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
 
         PropertyGrid.ComponentFields(texts, Labels, (index, text, width) =>
         {
-            var field = MarketEdits.Fields[index];
+            var field = MarketPlans.Fields[index];
             var edited = text;
             ImGui.SetNextItemWidth(width);
             var changed = ImGui.InputTextWithHint("##value", NotSet, ref edited,
                 (uint)Encoding.UTF8.GetByteCount(edited) + 256);
             // The edit runs when the field ends, also when the window closes, as the other text fields do.
-            grid.CommitField(MarketEdits.LineKey(line), changed, text, edited, (value, _) =>
+            grid.CommitField(MarketCommands.LineKey(line), changed, text, edited, (value, _) =>
             {
                 // The command runner writes a problem of the edit to the Console, so the commit returns no error.
                 window.Commands.Run(edits => MarketCommands.SetValue(edits, line, field, value));
                 return null;
             });
-            ImGui.SetItemTooltip(field.Tip);
+            ImGui.SetItemTooltip(lower ? field.Tip + "\n\n" + LowerLineTip : field.Tip);
         }, ToolbarItems.IconWidth + spacing);
 
         ImGui.SameLine(0, spacing);
-        if (ToolbarItems.Button("remove", EditorIcons.TrashAlt,
-                $"Remove the line. Then {line.Base} does not buy or sell the good."))
+        if (ToolbarItems.Button("remove", EditorIcons.TrashAlt, RemoveTip(line, lower)))
         {
             window.Commands.Run(edits => MarketCommands.SetLine(edits, line, null));
+        }
+    }
+
+    /// <summary>
+    /// The result of a line that replaces a lower line, in plain words, with a revert button. The tooltip names the line
+    /// that the save writes (AGENTS.md UI rules 9 and 10).
+    /// </summary>
+    /// <param name="reason">Why the line cannot change, or null when it can.</param>
+    private void Override(MarketOverride change, string? reason)
+    {
+        var spacing = ImGui.GetStyle().ItemInnerSpacing.X;
+        PropertyGrid.Field(change.Text, Math.Max(1, ImGui.GetContentRegionAvail().X - ToolbarItems.IconWidth - spacing));
+        ImGui.SetItemTooltip(change.Tip);
+        ImGui.SameLine(0, spacing);
+        if (ToolbarItems.Button("revert", EditorIcons.Undo, reason ?? RevertTip, reason == null))
+        {
+            window.Commands.Run(edits => MarketCommands.Revert(edits, change.Line));
         }
     }
 
@@ -209,7 +260,7 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
             if (bases.Draw(_ => false) is { } chosen)
             {
                 ImGui.CloseCurrentPopup();
-                var values = MarketEdits.DefaultValues(MarketEdits.Category(session.Edits, good));
+                var values = MarketPlans.DefaultValues(MarketPlans.Category(session.Edits, good));
                 window.Commands.Run(edits => MarketCommands.AddToBase(edits, good, chosen.Item, values));
             }
 

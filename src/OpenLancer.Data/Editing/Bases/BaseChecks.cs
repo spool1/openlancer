@@ -403,17 +403,11 @@ internal static class BaseChecks
                           $"only the first {places}.");
             }
             // Only a market that the active mod adds or changes. A new ship package of the mod does not warn about each
-            // base of the game that does not list it.
-            if (ships > 0 && state.UsesBuyOnlyShipLines &&
-                (view.Origin == ValueOrigin.ActiveMod || view.Market.Any(r => r.Origin == ValueOrigin.ActiveMod)))
-            {
-                var listed = view.Market.Select(r => r.Good).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var missing = state.ShipPackages.Where(p => !listed.Contains(p)).ToList();
-                if (missing.Count > 0)
-                    Add(false, view.Entry, "nickname",
-                        $"{Name} sells ships, but its market has no line for {ShipList(missing)}. The game gives 0 credits " +
-                        "for the trade-in of such a ship.");
-            }
+            // base of the game that does not list it. The market plans add the same lines (MarketPlans.ShipLines).
+            if (ships > 0 && MarketPlans.MissingShipLines(session, view) is { Count: > 0 } missing)
+                Add(false, view.Entry, "nickname",
+                    $"{Name} sells ships, but its market has no line for {ShipList(missing)}. The ship markets of the " +
+                    "game list each ship package at each base that sells ships.");
         }
 
         /// <summary>The goods of the category of a dealer in plain words, for example "commodities".</summary>

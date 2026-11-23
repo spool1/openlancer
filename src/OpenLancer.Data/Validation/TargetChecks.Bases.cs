@@ -20,9 +20,8 @@ namespace OpenLancer.Data.Validation;
 /// reads that room without a test. The game reads the first line of an <c>[MBase]</c> as its nickname. An
 /// <c>[MBase]</c> whose nickname names no base stops the read of the blocks after it. The game copies the nickname of a
 /// base into a buffer of 64 bytes to find its <c>[MBase]</c>. It drops a fixture whose character comes later in the
-/// block. The id of a base is the FLHash of its nickname, and the game drops a second base with the same id. The game
-/// gives the trade-in value of the ship of the player from the line of its package at the base. Without a line, the
-/// value is 0.</para>
+/// block. The id of a base is the FLHash of its nickname, and the game drops a second base with the same id. Vanilla
+/// lists each ship package at each base that sells ships.</para>
 /// <para>The checks give errors, except the trade-in check. It gives a warning, and only when the ship markets of the
 /// target use buy-only lines (see <see cref="BaseMarkets.UsesBuyOnlyShipLines"/>). Vanilla does, and HD Edition 0.7.1
 /// does not.</para>
@@ -131,10 +130,9 @@ public static partial class TargetChecks
     }
 
     /// <summary>
-    /// The trade-in lines of each base that sells a ship and whose market lines the mods add or change. The check runs
-    /// only when the ship markets of the target use buy-only lines. A ship package without a line at the base gives 0
-    /// credits in a trade-in there. A new ship package of a mod gives no finding for the bases that the mods do not
-    /// change.
+    /// The ship lines of each base that sells a ship and whose market lines the mods add or change. The check runs only
+    /// when the ship markets of the target use buy-only lines, as vanilla lists each ship package at each base that sells
+    /// ships. A new ship package of a mod gives no finding for the bases that the mods do not change.
     /// </summary>
     private static IEnumerable<Finding> TradeIns(Side side, Scope scope)
     {
@@ -160,8 +158,9 @@ public static partial class TargetChecks
                   (missing.Count > ShownShips ? $" and {missing.Count - ShownShips} more" : "");
             yield return new($"tradein|{baseName.ToLowerInvariant()}|{string.Join(",", missing).ToLowerInvariant()}",
                 Problem(false, at.Path, at.Id, "marketgood",
-                    $"Base '{baseName}': the base sells ships, but its market has no line for {list}. The game gives 0 " +
-                    "credits for the trade-in of such a ship. Add a buy-only line for each ship package."));
+                    $"Base '{baseName}': the base sells ships, but its market has no line for {list}. The ship " +
+                    "markets of this game list each ship package at each base that sells ships. Add a buy-only line " +
+                    "for each ship package."));
         }
     }
 

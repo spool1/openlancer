@@ -47,11 +47,11 @@ internal static class RetailChecks
         // (ge_fighter) when the player accepts Juni's offer (m01a.ini, trigger mrp_accept).
         const string newPlayer = "EXE/newplayer.fl";
         var player = SaveGame.FromBytes(newPlayer, fs.ReadAllBytes(newPlayer)).Player!;
-        var tradeIn = (long)(db.GetShipPrice(db.Ships.Get("ge_fighter")!) * TradeConstants.SHIP_RESALE_MULTIPLIER);
-
         var manhattan = db.Bases.Get(Manhattan)!;
+        // The trade-in and the price of the ship read the market price of the ship at the base (fork commit OL-0080).
+        var tradeIn = (long)TradeConstants.ShipResale(db.GetShipPrice(db.Ships.Get("ge_fighter")!, manhattan));
         var sold = manhattan.SoldShips.Single(s => s.Package.Nickname == package);
-        var price = sold.Package.BasePrice +
+        var price = db.GetShipPrice(sold.Package.Ship, manhattan) +
                     sold.Package.Addons.Sum(a => (long)manhattan.GetUnitPrice(a.Equipment) * a.Amount);
 
         output.WriteLine($"Credits {player.Money}, trade-in {tradeIn}, package price {price}.");

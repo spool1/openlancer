@@ -549,8 +549,8 @@ public sealed partial class BaseSaveGateTests
             r => r is { Good: "ol_ship2_package", Origin: ValueOrigin.ActiveMod } && BaseMarkets.Sells(r.Line.Values, ship: true));
         var warning = One(session, "Ol01_02_Base sells ships, but its market has no line", BaseWorkspace.Planet);
 
-        Assert.Equal("Ol01_02_Base sells ships, but its market has no line for the ship package ol_ship3_package. The game " +
-                     "gives 0 credits for the trade-in of such a ship.", warning.Message);
+        Assert.Equal("Ol01_02_Base sells ships, but its market has no line for the ship package ol_ship3_package. The ship " +
+                     "markets of the game list each ship package at each base that sells ships.", warning.Message);
         Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
     }
 
@@ -680,7 +680,7 @@ public sealed partial class BaseSaveGateTests
 
     /// <summary>A copy of the fixture with three ship packages, the second one and the third one without a market line
     /// at the planet unless <paramref name="shipMarket"/> has one.</summary>
-    private static TestWorkspace ShipWorkspace(string shipMarket)
+    internal static TestWorkspace ShipWorkspace(string shipMarket)
     {
         var ws = BaseWorkspace.Create();
         ws.WriteBase(@"DATA\EQUIPMENT\goods.ini", """

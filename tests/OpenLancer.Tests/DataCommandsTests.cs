@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Missions.Editing;
 using OpenLancer.Editor.Editing;
@@ -19,19 +20,19 @@ namespace OpenLancer.Tests;
 /// </summary>
 public sealed class MarketCommandsTests
 {
-    private static readonly MarketValue Maximum = MarketEdits.Fields.Single(f => f.Index == MarketLine.MaximumIndex);
+    private static readonly MarketValue Maximum = MarketPlans.Fields.Single(f => f.Index == MarketLine.MaximumIndex);
 
     [Fact]
     public void EachMarketCommandGivesTheLinesOfToday()
     {
-        var values = MarketEdits.DefaultValues("equipment");
-        DataParity.Assert(MarketPath, s => s.Execute(MarketEdits.AddToBase(s, "eng1", "b1", values)),
+        var values = MarketPlans.DefaultValues("equipment");
+        DataParity.Assert(MarketPath, s => s.Execute(MarketPlans.AddToBase(s, "eng1", "b1", values)),
             s => MarketCommands.AddToBase(s, "eng1", "b1", values));
-        DataParity.Assert(MarketPath, s => s.Execute(MarketEdits.SetValue(s, Added(s), Maximum, "20")),
+        DataParity.Assert(MarketPath, s => s.Execute(MarketPlans.SetValue(s, Added(s), Maximum, "20")),
             s => MarketCommands.SetValue(s, Added(s), Maximum, "20"), Sell);
-        DataParity.Assert(MarketPath, s => s.Execute(MarketEdits.SetTransaction(s, Added(s), MarketTransaction.SellOnly)),
+        DataParity.Assert(MarketPath, s => s.Execute(MarketPlans.SetTransaction(s, Added(s), MarketTransaction.SellOnly)),
             s => MarketCommands.SetTransaction(s, Added(s), MarketTransaction.SellOnly), Sell);
-        DataParity.Assert(MarketPath, s => s.Execute(MarketEdits.SetLine(s, Added(s), null)),
+        DataParity.Assert(MarketPath, s => s.Execute(MarketPlans.SetLine(s, Added(s), null)),
             s => MarketCommands.SetLine(s, Added(s), null), Sell);
     }
 
@@ -46,8 +47,10 @@ public sealed class MarketCommandsTests
 
         Assert.Equal("The base b1 already sells gun1.",
             Assert.Single(MarketCommands.AddToBase(session, "gun1", "b1", "0, -1, 10, 10, 0, 1").Refusals).Message);
-        Assert.StartsWith("A patch cannot change a market line of a lower layer.",
-            Assert.Single(MarketCommands.SetLine(session, lower, null).Refusals).Message);
+        // A lower line changes through a later line. Values that the line has already change nothing.
+        var same = string.Join(", ", lower.Values.Skip(1).Select(OpenLancer.Data.Export.RetailText.Of));
+        Assert.Equal("The market of b1 does not change.",
+            Assert.Single(MarketCommands.SetLine(session, lower, same).Refusals).Message);
         Sell(session);
         var refused = MarketCommands.SetValue(session, Added(session), Maximum, "many");
         Assert.Equal("Maximum stock must be a whole number, for example 3.", Assert.Single(refused.Refusals).Message);
@@ -59,7 +62,7 @@ public sealed class MarketCommandsTests
 
     /// <summary>Makes b1 sell eng1, as the start of an edit of the line.</summary>
     private static void Sell(EditSession session) =>
-        session.Execute(MarketEdits.AddToBase(session, "eng1", "b1", MarketEdits.DefaultValues("equipment")));
+        session.Execute(MarketPlans.AddToBase(session, "eng1", "b1", MarketPlans.DefaultValues("equipment")));
 }
 
 /// <summary>

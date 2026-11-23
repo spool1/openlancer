@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Strings;
 using OpenLancer.Editor.Dialogs;
 using OpenLancer.Editor.Editing;
@@ -441,20 +442,20 @@ public sealed class FieldEditRouterTests
     {
         using var ws = Create();
         var session = ws.Session("act");
-        session.Execute(MarketEdits.AddToBase(session, "eng1", "b1", MarketEdits.DefaultValues("equipment")));
-        session.Execute(MarketEdits.AddToBase(session, "s1_hull", "b1", MarketEdits.DefaultValues("equipment")));
+        session.Execute(MarketPlans.AddToBase(session, "eng1", "b1", MarketPlans.DefaultValues("equipment")));
+        session.Execute(MarketPlans.AddToBase(session, "s1_hull", "b1", MarketPlans.DefaultValues("equipment")));
         var router = new FieldEditRouter(_ => { });
-        var maximum = MarketEdits.Fields.Single(f => f.Index == MarketLine.MaximumIndex);
+        var maximum = MarketPlans.Fields.Single(f => f.Index == MarketLine.MaximumIndex);
         MarketLine Line(string good) => session.MarketLines(good).Single(l => l.Base == "b1");
         void Field(MarketLine line, FieldEvents events, string text, int frame) =>
-            Commit(router, X, MarketEdits.LineKey(line), events, MarketEdits.FieldText(line, maximum), text,
+            Commit(router, X, MarketCommands.LineKey(line), events, MarketPlans.FieldText(line, maximum), text,
                 (value, _) =>
                 {
-                    session.Execute(MarketEdits.SetValue(session, line, maximum, value));
+                    session.Execute(MarketPlans.SetValue(session, line, maximum, value));
                     return null;
                 }, frame);
         Assert.Equal(Line("eng1").Section, Line("s1_hull").Section);
-        Assert.NotEqual(MarketEdits.LineKey(Line("eng1")), MarketEdits.LineKey(Line("s1_hull")));
+        Assert.NotEqual(MarketCommands.LineKey(Line("eng1")), MarketCommands.LineKey(Line("s1_hull")));
 
         Field(Line("eng1"), Activated, "10", 1);
         Field(Line("eng1"), Typed, "20", 2);

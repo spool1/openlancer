@@ -112,6 +112,31 @@ public sealed partial class FlmmScriptTests
             ["marketgood = g2, 0, -1, 1, 1, 0, 1, 1"], @"DATA\EQUIPMENT\market_ships.ini"), script.Xml);
     }
 
+    /// <summary>
+    /// The games keep the last line of a good at a base. A line that changes or removes a line of the game must come
+    /// after it, so its new section goes to the end of the file with an append. A section of new goods only keeps the
+    /// section append after the header of the game section.
+    /// </summary>
+    [Theory]
+    [InlineData("marketgood = lf_hull, 0, -1, 1, 1, 0, 2, 1")]
+    [InlineData("marketgood = lf_hull, 0, -1, 0, 0, 1, 1, 1")]
+    public void AMarketLineOfAGoodOfTheGameSectionIsAnAppend(string line)
+    {
+        using var game = new ExportGame();
+        var mod = game.Mod("m", new()
+        {
+            [@"patches\" + MarketPath] = $"[BaseGood]\nbase = li01_01_base\n{line}\nmarketgood = g2, 0, -1, 1, 1, 0, 1, 1\n",
+        });
+
+        var script = Script(game, mod);
+
+        Assert.Empty(script.Problems);
+        Assert.Contains(Op("append", null, null, ["", "[BaseGood]", "base = li01_01_base", line,
+            "marketgood = g2, 0, -1, 1, 1, 0, 1, 1"], MarketPath), script.Xml);
+        Assert.DoesNotContain("sectionappend", script.Xml);
+        Assert.Empty(ScriptFormProblems(script.Xml));
+    }
+
     [Fact]
     public void DataLinesAppendAfterTheLastLineOfTheirKey()
     {

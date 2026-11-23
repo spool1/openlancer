@@ -324,8 +324,8 @@ public sealed partial class BaseSaveGateTests
         var warning = Assert.Single(findings);
         Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
         Assert.Equal("Base 'Ol01_02_Base': the base sells ships, but its market has no line for 2 ship packages: ol_p2, " +
-                     "ol_p3. The game gives 0 credits for the trade-in of such a ship. Add a buy-only line for each ship " +
-                     "package.", warning.Message);
+                     "ol_p3. The ship markets of this game list each ship package at each base that sells ships. Add a " +
+                     "buy-only line for each ship package.", warning.Message);
     }
 
     /// <summary>A new ship package of a mod gives no trade-in finding for the bases whose markets the mod does not
