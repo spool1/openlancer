@@ -139,6 +139,41 @@ The known limits of this version:
 - An encounter spawns NPCs only when its faction has ships for the ship classes of the encounter. The check does not test this. So use the encounter and the faction of a retail zone of the same kind.
 - The Universe panel is read-only. The editor has no hand tools that make a system, a jump connection or a lane. The agent tools make them. The Inspector has the "Lock at start" choice of a jump connection and the ring buttons of a lane.
 
+## Make a new base with an agent
+
+This example makes a new station in New York with an agent. The station copies the rooms, the bar characters, the dealers, the news and the market of the Manhattan base. Each request is a message that you type in the agent program. The names in the requests, for example ol_harbor_base, are examples.
+
+1. Open the profile in the editor.
+2. If your mod is not the active mod, make it active with **Make active mod** in **Mod > Mods...**.
+3. Start the agent server, and connect the agent program to the editor (see "Connect an agent to the editor").
+4. Ask the agent: "Which bases can be a template for a station?" The agent reads `openlancer://catalog/base-templates`, or calls `list_bases` with `kind: station`.
+5. Ask the agent: "Make the base ol_harbor_base in Li01 like Li01_01_Base. Name it Harbor Rock, and put a new station near Manhattan." The agent calls `get_system` to find a free place, then `base_create` with `dock_object`.
+6. Ask the agent: "Check the new base, and tell me the problems." The agent calls `get_base` and `check`. An error stops the save. A warning does not stop it.
+7. Click **File > Save**, or ask the agent to save.
+8. Wait until the editor loads the game data again. The agent waits until `studio_status` gives `data_load: ready`.
+9. Pick **Play > Play at base**, then the new base in the list of Li01. The expected result: the player is on the deck of the new station, with the bar and the dealers of the template.
+10. Launch, and fly back to the station with the autopilot. The expected result: the ship docks with the new station.
+
+OpenLancer Play (F5) showed these results in a test. Nobody checked them in the retail games yet.
+
+`base_create` makes these parts in one Undo step:
+
+- The `[Base]` in `universe.ini`, directly before the first `[system]`, with the run-by line and the terrain lines of the template.
+- A base file in the folder of the mod, with the start room and one room for each kept room of the template. Each room uses the room file of the template. A kept room with a door to a room that the base does not keep gets a copy of its room file without that door.
+- The `[MBase]` at the end of `mBases.ini`, with copies of the bartender, the dealers and the bar crowd. Each copied bartender and dealer gets its own name text. The text has three lines: the faction, the title at the new base and the name of the person.
+- A copy of each news item of the template, with the new base.
+- A copy of the market lines of the template from each market file, also `market_misc.ini`.
+- The station, or a planet with a docking ring, with the lines of the dock object of the template.
+- One name text for the base and its dock object. The games link a base to its object only when the two have the same name id.
+
+Before the save, the Scene and the Hierarchy show the new station, and the Inspector shows its lines. Play at base gives the base only after the save and the reload of the game data. The agent can make a system and a base in it in one `edit_batch`, so one undo takes them back.
+
+The known limits of this version:
+
+- The FLMM package refuses a mod with a new base. The drop-in zip holds the new base. Give `export_mod` the argument `"formats": ["drop_in"]` to make only the zip.
+- This version has no agent tool that changes the market, the characters or the rooms of a base after `base_create`. `set_fields` and `set_text` change single lines of its sections.
+- The editor has no hand tools that make a base. The agent tools make it.
+
 ## The tools
 
 `oltool mcp tools` prints the name, the title and the description of each tool. `oltool mcp tools --json` prints the tool list of the protocol with the schemas.
@@ -152,9 +187,10 @@ These tools work in both hosts. They change nothing.
 | `studio_status` | The profile, the active mod, the revision, the tool groups, the limits and the state of the game data (`data_load`). The agent calls it first. See "Save". |
 | `list_systems`, `get_system` | The star systems, and one system with its counts, bases, connections and problems. `get_system` also gives the place on the nav map, the zoom of the system map and the jump objects of the system. |
 | `get_universe`, `get_route`, `get_trade_lane` | The systems with their jump connections, the shortest routes from one system, and one trade lane with its rings. See "The universe tools". |
+| `list_bases`, `get_base` | The bases, and one base with its rooms, its characters, its market lines, its dock objects, its completeness and its problems. See "The base tools". |
 | `list_items`, `get_item` | The items of a system, and one item with its fields, their origins and their problems. A cutscene entity or event gives its fields by their THN paths. An object row of `list_items` and a connection row of `get_system` give the `solar_radius` of the archetype. |
 | `find_references` | Each line and each file that names an item, also in the mission scripts. |
-| `list_values` | The values that a field can take, from one data list. |
+| `list_values` | The values that a field can take, from one data list. With `base`, the rooms or the characters of one base. |
 | `search_assets`, `list_prop_groups` | The assets of the Assets panel, and the prop groups of the mods. |
 | `list_missions`, `get_mission`, `get_trigger`, `describe_mission_name` | The mission scripts, one script, one trigger, and the plain name of a condition or an action. |
 | `mission_dry_run` | A dry run of one mission script, without a game world. The trigger rules of the game run step by step on the inputs that the agent gives. The result gives each step and the state after the last step. The section "The dry run" of `docs/MISSIONS.md` gives the rules. |
@@ -220,7 +256,7 @@ When a lane keeps one ring or none, the whole lane goes with its lane zone, and 
 
 A system with a base gives `refused` in this version. A system of the game or of a lower mod gives `refused` with the detail `GameSystem`.
 
-`duplicate_items` takes objects, zones and lights of a system. A jump gate, a jump hole, an airlock gate and a trade lane ring give `refused`, because a copy has no partner. Use `connection_create` for a pair, and `trade_lane_create` or `trade_lane_insert_ring` for a lane.
+`duplicate_items` takes objects, zones and lights of a system. A jump gate, a jump hole, an airlock gate and a trade lane ring give `refused`, because a copy has no partner. Use `connection_create` for a pair, and `trade_lane_create` or `trade_lane_insert_ring` for a lane. A base gives `refused` with the detail `BaseCopy`. Use `base_create` with the base as the template.
 
 `rename_item` takes an item of a system, and a ship, equipment or a good that the active mod adds. It also takes a system that the active mod adds. The rename of a system changes the `goto` lines, the `[Base]` lines and the mission lines that name it, and its file keeps its path. Another section, for example a loadout, gives `refused`. A rename of a trade lane ring also changes the link lines of its neighbors, as each rename changes the lines that name the item.
 
@@ -426,6 +462,48 @@ The refusals of the trade lane tools are:
 When a refusal is about one argument, the `field` of the error names it, as for `connection_create`. A ring count below 2 gives `invalid_argument` with the detail `BadArgument` before the plan runs, because the input schema of `rings` has the minimum 2.
 
 In `edit_batch`, a step of these edit tools gives the result of its edit, without `system`, `pair`, `rings` and the other parts above. The `adds` of the step name the new items. So a batch can make a system, a gate pair to it and a lane from the new gate. The `start_near` of `trade_lane_create` names the gate that `connection_create` made in an earlier step.
+
+### The base tools
+
+These tools make a new base and read the bases of the edit view. They work in both hosts. They are in the group Scene. `base_create` is one Undo step, also when it changes `universe.ini`, `mBases.ini`, `news.ini`, the market files, a system file and the text of the mod. It can be a step of `edit_batch`. A later step can name the new base.
+
+| Tool | What it does |
+|---|---|
+| `list_bases` | Lists the bases in the order of `universe.ini`, also a new base before the save. The intro bases of the main menu are not in the list. |
+| `get_base` | Gives one base with its parts, its completeness and its problems. |
+| `base_create` | Makes a new base of the active mod from a template base. See "Make a new base with an agent" for the parts that it makes. |
+
+`list_bases` takes the filters `system`, `text`, `has_rooms`, `kind` and `active_mod_only`. `text` reads the nickname and the name. `has_rooms` keeps the bases that have each room of the list. `kind` is `station` for a base whose start room is Deck, `planet` for Cityscape or Planetscape, and `other`. `active_mod_only` keeps the bases that the active mod adds. Each row gives the name, the system, the kind, the rooms and the origin. It also counts the characters, the goods and the objects that dock with the base.
+
+`get_base` takes a nickname or a `base:` reference. It gives the base file, the start room and each room. A room has its file, its dealers, its virtual rooms, its places for ships for sale, its doors and its cutscene scripts. `shared` is true when another base uses the same room file. A change of such a file changes each of these bases. It also gives the `[MBase]` of the bar data with its faction and its difficulty. Each character has its role, room, faction, voice and name text. The market rows come from each market file, in load order. `kept` marks the line that the games keep for each good. The result also gives the objects that dock with the base, the named object and the terrain lines.
+
+`completeness` gives the seven steps of a base. These are the universe entry, the base file, the start room, the rooms, the characters, the market and the dock object. A missing step gives what is missing, why the step is necessary and the item to go to. The market step can give a fix in plain words, for example the buy-only lines of the ship packages that the market does not list. `problems` gives the problems of the base checks, as "The save gate" of `docs/MOD_FORMAT.md` tells.
+
+`base_create` takes `nickname`, `system`, `template` and `name`. The nickname has 1 to 31 letters, digits or `_`, and starts with a letter. A mission condition holds at most 31 characters of a base nickname. It cannot start with `intro`, because the OpenLancer engine shows such a base in the main menu. `rooms` picks the rooms of the template that the base keeps, and `start_room` the room where the player lands. `characters` is `template`, `dealers` or `none`. `local_faction` sets the faction that owns the base and the reputation of each new dock object. `market` is `template`, `none` or the nickname of another base whose market the base copies.
+
+`dock_object` makes the object that docks with the base. For a station, give `position`. `archetype` gives a station archetype with a docking sphere, and without it the station has the archetype of the dock object of the template. For a planet base, give `planet` for a planet of the system, or `archetype` and `position` for a new planet. `ring` gives the docking ring of the planet. Without `ring`, the ring copies the ring of the template, at the same height above the surface. Without `dock_object`, no object docks with the base, and the result warns.
+
+The result gives `base`, `file`, `dock_object` and `ring`. `select` is the dock object, or the base without one. The refusals are:
+
+| Detail | Error | Cause |
+|---|---|---|
+| `NameInvalid` | `invalid_value` | A nickname that starts with `intro`, or a nickname of `dock_object` that an INI line cannot hold. The input schema refuses another form with `invalid_argument`. |
+| `NameTaken` | `name_taken` | Another base has the nickname or its FLHash, an `[MBase]` has the nickname, or another object has the nickname of `dock_object`. |
+| `ReferenceNotFound` | `not_found` | `system`, `template` or `market` names an item that the edit view does not have. |
+| `IntroTemplate` | `refused` | The template is a scene of the main menu. |
+| `NoBaseFile` | `refused` | The template has no base file with rooms. |
+| `RoomUnknown` | `invalid_value` | `rooms` names a room that the template does not have. |
+| `StartRoomNotKept` | `invalid_value` | The start room is not one of the rooms that the base keeps. |
+| `NoSystemFile` | `refused` | The system of a dock object has no file that takes edits. |
+| `DockArchetype` | `invalid_value` | An unknown archetype, a station archetype without a docking sphere, or an archetype of another type. |
+| `NotAPlanet` | `invalid_value` | `planet` is not a planet of the system, or another base uses it. |
+| `DockPlace` | `invalid_argument` | A new station, a new planet or a new ring without a position. |
+
+When a refusal is about one argument, the `field` of the error names it, for example `dock_object.archetype`. The message is the text that the editor shows for the same refusal.
+
+`list_values` gives the parts of one base with the argument `base`. The list `room_of_base` gives the rooms of its base file, and the list `character_of_base` gives the characters of its `[MBase]`. Each other list refuses `base`. `get_system` gives each base whose `system` line names the system, also a new base before its dock object. Then it gives the other bases that an object of the system names. `find_references` on a `base:` reference also gives the mission lines that name the base.
+
+In `edit_batch`, a step of `base_create` gives the result of its edit, without `base`, `file`, `dock_object` and `ring`. The `adds` of the step name the new base first.
 
 ### The mission tools
 
@@ -851,7 +929,9 @@ An export can take minutes. A client that asks for progress gets a progress noti
 
 A play of an agent never saves on its own. When the active mod has unsaved edits, the editor asks you to save them, with the buttons "Save and continue" and "Cancel". Cancel gives the agent the error `refused`, and Play does not start. The setting "Auto-save and continue when an MCP agent starts Play" skips the question. When the call ends before you answer, for example at its time limit, the question closes as Cancel does. "Agent Play" in [PLAY.md](PLAY.md) gives each case.
 
-While a game runs, `play` gives `refused`, and the agent calls `play_stop` first. The Play menu closes the running game instead. `play` also gives `refused` when the checks of the Play menu refuse the start. An example is a system that the game data does not have. These checks are the same for the menu and the agent.
+While a game runs, `play` gives `refused`, and the agent calls `play_stop` first. The Play menu closes the running game instead. `play` also gives `refused` with the detail `StartBlocked` when the checks of the Play menu refuse the start. An example is a system that the game data does not have. These checks are the same for the menu and the agent.
+
+A start at a new base that the edit view has and the loaded game data does not have gives `refused` with the detail `SaveFirst`. The game data gets the base only after the save. The agent asks you to save, waits until `studio_status` gives `data_load: ready`, and then calls `play` again.
 
 When Play saves the active mod, the save gate runs first, as for `save`. When the save stops, `play` gives `save_blocked` or `changed_on_disk`, and the game does not start. A second play request of an agent gives `busy` until the earlier request ends, because one dialog shows the question. Without an open profile, `play` gives `not_available`, as the tools that read the profile do. `play_stop` also works without a profile.
 
@@ -979,9 +1059,10 @@ The server gives these resources. An agent program can read them before its firs
 | `openlancer://schema/mission-sections` | The 12 section types of a mission script and the ship build (`[NPCShipArch]`), with their keys and values. A type that `mission_add_item` adds has its kind, for example `ship` for `[MsnShip]`. |
 | `openlancer://schema/objlist-directives` | The 23 orders of an order list, with their values. The `steps` of `mission_add_item` take them. |
 | `openlancer://catalog/prefabs` | The behavior prefabs with their fields: the built-in prefabs and the prefab assets of the mods. Also the templates of `scene_create_object`, the builders and the prop groups of the profile. Without a profile, it gives the built-in prefabs and the rule data only. |
-| `openlancer://catalog/lists` | The data lists with their ids and labels. `list_values` takes the ids. |
+| `openlancer://catalog/base-templates` | The bases that `base_create` takes as a template: each base with a base file and rooms, except the intro bases. Each one has its kind, its start room and its rooms with their dealers, virtual rooms and places for ships for sale. It also has its terrain lines, its character count, its goods by category and the archetype of its dock object. Without a profile, the list is empty. |
+| `openlancer://catalog/lists` | The data lists with their ids and labels. `list_values` takes the ids. `one_system`, `one_script` and `one_base` tell which lists need the argument `system`, `script` or `base`. |
 | `openlancer://catalog/thn-events` | The event types that `cutscene_add_event` adds, in the order of the Add event menu. Each one has the entity types of its first and its second target, if it needs the second target, and if it has a length. Also the entity types that `cutscene_add_entity` adds, and if each one takes a position. |
-| `openlancer://guide/rules` | The rules of the editor and what they mean for an agent. It also gives the rules of the jump connections and the trade lanes, and the steps of a system with life. |
+| `openlancer://guide/rules` | The rules of the editor and what they mean for an agent. It also gives the rules of the jump connections, the trade lanes and the bases, and the steps of a system with life. |
 | `openlancer://guide/refs` | The forms of the item references. |
 
 The builders of the catalog are `scene_place_wreck`, `scene_place_patrol_route`, `system_create`, `connection_create` and `trade_lane_create`. Each row gives the tool, its title and its description. The three universe builders also give `defaults`: the rules of the rule data that they use when a call does not give a value. These rules come from `sceneBuilders` of `list-rules.json`:
@@ -990,7 +1071,7 @@ The builders of the catalog are `scene_place_wreck`, `scene_place_patrol_route`,
 - `connection_create`: the tunnel of the `goto` line, the smallest distance from the center (`min_radius`) and the distance between two jump objects (`spacing`). `gate` and `hole` give the archetype, the infocard, the name pattern, the lines and the traffic zone of each kind. `houses` gives the loadout and the pilot of a gate for each house.
 - `trade_lane_create`: the archetype, the name, the infocard and the lines of a ring. Also the ring spacing, its retail range (`retail_min`, `retail_max`) and the clearance of an end. Also the size and the lines of the lane zone. `houses` gives the loadout and the pilot of a ring for each house.
 
-The catalog of the prefabs reads the open profile, so its read waits in the queue of the tool calls. It waits while you edit a field or do a gesture, as a call does. It counts in the calls each second. Above the calls each second or after the wait limit, the read gives a protocol error with the reason. The other resources read only the rule data, so they do not wait.
+The catalog of the prefabs and the catalog of the template bases read the open profile. So a read waits in the queue of the tool calls. It waits while you edit a field or do a gesture, as a call does. It counts in the calls each second. Above the calls each second or after the wait limit, the read gives a protocol error with the reason. The other resources read only the rule data, so they do not wait.
 
 The server gives three prompts. An agent program shows a prompt as a command. In Claude Code, the commands are `/mcp__openlancer__two_trigger_mission`, `/mcp__openlancer__short_cutscene` and `/mcp__openlancer__new_system`.
 

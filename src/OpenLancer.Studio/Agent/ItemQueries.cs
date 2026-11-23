@@ -6,6 +6,7 @@ using LibreLancer.Data.Ini;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Assets;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Fields;
 using OpenLancer.Data.Editing.Lists;
@@ -242,10 +243,20 @@ internal static class ItemQueries
             Mentions(session, key)));
     }
 
+    /// <summary>
+    /// The values of a data list. A list of one system needs <c>system</c>, and a list of one mission script needs
+    /// <c>script</c>. A list of the parts of one base, its rooms or its characters, needs <c>base</c> (see
+    /// <see cref="BaseView.PartLists"/>).
+    /// </summary>
     public static ToolStep ListValues(ToolCall call)
     {
         var session = call.Session;
         var id = call.Args.Text("list")!;
+        var baseText = call.Args.Text("base");
+        if (BaseView.PartLists.Contains(id))
+            return Values(call, BaseValues(call, id, baseText));
+        if (baseText != null)
+            throw ToolInput.Bad("base", AgentTexts.Error("list_no_base", ("list", id)));
         // The argument takes the ids of the retail rule data. A test session can have other rule data.
         if (!session.Lists.RuleData.Lists.TryGetValue(id, out var definition))
         {
@@ -286,9 +297,37 @@ internal static class ItemQueries
                 throw ToolInput.Bad("script", AgentTexts.Error("list_no_script", ("list", id)));
             view = session.Lists.List(id);
         }
+        return Values(call, view);
+    }
+
+    /// <summary>
+    /// The list of the parts of one base for <c>list_values</c>: the rooms of its base file, or the characters of its
+    /// <c>[MBase]</c>. A base without a base file has no rooms.
+    /// </summary>
+    /// <exception cref="EditException"><see cref="EditErrorKind.InvalidArgument"/> without <c>base</c> or with
+    /// <c>system</c> or <c>script</c>, or <see cref="EditErrorKind.NotFound"/> for a base that W does not have.</exception>
+    private static ListView? BaseValues(ToolCall call, string id, string? baseText)
+    {
+        if (call.Args.Text("system") != null)
+            throw ToolInput.Bad("system", AgentTexts.Error("list_no_system", ("list", id)));
+        if (call.Args.Text("script") != null)
+            throw ToolInput.Bad("script", AgentTexts.Error("list_no_script", ("list", id)));
+        var text = baseText ?? throw ToolInput.Bad("base", AgentTexts.Error("list_needs_base", ("list", id)));
+        var session = call.Session;
+        return BaseView.PartsOf(session, EditTools.At("base", () => BaseTools.Nickname(session, text, "base")), id);
+    }
+
+    /// <summary>One page of the entries of a list that hold the text filter. The label of a character of a base is the
+    /// text of its name.</summary>
+    private static ToolResult Values(ToolCall call, ListView? view)
+    {
+        var session = call.Session;
+        var nameKey = view?.Id == BaseView.CharacterList ? "individual_name" : null;
         var filter = call.Args.Text("text");
         var rows = (view?.Entries ?? [])
-            .Select(e => (Entry: e, Label: e.Name ?? (e.Section is { } s ? call.Texts.NameOf(s) : "")))
+            .Select(e => (Entry: e, Label: e.Name ?? (e.Section is { } s
+                ? nameKey != null ? call.Texts.TextOf(s, nameKey) : call.Texts.NameOf(s)
+                : "")))
             .Where(r => ToolCall.Matches(filter, r.Entry.Value, r.Label, r.Entry.Detail))
             .ToList();
         return ToolResult.Of(call.Paged(rows, r => new ValueRow(r.Entry.Value, r.Label, r.Entry.Detail,

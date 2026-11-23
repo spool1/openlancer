@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Missions;
@@ -128,6 +129,7 @@ public static class AgentResources
         ["openlancer://schema/mission-sections"] = (false, _ => MissionSections()),
         ["openlancer://schema/objlist-directives"] = (false, _ => Directives()),
         ["openlancer://catalog/prefabs"] = (true, PrefabCatalog),
+        ["openlancer://catalog/base-templates"] = (true, host => Json(BaseTools.Templates(host))),
         ["openlancer://catalog/lists"] = (false, _ => ListCatalog()),
         ["openlancer://catalog/thn-events"] = (false, _ => ThnEvents()),
     };
@@ -213,26 +215,30 @@ public static class AgentResources
         _ => null,
     };
 
-    /// <summary>The data lists of the rule data: the id, the label, the section types that give the values, and if
-    /// the list holds the items of one system or of one mission script. <c>list_values</c> then needs the argument
-    /// <c>system</c> or <c>script</c>.</summary>
+    /// <summary>The data lists of the rule data and the lists of the parts of one base: the id, the label, the section
+    /// types that give the values, and if the list holds the items of one system, of one mission script or of one base.
+    /// <c>list_values</c> then needs the argument <c>system</c>, <c>script</c> or <c>base</c>. The rule data has no list
+    /// of the characters of one base, so the catalog adds its row (see <see cref="BaseView.PartLists"/>).</summary>
     private static string ListCatalog()
     {
-        var lists = new JsonArray();
-        foreach (var list in ListRules.Retail.Lists.Values.OrderBy(l => l.Id, StringComparer.Ordinal))
+        JsonObject Row(string id, string label, IEnumerable<string> sections, bool system, bool script, bool fixedValues) => new()
         {
-            lists.Add(new JsonObject
-            {
-                ["id"] = list.Id,
-                ["label"] = list.Label,
-                ["sections"] = new JsonArray((list.Source?.Sections ?? []).Select(s => (JsonNode)s).ToArray()),
-                ["one_system"] = list.Source is { Scoped: true, Role: null },
-                ["one_script"] = list.Source is { Scoped: true, Role: { } role } &&
-                                 ListRules.Retail.Roles.TryGetValue(role, out var scripts) && scripts.MissionFiles,
-                ["fixed_values"] = list.Enum != null,
-            });
-        }
-        return new JsonObject { ["lists"] = lists }.ToJsonString(Compact);
+            ["id"] = id,
+            ["label"] = label,
+            ["sections"] = new JsonArray(sections.Select(s => (JsonNode)s).ToArray()),
+            ["one_system"] = system,
+            ["one_script"] = script,
+            ["one_base"] = BaseView.PartLists.Contains(id),
+            ["fixed_values"] = fixedValues,
+        };
+        var rows = ListRules.Retail.Lists.Values.Select(list => Row(list.Id, list.Label, list.Source?.Sections ?? [],
+                list.Source is { Scoped: true, Role: null },
+                list.Source is { Scoped: true, Role: { } role } && ListRules.Retail.Roles.TryGetValue(role, out var scripts) &&
+                scripts.MissionFiles,
+                list.Enum != null))
+            .Append(Row(BaseView.CharacterList, "Character", ["GF_NPC"], false, false, false))
+            .OrderBy(r => (string)r["id"]!, StringComparer.Ordinal);
+        return new JsonObject { ["lists"] = new JsonArray([.. rows]) }.ToJsonString(Compact);
     }
 
     /// <summary>The event types of the Add event menu with the entity types of their targets and their length, in the

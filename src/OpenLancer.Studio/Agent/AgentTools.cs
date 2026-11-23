@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json.Nodes;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Assets;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Editing.Scene;
@@ -44,6 +45,21 @@ public static class AgentTools
         new TextParam("name", false, null, null, SceneEditTools.MaxName),
     ];
 
+    /// <summary>The members of the dock object of <c>base_create</c>.</summary>
+    private static readonly IReadOnlyList<ToolParam> DockObject =
+    [
+        new TextParam("archetype", false, null, null),
+        new PointParam("position", false, BuilderTools.MaxCoordinate),
+        new PointParam("rotation", false),
+        new TextParam("nickname", false, null, null),
+        new TextParam("planet", false, null, null),
+        new GroupParam("ring", [
+            new TextParam("archetype", false, null, null),
+            new PointParam("position", false, BuilderTools.MaxCoordinate),
+            new PointParam("rotation", false),
+        ]),
+    ];
+
     /// <summary>The tools in the order of <c>tools/list</c>.</summary>
     public static IReadOnlyList<StudioTool> All { get; } =
     [
@@ -52,6 +68,15 @@ public static class AgentTools
         Query("list_systems", ToolGroup.Scene, new ToolInput(TextFilter, Cursor, Limit), typeof(Page<SystemRow>),
             SceneQueries.ListSystems),
         Query("get_system", ToolGroup.Scene, new ToolInput(Text("system", true)), typeof(SystemView), SceneQueries.GetSystem),
+        Query("list_bases", ToolGroup.Scene, new ToolInput(
+                Text("system"),
+                TextFilter,
+                new TextListParam("has_rooms", false),
+                new TextParam("kind", false, BaseTools.Kinds, null),
+                new FlagParam("active_mod_only"),
+                Cursor, Limit),
+            typeof(Page<BaseRow>), BaseTools.ListBases),
+        Query("get_base", ToolGroup.Scene, new ToolInput(Text("base", true)), typeof(BaseDetailView), BaseTools.GetBase),
         Query("list_items", ToolGroup.Scene, new ToolInput(
                 Text("system", true),
                 new ChoicesParam("kinds", Names<SceneItemKind>()),
@@ -67,8 +92,9 @@ public static class AgentTools
         Query("find_references", ToolGroup.Studio, new ToolInput(Text("ref"), Text("name"), Cursor, Limit),
             typeof(ReferencesView), ItemQueries.FindReferences),
         Query("list_values", ToolGroup.Studio, new ToolInput(
-                new TextParam("list", true, ListRules.Retail.Lists.Keys.Order(StringComparer.Ordinal).ToList(), null),
-                TextFilter, Text("system"), Text("script"), Cursor, Limit),
+                new TextParam("list", true,
+                    ListRules.Retail.Lists.Keys.Concat(BaseView.PartLists).Distinct().Order(StringComparer.Ordinal).ToList(), null),
+                TextFilter, Text("system"), Text("script"), Text("base"), Cursor, Limit),
             typeof(Page<ValueRow>), ItemQueries.ListValues),
         Query("search_assets", ToolGroup.Scene, new ToolInput(
                 new TextParam("kind", false, Names<AssetKind>(), null),
@@ -282,6 +308,20 @@ public static class AgentTools
                 Text("template", true),
                 Text("nickname", true)),
             DataEditTools.CreateFromTemplate),
+        // A call can give an existing planet the base and its name.
+        Edit("base_create", ToolHints.Changing, EditTools.Input(false,
+                new TextParam("nickname", true, null, null, pattern: BasePlans.NicknamePattern),
+                Text("system", true),
+                Text("template", true),
+                new TextParam("name", true, null, null, BaseTools.MaxName),
+                new TextParam("info", false, null, null, BaseTools.MaxInfo),
+                new TextListParam("rooms", false),
+                Text("start_room"),
+                new TextParam("characters", false, BaseTools.CharacterCopies, BaseTools.CharacterCopies[0]),
+                Text("local_faction"),
+                new TextParam("market", false, null, BaseTools.MarketTemplate),
+                new GroupParam("dock_object", DockObject)),
+            BaseTools.Create, ToolGroup.Scene, typeof(BaseEditResult)),
         Mission("mission_edit", ToolHints.Changing, MissionEditTools.EditInput, MissionEditTools.Edit),
         Mission("mission_add_trigger", ToolHints.Adding, MissionEditTools.AddTriggerInput, MissionEditTools.NewTrigger),
         Mission("mission_set_condition", ToolHints.Changing, MissionEditTools.SetConditionInput,

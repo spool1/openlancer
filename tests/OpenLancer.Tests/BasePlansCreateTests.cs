@@ -129,7 +129,7 @@ public sealed class BasePlansCreateTests
 
     /// <summary>The station workspace of <see cref="BaseWorkspace"/> with news, more solar archetypes and the full
     /// system file of Ol01.</summary>
-    private static TestWorkspace Workspace(bool fullSystem = false)
+    internal static TestWorkspace Workspace(bool fullSystem = false)
     {
         var ws = BaseWorkspace.Create();
         ws.WriteBase(BaseWorkspace.NewsPath, News);

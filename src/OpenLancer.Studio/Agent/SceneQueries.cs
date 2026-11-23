@@ -72,7 +72,8 @@ internal sealed record SystemView(string Ref, string Name, string? File)
     /// <summary>The number of objects of each object kind, by the names of <see cref="SceneObjectKind"/>.</summary>
     public IReadOnlyDictionary<string, int> ObjectKinds { get; init; } = new Dictionary<string, int>();
 
-    /// <summary>The <c>base:</c> references of the bases that objects of the system name.</summary>
+    /// <summary>The <c>base:</c> references of the bases of the system: the bases whose <c>system</c> line names it,
+    /// then the other bases that objects of the system name.</summary>
     public IReadOnlyList<string> Bases { get; init; } = [];
 
     public IReadOnlyList<ConnectionRow> Connections { get; init; } = [];
@@ -153,9 +154,8 @@ internal static class SceneQueries
             JumpObjects = UniverseRows.Slots(session, path),
             Counts = Enum.GetValues<SceneItemKind>().ToDictionary(Name, k => items.Count(i => KindOf(i.Kind) == k)),
             ObjectKinds = objects.GroupBy(o => o.Kind).ToDictionary(g => Name(g.Key), g => g.Count()),
-            Bases = objects.Select(o => SceneSections.Last(o.View, "base")).OfType<string>()
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(b => ItemRefs.Format(new ItemReference(ItemRefKind.Base, b))).ToList(),
+            Bases = BaseTools.OfSystem(session, section.Id.Key!,
+                objects.Select(o => SceneSections.Last(o.View, "base")).OfType<string>()),
             Connections = objects.Where(o => o.Kind is SceneObjectKind.Gate or SceneObjectKind.Hole or SceneObjectKind.LaneRing)
                 .Select(o => Connection(session, o.Section, o.View, o.Kind, archetypes.RadiusOf(o.View))).ToList(),
             Nebulae = items.Where(i => i.Kind == SceneKind.Nebula).Select(i => Ref(i.Section)).ToList(),

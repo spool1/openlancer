@@ -171,11 +171,18 @@ internal static partial class ItemEditTools
     /// So the result tells the agent each copy that is not at the offset. Mission items get the copies of the mission
     /// studio (see <see cref="DuplicateMissionItems"/>), and cutscene events get the copies of the Timeline (see
     /// <see cref="DuplicateCutsceneEvents"/>). The offset does not move these copies either, and the result warns about
-    /// them too.
+    /// them too. A base refuses, because <c>base_create</c> makes a new base from a template base.
     /// </summary>
     public static ToolStep DuplicateItems(ToolCall call) => EditTools.Apply(call, scope =>
     {
         var (scene, missions, cutscene) = Split(call, scope, "Duplicate");
+        // A copy of a [Base] would have no base file, rooms or bar data of its own (section E.5 of the bases design).
+        if (scene.FirstOrDefault(s => BaseTools.IsEntry(scope.Session, s)) is { } entry)
+        {
+            var reference = ItemRefs.Canonical(scope.Session, entry);
+            throw new EditException(new EditError(EditErrorKind.Refused, BaseTools.BaseCopy,
+                AgentTexts.Error("base_copy", ("ref", reference))) { Field = "refs", Target = reference });
+        }
         var offset = call.Args.Point("offset") is { } point && point != Vector3.Zero ? point : (Vector3?)null;
         var timeOffset = call.Args.Number("time_offset");
         if (timeOffset != null && cutscene.Count == 0)

@@ -216,13 +216,15 @@ public sealed class McpServerTests
 
         Assert.Equal([
             "openlancer://schema/mission-names", "openlancer://schema/mission-sections",
-            "openlancer://schema/objlist-directives", "openlancer://catalog/prefabs", "openlancer://catalog/lists",
-            "openlancer://catalog/thn-events", "openlancer://guide/rules", "openlancer://guide/refs",
+            "openlancer://schema/objlist-directives", "openlancer://catalog/prefabs", "openlancer://catalog/base-templates",
+            "openlancer://catalog/lists", "openlancer://catalog/thn-events", "openlancer://guide/rules",
+            "openlancer://guide/refs",
         ], resources.Select(r => r.Uri));
         Assert.Equal(["application/json", "application/json", "application/json", "application/json", "application/json",
-            "application/json", "text/plain", "text/plain"], resources.Select(r => r.MimeType));
+            "application/json", "application/json", "text/plain", "text/plain"], resources.Select(r => r.MimeType));
         var catalog = JsonNode.Parse(Assert.IsType<TextResourceContents>(Assert.Single(lists.Contents)).Text)!;
-        Assert.Equal(66, catalog["lists"]!.AsArray().Count);
+        // The 66 lists of the rule data, and the characters of one base.
+        Assert.Equal(67, catalog["lists"]!.AsArray().Count);
         // The rooms of a base file are the rooms of one base, not of one system or one script.
         Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "room_of_base" && !(bool)l["one_system"]! &&
                                                           !(bool)l["one_script"]!);
@@ -245,6 +247,11 @@ public sealed class McpServerTests
         Assert.Contains("A system with life:", rule);
         Assert.Contains("prop_group_save", rule);
         Assert.Contains("An encounter spawns NPCs only when its faction has ships for the ship classes of the encounter.", rule);
+        // The rules of the bases name the shared room files, the name rule and the save before Play.
+        Assert.Contains("Rules of the bases:", rule);
+        Assert.Contains("Other bases use the same room file, so do not change a shared room file.", rule);
+        Assert.Contains("base_create gives both one name key.", rule);
+        Assert.Contains("The game data gets a new base only after the save.", rule);
         await Assert.ThrowsAsync<McpProtocolException>(() => client.ReadResourceAsync("openlancer://none", cancellationToken: Token).AsTask());
     }
 

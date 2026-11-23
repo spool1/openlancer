@@ -244,20 +244,48 @@ public sealed class BaseView
                     ? new BasePartList(rooms, RoomUses(session, baseName, file))
                     : null;
             case ("mroom", "fixture") or ("basefaction", "npc"):
-                var (mbase, parts) = MBaseOf(session, baseName);
-                var characters = CharactersOf(session, mbase, parts)
-                    .Select(c =>
-                    {
-                        var (origin, mod) = session.Origin(c.Section, "nickname");
-                        return new ListEntry(c.Nickname, c.Section, origin, mod, c.Role ?? "crowd");
-                    })
-                    .ToList();
-                return new BasePartList(
-                    new ListView("character_of_base", "Character", "Character", true, false, characters, []),
-                    CharacterUses(session, parts));
+                return new BasePartList(CharacterListOf(session, baseName), CharacterUses(session, MBaseOf(session, baseName).Parts));
             default:
                 return null;
         }
+    }
+
+    /// <summary>
+    /// The entries of a list of the parts of one base: <see cref="RoomList"/> gives the rooms of its base file, and
+    /// <see cref="CharacterList"/> gives the characters of its <c>[MBase]</c>. Null for another list, or for the rooms of
+    /// a base without a base file. <c>list_values</c> gives these entries for one base.
+    /// </summary>
+    internal static ListView? PartsOf(EditSession session, string baseNickname, string list)
+    {
+        if (string.Equals(list, CharacterList, StringComparison.Ordinal))
+            return CharacterListOf(session, baseNickname.Trim());
+        return string.Equals(list, RoomList, StringComparison.Ordinal) && session.Bases.FileOf(baseNickname) is { } file
+            ? session.Lists.List(RoomList, file)
+            : null;
+    }
+
+    /// <summary>The list of the characters of the <c>[MBase]</c> of a base. The detail of an entry is the role of its
+    /// fixture, or <c>crowd</c>.</summary>
+    private static ListView CharacterListOf(EditSession session, string baseName)
+    {
+        var (mbase, parts) = MBaseOf(session, baseName);
+        var characters = CharactersOf(session, mbase, parts)
+            .Select(c =>
+            {
+                var (origin, mod) = session.Origin(c.Section, "nickname");
+                return new ListEntry(c.Nickname, c.Section, origin, mod, c.Role ?? "crowd");
+            })
+            .ToList();
+        return new ListView(CharacterList, "Character", "Character", true, false, characters, []);
+    }
+
+    /// <summary>The kind of a base from the start room of its base file, without a view of the whole base. A base
+    /// without a base file is of the kind <see cref="BaseKind.Other"/>.</summary>
+    internal static BaseKind KindOf(EditSession session, string baseNickname)
+    {
+        var file = session.Bases.FileOf(baseNickname);
+        var info = file == null ? null : session.Sections(file).FirstOrDefault(s => Is(s.Id.Type, "BaseInfo"));
+        return KindOf(info is { } i && session.WorkingSection(i) is { } section ? Last(section, "start_room") : null);
     }
 
     /// <summary>
@@ -310,7 +338,14 @@ public sealed class BaseView
     }
 
     /// <summary>The list of the rule data that holds the rooms of one base file.</summary>
-    private const string RoomList = "room_of_base";
+    public const string RoomList = "room_of_base";
+
+    /// <summary>The list of the characters of one base. The rule data has no such list, because the <c>[MBase]</c> of
+    /// the base gives the entries, not a file.</summary>
+    public const string CharacterList = "character_of_base";
+
+    /// <summary>The lists that hold the parts of one base (see <see cref="PartsOf"/>).</summary>
+    public static IReadOnlyList<string> PartLists { get; } = [RoomList, CharacterList];
 
     /// <summary>The base of a section of <c>mBases.ini</c>: the key of an <c>[MBase]</c>, or the key of the
     /// <c>[MBase]</c> of a child section. Null for another section.</summary>

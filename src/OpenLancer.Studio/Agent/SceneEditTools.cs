@@ -411,7 +411,7 @@ internal static class SceneEditTools
             // No nickname holds a ':' (section 5.6 of the MCP1 design), so a text with one is a reference.
             var reference = text.Contains(':') ? ItemRefs.Parse(text) : new ItemReference(ItemRefKind.Base, text);
             if (reference.Kind != ItemRefKind.Base)
-                throw ToolInput.Bad("base", AgentTexts.Error("base_ref", ("ref", text)));
+                throw ToolInput.Bad("base", AgentTexts.Error("base_ref", ("name", "base"), ("ref", text)));
             return ItemRefs.ResolveSection(call.Session, reference).Id.Key ?? reference.Name;
         });
     }

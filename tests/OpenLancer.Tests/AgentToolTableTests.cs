@@ -22,13 +22,14 @@ public sealed class AgentToolTableTests
     /// <summary>The order follows the sections of the design. The query tools of section 7.1 come first. Then come the
     /// edit tools of section 7.2, the Scene and data tools of section 7.3, the mission tools of section 7.4, the
     /// cutscene tools of section 7.5, the tools of section 7.6 with the play tools at their end, and the view tools of
-    /// section 7.7.</summary>
+    /// section 7.7. The read tools of the bases follow get_system (section E.8 of the bases design).</summary>
     [Fact]
     public void TheToolsHaveTheFixedOrderOfTheSectionsOfTheDesign()
     {
         Assert.Equal(
         [
-            "studio_status", "list_systems", "get_system", "list_items", "get_item", "find_references", "list_values",
+            "studio_status", "list_systems", "get_system", "list_bases", "get_base", "list_items", "get_item",
+            "find_references", "list_values",
             "search_assets", "list_prop_groups", "list_missions", "get_mission", "get_trigger", "describe_mission_name",
             "mission_dry_run", "list_cutscenes", "get_cutscene", "get_raw_ini", "check", "get_console",
             .. EditTools,
@@ -374,7 +375,8 @@ public sealed class AgentToolTableTests
     /// come after the builders: system_create adds data, connection_create can change an existing end, and
     /// connection_set_lock sets absolute values, so a second call changes nothing. The trade lane tools follow them:
     /// trade_lane_create adds data, an insert changes the links of the neighbors, and a second repair changes nothing.
-    /// get_trade_lane follows the other read tools of the universe. The tools of section 7.6 come next. mission_edit can remove triggers and items, so it is destructive. A tool that adds data
+    /// get_trade_lane follows the other read tools of the universe. base_create follows create_from_template. It can
+    /// give an existing planet the base and its name, so it is destructive. The tools of section 7.6 come next. mission_edit can remove triggers and items, so it is destructive. A tool that adds data
     /// is not destructive, and a tool that can change or remove data is (review finding R7 of MCP1-2). So a mission
     /// tool that sets, moves or links lines is destructive. edit_batch can have a step that removes data, so it is
     /// destructive (final finding of MCP1-2). play and mission_play can save the mod, so
@@ -412,6 +414,7 @@ public sealed class AgentToolTableTests
         ["prop_group_delete"] = (ToolKind.AssetWrite, new ToolHints(false, true, false)),
         ["create_loadout"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["create_from_template"] = (ToolKind.Edit, new ToolHints(false, false, false)),
+        ["base_create"] = (ToolKind.Edit, new ToolHints(false, true, false)),
         ["mission_edit"] = (ToolKind.Edit, new ToolHints(false, true, false)),
         ["mission_add_trigger"] = (ToolKind.Edit, new ToolHints(false, false, false)),
         ["mission_set_condition"] = (ToolKind.Edit, new ToolHints(false, true, false)),
