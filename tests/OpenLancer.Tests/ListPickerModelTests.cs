@@ -316,6 +316,38 @@ public sealed class ListWidgetTests
         Assert.Equal(PropertyGrid.BoundWidget.Text, PropertyGrid.WidgetOf(key, 1, 1, null));
     }
 
+    /// <summary>A one-line key that names a part of a base, for example the room of a bar character, gets the part
+    /// picker. A key with a list rule keeps its list picker. A key that can repeat keeps its text field (decision D122),
+    /// also when it names a part of the base.</summary>
+    [Fact]
+    public void AOneLineBasePartKeyGetsThePartPicker()
+    {
+        using var ws = BaseWorkspace.Create();
+        var session = ws.Session("act");
+        var npc = BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "GF_NPC", "ol01_01_npc_1");
+        var room = BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "MRoom", "Bar");
+
+        // The same choice as a bound row of the Inspector, for a list that is available.
+        (PropertyGrid.BoundWidget Widget, bool Parts) Choice(SectionRef section, string name)
+        {
+            var field = FieldBinding.Create(session, section, session.Get(section)!, name);
+            var rules = session.Lists.Rules(section, name);
+            var parts = PropertyGrid.PartsOf(field, rules);
+            var listed = field.Key?.Multiline != true && PropertyGrid.IsListed(rules);
+            return (PropertyGrid.WidgetOf(field.Key, field.Lines.Count, FieldEdit.Values(field.Text).Length,
+                PropertyGrid.DefaultLabels(field.Key), listed, parts != null), parts != null);
+        }
+
+        Assert.Equal((PropertyGrid.BoundWidget.Parts, true), Choice(npc, "room"));
+        Assert.Equal((PropertyGrid.BoundWidget.List, false), Choice(npc, "head"));
+        Assert.Equal((PropertyGrid.BoundWidget.Text, false), Choice(room, "fixture"));
+        // A character without a room line gets the part picker too, with "None" as its value.
+        var bartender = BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "GF_NPC", "ol01_01_bartender");
+        Assert.Equal((PropertyGrid.BoundWidget.Parts, true), Choice(bartender, "room"));
+        // More than one line of the key keeps the text field.
+        Assert.Equal(PropertyGrid.BoundWidget.Text, PropertyGrid.WidgetOf(null, 2, 1, null, parts: true));
+    }
+
     /// <summary>A one-line key with labeled rules on its values gets a slot for each value, with the label of the
     /// rule.</summary>
     [Fact]

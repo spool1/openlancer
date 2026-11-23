@@ -88,6 +88,16 @@ public sealed record BaseDockObject(SectionRef Section, bool DocksWith, bool Has
 /// <c>$terrain_*</c> template.</summary>
 public sealed record BaseTerrainLine(string Key, string Value);
 
+/// <summary>The entries of the picker of a key that names a part of a base (see <see cref="BaseView.PartList"/>), with
+/// the number of lines of the base that name each entry.</summary>
+/// <param name="List">The entries: the rooms or the characters of the base.</param>
+/// <param name="Uses">The number of lines of the base that name each entry, by value without letter case.</param>
+public sealed record BasePartList(ListView List, IReadOnlyDictionary<string, int> Uses)
+{
+    /// <summary>The number of lines of the base that name an entry, for the footer of the picker.</summary>
+    public int UsedBy(ListEntry entry) => Uses.GetValueOrDefault(entry.Value.Trim());
+}
+
 /// <summary>
 /// The parts of one base as W gives them now (section C.1 of the bases design): its <c>[Base]</c> entry of
 /// <c>universe.ini</c>, its base file with <c>[BaseInfo]</c> and its rooms, the <c>[MBase]</c> of <c>mBases.ini</c>
@@ -218,16 +228,19 @@ public sealed class BaseView
     /// another key. <c>[GF_NPC] room</c> and <c>[MRoom] nickname</c> name a room of the base: the entries are the list
     /// <c>room_of_base</c> of the base file of the base. Value 0 of <c>[MRoom] fixture</c> and of
     /// <c>[BaseFaction] npc</c> names a character of the <c>[MBase]</c>. A list rule cannot give these entries, because
-    /// the base of the section names them, not the file of the section.
+    /// the base of the section names them, not the file of the section. So the counts of the data lists do not see the
+    /// lines that name these parts, and the result has its own counts.
     /// </summary>
-    internal static ListView? PartList(EditSession session, SectionRef section, string key)
+    internal static BasePartList? PartList(EditSession session, SectionRef section, string key)
     {
         if (!session.IsMBasesFile(section.Path) || BaseOf(section) is not { } baseName)
             return null;
         switch (section.Id.Type.ToLowerInvariant(), key.ToLowerInvariant())
         {
             case ("gf_npc", "room") or ("mroom", "nickname"):
-                return session.Bases.FileOf(baseName) is { } file ? session.Lists.List(RoomList, file) : null;
+                return session.Bases.FileOf(baseName) is { } file && session.Lists.List(RoomList, file) is { } rooms
+                    ? new BasePartList(rooms, RoomUses(session, baseName, file))
+                    : null;
             case ("mroom", "fixture") or ("basefaction", "npc"):
                 var (mbase, parts) = MBaseOf(session, baseName);
                 var characters = CharactersOf(session, mbase, parts)
@@ -237,9 +250,60 @@ public sealed class BaseView
                         return new ListEntry(c.Nickname, c.Section, origin, mod, c.Role ?? "crowd");
                     })
                     .ToList();
-                return new ListView("character_of_base", "Character", "Character", true, false, characters, []);
+                return new BasePartList(
+                    new ListView("character_of_base", "Character", "Character", true, false, characters, []),
+                    CharacterUses(session, parts));
             default:
                 return null;
+        }
+    }
+
+    /// <summary>
+    /// The number of lines of a base that name each of its rooms: the <c>start_room</c> of <c>[BaseInfo]</c>, the
+    /// <c>room</c> lines of the characters and the <c>nickname</c> of each <c>[MRoom]</c> of its <c>[MBase]</c>, and
+    /// the <c>room_switch</c> of each door of its rooms.
+    /// </summary>
+    private static Dictionary<string, int> RoomUses(EditSession session, string baseName, string file)
+    {
+        var uses = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var info in session.Sections(file).Where(s => Is(s.Id.Type, "BaseInfo")))
+            CountValues(uses, session.WorkingSection(info), "start_room");
+        foreach (var part in MBaseOf(session, baseName).Parts)
+        {
+            var section = session.WorkingSection(part);
+            CountValues(uses, section, Is(section?.Name, "GF_NPC") ? "room" : Is(section?.Name, "MRoom") ? "nickname" : null);
+        }
+        foreach (var door in RoomsOf(session, baseName, file).SelectMany(r => r.Doors))
+        {
+            if (door.Target is { } target)
+                uses[target] = uses.GetValueOrDefault(target) + 1;
+        }
+        return uses;
+    }
+
+    /// <summary>The number of lines of an <c>[MBase]</c> that name each of its characters: value 0 of each
+    /// <c>fixture</c> of an <c>[MRoom]</c> and of each <c>npc</c> of a <c>[BaseFaction]</c>.</summary>
+    private static Dictionary<string, int> CharacterUses(EditSession session, IReadOnlyList<SectionRef> parts)
+    {
+        var uses = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var part in parts)
+        {
+            var section = session.WorkingSection(part);
+            CountValues(uses, section, Is(section?.Name, "MRoom") ? "fixture" : Is(section?.Name, "BaseFaction") ? "npc" : null);
+        }
+        return uses;
+    }
+
+    /// <summary>Adds 1 to the count of value 0 of each line of a key of a section. Does nothing for a null section or
+    /// key.</summary>
+    private static void CountValues(Dictionary<string, int> uses, Section? section, string? key)
+    {
+        if (section == null || key == null)
+            return;
+        foreach (var line in section.Where(e => Is(e.Name, key) && e.Count > 0))
+        {
+            if (line[0].ToString().Trim() is { Length: > 0 } value)
+                uses[value] = uses.GetValueOrDefault(value) + 1;
         }
     }
 

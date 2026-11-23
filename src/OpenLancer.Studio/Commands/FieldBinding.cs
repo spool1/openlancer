@@ -50,7 +50,7 @@ internal sealed class FieldBinding
 
     private FieldBinding(SectionRef section, string name, KeySchema? key, IReadOnlyList<EntryView> lines,
         ValueOrigin origin, string? originMod, IReadOnlyList<string> laterMods, string? readOnlyReason, bool canRevert,
-        ListView? parts)
+        BasePartList? parts)
     {
         Section = section;
         Name = name;
@@ -99,11 +99,11 @@ internal sealed class FieldBinding
 
     /// <summary>
     /// The entries of a key that names a part of a base, from the base view (see <see cref="BaseView.PartList"/>): the
-    /// rooms of the base for <c>[GF_NPC] room</c>, or its characters for value 0 of <c>[MRoom] fixture</c>. Null for
-    /// another key. A list rule cannot give these entries, because the base of the section names them. So the picker of
-    /// such a key reads them here.
+    /// rooms of the base for <c>[GF_NPC] room</c>, or its characters for value 0 of <c>[MRoom] fixture</c>, with the
+    /// number of lines of the base that name each entry. Null for another key. A list rule cannot give these entries,
+    /// because the base of the section names them. So the picker of such a key reads them here.
     /// </summary>
-    public ListView? Parts { get; }
+    public BasePartList? Parts { get; }
 
     /// <summary>One line that says which layer sets the key.</summary>
     public string OriginText => Origin switch

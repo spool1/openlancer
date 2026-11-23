@@ -8,6 +8,8 @@ using ImGuiNET;
 using LibreLancer.ImUI;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Bases;
+using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Strings;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Ui;
@@ -240,12 +242,11 @@ internal sealed partial class PropertyGrid
             var labelsOf = slots ?? labels ?? DefaultLabels(field.Key);
             var values = FieldEdit.Values(shape.Text).Length;
             var listed = single && IsListed(rules) && ListOf(field, rules[0]) != null;
-            // A key that names a part of a base, for example the room of a bar character, gets a picker of the parts.
-            var parts = single && rules.Count == 0 ? field.Parts : null;
+            var parts = PartsOf(field, rules);
             var wholeLabels = whole != null && single && shape.Lines.Count == 1 ? labelsOf?.Invoke(values) : null;
             var widget = wholeLabels != null && WholeValues(shape.Text, wholeLabels.Count, whole!.Value) != null
                 ? BoundWidget.WholeNumbers
-                : WidgetOf(field.Key, shape.Lines.Count, values, labelsOf, listed || parts != null);
+                : WidgetOf(field.Key, shape.Lines.Count, values, labelsOf, listed, parts != null);
             switch (widget)
             {
                 case BoundWidget.WholeNumbers:
@@ -257,8 +258,8 @@ internal sealed partial class PropertyGrid
                 case BoundWidget.Enum:
                     EnumField(field, field.Key!.ClrType!, hint);
                     break;
-                case BoundWidget.List when parts != null:
-                    PartField(field, parts, hint);
+                case BoundWidget.Parts:
+                    PartField(field, parts!, hint);
                     break;
                 case BoundWidget.List:
                     ListField(field, rules[0], hint);
@@ -299,20 +300,31 @@ internal sealed partial class PropertyGrid
     }
 
     /// <summary>
-    /// The widget of an editable bound row: a picker for a key with a data list, a checkbox for a bool, a list for an
-    /// enum, a labeled field for each value of a line with component labels, a color swatch with the text field for a
-    /// one-line color key, else a text field.
+    /// The parts of a base that the picker of a bound key lists (see <see cref="FieldBinding.Parts"/>), or null. Only a
+    /// one-line key without a list rule gets them, for example the room of a bar character. A key with a list rule keeps
+    /// its list. A key that can have more than one line keeps its text field (decision D122).
+    /// </summary>
+    internal static BasePartList? PartsOf(FieldBinding field, IReadOnlyList<ListRule> rules) =>
+        field.Key?.Multiline != true && rules.Count == 0 ? field.Parts : null;
+
+    /// <summary>
+    /// The widget of an editable bound row: a picker for a key with a data list or with the parts of a base, a checkbox
+    /// for a bool, a list for an enum, a labeled field for each value of a line with component labels, a color swatch
+    /// with the text field for a one-line color key, else a text field.
     /// </summary>
     /// <param name="lines">The number of lines of the key at the start of an open edit of it, or now.</param>
     /// <param name="values">The number of values of the first line, in the same state.</param>
     /// <param name="labels">The labels of the values of a line with a number of values (see <see cref="BoundRow"/>),
     /// with the default already applied.</param>
     /// <param name="listed">True for a key with one list rule on its first value (see <see cref="IsListed"/>).</param>
+    /// <param name="parts">True for a key that names a part of a base (see <see cref="PartsOf"/>).</param>
     internal static BoundWidget WidgetOf(KeySchema? key, int lines, int values,
-        Func<int, IReadOnlyList<ComponentLabel>?>? labels, bool listed = false)
+        Func<int, IReadOnlyList<ComponentLabel>?>? labels, bool listed = false, bool parts = false)
     {
         if (listed && lines <= 1)
             return BoundWidget.List;
+        if (parts && lines <= 1)
+            return BoundWidget.Parts;
         if (key?.ClrType == typeof(bool) && lines <= 1)
             return BoundWidget.Bool;
         if (key?.ClrType is { IsEnum: true } && lines <= 1)
@@ -822,6 +834,9 @@ internal sealed partial class PropertyGrid
 
         /// <summary>The picker of a key with a data list.</summary>
         List,
+
+        /// <summary>The picker of a key that names a part of a base (see <see cref="PartsOf"/>).</summary>
+        Parts,
 
         /// <summary>A whole-number field for each value of a line, each in a range (see <see cref="WholeField"/>).</summary>
         WholeNumbers,

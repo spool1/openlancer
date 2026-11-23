@@ -6,6 +6,7 @@ using ImGuiNET;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Assets;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Editor.Editing;
 using OpenLancer.Editor.Ui;
@@ -107,13 +108,14 @@ internal sealed partial class PropertyGrid
     /// The picker field of a one-line key that names a part of a base, for example the room of a bar character. The
     /// base view gives the entries (see <see cref="FieldBinding.Parts"/>), because no list rule can give them. The picker
     /// offers "None", and a value outside the list shows as "Not listed". The base checks of the save gate tell what the
-    /// game does with such a value.
+    /// game does with such a value. The footer counts the lines of the base that name the entry, because the data lists
+    /// do not see these lines.
     /// </summary>
-    private void PartField(FieldBinding field, ListView parts, string hint)
+    private void PartField(FieldBinding field, BasePartList parts, string hint)
     {
         var value = field.Lines.Count > 0 && field.Lines[0].Values is [var first, ..] ? first.ToString().Trim() : "";
-        var clicked = ListValue(parts, value, null, FillWidth, hint);
-        ListPopup("##parts", clicked, field, parts, value, true, _ => picked);
+        var clicked = ListValue(parts.List, value, null, FillWidth, hint, usedBy: parts.UsedBy);
+        ListPopup("##parts", clicked, field, parts.List, value, true, _ => picked, usedBy: parts.UsedBy);
     }
 
     /// <summary>
@@ -191,8 +193,10 @@ internal sealed partial class PropertyGrid
     /// </summary>
     /// <param name="width">The width of the field, or a negative width that leaves that room at the right.</param>
     /// <param name="other">True for a valid value outside a list of files (see <see cref="IsOtherFile"/>).</param>
+    /// <param name="usedBy">The number of INI lines that name an entry, or null for the count of the data lists (see
+    /// <see cref="UsedBy"/>).</param>
     private bool ListValue(ListView? list, string value, ListProblem? problem, float width, string hint,
-        bool other = false)
+        bool other = false, Func<ListEntry, int>? usedBy = null)
     {
         var entry = value.Length == 0 ? null : list?.Find(value);
         var (text, dim, color, error) = other
@@ -203,8 +207,8 @@ internal sealed partial class PropertyGrid
         {
             ImGui.SetTooltip(other
                 ? string.Join("\n", ListPickerModel.Footer(new ListPickerRow(ListRowKind.Other, value, value, null),
-                    list.Label, UsedBy(list)))
-                : ListTooltip(list, value, entry, problem));
+                    list.Label, usedBy ?? UsedBy(list)))
+                : ListTooltip(list, value, entry, problem, usedBy ?? UsedBy(list)));
         }
 
         return clicked;
@@ -295,7 +299,9 @@ internal sealed partial class PropertyGrid
 
     /// <summary>The tooltip of a listed value: the nickname, the file of the entry, its layer and the number of lines
     /// that name it.</summary>
-    private string ListTooltip(ListView list, string value, ListEntry? entry, ListProblem? problem)
+    /// <param name="usedBy">The number of INI lines that name an entry.</param>
+    private string ListTooltip(ListView list, string value, ListEntry? entry, ListProblem? problem,
+        Func<ListEntry, int> usedBy)
     {
         var kind = list.Label.ToLowerInvariant();
         if (entry == null)
@@ -306,7 +312,7 @@ internal sealed partial class PropertyGrid
         }
 
         return string.Join("\n", ListPickerModel.Footer(
-            new ListPickerRow(ListRowKind.Entry, entry.Value, EntryName(entry), entry), list.Label, UsedBy(list)));
+            new ListPickerRow(ListRowKind.Entry, entry.Value, EntryName(entry), entry), list.Label, usedBy));
     }
 
     /// <summary>The number of INI lines that name an entry of a list, for the footer and the tooltip. The templates of
@@ -346,8 +352,10 @@ internal sealed partial class PropertyGrid
     /// <param name="none">True when the picker offers "None": the value can be empty.</param>
     /// <param name="text">Gives the text of the key after a pick, from the text at the start of the edit.</param>
     /// <param name="other">True for a valid value outside a list of files (see <see cref="IsOtherFile"/>).</param>
+    /// <param name="usedBy">The number of INI lines that name an entry, or null for the count of the data lists (see
+    /// <see cref="UsedBy"/>).</param>
     private void ListPopup(string id, bool open, FieldBinding field, ListView? list, string value, bool none,
-        Func<string, string> text, bool other = false)
+        Func<string, string> text, bool other = false, Func<ListEntry, int>? usedBy = null)
     {
         if (list == null || window.Session == null)
         {
@@ -355,7 +363,7 @@ internal sealed partial class PropertyGrid
         }
 
         listPicker.Draw(id, open, () => new ListPickerModel(Named(list), none, PickerValue(list, value), other),
-            ObjectKinds.OfList(list.Kind), UsedBy(list), fieldEdits.IsOpenFor, (popup, events, selected) =>
+            ObjectKinds.OfList(list.Kind), usedBy ?? UsedBy(list), fieldEdits.IsOpenFor, (popup, events, selected) =>
             {
                 picked = selected;
                 RouteEvents(popup, field.FieldKey, events, () => LineGesture.Open(window.Commands, field), text);

@@ -168,23 +168,49 @@ public sealed class BaseRulesTests
         var room = BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "MRoom", "Deck");
         var faction = BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "BaseFaction");
 
-        var rooms = FieldBinding.Create(session, npc, session.Get(npc)!, "room").Parts!;
+        var rooms = FieldBinding.Create(session, npc, session.Get(npc)!, "room").Parts!.List;
         Assert.Equal(["Deck", "Bar"], rooms.Entries.Select(e => e.Value));
         Assert.Equal(BaseWorkspace.Section(session, BaseWorkspace.StationPath, "Room", "Deck"), rooms.Entries[0].Section);
         Assert.Equal(("Room", "Room"), (rooms.Label, rooms.Kind));
-        var characters = FieldBinding.Create(session, room, session.Get(room)!, "fixture").Parts!;
+        var characters = FieldBinding.Create(session, room, session.Get(room)!, "fixture").Parts!.List;
         Assert.Equal(["ol01_01_bartender", "ol01_01_trader", "ol01_01_npc_1"], characters.Entries.Select(e => e.Value));
         Assert.Equal(["bartender", "trader", "crowd"], characters.Entries.Select(e => e.Detail));
         Assert.Equal(characters.Entries.Select(e => e.Value),
-            FieldBinding.Create(session, faction, session.Get(faction)!, "npc").Parts!.Entries.Select(e => e.Value));
+            FieldBinding.Create(session, faction, session.Get(faction)!, "npc").Parts!.List.Entries.Select(e => e.Value));
         Assert.Null(FieldBinding.Create(session, npc, session.Get(npc)!, "head").Parts);
         var deck = BaseWorkspace.Section(session, BaseWorkspace.StationDeckPath, "Room_Info");
         Assert.Null(FieldBinding.Create(session, deck, session.Get(deck)!, "set_script").Parts);
         // The pirate base has its own rooms.
         var pirate = BaseWorkspace.MBasePart(session, BaseWorkspace.Pirate, "GF_NPC");
-        Assert.Equal(["Deck", "Bar"], FieldBinding.Create(session, pirate, session.Get(pirate)!, "room").Parts!.Entries
+        Assert.Equal(["Deck", "Bar"], FieldBinding.Create(session, pirate, session.Get(pirate)!, "room").Parts!.List.Entries
             .Select(e => e.Value));
         Assert.Equal(BaseWorkspace.PiratePath, FieldBinding.Create(session, pirate, session.Get(pirate)!, "room").Parts!
-            .Entries[0].Section!.Path, System.StringComparer.OrdinalIgnoreCase);
+            .List.Entries[0].Section!.Path, System.StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The footer of a part picker counts the lines of the base that name the entry, because the data lists do
+    /// not see them (editor UI rule 9). A room counts the start room, the room lines of the characters, the nickname of
+    /// each [MRoom] and the doors of the rooms. A character counts the fixture and the npc lines.</summary>
+    [Fact]
+    public void ThePartPickerCountsTheLinesOfTheBaseThatNameEachPart()
+    {
+        using var ws = BaseWorkspace.Create();
+        var session = ws.Session("act");
+        var npc = BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "GF_NPC", "ol01_01_npc_1");
+        var room = BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "MRoom", "Deck");
+
+        var rooms = FieldBinding.Create(session, npc, session.Get(npc)!, "room").Parts!;
+        // Deck: the start room, its [MRoom] and the door of the bar. Bar: the room line of the character, its [MRoom]
+        // and the door of the deck.
+        Assert.Equal([("Deck", 3), ("Bar", 3)], rooms.List.Entries.Select(e => (e.Value, rooms.UsedBy(e))));
+        var characters = FieldBinding.Create(session, room, session.Get(room)!, "fixture").Parts!;
+        Assert.Equal([("ol01_01_bartender", 1), ("ol01_01_trader", 1), ("ol01_01_npc_1", 1)],
+            characters.List.Entries.Select(e => (e.Value, characters.UsedBy(e))));
+
+        // The pirate base has no [MRoom] Deck, and its character has no room line. So its deck counts the start room
+        // and the door of the shared bar. Its bar counts its [MRoom] and the door of its own deck.
+        var pirate = BaseWorkspace.MBasePart(session, BaseWorkspace.Pirate, "GF_NPC");
+        var pirateRooms = FieldBinding.Create(session, pirate, session.Get(pirate)!, "room").Parts!;
+        Assert.Equal([("Deck", 2), ("Bar", 2)], pirateRooms.List.Entries.Select(e => (e.Value, pirateRooms.UsedBy(e))));
     }
 }

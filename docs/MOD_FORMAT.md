@@ -1415,7 +1415,7 @@ The start room of a base compares without letter case, as the engine compares it
 
 Some keys of `mBases.ini` name a part of the base of their `[MBase]`. `[GF_NPC] room` and `[MRoom] nickname` name a room of the base. Value 0 of `[MRoom] fixture` and of `[BaseFaction] npc` names a character of the same `[MBase]`. The base names these parts, so no list of the rule data can give them.
 
-The picker of `[GF_NPC] room` lists the rooms of the base file of the base. The picker offers "None", because a character without a room line is a fixture of a room. A value outside the rooms shows as "Not listed". A fixture line and an npc line can repeat, so they keep their text field.
+The picker of `[GF_NPC] room` lists the rooms of the base file of the base. The picker offers "None", because a character without a room line is a fixture of a room. A value outside the rooms shows as "Not listed". The footer counts the lines of the base that name the room. These are the `start_room` line, the room lines of the characters, the nickname of each `[MRoom]` and the doors of the rooms. A fixture line and an npc line can repeat, so they keep their text field.
 
 The `file` key of a `[Nebula]` and of an `[Asteroids]` section uses the list of the nebula files or of the asteroid files. The list holds the INI files below `SOLAR\NEBULA` or `SOLAR\ASTEROIDS` whose sections all belong to a nebula file or to an asteroid file. So the texture files of these folders, for example `edge_shapes.ini`, are not in the list. The engine reads a file of any folder. So a value outside the list is valid when its file exists, and the picker shows it as "value (other folder)". A file that does not exist is an error: the game crashes when it loads the data.
 
