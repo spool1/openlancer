@@ -12,9 +12,9 @@ using OpenLancer.Data.Strings;
 namespace OpenLancer.Data.Editing.Bases;
 
 /// <summary>
-/// The plans of the bases (section C.5 of the bases design). Each plan gives one command, which runs as one entry of the
-/// edit history, also when it changes several files and the text of the mod. The agent tools and the editor call the
-/// same plans.
+/// The plans of the bases (section C.5 of the bases design). Each plan gives one command. The command runs as one
+/// entry of the edit history, also when it changes several files and the text of the mod. The agent tools and the
+/// editor call the same plans.
 /// </summary>
 /// <remarks>
 /// <para>Retail facts: the id of a base is the FLHash of its nickname, and the game drops a second base with the same
@@ -32,8 +32,8 @@ public static partial class BasePlans
     /// <summary>The detail code of a template base whose nickname starts with "intro": a scene of the main menu.</summary>
     public const string IntroTemplate = "IntroTemplate";
 
-    /// <summary>The detail code of a system without a file in the edit view, or with a read-only file, when the plan
-    /// adds a dock object to it.</summary>
+    /// <summary>The detail code of a system without a file in the edit view, or with a read-only file. Only a plan with
+    /// a dock object needs the file.</summary>
     public const string NoSystemFile = "NoSystemFile";
 
     /// <summary>The detail code of a room that the template does not have.</summary>
@@ -59,8 +59,8 @@ public static partial class BasePlans
     /// its room scenes.</summary>
     private const string TerrainPrefix = "terrain_";
 
-    /// <summary>Why a part of the request refuses the plan: the file, the text, the detail code, the part of the request
-    /// (see <see cref="BasePlan.RefusedPart"/>) and the section that the text names.</summary>
+    /// <summary>Why a part of the request refuses the plan. It holds the file, the text, the detail code, the part of the
+    /// request (see <see cref="BasePlan.RefusedPart"/>) and the section that the text names.</summary>
     private sealed record Refusal(string Path, string Message, string? Detail = null, string? Part = null,
         SectionRef? Target = null);
 
@@ -71,26 +71,26 @@ public static partial class BasePlans
     /// <remarks>
     /// <para>The entry adds, in this order:</para>
     /// <list type="number">
-    /// <item>The <c>[Base]</c> of <c>universe.ini</c> with <c>nickname</c>, <c>system</c>, <c>strid_name</c>,
-    /// <c>file</c>, and the <c>BGCS_base_run_by</c> and <c>terrain_*</c> lines of the template. It goes directly before
-    /// the first <c>[system]</c>, as the merge puts it.</item>
-    /// <item>The base file at the first free place of <see cref="ContentPaths.NewBaseFile"/>: the <c>[BaseInfo]</c>
-    /// with the start room and the <c>price_variance</c> and <c>ship_repair_cost</c> of the template, then one
+    /// <item>The <c>[Base]</c> of <c>universe.ini</c> with <c>nickname</c>, <c>system</c>, <c>strid_name</c> and
+    /// <c>file</c>. Then come the <c>BGCS_base_run_by</c> and <c>terrain_*</c> lines of the template. The <c>[Base]</c>
+    /// goes directly before the first <c>[system]</c>, as the merge puts it.</item>
+    /// <item>The base file at the first free place of <see cref="ContentPaths.NewBaseFile"/>. Its <c>[BaseInfo]</c>
+    /// has the start room and the <c>price_variance</c> and <c>ship_repair_cost</c> of the template. Then comes one
     /// <c>[Room]</c> for each room that the base keeps. A room names the room file of the template.</item>
-    /// <item>A copy of a room file, only when a kept room has a door to a room of the template that the base does not
-    /// keep. The copy has no such door. The plan lists each copy in its fixes.</item>
+    /// <item>A copy of a room file when a kept room has a door to a room that the base does not keep. The copy has no
+    /// such door. The plan lists each copy in its fixes.</item>
     /// <item>The <c>[MBase]</c> at the end of <c>mBases.ini</c>, with <c>nickname</c> first, the faction and the
-    /// <c>diff</c>, and no <c>msg_id_prefix</c>, because the voice lines of a base name exist only for the bases of
-    /// the game. Then its children in the retail order: the <c>[MVendor]</c>, the <c>[BaseFaction]</c> sections
-    /// without <c>mission_type</c> and <c>offers_missions</c>, the characters and the <c>[MRoom]</c> sections of the
-    /// kept rooms (see <see cref="BaseCharacters"/>). Each copied fixture character gets its own name text.</item>
+    /// <c>diff</c>. It has no <c>msg_id_prefix</c>, because the voice lines of a base name exist only for the bases of
+    /// the game. Its children follow in the retail order. These are the <c>[MVendor]</c>, the <c>[BaseFaction]</c>
+    /// sections without <c>mission_type</c> and <c>offers_missions</c>, the characters and the <c>[MRoom]</c> sections
+    /// of the kept rooms (see <see cref="CharacterCopy"/>). Each copied fixture character gets its own name text.</item>
     /// <item>One <c>[NewsItem]</c> at the end of <c>news.ini</c> for each news item of the template, with the new base
     /// in place of its <c>base</c> lines.</item>
     /// <item>The dock objects of the request (see <see cref="DockSpec"/>).</item>
     /// </list>
     /// <para>The name goes into the text of the active mod with one key. The <c>strid_name</c> of the base and the
-    /// <c>ids_name</c> of the station or the planet share it, because the games link a base to its object only when
-    /// the two ids are equal. The infocard goes to the <c>ids_info</c> of that object.</para>
+    /// <c>ids_name</c> of the station or the planet share the key. The games link a base to its object only when the two
+    /// ids are equal. The infocard goes to the <c>ids_info</c> of that object.</para>
     /// <para>The market lines of the template stay out of this version of the plan.</para>
     /// </remarks>
     public static BasePlan Create(EditSession session, BaseSpec spec)
@@ -208,8 +208,8 @@ public static partial class BasePlans
     }
 
     /// <summary>
-    /// The base file of a new base and the copies of its room files (see <see cref="Create"/>): the new files, their
-    /// commands and a fix for each copy.
+    /// The base file of a new base and the copies of its room files (see <see cref="Create"/>). The result holds the new
+    /// files, their commands and a fix for each copy.
     /// </summary>
     private static (List<string> Files, List<EditCommand> Commands, List<PlannedFix> Fixes) BaseFile(EditSession session,
         string modId, string nickname, string path, BaseTemplate template, IReadOnlyList<TemplateRoom> kept,
@@ -237,10 +237,11 @@ public static partial class BasePlans
                 lines = [.. lines.Where(e => !SceneSections.Is(e.Name, "file")),
                     new EntryView("file", [new StringValue(ContentPaths.DataValue(copy)!)])];
                 var oneRoom = gone.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
+                var doors = gone.Count == 1 ? "door" : "doors";
                 fixes.Add(new PlannedFix(new SectionRef(path, new SectionIdentity("Room", room.Nickname)), "file",
-                    $"The room {room.Nickname} uses a copy of its room file without the {(gone.Count == 1 ? "door" : "doors")} " +
-                    $"to {SceneSections.Join(gone)}, because the base does not keep " +
-                    $"{(oneRoom ? "that room" : "those rooms")}. The copy is {copy}."));
+                    $"The room {room.Nickname} uses a copy of its room file without the {doors} to " +
+                    $"{SceneSections.Join(gone)}, because the base does not keep {(oneRoom ? "that room" : "those rooms")}. " +
+                    $"The copy is {copy}."));
             }
             sections.Add(new SectionEntries("Room", [new EntryView("nickname", [new StringValue(room.Nickname)]), .. lines]));
         }
@@ -283,9 +284,10 @@ public static partial class BasePlans
     }
 
     /// <summary>
-    /// The copy of the room file of a kept room, when the file has a door to a room of the template that the base does
-    /// not keep: the first free place of <see cref="ContentPaths.NewRoomFile"/>, the sections of the file without
-    /// those doors, and the rooms of the doors. Null when the room needs no copy.
+    /// The copy of the room file of a kept room, or null when the room needs no copy. A room needs a copy when its file
+    /// has a door to a room of the template that the base does not keep. The result holds the first free place of
+    /// <see cref="ContentPaths.NewRoomFile"/>, the sections of the file without those doors, and the rooms of the
+    /// doors.
     /// </summary>
     private static (string Path, List<SectionEntries> Sections, List<string> Rooms)? RoomCopy(EditSession session,
         string modId, string nickname, BaseTemplate template, IReadOnlyList<TemplateRoom> kept, TemplateRoom room)
@@ -312,10 +314,10 @@ public static partial class BasePlans
     }
 
     /// <summary>
-    /// The news items of a new base (owner decision of 2026-11-21): one new <c>[NewsItem]</c> at the end of
-    /// <c>news.ini</c> for each news item of the template, with each line of the item except its <c>base</c> lines, and
-    /// one <c>base</c> line of the new base. Without news, the bar of the base shows no news button. A patch always adds
-    /// a <c>[NewsItem]</c>, because it has no key.
+    /// The news items of a new base (owner decision of 2026-11-21). Each news item of the template gets a new
+    /// <c>[NewsItem]</c> at the end of <c>news.ini</c>. The copy has each line of the item except its <c>base</c> lines,
+    /// and one <c>base</c> line of the new base. Without news, the bar of the base shows no news button. A patch always
+    /// adds a <c>[NewsItem]</c>, because it has no key.
     /// </summary>
     private static (List<EditCommand> Commands, List<SectionRef> Adds, Refusal? Refusal) NewsCommands(EditSession session,
         BaseTemplate template, string nickname)
@@ -349,6 +351,13 @@ public static partial class BasePlans
     /// <param name="binary">True for lines of a binary file.</param>
     private static IEnumerable<EntryView> Copied(Section section, Func<Entry, bool> keep, bool binary) =>
         section.Where(keep).Select(e => new EntryView(e.Name, e.Select(v => SectionCopies.Stored(v, binary)).ToList()));
+
+    /// <summary>A line of a template in a copy: a text of a mod gets a copy for the new section (see
+    /// <see cref="SectionCopies.Copy(Entry, int, SectionIdentity)"/>), and each value is as a file stores it.</summary>
+    /// <param name="copy">The new section, for the key of a copied text.</param>
+    /// <param name="binary">True for a line of a binary file.</param>
+    private static EntryView CopiedLine(Entry line, SectionIdentity copy, SectionCopies texts, bool binary) =>
+        new(line.Name, line.Select((_, i) => SectionCopies.Stored(texts.Copy(line, i, copy), binary)).ToList());
 
     /// <summary>A line of a section with its values.</summary>
     private static EntryView Line(Entry entry) => new(entry.Name, entry.ToArray());

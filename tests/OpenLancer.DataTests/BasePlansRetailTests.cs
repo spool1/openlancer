@@ -30,9 +30,9 @@ public sealed class BasePlansRetailTests(ITestOutputHelper output)
 
     /// <summary>
     /// Each base of vanilla 1.1 is a template, except the three intro bases. Each plan runs, without and with a dock
-    /// object far from the center of the system of the template. A dock object needs the archetype of the request when
-    /// the template has no object that names it (11 bases), or when its object cannot dock a ship: the satellite of
-    /// gd_im_water_miner has no docking sphere.
+    /// object far from the center of the system of the template. A dock object needs the archetype of the request in
+    /// two cases. The template has no object that names it (11 bases), or its object cannot dock a ship. The satellite
+    /// of gd_im_water_miner has no docking sphere.
     /// </summary>
     [Fact]
     public void EachVanillaBaseIsATemplateAndItsPlanHasNoError() =>
@@ -88,8 +88,8 @@ public sealed class BasePlansRetailTests(ITestOutputHelper output)
 
     /// <summary>
     /// A base from Li01_13_Base with a new station in Li01 has no error of the base checks and of the save gate. It
-    /// copies the three rooms, the bar data with a name text of three lines for each fixture, the news of the template
-    /// and the lines of the station. One Undo removes each part and the texts.
+    /// copies the three rooms and the bar data with a name text of three lines for each fixture. It also copies the news
+    /// of the template and the lines of the station. One Undo removes each part and the texts.
     /// </summary>
     [Fact]
     public void ABaseFromLi0113WithAStationHasNoErrorAndOneUndoRemovesIt()

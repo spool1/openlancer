@@ -40,9 +40,9 @@ public static partial class BasePlans
     /// <c>npc</c> line of a character that the base does not copy goes.
     /// </summary>
     /// <remarks>
-    /// A retail name text of a character has three lines: the faction, the title and the name of the person, for
-    /// example "Junkers", "Rochester Bartender" and "Winston Harris". So each copied fixture character gets its own text
-    /// of the mod with the name of its faction, the name of the new base with the word of its role, and the name of the
+    /// A retail name text of a character has three lines: the faction, the title and the name of the person. An example
+    /// is "Junkers", "Rochester Bartender" and "Winston Harris". So each copied fixture character gets its own text of
+    /// the mod. Its lines are its faction, the name of the new base with the word of its role, and the name of the
     /// person. A character of the crowd keeps its text.
     /// </remarks>
     private static BarPlan? MBaseCommands(EditSession session, BaseSpec spec, BaseTemplate template,
@@ -67,8 +67,8 @@ public static partial class BasePlans
             var fixture = roles.TryGetValue(character.Nickname, out var role);
             var keep = spec.Characters switch
             {
-                BaseCharacters.Template => fixture || character.Room != null && rooms.Contains(character.Room),
-                BaseCharacters.Dealers => fixture,
+                CharacterCopy.Template => fixture || character.Room != null && rooms.Contains(character.Room),
+                CharacterCopy.Dealers => fixture,
                 _ => false,
             };
             if (!keep || names.ContainsKey(character.Nickname))
@@ -119,13 +119,13 @@ public static partial class BasePlans
             var id = new SectionIdentity("GF_NPC", names[character.Nickname], mbaseId);
             var name = role == null ? null : NameText(session, spec, template, character, role, warnings);
             var characterEntries = new List<EntryView> { new("nickname", [new StringValue(id.Key!)]) };
-            foreach (var line in character.Section.Where(e => CharacterLines.Contains(e.Name, StringComparer.OrdinalIgnoreCase)))
+            foreach (var line in character.Section.Where(e => CharacterLines.Contains(e.Name,
+                         StringComparer.OrdinalIgnoreCase)))
             {
                 characterEntries.Add(SceneSections.Is(line.Name, "individual_name") && name != null &&
                                      texts.New(StringKind.String, name, id, "individual_name") is { } text
                     ? new EntryView(line.Name, [text])
-                    : new EntryView(line.Name, line.Select((v, i) => SectionCopies.Stored(texts.Copy(line, i, id), binary))
-                        .ToList()));
+                    : CopiedLine(line, id, texts, binary));
             }
             Child("GF_NPC", id.Key, characterEntries);
             characters.Add(adds[^1]);
@@ -141,12 +141,12 @@ public static partial class BasePlans
     }
 
     /// <summary>
-    /// The name text of a copied fixture character, with three lines: the name of the faction of its
-    /// <c>affiliation</c>, the title (the name of the new base and the word of the role), and the name of the person
-    /// (the third line of the text of the template, else its last line). When the plan finds no name of the faction,
-    /// the first line is the first line of a text of the template with three lines, or no line. Null when the
-    /// character has no <c>individual_name</c>, or when the plan cannot read its text. The character then keeps the
-    /// line of the template, and the second case gives a warning.
+    /// The name text of a copied fixture character, with three lines. The first line is the name of the faction of its
+    /// <c>affiliation</c>. The second line is the title: the name of the new base and the word of the role. The third
+    /// line is the name of the person: the third line of the text of the template, else its last line. Without a name
+    /// of the faction, a text of the template with three lines gives the first line. Else the text has no faction line.
+    /// Null when the character has no <c>individual_name</c>, or when the plan cannot read its text. The character then
+    /// keeps the line of the template, and the second case gives a warning.
     /// </summary>
     private static string? NameText(EditSession session, BaseSpec spec, BaseTemplate template,
         TemplateCharacter character, string? role, List<Diagnostic> warnings)
@@ -177,8 +177,8 @@ public static partial class BasePlans
     }
 
     /// <summary>
-    /// The text of a text key of a section of W: from the host (see <see cref="BaseSpec.Text"/>), else the text of a
-    /// placeholder or of an id of a text of a mod. Null when the plan finds no text.
+    /// The text of a text key of a section of W, or null. The text comes from the host (see
+    /// <see cref="BaseSpec.Text"/>), else from a placeholder or an id of a text of a mod.
     /// </summary>
     private static string? TextOf(EditSession session, BaseSpec spec, SectionRef section, string key)
     {
@@ -191,8 +191,8 @@ public static partial class BasePlans
         return int.TryParse(value, out var id) && session.ModTextOf(id) is { Text.Length: > 0 } found ? found.Text : null;
     }
 
-    /// <summary>A line whose value 0 names a character, with the new nickname of the character when the base copies it,
-    /// and its other values as a file stores them.</summary>
+    /// <summary>A line whose value 0 names a character. The value gets the new nickname of the character when the base
+    /// copies it. The other values stay as a file stores them.</summary>
     private static EntryView Renamed(Entry entry, IReadOnlyDictionary<string, string> names, bool binary) =>
         new(entry.Name, entry.Select((v, i) =>
             i == 0 && (SceneSections.Is(entry.Name, "npc") || SceneSections.Is(entry.Name, "fixture")) &&

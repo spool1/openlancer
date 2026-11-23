@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing.Scene;
-using OpenLancer.Data.Ini;
 
 namespace OpenLancer.Data.Editing.Bases;
 
@@ -31,10 +30,10 @@ internal sealed record TemplateFixture(string Room, string Character, string? Ro
 internal sealed record TemplateCharacter(SectionRef Ref, Section Section, string Nickname, string? Room);
 
 /// <summary>
-/// A base of the edit view that a new base copies (section C.5 of the bases design): its rooms with their files, its
-/// start room and kind, its fixtures and bar crowd, its <c>[MBase]</c> values, the run-by and terrain lines of its
-/// <c>[Base]</c>, its market lines, its dock objects and its news items. Each part comes from W, so an unsaved edit
-/// counts.
+/// A base of the edit view that a new base copies (section C.5 of the bases design). The template gives the rooms with
+/// their files, the start room and the kind, and the fixtures and the bar crowd. It also gives the <c>[MBase]</c>
+/// values, the run-by and terrain lines of the <c>[Base]</c>, the market lines, the dock objects and the news items.
+/// Each part comes from W, so an unsaved edit counts.
 /// </summary>
 /// <remarks>
 /// <para>A template needs a base file with at least one room. An intro base is not a template, because the OpenLancer
@@ -95,9 +94,9 @@ internal sealed class BaseTemplate
     /// order.</summary>
     public IReadOnlyList<Section> News { get; private init; } = [];
 
-    /// <summary>The object that the games link to the base: the named object, else the first object with the
-    /// <c>base</c> line, else the first object that docks with the base. For a station, it is the station. For a
-    /// planet, it is the planet. Null when no object names the base.</summary>
+    /// <summary>The object that the games link to the base, or null when no object names the base. It is the named
+    /// object, else the first object with the <c>base</c> line, else the first object that docks with the base. For a
+    /// station, it is the station. For a planet, it is the planet.</summary>
     public SectionRef? MainObject { get; private init; }
 
     /// <summary>The docking ring of a planet: the first object that docks with the base when the main object does not
@@ -113,10 +112,10 @@ internal sealed class BaseTemplate
     /// <summary>
     /// Reads a template base from W, or gives why the base is not a template.
     /// </summary>
-    /// <param name="refusal">Gets the reason and the detail code when the result is null: the edit view has no such base
-    /// (<see cref="Missions.Editing.MissionErrors.ItemNotFound"/>), the base is an intro base
-    /// (<see cref="BasePlans.IntroTemplate"/>), or it has no base file with a room
-    /// (<see cref="BasePlans.NoBaseFile"/>).</param>
+    /// <param name="refusal">Gets the reason and the detail code when the result is null. The detail code is
+    /// <see cref="Missions.Editing.MissionErrors.ItemNotFound"/> when the edit view has no such base, and
+    /// <see cref="BasePlans.IntroTemplate"/> for an intro base. It is <see cref="BasePlans.NoBaseFile"/> for a base
+    /// without a base file with a room.</param>
     public static BaseTemplate? Of(EditSession session, string nickname, out (string Message, string Detail)? refusal)
     {
         refusal = null;
@@ -128,7 +127,8 @@ internal sealed class BaseTemplate
         }
         if (view.Nickname.StartsWith(IntroPrefix, StringComparison.OrdinalIgnoreCase))
         {
-            refusal = ($"The base {view.Nickname} is a scene of the main menu. Pick another template.", BasePlans.IntroTemplate);
+            refusal = ($"The base {view.Nickname} is a scene of the main menu. Pick another template.",
+                BasePlans.IntroTemplate);
             return null;
         }
         var rooms = view.Rooms
@@ -138,7 +138,8 @@ internal sealed class BaseTemplate
             .ToList();
         if (view.File == null || view.Info == null || rooms.Count == 0)
         {
-            refusal = ($"The base {view.Nickname} has no base file with rooms. Pick a template with rooms.", BasePlans.NoBaseFile);
+            refusal = ($"The base {view.Nickname} has no base file with rooms. Pick a template with rooms.",
+                BasePlans.NoBaseFile);
             return null;
         }
 

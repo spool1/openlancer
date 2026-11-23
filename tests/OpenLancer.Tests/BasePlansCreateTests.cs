@@ -19,10 +19,10 @@ using Xunit;
 namespace OpenLancer.Tests;
 
 /// <summary>
-/// A new base from a template base (section C.5 of the bases design): the entry in <c>universe.ini</c>, the base file,
-/// the copies of room files, the <c>[MBase]</c> with its characters and their name texts, the news items, the dock
-/// objects and the shared name. One Undo restores each file and the text. The data is made up (see
-/// <see cref="BaseWorkspace"/>).
+/// A new base from a template base (section C.5 of the bases design). The tests check the entry in
+/// <c>universe.ini</c>, the base file and the copies of room files. They also check the <c>[MBase]</c> with its
+/// characters and their name texts, the news items, the dock objects and the shared name. One Undo restores each file
+/// and the text. The data is made up (see <see cref="BaseWorkspace"/>).
 /// </summary>
 public sealed class BasePlansCreateTests
 {
@@ -56,8 +56,8 @@ public sealed class BasePlansCreateTests
         base = ol01_01_base
         """;
 
-    /// <summary>The system file of Ol01 with the lines of a retail station on the station, a planet without a base,
-    /// and lines of a retail ring on the ring.</summary>
+    /// <summary>The system file of Ol01 with more lines. The station has the lines of a retail station, a planet has
+    /// no base, and the ring has lines of a retail ring.</summary>
     private const string Ol01Full = """
         [Object]
         nickname = Ol01_01
@@ -96,8 +96,8 @@ public sealed class BasePlansCreateTests
         archetype = ol_planet
         """;
 
-    /// <summary>The solar archetypes of the tests: the archetypes of the fixture, a second station, a bigger planet,
-    /// a station without a docking sphere and a sun.</summary>
+    /// <summary>The solar archetypes of the tests. These are the archetypes of the fixture, a second station, a bigger
+    /// planet, a station without a docking sphere and a sun.</summary>
     private const string Solars = """
         [Solar]
         nickname = ol_station
@@ -278,8 +278,8 @@ public sealed class BasePlansCreateTests
         Assert.Equal(@"MODS\act\BASES\Ol01_05_Base_2.ini", Value(session, plan.Base!, "file"));
     }
 
-    /// <summary>A kept room with a door to a room of the template that the base does not keep gets a copy of its room
-    /// file without that door. The plan lists the copy in its fixes. The kept rooms take the letter case of the
+    /// <summary>A kept room with a door to a dropped room of the template gets a copy of its room file without that
+    /// door. The plan lists the copy in its fixes. The kept rooms take the letter case of the
     /// template.</summary>
     [Fact]
     public void ARoomWithADoorToARoomThatTheBaseDoesNotKeepGetsACopyWithoutTheDoor()
@@ -360,7 +360,7 @@ public sealed class BasePlansCreateTests
                                                               p.Message.StartsWith("The character", StringComparison.Ordinal)));
     }
 
-    /// <summary><see cref="BaseCharacters.Dealers"/> copies the characters of the fixtures. The <c>npc</c> line of the
+    /// <summary><see cref="CharacterCopy.Dealers"/> copies the characters of the fixtures. The <c>npc</c> line of the
     /// crowd goes with the crowd.</summary>
     [Fact]
     public void DealersCopiesTheFixturesAndLeavesOutTheCrowd()
@@ -368,20 +368,20 @@ public sealed class BasePlansCreateTests
         using var ws = Workspace();
         var session = ws.Session("act");
 
-        var plan = Create(session, Spec() with { Characters = BaseCharacters.Dealers });
+        var plan = Create(session, Spec() with { Characters = CharacterCopy.Dealers });
 
         Assert.Equal(["Ol01_05_Base_bartender", "Ol01_05_Base_trader"], plan.Characters.Select(c => c.Id.Key));
         Assert.Equal(["faction", "weight"], Names(session, BaseWorkspace.MBasePart(session, New, "BaseFaction")));
     }
 
-    /// <summary><see cref="BaseCharacters.None"/> copies no character, and no fixture line names one.</summary>
+    /// <summary><see cref="CharacterCopy.None"/> copies no character, and no fixture line names one.</summary>
     [Fact]
     public void NoneCopiesNoCharacters()
     {
         using var ws = Workspace();
         var session = ws.Session("act");
 
-        var plan = Create(session, Spec() with { Characters = BaseCharacters.None });
+        var plan = Create(session, Spec() with { Characters = CharacterCopy.None });
 
         Assert.Empty(plan.Characters);
         var view = session.Base(New)!;
@@ -419,9 +419,9 @@ public sealed class BasePlansCreateTests
         Assert.Equal("ol_pirates", Value(session, plan.DockObject!, "reputation"));
     }
 
-    /// <summary>Each copied fixture character gets a name text of the mod with three lines: its faction, the name of the
-    /// new base with the word of its role, and the person of the text of the template (the third line, else the last
-    /// line). The crowd keeps its text.</summary>
+    /// <summary>Each copied fixture character gets a name text of the mod with three lines. The lines are its faction,
+    /// the name of the new base with the word of its role, and the person. The person is the third line of the text of
+    /// the template, else the last line. The crowd keeps its text.</summary>
     [Fact]
     public void EachFixtureGetsANameWithItsFactionTheTitleOfTheBaseAndThePerson()
     {
@@ -576,7 +576,7 @@ public sealed class BasePlansCreateTests
     }
 
     /// <summary>A new station gets the base line, the dock line, the name of the base, its infocard and the lines of the
-    /// station of the template, in the retail order. The games link the base to it.</summary>
+    /// template station. The lines are in the retail order. The games link the base to the station.</summary>
     [Fact]
     public void AStationGetsTheBaseTheNameTheInfocardAndTheLinesOfTheTemplateStation()
     {
@@ -623,9 +623,9 @@ public sealed class BasePlansCreateTests
         Assert.Equal("ol_voice_atc", Value(session, plan.DockObject, "voice"));
     }
 
-    /// <summary>A new planet gets the base line and the name of the base. Its new ring docks with the base, keeps the
-    /// name and the lines of the ring of the template, and goes at the height of that ring above the bigger planet, in
-    /// the same direction. Retail rings have no base line.</summary>
+    /// <summary>A new planet gets the base line and the name of the base. Its new ring docks with the base and keeps the
+    /// name and the lines of the ring of the template. The ring goes in the same direction, at the height of that ring
+    /// above the bigger planet. Retail rings have no base line.</summary>
     [Fact]
     public void ANewPlanetGetsTheBaseAndARingAtTheHeightOfTheTemplateRing()
     {
@@ -794,9 +794,9 @@ public sealed class BasePlansCreateTests
     }
 
     /// <summary>A new base with a station has no error of the base checks, and the save gate takes it. After the save,
-    /// the overlay of F5, the build of a retail target and the drop-in zip have the new <c>[Base]</c> before the first
-    /// <c>[system]</c>, the new <c>[MBase]</c> with its nickname first and its children after it, and the new news
-    /// items at the end of news.ini.</summary>
+    /// three forms have the order of the game: the overlay of F5, the build of a retail target and the drop-in zip. The
+    /// new <c>[Base]</c> comes before the first <c>[system]</c>. The new <c>[MBase]</c> has its nickname first and its
+    /// children after it. The new news items are at the end of news.ini.</summary>
     [Fact]
     public void TheSavedBaseHasTheOrderOfTheGameInEachForm()
     {

@@ -5,7 +5,7 @@ using System.Numerics;
 namespace OpenLancer.Data.Editing.Bases;
 
 /// <summary>The characters that a new base copies from its template (see <see cref="BasePlans.Create"/>).</summary>
-public enum BaseCharacters
+public enum CharacterCopy
 {
     /// <summary>The bartender, the dealers and the bar crowd of the rooms that the base keeps.</summary>
     Template,
@@ -19,8 +19,8 @@ public enum BaseCharacters
 
 /// <summary>The docking ring of a new planet base. A value that is null comes from the ring of the template.</summary>
 /// <param name="Archetype">The solar archetype of the ring. It needs a docking sphere.</param>
-/// <param name="Position">The position of the ring, or null for the place of the ring of the template: at the same
-/// height above the surface of the planet, in the same direction.</param>
+/// <param name="Position">The position of the ring, or null for the place of the ring of the template. That place has
+/// the same height above the surface of the planet, in the same direction.</param>
 /// <param name="Rotation">The rotation of the ring in degrees, or null for the rotation of the ring of the
 /// template.</param>
 public sealed record RingSpec(string? Archetype = null, Vector3? Position = null, Vector3? Rotation = null);
@@ -68,7 +68,7 @@ public sealed record BaseSpec(string Nickname, string System, string Template, s
     public string? StartRoom { get; init; }
 
     /// <summary>The characters that the base copies.</summary>
-    public BaseCharacters Characters { get; init; } = BaseCharacters.Template;
+    public CharacterCopy Characters { get; init; } = CharacterCopy.Template;
 
     /// <summary>The faction that owns the base, or null for the faction of the template. It is also the reputation of
     /// each new dock object.</summary>

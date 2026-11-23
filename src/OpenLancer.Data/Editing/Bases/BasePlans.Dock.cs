@@ -11,8 +11,8 @@ namespace OpenLancer.Data.Editing.Bases;
 
 public static partial class BasePlans
 {
-    /// <summary>The detail code of an archetype that cannot be a dock object: an unknown archetype, a station archetype
-    /// without a docking sphere, or an archetype of another type.</summary>
+    /// <summary>The detail code of an archetype that cannot be a dock object. It is an unknown archetype, a station
+    /// archetype without a docking sphere, or an archetype of another type.</summary>
     public const string DockArchetype = "DockArchetype";
 
     /// <summary>The detail code of a planet that is not a planet of the system, or that another base uses.</summary>
@@ -23,17 +23,19 @@ public static partial class BasePlans
 
     /// <summary>The lines of the ring of the template that a new ring does not copy: the new ring has its own place,
     /// archetype and base.</summary>
-    private static readonly string[] RingSkipped = ["nickname", "ids_name", "pos", "rotate", "archetype", "dock_with", "base", "parent"];
+    private static readonly string[] RingSkipped =
+        ["nickname", "ids_name", "pos", "rotate", "archetype", "dock_with", "base", "parent"];
 
-    /// <summary>The commands of the dock objects of a new base, the new objects, the changed planet, the object that the
-    /// games link to the base, the new ring, and true when a new object docks with the base.</summary>
+    /// <summary>The commands of the dock objects of a new base, with the new objects and the changed planet. It also
+    /// holds the object that the games link to the base, the new ring, and true when a new object docks with the
+    /// base.</summary>
     private sealed record DockPlan(List<EditCommand> Commands, List<SectionRef> Adds, List<SectionRef> Changes,
         SectionRef Named, SectionRef? Ring, bool Docks);
 
     /// <summary>
     /// The dock objects of a new base (see <see cref="DockSpec"/>), or null when the request has none. A station gets
-    /// <c>base</c>, <c>dock_with</c>, the name of the base and the infocard, with the lines of the station of the
-    /// template (<see cref="BaseTemplate.StationLines"/>). A planet gets <c>base</c> and the name of the base. Its new
+    /// <c>base</c>, <c>dock_with</c>, the name of the base and the infocard. It also gets the lines of the station of
+    /// the template (see <see cref="BaseTemplate.StationLines"/>). A planet gets <c>base</c> and the name of the base. Its new
     /// docking ring gets <c>dock_with</c>, the name of the ring of the template and the lines of that ring. Retail
     /// rings have no <c>base</c> line. A <c>reputation</c> line names the faction of the request when it gives one.
     /// </summary>
@@ -57,8 +59,10 @@ public static partial class BasePlans
                                                                      SceneSections.Is(s.Id.Key ?? "", planetName));
             var view = planet == null ? null : session.Get(planet);
             if (planet == null || view == null || SceneSections.ArchetypeType(session, view) != "planet")
-                return (null, new Refusal(path, $"{planetName} is not a planet of {system}.", NotAPlanet, "dock_object.planet"));
-            if (SceneSections.Last(view, "base") is { } other && !SceneSections.Is(other, nickname) && session.Base(other) != null)
+                return (null, new Refusal(path, $"{planetName} is not a planet of {system}.", NotAPlanet,
+                    "dock_object.planet"));
+            if (SceneSections.Last(view, "base") is { } other && !SceneSections.Is(other, nickname) &&
+                session.Base(other) != null)
                 return (null, new Refusal(path, $"The planet {planet.Id.Key} is the dock object of the base {other}. Pick a " +
                                                 "planet without a base.", NotAPlanet, "dock_object.planet", planet));
             if (view.ReadOnlyReason is { } reason)
@@ -77,7 +81,9 @@ public static partial class BasePlans
                 null);
         }
 
-        var archetype = dock.Archetype?.Trim() is { Length: > 0 } a ? a : main == null ? null : SceneSections.Last(main, "archetype");
+        var archetype = dock.Archetype?.Trim() is { Length: > 0 } a ? a
+            : main == null ? null
+            : SceneSections.Last(main, "archetype");
         if (archetype == null)
             return (null, new Refusal(path, $"Give the archetype of the dock object. The template {template.Nickname} has no " +
                                             "dock object.", DockArchetype, "dock_object.archetype"));
@@ -159,7 +165,8 @@ public static partial class BasePlans
             ? ringSection?.LastOrDefault(e => SceneSections.Is(e.Name, "rotate"))
             : null;
         var entries = WithLines(made.Entries, ringText, request?.Rotation, rotate, null);
-        var sameArchetype = ringSection != null && SceneSections.Is(BaseTemplate.Last(ringSection, "archetype") ?? "", archetype);
+        var sameArchetype = ringSection != null &&
+                            SceneSections.Is(BaseTemplate.Last(ringSection, "archetype") ?? "", archetype);
         var copied = ringSection?.Select(e => e.Name).Where(n => !RingSkipped.Contains(n, StringComparer.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? [];
         entries.AddRange(TemplateLines(ringSection, copied, ringId, sameArchetype, faction, texts, binary));
@@ -167,10 +174,9 @@ public static partial class BasePlans
     }
 
     /// <summary>
-    /// The place of a new ring from the ring of the template: the direction of the template ring from the template
-    /// planet, at the height of the template ring above the surface of its planet. Null when the template has no ring,
-    /// or the ring or its planet has no position. Without a radius of a planet, the ring keeps the distance of the
-    /// template.
+    /// The place of a new ring from the ring of the template. The new ring keeps the direction from the planet and the
+    /// height above the surface of the template ring. Without the radius of a planet, it keeps the distance of the
+    /// template. Null when the template has no ring, or the ring or its planet has no position.
     /// </summary>
     private static Vector3? TemplatePlace(EditSession session, BaseTemplate template, Vector3 planet, float? radius)
     {
@@ -227,8 +233,8 @@ public static partial class BasePlans
             : (given, null);
     }
 
-    /// <summary>The lines of a new object in the retail order: the name after the nickname, the rotation after the
-    /// position, and the infocard after the archetype.</summary>
+    /// <summary>The lines of a new object in the retail order. The name follows the nickname, the rotation follows the
+    /// position, and the infocard follows the archetype.</summary>
     /// <param name="rotation">The rotation of the request, or null.</param>
     /// <param name="rotate">The <c>rotate</c> line of the template when the request gives no rotation, or null.</param>
     private static List<EntryView> WithLines(List<EntryView> entries, ValueBase? name, Vector3? rotation, Entry? rotate,
@@ -269,7 +275,7 @@ public static partial class BasePlans
             if (SceneSections.Is(key, "loadout") && !sameArchetype)
                 continue;
             foreach (var line in source?.Where(e => SceneSections.Is(e.Name, key)) ?? [])
-                yield return new EntryView(line.Name, line.Select((_, i) => SectionCopies.Stored(texts.Copy(line, i, copy), binary)).ToList());
+                yield return CopiedLine(line, copy, texts, binary);
         }
         if (faction != null && !names.Contains("reputation", StringComparer.OrdinalIgnoreCase))
             yield return new EntryView("reputation", [new StringValue(faction)]);
