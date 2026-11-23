@@ -329,7 +329,7 @@ base = li01_01_base
 marketgood = my_package, 0, -1, 1, 1, 0, 1, 1
 ```
 
-The values of `marketgood` are: good, rank, reputation, min, max, transaction type, price multiplier. The transaction type is 0 when the base buys and sells the good, 1 when the base only buys it, and 2 when the base only sells it. The engine sells a ship only when min or max is not 0.
+The values of `marketgood` are: good, rank, reputation, min, max, transaction type, price multiplier. The transaction type tells what the base does with the good: 0 buys and sells, 1 only buys, and 2 only sells. The engine sells a ship only when min or max is not 0.
 
 The retail games and OpenLancer Play keep the last line of a good at a base, in the order of the market files of `[Data]`. The merge puts a new `[BaseGood]` of a patch after the sections of the game in its file. So a patch changes a line of the game with a later line of the same good in the same market file:
 
@@ -341,7 +341,9 @@ marketgood = my_good, 0, -1, 150, 500, 0, 0.8
 
 To remove a good from a base, write the buy-only form: min 0, max 0 and the transaction type 1. The base then stops the sale of the good, and it only buys the good. The Inspector and the agent tools write this form for a remove of a line of the game.
 
-The retail games and OpenLancer Play skip a line in which each value after the good has its default value: rank 0, reputation -1, min 0, max 0, transaction type 0 and price multiplier 1. A value that the line does not give has its default value. The earlier line of the good then counts. So such a line does not remove a good. The Inspector, the save checks and the agent tools read such a line as no line. The Inspector and the agent tools do not write one, and they tell you why.
+The retail games and OpenLancer Play skip a line with only default values. These values are rank 0, reputation -1, min 0, max 0, transaction type 0 and price multiplier 1. A value that the line does not give has its default value. The earlier line of the good then counts. So such a line does not remove a good.
+
+The Inspector, the save checks and the agent tools read a line with only default values as no line. The Inspector and the agent tools do not write one, and they tell you why.
 
 The price of a ship at a base comes from the market price of its hull good there. A line of the hull good, for example `marketgood = my_ship_hull, 0, -1, 0, 0, 1, 0.9`, gives the hull price times the multiplier. Without such a line, the price is the price of the hull good in `goods.ini`. A line of the ship package does not change the price.
 
@@ -823,7 +825,7 @@ The editor shows each problem of a group file with its line. The problems are: n
 - A `dock_with` line stays in the file.
 - A text of the active mod, and a text of a lower mod, go into the file of the texts. A numeric text id of the base data stays.
 - A line that names an entry that the active mod did not save gets a warning. Save the mod, or the group names an entry that the mod does not have.
-- The editor refuses connection objects, nebulae, asteroid fields, the zones that hold them, and items of more than one system file. A stray `prev_ring` or `next_ring` line on an object that is not a trade lane ring does not make it a connection object (see "Create, duplicate, rename and delete").
+- The editor refuses connection objects, nebulae, asteroid fields, the zones that hold them, and items of more than one system file. A stray `prev_ring` or `next_ring` line on an object that is not a trade lane ring does not make it a connection object. See "Create, duplicate, rename and delete".
 
 The editor writes the group at once, under the lock of the mod: the file of the texts first, then the group file. `Ctrl+S` does not save it, and Undo does not remove it, as in Unity. Rename (`F2`) moves both files and changes the `nickname` line. Delete asks first and removes both files. The placed copies stay.
 
@@ -998,7 +1000,7 @@ A row shows the display name, the id and the version. A blue dot marks unsaved o
 
 The page of the selected mod has these parts:
 
-- The header: the display name, the id, the version, the authors and the chips of the state. The tooltip of a chip tells more. **Export...** opens the Export dialog of the mod. The dialog refuses the export of a mod that the open profile does not hold (see "Export"). The tooltip of **Export...** then tells why. **Play** plays the mod alone in a linked game (see "Play in the game" in [PLAY.md](PLAY.md)). The **...** menu has Make active mod, Duplicate..., Rename..., Add to profile or Remove from profile, Open folder, Open export folder and Show in Console.
+- The header: the display name, the id, the version, the authors and the chips of the state. The tooltip of a chip tells more. **Export...** opens the Export dialog of the mod. The dialog refuses the export of a mod that the open profile does not hold, and the tooltip of **Export...** then tells why (see "Export"). **Play** plays the mod alone in a linked game (see "Play in the game" in [PLAY.md](PLAY.md)). The **...** menu has Make active mod, Duplicate..., Rename..., Add to profile or Remove from profile, Open folder, Open export folder and Show in Console.
 - The publish checklist: for example "4 of 6 steps complete", and one row for each step. A missing step tells what is missing and why. Its buttons go to the field or fix the step. The recommended items do not count.
 - The tab **Settings**: the display name, the version and the target games of `mod.json`, and the publish settings. Each list has Add, Remove, Move up, Move down and a drag handle. Increase version gives the next patch, minor or major version, and adds a changelog entry for it. **Add entry** adds a changelog entry at the top, because the changelog lists the newest version first. The entry of a version with the mark "published" is read-only: you cannot change, move or remove it.
 - The tab **Preview**: the parts of the Nexus page in the order of the page, each with Copy. Copy copies the text of the field in `nexus-page.txt`. The README of each package, the header of the FLMM script and `CHECKLIST.txt` come from the last check. Click **Check now** to make them.
@@ -1025,7 +1027,9 @@ Rename gives the mod a new id and a new folder name. Before it changes a file, i
 
 ### Edits in the Inspector
 
-The Inspector edits ships, equipment, goods, the other sections of the item files and the market lines. It also edits the parts of the bases, and the objects, zones and lights of the open star system. The sections that set the fields of a system take edits too. The edits go into the active mod. A field shows each line of a key on its own text line, with the values separated by `, `. The editor reads the text as the merge reads a patch line, so a value gets the type that a save and a reload give it (see "Value types in binary files"). For example, in a binary file, `true` that replaces the text `TRUE` stays `TRUE`, and `200` that replaces a float is a float. An empty field removes the key.
+The Inspector edits ships, equipment, goods, the other sections of the item files and the market lines. It also edits the parts of the bases, and the objects, zones and lights of the open star system. The sections that set the fields of a system take edits too. The edits go into the active mod.
+
+A field shows each line of a key on its own text line, with the values separated by `, `. The editor reads the text as the merge reads a patch line. So a value gets the type that a save and a reload give it (see "Value types in binary files"). For example, in a binary file, `true` that replaces the text `TRUE` stays `TRUE`, and `200` that replaces a float is a float. An empty field removes the key.
 
 The parts of a base are its `[Base]` of `universe.ini`, its base file, its room files and its `[MBase]` in `mBases.ini`. The base file has a `[BaseInfo]` and a `[Room]` for each room. The children of an `[MBase]` are `[MVendor]`, `[BaseFaction]`, `[GF_NPC]` and `[MRoom]`. The fields of these sections get the checks of their types and of their lists (see "Data lists and pickers").
 
@@ -1074,9 +1078,9 @@ The "Price multiplier" of a line of a ship package is read-only, because it does
 
 "Markets" shows the last line of each base, because the games keep the last line of a good at a base. An edit of a line of a lower layer writes a later line of the active mod in the same market file (see "Markets"). A second edit changes that later line. The remove button of a line of the active mod deletes the line. When the line replaces a line of a lower layer, the remove button writes the buy-only form instead. A buy-only line with a line of a lower layer already stops the sale, so its remove button is not available.
 
-The row "Change" under a line that replaces a line of a lower layer shows the result in plain words, for example "Removed: the base only buys it". Its tooltip names the line that the save writes. Revert next to it removes the line of the active mod, and the line of the lower layer counts again.
+The row "Change" under a line that replaces a line of a lower layer shows the result in plain words. An example is "Removed: the base only buys it". Its tooltip names the line that the save writes. Revert next to it removes the line of the active mod, and the line of the lower layer counts again.
 
-"Add to base" adds a line to a `[BaseGood]` of that base that the active mod adds. Without one, a new `[BaseGood]` goes into the market file in which the base sells goods of the same category, else into the first market file of the base. The editor refuses a base that already sells the good in a market file.
+"Add to base" adds a line to a `[BaseGood]` of that base that the active mod adds. Without one, a new `[BaseGood]` goes into the market file in which the base sells goods of the same category. Else it goes into the first market file of the base. The editor refuses a base that already sells the good in a market file.
 
 ### Edits in the Scene
 
@@ -1856,9 +1860,9 @@ When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod
 - FLMM uses the first match of an anchor. So the header line and the key line must occur once in the file as whole lines. Their first match as text must also be these lines. For example, the anchor of `ring_1` is not valid when the section of `ring_10` comes first. The same rule holds for a changed line in its section.
 - A new `[BaseGood]` of new goods adds its lines to the `[BaseGood]` of the same base. The games keep the last line of a good at a base, and a line there comes before the line of the game. So a new `[BaseGood]` with a good that the game section of the base sells is an `append` at the end of the file. An example is a line that changes or removes a line of the game. A new `[Data]` line goes after the last line of its key.
 - The text of the mod becomes `<key> = 0 ;GENERATESTRRES("<text>")` and `<key> = 0 ;GENERATEXMLRES("<text>")`. FLMM makes its own text DLL and writes the id of the text in the line. The game reads the text after the semicolon as a comment. So the text must be the last value of its line, and a line can hold only one text. Else the export refuses the change.
-- A text with `"`, with a line end or with a character outside ASCII refuses the change, because no known FLMM rule can hold it.
+- A text with `"`, with a line end or with a character outside ASCII refuses the change. No known FLMM rule can hold such a text.
 - The script writes `&`, `<` and `>` as `&amp;`, `&lt;` and `&gt;`, also in a content line. The FLMM test did not show if FLMM writes the characters or the escapes into the game file. So a text with these characters, for example each infocard, is not checked in FLMM yet.
-- A change that the operations cannot express puts the whole merged file into the package, with a warning. Examples are a removed line or section, a key line that does not directly follow its header, and an anchor that FLMM can find at more than one place. A whole file cannot hold the text of the mod, so such a change with text refuses the package.
+- A change that the operations cannot express puts the whole merged file into the package, with a warning. One example is a removed line or section. Others are a key line that does not directly follow its header, and an anchor that FLMM can find at more than one place. A whole file cannot hold the text of the mod, so such a change with text refuses the package.
 - A new whole INI file of the mod with mod text refuses the package, because FLMM reads its text macros only in script operations.
 - The route tables are whole files. The package copies them with no operation and no warning (see "Route tables").
 - A new `[Base]` of `universe.ini` refuses the package. The game needs each `[Base]` before the `[system]` sections (see "universe.ini"), and an `append` puts the section at the end of the file. This version of the FLMM package cannot put a section before the first `[system]` yet.

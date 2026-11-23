@@ -473,15 +473,27 @@ These tools make a new base and read the bases of the edit view. They work in bo
 | `get_base` | Gives one base with its parts, its completeness and its problems. |
 | `base_create` | Makes a new base of the active mod from a template base. See "Make a new base with an agent" for the parts that it makes. |
 
-`list_bases` takes the filters `system`, `text`, `has_rooms`, `kind` and `active_mod_only`. `text` reads the nickname and the name. `has_rooms` keeps the bases that have each room of the list. `kind` is `station` for a base whose start room is Deck, `planet` for Cityscape or Planetscape, and `other`. `active_mod_only` keeps the bases that the active mod adds. Each row gives the name, the system, the kind, the rooms and the origin. It also counts the characters, the goods and the objects that dock with the base.
+`list_bases` takes the filters `system`, `text`, `has_rooms`, `kind` and `active_mod_only`. `text` reads the nickname and the name. `has_rooms` keeps the bases that have each room of the list. `kind` is `station` for a base whose start room is Deck, `planet` for Cityscape or Planetscape, and `other`. `active_mod_only` keeps the bases that the active mod adds.
 
-`get_base` takes a nickname or a `base:` reference. It gives the base file, the start room and each room. A room has its file, its dealers, its virtual rooms, its places for ships for sale, its doors and its cutscene scripts. `shared` is true when another base uses the same room file. A change of such a file changes each of these bases. It also gives the `[MBase]` of the bar data with its faction and its difficulty. Each character has its role, room, faction, voice and name text. The market rows come from each market file, in load order. `kept` marks the line that the games keep for each good. The result also gives the objects that dock with the base, the named object and the terrain lines.
+Each row of `list_bases` gives the name, the system, the kind, the rooms and the origin. It also counts the characters, the goods and the objects that dock with the base.
+
+`get_base` takes a nickname or a `base:` reference. It gives the base file, the start room and each room. A room has its file, its dealers, its virtual rooms, its places for ships for sale, its doors and its cutscene scripts. `shared` is true when another base uses the same room file. A change of such a file changes each of these bases.
+
+`get_base` also gives the `[MBase]` of the bar data with its faction and its difficulty. Each character has its role, room, faction, voice and name text.
+
+The market rows of `get_base` come from each market file, in load order. `kept` marks the line that the games keep for each good. The result also gives the objects that dock with the base, the named object and the terrain lines.
 
 `completeness` gives the seven steps of a base. These are the universe entry, the base file, the start room, the rooms, the characters, the market and the dock object. A missing step gives what is missing, why the step is necessary and the item to go to. The market step can give a fix in plain words, for example the buy-only lines of the ship packages that the market does not list. `problems` gives the problems of the base checks, as "The save gate" of `docs/MOD_FORMAT.md` tells.
 
-`base_create` takes `nickname`, `system`, `template` and `name`. The nickname has 1 to 31 letters, digits or `_`, and starts with a letter. A mission condition holds at most 31 characters of a base nickname. It cannot start with `intro`, because the OpenLancer engine shows such a base in the main menu. `rooms` picks the rooms of the template that the base keeps, and `start_room` the room where the player lands. `characters` is `template`, `dealers` or `none`. `local_faction` sets the faction that owns the base and the reputation of each new dock object. `market` is `template`, `none` or the nickname of another base whose market the base copies.
+`base_create` takes `nickname`, `system`, `template` and `name`. The nickname has 1 to 31 letters, digits or `_`, and starts with a letter. A mission condition holds at most 31 characters of a base nickname. The nickname cannot start with `intro`, because the OpenLancer engine shows such a base in the main menu.
 
-`dock_object` makes the object that docks with the base. For a station, give `position`. `archetype` gives a station archetype with a docking sphere, and without it the station has the archetype of the dock object of the template. For a planet base, give `planet` for a planet of the system, or `archetype` and `position` for a new planet. `fields` gives more keys of the new station or the planet, as `set_fields` takes them. The tool sets them after the lines of the template, in the same Undo step. `ring` gives the docking ring of the planet. Without `ring`, the ring copies the ring of the template, at the same height above the surface. Without `dock_object`, no object docks with the base. The result then gives the problem of the base checks in `new_problems`.
+`rooms` picks the rooms of the template that the base keeps, and `start_room` the room where the player lands. `characters` is `template`, `dealers` or `none`. `local_faction` sets the faction that owns the base and the reputation of each new dock object. `market` is `template`, `none` or the nickname of another base whose market the base copies.
+
+`dock_object` makes the object that docks with the base. For a station, give `position`. `archetype` gives a station archetype with a docking sphere, and without it the station has the archetype of the dock object of the template. For a planet base, give `planet` for a planet of the system, or `archetype` and `position` for a new planet.
+
+`fields` of `dock_object` gives more keys of the new station or the planet, as `set_fields` takes them. The tool sets them after the lines of the template, in the same Undo step.
+
+`ring` gives the docking ring of the planet. Without `ring`, the ring copies the ring of the template, at the same height above the surface. Without `dock_object`, no object docks with the base. The result then gives the problem of the base checks in `new_problems`.
 
 The result gives `base`, `file`, `dock_object` and `ring`. `select` is the dock object, or the base without one. The refusals are:
 
