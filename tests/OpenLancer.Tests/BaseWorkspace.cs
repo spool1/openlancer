@@ -71,13 +71,13 @@ internal static class BaseWorkspace
         system = Ol01
         strid_name = 1001
         file = Universe\Systems\Ol01\Bases\ol01_01_base.ini
-        BGCS_base_run_by = W02bF35
+        BGCS_base_run_by = ol_run_by_a
         [Base]
         nickname = Ol01_02_Base
         system = Ol01
         strid_name = 1002
         file = Universe\Systems\Ol01\Bases\ol01_02_base.ini
-        BGCS_base_run_by = W02bF44
+        BGCS_base_run_by = ol_run_by_b
         terrain_tiny = ol_rock_tiny
         terrain_sml = ol_rock_sml
         [Base]
