@@ -42,10 +42,10 @@ public static partial class BasePlans
     /// their new nicknames and copies the texts of the mods.
     /// </summary>
     /// <remarks>
-    /// A retail name text of a character has three lines: the faction, the title and the name of the person. An example
-    /// is "Junkers", "Rochester Bartender" and "Winston Harris". So each copied fixture character gets its own text of
-    /// the mod. Its lines are its faction, the name of the new base with the word of its role, and the name of the
-    /// person. A character of the crowd keeps its text.
+    /// A retail name text of a character has three lines: the faction, the title and the name of the person. A made-up
+    /// example is "Ol Guild", "Harbor Rock Bartender" and "Ada Vance". So each copied fixture character gets its own
+    /// text of the mod. Its lines are its faction, the name of the new base with the word of its role, and the name of
+    /// the person. A character of the crowd keeps its text.
     /// </remarks>
     private static BarPlan? MBaseCommands(EditSession session, BaseSpec spec, BaseTemplate template,
         IReadOnlyList<TemplateRoom> kept, string nickname, SectionCopies texts, List<Diagnostic> warnings)
