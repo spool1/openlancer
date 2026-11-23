@@ -5,6 +5,7 @@ using System.Linq;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Bases;
 
 namespace OpenLancer.Studio.Commands;
 
@@ -101,9 +102,9 @@ internal static class MarketEdits
     /// widget of the key.</summary>
     public static FieldKey LineKey(MarketLine line) => new(line.Section, MarketGood, line.Line);
 
-    /// <summary>True when the active mod adds the section of the line, so an edit can change the line.</summary>
-    public static bool CanChange(EditSession session, MarketLine line) =>
-        session.Get(line.Section) is { IsNew: true, ReadOnlyReason: null };
+    /// <summary>True when the active mod adds the section of the line, so an edit can change the line. The base view
+    /// gives the same rule to each market line of a base.</summary>
+    public static bool CanChange(EditSession session, MarketLine line) => BaseView.CanChange(session, line);
 
     /// <summary>
     /// The edit that makes a base sell a good. The line goes into a <c>[BaseGood]</c> of that base that the active mod

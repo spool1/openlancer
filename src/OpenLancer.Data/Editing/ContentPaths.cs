@@ -123,4 +123,26 @@ public static class ContentPaths
     /// </summary>
     internal static bool Taken(EditSession session, string installPath) =>
         InstallPaths.TryParse(installPath) is { } normal && session.HasFile(normal);
+
+    /// <summary>
+    /// The first free install path for a new file: the path itself, or else the path with <c>_2</c>, <c>_3</c> and on
+    /// before its extension (see <see cref="Taken"/>). For example, <c>BASES\my_base.ini</c> becomes
+    /// <c>BASES\my_base_2.ini</c> when a file has the path. So a new base file or a room copy never takes the place of
+    /// another file.
+    /// </summary>
+    /// <param name="installPath">An install path in any form.</param>
+    internal static string FreePath(EditSession session, string installPath)
+    {
+        if (!Taken(session, installPath))
+            return installPath;
+        var name = installPath.LastIndexOfAny(['\\', '/']) + 1;
+        var dot = installPath.LastIndexOf('.');
+        var (stem, extension) = dot > name ? (installPath[..dot], installPath[dot..]) : (installPath, "");
+        for (var n = 2; ; n++)
+        {
+            var free = $"{stem}_{n}{extension}";
+            if (!Taken(session, free))
+                return free;
+        }
+    }
 }

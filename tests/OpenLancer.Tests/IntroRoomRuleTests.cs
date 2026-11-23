@@ -50,7 +50,7 @@ public sealed class IntroRoomRuleTests
         var session = ws.Session("act");
         var info = RoomWorkspace.Section(session, IntroRoomPath, "Room_Info");
 
-        Assert.True(session.Rooms.IsIntroRoom(IntroRoomPath));
+        Assert.True(session.Bases.IsIntroRoom(IntroRoomPath));
         Assert.Empty(session.Lists.Problems(info));
 
         // A change of the active mod gives no error either, because the player cannot enter the room.
@@ -67,7 +67,7 @@ public sealed class IntroRoomRuleTests
         var session = ws.Session("act");
         var bar = RoomWorkspace.Section(session, RoomWorkspace.BarPath, "Room_Info");
 
-        Assert.False(session.Rooms.IsIntroRoom(RoomWorkspace.BarPath));
+        Assert.False(session.Bases.IsIntroRoom(RoomWorkspace.BarPath));
         session.Execute(EditCommand.RemoveName(bar, "set_script"));
 
         Assert.Contains(session.Lists.Problems(bar), p => p.Diagnostic.Key == "set_script" && p.IsError);

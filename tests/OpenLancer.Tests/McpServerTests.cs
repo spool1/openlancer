@@ -222,7 +222,11 @@ public sealed class McpServerTests
         Assert.Equal(["application/json", "application/json", "application/json", "application/json", "application/json",
             "application/json", "text/plain", "text/plain"], resources.Select(r => r.MimeType));
         var catalog = JsonNode.Parse(Assert.IsType<TextResourceContents>(Assert.Single(lists.Contents)).Text)!;
-        Assert.Equal(65, catalog["lists"]!.AsArray().Count);
+        Assert.Equal(66, catalog["lists"]!.AsArray().Count);
+        // The rooms of a base file are the rooms of one base, not of one system or one script.
+        Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "room_of_base" && !(bool)l["one_system"]! &&
+                                                          !(bool)l["one_script"]!);
+        Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "mission_trigger" && (bool)l["one_script"]!);
         Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "object_of_system" && (bool)l["one_system"]!);
         Assert.Contains(catalog["lists"]!.AsArray(), l => (string?)l!["id"] == "costume");
         // The lists of the templates and the clips of a cutscene (section 12.1 of the M8b design).

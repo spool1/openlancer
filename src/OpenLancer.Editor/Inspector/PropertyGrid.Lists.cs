@@ -104,6 +104,19 @@ internal sealed partial class PropertyGrid
     }
 
     /// <summary>
+    /// The picker field of a one-line key that names a part of a base, for example the room of a bar character. The
+    /// base view gives the entries (see <see cref="FieldBinding.Parts"/>), because no list rule can give them. The picker
+    /// offers "None", and a value outside the list shows as "Not listed". The base checks of the save gate tell what the
+    /// game does with such a value.
+    /// </summary>
+    private void PartField(FieldBinding field, ListView parts, string hint)
+    {
+        var value = field.Lines.Count > 0 && field.Lines[0].Values is [var first, ..] ? first.ToString().Trim() : "";
+        var clicked = ListValue(parts, value, null, FillWidth, hint);
+        ListPopup("##parts", clicked, field, parts, value, true, _ => picked);
+    }
+
+    /// <summary>
     /// The asset of the value of the <c>archetype</c> or the <c>loadout</c> line of an object, for the button "Show in
     /// Assets" (section 6.3 of the M23 design), as Unity pings an asset from an object field. Null for another key, and
     /// for a value that no tile has.

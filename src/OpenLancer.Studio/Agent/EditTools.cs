@@ -566,10 +566,13 @@ internal static class EditTools
     }
 
     /// <summary>The tool group of a section, or null for a section of no group, for example a loadout. A section of a
-    /// system file and the <c>[system]</c> sections of <c>universe.ini</c> are in the group Scene. A section of a file
-    /// under <c>DATA\MISSIONS</c> is in the group Missions.</summary>
+    /// system file and the <c>[system]</c> sections of <c>universe.ini</c> are in the group Scene. So are the sections of
+    /// <c>mBases.ini</c> and <c>news.ini</c>: they are below <c>DATA\MISSIONS</c>, but they hold the bar data and the news
+    /// of the bases. So a host that hides Missions still edits bases. A section of another file under
+    /// <c>DATA\MISSIONS</c> is in the group Missions.</summary>
     internal static ToolGroup? GroupOf(EditSession session, SectionRef section) =>
-        SectionKeys.IsMissionFile(section.Path) ? ToolGroup.Missions
+        session.IsMBasesFile(section.Path) || session.IsNewsFile(section.Path) ? ToolGroup.Scene
+        : SectionKeys.IsMissionFile(section.Path) ? ToolGroup.Missions
         : session.IsSystemFile(section.Path) || session.IsSystemSection(section)
             ? ToolGroup.Scene
             : null;
@@ -614,7 +617,9 @@ internal static class EditTools
         if (plan.Fixes.Where(f => !f.Part).Select(f => Ref(f.Section)).Distinct().ToList() is { Count: > 0 } asking)
             parts.Add(AgentTexts.Error("confirm_fixes", ("refs", Shown(asking))));
         // A rename also changes the mission lines that name the item. The question names their sections and scripts.
-        var missions = plan.Changes.Where(c => SectionKeys.IsMissionFile(c.Path)).ToList();
+        // Only the scripts and their ship build files hold mission lines. A change of mBases.ini or news.ini is not a
+        // mission change.
+        var missions = plan.Changes.Where(c => session.IsGuardedMissionFile(c.Path)).ToList();
         if (missions.Count > 0)
         {
             var files = Shown(missions.Select(m => m.Path).Distinct(OpenLancer.Data.IO.VfsPath.Comparer).ToList());

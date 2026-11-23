@@ -117,10 +117,11 @@ internal static class RoomWorkspace
 }
 
 /// <summary>
-/// The room files (decisions D66 and D135, test 5 of section 8.1 of the M8b design): the role from the bases of
-/// universe.ini, the schema of the room files, and the patch of a singleton room section.
+/// The base files and the room files (decisions D66 and D135, test 5 of section 8.1 of the M8b design, and section H.1 of
+/// the bases design): the roles from the bases of universe.ini, the base of each file and the rooms of each base, the
+/// schemas of the base files, the room files and mBases.ini, and the patch of a singleton room section.
 /// </summary>
-public sealed class RoomFilesTests
+public sealed class BaseFilesTests
 {
     [Fact]
     public void TheRoomFilesComeFromTheBasesOfUniverseIniWithoutRepeats()
@@ -134,7 +135,7 @@ public sealed class RoomFilesTests
         Assert.False(session.IsRoomFile(RoomWorkspace.Base1Path));
         Assert.False(session.IsRoomFile(RoomWorkspace.UniversePath));
         Assert.Contains("room", session.DataFiles.RolesOf(RoomWorkspace.DeckPath));
-        Assert.Empty(session.DataFiles.RolesOf(RoomWorkspace.Base1Path));
+        Assert.Equal(["base_files"], session.DataFiles.RolesOf(RoomWorkspace.Base1Path));
         // The first use reads the base files from the edit view, so it opens no document of them.
         Assert.Null(session.OpenedDocument(RoomWorkspace.Base1Path));
         Assert.Null(session.OpenedDocument(RoomWorkspace.Base2Path));
@@ -168,7 +169,8 @@ public sealed class RoomFilesTests
         var camera = RoomWorkspace.Section(session, RoomWorkspace.BarPath, "Camera");
 
         Assert.True(session.KnowsSchema(RoomWorkspace.BarPath));
-        Assert.False(session.KnowsSchema(RoomWorkspace.Base1Path));
+        Assert.True(session.KnowsSchema(RoomWorkspace.Base1Path));
+        Assert.False(session.KnowsSchema(RoomWorkspace.UniversePath.Replace("universe.ini", "other.ini")));
         var binding = FieldBinding.Create(session, placement, session.Get(placement)!, "start_script");
         Assert.Null(binding.ReadOnlyReason);
         Assert.NotNull(binding.Key);
@@ -203,5 +205,101 @@ public sealed class RoomFilesTests
         Assert.Equal(SectionMatchKind.Singleton, SectionKeys.For("CharacterPlacement").Kind);
         Assert.Equal(SectionMatchKind.Singleton, SectionKeys.For("room_info").Kind);
         Assert.Equal(SectionMatchKind.Singleton, SectionKeys.For("PlayerShipPlacement").Kind);
+    }
+
+    /// <summary>The map gives the base file of each base, the rooms of each base and the bases of each room file, in any
+    /// letter case. The shared bar has two users. The roles and the schemas follow the map.</summary>
+    [Fact]
+    public void TheMapGivesTheBaseFileTheRoomsAndTheUsersOfEachBase()
+    {
+        using var ws = BaseWorkspace.Create();
+        var session = ws.Session("act");
+        var bases = session.Bases;
+
+        Assert.Equal([BaseWorkspace.Station, BaseWorkspace.Planet, BaseWorkspace.Pirate], bases.Nicknames);
+        Assert.Equal([BaseWorkspace.StationPath, BaseWorkspace.PlanetPath, BaseWorkspace.PiratePath], bases.Files,
+            StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(BaseWorkspace.PlanetPath, bases.FileOf("OL01_02_BASE"), StringComparer.OrdinalIgnoreCase);
+        Assert.Null(bases.FileOf("no_base"));
+        Assert.Equal([("Deck", BaseWorkspace.StationDeckPath), ("Bar", BaseWorkspace.BarPath)],
+            bases.RoomsOf(BaseWorkspace.Station).Select(r => (r.Nickname, r.File.ToUpperInvariant())),
+            new TupleComparer());
+        Assert.Equal([BaseWorkspace.Station, BaseWorkspace.Pirate], bases.BasesOfRoomFile(BaseWorkspace.BarPath.ToLowerInvariant()));
+        Assert.Equal([BaseWorkspace.Planet], bases.BasesOfRoomFile(BaseWorkspace.CityscapePath));
+        Assert.Equal(5, bases.RoomFiles.Count);
+        Assert.True(session.IsBaseFile(BaseWorkspace.PiratePath.ToLowerInvariant().Replace('\\', '/')));
+        Assert.False(session.IsBaseFile(BaseWorkspace.BarPath));
+        Assert.True(session.IsMBasesFile(@"data\missions\MBASES.INI"));
+        Assert.True(session.IsNewsFile(BaseWorkspace.NewsPath));
+        Assert.False(session.IsMBasesFile(BaseWorkspace.NewsPath));
+
+        Assert.Equal(["base_files"], session.DataFiles.RolesOf(BaseWorkspace.StationPath));
+        Assert.Equal(["mbases"], session.DataFiles.RolesOf(BaseWorkspace.MBasesPath));
+        Assert.Equal(3, session.DataFiles.Paths("base_files").Count);
+        Assert.True(session.KnowsSchema(BaseWorkspace.StationPath));
+        Assert.True(session.KnowsSchema(BaseWorkspace.MBasesPath));
+        Assert.False(session.KnowsSchema(BaseWorkspace.NewsPath));
+        // The first use reads the files from the edit view, so it opens no document of them.
+        Assert.Null(session.OpenedDocument(BaseWorkspace.StationPath));
+    }
+
+    /// <summary>The map reads W of universe.ini and of the base files, so an edit shows at once, and an undo puts the
+    /// map back.</summary>
+    [Fact]
+    public void AnEditOfUniverseIniOrOfABaseFileChangesTheMap()
+    {
+        using var ws = BaseWorkspace.Create();
+        var session = ws.Session("act");
+        var pirate = BaseWorkspace.Section(session, BaseWorkspace.UniversePath, "Base", BaseWorkspace.Pirate);
+
+        session.Execute(EditCommand.DeleteSection(pirate));
+        Assert.False(session.IsBaseFile(BaseWorkspace.PiratePath));
+        Assert.Equal([BaseWorkspace.Station], session.Bases.BasesOfRoomFile(BaseWorkspace.BarPath));
+        Assert.False(session.IsRoomFile(BaseWorkspace.PirateDeckPath));
+        session.Undo();
+        Assert.True(session.IsBaseFile(BaseWorkspace.PiratePath));
+
+        var room = BaseWorkspace.Section(session, BaseWorkspace.StationPath, "Room", "Bar");
+        session.Execute(EditCommand.SetLinesFromText(room, "file", [@"Universe\Systems\Ol02\Bases\Rooms\ol02_01_deck.ini"]));
+        Assert.Equal([BaseWorkspace.Pirate], session.Bases.BasesOfRoomFile(BaseWorkspace.BarPath));
+        Assert.Equal([BaseWorkspace.Station, BaseWorkspace.Pirate], session.Bases.BasesOfRoomFile(BaseWorkspace.PirateDeckPath));
+    }
+
+    /// <summary>The editor knows the schemas of a base file and of mBases.ini (section C.3 of the bases design).
+    /// [BaseInfo] has the keys of the fork and the retail key ship_repair_cost. The children of an [MBase] take
+    /// edits, and individual_name holds a string id.</summary>
+    [Fact]
+    public void TheSchemasOfTheBaseFilesAndOfMBasesMakeTheirSectionsEditable()
+    {
+        using var ws = BaseWorkspace.Create();
+        var session = ws.Session("act");
+        var info = BaseWorkspace.Section(session, BaseWorkspace.StationPath, "BaseInfo");
+        var room = BaseWorkspace.Section(session, BaseWorkspace.StationPath, "Room", "Deck");
+        var npc = BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "GF_NPC", "ol01_01_npc_1");
+        var mbase = BaseWorkspace.Section(session, BaseWorkspace.MBasesPath, "MBase", BaseWorkspace.Station);
+
+        Assert.Equal(["nickname", "start_room", "price_variance", "ship_repair_cost"],
+            session.Schema(info).Select(k => k.Name));
+        Assert.Equal(typeof(float), session.Schema(info, "ship_repair_cost")!.ClrType);
+        Assert.Equal(["nickname", "file"], session.Schema(room).Select(k => k.Name));
+        Assert.Equal(Data.Strings.StringKind.String, session.Schema(npc, "individual_name")!.TextKind);
+        Assert.NotNull(session.Schema(npc, "rumor"));
+        Assert.NotNull(session.Schema(mbase, "local_faction"));
+        Assert.Empty(session.Check(info));
+        Assert.Empty(session.Check(npc));
+        foreach (var (section, key) in new[] { (info, "start_room"), (npc, "head"), (mbase, "diff") })
+        {
+            var binding = FieldBinding.Create(session, section, session.Get(section)!, key);
+            Assert.Null(binding.ReadOnlyReason);
+        }
+    }
+
+    private sealed class TupleComparer : IEqualityComparer<(string, string)>
+    {
+        public bool Equals((string, string) x, (string, string) y) =>
+            StringComparer.OrdinalIgnoreCase.Equals(x.Item1, y.Item1) && StringComparer.OrdinalIgnoreCase.Equals(x.Item2, y.Item2);
+
+        public int GetHashCode((string, string) obj) =>
+            HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Item1), StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Item2));
     }
 }

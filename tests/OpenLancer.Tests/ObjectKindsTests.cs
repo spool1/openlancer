@@ -129,6 +129,8 @@ public sealed class ObjectKindsTests
         Assert.Same(ObjectKinds.AsteroidField, ObjectKinds.OfList("AsteroidField"));
         // The list of the animation clips shows the glyph of the clip picker.
         Assert.Same(ObjectKinds.Thn.Clip, ObjectKinds.OfList("Animation"));
+        // The pickers of the parts of a base show a room and a character.
+        Assert.Equal(("Room", "Character"), (ObjectKinds.OfList("Room").Label, ObjectKinds.OfList("Character").Label));
     }
 
     [Fact]

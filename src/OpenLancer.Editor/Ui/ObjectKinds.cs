@@ -260,6 +260,8 @@ internal static class ObjectKinds
         "faction" => Lists.Faction,
         "system" => StarSystem,
         "base" => Lists.Base,
+        "room" => Lists.Room,
+        "character" => Lists.Character,
         "object" => OtherObject,
         "zone" => Zones.Other,
         "encounter" => Zones.Population,
@@ -351,6 +353,8 @@ internal static class ObjectKinds
         public static readonly ObjectKind Loadout = new("Loadout", EditorIcons.Boxes, EditorTheme.Text);
         public static readonly ObjectKind Faction = new("Faction", EditorIcons.Users, EditorTheme.Text);
         public static readonly ObjectKind Base = new("Base", EditorIcons.DoorOpen, Station.Color);
+        public static readonly ObjectKind Room = new("Room", EditorIcons.DoorOpen, EditorTheme.Text);
+        public static readonly ObjectKind Character = new("Character", EditorIcons.User, EditorTheme.Text);
         public static readonly ObjectKind StarPart = new("Star part", EditorIcons.Star, Sun.Color);
         public static readonly ObjectKind Pilot = new("Pilot", EditorIcons.User, EditorTheme.Text);
         public static readonly ObjectKind Sound = new("Sound", EditorIcons.VolumeUp, EditorTheme.Text);

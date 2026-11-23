@@ -45,6 +45,7 @@ public sealed class NameKeyKindTests(ITestOutputHelper output)
         (null, "ids_short_name", StringKind.String),
         (null, "strid_name", StringKind.String),
         (null, "tradelane_space_name", StringKind.String),
+        (null, "individual_name", StringKind.String),
         (null, "ids_info", StringKind.Infocard),
         (null, "ids_info1", StringKind.Infocard),
         (null, "ids_info2", StringKind.Infocard),

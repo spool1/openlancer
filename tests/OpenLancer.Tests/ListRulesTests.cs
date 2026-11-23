@@ -46,6 +46,9 @@ public sealed class ListRulesTests
         ["system"] = typeof(StarSystem),
         // The room files of the bases (decision D135 of the M8b design).
         ["room"] = typeof(Room),
+        // The base files, and the bar and mission data of the bases (section C.3 of the bases design).
+        ["base_files"] = typeof(Base),
+        ["mbases"] = typeof(LibreLancer.Data.Schema.MBases.MBasesIni),
         // The nebula and asteroid field files that the system files name (milestone M3).
         ["nebula_files"] = typeof(Nebula),
         ["field_files"] = typeof(AsteroidField),

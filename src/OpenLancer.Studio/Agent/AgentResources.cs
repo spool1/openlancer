@@ -227,7 +227,8 @@ public static class AgentResources
                 ["label"] = list.Label,
                 ["sections"] = new JsonArray((list.Source?.Sections ?? []).Select(s => (JsonNode)s).ToArray()),
                 ["one_system"] = list.Source is { Scoped: true, Role: null },
-                ["one_script"] = list.Source is { Scoped: true, Role: not null },
+                ["one_script"] = list.Source is { Scoped: true, Role: { } role } &&
+                                 ListRules.Retail.Roles.TryGetValue(role, out var scripts) && scripts.MissionFiles,
                 ["fixed_values"] = list.Enum != null,
             });
         }

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Bases;
+using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Editing.Universe;
 
@@ -47,7 +49,8 @@ internal sealed class FieldBinding
     public const string NoSchemaReason = "The editor cannot edit this file yet. It reads it for the lists.";
 
     private FieldBinding(SectionRef section, string name, KeySchema? key, IReadOnlyList<EntryView> lines,
-        ValueOrigin origin, string? originMod, IReadOnlyList<string> laterMods, string? readOnlyReason, bool canRevert)
+        ValueOrigin origin, string? originMod, IReadOnlyList<string> laterMods, string? readOnlyReason, bool canRevert,
+        ListView? parts)
     {
         Section = section;
         Name = name;
@@ -58,6 +61,7 @@ internal sealed class FieldBinding
         LaterMods = laterMods;
         ReadOnlyReason = readOnlyReason;
         CanRevert = canRevert;
+        Parts = parts;
         Text = FieldEdit.Format(lines);
     }
 
@@ -93,6 +97,14 @@ internal sealed class FieldBinding
     /// the lower lines.</summary>
     public bool CanRevert { get; }
 
+    /// <summary>
+    /// The entries of a key that names a part of a base, from the base view (see <see cref="BaseView.PartList"/>): the
+    /// rooms of the base for <c>[GF_NPC] room</c>, or its characters for value 0 of <c>[MRoom] fixture</c>. Null for
+    /// another key. A list rule cannot give these entries, because the base of the section names them. So the picker of
+    /// such a key reads them here.
+    /// </summary>
+    public ListView? Parts { get; }
+
     /// <summary>One line that says which layer sets the key.</summary>
     public string OriginText => Origin switch
     {
@@ -111,7 +123,7 @@ internal sealed class FieldBinding
                      LinkLock(session, section, name);
         return new FieldBinding(section, key?.Name ?? name, key, view.Lines(name), origin, mod,
             session.LaterModsThatChange(section, name), reason,
-            reason == null && origin == ValueOrigin.ActiveMod && !view.IsNew);
+            reason == null && origin == ValueOrigin.ActiveMod && !view.IsNew, BaseView.PartList(session, section, name));
     }
 
     /// <summary>

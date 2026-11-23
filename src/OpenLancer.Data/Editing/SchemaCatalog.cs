@@ -59,6 +59,9 @@ internal static class SchemaCatalog
         ["ids_short_name"] = StringKind.String,
         ["strid_name"] = StringKind.String,
         ["tradelane_space_name"] = StringKind.String,
+        // The name of a bar character of mBases.ini, and of a mission NPC. Retail gives three lines: the faction, the
+        // title and the name of the person.
+        ["individual_name"] = StringKind.String,
         ["ids_info"] = StringKind.Infocard,
         // The ship dealer shows these three infocards: the description, the stats labels and the stats values.
         ["ids_info1"] = StringKind.Infocard,

@@ -150,7 +150,7 @@ public sealed class ListRetailTests(ITestOutputHelper output)
         Assert.DoesNotContain(problems, p => p.IsError);
         Assert.Equal(4, problems.Count);
         Assert.DoesNotContain(problems, p => p.Kind == ListProblemKind.RequiredMissing);
-        Assert.Equal(3, session.Rooms.Files.Count(session.Rooms.IsIntroRoom));
+        Assert.Equal(3, session.Bases.RoomFiles.Count(session.Bases.IsIntroRoom));
         Assert.Equal(2, problems.Count(p => p.Diagnostic.Key == "parent" && p.Value!.Equals("Li01_space_police_dmg_1",
             StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(problems, p => p.Diagnostic.Key == "lens_glow" && p.Value == "blue_lens_glow");

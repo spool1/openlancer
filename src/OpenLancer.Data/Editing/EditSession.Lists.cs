@@ -29,7 +29,7 @@ public sealed partial class EditSession
     internal SectionTable Table => table ??= new SectionTable(OpenDocument);
 
     /// <summary>The files of each role of the rule data.</summary>
-    internal DataFiles DataFiles => dataFiles ??= new DataFiles(FreelancerIni, ruleData, Systems, Rooms, FieldFiles,
+    internal DataFiles DataFiles => dataFiles ??= new DataFiles(FreelancerIni, ruleData, Systems, Bases, FieldFiles,
         () => MissionScriptPaths, () => MissionShipPaths);
 
     /// <summary>The rule data of the lists: the retail rules, or the rules of a test.</summary>
@@ -60,14 +60,14 @@ public sealed partial class EditSession
         Lists.Problems(target).Select(p => p.Diagnostic).ToList();
 
     /// <summary>
-    /// True when the editor knows the schema of the file: an item file, <c>universe.ini</c>, a star system file or a
-    /// room file (decision D135 of the M8b design). The editor reads the other files only for the lists, so the
-    /// Inspector shows their sections read-only (decision D123).
+    /// True when the editor knows the schema of the file: an item file, <c>universe.ini</c>, a star system file, a base
+    /// file, a room file (decision D135 of the M8b design) or <c>mBases.ini</c>. The editor reads the other files only
+    /// for the lists, so the Inspector shows their sections read-only (decision D123).
     /// </summary>
     public bool KnowsSchema(string path) =>
         Items.KindOf(path) != null ||
         UniversePath is { } universe && VfsPath.Comparer.Equals(VfsPath.Normalize(path), universe) ||
-        IsSystemFile(path) || IsRoomFile(path);
+        IsSystemFile(path) || IsBaseFile(path) || IsRoomFile(path) || IsMBasesFile(path);
 
     /// <summary>
     /// The layer that gives an entry of a list: the active mod when it adds the section, else the last lower mod that

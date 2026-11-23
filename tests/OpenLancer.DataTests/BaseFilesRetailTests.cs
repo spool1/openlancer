@@ -16,16 +16,17 @@ using Xunit;
 namespace OpenLancer.DataTests;
 
 /// <summary>
-/// The room files and the room lines on the retail data (retail tests 4, 5 and 6 of the M8b design): the role
-/// <c>room</c> holds the room files that the engine reads, the <c>scene</c> rule reads the value that the engine reads in
-/// each of the 666 retail lines, and a new cutscene that a room line names plays in the room after the save.
+/// The base files, the room files and the room lines on the retail data (retail tests 4, 5 and 6 of the M8b design, and
+/// section H.2 of the bases design): the counts of the bases, rooms and bar data, the role <c>room</c> holds the room
+/// files that the engine reads, the <c>scene</c> rule reads the value that the engine reads in each of the 666 retail
+/// lines, and a new cutscene that a room line names plays in the room after the save.
 /// </summary>
-public sealed class RoomFilesRetailTests(ITestOutputHelper output)
+public sealed class BaseFilesRetailTests(ITestOutputHelper output)
 {
     private static readonly ThnRoomRole[] RoomKeys =
         [ThnRoomRole.Set, ThnRoomRole.Scene, ThnRoomRole.Cart, ThnRoomRole.Start, ThnRoomRole.Landing, ThnRoomRole.Launching];
 
-    static RoomFilesRetailTests() => AppHandler.ConsoleInit(silent: true);
+    static BaseFilesRetailTests() => AppHandler.ConsoleInit(silent: true);
 
     /// <summary>The role holds the same files as the rooms of the engine data and the room chain of the reference scan:
     /// 446 room files of 461 [Room] sections of 197 bases. The first use takes less than 200 ms, and it opens no base

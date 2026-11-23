@@ -13,19 +13,9 @@ public delegate bool SectionParser<T>(Section section, [NotNullWhen(true)] out T
 public sealed partial class EditSession
 {
     private SystemFiles? systems;
-    private RoomFiles? rooms;
 
     /// <summary>The star system files of the edit view, and <c>universe.ini</c>.</summary>
     internal SystemFiles Systems => systems ??= new SystemFiles(SystemFiles.ReadUniversePath(FreelancerIni), OpenDocument);
-
-    /// <summary>The room files of the edit view, from the bases of <c>universe.ini</c> (decision D135 of the M8b
-    /// design).</summary>
-    internal RoomFiles Rooms => rooms ??= new RoomFiles(this, () => FreelancerIni);
-
-    /// <summary>True when a <c>[Room]</c> of a base file of the edit view names the file. The editor knows the schema of
-    /// a room file, so the Inspector edits its <c>[Room_Info]</c>, <c>[CharacterPlacement]</c> and
-    /// <c>[PlayerShipPlacement]</c>.</summary>
-    public bool IsRoomFile(string path) => Rooms.Contains(path);
 
     /// <summary>The install path of the <c>universe.ini</c> that the <c>freelancer.ini</c> of the edit view names, or
     /// null when it names none.</summary>

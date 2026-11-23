@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using LibreLancer.Data.Ini;
-using LibreLancer.Data.Schema.Universe;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Ini;
 using OpenLancer.Data.Overlay;
@@ -41,8 +40,8 @@ public sealed partial class EditSession
 
     /// <summary>
     /// The keys that the engine reads in a section, in declaration order. The list is empty when the editor does not
-    /// know the schema of the section. The editor knows the schema of the item files, of <c>universe.ini</c> and of
-    /// the star system files.
+    /// know the schema of the section. The editor knows the schema of the item files, of <c>universe.ini</c>, of the
+    /// star system files, of the base files, of the room files and of <c>mBases.ini</c>.
     /// </summary>
     public IReadOnlyList<KeySchema> Schema(SectionRef target) => SchemaOf(target)?.Keys ?? [];
 
@@ -100,8 +99,7 @@ public sealed partial class EditSession
     private SectionSchema? SchemaOf(SectionRef target) =>
         Items.KindOf(target.Path) is { } kind
             ? SchemaCatalog.Section(ItemIndex.SchemaOf(kind), target.Id.Type)
-            : Systems.SchemaOf(target.Path, target.Id.Type) ??
-              (Rooms.Contains(target.Path) ? SchemaCatalog.Section(typeof(Room), target.Id.Type) : null);
+            : Systems.SchemaOf(target.Path, target.Id.Type) ?? Bases.SchemaOf(target.Path, target.Id.Type);
 
     /// <summary>True when a value of a line of the section is a text placeholder. Most sections have no placeholder,
     /// so the check of rule S8 can skip them. This is important for the catch-up of a system in the scene, which

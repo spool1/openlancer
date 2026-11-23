@@ -240,10 +240,12 @@ internal sealed partial class PropertyGrid
             var labelsOf = slots ?? labels ?? DefaultLabels(field.Key);
             var values = FieldEdit.Values(shape.Text).Length;
             var listed = single && IsListed(rules) && ListOf(field, rules[0]) != null;
+            // A key that names a part of a base, for example the room of a bar character, gets a picker of the parts.
+            var parts = single && rules.Count == 0 ? field.Parts : null;
             var wholeLabels = whole != null && single && shape.Lines.Count == 1 ? labelsOf?.Invoke(values) : null;
             var widget = wholeLabels != null && WholeValues(shape.Text, wholeLabels.Count, whole!.Value) != null
                 ? BoundWidget.WholeNumbers
-                : WidgetOf(field.Key, shape.Lines.Count, values, labelsOf, listed);
+                : WidgetOf(field.Key, shape.Lines.Count, values, labelsOf, listed || parts != null);
             switch (widget)
             {
                 case BoundWidget.WholeNumbers:
@@ -254,6 +256,9 @@ internal sealed partial class PropertyGrid
                     break;
                 case BoundWidget.Enum:
                     EnumField(field, field.Key!.ClrType!, hint);
+                    break;
+                case BoundWidget.List when parts != null:
+                    PartField(field, parts, hint);
                     break;
                 case BoundWidget.List:
                     ListField(field, rules[0], hint);

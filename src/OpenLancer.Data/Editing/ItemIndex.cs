@@ -245,6 +245,25 @@ internal sealed class ItemIndex
         return result;
     }
 
+    /// <summary>The <c>marketgood</c> lines of all market files at a base, in load order. The base compares without
+    /// letter case.</summary>
+    public IReadOnlyList<MarketLine> BaseMarketLines(string baseNickname)
+    {
+        var result = new List<MarketLine>();
+        foreach (var market in Items(ItemFileKind.Markets))
+        {
+            if (First(market.Section, "base") is not { } baseName || !Is(baseName.Trim(), baseNickname.Trim()))
+                continue;
+            var lines = market.Section.Where(e => Is(e.Name, "marketgood")).ToList();
+            for (var i = 0; i < lines.Count; i++)
+            {
+                if (lines[i].Count > 0)
+                    result.Add(new MarketLine(market.Ref, baseName, i, lines[i].ToList()));
+            }
+        }
+        return result;
+    }
+
     /// <summary>The names of the lines that name a section of a kind by its nickname, for each section that has
     /// such a line (see <see cref="References"/>).</summary>
     public IEnumerable<(SectionRef Section, string Name)> ReferencesTo(ItemFileKind kind, string nickname)

@@ -185,6 +185,7 @@ public sealed record ListRule(string Role, string Section, string Key, int Index
 /// <param name="SystemFiles">True for the files that the <c>[system]</c> sections of <c>universe.ini</c> name.</param>
 /// <param name="RoomFiles">True for the room files that the <c>[Room]</c> sections of the base files name (decision D135
 /// of the M8b design).</param>
+/// <param name="BaseFiles">True for the base files that the <c>[Base]</c> sections of <c>universe.ini</c> name.</param>
 /// <param name="FieldFiles">For the nebula or asteroid field files: the section type of the system files whose
 /// <c>file</c> lines name the files, <c>Nebula</c> or <c>Asteroids</c> (milestone M3). Null for another role.</param>
 /// <param name="MissionFiles">True for the mission scripts of <c>MissionFiles</c> (section 14.1 of the M6a
@@ -193,10 +194,11 @@ public sealed record ListRule(string Role, string Section, string Key, int Index
 /// design).</param>
 internal sealed record RoleDefinition(string Name, string? Data, bool Last, string? Fallback,
     IReadOnlyList<string> Paths, bool Engine, bool Universe, bool SystemFiles, bool RoomFiles, string? FieldFiles = null,
-    bool MissionFiles = false, bool NpcShipFiles = false)
+    bool MissionFiles = false, bool NpcShipFiles = false, bool BaseFiles = false)
 {
     /// <summary>True when the files of the role change in a session, so the editor finds them at each use.</summary>
-    public bool Dynamic => Universe || SystemFiles || RoomFiles || FieldFiles != null || MissionFiles || NpcShipFiles;
+    public bool Dynamic => Universe || SystemFiles || RoomFiles || BaseFiles || FieldFiles != null || MissionFiles ||
+                           NpcShipFiles;
 }
 
 /// <summary>A template of Create in the Scene (decision D233 of the M3 design).</summary>
@@ -392,7 +394,8 @@ internal sealed class ListRules
     private static RoleDefinition ReadRole(string name, JsonElement e) => new(name,
         String(e, "data"), Bool(e, "last"), String(e, "fallback"), Strings(e, "paths"),
         !e.TryGetProperty("engine", out var engine) || engine.GetBoolean(), Bool(e, "universe"), Bool(e, "systemFiles"),
-        Bool(e, "roomFiles"), String(e, "fieldFiles"), Bool(e, "missionFiles"), Bool(e, "npcShipFiles"));
+        Bool(e, "roomFiles"), String(e, "fieldFiles"), Bool(e, "missionFiles"), Bool(e, "npcShipFiles"),
+        Bool(e, "baseFiles"));
 
     private static AssetCategoryDefinition ReadAssetCategory(JsonElement e) => new(e.GetProperty("id").GetString()!,
         e.GetProperty("label").GetString()!, String(e, "kind"), String(e, "list"), String(e, "split"));

@@ -135,6 +135,30 @@ public sealed class ContentPathsTests
         Assert.False(ContentPaths.Taken(session, newPath));
     }
 
+    /// <summary>A new base file or room copy takes a free path: the path itself, or the path with _2, _3 and on before
+    /// its extension. The test of a taken path decides, so a file of W, of the lower layer and of any letter case
+    /// counts.</summary>
+    [Fact]
+    public void ANewFileTakesTheFirstFreePath()
+    {
+        using var ws = ListWorkspace.Create(
+            lowerFiles: new()
+            {
+                [@"files\DATA\MODS\act\BASES\Ol01_01_Base.ini"] = "[BaseInfo]\nnickname = a\n",
+                [@"files\DATA\MODS\act\v1.0\notes"] = "text",
+            });
+        var session = ws.Session("act");
+        var path = ContentPaths.NewBaseFile("act", "Ol01_01_Base");
+
+        Assert.Equal(@"DATA\MODS\act\BASES\Ol01_01_Base_2.ini", ContentPaths.FreePath(session, path));
+        session.Execute(EditCommand.NewFile(@"DATA\MODS\act\BASES\OL01_01_BASE_2.ini", []));
+        Assert.Equal(@"DATA\MODS\act\BASES\Ol01_01_Base_3.ini", ContentPaths.FreePath(session, path));
+        var free = ContentPaths.NewRoomFile("act", "Ol01_02_Base", "bar");
+        Assert.Equal(free, ContentPaths.FreePath(session, free));
+        // A dot in a folder name is no extension.
+        Assert.Equal(@"DATA\MODS\act\v1.0\notes_2", ContentPaths.FreePath(session, @"DATA\MODS\act\v1.0\notes"));
+    }
+
     /// <summary>The sections of an INI text, for <see cref="EditCommand.NewFile"/>.</summary>
     internal static IReadOnlyList<SectionEntries> Sections(string text) =>
         Data.Ini.IniDocument.Parse("new.ini", System.Text.Encoding.ASCII.GetBytes(text)).Sections

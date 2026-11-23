@@ -97,7 +97,7 @@ internal static class ListChecks
             .SelectMany(r => lists.RuleData.ByRoleAndSection.GetValueOrDefault((r.ToLowerInvariant(),
                 section.Name.ToLowerInvariant())) ?? [])
             .Where(r => !unusableOnly || ListRule.MakesUnusable(r.Effect))
-            .Where(r => !r.SkipIntroRooms || !session.Rooms.IsIntroRoom(target.Path))
+            .Where(r => !r.SkipIntroRooms || !session.Bases.IsIntroRoom(target.Path))
             .GroupBy(r => r.Key, StringComparer.OrdinalIgnoreCase);
         var lower = document.BaseSection(document.IdentityAt(index));
         var changedSection = lower == null || !ReferenceEquals(lower, section);

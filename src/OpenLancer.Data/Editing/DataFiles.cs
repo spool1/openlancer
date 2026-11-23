@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using LibreLancer.Data.Ini;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.IO;
 
@@ -14,10 +15,11 @@ namespace OpenLancer.Data.Editing;
 /// </summary>
 /// <remarks>
 /// <para>The roles come from <c>freelancer.ini</c> of the edit view, which a patch cannot change. So they do not
-/// change in a session, except the <c>system</c> and <c>room</c> roles: the system files are the files that the
-/// <c>[system]</c> sections of W of <c>universe.ini</c> name, the room files are the files that the <c>[Room]</c>
-/// sections of the base files name (see <see cref="RoomFiles"/>), and the nebula and field files are the files that the
-/// <c>[Nebula]</c> and <c>[Asteroids]</c> sections of the system files name (see <see cref="FieldFiles"/>).</para>
+/// change in a session, except the dynamic roles: the system files are the files that the <c>[system]</c> sections of W
+/// of <c>universe.ini</c> name, the base files are the files that the <c>[Base]</c> sections name, the room files are the
+/// files that the <c>[Room]</c> sections of the base files name (see <see cref="BaseFiles"/>), and the nebula and field
+/// files are the files that the <c>[Nebula]</c> and <c>[Asteroids]</c> sections of the system files name (see
+/// <see cref="FieldFiles"/>).</para>
 /// <para>The <c>[Data]</c> names compare without letter case, as the engine compares them. Retail spells
 /// <c>PetalDB</c> and <c>WeaponModDB</c>.</para>
 /// </remarks>
@@ -25,7 +27,7 @@ internal sealed class DataFiles
 {
     private readonly ListRules rules;
     private readonly SystemFiles systems;
-    private readonly RoomFiles rooms;
+    private readonly BaseFiles bases;
     private readonly FieldFiles fields;
     private readonly Func<IReadOnlyList<string>> missionFiles;
     private readonly Func<IReadOnlyList<string>> npcShipFiles;
@@ -35,12 +37,12 @@ internal sealed class DataFiles
     /// <param name="freelancerIni">The sections of <c>freelancer.ini</c> of the edit view.</param>
     /// <param name="missionFiles">Gives the mission scripts of the edit view (section 14.1 of the M6a design).</param>
     /// <param name="npcShipFiles">Gives the files of the NPC ship builds of the edit view.</param>
-    public DataFiles(IReadOnlyList<Section> freelancerIni, ListRules rules, SystemFiles systems, RoomFiles rooms,
+    public DataFiles(IReadOnlyList<Section> freelancerIni, ListRules rules, SystemFiles systems, BaseFiles bases,
         FieldFiles fields, Func<IReadOnlyList<string>>? missionFiles = null, Func<IReadOnlyList<string>>? npcShipFiles = null)
     {
         this.rules = rules;
         this.systems = systems;
-        this.rooms = rooms;
+        this.bases = bases;
         this.fields = fields;
         this.missionFiles = missionFiles ?? (() => []);
         this.npcShipFiles = npcShipFiles ?? (() => []);
@@ -76,7 +78,9 @@ internal sealed class DataFiles
             return missionFiles();
         if (definition.NpcShipFiles)
             return npcShipFiles();
-        return definition.SystemFiles ? systems.Files : definition.RoomFiles ? rooms.Files : [];
+        if (definition.BaseFiles)
+            return bases.Files;
+        return definition.SystemFiles ? systems.Files : definition.RoomFiles ? bases.RoomFiles : [];
     }
 
     /// <summary>The system files whose sections name a nebula or field file, for the scope <c>owner</c> (milestone
@@ -96,7 +100,8 @@ internal sealed class DataFiles
         foreach (var role in rules.Roles.Values)
         {
             if (role.Universe && systems.UniversePath is { } universe && VfsPath.Comparer.Equals(universe, normal) ||
-                role.SystemFiles && systems.IsSystemFile(normal) || role.RoomFiles && rooms.Contains(normal) ||
+                role.SystemFiles && systems.IsSystemFile(normal) || role.BaseFiles && bases.IsBaseFile(normal) ||
+                role.RoomFiles && bases.IsRoomFile(normal) ||
                 role.FieldFiles != null && fields.Contains(role.FieldFiles, normal) ||
                 role.MissionFiles && missionFiles().Contains(normal, VfsPath.Comparer) ||
                 role.NpcShipFiles && npcShipFiles().Contains(normal, VfsPath.Comparer))
