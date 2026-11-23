@@ -45,9 +45,9 @@ internal sealed record BaseProblem(Diagnostic Problem, BaseStep Step);
 /// check gives a warning.
 /// </summary>
 /// <remarks>
-/// <para>An error comes only from a section that the active mod adds or changes, or from a file that the active mod
-/// adds, changes or deletes. The same problem of the base game or of a lower mod is a warning, so it does not stop the
-/// save.</para>
+/// <para>An error comes only from a line that the active mod sets or removes, from a section that it adds, or from a
+/// file that it adds, changes or deletes. The same problem of the base game or of a lower mod is a warning, so it does
+/// not stop the save.</para>
 /// <para>The gate reads only the errors (see <see cref="SaveErrors"/>). The warnings show in the checks of each section
 /// (see <see cref="Check"/>) and in the problems of a base (see <see cref="Problems"/>). The checks of the retail
 /// targets give the problems that only the retail games have as errors (see
@@ -69,6 +69,9 @@ internal static class BaseChecks
 
     /// <summary>The nickname prefix of an intro base. The OpenLancer engine shows its rooms in the main menu.</summary>
     private const string IntroPrefix = "intro";
+
+    /// <summary>The keys of a character that the game needs to show it.</summary>
+    private static readonly string[] CharacterKeys = ["body", "base_appr", "voice", "individual_name"];
 
     /// <summary>The most ship packages that the trade-in warning names.</summary>
     private const int ShownShips = 5;
@@ -203,18 +206,18 @@ internal static class BaseChecks
             var value = entry == null ? null : SceneSections.Last(entry, "file");
             if (value == null)
             {
-                Add(Mine(view.Entry), view.Entry, "file",
+                Add(Mine(view.Entry, "file"), view.Entry, "file",
                     $"The base {Name} names no base file. The game can crash when the player docks here.");
                 return;
             }
             if (view.File == null || !session.HasFile(view.File))
             {
-                Add(Mine(view.Entry, view.File), view.Entry, "file",
+                Add(Mine(view.Entry, "file", view.File), view.Entry, "file",
                     $"The base file {value} of {Name} does not exist. The game can crash when the player docks here.");
                 return;
             }
             if (view.Info == null)
-                Add(Mine(view.Entry, view.File), view.Entry, "file",
+                Add(Mine(view.Entry, "file", view.File), view.Entry, "file",
                     $"The base file {value} of {Name} has no [BaseInfo] with a start room. The game can crash when the " +
                     "player docks here.");
 
@@ -232,20 +235,20 @@ internal static class BaseChecks
             var value = section == null ? null : SceneSections.Last(section, "file");
             if (room.Nickname.Length == 0)
             {
-                Add(Mine(room.Section), room.Section, "nickname",
+                Add(Mine(room.Section, "nickname"), room.Section, "nickname",
                     $"A [Room] of the base file of {Name} has no nickname. The game keeps a broken room, and it can crash.");
                 return;
             }
             if (value == null)
             {
-                Add(Mine(room.Section), room.Section, "file",
+                Add(Mine(room.Section, "file"), room.Section, "file",
                     $"The room {room.Nickname} of {Name} names no room file. The game keeps a broken room, and it can " +
                     "crash.");
                 return;
             }
             if (room.File == null || !session.HasFile(room.File))
             {
-                Add(Mine(room.Section, room.File), room.Section, "file",
+                Add(Mine(room.Section, "file", room.File), room.Section, "file",
                     $"The room file {value} of the room {room.Nickname} of {Name} does not exist. The game can crash when " +
                     "the player enters this room.");
                 return;
@@ -332,10 +335,11 @@ internal static class BaseChecks
             $"The room {room} in the [MBase] of {Name} is not a room of the base. The game ignores this line.";
 
         /// <summary>The parts that the game needs to show a character of the active mod: a body or a costume, a voice
-        /// and a name.</summary>
+        /// and a name. A character is of the active mod when the active mod adds it, or sets or removes one of these
+        /// lines. Each character of a whole file of the active mod is of the active mod.</summary>
         private void Complete(SectionRef part, string nickname, Section section)
         {
-            if (session.Get(part) is not { IsChanged: true })
+            if (!CharacterKeys.Any(k => session.Origin(part, k).Origin == ValueOrigin.ActiveMod))
                 return;
             var missing = new List<string>();
             if (Value(section, "body") == null && Value(section, "base_appr") == null)
@@ -440,10 +444,10 @@ internal static class BaseChecks
             }
         }
 
-        /// <summary>True when the active mod causes a problem of a section: it adds or changes the section, or it adds,
-        /// changes or deletes the file.</summary>
-        private bool Mine(SectionRef section, string? file = null) =>
-            session.Get(section) is { IsChanged: true } || file != null && state.Changed.Contains(file);
+        /// <summary>True when the active mod causes a problem of a key of a section: it sets or removes the lines of the
+        /// key, it adds the section, or it adds, changes or deletes the file that the key names.</summary>
+        private bool Mine(SectionRef section, string key, string? file = null) =>
+            session.Origin(section, key).Origin == ValueOrigin.ActiveMod || file != null && state.Changed.Contains(file);
 
         private void Add(bool error, SectionRef target, string key, string message) =>
             problems.Add(new BaseProblem(error ? Error(target, key, message) : Warning(target, key, message), step));

@@ -161,32 +161,36 @@ public sealed class ComponentChecksTests
         var session = ws.Session("act");
 
         var other = Assert.Single(ComponentChecks.Check(session, Li02("Object", "Li02_01"), onlyActiveMod: false));
-        Assert.Equal("Li02_01: The base Li01_01_Base is in Li01. After a launch, the game puts the player in Li01.", other.Message);
+        Assert.Equal("The object Li02_01 in Li02 docks with Li01_01_Base, but Li01_01_Base is in Li01. After a launch, the " +
+                     "game puts the player in Li01.", other.Message);
+        Assert.Equal((DiagnosticSeverity.Warning, "dock_with"), (other.Severity, other.Key));
         session.Execute(EditCommand.SetLinesFromText(Object("Li01_dock"), "archetype", ["station_nodock"]));
         Assert.Contains(ComponentChecks.Check(session, Object("Li01_dock")),
             p => p.Message == "Li01_dock: The player cannot dock here: the archetype station_nodock has no docking sphere.");
         Assert.Empty(ComponentChecks.Check(session, Li02("Object", "Li02_01")));
     }
 
-    /// <summary>Decision D254: a base without a docking object or without a base object in its system gives two
-    /// warnings. The bases of the workspace come after their systems, so the universe checks warn about them too. This
-    /// test leaves out those warnings.</summary>
+    /// <summary>Decision D254 and the base checks: a base that no object docks with, and without a base object in its
+    /// system, gives two warnings. The bases of the workspace come after their systems and have no base file, so other
+    /// checks warn about them too. This test reads only the dock warnings. The base Li01_01_Base has an object in its
+    /// system, and the object of Li02 that docks with it gives its own warning, so the base gives no dock
+    /// warning.</summary>
     [Fact]
     public void ABaseWithoutObjectsGivesTwoWarnings()
     {
         using var ws = Create();
         var session = ws.Session("act");
         var li02Base = new SectionRef(ListWorkspace.UniversePath, new SectionIdentity("Base", "Li02_01_Base"));
-        static bool NotOrder(Diagnostic d) => !d.Message.StartsWith("[Base]", StringComparison.Ordinal);
+        static bool Dock(Diagnostic d) => d.Key == "system" && !d.Message.StartsWith("[Base]", StringComparison.Ordinal);
 
-        var warnings = ComponentChecks.Check(session, li02Base, onlyActiveMod: false).Where(NotOrder);
+        var warnings = ComponentChecks.Check(session, li02Base, onlyActiveMod: false).Where(Dock).ToList();
 
-        Assert.Equal(["Li02_01_Base: No object in Li02 docks with Li02_01_Base. The game puts the player at the center of " +
-                      "Li02 after a launch.",
-            "Li02_01_Base: No object in Li02 has 'base = Li02_01_Base'. The navigation map does not list the base, and its " +
-            "rooms show no planet."], warnings.Select(w => w.Message));
+        Assert.Equal(["No object docks with Li02_01_Base. The player cannot dock there.",
+            "No object in Li02 has 'base = Li02_01_Base'. The navigation map does not list the base, its rooms show no " +
+            "planet, and the trade lists of the game skip it."], warnings.Select(w => w.Message));
+        Assert.All(warnings, w => Assert.Equal(DiagnosticSeverity.Warning, w.Severity));
         Assert.DoesNotContain(ComponentChecks.Check(session,
             new SectionRef(ListWorkspace.UniversePath, new SectionIdentity("Base", "Li01_01_Base")), onlyActiveMod: false),
-            NotOrder);
+            Dock);
     }
 }

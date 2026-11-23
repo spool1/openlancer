@@ -51,11 +51,13 @@ public sealed class UniverseOrderTests
     private static EditCommand NewSystem(string nickname) => EditCommand.AddSection(Universe, "system",
         [ListWorkspace.Line("nickname", nickname), ListWorkspace.Line("file", $@"systems\{nickname}\{nickname}.ini")]);
 
-    /// <summary>A workspace whose base data has <paramref name="universe"/> as <c>universe.ini</c>.</summary>
+    /// <summary>A workspace whose base data has <paramref name="universe"/> as <c>universe.ini</c>. The base files of
+    /// the <c>file</c> lines of the tests exist, so the base checks of the save find no error.</summary>
     private static TestWorkspace Workspace(string universe = RetailOrder, Dictionary<string, string>? lowerFiles = null)
     {
         var ws = ListWorkspace.Create(lowerFiles);
         ws.WriteBase(Universe, universe);
+        BaseWorkspace.WriteBaseFiles(ws, @"MODS\act\BASES", "Ol01_01_Base", "Ol01_02_Base", "Li01_01_Base", "Li01_02_Base");
         return ws;
     }
 

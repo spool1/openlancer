@@ -530,7 +530,8 @@ public sealed class AgentViewToolTests
 
     /// <summary>A new system of the active mod, as one edit. The edit makes the file of the system in the folder of the
     /// mod, the text of its name and its <c>[system]</c> in <c>universe.ini</c>. With <paramref name="dock"/>, it also
-    /// makes a new base in the system.</summary>
+    /// makes a new base in the system, with its base file, the file of its room and the set script of the room. So the
+    /// base checks of the save find no error.</summary>
     private static EditCommand NewSystem(EditSession session, bool dock = false) => EditCommand.Group("New system",
     [
         EditCommand.NewFile(NewModFileTests.NewPath, ContentPathsTests.Sections(NewModFileTests.SystemText)),
@@ -549,6 +550,17 @@ public sealed class AgentViewToolTests
                     ListWorkspace.Line("system", "Ol01"),
                     ListWorkspace.Line("file", @"MODS\act\BASES\Ol01_01_Base.ini"),
                 ]),
+                EditCommand.NewFile(@"DATA\MODS\act\BASES\Ol01_01_Base.ini", ContentPathsTests.Sections("""
+                    [BaseInfo]
+                    nickname = Ol01_01_Base
+                    start_room = Deck
+                    [Room]
+                    nickname = Deck
+                    file = MODS\act\BASES\ROOMS\Ol01_01_Base_Deck.ini
+                    """)),
+                EditCommand.NewFile(@"DATA\MODS\act\BASES\ROOMS\Ol01_01_Base_Deck.ini",
+                    ContentPathsTests.Sections("[Room_Info]\nset_script = MODS\\act\\CUTSCENES\\ol01_deck.thn\n")),
+                Data.Thn.ThnEdits.NewCutscene(@"DATA\MODS\act\CUTSCENES\ol01_deck.thn", Data.Thn.ThnTemplates.NewScript()),
             }
             : [],
     ]);

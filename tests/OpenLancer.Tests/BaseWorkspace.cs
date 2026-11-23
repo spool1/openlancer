@@ -403,6 +403,21 @@ internal static class BaseWorkspace
         return ws;
     }
 
+    /// <summary>
+    /// Writes a base file into the base folder of a workspace for each nickname, at
+    /// <c>DATA\&lt;folder&gt;\&lt;nickname&gt;.ini</c>. Each base file has the start room Deck with one shared room file,
+    /// and the room file has a set script. So a test that adds a <c>[Base]</c> with such a <c>file</c> line gets no error
+    /// of the base checks. The data is made up.
+    /// </summary>
+    public static void WriteBaseFiles(TestWorkspace ws, string folder, params string[] nicknames)
+    {
+        ws.WriteBase($@"DATA\{folder}\ROOMS\ol_test_deck.ini", "[Room_Info]\nset_script = Scripts\\Bases\\ol_test_deck.thn\n");
+        ws.WriteBase(@"DATA\SCRIPTS\BASES\ol_test_deck.thn", "duration = 1\nentities = {}\nevents = {}\n");
+        foreach (var nickname in nicknames)
+            ws.WriteBase($@"DATA\{folder}\{nickname}.ini",
+                $"[BaseInfo]\nnickname = {nickname}\nstart_room = Deck\n[Room]\nnickname = Deck\nfile = {folder}\\ROOMS\\ol_test_deck.ini\n");
+    }
+
     /// <summary>The section of a type and a key in a file of W.</summary>
     public static SectionRef Section(EditSession session, string path, string type, string? key = null) =>
         session.Sections(path).Single(s => s.Id.Type == type && (key == null || s.Id.Key == key));

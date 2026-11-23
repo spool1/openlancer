@@ -54,7 +54,9 @@ public static class BaseCompleteness
             var state = BaseGame(session, view, found) ? CompletenessState.Hidden : CompletenessState.Missing;
             if (state == CompletenessState.Hidden)
                 hidden += found.Count == 0 ? 1 : found.Count;
-            return new CompletenessStep(name, state, reason, first?.Message ?? missing, first?.Target ?? goTo,
+            // A problem of the [Base] goes to the place of the step, for example the system of a missing dock object.
+            var target = first?.Target is { } at && !(goTo != null && at.Equals(view.Entry)) ? at : goTo;
+            return new CompletenessStep(name, state, reason, first?.Message ?? missing, target,
                 IsError: found.Any(p => p.Severity == DiagnosticSeverity.Error));
         }
 
@@ -67,7 +69,7 @@ public static class BaseCompleteness
                 view.Info == null ? $"{view.Nickname} has no [BaseInfo] with a start room." : null, view.Entry),
             Step("Rooms", BaseStep.Rooms, RoomsReason,
                 view.Info != null && view.Rooms.Count == 0 ? $"The base file of {view.Nickname} has no [Room]." : null,
-                view.Info),
+                view.Info != null && view.Rooms.Count == 0 ? view.Info : null),
             Step("Characters", BaseStep.Characters, CharactersReason,
                 view.MBase == null ? $"{view.Nickname} has no [MBase]. Its bar has no characters." : null, view.Entry),
             Step("Market", BaseStep.Market, MarketReason),
