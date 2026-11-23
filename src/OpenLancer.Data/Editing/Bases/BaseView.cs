@@ -215,37 +215,36 @@ public sealed class BaseView
 
     /// <summary>
     /// The entries of the picker of a key that names a part of the base of a section of <c>mBases.ini</c>, or null for
-    /// another key. <c>[GF_NPC] room</c> and <c>[MRoom] nickname</c> name a room of the base. Value 0 of
-    /// <c>[MRoom] fixture</c> and of <c>[BaseFaction] npc</c> names a character of the <c>[MBase]</c>. A list rule
-    /// cannot give these entries, because the base of the section names them.
+    /// another key. <c>[GF_NPC] room</c> and <c>[MRoom] nickname</c> name a room of the base: the entries are the list
+    /// <c>room_of_base</c> of the base file of the base. Value 0 of <c>[MRoom] fixture</c> and of
+    /// <c>[BaseFaction] npc</c> names a character of the <c>[MBase]</c>. A list rule cannot give these entries, because
+    /// the base of the section names them, not the file of the section.
     /// </summary>
     internal static ListView? PartList(EditSession session, SectionRef section, string key)
     {
-        if (!session.IsMBasesFile(section.Path))
+        if (!session.IsMBasesFile(section.Path) || BaseOf(section) is not { } baseName)
             return null;
-        var part = (section.Id.Type.ToLowerInvariant(), key.ToLowerInvariant()) switch
+        switch (section.Id.Type.ToLowerInvariant(), key.ToLowerInvariant())
         {
-            ("gf_npc", "room") or ("mroom", "nickname") => "room",
-            ("mroom", "fixture") or ("basefaction", "npc") => "character",
-            _ => null,
-        };
-        if (part == null || BaseOf(section) is not { } baseName)
-            return null;
-        if (part == "room")
-        {
-            var rooms = RoomsOf(session, baseName, session.Bases.FileOf(baseName))
-                .Where(r => r.Nickname.Length > 0)
-                .Select(r => new ListEntry(r.Nickname, r.Section, ValueOrigin.Base, null,
-                    r.File == null ? "" : Scene.SceneSections.FileName(r.File)))
-                .ToList();
-            return new ListView("room_of_base", "Room", "Room", true, false, rooms, []);
+            case ("gf_npc", "room") or ("mroom", "nickname"):
+                return session.Bases.FileOf(baseName) is { } file ? session.Lists.List(RoomList, file) : null;
+            case ("mroom", "fixture") or ("basefaction", "npc"):
+                var (mbase, parts) = MBaseOf(session, baseName);
+                var characters = CharactersOf(session, mbase, parts)
+                    .Select(c =>
+                    {
+                        var (origin, mod) = session.Origin(c.Section, "nickname");
+                        return new ListEntry(c.Nickname, c.Section, origin, mod, c.Role ?? "crowd");
+                    })
+                    .ToList();
+                return new ListView("character_of_base", "Character", "Character", true, false, characters, []);
+            default:
+                return null;
         }
-        var (mbase, parts) = MBaseOf(session, baseName);
-        var characters = CharactersOf(session, mbase, parts)
-            .Select(c => new ListEntry(c.Nickname, c.Section, ValueOrigin.Base, null, c.Role ?? "crowd"))
-            .ToList();
-        return new ListView("character_of_base", "Character", "Character", true, false, characters, []);
     }
+
+    /// <summary>The list of the rule data that holds the rooms of one base file.</summary>
+    private const string RoomList = "room_of_base";
 
     /// <summary>The base of a section of <c>mBases.ini</c>: the key of an <c>[MBase]</c>, or the key of the
     /// <c>[MBase]</c> of a child section. Null for another section.</summary>

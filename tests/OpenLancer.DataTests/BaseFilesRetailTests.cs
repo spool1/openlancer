@@ -7,6 +7,7 @@ using LibreLancer.Data.IO;
 using LibreLancer.Data.Schema.Universe.Rooms;
 using LibreLancer.Thn;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Thn;
 using OpenLancer.Data.Validation;
@@ -64,6 +65,54 @@ public sealed class BaseFilesRetailTests(ITestOutputHelper output)
         Assert.Contains(rooms, p => p.EndsWith(@"\li01_01_cityscape.ini", StringComparison.OrdinalIgnoreCase));
         Assert.All(items.Bases, b => Assert.Null(session.OpenedDocument(ThnReferences.PathOf(b.SourceFile)!)));
         Assert.True(first < TimeSpan.FromMilliseconds(200), $"The first use took {first.TotalMilliseconds:0.0} ms.");
+    }
+
+    /// <summary>
+    /// The counts of section B of the bases design: 197 <c>[Base]</c> before 53 <c>[system]</c>, each with its own base
+    /// file, 461 <c>[Room]</c> that name 446 room files, one room file with 16 bases, 194 <c>[MBase]</c> with 1642
+    /// characters, 69 of them with <c>base_appr</c> and without body and head. The view of each base reads its parts:
+    /// 161 stations, 34 planets and 2 bases that start in the bar. 178 bases have an object with the base line and the
+    /// name of the base, and 187 bases have the 14694 market lines.
+    /// </summary>
+    [Fact]
+    public void TheBasesOfTheRetailDataHaveTheCountsOfTheDesign()
+    {
+        using var workspace = new RetailWorkspace(GameDataPaths.RequireBase(), "c4bases");
+        var session = workspace.Open();
+        var bases = session.Bases;
+        var universe = session.Sections(session.UniversePath!).Select(s => s.Id.Type.ToLowerInvariant()).ToList();
+
+        Assert.Equal((197, 53), (universe.Count(t => t == "base"), universe.Count(t => t == "system")));
+        Assert.True(universe.LastIndexOf("base") < universe.IndexOf("system"));
+        Assert.Equal((197, 197), (bases.Nicknames.Count, bases.Files.Count));
+        Assert.Equal(461, bases.Nicknames.Sum(b => bases.RoomsOf(b).Count));
+        Assert.Equal(446, bases.RoomFiles.Count);
+        var shared = Assert.Single(bases.RoomFiles, f => bases.BasesOfRoomFile(f).Count > 1);
+        Assert.EndsWith(@"\li05_01_deck.ini", shared, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(16, bases.BasesOfRoomFile(shared).Count);
+        Assert.Equal(197, session.DataFiles.Paths("base_files").Count);
+        Assert.Single(session.DataFiles.Paths("mbases"));
+        var mbases = session.Sections(bases.MBasesPath!);
+        Assert.Equal(194, mbases.Count(s => s.Id.Type.Equals("MBase", StringComparison.OrdinalIgnoreCase)));
+        var characters = mbases.Where(s => s.Id.Type.Equals("GF_NPC", StringComparison.OrdinalIgnoreCase))
+            .Select(s => session.Get(s)!).ToList();
+        Assert.Equal(69, characters.Count(c => c.Lines("base_appr").Count > 0 && c.Lines("body").Count == 0 &&
+                                               c.Lines("head").Count == 0));
+
+        var views = bases.Nicknames.Select(n => session.Base(n)!).ToList();
+        output.WriteLine(string.Join(", ", views.GroupBy(v => v.Kind).Select(g => $"{g.Key} {g.Count()}")));
+        Assert.Equal((161, 34, 2), (views.Count(v => v.Kind == BaseKind.Station), views.Count(v => v.Kind == BaseKind.Planet),
+            views.Count(v => v.Kind == BaseKind.Other)));
+        Assert.Equal(461, views.Sum(v => v.Rooms.Count));
+        Assert.Equal(1642, views.Sum(v => v.Characters.Count));
+        Assert.Equal(194, views.Count(v => v.MBase != null));
+        Assert.Equal(178, views.Count(v => v.NamedObject != null));
+        Assert.Equal((187, 14694), (views.Count(v => v.Market.Count > 0), views.Sum(v => v.Market.Count)));
+        Assert.All(views.SelectMany(v => v.Market), m => Assert.False(m.CanChange));
+        Assert.All(views, v => Assert.Equal(ValueOrigin.Base, v.Origin));
+        var manhattan = views.Single(v => v.Nickname == "Li01_01_Base");
+        Assert.Equal(["Cityscape", "Bar", "Trader", "ShipDealer", "Equipment"], manhattan.Rooms.Select(r => r.Nickname));
+        Assert.Contains(BaseDealer.ShipDealer, manhattan.Rooms.Single(r => r.Nickname == "ShipDealer").Dealers);
     }
 
     /// <summary>

@@ -292,6 +292,14 @@ public sealed class BaseFilesTests
             var binding = FieldBinding.Create(session, section, session.Get(section)!, key);
             Assert.Null(binding.ReadOnlyReason);
         }
+        // A patch finds a child section by its nickname. An [MVendor] has none, and the nickname Bar of an [MRoom]
+        // repeats in the other [MBase].
+        Assert.NotNull(session.Get(BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "MVendor"))!.ReadOnlyReason);
+        Assert.NotNull(session.Get(BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "MRoom", "Bar"))!.ReadOnlyReason);
+        Assert.Null(session.Get(BaseWorkspace.MBasePart(session, BaseWorkspace.Station, "MRoom", "Deck"))!.ReadOnlyReason);
+        // The edits of mBases.ini stay patches, because the active mod holds no whole copy.
+        Assert.False(session.OpenDocument(BaseWorkspace.MBasesPath)!.IsWholeFile);
+        Assert.False(session.IsGuardedMissionFile(BaseWorkspace.MBasesPath));
     }
 
     private sealed class TupleComparer : IEqualityComparer<(string, string)>
