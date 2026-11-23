@@ -1070,6 +1070,8 @@ Revert, in the menu of a row or in the item menu, puts back the lines of the low
 
 "Markets" lists the market lines of a good, by base. Each value of a line has its own field: "Rank", "Reputation", "Minimum stock", "Maximum stock" and "Price multiplier". "Buys or sells" under them sets the transaction type: "Buys and sells", "Only buys" or "Only sells". An edit of a field changes only its value. The engine ignores a line without the price multiplier. So an edit of a shorter line also writes the values of a new line in the missing places.
 
+The "Price multiplier" of a line of a ship package is read-only, because it does not change the price of the ship (see "Markets"). Its tooltip names the hull good of the ship. To set the price of the ship at a base, open the hull good from the Goods section of the ship page, and use its "Markets" section.
+
 "Markets" shows the last line of each base, because the games keep the last line of a good at a base. An edit of a line of a lower layer writes a later line of the active mod in the same market file (see "Markets"). A second edit changes that later line. The remove button of a line of the active mod deletes the line. When the line replaces a line of a lower layer, the remove button writes the buy-only form instead.
 
 The row "Change" under a line that replaces a line of a lower layer shows the result in plain words, for example "Removed: the base only buys it". Its tooltip names the line that the save writes. Revert next to it removes the line of the active mod, and the line of the lower layer counts again.

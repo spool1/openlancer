@@ -163,6 +163,36 @@ public sealed class MarketPlansSetTests
         Assert.Empty(Lines(session, BaseWorkspace.Pirate, "ol_ship_package"));
     }
 
+    /// <summary>
+    /// Review finding of step 7: a line of a ship package does not change the price of the ship. The price factor does
+    /// not scale the line of a ship package, and a factor of the ship category warns. A row that gives the price
+    /// multiplier of a ship package warns and names the hull good.
+    /// </summary>
+    [Fact]
+    public void ThePriceOfAShipDoesNotComeFromTheLineOfItsPackage()
+    {
+        using var ws = BaseWorkspace.Create();
+        var session = ws.Session("act");
+        Run(session, BaseWorkspace.Pirate, [new MarketRow("ol_ship_package"), new MarketRow("ol_water")]);
+
+        var plan = Run(session, BaseWorkspace.Pirate, [new MarketRow("ol_ship_package"), new MarketRow("ol_water")],
+            scale: new MarketPriceScale(2));
+
+        Assert.Empty(plan.Warnings);
+        Assert.Equal(["market_misc.ini: 0, -1, 10, 10, 0, 2"], Lines(session, BaseWorkspace.Pirate, "ol_water"));
+        Assert.Equal(["market_misc.ini: 0, -1, 1, 1, 0, 1, 1"], Lines(session, BaseWorkspace.Pirate, "ol_ship_package"));
+
+        var factor = MarketPlans.Set(session, BaseWorkspace.Pirate, [new MarketRow("ol_ship_package")], [],
+            priceScale: new MarketPriceScale(2, "ship"));
+        Assert.Contains(factor.Warnings, w => w.Message == "The price factor does not change the price of a ship. The " +
+                                              "price of a ship at a base comes from the market line of its hull good.");
+
+        plan = Run(session, BaseWorkspace.Pirate, [new MarketRow("ol_ship_package") { PriceMultiplier = 3, Rank = 2 }]);
+        Assert.Equal("A line of a ship package does not change the price of the ship. The price of the ship at a base " +
+                     "comes from the market line of its hull good ol_ship_hull. Set that price in the Markets section of " +
+                     "ol_ship_hull.", Assert.Single(plan.Warnings).Message);
+    }
+
     /// <summary>With the buy-only form of vanilla, a base that sells a ship after the change gets a buy-only line for
     /// each ship package without a line. The fix names them.</summary>
     [Fact]

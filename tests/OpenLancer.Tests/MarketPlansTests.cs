@@ -447,6 +447,33 @@ public sealed class MarketPlansTests
             Bases(session, "gun1"));
     }
 
+    /// <summary>
+    /// Review finding of step 7: the price multiplier of a line of a ship package has no effect, because the price of a
+    /// ship at a base comes from the market line of its hull good (fork commit OL-0080). The field is read-only, and its
+    /// tooltip names the hull good. The other fields and the lines of other goods take edits.
+    /// </summary>
+    [Fact]
+    public void ThePriceMultiplierOfAShipPackageHasNoEffect()
+    {
+        using var ws = TwoMarkets();
+        var session = ws.Session("act");
+        var ship = session.MarketLines("s1_package").Single(l => l.Base == "b1");
+        var gun = session.MarketLines("gun1").Single(l => l.Base == "b1");
+
+        var reason = MarketPlans.NoEffectReason(session, ship, Field(MarketLine.PriceIndex));
+
+        Assert.Equal("A line of a ship package does not change the price of the ship. The price of the ship at a base " +
+                     "comes from the market line of its hull good s1_hull. Set that price in the Markets section of " +
+                     "s1_hull.", reason);
+        Assert.Empty(SteLint.Problems(reason!));
+        Assert.All(MarketPlans.Fields.Where(f => f.Index != MarketLine.PriceIndex),
+            f => Assert.Null(MarketPlans.NoEffectReason(session, ship, f)));
+        Assert.All(MarketPlans.Fields, f => Assert.Null(MarketPlans.NoEffectReason(session, gun, f)));
+        // A line of the hull good sets the price of the ship, so its price multiplier takes edits.
+        var hull = AddedLine(session, "s1_hull", "0, -1, 0, 0, 1, 0.9");
+        Assert.Null(MarketPlans.NoEffectReason(session, hull, Field(MarketLine.PriceIndex)));
+    }
+
     /// <summary>A line of a lower mod names the mod in its change.</summary>
     [Fact]
     public void TheChangeOfALineOfALowerModNamesTheMod()

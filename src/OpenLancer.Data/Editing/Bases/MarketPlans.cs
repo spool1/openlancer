@@ -147,6 +147,14 @@ public static class MarketPlans
             ? "0, -1, 1, 1, 0, 1, 1"
             : "0, -1, 10, 10, 0, 1";
 
+    /// <summary>
+    /// Why a value of a line has no effect in the games, or null when it has an effect. The price multiplier of a line
+    /// of a ship package has no effect, because the price of a ship at a base comes from the market line of its hull
+    /// good (fork commit OL-0080). The "Markets" section locks such a field.
+    /// </summary>
+    public static string? NoEffectReason(EditSession session, MarketLine line, MarketValue field) =>
+        field.Index == MarketLine.PriceIndex && IsShip(session, Good(line)) ? ShipPriceText(session, Good(line)) : null;
+
     /// <summary>The text of the field of a value of a line, or an empty text when the line does not have the
     /// value.</summary>
     public static string FieldText(MarketLine line, MarketValue field) =>
@@ -291,7 +299,9 @@ public static class MarketPlans
     /// <item>Each row sets the line of its good. A row keeps the values that it does not give from the line of the base,
     /// or from the copied line.</item>
     /// <item><paramref name="replace"/> removes each good of the base that the copy and the rows do not give.</item>
-    /// <item><paramref name="priceScale"/> multiplies the price multiplier of each copied and named good.</item>
+    /// <item><paramref name="priceScale"/> multiplies the price multiplier of each copied and named good, but not of a
+    /// ship package. A line of a ship package does not change the price of the ship (see
+    /// <see cref="NoEffectReason"/>). A row that gives the price multiplier of a ship package gets a warning.</item>
     /// <item>When the base sells a ship after the change, and the ship markets of the game use buy-only lines, each
     /// ship package without a line at the base gets a buy-only line. The fixes list them.</item>
     /// </list>
@@ -406,17 +416,22 @@ public static class MarketPlans
         var given = named.Select(n => n.Row.Good).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var places = rows.Select((r, i) => (Good: r.Good.Trim(), Index: i))
             .ToDictionary(r => r.Good, r => r.Index, StringComparer.OrdinalIgnoreCase);
+        if (priceScale?.Category is { } scaled && Is(scaled.Trim(), BaseMarkets.Ship))
+            plan.Warnings = [.. plan.Warnings, Diagnostic.Warning("", ShipFactorText)];
         try
         {
             foreach (var (row, file, copied) in named)
             {
                 var category = Category(session, row.Good);
+                var ship = Is(category, BaseMarkets.Ship);
+                if (ship && row.PriceMultiplier != null)
+                    plan.Warnings = [.. plan.Warnings, Diagnostic.Warning("", ShipPriceText(session, row.Good))];
                 IReadOnlyList<string>? current = copied;
                 if (current == null && draft.Last(row.Good) is { } line)
                     current = Texts(line.Values);
                 var values = Values(row, current, category);
-                if (priceScale != null && (priceScale.Category == null ||
-                                           Is(priceScale.Category.Trim(), category ?? "")))
+                if (priceScale != null && !ship && (priceScale.Category == null ||
+                                                    Is(priceScale.Category.Trim(), category ?? "")))
                     values[MarketLine.PriceIndex - 1] = RetailText.Float(Number(values[MarketLine.PriceIndex - 1]) *
                                                                          priceScale.Factor);
                 if (IsSkipped(row.Good, values))
@@ -556,6 +571,29 @@ public static class MarketPlans
     /// <see cref="BaseMarkets.IsSkipped"/>).</summary>
     private static bool IsSkipped(string good, IReadOnlyList<string> values) =>
         BaseMarkets.IsSkipped(ParseLine(LineText(good, values)));
+
+    /// <summary>True when the good is a ship package.</summary>
+    private static bool IsShip(EditSession session, string good) => Is(Category(session, good), BaseMarkets.Ship);
+
+    /// <summary>The warning of a price factor of the category of the ship packages.</summary>
+    private const string ShipFactorText =
+        "The price factor does not change the price of a ship. The price of a ship at a base comes from the market " +
+        "line of its hull good.";
+
+    /// <summary>Why the price multiplier of a line of a ship package has no effect, with the hull good that gives the
+    /// price.</summary>
+    private static string ShipPriceText(EditSession session, string package) =>
+        "A line of a ship package does not change the price of the ship. " + (HullGood(session, package) is { } hull
+            ? $"The price of the ship at a base comes from the market line of its hull good {hull}. Set that price in " +
+              $"the Markets section of {hull}."
+            : "The price of the ship at a base comes from the market line of its hull good.");
+
+    /// <summary>The hull good that the <c>hull</c> line of a ship package names, or null.</summary>
+    private static string? HullGood(EditSession session, string package) =>
+        session.Find(ItemFileKind.Goods, package.Trim()) is { } section && session.Get(section) is { } view &&
+        view.Lines("hull") is [{ Values: [var value, ..] }, ..]
+            ? value.ToString()?.Trim()
+            : null;
 
     /// <summary>Why an edit does not write a line that the games skip.</summary>
     private static string SkippedText(string baseNickname, string good, IReadOnlyList<string> values) =>
