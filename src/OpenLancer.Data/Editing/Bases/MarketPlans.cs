@@ -140,20 +140,35 @@ public static class MarketPlans
     /// <summary>
     /// The values of a new line after the good: rank, reputation, minimum, maximum, transaction type and price
     /// multiplier. The base buys and sells the good. A ship package gets the form of the retail ship lines, which sell
-    /// one ship. The engine sells a ship only when the minimum or the maximum is not 0.
+    /// one ship. The engine sells a ship only when the minimum or the maximum is not 0. A hull good gets the stock 0
+    /// and 0 and the type 1, because no dealer sells it. Its line sets only the price of its ship.
     /// </summary>
     public static string DefaultValues(string? category) =>
-        string.Equals(category, BaseMarkets.Ship, StringComparison.OrdinalIgnoreCase)
-            ? "0, -1, 1, 1, 0, 1, 1"
-            : "0, -1, 10, 10, 0, 1";
+        Is(category, BaseMarkets.Ship) ? "0, -1, 1, 1, 0, 1, 1"
+        : Is(category, BaseMarkets.Hull) ? "0, -1, 0, 0, 1, 1"
+        : "0, -1, 10, 10, 0, 1";
 
     /// <summary>
-    /// Why a value of a line has no effect in the games, or null when it has an effect. The price multiplier of a line
-    /// of a ship package has no effect, because the price of a ship at a base comes from the market line of its hull
-    /// good (fork commit OL-0080). The "Markets" section locks such a field.
+    /// Why a value of a line has no effect in the games, or null when it has an effect (see
+    /// <see cref="NoEffectReason(EditSession, MarketLine, int)"/>). The "Markets" section shows such a field
+    /// read-only.
     /// </summary>
     public static string? NoEffectReason(EditSession session, MarketLine line, MarketValue field) =>
-        field.Index == MarketLine.PriceIndex && IsShip(session, Good(line)) ? ShipPriceText(session, Good(line)) : null;
+        NoEffectReason(session, line, field.Index);
+
+    /// <summary>
+    /// Why the value at a place of <see cref="MarketLine.Values"/> has no effect in the games, or null when it has an
+    /// effect. The price multiplier of a line of a ship package has no effect, because the price of a ship at a base
+    /// comes from the market line of its hull good (fork commit OL-0080). On a line of a hull good, only the price
+    /// multiplier has an effect, because no dealer sells a hull good.
+    /// </summary>
+    public static string? NoEffectReason(EditSession session, MarketLine line, int index)
+    {
+        var category = Category(session, Good(line));
+        if (Is(category, BaseMarkets.Ship))
+            return index == MarketLine.PriceIndex ? ShipPriceText(session, Good(line)) : null;
+        return Is(category, BaseMarkets.Hull) && index != MarketLine.PriceIndex ? HullValueText : null;
+    }
 
     /// <summary>The text of the field of a value of a line, or an empty text when the line does not have the
     /// value.</summary>
@@ -590,8 +605,10 @@ public static class MarketPlans
     private static bool IsSkipped(string good, IReadOnlyList<string> values) =>
         BaseMarkets.IsSkipped(ParseLine(LineText(good, values)));
 
-    /// <summary>True when the good is a ship package.</summary>
-    private static bool IsShip(EditSession session, string good) => Is(Category(session, good), BaseMarkets.Ship);
+    /// <summary>Why a value of a line of a hull good other than the price multiplier has no effect.</summary>
+    private const string HullValueText =
+        "A line of a hull good sets only the price of its ship at the base. The price is the price of the hull good " +
+        "times the price multiplier. No dealer sells a hull good, so this value has no effect.";
 
     /// <summary>The warning of a price factor of the category of the ship packages.</summary>
     private const string ShipFactorText =

@@ -359,6 +359,9 @@ public sealed class MarketPlansTests
         Assert.Null(MarketPlans.Category(session, "nothing"));
         Assert.Equal("0, -1, 1, 1, 0, 1, 1", MarketPlans.DefaultValues("SHIP"));
         Assert.Equal("0, -1, 10, 10, 0, 1", MarketPlans.DefaultValues(null));
+        // A hull good gets the form of the help: no stock, the type "Only buys" and the price multiplier 1.
+        Assert.Equal("shiphull", MarketPlans.Category(session, "s1_hull"));
+        Assert.Equal("0, -1, 0, 0, 1, 1", MarketPlans.DefaultValues("shiphull"));
     }
     /// <summary>
     /// The "Markets" section of a good shows the last line of each base, which the games keep. A line that replaces a
@@ -472,6 +475,33 @@ public sealed class MarketPlansTests
         // A line of the hull good sets the price of the ship, so its price multiplier takes edits.
         var hull = AddedLine(session, "s1_hull", "0, -1, 0, 0, 1, 0.9");
         Assert.Null(MarketPlans.NoEffectReason(session, hull, Field(MarketLine.PriceIndex)));
+    }
+
+    /// <summary>
+    /// Final finding of V1-C4: on a line of a hull good, only the price multiplier has an effect. The line sets the price
+    /// of its ship at the base, and no dealer sells a hull good. So the other fields and the "Buys or sells" dropdown
+    /// are read-only, with the reason. "Add to base" gives a hull good the line form of the help.
+    /// </summary>
+    [Fact]
+    public void OnALineOfAHullGoodOnlyThePriceMultiplierHasAnEffect()
+    {
+        using var ws = TwoMarkets();
+        var session = ws.Session("act");
+
+        var hull = AddedLine(session, "s1_hull", MarketPlans.DefaultValues(MarketPlans.Category(session, "s1_hull")));
+
+        Assert.Equal("0, -1, 0, 0, 1, 1", Values(hull));
+        Assert.Null(MarketPlans.NoEffectReason(session, hull, MarketLine.PriceIndex));
+        const string reason = "A line of a hull good sets only the price of its ship at the base. The price is the " +
+                              "price of the hull good times the price multiplier. No dealer sells a hull good, so this " +
+                              "value has no effect.";
+        Assert.All(MarketPlans.Fields.Where(f => f.Index != MarketLine.PriceIndex),
+            f => Assert.Equal(reason, MarketPlans.NoEffectReason(session, hull, f)));
+        Assert.Equal(reason, MarketPlans.NoEffectReason(session, hull, MarketLine.TransactionIndex));
+        Assert.Empty(SteLint.Problems(reason));
+        // The type of a line of another good has an effect.
+        var gun = session.MarketLines("gun1").Single(l => l.Base == "b1");
+        Assert.Null(MarketPlans.NoEffectReason(session, gun, MarketLine.TransactionIndex));
     }
 
     /// <summary>

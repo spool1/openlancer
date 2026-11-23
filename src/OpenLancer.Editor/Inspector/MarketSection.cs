@@ -17,11 +17,11 @@ namespace OpenLancer.Editor.Inspector;
 /// The "Markets" section of a good: for each base that has a <c>marketgood</c> line of the good, the last line, which the
 /// games keep. The line has a named field for each of its values (see <see cref="MarketPlans.Fields"/>) and a "Buys or
 /// sells" dropdown for its transaction type. A value without an effect in the games is read-only, for example the price
-/// multiplier of a ship package (see <see cref="MarketPlans.NoEffectReason"/>). A line of a <c>[BaseGood]</c> that the
-/// active mod adds changes or goes. An
-/// edit of a line of a lower layer writes a later line of the active mod, and a row under the line shows that result in
-/// plain words (see <see cref="MarketPlans.Override"/>). "Add to base" makes one more base sell the good (see
-/// <see cref="MarketPlans"/>).
+/// multiplier of a ship package, or each value of a hull good except the price multiplier (see
+/// <see cref="MarketPlans.NoEffectReason(EditSession, MarketLine, int)"/>). A line of a <c>[BaseGood]</c> that the
+/// active mod adds changes or goes. An edit of a line of a lower layer writes a later line of the active mod, and a row
+/// under the line shows that result in plain words (see <see cref="MarketPlans.Override"/>). "Add to base" makes one
+/// more base sell the good (see <see cref="MarketPlans"/>).
 /// </summary>
 internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
 {
@@ -190,6 +190,14 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
         if (reason != null)
         {
             ReadOnly(text, TransactionTip, reason);
+            return;
+        }
+
+        // A type without an effect in the games is read-only, and its tooltip tells why (UI rule 4).
+        if (MarketPlans.NoEffectReason(window.Session!.Edits, line, MarketLine.TransactionIndex) is { } noEffect)
+        {
+            PropertyGrid.Field(text);
+            ImGui.SetItemTooltip(TransactionTip + "\n\n" + noEffect);
             return;
         }
 

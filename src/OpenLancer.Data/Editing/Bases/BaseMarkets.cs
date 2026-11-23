@@ -32,6 +32,10 @@ public static class BaseMarkets
     /// <summary>The goods category of a ship package.</summary>
     public const string Ship = "ship";
 
+    /// <summary>The goods category of a hull good. A market line of a hull good sets the price of its ship at the base
+    /// (fork commit OL-0080). No dealer sells a hull good.</summary>
+    public const string Hull = "shiphull";
+
     /// <summary>The number of values that the engine reads from a <c>marketgood</c> line. It ignores a line with fewer
     /// values.</summary>
     private const int ReadValues = MarketLine.PriceIndex + 1;
