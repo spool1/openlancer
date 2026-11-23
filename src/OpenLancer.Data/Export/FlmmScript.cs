@@ -39,6 +39,9 @@ namespace OpenLancer.Data.Export;
 /// <para>FLMM takes the first match of an anchor. The test did not show if FLMM matches whole lines or text. So an
 /// anchor must occur once as a run of whole lines, and its first match as text must be the anchor itself. The same
 /// rule holds for the line of <c>dest</c> below the header of its section.</para>
+/// <para>The script writes <c>&amp;</c>, <c>&lt;</c> and <c>&gt;</c> with their XML escapes, also in a content line.
+/// The FLMM test did not show if FLMM writes the characters or the escapes into the game file. So a text with these
+/// characters, for example each infocard, is not checked in FLMM yet.</para>
 /// <para>A change that the operations cannot express puts the whole merged file into the package. A whole file
 /// cannot hold mod text, so such a change with mod text is a refusal.</para>
 /// <para>A new <c>[Base]</c> of <c>universe.ini</c> is a refusal too. It must go before the <c>[system]</c> sections

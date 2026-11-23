@@ -1768,6 +1768,7 @@ When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod
 - A new `[BaseGood]` adds its lines to the `[BaseGood]` of the same base. A new `[Data]` line goes after the last line of its key.
 - The text of the mod becomes `<key> = 0 ;GENERATESTRRES("<text>")` and `<key> = 0 ;GENERATEXMLRES("<text>")`. FLMM makes its own text DLL and writes the id of the text in the line. The game reads the text after the semicolon as a comment. So the text must be the last value of its line, and a line can hold only one text. Else the export refuses the change.
 - A text with `"`, with a line end or with a character outside ASCII refuses the change, because no known FLMM rule can hold it.
+- The script writes `&`, `<` and `>` as `&amp;`, `&lt;` and `&gt;`, also in a content line. The FLMM test did not show if FLMM writes the characters or the escapes into the game file. So a text with these characters, for example each infocard, is not checked in FLMM yet.
 - A change that the operations cannot express puts the whole merged file into the package, with a warning. Examples are a removed line or section, a key line that does not directly follow its header, and an anchor that FLMM can find at more than one place. A whole file cannot hold the text of the mod, so such a change with text refuses the package.
 - A new whole INI file of the mod with mod text refuses the package, because FLMM reads its text macros only in script operations.
 - The route tables are whole files. The package copies them with no operation and no warning (see "Route tables").
