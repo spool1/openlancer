@@ -85,7 +85,7 @@ public sealed class HdePublishRetailTests(ITestOutputHelper output) : IDisposabl
     private static string Script(byte[] package)
     {
         using var outer = new ZipArchive(new MemoryStream(package));
-        using var flmod = new ZipArchive(outer.GetEntry("ol-sample.flmod")!.Open());
+        using var flmod = new ZipArchive(outer.GetEntry("ol-sample.zip.flmod")!.Open());
         using var reader = new StreamReader(flmod.GetEntry("script.xml")!.Open());
         return reader.ReadToEnd();
     }

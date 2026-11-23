@@ -306,12 +306,14 @@ public sealed class FlmmScriptTests
         Assert.Equal("m-1.2.0-vanilla-1.1-flmm.zip", one.FileName);
         Assert.Equal("m-1.2.0-vanilla-1.1-flmm-probe.zip", probe.FileName);
         using var zip = new ZipArchive(new MemoryStream(one.Bytes!));
-        Assert.Equal(["m README.txt", "m.flmod"], zip.Entries.Select(e => e.FullName));
-        using var flmod = new ZipArchive(zip.GetEntry("m.flmod")!.Open());
+        Assert.Equal(["m README.txt", "m.zip.flmod"], zip.Entries.Select(e => e.FullName));
+        using var flmod = new ZipArchive(zip.GetEntry("m.zip.flmod")!.Open());
         Assert.Equal(["DATA/MODS/m/a.txt", "script.xml"], flmod.Entries.Select(e => e.FullName));
+        using (var readme = new StreamReader(zip.GetEntry("m README.txt")!.Open(), Encoding.UTF8))
+            Assert.Contains("\r\n1. In the Freelancer Mod Manager, import m.zip.flmod.\r\n", readme.ReadToEnd());
         using var probeZip = new ZipArchive(new MemoryStream(probe.Bytes!));
-        using var readme = new StreamReader(probeZip.GetEntry("m README.txt")!.Open(), Encoding.UTF8);
-        Assert.Contains("Probe for the FLMM check. Do not publish.", readme.ReadToEnd());
+        using var probeReadme = new StreamReader(probeZip.GetEntry("m README.txt")!.Open(), Encoding.UTF8);
+        Assert.Contains("Probe for the FLMM check. Do not publish.", probeReadme.ReadToEnd());
         Assert.False(FlmmPackage.Checked);
     }
 

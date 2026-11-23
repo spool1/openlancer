@@ -1759,7 +1759,7 @@ When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod
 
 ### FLMM package (preview)
 
-`<mod id>-<version>-<target>-flmm.zip` holds `<mod id>.flmod` and the README. The `.flmod` file is a zip with `script.xml` and the files of the mod, for the Freelancer Mod Manager (FLMM). OpenLancer did not check this package with FLMM yet. Check it with FLMM before you publish it.
+`<mod id>-<version>-<target>-flmm.zip` holds `<mod id>.zip.flmod` and the README. The `.zip.flmod` file is a zip with `script.xml` and the files of the mod, for the Freelancer Mod Manager (FLMM). FLMM 1.31 unpacks only a file whose name ends in `.zip.flmod`. OpenLancer did not check an exported package with FLMM yet. Check it with FLMM before you publish it.
 
 - A new section is an `append` operation. A new line is a `sectionappend` after the header line and the key line of its section. A changed value is a `sectionreplace` of the raw line of the game file.
 - A new `[BaseGood]` adds its lines to the `[BaseGood]` of the same base. A new `[Data]` line goes after the last line of its key.

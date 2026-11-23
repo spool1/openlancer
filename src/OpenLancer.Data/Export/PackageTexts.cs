@@ -21,7 +21,7 @@ public enum PackageForm
     /// <summary>A zip with the folders DATA and EXE at its top. The player extracts it over the game folder.</summary>
     DropIn,
 
-    /// <summary>An FLMM package: a <c>.flmod</c> file with a script for the Freelancer Mod Manager.</summary>
+    /// <summary>An FLMM package: a <c>.zip.flmod</c> file with a script for the Freelancer Mod Manager.</summary>
     Flmm,
 
     /// <summary>A zip of the mod folder for OpenLancer.</summary>
@@ -159,7 +159,7 @@ public static class PackageTexts
                 break;
             case PackageForm.Flmm:
                 lines.Add("Install:");
-                lines.Add($"1. In the Freelancer Mod Manager, import {mod.Id}.flmod.");
+                lines.Add($"1. In the Freelancer Mod Manager, import {FlmmPackage.InnerFileName(mod)}.");
                 lines.Add("2. Activate the mod.");
                 lines.Add("");
                 lines.Add("Remove:");
@@ -326,7 +326,7 @@ public static class PackageTexts
         ]),
         PackageForm.Flmm => ("FLMM package",
         [
-            $"In the Freelancer Mod Manager, import {mod.Id}.flmod.",
+            $"In the Freelancer Mod Manager, import {FlmmPackage.InnerFileName(mod)}.",
             "Activate the mod.",
         ]),
         _ => ("OpenLancer",

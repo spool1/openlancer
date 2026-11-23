@@ -150,7 +150,7 @@ public sealed class ModExportTests
     private static string Script(string zip, string id)
     {
         using var outer = ZipFile.OpenRead(zip);
-        using var flmod = new ZipArchive(outer.GetEntry($"{id}.flmod")!.Open());
+        using var flmod = new ZipArchive(outer.GetEntry($"{id}.zip.flmod")!.Open());
         using var reader = new StreamReader(flmod.GetEntry("script.xml")!.Open());
         return reader.ReadToEnd();
     }
@@ -248,7 +248,7 @@ public sealed class ModExportTests
                           "[size=5][b]The ship[/b][/size]\r\n[list]\r\n[*]Fast.\r\n[*][b]Cheap[/b].\r\n[/list]\r\n\r\n" +
                           "See [url=https://example.org/t]the thread[/url].\r\n\r\n[size=4][b]Install[/b][/size]\r\n" +
                           "[b]Drop-in zip[/b]\r\n", nexus);
-        Assert.Contains("[b]FLMM package[/b]\r\n[list=1]\r\n[*]In the Freelancer Mod Manager, import m.flmod.\r\n", nexus);
+        Assert.Contains("[b]FLMM package[/b]\r\n[list=1]\r\n[*]In the Freelancer Mod Manager, import m.zip.flmod.\r\n", nexus);
         Assert.Contains("== Requirements ==\r\n- Freelancer 1.1: Freelancer 1.1, with or without JFLP.\r\n" +
                         "- OpenLancer: OpenLancer.\r\n- JFLP: Optional (https://example.org/jflp)\r\n", nexus);
         Assert.Contains("== Files ==\r\nm-1.2.0-vanilla-1.1.zip: Drop-in zip for Freelancer 1.1. The README gives the backup " +
@@ -514,7 +514,7 @@ public sealed class ModExportTests
         Assert.Subset(dropIn.ToHashSet(), routes.ToHashSet());
         Assert.Contains("DATA/MODS/conn/SYSTEMS/E/E.ini", dropIn);
         using (var outer = ZipFile.OpenRead(result.Packages.Single(p => p.Form == PackageForm.Flmm).Path!))
-        using (var flmod = new ZipArchive(outer.GetEntry("conn.flmod")!.Open()))
+        using (var flmod = new ZipArchive(outer.GetEntry("conn.zip.flmod")!.Open()))
             Assert.Subset(flmod.Entries.Select(e => e.FullName).ToHashSet(), routes.ToHashSet());
         var vanilla = prepared.ChecklistBlocks.Single(b => b.Target == ExportTarget.Vanilla).Lines;
         var openLancer = prepared.ChecklistBlocks.Single(b => b.Target == ExportTarget.OpenLancer).Lines;
