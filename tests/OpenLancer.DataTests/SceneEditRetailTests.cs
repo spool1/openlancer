@@ -317,7 +317,8 @@ public sealed class SceneBaselineRetailTests(ITestOutputHelper output)
     }
 
     /// <summary>Each retail object gives its components without an exception, and the warnings of the component checks
-    /// have their retail counts: 2, 18, 15 and 15.</summary>
+    /// have their retail counts: 2 objects without a docking sphere, 18 objects that dock with a base of another system,
+    /// 15 bases that no object docks with, and 15 bases without an object with their base line in their system.</summary>
     [Fact]
     public void EachRetailObjectGetsItsComponents()
     {
@@ -338,7 +339,7 @@ public sealed class SceneBaselineRetailTests(ITestOutputHelper output)
         Assert.Equal(3430, objects.Count);
         Assert.Equal(2, warnings.Count(w => w.Message.Contains("has no docking sphere")));
         Assert.Equal(18, warnings.Count(w => w.Message.Contains("After a launch, the game puts the player in")));
-        Assert.Equal(15, warnings.Count(w => w.Message.Contains(" docks with ") && w.Message.Contains("No object in")));
+        Assert.Equal(15, warnings.Count(w => w.Message.StartsWith("No object docks with ", StringComparison.Ordinal)));
         Assert.Equal(15, warnings.Count(w => w.Message.Contains("has 'base = ")));
     }
 

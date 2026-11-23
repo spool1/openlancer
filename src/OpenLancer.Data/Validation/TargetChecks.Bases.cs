@@ -131,9 +131,9 @@ public static partial class TargetChecks
     }
 
     /// <summary>
-    /// The trade-in lines of each base that sells a ship, when the mods change a market file or a goods file and the
-    /// ship markets of the target use buy-only lines. A ship package without a line at the base gives 0 credits in a
-    /// trade-in there.
+    /// The trade-in lines of each base that sells a ship and whose market lines the mods add or change, when the ship
+    /// markets of the target use buy-only lines. A ship package without a line at the base gives 0 credits in a trade-in
+    /// there. A new ship package of a mod does not give a finding for each base that the mods do not change.
     /// </summary>
     private static IEnumerable<Finding> TradeIns(Side side, Scope scope)
     {
@@ -141,7 +141,7 @@ public static partial class TargetChecks
             yield break;
         var packages = side.ShipPackages;
         var bases = side.Bases.Select(b => b.Nickname).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var (baseName, lines) in side.MarketLines.Where(m => bases.Contains(m.Key)))
+        foreach (var (baseName, lines) in side.MarketLines.Where(m => bases.Contains(m.Key) && scope.MarketBases.Contains(m.Key)))
         {
             // The game keeps the last line of a good.
             var sells = lines.GroupBy(l => l.Good, StringComparer.OrdinalIgnoreCase).Select(g => g.Last())
@@ -268,6 +268,7 @@ public static partial class TargetChecks
         private HashSet<string>? doorBases;
         private bool? buyOnly;
         private bool? changesMarkets;
+        private HashSet<string>? marketBases;
 
         /// <summary>
         /// The bases whose doors the checks read on both sides: a base whose <c>[Base]</c> the mods add or change, a base
@@ -275,6 +276,26 @@ public static partial class TargetChecks
         /// <c>[Hotspot]</c> can change a door, so the checks read the base files of all bases only for such a file.
         /// </summary>
         public IReadOnlySet<string> DoorBases => doorBases ??= FindDoorBases();
+
+        /// <summary>The bases whose market lines differ on the two sides: the mods add, change or remove a line of
+        /// the base.</summary>
+        public IReadOnlySet<string> MarketBases => marketBases ??= FindMarketBases();
+
+        private HashSet<string> FindMarketBases()
+        {
+            static string Text(List<MarketEntry> lines) =>
+                string.Join("\n", lines.Select(l => string.Join(",", l.Values.Select(v => v.ToString()?.Trim()))));
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!ChangesMarkets)
+                return result;
+            foreach (var name in without.MarketLines.Keys.Union(with.MarketLines.Keys, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!without.MarketLines.TryGetValue(name, out var before) || !with.MarketLines.TryGetValue(name, out var after) ||
+                    Text(before) != Text(after))
+                    result.Add(name);
+            }
+            return result;
+        }
 
         /// <summary>True when the mods change a market file or a goods file.</summary>
         public bool ChangesMarkets => changesMarkets ??= new[] { without, with }

@@ -303,6 +303,19 @@ public sealed partial class BaseSaveGateTests
                      "package.", warning.Message);
     }
 
+    /// <summary>A new ship package of a mod gives no trade-in finding for the bases whose markets the mod does not
+    /// change.</summary>
+    [Fact]
+    public void ANewShipPackageGivesNoTradeInFindingForTheBasesOfTheGame()
+    {
+        using var game = TargetGame();
+
+        Assert.Empty(TargetFindings(game, new()
+        {
+            [@"patches\" + ExportGame.GoodsPath] = "[Good]\nol.new = true\nnickname = ol_p4\ncategory = ship\n",
+        }));
+    }
+
     /// <summary>
     /// One fault in a session: a door of a new base to a room that the base does not have. For a mod without a retail
     /// target, it is a warning of the base checks, and the save continues. For a data mod with a retail target, the

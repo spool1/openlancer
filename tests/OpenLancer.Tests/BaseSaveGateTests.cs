@@ -492,7 +492,9 @@ public sealed partial class BaseSaveGateTests
     }
 
     /// <summary>With the buy-only pattern of vanilla, a base that sells a ship needs a line for each ship package. The
-    /// warning names the packages without a line.</summary>
+    /// check reads a market that the active mod adds or changes, and the warning names the packages without a line. The
+    /// planet of the base game lists no ol_ship3_package, but the active mod does not change its market, so it gets no
+    /// warning first.</summary>
     [Fact]
     public void WithTheBuyOnlyPatternABaseThatSellsAShipNeedsALineForEachShip()
     {
@@ -503,7 +505,9 @@ public sealed partial class BaseSaveGateTests
             marketgood = ol_ship2_package, 0, -1, 0, 0, 1, 1, 1
             """);
         var session = ws.Session("act");
+        Assert.Empty(Problems(session, BaseWorkspace.Planet));
 
+        session.Execute(SellShip2AtThePlanet());
         var warning = One(session, "Ol01_02_Base sells ships, but its market has no line", BaseWorkspace.Planet);
 
         Assert.Equal("Ol01_02_Base sells ships, but its market has no line for the ship package ol_ship3_package. The game " +
@@ -523,16 +527,24 @@ public sealed partial class BaseSaveGateTests
             marketgood = ol_ship_package, 0, -1, 1, 1, 0, 1, 1
             """);
         var session = ws.Session("act");
+        session.Execute(SellShip2AtThePlanet());
         Assert.Empty(Problems(session, BaseWorkspace.Planet));
 
         session.Execute(EditCommand.AddSection(BaseWorkspace.ShipMarketPath, "BaseGood",
         [
             ListWorkspace.Line("base", BaseWorkspace.Station),
-            ListWorkspace.Line("marketgood", "ol_ship2_package, 0, -1, 0, 0, 1, 1, 1"),
+            ListWorkspace.Line("marketgood", "ol_ship3_package, 0, -1, 0, 0, 1, 1, 1"),
         ]));
 
         Assert.Empty(Problems(session, BaseWorkspace.Planet));
     }
+
+    /// <summary>A market line of the active mod: the planet also sells ol_ship2_package.</summary>
+    private static EditCommand SellShip2AtThePlanet() => EditCommand.AddSection(BaseWorkspace.ShipMarketPath, "BaseGood",
+    [
+        ListWorkspace.Line("base", BaseWorkspace.Planet),
+        ListWorkspace.Line("marketgood", "ol_ship2_package, 0, -1, 1, 1, 0, 1, 1"),
+    ]);
 
     [Fact]
     public void ATerrainTemplateWithoutItsLineIsAWarning()

@@ -396,7 +396,10 @@ internal static class BaseChecks
                         : $"{Name} sells {Words.Count(ships, "ship")}, but its rooms show at most {places}. The game shows " +
                           $"only the first {places}.");
             }
-            if (ships > 0 && state.UsesBuyOnlyShipLines)
+            // Only a market that the active mod adds or changes. A new ship package of the mod does not warn about each
+            // base of the game that does not list it.
+            if (ships > 0 && state.UsesBuyOnlyShipLines &&
+                (view.Origin == ValueOrigin.ActiveMod || view.Market.Any(r => r.Origin == ValueOrigin.ActiveMod)))
             {
                 var listed = view.Market.Select(r => r.Good).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var missing = state.ShipPackages.Where(p => !listed.Contains(p)).ToList();
