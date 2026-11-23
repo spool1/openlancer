@@ -400,7 +400,7 @@ These keys hold a text id. The retail data confirms the kind of text of each key
 | `ids_info`, `ids_info1`, `ids_info2`, `ids_info3` | `$ifc:` (an infocard) |
 | `ids_info` of a `[KeyCmd]` | `$str:` (a string) |
 
-`individual_name` is the name of a bar character in `mBases.ini` and of a mission NPC. The name of a bar character has three lines: the faction, the title and the name of the person, for example "Ol Guild", "Harbor Rock Bartender" and "Ada Vance".
+`individual_name` is the name of a bar character in `mBases.ini` and of a mission NPC. The name of a bar character has three lines: the faction, the title and the name of the person. For example, the three lines are "Ol Guild", "Harbor Rock Bartender" and "Ada Vance".
 
 Freelancer also shows a string id in `ids_info` as an infocard with plain text, and some retail solars, objects and commodities use that. Librelancer shows only infocards, so use `$ifc:` for `ids_info`.
 
@@ -1008,7 +1008,7 @@ Rename gives the mod a new id and a new folder name. Before it changes a file, i
 
 ### Edits in the Inspector
 
-The Inspector edits ships, equipment, goods, the other sections of the item files, the market lines, the parts of the bases, and the objects, zones and lights of the open star system and the sections that set the fields of a system. The edits go into the active mod. A field shows each line of a key on its own text line, with the values separated by `, `. The editor reads the text as the merge reads a patch line, so a value gets the type that a save and a reload give it (see "Value types in binary files"). For example, in a binary file, `true` that replaces the text `TRUE` stays `TRUE`, and `200` that replaces a float is a float. An empty field removes the key.
+The Inspector edits ships, equipment, goods, the other sections of the item files and the market lines. It also edits the parts of the bases, and the objects, zones and lights of the open star system. The sections that set the fields of a system take edits too. The edits go into the active mod. A field shows each line of a key on its own text line, with the values separated by `, `. The editor reads the text as the merge reads a patch line, so a value gets the type that a save and a reload give it (see "Value types in binary files"). For example, in a binary file, `true` that replaces the text `TRUE` stays `TRUE`, and `200` that replaces a float is a float. An empty field removes the key.
 
 The parts of a base are its `[Base]` of `universe.ini`, its base file, its room files and its `[MBase]` in `mBases.ini`. The base file has a `[BaseInfo]` and a `[Room]` for each room. The children of an `[MBase]` are `[MVendor]`, `[BaseFaction]`, `[GF_NPC]` and `[MRoom]`. The fields of these sections get the checks of their types and of their lists (see "Data lists and pickers").
 
