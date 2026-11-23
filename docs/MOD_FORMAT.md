@@ -1677,7 +1677,7 @@ Each export runs the save gate of the mod first (see "The save gate"). When the 
 
 - The dialog and the agent tool use the save gate of the editor when the mod is the active mod and has no unsaved edits.
 - Else the export opens the profile with the mod active, only to read the saved files. The dialog does this for another mod of the profile, and `oltool export` always does it.
-- The dialog refuses a mod that no open profile holds, also when no profile is open, because it cannot run the save gate of such a mod. It writes no package. The dialog and the Console show this text: "The export of mod '<id>' stopped. The open profile does not hold mod '<id>', so the export cannot run the save gate of the mod. Open a profile that holds the mod, then export again." Export and play refuses the mod in the same way.
+- The dialog refuses a mod that no open profile holds, because it cannot run the save gate of such a mod. This also applies when no profile is open. The dialog writes no package. The dialog and the Console show this text: "The export of mod '<id>' stopped. The open profile does not hold mod '<id>', so the export cannot run the save gate of the mod. Open a profile that holds the mod, then export again." Export and play refuses the mod in the same way.
 - `oltool export --checklist` and `--flmm-probe` do not run the save gate. `oltool validate` does not run it either.
 
 When you close the Export dialog while the export runs, the export goes on without the dialog. An export that still checks the mod then stops and writes no package. An export that writes its packages completes, records them in the publish history and writes the result to the Console. Export and play then does not start the game.

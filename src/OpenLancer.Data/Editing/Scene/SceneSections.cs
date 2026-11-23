@@ -95,11 +95,11 @@ internal static class SceneSections
     public const string LaneRingKind = "trade lane ring";
 
     /// <summary>
-    /// The kind of a connection object in plain words, or null for another section (decision D253): an object with an
-    /// archetype of a connection type, or an object with a <c>goto</c> line. Only an object with an archetype of the type
+    /// The kind of a connection object in plain words, or null for another section (decision D253). A connection object
+    /// has an archetype of a connection type, or a <c>goto</c> line. Only an object with an archetype of the type
     /// <c>TRADELANE_RING</c> is a trade lane ring, as in the lane plans (see
-    /// <see cref="OpenLancer.Data.Editing.Universe.LanePlans.IsRingObject"/>), because the game makes lanes only from
-    /// such objects. A <c>prev_ring</c> or <c>next_ring</c> line on another object gives no ring kind (#90).
+    /// <see cref="OpenLancer.Data.Editing.Universe.LanePlans.IsRingObject"/>). The game makes lanes only from such
+    /// objects. A <c>prev_ring</c> or <c>next_ring</c> line on another object gives no ring kind (#90).
     /// </summary>
     public static string? ConnectionKind(EditSession session, SectionView view)
     {
