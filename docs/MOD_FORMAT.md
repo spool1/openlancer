@@ -1286,7 +1286,9 @@ These component checks give warnings, until a retail comparison proves an effect
 - A Dockable station whose archetype has no docking sphere. The player cannot dock there.
 - A Dockable station that docks with a base of another system. After a launch, the game puts the player in the system of the base.
 - An object with the nickname or the FLHash of an object of any system. The game can confuse the two objects.
-- A `[Base]` without an object in its system that docks with it, or without an object with `base` of it. The Inspector of the base shows these warnings.
+- A `[Base]` that no object docks with, or without an object with `base` of it in its system. The Inspector of the base shows these warnings.
+
+The base checks give the warnings of a Dockable station and of a `[Base]` (see "The save gate"). One fault gives one warning. So a base whose only dock object is in another system gets no warning of its own, and the object gets one.
 
 #### Used by, Behaviors and marks
 
@@ -1417,6 +1419,8 @@ Some keys of `mBases.ini` name a part of the base of their `[MBase]`. `[GF_NPC] 
 
 The picker of `[GF_NPC] room` lists the rooms of the base file of the base. The picker offers "None", because a character without a room line is a fixture of a room. A value outside the rooms shows as "Not listed". The footer counts the lines of the base that name the room. These are the `start_room` line, the room lines of the characters, the nickname of each `[MRoom]` and the doors of the rooms. A fixture line and an npc line can repeat, so they keep their text field.
 
+The base checks report a value outside these parts with a warning (see "The save gate"). Examples are a room line that names no room of the base, and a fixture that names no character before it in its `[MBase]`.
+
 The `file` key of a `[Nebula]` and of an `[Asteroids]` section uses the list of the nebula files or of the asteroid files. The list holds the INI files below `SOLAR\NEBULA` or `SOLAR\ASTEROIDS` whose sections all belong to a nebula file or to an asteroid file. So the texture files of these folders, for example `edge_shapes.ini`, are not in the list. The engine reads a file of any folder. So a value outside the list is valid when its file exists, and the picker shows it as "value (other folder)". A file that does not exist is an error: the game crashes when it loads the data.
 
 A list of files reads each INI file of the active mod below `DATA/MODS/<mod id>/` (see "Whole files") with its unsaved edits. The file must fit the list: the extension, the folder and, for a list with a file class, the sections of the file. So the save does not change the list.
@@ -1484,6 +1488,13 @@ Each save runs the save gate first, also a save with nothing to write, and also 
 - A system file that the active mod changes, with more than 10 objects with `goto`. The game crashes. The error comes for each data mod (tier 1), also without a retail target, when the active mod makes the count go above 10. An `[Object]` of the active mod with its `goto` line before its `nickname` line is an error too. The game then records the jump under another object (see "Jump connections and gate locks").
 - A trade lane whose links go in a circle, in a system file that the active mod changes. The error comes only when the active mod writes a link line of a ring of the circle. The game hangs when the HUD reads the lane (see "Trade lanes").
 - A `[system]` of `universe.ini` that the active mod adds or changes, with one of three errors (see "New systems"). Its `file` line comes before its `nickname` line, so the game loads the system under another id. Another system has its nickname, so the game drops one of the two. Its `file` line names no file, so the game loads it without objects and zones and can crash. The error comes only from a line of the active mod.
+- A base whose `[Base]`, base file or room file the active mod adds or changes, with one of these errors. The game can crash when the player docks at the base or enters the room:
+  - The `[Base]` names no base file, or its base file does not exist.
+  - The base file has no `[BaseInfo]`. A start room that is not a room of the base is an error of the data lists (see "Data lists and pickers").
+  - A `[Room]` has no nickname or no room file.
+  - A room file does not exist.
+
+  The error comes only from a line or a file of the active mod. The same problem of the base game or of a lower mod is a warning.
 - An error of the format checks of the export or of the content checks of the retail game, when the active mod adds it. See "Format checks" and "Content checks of the retail game". These checks run only for a tier-1 mod that names a retail target. They compare the data with the active mod with the data of the mods that load before it. They do not merge on the files of each target game. Play in the game and the export do that. For example, a good with the price 0 blocks the save, because the retail game can crash when a player buys or sells it.
 - An error of the mission checks in a mission script that the active mod changes. Examples are a trigger without a condition (rule M01) and two triggers whose names have one game id (rule M27). A line of any script that names a name that the active mod removes or renames is an error too. A mission problem that the base game or a lower mod also has is a warning, so it does not block the save.
 - A mission patch that does not merge on the game of a retail target of `mod.json` (rule T01). The check runs for each target with a linked game. It merges the lower mods of the profile on that game first, as Play in the game does. For example, the patch changes a trigger that the game of the target does not have. A section of the target that differs from the `ol.base` of the patch gives a warning (rule T02), because the changes of the target in the section go away. A target without a linked game gives one info line in the Console.
@@ -1513,6 +1524,19 @@ Each save runs the save gate first, also a save with nothing to write, and also 
   The check applies only when the first target of the event names an entity, and the last entity with that name is a DEFORMABLE. The clip picker of the Inspector uses the same rule. A clip that the lower cutscene has with the same problem in the lower data does not block the save. A clip that the active mod removes blocks the save, also when the clip does not change.
 
 The save also gives a warning for each `.anm` file of the active mod that the list `animation` cannot read. The warning does not block the save. If the game cannot read the file either, the game closes during its load.
+
+The base checks also give warnings, which do not block the save. The Inspector shows them above the sections of a base, of its base file and of `mBases.ini`. The agent tools `get_item` and `check` with the scope `item` give them too. A data mod with a retail target gets some of them as errors of the content checks (see "Content checks of the retail game"):
+
+- A door of a room that leads to a room that the base does not have. The retail games can crash when the player uses the door. A door without `room_switch` gives no warning.
+- An `[MBase]` whose first line is not its nickname line. The retail games read the first line as the nickname.
+- A base nickname with more than 63 characters: the retail games ignore the bar data of the base. A nickname with more than 31 characters: a mission condition cannot name the base. A base of the active mod whose nickname starts with "intro": OpenLancer also shows its rooms in the main menu.
+- A fixture of an `[MRoom]` that names no `[GF_NPC]` before it in its `[MBase]`. The retail games show no character at this place. An `npc` line of a `[BaseFaction]` that names no character of its `[MBase]`, and a `room` line or an `[MRoom]` that names no room of the base. The game ignores these lines.
+- A base that no object docks with, and a base without an object with `base = <base>` in its system. An object that docks with a base of another system. A base of the active mod also warns when no object with its base line shows the name of the base. The trade lists of the game then skip the base.
+- A base that sells more ships than the room of its ship dealer shows, a base that sells goods without the dealer of their category, and a dealer whose category the market does not sell. Such a dealer shows an empty list.
+- A base of the active mod without an `[MBase]`. Its bar has no characters, and it offers no missions.
+- A base whose market the active mod adds or changes, when the base sells a ship and has no line for each ship package. The check runs only when the ship markets of the game and of the lower mods have buy-only lines, as vanilla has. The game gives 0 credits for the trade-in of a ship without a line.
+- A room scene that shows a `$terrain_*` template, when the base has no `terrain_*` line for it. The room shows no model there.
+- A character of the active mod without a body or a costume, a voice or a name. The game does not show the character.
 
 A field-check error or a missing required key that the base game has too does not block the save. This is true when the key has the value of the base data, no lower mod changes the section, and the same check of the base version of the section gives the same error. For example, the active mod changes the loadout of a retail object, and the position of the object in the base data has a value that is not a number. The save continues with a warning that ends with "The base game has the same problem, so the save continues." Each other error blocks the save, also when it is a value of the base data: an error of a key that the active mod writes again, an error that a key of the active mod causes, an error of a key that a lower mod changes, and each error that reads another section.
 
@@ -1898,6 +1922,15 @@ Librelancer loads some data that the retail game does not accept or does not rea
 | A key that only Librelancer reads: the section `[Extended]` of `freelancer.ini`, a `[Data]` key that the retail loaders do not know (for example `newplayer`, `mpnewcharacter`, `mbases`, `navmap`, `mouse` or `cameras`), and `cruise_speed` of an `[Engine]` | Error | It does not read the key. Only OpenLancer reads it. |
 | A boolean key with a value other than `true`, `false`, `1` or `0` (in any letter case) | Warning | It reads false and logs an error. For `requires_ammo` and `force_gun_ori`, the check gives an error, because the game can crash. |
 | A line of the mod that replaces a line that HD Edition changed (HD Edition 0.7.1 only) | Warning | The mod can undo a fix of HD Edition. The check compares the HD Edition file with the file of a linked Freelancer 1.0 or 1.1 game. Without such a game, the check does not run. |
+| A door (`ExitDoor`) of a room that leads to a room that its base does not have | Error | It can crash when the player uses the door. A door without `room_switch` gives no finding. The check reads each base whose `[Base]`, base file or room file the mods add or change. |
+| An `[MBase]` whose nickname names no base | Error | It stops reading the bar data of the bases after the block. |
+| An `[MBase]` whose first line is not its nickname line | Error | It reads the first line as the nickname. |
+| A base nickname with more than 63 characters | Error | It ignores the bar data of the base. |
+| A base with the nickname or the FLHash of another base | Error | It drops one of the two bases. The check reads the bases of the game of each target, so a base of the mod can collide with a base of one target game and not of the other. |
+| A fixture of an `[MRoom]` that names no `[GF_NPC]` before it in its `[MBase]` | Error | It shows no character at this place. |
+| A base whose market the mods add or change, when it sells a ship and has no line for each ship package | Warning | It gives 0 credits for the trade-in of a ship without a line. The check runs only for a target whose ship markets have buy-only lines. Vanilla 1.1 has them, and HD Edition 0.7.1 does not. So a mod that you make on HD Edition data can get the warning for the vanilla target. |
+
+A mod without a retail target gets the door, the first line of an `[MBase]`, the long nickname and the fixture as warnings of the base checks (see "The save gate").
 
 The save gate does not run the check of the jump holes and jump gates. It gives that error through the checks of the jump connections, for each data mod (see "Jump connections and gate locks"). So the save gate shows one error for one cause. Play in the game, the export and `oltool validate --target` run the content check.
 

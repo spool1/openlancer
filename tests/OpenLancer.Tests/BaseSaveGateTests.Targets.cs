@@ -333,8 +333,8 @@ public sealed partial class BaseSaveGateTests
             [NewBase(), NewBaseFile(StationRooms[..StationRooms.LastIndexOf("[Room]")])]));
 
         Assert.Equal(DiagnosticSeverity.Warning, One(session, "The door").Severity);
-        var target = session.SaveProblems().Where(p => p.Message.StartsWith("Base 'Ol01_03_Base': the door", StringComparison.Ordinal))
-            .ToList();
+        var target = session.SaveProblems()
+            .Where(p => p.Message.StartsWith("Base 'Ol01_03_Base': the door", StringComparison.Ordinal)).ToList();
         if (blocks)
             Assert.Equal(DiagnosticSeverity.Error, Assert.Single(target).Severity);
         else

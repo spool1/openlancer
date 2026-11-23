@@ -414,8 +414,8 @@ internal static class BaseWorkspace
         ws.WriteBase($@"DATA\{folder}\ROOMS\ol_test_deck.ini", "[Room_Info]\nset_script = Scripts\\Bases\\ol_test_deck.thn\n");
         ws.WriteBase(@"DATA\SCRIPTS\BASES\ol_test_deck.thn", "duration = 1\nentities = {}\nevents = {}\n");
         foreach (var nickname in nicknames)
-            ws.WriteBase($@"DATA\{folder}\{nickname}.ini",
-                $"[BaseInfo]\nnickname = {nickname}\nstart_room = Deck\n[Room]\nnickname = Deck\nfile = {folder}\\ROOMS\\ol_test_deck.ini\n");
+            ws.WriteBase($@"DATA\{folder}\{nickname}.ini", $"[BaseInfo]\nnickname = {nickname}\nstart_room = Deck\n" +
+                                                         $"[Room]\nnickname = Deck\nfile = {folder}\\ROOMS\\ol_test_deck.ini\n");
     }
 
     /// <summary>The section of a type and a key in a file of W.</summary>

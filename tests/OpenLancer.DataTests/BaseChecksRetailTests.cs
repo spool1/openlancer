@@ -98,7 +98,8 @@ public sealed class BaseChecksRetailTests(ITestOutputHelper output)
         Assert.Empty(session.SaveProblems());
         var br0502 = session.Base("Br05_02_Base")!;
         Assert.Contains(br0502.Rooms.SelectMany(r => r.Doors), d => d.Target == null);
-        Assert.DoesNotContain(BaseChecks.Problems(session, "Br05_02_Base"), p => p.Message.StartsWith("The door", StringComparison.Ordinal));
+        Assert.DoesNotContain(BaseChecks.Problems(session, "Br05_02_Base"),
+            p => p.Message.StartsWith("The door", StringComparison.Ordinal));
         Assert.DoesNotContain("other", counts.Keys);
 
         // The checks read the scripts of the rooms: the bases whose room scenes show a terrain template have the lines.

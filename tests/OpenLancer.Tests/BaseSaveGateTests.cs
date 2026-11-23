@@ -307,9 +307,18 @@ public sealed partial class BaseSaveGateTests
     {
         using var ws = BaseWorkspace.Create();
         // The [MRoom] of the pirate base comes before its bartender.
-        ws.WriteBase(BaseWorkspace.MBasesPath, BaseWorkspace.MBases[..BaseWorkspace.MBases.IndexOf("[GF_NPC]\nnickname = ol02_01_bartender")] +
-            "[MRoom]\nnickname = Bar\nfixture = ol02_01_bartender, Zs/NPC/Bartender/01/A/Stand, scripts\\vendors\\ol_bartender_fidget.thn, bartender\n" +
-            "[GF_NPC]\nnickname = ol02_01_bartender\nbase_appr = ol_costume\nindividual_name = 1200\naffiliation = ol_pirates\nvoice = ol_voice\n");
+        var at = BaseWorkspace.MBases.IndexOf("[GF_NPC]\nnickname = ol02_01_bartender", StringComparison.Ordinal);
+        ws.WriteBase(BaseWorkspace.MBasesPath, BaseWorkspace.MBases[..at] + """
+            [MRoom]
+            nickname = Bar
+            fixture = ol02_01_bartender, Zs/NPC/Bartender/01/A/Stand, scripts\vendors\ol_bartender_fidget.thn, bartender
+            [GF_NPC]
+            nickname = ol02_01_bartender
+            base_appr = ol_costume
+            individual_name = 1200
+            affiliation = ol_pirates
+            voice = ol_voice
+            """);
         var session = ws.Session("act");
 
         var warning = One(session, "The fixture", BaseWorkspace.Pirate);
