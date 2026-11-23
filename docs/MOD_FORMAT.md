@@ -1924,6 +1924,7 @@ First, the INI checks:
 - A market for a base that does not exist, a market good that does not exist, or a market good that the engine ignores (a good without equipment). A line of a hull good is valid: it sets the price of its ship at the base (see "Markets").
 - A market ship whose letter case differs from the ship package. The engine finds ship packages with a case-sensitive match.
 - A ship that a market sells with min = max = 0 (warning: it is not for sale). A line whose transaction type is 1 tells that the base only buys the ship, so it gives no warning. Retail has such a line for each ship of each ship market.
+- A market line in which each value after the good has its default value (warning: the games skip it, see "Markets").
 - A duplicate nickname, two nicknames with the same hash, a nickname that is not ASCII, or an equipment section without a nickname. (The engine drops a `[Good]` or `[Ship]` without a nickname and logs `Missing required field nickname`.)
 - A ship or good whose text id has no text.
 

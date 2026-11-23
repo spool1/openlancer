@@ -39,15 +39,24 @@ public static class ModValidator
     /// True when a market line of a ship package gives the warning that the ship is not for sale (decision D511 of the
     /// console filter design): min = max = 0, and the base does not only buy the ship. Retail reads the sixth value of a
     /// <c>MarketGood</c> line as the transaction type: 0 buy and sell, 1 the base buys only, 2 the base sells only. Retail
-    /// marks each ship line with min = max = 0 as type 1 on purpose. The fork keeps the type since OL-0045.
+    /// marks each ship line with min = max = 0 as type 1 on purpose. The fork keeps the type since OL-0045. A line with
+    /// only default values gives the warning of <see cref="SkippedLine"/> instead.
     /// </summary>
     internal static bool ShipNotForSale(MarketGood item) =>
-        item.Min == 0 && item.Max == 0 && (MarketTransaction)item.TransactionType != MarketTransaction.BuyOnly;
+        item.Min == 0 && item.Max == 0 && (MarketTransaction)item.TransactionType != MarketTransaction.BuyOnly &&
+        !item.HasOnlyDefaults;
+
+    /// <summary>The warning of a market line in which each value after the good has its default value, or null. The
+    /// games skip such a line, so the earlier line of the good counts (fork commit OL-0081).</summary>
+    internal static string? SkippedLine(MarketGood item) => item.HasOnlyDefaults
+        ? "each value after the good has its default value, so the games skip the line. The earlier line of the good " +
+          "counts."
+        : null;
 
     /// <summary>
     /// Why the engine ignores the market line of a good that is not a ship package, or null. A market sells equipment
     /// and commodities with equipment. A line of a hull good sets the price of its ship at the base, for the ship dealer
-    /// and the trade-in (fork commit OL-0080).
+    /// and the trade-in value (fork commit OL-0080).
     /// </summary>
     /// <param name="category">The category of the good.</param>
     /// <param name="hasEquipment">True when an equipment section has the nickname of the good.</param>
@@ -196,6 +205,8 @@ public static class ModValidator
                     var label = $"Market for base '{market.Base}', good '{item.Good}'";
                     if (item.Good == null)
                         Error($"{label}: no good nickname.");
+                    else if (SkippedLine(item) is { } skipped)
+                        Warning($"{label}: {skipped}");
                     else if (packagesExact.Contains(item.Good))
                     {
                         if (ShipNotForSale(item))

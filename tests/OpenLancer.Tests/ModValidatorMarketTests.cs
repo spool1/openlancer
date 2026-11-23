@@ -30,7 +30,7 @@ public sealed class ModValidatorMarketTests
 
     /// <summary>The base sells the ship (type 0 or 2), but it has no stock, so the ship is not for sale.</summary>
     [Theory]
-    [InlineData("pkg1, 0, -1, 0, 0, 0, 1")]
+    [InlineData("pkg1, 2, -1, 0, 0, 0, 1")]
     [InlineData("pkg1, 0, -1, 0, 0, 2, 1")]
     public void AShipWithMinAndMaxZeroThatTheBaseCanSellGivesTheWarning(string values) =>
         Assert.True(ModValidator.ShipNotForSale(Line(values)));
@@ -41,7 +41,23 @@ public sealed class ModValidatorMarketTests
     [InlineData(MarketTransaction.BuyOnly, false)]
     [InlineData(MarketTransaction.SellOnly, true)]
     public void TheRuleReadsTheTransactionTypeOfTheInspector(MarketTransaction type, bool warning) =>
-        Assert.Equal(warning, ModValidator.ShipNotForSale(Line($"pkg1, 0, -1, 0, 0, {(int)type}, 1")));
+        Assert.Equal(warning, ModValidator.ShipNotForSale(Line($"pkg1, 2, -1, 0, 0, {(int)type}, 1")));
+
+    /// <summary>The games skip a line in which each value after the good has its default value (fork commit OL-0081).
+    /// The line gives the warning of a skipped line, not the warning of a ship that is not for sale.</summary>
+    [Fact]
+    public void ALineWithOnlyDefaultValuesGivesTheWarningOfASkippedLine()
+    {
+        var skipped = Line("pkg1, 0, -1, 0, 0, 0, 1");
+
+        Assert.False(ModValidator.ShipNotForSale(skipped));
+        var warning = ModValidator.SkippedLine(skipped);
+        Assert.Equal("each value after the good has its default value, so the games skip the line. The earlier line " +
+                     "of the good counts.", warning);
+        Assert.Empty(SteLint.Problems(warning!));
+        Assert.Null(ModValidator.SkippedLine(Line("pkg1, 0, -1, 0, 0, 1, 1")));
+        Assert.Null(ModValidator.SkippedLine(Line("water, 0, -1, 0, 0, 0, 1.2")));
+    }
 
     [Fact]
     public void AShipWithStockGivesNoWarning() =>
