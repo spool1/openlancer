@@ -1010,7 +1010,9 @@ Rename gives the mod a new id and a new folder name. Before it changes a file, i
 
 The Inspector edits ships, equipment, goods, the other sections of the item files, the market lines, the parts of the bases, and the objects, zones and lights of the open star system and the sections that set the fields of a system. The edits go into the active mod. A field shows each line of a key on its own text line, with the values separated by `, `. The editor reads the text as the merge reads a patch line, so a value gets the type that a save and a reload give it (see "Value types in binary files"). For example, in a binary file, `true` that replaces the text `TRUE` stays `TRUE`, and `200` that replaces a float is a float. An empty field removes the key.
 
-The parts of a base are the `[Base]` of `universe.ini`, the `[BaseInfo]` and `[Room]` sections of its base file, the sections of its room files, and its `[MBase]` in `mBases.ini` with the children `[MVendor]`, `[BaseFaction]`, `[GF_NPC]` and `[MRoom]`. Their fields get the checks of their types and of their lists (see "Data lists and pickers"). `[BaseInfo]` also has `ship_repair_cost`, the cost factor of a ship repair at the base. Retail reads it, and OpenLancer does not read it. `individual_name` of a `[GF_NPC]` holds the name of the character as a text (see "Text: strings.json").
+The parts of a base are its `[Base]` of `universe.ini`, its base file, its room files and its `[MBase]` in `mBases.ini`. The base file has a `[BaseInfo]` and a `[Room]` for each room. The children of an `[MBase]` are `[MVendor]`, `[BaseFaction]`, `[GF_NPC]` and `[MRoom]`. The fields of these sections get the checks of their types and of their lists (see "Data lists and pickers").
+
+`[BaseInfo]` also has `ship_repair_cost`, the cost factor of a ship repair at the base. Retail reads it, and OpenLancer does not read it. `individual_name` of a `[GF_NPC]` holds the name of the character as a text (see "Text: strings.json").
 
 `mBases.ini` is below `DATA\MISSIONS`, but its edits are patches, as the edits of the other data files are. A patch finds a child section by its nickname. So an `[MVendor]` and a `[BaseFaction]`, which have no nickname, are read-only. An `[MRoom]` whose nickname another `[MRoom]` has is read-only too, for example `Bar`. When the active mod holds a whole copy of `mBases.ini`, each section takes edits.
 
@@ -1401,16 +1403,19 @@ The base files and `mBases.ini` use these lists. A base file is a file that the 
 
 | Key | Field | A value of the active mod outside the list |
 |---|---|---|
-| `[BaseInfo] start_room` | Picker of the rooms of the same base file, without None | Error: the game crashes when the player docks here. A `[BaseInfo]` of the active mod without the key is an error too. |
+| `[BaseInfo] start_room` | Picker of the rooms of the same base file, without None | Error: the game crashes when the player docks here. A `[BaseInfo]` that the active mod adds or changes without the key is an error too. |
 | `[MBase] nickname` | The key of the section | Error: the game does not use the bar data of this block. |
 | `[MBase] local_faction`, `[BaseFaction] faction`, `[GF_NPC] affiliation` | Picker of the factions | Error: the game ignores this value. |
-| `[GF_NPC] body`, `head`, `lefthand`, `righthand`, `accessory` | Picker of the body parts of that kind | Error: the game ignores this value. |
+| `[GF_NPC] body`, `head`, `lefthand`, `righthand` | Picker of the body parts of that kind | Error: the game ignores this value. |
+| `[GF_NPC] accessory` | Text field, because the key can have more than one line | Error: the game ignores this value. |
 | `[GF_NPC] base_appr` | Picker of the costumes | Error: the game ignores this value. |
 | `[GF_NPC] voice` | Picker of the voices | Warning: unlisted values are allowed. OpenLancer opens the voice bank by its name. |
 
 The start room of a base compares without letter case, as the engine compares it. So `start_room = bar` names the room `Bar`.
 
-Some keys of `mBases.ini` name a part of the base of their `[MBase]`. `[GF_NPC] room` and `[MRoom] nickname` name a room of the base. Value 0 of `[MRoom] fixture` and of `[BaseFaction] npc` names a character of the same `[MBase]`. The base names these parts, so no list of the rule data can give them. The picker of `[GF_NPC] room` lists the rooms of the base file of the base. The picker offers "None", because a character without a room line is a fixture of a room. A value outside the rooms shows as "Not listed". A fixture line and an npc line can repeat, so they keep their text field.
+Some keys of `mBases.ini` name a part of the base of their `[MBase]`. `[GF_NPC] room` and `[MRoom] nickname` name a room of the base. Value 0 of `[MRoom] fixture` and of `[BaseFaction] npc` names a character of the same `[MBase]`. The base names these parts, so no list of the rule data can give them.
+
+The picker of `[GF_NPC] room` lists the rooms of the base file of the base. The picker offers "None", because a character without a room line is a fixture of a room. A value outside the rooms shows as "Not listed". A fixture line and an npc line can repeat, so they keep their text field.
 
 The `file` key of a `[Nebula]` and of an `[Asteroids]` section uses the list of the nebula files or of the asteroid files. The list holds the INI files below `SOLAR\NEBULA` or `SOLAR\ASTEROIDS` whose sections all belong to a nebula file or to an asteroid file. So the texture files of these folders, for example `edge_shapes.ini`, are not in the list. The engine reads a file of any folder. So a value outside the list is valid when its file exists, and the picker shows it as "value (other folder)". A file that does not exist is an error: the game crashes when it loads the data.
 
