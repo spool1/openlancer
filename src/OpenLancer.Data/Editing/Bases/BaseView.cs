@@ -4,6 +4,7 @@ using System.Linq;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Ini;
+using OpenLancer.Data.IO;
 
 namespace OpenLancer.Data.Editing.Bases;
 
@@ -161,7 +162,8 @@ public sealed class BaseView
     public IReadOnlyList<BaseDockObject> DockObjects { get; private init; } = [];
 
     /// <summary>The object with a <c>base</c> line of the base and the same name text as the base, or null. The games
-    /// link the base to this object. The trade lists of the base screens skip a base without it.</summary>
+    /// link the base to this object. The trade lists of the base screens skip a base without it. An object of the
+    /// system of the base comes before an object of another system.</summary>
     public SectionRef? NamedObject { get; private init; }
 
     /// <summary>The <c>terrain_*</c> lines of the <c>[Base]</c>, in file order.</summary>
@@ -214,7 +216,7 @@ public sealed class BaseView
             Characters = CharactersOf(session, mbase, parts),
             Market = market,
             DockObjects = docks,
-            NamedObject = NamedObjectOf(session, docks, Last(section, "strid_name")),
+            NamedObject = NamedObjectOf(session, docks, Last(section, "strid_name"), Last(section, "system")),
             Terrain = section.Where(e => e.Name.StartsWith("terrain_", StringComparison.OrdinalIgnoreCase) && e.Count > 0)
                 .Select(e => new BaseTerrainLine(e.Name, e[0].ToString().Trim()))
                 .ToList(),
@@ -436,13 +438,20 @@ public sealed class BaseView
             .ToList();
 
     /// <summary>The object with a <c>base</c> line of the base whose <c>ids_name</c> is the <c>strid_name</c> of the
-    /// base, as text. A text placeholder compares as its text, so a base and its object of one mod share it.</summary>
-    private static SectionRef? NamedObjectOf(EditSession session, IReadOnlyList<BaseDockObject> docks, string? name) =>
+    /// base, as text. A text placeholder compares as its text, so a base and its object of one mod share it. An object
+    /// in the file of the system of the base comes first.</summary>
+    private static SectionRef? NamedObjectOf(EditSession session, IReadOnlyList<BaseDockObject> docks, string? name,
+        string? system) =>
         name == null
             ? null
-            : docks.Where(d => d.HasBaseLine)
-                .FirstOrDefault(d => session.WorkingSection(d.Section) is { } section &&
-                                     Is(Last(section, "ids_name"), name))?.Section;
+            : docks.Where(d => d.HasBaseLine && session.WorkingSection(d.Section) is { } section &&
+                               Is(Last(section, "ids_name"), name))
+                .OrderByDescending(d => InSystem(session, d.Section, system))
+                .FirstOrDefault()?.Section;
+
+    /// <summary>True when a section is in the file of a system.</summary>
+    internal static bool InSystem(EditSession session, SectionRef section, string? system) =>
+        system != null && session.SystemPath(system) is { } path && VfsPath.Comparer.Equals(section.Path, path);
 
     /// <summary>The first value of the last line of a key with a value, trimmed, or null.</summary>
     private static string? Last(Section section, string key) =>

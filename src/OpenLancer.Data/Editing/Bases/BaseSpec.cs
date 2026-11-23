@@ -58,7 +58,8 @@ public sealed record DockSpec
 /// <param name="Name">The name of the base and its dock object in the game.</param>
 public sealed record BaseSpec(string Nickname, string System, string Template, string Name)
 {
-    /// <summary>The plain text of the infocard of the dock object, or null for the name.</summary>
+    /// <summary>The plain text of the infocard of the dock object. Null gives a new station or a new planet the name as
+    /// its infocard, and an existing planet keeps its infocard.</summary>
     public string? Info { get; init; }
 
     /// <summary>The rooms of the template that the base keeps, or null for each room.</summary>

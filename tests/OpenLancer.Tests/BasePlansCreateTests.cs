@@ -354,10 +354,10 @@ public sealed class BasePlansCreateTests
         Assert.Equal(["nickname", "character_density", "fixture"], Names(session, view.MBaseParts[5]));
         Assert.Equal(@"Ol01_05_Base_bartender, Zs/NPC/Bartender/01/A/Stand, scripts\vendors\ol_bartender_fidget.thn, bartender",
             Value(session, view.MBaseParts[5], "fixture"));
-        Assert.Empty(BaseChecks.Problems(session, New).Where(p => p.Message.Contains("[MBase]", StringComparison.Ordinal) ||
-                                                              p.Message.StartsWith("The fixture", StringComparison.Ordinal) ||
-                                                              p.Message.StartsWith("The faction", StringComparison.Ordinal) ||
-                                                              p.Message.StartsWith("The character", StringComparison.Ordinal)));
+        Assert.DoesNotContain(BaseChecks.Problems(session, New), p => p.Message.Contains("[MBase]", StringComparison.Ordinal) ||
+                                                                    p.Message.StartsWith("The fixture", StringComparison.Ordinal) ||
+                                                                    p.Message.StartsWith("The faction", StringComparison.Ordinal) ||
+                                                                    p.Message.StartsWith("The character", StringComparison.Ordinal));
     }
 
     /// <summary><see cref="CharacterCopy.Dealers"/> copies the characters of the fixtures. The <c>npc</c> line of the
@@ -607,6 +607,53 @@ public sealed class BasePlansCreateTests
         Assert.DoesNotContain(plan.Warnings, w => w.Message.StartsWith("No object docks", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// The main object of a template is an object of the system of its <c>[Base]</c> that docks. An object of another
+    /// system with the base line, the dock line and the name of the base comes after it, also when it comes first in the
+    /// files. The station of the system wins also when its name differs from the name of the base. Then the object of
+    /// the other system is the named object. A new station thus gets the archetype of the station that docks.
+    /// </summary>
+    [Theory]
+    [InlineData(1003)]
+    [InlineData(1004)]
+    public void TheMainObjectOfATemplateIsAnObjectOfItsSystemThatDocks(int stationName)
+    {
+        using var ws = Workspace();
+        ws.WriteBase(BaseWorkspace.Ol01Path, BaseWorkspace.Ol01 + """
+
+            [Object]
+            nickname = Ol01_Pirate_Mine
+            ids_name = 1003
+            pos = 0, 0, 30000
+            archetype = ol_station_c
+            base = Ol02_01_Base
+            dock_with = Ol02_01_Base
+            """);
+        ws.WriteBase(BaseWorkspace.Ol02Path, $"""
+            [Object]
+            nickname = Ol02_01
+            ids_name = {stationName}
+            pos = 0, 0, 0
+            archetype = ol_station
+            base = Ol02_01_Base
+            dock_with = Ol02_01_Base
+            """);
+        var session = ws.Session("act");
+        var station = BaseWorkspace.Section(session, BaseWorkspace.Ol02Path, "Object", "Ol02_01");
+        var mine = BaseWorkspace.Section(session, BaseWorkspace.Ol01Path, "Object", "Ol01_Pirate_Mine");
+
+        var template = BaseTemplate.Of(session, BaseWorkspace.Pirate, out _)!;
+
+        Assert.Equal([mine, station], session.Base(BaseWorkspace.Pirate)!.DockObjects.Select(d => d.Section));
+        Assert.Equal(stationName == 1003 ? station : mine, session.Base(BaseWorkspace.Pirate)!.NamedObject);
+        Assert.Equal((station, (SectionRef?)null), (template.MainObject, template.Ring));
+        var plan = Create(session, new BaseSpec(New, "Ol02", BaseWorkspace.Pirate, "Harbor Rock")
+        {
+            Dock = new DockSpec { Position = new Vector3(0, 0, 5000) },
+        });
+        Assert.Equal("ol_station", Value(session, plan.DockObject!, "archetype"));
+    }
+
     /// <summary>A loadout names the hardpoints of an archetype, so a station of another archetype gets no loadout.</summary>
     [Fact]
     public void AStationOfAnotherArchetypeGetsNoLoadout()
@@ -671,7 +718,7 @@ public sealed class BasePlansCreateTests
         Assert.Equal((New, "$str:ol01_05_base", "$ifc:ol01_03.info"),
             (Value(session, planet, "base"), Value(session, planet, "ids_name"), Value(session, planet, "ids_info")));
         Assert.Equal("-20000, 0, 2500", Value(session, plan.Ring!, "pos"));
-        Assert.Equal(plan.Ring, Assert.Single(plan.Adds.Where(a => a.Id.Type == "Object")));
+        Assert.Equal(plan.Ring, Assert.Single(plan.Adds, a => a.Id.Type == "Object"));
     }
 
     public static IEnumerable<object?[]> Refusals()

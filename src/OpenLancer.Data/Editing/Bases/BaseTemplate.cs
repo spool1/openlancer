@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing.Scene;
+using OpenLancer.Data.IO;
 
 namespace OpenLancer.Data.Editing.Bases;
 
@@ -94,13 +95,20 @@ internal sealed class BaseTemplate
     /// order.</summary>
     public IReadOnlyList<Section> News { get; private init; } = [];
 
-    /// <summary>The object that the games link to the base, or null when no object names the base. It is the named
-    /// object, else the first object with the <c>base</c> line, else the first object that docks with the base. For a
-    /// station, it is the station. For a planet, it is the planet.</summary>
+    /// <summary>
+    /// The object of the base that a new dock object copies, or null when no object names the base. For a station, it
+    /// is the station. For a planet, it is the planet. An object of the system of the <c>[Base]</c> comes first. In
+    /// that order, the main object is the named object when it docks, else the named object, else an object with the
+    /// <c>base</c> line that docks, else an object with the <c>base</c> line, else an object that docks.
+    /// </summary>
+    /// <remarks>Retail fact: in vanilla 1.1, a satellite of Iw03 has the base line, the dock line and the name of
+    /// gd_im_water_miner, but its archetype has no docking sphere. The two stations of Bw10, the system of the base,
+    /// dock with the base.</remarks>
     public SectionRef? MainObject { get; private init; }
 
-    /// <summary>The docking ring of a planet: the first object that docks with the base when the main object does not
-    /// dock, or null. Retail planets have no <c>dock_with</c> line, and their rings have no <c>base</c> line.</summary>
+    /// <summary>The docking ring of a planet: an object that docks with the base when the main object does not dock, or
+    /// null. An object in the file of the main object comes first. Retail planets have no <c>dock_with</c> line, and
+    /// their rings have no <c>base</c> line.</summary>
     public SectionRef? Ring { get; private init; }
 
     /// <summary>The warnings of the template, for example a template without <c>[MBase]</c>.</summary>
@@ -156,7 +164,7 @@ internal sealed class BaseTemplate
         var characters = refs.Where(p => Is(p.Section!.Name, "GF_NPC") && Last(p.Section, "nickname") != null)
             .Select(p => new TemplateCharacter(p.Ref, p.Section!, Last(p.Section!, "nickname")!, Last(p.Section!, "room")))
             .ToList();
-        var (main, ring) = DockObjectsOf(view);
+        var (main, ring) = DockObjectsOf(session, view);
         return new BaseTemplate(view, entry)
         {
             Info = session.WorkingSection(view.Info),
@@ -182,13 +190,21 @@ internal sealed class BaseTemplate
 
     /// <summary>The main object and the docking ring of a template (see <see cref="MainObject"/> and
     /// <see cref="Ring"/>).</summary>
-    private static (SectionRef? Main, SectionRef? Ring) DockObjectsOf(BaseView view)
+    private static (SectionRef? Main, SectionRef? Ring) DockObjectsOf(EditSession session, BaseView view)
     {
-        var main = view.NamedObject ?? view.DockObjects.FirstOrDefault(d => d.HasBaseLine)?.Section ??
-                   view.DockObjects.FirstOrDefault(d => d.DocksWith)?.Section;
-        if (main == null || view.DockObjects.Any(d => d.Section.Equals(main) && d.DocksWith))
-            return (main, null);
-        return (main, view.DockObjects.FirstOrDefault(d => d.DocksWith && !d.Section.Equals(main))?.Section);
+        var main = view.DockObjects
+            .OrderByDescending(d => BaseView.InSystem(session, d.Section, view.System))
+            .ThenByDescending(d => d.Section.Equals(view.NamedObject) && d.DocksWith)
+            .ThenByDescending(d => d.Section.Equals(view.NamedObject))
+            .ThenByDescending(d => d.HasBaseLine && d.DocksWith)
+            .ThenByDescending(d => d.HasBaseLine)
+            .FirstOrDefault();
+        if (main == null || main.DocksWith)
+            return (main?.Section, null);
+        var ring = view.DockObjects.Where(d => d.DocksWith && !d.Section.Equals(main.Section))
+            .OrderByDescending(d => VfsPath.Comparer.Equals(d.Section.Path, main.Section.Path))
+            .FirstOrDefault();
+        return (main.Section, ring?.Section);
     }
 
     /// <summary>The <c>[NewsItem]</c> sections of W of <c>news.ini</c> with a <c>base</c> line of the base, in file

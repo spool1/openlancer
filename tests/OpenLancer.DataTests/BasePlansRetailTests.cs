@@ -30,19 +30,54 @@ public sealed class BasePlansRetailTests(ITestOutputHelper output)
 
     /// <summary>
     /// Each base of vanilla 1.1 is a template, except the three intro bases. Each plan runs, without and with a dock
-    /// object far from the center of the system of the template. A dock object needs the archetype of the request in
-    /// two cases. The template has no object that names it (11 bases), or its object cannot dock a ship. The satellite
-    /// of gd_im_water_miner has no docking sphere.
+    /// object far from the center of the system of the template. A dock object needs the archetype of the request only
+    /// when the template has no object that names it (11 bases). The main object of each template is in the system of
+    /// its <c>[Base]</c> when an object there names the base.
     /// </summary>
     [Fact]
     public void EachVanillaBaseIsATemplateAndItsPlanHasNoError() =>
-        CheckTemplates(GameDataPaths.RequireBase(), templates: 194, noDockObject: 11, otherDockObject: 1);
+        CheckTemplates(GameDataPaths.RequireBase(), templates: 194, noDockObject: 11, otherDockObject: 0);
 
     /// <summary>HD Edition 0.7.1 has the same templates. The object of each template that has one can dock a
     /// ship.</summary>
     [Fact]
     public void EachHdEditionBaseIsATemplateAndItsPlanHasNoError() =>
         CheckTemplates(GameDataPaths.RequireHde(), templates: 194, noDockObject: 11, otherDockObject: 0);
+
+    /// <summary>
+    /// In vanilla 1.1, a satellite of Iw03 has the base line, the dock line and the name of gd_im_water_miner. Its
+    /// archetype has no docking sphere, so it cannot dock a ship. The two stations of Bw10, the system of the base, dock
+    /// with the base. The main object of the template is the first station of Bw10, so a new station gets its archetype.
+    /// </summary>
+    [Fact]
+    public void TheMainObjectOfTheWaterMinerIsAStationOfItsSystem()
+    {
+        var root = GameDataPaths.RequireBase();
+        using var workspace = new RetailWorkspace(root, "c4miner");
+        var session = workspace.Open();
+        var view = session.Base("gd_im_water_miner")!;
+        var satellite = Assert.Single(view.DockObjects, d => !BaseView.InSystem(session, d.Section, view.System));
+        Assert.True(satellite.HasBaseLine && satellite.DocksWith);
+        Assert.Equal("Roid_Miner", SceneSections.Last(session.Get(satellite.Section)!, "archetype"));
+
+        var template = BaseTemplate.Of(session, "gd_im_water_miner", out _)!;
+
+        Assert.Equal("Bw10", view.System);
+        Assert.True(BaseView.InSystem(session, template.MainObject!, "Bw10"), template.MainObject!.ToString());
+        Assert.Equal(template.MainObject, view.NamedObject);
+        Assert.Contains(view.DockObjects, d => d.Section.Equals(template.MainObject) && d.DocksWith);
+        Assert.Null(template.Ring);
+        var plan = BasePlans.Create(session, new BaseSpec(New, "Bw10", "gd_im_water_miner", "New Harbor")
+        {
+            Text = Texts(session, root),
+            Dock = new DockSpec { Position = new Vector3(0, 0, 250000) },
+        });
+        Assert.True(plan.CanRun, string.Join(" ", plan.Refusals.Select(r => r.Message)));
+        session.Execute(plan.Command!);
+        Assert.Equal("Roid_Miner2", SceneSections.Last(session.Get(template.MainObject!)!, "archetype"));
+        Assert.Equal(SceneSections.Last(session.Get(template.MainObject!)!, "archetype"),
+            SceneSections.Last(session.Get(plan.DockObject!)!, "archetype"));
+    }
 
     private void CheckTemplates(string root, int templates, int noDockObject, int otherDockObject)
     {
@@ -66,6 +101,9 @@ public sealed class BasePlansRetailTests(ITestOutputHelper output)
             Assert.True(plan.CanRun, $"{nickname}: {string.Join(" ", plan.Refusals.Select(r => r.Message))}");
             Assert.DoesNotContain(plan.Warnings, w => w.Message.Contains("cannot read", StringComparison.Ordinal));
 
+            var view = template.View;
+            if (view.DockObjects.Any(d => BaseView.InSystem(session, d.Section, view.System)))
+                Assert.True(BaseView.InSystem(session, template.MainObject!, view.System), nickname);
             var docked = BasePlans.Create(session, spec with { Dock = new DockSpec { Position = new Vector3(0, 0, 250000) } });
             if (template.MainObject == null)
             {
