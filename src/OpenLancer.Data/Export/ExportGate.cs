@@ -24,16 +24,35 @@ public enum ExportGateSource
     None,
 }
 
-/// <summary>The save gate of one export: where the export gets it, and the call that gives its errors or the refusal of
-/// the export (see <see cref="ExportGate.For"/>). Exactly one of <paramref name="Errors"/> and
-/// <paramref name="Refusal"/> is set.</summary>
-/// <param name="Source">Where the export gets the gate.</param>
-/// <param name="Errors">Gives the errors of the gate, or null for <see cref="ExportGateSource.None"/>. For
-/// <see cref="ExportGateSource.Session"/>, the call reads the open session, so it runs on the thread of the session. For
-/// <see cref="ExportGateSource.Profile"/>, the call opens a session of its own, so a worker can run it.</param>
-/// <param name="Refusal">For <see cref="ExportGateSource.None"/>, the refusal of the export (see
-/// <see cref="ExportGate.NoProfileRefusal"/>), else null. The export then writes no package.</param>
-public sealed record ExportGateRun(ExportGateSource Source, Func<IReadOnlyList<Diagnostic>>? Errors, string? Refusal);
+/// <summary>
+/// The save gate of one export (see <see cref="ExportGate.For"/>). A run has the call that gives the errors of the gate,
+/// or the refusal of the export when the export cannot run the gate (#89). The two constructors make sure that a run
+/// has exactly one of the two.
+/// </summary>
+public sealed record ExportGateRun
+{
+    /// <summary>A run that gives the errors of the gate of a source.</summary>
+    /// <param name="source">Where the export gets the gate.</param>
+    /// <param name="errors">Gives the errors of the gate (see <see cref="Errors"/>).</param>
+    public ExportGateRun(ExportGateSource source, Func<IReadOnlyList<Diagnostic>> errors) =>
+        (Source, Errors) = (source, errors);
+
+    /// <summary>A run that refuses the export, because no open profile holds the mod (see
+    /// <see cref="ExportGate.NoProfileRefusal"/>). Its source is <see cref="ExportGateSource.None"/>.</summary>
+    public ExportGateRun(string refusal) => (Source, Refusal) = (ExportGateSource.None, refusal);
+
+    /// <summary>Where the export gets the gate.</summary>
+    public ExportGateSource Source { get; }
+
+    /// <summary>Gives the errors of the gate, or null for a run with a refusal. For
+    /// <see cref="ExportGateSource.Session"/>, the call reads the open session, so it runs on the thread of the session.
+    /// For <see cref="ExportGateSource.Profile"/>, the call opens a session of its own, so a worker can run it.</summary>
+    public Func<IReadOnlyList<Diagnostic>>? Errors { get; }
+
+    /// <summary>The refusal of the export, or null for a run with a gate call. The export then writes no
+    /// package.</summary>
+    public string? Refusal { get; }
+}
 
 /// <summary>
 /// The save gate before an export (#87). An export refuses a mod that the save gate of the mod refuses, with the same
@@ -96,13 +115,13 @@ public static class ExportGate
         switch (SourceOf(session, modFolder))
         {
             case ExportGateSource.Session:
-                return new ExportGateRun(ExportGateSource.Session, () => Errors(session!), null);
+                return new ExportGateRun(ExportGateSource.Session, () => Errors(session!));
             case ExportGateSource.Profile:
                 var profile = session!.Profile.FilePath;
                 return new ExportGateRun(ExportGateSource.Profile,
-                    () => Errors(ModProfile.Load(profile), modId, reports, strings, thn), null);
+                    () => Errors(ModProfile.Load(profile), modId, reports, strings, thn));
             default:
-                return new ExportGateRun(ExportGateSource.None, null, NoProfileRefusal(modId, session != null));
+                return new ExportGateRun(NoProfileRefusal(modId, session != null));
         }
     }
 

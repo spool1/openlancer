@@ -110,9 +110,10 @@ public sealed class ExportGateTests
         var notHeld = For(own, "outside");
         var noProfile = For(null, "ol-test");
 
-        Assert.Equal(new ExportGateRun(ExportGateSource.None, null, ExportGate.NoProfileRefusal("outside", true)), notHeld);
-        Assert.Equal(new ExportGateRun(ExportGateSource.None, null, ExportGate.NoProfileRefusal("ol-test", false)),
-            noProfile);
+        Assert.Equal(new ExportGateRun(ExportGate.NoProfileRefusal("outside", true)), notHeld);
+        Assert.Equal(ExportGateSource.None, notHeld.Source);
+        Assert.Null(notHeld.Errors);
+        Assert.Equal(new ExportGateRun(ExportGate.NoProfileRefusal("ol-test", false)), noProfile);
         Assert.Equal("The export of mod 'outside' stopped. The open profile does not hold mod 'outside', so the export " +
                      "cannot run the save gate of the mod. Open a profile that holds the mod, then export again.",
             notHeld.Refusal);

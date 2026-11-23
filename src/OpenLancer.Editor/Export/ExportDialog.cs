@@ -341,8 +341,9 @@ internal sealed class ExportDialog : ModalDialog
     /// <see cref="ExportGate"/>). When the open session holds the saved mod, its gate runs on the UI thread, as a save
     /// does. Else the worker opens the profile with the mod active, as <c>oltool export</c> does. The dialog refuses a
     /// mod that no open profile holds, also when no profile is open (#89). It then writes no package and starts no
-    /// prepare, and the dialog and the Console show the refusal. This also applies to Export and play. The guard runs
-    /// when the prepare ends.
+    /// prepare, and the dialog and the Console show the refusal. This also applies to Export and play. The dialog
+    /// refuses before it makes the request, so the Console gets no publish warning for an export that does not run.
+    /// <see cref="ExportRun.Prepare"/> also refuses such a gate run. The guard runs when the prepare ends.
     /// </summary>
     private void Start(Mod exported, ExportTarget? play)
     {
@@ -368,7 +369,7 @@ internal sealed class ExportDialog : ModalDialog
         GuardedExport Prepare() => GuardedExport.Prepare(request, location, DateTime.UtcNow);
         if (gate.Source != ExportGateSource.Session)
         {
-            run.Prepare(gate.Errors, Prepare);
+            run.Prepare(gate, Prepare);
             return;
         }
 
@@ -385,7 +386,7 @@ internal sealed class ExportDialog : ModalDialog
             if (!run.Running)
             {
                 var errors = gate.Errors!();
-                run.Prepare(() => errors, Prepare);
+                run.Prepare(new ExportGateRun(gate.Source, () => errors), Prepare);
             }
         });
     }

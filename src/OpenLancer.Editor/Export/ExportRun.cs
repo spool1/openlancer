@@ -42,7 +42,8 @@ internal sealed class ExportRun
     /// <summary>Runs when a write ends, also after a close of the dialog.</summary>
     public event Action<ExportWritten>? Written;
 
-    /// <summary>Runs when a prepare or a write stops with an exception, with the reason.</summary>
+    /// <summary>Runs when the gate run of a prepare refuses the export, with the refusal (see <see cref="Prepare"/>).
+    /// Also runs when a prepare or a write stops with an exception, with the reason.</summary>
     public event Action<string>? Failed;
 
     /// <summary>True while the export prepares or writes.</summary>
@@ -54,15 +55,14 @@ internal sealed class ExportRun
     /// <summary>True when the dialog closed after the start of this run.</summary>
     public bool Closed { get; private set; }
 
-    /// <summary>Starts the prepare of a new run on a thread of its own.</summary>
+    /// <summary>
+    /// Starts the prepare of a new run on a thread of its own. The save gate of the mod runs first on that thread. When
+    /// it gives errors, the prepare does not run. A gate run with a refusal starts no thread, and <see cref="Failed"/>
+    /// gives the refusal at once (#89). So a run never prepares an export without the save gate of the mod.
+    /// </summary>
+    /// <param name="gate">The save gate of the mod (see <see cref="ExportGate.For"/>).</param>
     /// <exception cref="InvalidOperationException">A run is not complete.</exception>
-    public void Prepare(Func<GuardedExport> prepare) => Prepare(null, prepare);
-
-    /// <summary>Starts the prepare of a new run on a thread of its own. The save gate of the mod runs first on that
-    /// thread. When it gives errors, the prepare does not run.</summary>
-    /// <param name="gate">Gives the errors of the save gate of the mod, or null when the run has no gate.</param>
-    /// <exception cref="InvalidOperationException">A run is not complete.</exception>
-    public void Prepare(Func<IReadOnlyList<Diagnostic>>? gate, Func<GuardedExport> prepare)
+    public void Prepare(ExportGateRun gate, Func<GuardedExport> prepare)
     {
         if (Running)
         {
@@ -70,10 +70,18 @@ internal sealed class ExportRun
         }
 
         Closed = false;
+        if (gate.Refusal is { } refusal)
+        {
+            Failed?.Invoke(refusal);
+            return;
+        }
+
+        // A run without a refusal has its gate call (see the constructors of ExportGateRun).
+        var errors = gate.Errors!;
         preparing = OwnThread.Run(() =>
         {
-            var errors = gate?.Invoke() ?? [];
-            return (errors, errors.Count > 0 ? null : prepare());
+            var found = errors();
+            return (found, found.Count > 0 ? null : prepare());
         });
     }
 

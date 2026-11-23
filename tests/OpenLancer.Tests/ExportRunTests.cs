@@ -18,6 +18,9 @@ public sealed class ExportRunTests
 {
     private const string Patch = "[Good]\nnickname = lf_hull\nprice = 5600\n";
 
+    /// <summary>A save gate on the worker that finds no error.</summary>
+    private static readonly ExportGateRun NoErrors = new(ExportGateSource.Profile, () => []);
+
     private static HistoryLocation Location(ExportGame game, Mod mod) =>
         new(PublishHistory.FolderOf(game.Game.Folder, mod.Id), mod.Id, mod.Folder, [game.Root]);
 
@@ -52,7 +55,7 @@ public sealed class ExportRunTests
         run.Prepared += prepared.Add;
         using var gate = new ManualResetEventSlim();
 
-        run.Prepare(() =>
+        run.Prepare(NoErrors, () =>
         {
             gate.Wait();
             return Prepare(game, mod);
@@ -80,7 +83,7 @@ public sealed class ExportRunTests
         run.Prepared += export => prepared = export;
         run.Written += result => written = result;
 
-        run.Prepare(() => Prepare(game, mod));
+        run.Prepare(NoErrors, () => Prepare(game, mod));
         await FinishAsync(run);
         Assert.NotNull(prepared);
         run.Write(prepared, replace: false);
@@ -105,12 +108,12 @@ public sealed class ExportRunTests
         run.Failed += failures.Add;
         using var gate = new ManualResetEventSlim();
 
-        run.Prepare(() =>
+        run.Prepare(NoErrors, () =>
         {
             gate.Wait();
             throw new IOException("The disk is full.");
         });
-        Assert.Throws<InvalidOperationException>(() => run.Prepare(() => null!));
+        Assert.Throws<InvalidOperationException>(() => run.Prepare(NoErrors, () => null!));
         gate.Set();
         await FinishAsync(run);
 
@@ -132,15 +135,50 @@ public sealed class ExportRunTests
         run.Prepared += prepared.Add;
         var error = OpenLancer.Data.Diagnostic.Error(ExportGame.GoodsPath, "The game crashes.");
 
-        run.Prepare(() => [error], () => throw new InvalidOperationException("The prepare must not run."));
+        run.Prepare(new ExportGateRun(ExportGateSource.Profile, () => [error]),
+            () => throw new InvalidOperationException("The prepare must not run."));
         await FinishAsync(run);
 
         Assert.Equal([error], Assert.Single(gated));
         Assert.Empty(prepared);
         Assert.False(Directory.Exists(Path.Combine(Location(game, mod).Folder, "1.2.0")));
-        run.Prepare(() => [], () => Prepare(game, mod));
+        run.Prepare(NoErrors, () => Prepare(game, mod));
         await FinishAsync(run);
         Assert.Single(gated);
         Assert.Single(prepared);
+    }
+
+    /// <summary>
+    /// A gate run with a refusal stops the run before the save gate and the prepare (#89). The run starts no thread, and
+    /// the dialog gets the refusal at once. So the Export dialog cannot write a package of a mod that no open profile
+    /// holds, also when the dialog does not check the refusal itself. The next run starts as usual.
+    /// </summary>
+    [Fact]
+    public async Task ARefusedGateRunStartsNoPrepare()
+    {
+        using var game = new ExportGame();
+        var mod = game.GoodsMod(Patch);
+        var run = new ExportRun();
+        var failures = new List<string>();
+        var gated = new List<IReadOnlyList<OpenLancer.Data.Diagnostic>>();
+        var prepared = new List<GuardedExport>();
+        run.Failed += failures.Add;
+        run.Gated += gated.Add;
+        run.Prepared += prepared.Add;
+        var refusal = ExportGate.NoProfileRefusal(mod.Id, profileOpen: false);
+
+        run.Prepare(new ExportGateRun(refusal), () => throw new InvalidOperationException("The prepare must not run."));
+
+        Assert.False(run.Running);
+        Assert.Equal([refusal], failures);
+        run.Update();
+        Assert.Equal([refusal], failures);
+        Assert.Empty(gated);
+        Assert.Empty(prepared);
+        Assert.False(Directory.Exists(Path.Combine(Location(game, mod).Folder, "1.2.0")));
+        run.Prepare(NoErrors, () => Prepare(game, mod));
+        await FinishAsync(run);
+        Assert.Single(prepared);
+        Assert.Equal([refusal], failures);
     }
 }
