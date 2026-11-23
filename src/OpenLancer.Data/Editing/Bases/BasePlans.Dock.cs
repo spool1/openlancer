@@ -35,9 +35,10 @@ public static partial class BasePlans
     /// <summary>
     /// The dock objects of a new base (see <see cref="DockSpec"/>), or null when the request has none. A station gets
     /// <c>base</c>, <c>dock_with</c>, the name of the base and the infocard. It also gets the lines of the station of
-    /// the template (see <see cref="BaseTemplate.StationLines"/>). A planet gets <c>base</c> and the name of the base. Its new
-    /// docking ring gets <c>dock_with</c>, the name of the ring of the template and the lines of that ring. Retail
-    /// rings have no <c>base</c> line. A <c>reputation</c> line names the faction of the request when it gives one.
+    /// the template (see <see cref="BaseTemplate.StationLines"/>). A planet gets <c>base</c> and the name of the base.
+    /// Its new docking ring gets <c>dock_with</c>, the name of the ring of the template and the lines of that ring.
+    /// Retail rings have no <c>base</c> line. A <c>reputation</c> line names the faction of the request when it gives
+    /// one.
     /// </summary>
     /// <remarks>A <c>loadout</c> names hardpoints of an archetype. So a new object copies the loadout of the template
     /// only when it has the archetype of the template object.</remarks>
