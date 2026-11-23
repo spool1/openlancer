@@ -153,7 +153,8 @@ public static partial class TargetChecks
             .Concat(Triggers(side, scope))
             .Concat(NpcEngines(side, scope))
             .Concat(LibrelancerKeys(side, scope))
-            .Concat(Booleans(side, scope));
+            .Concat(Booleans(side, scope))
+            .Concat(Bases(side, scope));
 
     /// <summary>The jump objects, the solar objects and the asteroid zones of each system that the mods can
     /// change.</summary>
@@ -464,7 +465,7 @@ public static partial class TargetChecks
     private readonly record struct Finding(string Key, Diagnostic Problem);
 
     /// <summary>The data without the mods or with them, and the files that the game reads for it.</summary>
-    private sealed class Side(CheckView view, bool withMods)
+    private sealed partial class Side(CheckView view, bool withMods)
     {
         private IReadOnlyList<Section>? freelancerIni;
         private Dictionary<string, string?>? systems;
@@ -525,10 +526,15 @@ public static partial class TargetChecks
 
     /// <summary>The files and systems that the checks read: the ones that the mods can change. Both sides read the same
     /// ones, so that their findings compare.</summary>
-    private sealed class Scope
+    private sealed partial class Scope
     {
+        private readonly Side without;
+        private readonly Side with;
+
         public Scope(CheckView view, HashSet<string> changed, Side without, Side with)
         {
+            this.without = without;
+            this.with = with;
             Changed = changed;
             Systems = without.SystemFiles.Keys.Union(with.SystemFiles.Keys, StringComparer.OrdinalIgnoreCase)
                 .Where(n => without.SystemPath(n) is var a && with.SystemPath(n) is var b &&

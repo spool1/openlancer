@@ -90,6 +90,17 @@ internal sealed class BaseFiles(EditSession session, Func<IReadOnlyList<Section>
     public IReadOnlyList<BaseRoomFile> RoomsOf(string baseNickname) =>
         Current.Bases.TryGetValue(baseNickname.Trim(), out var entry) ? entry.Rooms : [];
 
+    /// <summary>The nicknames of the bases whose <c>file</c> line names a base file, in the order of
+    /// <c>universe.ini</c>.</summary>
+    public IReadOnlyList<string> BasesOfBaseFile(string path)
+    {
+        if (VfsPath.Normalize(path) is not { } normal)
+            return [];
+        var current = Current;
+        return current.Nicknames
+            .Where(n => current.Bases[n].File is { } file && VfsPath.Comparer.Equals(file, normal)).ToList();
+    }
+
     /// <summary>The nicknames of the bases whose rooms use a room file, in the order of <c>universe.ini</c>.</summary>
     public IReadOnlyList<string> BasesOfRoomFile(string path) =>
         VfsPath.Normalize(path) is { } normal && Current.Users.TryGetValue(normal, out var users) ? users : [];

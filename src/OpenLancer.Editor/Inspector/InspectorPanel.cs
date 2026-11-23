@@ -522,18 +522,21 @@ internal sealed class InspectorPanel : IDisposable
 
     /// <summary>
     /// The component checks of a section without a components strip. Such a section is a <c>[Base]</c>, a
-    /// <c>[system]</c>, a <c>[locked_gates]</c> section or a zone. A base warns when no object of
-    /// its system docks with it, or no object of its system is its object in space (decision D254 of the M3 design). The
-    /// checks of the universe tell, for example, that no jump gate leads to a system, or that a system names no file. A
-    /// gate lock warns when it names no jump gate or jump hole. A zone gives the error of a nickname that another zone
-    /// has, and a lane zone warns when it does not cover its trade lane.
+    /// <c>[system]</c>, a <c>[locked_gates]</c> section, a zone, or a section of a base file or of <c>mBases.ini</c>.
+    /// The base checks tell, for example, that no object docks with a base, that a door leads to a room that the base
+    /// does not have, or that a fixture names no character before it. The checks of the universe tell, for example,
+    /// that no jump gate leads to a system, or that a system names no file. A gate lock warns when it names no jump
+    /// gate or jump hole. A zone gives the error of a nickname that another zone has, and a lane zone warns when it
+    /// does not cover its trade lane.
     /// </summary>
     private void CheckStrip(SectionRef section)
     {
-        if (!section.Id.Type.Equals("Base", StringComparison.OrdinalIgnoreCase) &&
+        if (window.Session is not { } session ||
+            !section.Id.Type.Equals("Base", StringComparison.OrdinalIgnoreCase) &&
             !section.Id.Type.Equals("system", StringComparison.OrdinalIgnoreCase) &&
             !section.Id.Type.Equals("locked_gates", StringComparison.OrdinalIgnoreCase) &&
-            !section.Id.Type.Equals("zone", StringComparison.OrdinalIgnoreCase) || window.Session is not { } session)
+            !section.Id.Type.Equals("zone", StringComparison.OrdinalIgnoreCase) &&
+            !session.Edits.IsBaseFile(section.Path) && !session.Edits.IsMBasesFile(section.Path))
         {
             return;
         }

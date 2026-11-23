@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.IO;
 
 namespace OpenLancer.Data.Editing.Scene;
@@ -10,13 +11,16 @@ namespace OpenLancer.Data.Editing.Scene;
 /// with a target, a key, a severity and a consequence, as the list checks do. A zone nickname that another zone of any
 /// system has, also by FLHash, is an error: retail drops one of the two zones (decision D240). The errors of the
 /// universe checks, of the jump connection checks and of the trade lane checks also stop the save (see
-/// <see cref="UniverseChecks"/>, <see cref="ConnectionChecks"/> and <see cref="LaneChecks"/>). The other checks are
-/// warnings until a retail comparison proves an effect (decision D254).
+/// <see cref="UniverseChecks"/>, <see cref="ConnectionChecks"/> and <see cref="LaneChecks"/>). The checks of a base,
+/// of the sections of its base file and of <c>mBases.ini</c>, and of an object that docks with a base of another system
+/// come from <see cref="BaseChecks"/>. The gate reads their errors in its own layer. The other checks are warnings until
+/// a retail comparison proves an effect (decision D254).
 /// </summary>
 internal static class ComponentChecks
 {
     /// <summary>The problems of a section of a system file, of a <c>[Base]</c> or a <c>[system]</c> of
-    /// <c>universe.ini</c>, or of a <c>[locked_gates]</c> section.</summary>
+    /// <c>universe.ini</c>, of a section of a base file or of <c>mBases.ini</c>, or of a <c>[locked_gates]</c>
+    /// section.</summary>
     /// <param name="onlyActiveMod">True to check the section only when the active mod adds or changes it. The retail
     /// tests check each section.</param>
     public static IReadOnlyList<Diagnostic> Check(EditSession session, SectionRef section, bool onlyActiveMod = true)
@@ -27,10 +31,12 @@ internal static class ComponentChecks
         if (IsUniverse(session, section))
         {
             if (SceneSections.Is(section.Id.Type, "Base"))
-                result.AddRange(BaseChecks(session, section, view));
+                result.AddRange(BaseChecks.Check(session, section));
             result.AddRange(UniverseChecks.Check(session, section));
             return result;
         }
+        if (BaseChecks.IsBasePart(session, section))
+            return BaseChecks.Check(session, section);
         result.AddRange(ConnectionChecks.Check(session, section));
         result.AddRange(LaneChecks.Check(session, section));
         switch (SceneSections.KindOf(session, section))
@@ -52,16 +58,11 @@ internal static class ComponentChecks
                             $"the object {other.Name} in {SystemOf(session, other.Section)} has the same nickname or the " +
                             "same FLHash. The game can confuse the two objects."));
                 }
-                if (SceneSections.Last(view, "dock_with") is { } dock)
-                {
-                    if (!ObjectComponents.HasDockingSphere(session, view) && SceneSections.Last(view, "archetype") is { } archetype)
-                        result.Add(Problem(DiagnosticSeverity.Warning, section, "dock_with",
-                            $"The player cannot dock here: the archetype {archetype} has no docking sphere."));
-                    if (SystemOfBase(session, dock) is { } system && session.SystemPath(system) is { } path &&
-                        !VfsPath.Comparer.Equals(path, section.Path))
-                        result.Add(Problem(DiagnosticSeverity.Warning, section, "dock_with",
-                            $"The base {dock} is in {system}. After a launch, the game puts the player in {system}."));
-                }
+                if (SceneSections.Last(view, "dock_with") != null && !ObjectComponents.HasDockingSphere(session, view) &&
+                    SceneSections.Last(view, "archetype") is { } archetype)
+                    result.Add(Problem(DiagnosticSeverity.Warning, section, "dock_with",
+                        $"The player cannot dock here: the archetype {archetype} has no docking sphere."));
+                result.AddRange(BaseChecks.Check(session, section));
                 break;
         }
         return result;
@@ -87,26 +88,6 @@ internal static class ComponentChecks
         if (session.UniversePath is { } universe && paths.Contains(universe, VfsPath.Comparer))
             result.AddRange(UniverseChecks.SaveErrors(session));
         return result;
-    }
-
-    /// <summary>
-    /// The warnings of a <c>[Base]</c> (decision D254): no object of its system docks with it, or no object of its system
-    /// has <c>base</c> with it. The game then puts the player at the center of the system after a launch, or the
-    /// navigation map does not list the base.
-    /// </summary>
-    private static IEnumerable<Diagnostic> BaseChecks(EditSession session, SectionRef section, SectionView view)
-    {
-        if (section.Id.Key is not { } name || SceneSections.Last(view, "system") is not { } system ||
-            session.SystemPath(system) is not { } path)
-            yield break;
-        var references = session.Lists.ReferencesTo("base", name);
-        if (!references.Any(r => SceneSections.Is(r.Key, "dock_with") && VfsPath.Comparer.Equals(r.Section.Path, path)))
-            yield return Problem(DiagnosticSeverity.Warning, section, "system",
-                $"No object in {system} docks with {name}. The game puts the player at the center of {system} after a launch.");
-        if (!references.Any(r => SceneSections.Is(r.Key, "base") && VfsPath.Comparer.Equals(r.Section.Path, path)))
-            yield return Problem(DiagnosticSeverity.Warning, section, "system",
-                $"No object in {system} has 'base = {name}'. The navigation map does not list the base, and its rooms show " +
-                "no planet.");
     }
 
     /// <summary>True for a <c>[Base]</c> or a <c>[system]</c> of <c>universe.ini</c>.</summary>

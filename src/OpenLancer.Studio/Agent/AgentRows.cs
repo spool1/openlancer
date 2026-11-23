@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Editing.Scene;
 
@@ -97,12 +98,15 @@ internal static class AgentRows
     /// <c>[system]</c> or a <c>[Base]</c> of <c>universe.ini</c> also gets the problems of the universe checks (see
     /// <see cref="UniverseChecks"/>). An object with a <c>goto</c> line and a <c>[locked_gates]</c> section also get
     /// the problems of the jump connection checks (see <see cref="ConnectionChecks"/>). A trade lane ring and a lane
-    /// zone also get the problems of the trade lane checks (see <see cref="LaneChecks"/>).</summary>
+    /// zone also get the problems of the trade lane checks (see <see cref="LaneChecks"/>). A <c>[Base]</c>, a section
+    /// of a base file or of <c>mBases.ini</c>, and an object that docks with a base of another system also get the
+    /// problems of the base checks (see <see cref="BaseChecks"/>).</summary>
     public static IReadOnlyList<Diagnostic> DiagnosticsOf(EditSession session, SectionRef section) =>
         session.Check(section).Concat(session.Lists.Problems(section).Select(p => p.Diagnostic))
             .Concat(UniverseChecks.Check(session, section))
             .Concat(ConnectionChecks.Check(session, section))
             .Concat(LaneChecks.Check(session, section))
+            .Concat(BaseChecks.Check(session, section))
             .Select(d => d with { Target = d.Target ?? section }).ToList();
 
     /// <summary>The problems of the field checks and the list checks of a section.</summary>

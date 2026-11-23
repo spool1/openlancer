@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using LibreLancer.Data.Ini;
+using OpenLancer.Data.Editing.Bases;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Ini;
 using OpenLancer.Data.IO;
@@ -206,6 +207,9 @@ public sealed partial class EditSession
     /// template that names no item of the data lists is a problem too. The gate also checks each cutscene of the edit
     /// view that uses an item that a change of the active mod removes or breaks. This is true also when the active mod
     /// does not change the cutscene (see <see cref="CutsceneGateErrors"/>).</item>
+    /// <item>The errors of the base checks of each base that the active mod adds or changes: a base without a base file
+    /// that exists, a base file without <c>[BaseInfo]</c>, a <c>[Room]</c> without a nickname or a room file, and a
+    /// room file that does not exist (see <see cref="BaseChecks"/>). The game can crash with them.</item>
     /// </list>
     /// <para>Each list error tells what the game does with the data, for example "The game stops loading with this
     /// value."</para>
@@ -309,6 +313,10 @@ public sealed partial class EditSession
         }
 
         foreach (var problem in CutsceneGateErrors(active))
+            Add(problem);
+
+        // The base checks come after the cutscene layer (rule 7 of the 1.0 content scope).
+        foreach (var problem in BaseChecks.SaveErrors(this))
             Add(problem);
 
         foreach (var warning in AnimationWarnings(active))

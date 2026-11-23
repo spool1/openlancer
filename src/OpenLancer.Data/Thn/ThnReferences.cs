@@ -158,6 +158,31 @@ public sealed class ThnReferences
     /// </summary>
     public static string? PathOf(string value) => VfsPath.Normalize(DataFolder + "\\" + value);
 
+    /// <summary>
+    /// The scripts that the room keys of a room file name and that the game plays in the room: the set script, the
+    /// scene scripts, the start script and the landing and launching scripts. The cart script is not in the result,
+    /// because the game does not play it. The result has install paths in normal form, each once, in file order.
+    /// </summary>
+    public static IReadOnlyList<string> RoomScripts(IEnumerable<Section> roomFile)
+    {
+        var result = new List<string>();
+        foreach (var section in roomFile)
+        {
+            foreach (var entry in section)
+            {
+                if (!RoomKeys.TryGetValue(Key(section.Name, entry.Name), out var role) || role == ThnRoomRole.Cart)
+                    continue;
+                foreach (var value in entry)
+                {
+                    if (value.ToString() is { } text && IsScript(text) && PathOf(text) is { } path &&
+                        !result.Contains(path, VfsPath.Comparer))
+                        result.Add(path);
+                }
+            }
+        }
+        return result;
+    }
+
     /// <summary>Reads each INI file of a view of the game data, in the order of the paths.</summary>
     public static ThnReferences Scan(FileSystem view)
     {

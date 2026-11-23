@@ -5,6 +5,7 @@ namespace OpenLancer.Data.Editing;
 public sealed partial class EditSession
 {
     private BaseFiles? bases;
+    private BaseChecks.State? baseChecks;
 
     /// <summary>The base files and the room files of the edit view, from the bases of <c>universe.ini</c> (decision
     /// D135 of the M8b design), and the place of <c>mBases.ini</c>.</summary>
@@ -32,4 +33,11 @@ public sealed partial class EditSession
     /// nickname.
     /// </summary>
     public BaseView? Base(string nickname) => BaseView.Of(this, nickname);
+
+    /// <summary>The checks of the bases at the current state of W. A change of W starts a new state, so the checks of a
+    /// base run once for each state.</summary>
+    internal BaseChecks.State BaseCheckState =>
+        baseChecks is { } known && known.Revision == CacheRevision
+            ? known
+            : baseChecks = new BaseChecks.State(this, CacheRevision);
 }
