@@ -130,6 +130,32 @@ public sealed partial class FlmmScriptTests
         Assert.Equal([@"DATA\MODS\m\goods.ini"], script.Files.Select(f => f.Path));
     }
 
+    /// <summary>A comment before the last goods line holds the text of that line. FLMM can take the comment as the
+    /// anchor, so the export refuses the new line.</summary>
+    [Fact]
+    public void ADataLineWhoseAnchorFlmmCanFindTwiceIsRefused()
+    {
+        using var game = new ExportGame();
+        game.Game.Write(@"EXE\freelancer.ini", "[Freelancer]\ndata path = ..\\data\n\n[Data]\n; goods = equipment\\goods.ini " +
+                                               "is the list of goods\ngoods = equipment\\goods.ini\n\n[Resources]\n" +
+                                               "DLL = InfoCards.dll\n");
+        var mod = game.Mod("m", new()
+        {
+            [@"patches\EXE\freelancer.ini"] = "[Data]\nol.append = true\ngoods = MODS\\m\\goods.ini\n",
+            [@"files\DATA\MODS\m\goods.ini"] = "[Good]\nnickname = new_good\nprice = 1\n",
+        });
+
+        var script = Script(game, mod);
+
+        var error = Assert.Single(script.Problems);
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Equal(@"The FLMM package cannot hold this change in EXE\freelancer.ini: FLMM can find 'goods = " +
+                     @"equipment\goods.ini' at more than one place in freelancer.ini. Use the drop-in zip, or change the mod.",
+            error.Message);
+        Assert.Empty(SteLint.Problems(error.Message));
+        Assert.DoesNotContain("<data", script.Xml);
+    }
+
     [Fact]
     public void TextBecomesGenerateMacros()
     {
@@ -304,8 +330,7 @@ public sealed partial class FlmmScriptTests
 
         var script = Script(game, "[Good]\nnickname = ring_1\nprice = 5\n");
 
-        Assert.Contains("because OpenLancer finds no unique anchor for [Good]", Assert.Single(script.Problems).Message);
-        Assert.DoesNotContain("<data", script.Xml);
+        AssertFallsBack(script, "FLMM can find the anchor of [Good] at more than one place");
         Assert.Equal([Goods], script.Files.Select(f => f.Path), System.StringComparer.OrdinalIgnoreCase);
     }
 
@@ -319,8 +344,38 @@ public sealed partial class FlmmScriptTests
 
         var script = Script(game, "[Good]\nnickname = g2\nprice = 5\n");
 
-        Assert.Contains("because the line 'price = 200' is not unique in its section", Assert.Single(script.Problems).Message);
-        Assert.DoesNotContain("<data", script.Xml);
+        AssertFallsBack(script, "FLMM can find 'price = 200' at more than one place in its section");
+    }
+
+    /// <summary>The changed line occurs twice in its section as a whole line. The test did not show if FLMM changes the
+    /// first line or both lines. So the package holds the whole file, also when the first line is the changed
+    /// line.</summary>
+    [Fact]
+    public void ADestLineThatOccursTwiceInItsSectionFallsBack()
+    {
+        using var game = new ExportGame();
+        game.Game.Write(GoodsPath, "[Good]\nnickname = g2\nprice = 200\nvolume = 1\nprice = 200\n");
+
+        // The lines of a patch replace all lines of their names, so the patch keeps the other two lines.
+        var script = Script(game, "[Good]\nnickname = g2\nprice = 5\nvolume = 1\nprice = 200\n");
+
+        AssertFallsBack(script, "FLMM can find 'price = 200' at more than one place in its section");
+    }
+
+    /// <summary>FLMM finds the line of dest below the header of its section. The same line in another section does not
+    /// matter, also when that section comes later.</summary>
+    [Theory]
+    [InlineData("g2")]
+    [InlineData("g3")]
+    public void ADestLineThatAlsoOccursInAnotherSectionIsASectionReplace(string nickname)
+    {
+        using var game = new ExportGame();
+        game.Game.Write(GoodsPath, "[Good]\nnickname = g2\nprice = 200\n\n[Good]\nnickname = g3\nprice = 200\n");
+
+        var script = Script(game, $"[Good]\nnickname = {nickname}\nprice = 5\n");
+
+        Assert.Empty(script.Problems);
+        Assert.Contains(Op("sectionreplace", ["[Good]", $"nickname = {nickname}"], "price = 200", ["price = 5"]), script.Xml);
     }
 
     /// <summary>A later text match of the dest line does not matter, because FLMM takes the first match.</summary>
@@ -355,7 +410,7 @@ public sealed partial class FlmmScriptTests
 
         var script = SystemScript(game, "[SystemInfo]");
 
-        Assert.Contains("because OpenLancer finds no unique anchor for [SystemInfo]", Assert.Single(script.Problems).Message);
+        AssertFallsBack(script, "FLMM can find the anchor of [SystemInfo] at more than one place");
         // The path has the letter case of the folders of the game.
         Assert.Equal([SystemFile], script.Files.Select(f => f.Path), System.StringComparer.OrdinalIgnoreCase);
     }
@@ -367,7 +422,7 @@ public sealed partial class FlmmScriptTests
 
         var script = SystemScript(game, "[SYSTEMINFO]");
 
-        Assert.Contains("because OpenLancer finds no unique anchor for [SystemInfo]", Assert.Single(script.Problems).Message);
+        AssertFallsBack(script, "FLMM can find the anchor of [SystemInfo] at more than one place");
     }
 
     /// <summary>FLMM adds a line after the key line. In a mission file, the game reads the lines of a formation in order,
@@ -397,7 +452,19 @@ public sealed partial class FlmmScriptTests
 
         var script = Script(game, "[Good]\nnickname = g2\nprice = 5\n");
 
-        Assert.Contains("because OpenLancer finds no unique anchor for [Good]", Assert.Single(script.Problems).Message);
+        AssertFallsBack(script, "the key line of [Good] does not directly follow its header");
+    }
+
+    /// <summary>The one warning of a script: the package holds the whole merged file for the reason. The warning passes
+    /// the STE lint.</summary>
+    private static void AssertFallsBack(FlmmScript script, string reason)
+    {
+        var warning = Assert.Single(script.Problems);
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+        Assert.True(warning.Message.Contains($", because {reason}. The file undoes the changes of other mods in it."),
+            warning.Message);
+        Assert.Empty(SteLint.Problems(warning.Message));
+        Assert.DoesNotContain("<data", script.Xml);
     }
 
     [Fact]

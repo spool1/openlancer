@@ -173,7 +173,7 @@ internal sealed partial class FlmmScript
             {
                 Refuse(file.Path, last < 0
                     ? $"[Data] has no {group.Key} line, so FLMM has no place for the new line"
-                    : $"the line '{raw.Lines[last]}' is not unique in freelancer.ini, so FLMM cannot find its place");
+                    : $"FLMM can find '{raw.Lines[last]}' at more than one place in freelancer.ini");
                 return;
             }
             Operation(file.Path, new Op("sectionappend", [raw.Lines[last]], null, [.. group.Select(d => d.Line)]));
@@ -243,8 +243,10 @@ internal sealed partial class FlmmScript
                 return $"the mod changes lines of [{section.Name}] that belong together";
             if (pair.Inserted.Any() && SectionKeys.IsOrderSensitive(section.Name, path))
                 return $"the game reads the lines of [{section.Name}] in order, and FLMM adds lines after the key line";
-            if (Anchor(text, pair.Base, diff.BaseSections[pair.Base]) is not { } anchor)
-                return $"OpenLancer finds no unique anchor for [{section.Name}]";
+            if (AnchorLines(raw, pair.Base, diff.BaseSections[pair.Base]) is not { } lines)
+                return $"the key line of [{section.Name}] does not directly follow its header";
+            if (text.AnchorOf(lines.From, lines.To) is not { } anchor)
+                return $"FLMM can find the anchor of [{section.Name}] at more than one place";
 
             // FLMM finds the line of dest only below the header of the section.
             var end = raw.SectionEnd(pair.Base);
@@ -252,7 +254,7 @@ internal sealed partial class FlmmScript
             {
                 var line = rawSection.Entries[i];
                 if (!text.Finds(rawSection.Header + 1, end, line, line))
-                    return $"the line '{raw.Lines[line]}' is not unique in its section";
+                    return $"FLMM can find '{raw.Lines[line]}' at more than one place in its section";
                 var merged = section[pair.MergedOf[i]];
                 ops.Add(new Op("sectionreplace", anchor, raw.Lines[line],
                     [raw.Indent(line) + IniLines.Line(raw.RawKey(line), merged) + raw.Comment(line)]));
@@ -288,22 +290,21 @@ internal sealed partial class FlmmScript
     private sealed record Op(string Method, IReadOnlyList<string> Section, string? Dest, IReadOnlyList<string> Source);
 
     /// <summary>
-    /// The anchor of a section: its raw header line and the raw line of its key, when the key line directly follows the
-    /// header. A section without a key has its header line alone. Null when the key line does not follow the header, or
-    /// when FLMM cannot find the anchor (<see cref="RawText.Finds"/>).
+    /// The raw lines of the anchor of a section: its header line and the line of its key, when the key line directly
+    /// follows the header. A section without a key has its header line alone. Null when the key line does not directly
+    /// follow the header.
     /// </summary>
-    /// <remarks>A key can be the start of another key, for example <c>Li01_08</c> and <c>Li01_08_depot</c>. The anchor
-    /// of the shorter key is then valid only when its section comes first in the file.</remarks>
-    private static IReadOnlyList<string>? Anchor(RawText text, int index, Section section)
+    /// <remarks>FLMM must also find the anchor at one place only (<see cref="RawText.AnchorOf"/>). A key can be the start
+    /// of another key, for example <c>Li01_08</c> and <c>Li01_08_depot</c>. The anchor of the shorter key is then valid
+    /// only when its section comes first in the file.</remarks>
+    private static (int From, int To)? AnchorLines(RawIni raw, int index, Section section)
     {
-        var rawSection = text.Raw.Sections[index];
+        var rawSection = raw.Sections[index];
         var match = SectionKeys.For(section.Name);
         if (match.Kind != SectionMatchKind.Keyed || !SectionKeys.HasKeyLine(section, match))
-            return text.AnchorOf(rawSection.Header, rawSection.Header);
+            return (rawSection.Header, rawSection.Header);
         var key = section.ToList().FindIndex(e => e.Name.Equals(match.KeyEntry, StringComparison.OrdinalIgnoreCase));
-        return key < 0 || rawSection.Entries[key] != rawSection.Header + 1
-            ? null
-            : text.AnchorOf(rawSection.Header, rawSection.Header + 1);
+        return key < 0 || rawSection.Entries[key] != rawSection.Header + 1 ? null : (rawSection.Header, rawSection.Header + 1);
     }
 
     /// <summary>The anchor of the <c>[BaseGood]</c> section of the base of a new <c>[BaseGood]</c>, or null. The engine
