@@ -96,6 +96,8 @@ A character of a play is an admin. These chat commands work:
 
 The game window shows the debug view. Its Debug window shows the position of the player.
 
+The market of a base keeps the last line of each good, as the retail games do. So a mod can change or remove a market line of the game with a later line. The ship dealer gives the price of a ship from the market price of its hull good at the base. A market line of the hull good changes that price, and without such a line the price is the price of the hull good. The trade-in value of your ship is that price times 0.8. OpenLancer Play does not use the price variance of a base or the damage of your ship.
+
 OpenLancer Play does not lock gates. In a new game of the retail game, the gate locks of `InitialWorld.ini` lock some jump gates and jump holes. In OpenLancer Play, each gate and hole is open.
 
 ## The status of the game
