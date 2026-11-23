@@ -418,15 +418,17 @@ internal static class BaseTools
         }
     }
 
-    /// <summary>The row of a base of <c>list_bases</c>.</summary>
+    /// <summary>The row of a base of <c>list_bases</c>. It reads only the counts of the base, not a view of the whole
+    /// base, so a page of many bases stays fast.</summary>
     private static BaseRow Row(EditSession session, SectionRef entry, string name)
     {
-        var view = session.Base(entry.Id.Key!)!;
-        return new BaseRow(ItemRefs.Canonical(session, entry), view.Nickname, name,
-            view.System is { } system ? SceneQueries.SystemRef(system) : null, view.Kind,
-            view.Rooms.Select(r => r.Nickname).Where(n => n.Length > 0).ToList(), view.Characters.Count,
-            BaseMarkets.KeptLines(view.Market, r => r.Good, r => r.Line.Values).Count,
-            view.DockObjects.Count(d => d.DocksWith), AgentRows.OriginOf(session, entry, session.Get(entry)!, "nickname"));
+        var nickname = entry.Id.Key!;
+        var view = session.Get(entry)!;
+        var (characters, goods, docks) = BaseView.CountsOf(session, nickname);
+        return new BaseRow(ItemRefs.Canonical(session, entry), nickname, name,
+            SceneSections.Last(view, "system") is { } system ? SceneQueries.SystemRef(system) : null,
+            BaseView.KindOf(session, nickname), session.Bases.RoomsOf(nickname).Select(r => r.Nickname).ToList(),
+            characters, goods, docks, AgentRows.OriginOf(session, entry, view, "nickname"));
     }
 
     /// <summary>A step of the completeness report as a row. The fix of the market step tells which buy-only lines of

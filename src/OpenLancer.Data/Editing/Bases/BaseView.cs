@@ -279,6 +279,21 @@ public sealed class BaseView
         return new ListView(CharacterList, "Character", "Character", true, false, characters, []);
     }
 
+    /// <summary>
+    /// The counts of a base without a view of the whole base, for a list of many bases: the characters of its
+    /// <c>[MBase]</c>, the goods of the market lines that the games keep, and the objects whose <c>dock_with</c> line
+    /// names the base. The counts are the counts of <see cref="Characters"/>, of the kept lines of <see cref="Market"/>
+    /// and of the docking objects of <see cref="DockObjects"/>.
+    /// </summary>
+    internal static (int Characters, int Goods, int DockObjects) CountsOf(EditSession session, string baseNickname)
+    {
+        var name = baseNickname.Trim();
+        var (mbase, parts) = MBaseOf(session, name);
+        var goods = BaseMarkets.KeptLines(session.Items.BaseMarketLines(name), l => l.Values[0].ToString().Trim(),
+            l => l.Values).Count;
+        return (CharactersOf(session, mbase, parts).Count, goods, DockObjectsOf(session, name).Count(d => d.DocksWith));
+    }
+
     /// <summary>The kind of a base from the start room of its base file, without a view of the whole base. A base
     /// without a base file is of the kind <see cref="BaseKind.Other"/>.</summary>
     internal static BaseKind KindOf(EditSession session, string baseNickname)
