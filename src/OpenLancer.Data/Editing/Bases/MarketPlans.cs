@@ -428,12 +428,13 @@ public static class MarketPlans
                     draft.RemoveGood(good);
             }
             draft.AddShipLines();
+            // A market file that takes no edits refuses when the draft makes its commands.
+            draft.Fill(plan);
         }
         catch (InvalidOperationException e)
         {
             return plan.Refuse("", e.Message);
         }
-        draft.Fill(plan);
         return plan;
     }
 

@@ -108,7 +108,8 @@ public sealed class BaseFilesRetailTests(ITestOutputHelper output)
         Assert.Equal(194, views.Count(v => v.MBase != null));
         Assert.Equal(178, views.Count(v => v.NamedObject != null));
         Assert.Equal((187, 14694), (views.Count(v => v.Market.Count > 0), views.Sum(v => v.Market.Count)));
-        Assert.All(views.SelectMany(v => v.Market), m => Assert.False(m.CanChange));
+        // Each retail line changes through a later line of the active mod (fork commit OL-0080).
+        Assert.All(views.SelectMany(v => v.Market), m => Assert.True(m.CanChange));
         Assert.All(views, v => Assert.Equal(ValueOrigin.Base, v.Origin));
         var manhattan = views.Single(v => v.Nickname == "Li01_01_Base");
         Assert.Equal(["Cityscape", "Bar", "Trader", "ShipDealer", "Equipment"], manhattan.Rooms.Select(r => r.Nickname));

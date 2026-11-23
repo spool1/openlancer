@@ -238,6 +238,25 @@ public sealed class MarketPlansSetTests
         Assert.Empty(SteLint.Problems(message));
     }
 
+    /// <summary>A market file that the active mod replaces with its own file takes no edits, so a change of its lines
+    /// refuses with the reason.</summary>
+    [Fact]
+    public void AMarketFileThatTakesNoEditsRefusesTheChange()
+    {
+        using var ws = BaseWorkspace.Create(new Dictionary<string, string>
+        {
+            [@"files\" + BaseWorkspace.MiscMarketPath] = "[BaseGood]\nbase = Ol01_01_Base\nmarketgood = ol_gun, 0, -1, 10, 10, 0, 1\n",
+        });
+        var session = ws.Session("act");
+        var line = session.Items.BaseMarketLines(BaseWorkspace.Station).Single(l => l.Values[0].ToString() == "ol_gun");
+        Assert.False(MarketPlans.CanChange(session, line));
+
+        var plan = MarketPlans.Set(session, BaseWorkspace.Station, [new MarketRow("ol_gun") { PriceMultiplier = 2 }], []);
+
+        Assert.False(plan.CanRun);
+        Assert.StartsWith("market_misc.ini: ", Assert.Single(plan.Refusals).Message);
+    }
+
     [Fact]
     public void AnUnknownBaseIsRefused()
     {
