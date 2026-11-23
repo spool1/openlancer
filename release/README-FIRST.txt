@@ -153,7 +153,9 @@ WHAT WORKS IN THIS VERSION
   system_create makes a new star system, and connection_create connects
   two systems with a jump gate pair or a jump hole pair. The tools
   trade_lane_create, trade_lane_insert_ring, trade_lane_repair and
-  trade_lane_delete make and change trade lanes.
+  trade_lane_delete make and change trade lanes. Its tool base_create
+  makes a new base from a template base, with its station, characters
+  and market.
 - A new system shows at once in the Database, in the Inspector and in
   the Universe panel. The Scene shows a card with a Save button. After
   the save, the Scene opens the new system.
@@ -192,7 +194,10 @@ WHAT DOES NOT WORK YET
   trade lane rings. The agent tools make jump gate pairs, jump hole pairs
   and trade lanes. A delete of a jump gate or a jump hole deletes its
   pair. You cannot delete airlock gates yet.
-- You cannot make new bases, nebulae or asteroid fields yet.
+- You cannot make new nebulae or asteroid fields yet. The editor has no
+  hand tools that make a base. The agent tool base_create makes one.
+- In Play (F5), the autopilot dock can stop at a closed door at a base
+  where NPC ships launch. To test a base, start Play at the base.
 - You can select only one item at a time.
 - A Play start at a checkpoint restores only the triggers of the
   checkpoint. It does not restore the objective, the dock and lane rules
