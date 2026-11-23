@@ -94,11 +94,11 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
     }
 
     /// <summary>
-    /// The last line of each base, in the order of the first line of the base. The games keep the last line of a good
-    /// at a base, so the section shows only that line.
+    /// The last line of each base, in the order of the lines. The games keep the last line of a good at a base, so the
+    /// section shows only that line. A line that the games skip does not count (see <see cref="BaseMarkets.IsSkipped"/>).
     /// </summary>
     internal static IReadOnlyList<MarketLine> LastLines(IReadOnlyList<MarketLine> lines) =>
-        lines.GroupBy(l => l.Base.Trim(), StringComparer.OrdinalIgnoreCase).Select(g => g.Last()).ToList();
+        BaseMarkets.KeptLines(lines, l => l.Base.Trim(), l => l.Values);
 
     /// <summary>The tooltip of the remove button of a line.</summary>
     /// <param name="lower">True for a line of a lower layer.</param>

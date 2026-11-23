@@ -102,6 +102,8 @@ public sealed class MarketPlan : EditPlan
 /// buy-only form: the minimum stock 0, the maximum stock 0 and the transaction type 1.</para>
 /// <para>A line of the active mod changes in its place. A remove of a line of the active mod deletes it, and a section
 /// without lines goes. When the line replaces a lower line, the remove writes the buy-only form instead.</para>
+/// <para>The games skip a line in which each value after the good has its default value (fork commit OL-0081, see
+/// <see cref="BaseMarkets.IsSkipped"/>). The edits read such a line as no line, and they refuse to write one.</para>
 /// </remarks>
 public static class MarketPlans
 {
@@ -178,11 +180,12 @@ public static class MarketPlans
     /// <summary>
     /// The line of the active mod that replaces a lower line of the same good at the base, with the result in plain
     /// words, or null. A line is such a line when it is the last line of its good at the base, the active mod adds its
-    /// section, and a lower layer has a line of the good at the base.
+    /// section, and a lower layer has a line of the good at the base. A line that the games skip does not count.
     /// </summary>
     public static MarketOverride? Override(EditSession session, MarketLine line)
     {
-        var lines = session.Items.BaseMarketLines(line.Base).Where(l => Is(Good(l), Good(line))).ToList();
+        var lines = session.Items.BaseMarketLines(line.Base)
+            .Where(l => Is(Good(l), Good(line)) && !BaseMarkets.IsSkipped(l.Values)).ToList();
         if (lines.Count == 0 || !Same(lines[^1], line) || !Own(session, line) ||
             lines.LastOrDefault(l => !Own(session, l)) is not { } lower)
             return null;
@@ -265,14 +268,15 @@ public static class MarketPlans
     /// else into the first market file of the base, else into the first market file.
     /// </summary>
     /// <param name="values">The values after the good (see <see cref="DefaultValues"/>).</param>
-    /// <exception cref="InvalidOperationException">A market file already sells the good at the base, or the edit view
-    /// has no market file.</exception>
+    /// <remarks>A line of the active mod that the games skip changes to the new line.</remarks>
+    /// <exception cref="InvalidOperationException">A market file already sells the good at the base, the edit view has
+    /// no market file, or the games skip the new line.</exception>
     public static EditCommand AddToBase(EditSession session, string good, string baseNickname, string values)
     {
-        if (session.MarketLines(good).Any(l => Is(l.Base, baseNickname)))
+        if (session.MarketLines(good).Any(l => Is(l.Base, baseNickname) && !BaseMarkets.IsSkipped(l.Values)))
             throw new InvalidOperationException($"The base {baseNickname} already sells {good}.");
         var draft = new Draft(session, baseNickname);
-        draft.Add(good, [.. Split(values)], null);
+        draft.SetGood(good, [.. Split(values)], null);
         return draft.Command($"Sell {good} at {baseNickname}");
     }
 
@@ -338,11 +342,11 @@ public static class MarketPlans
         if (!state.UsesBuyOnlyShipLines ||
             view.Origin != ValueOrigin.ActiveMod && view.Market.All(r => r.Origin != ValueOrigin.ActiveMod))
             return [];
-        var last = view.Market.GroupBy(r => r.Good, StringComparer.OrdinalIgnoreCase).Select(g => g.Last());
-        if (!last.Any(r => BaseMarkets.Ship.Equals(state.Category(r.Good), StringComparison.OrdinalIgnoreCase) &&
+        var kept = BaseMarkets.KeptLines(view.Market, r => r.Good, r => r.Line.Values);
+        if (!kept.Any(r => BaseMarkets.Ship.Equals(state.Category(r.Good), StringComparison.OrdinalIgnoreCase) &&
                            BaseMarkets.Sells(r.Line.Values, ship: true)))
             return [];
-        var listed = view.Market.Select(r => r.Good).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var listed = kept.Select(r => r.Good).ToHashSet(StringComparer.OrdinalIgnoreCase);
         return state.ShipPackages.Where(p => !listed.Contains(p)).ToList();
     }
 
@@ -389,8 +393,8 @@ public static class MarketPlans
                 return plan.Refuse("", $"No [Base] of universe.ini has the nickname {source}. Get the bases from " +
                                        "list_bases.", MissionErrors.ItemNotFound, "copy_from");
             var removed = remove.Select(g => g.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var row in sourceView.Market.GroupBy(r => r.Good, StringComparer.OrdinalIgnoreCase)
-                         .Select(g => g.Last()).Where(r => !removed.Contains(r.Good)))
+            foreach (var row in BaseMarkets.KeptLines(sourceView.Market, r => r.Good, r => r.Line.Values)
+                         .Where(r => !removed.Contains(r.Good)))
                 copies[row.Good] = (row.Line.Section.Path, Texts(row.Line.Values));
         }
         var rowGoods = rows.Select(r => r.Good.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -400,6 +404,8 @@ public static class MarketPlans
         foreach (var row in rows.Select(r => r with { Good = r.Good.Trim() }))
             named.Add(copies.TryGetValue(row.Good, out var copy) ? (row, copy.File, copy.Values) : (row, null, null));
         var given = named.Select(n => n.Row.Good).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var places = rows.Select((r, i) => (Good: r.Good.Trim(), Index: i))
+            .ToDictionary(r => r.Good, r => r.Index, StringComparer.OrdinalIgnoreCase);
         try
         {
             foreach (var (row, file, copied) in named)
@@ -413,6 +419,9 @@ public static class MarketPlans
                                            Is(priceScale.Category.Trim(), category ?? "")))
                     values[MarketLine.PriceIndex - 1] = RetailText.Float(Number(values[MarketLine.PriceIndex - 1]) *
                                                                          priceScale.Factor);
+                if (IsSkipped(row.Good, values))
+                    return plan.Refuse("", SkippedText(baseNickname, row.Good, values), MissionErrors.FieldValue,
+                        places.TryGetValue(row.Good, out var place) ? $"goods[{place}]" : "price_scale.factor");
                 draft.SetGood(row.Good, values, file);
             }
             foreach (var good in remove.Select(g => g.Trim()))
@@ -529,6 +538,31 @@ public static class MarketPlans
 
     private static bool Is(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>The text of a line after its key, from the good and the values after it.</summary>
+    private static string LineText(string good, IReadOnlyList<string> values) =>
+        values.Count == 0 ? good : $"{good}, {string.Join(", ", values)}";
+
+    /// <summary>The values of a line text, as the index reads them: the good as a string, numbers as numbers.</summary>
+    private static List<ValueBase> ParseLine(string text) => Split(text).Select(ValueOf).ToList();
+
+    private static ValueBase ValueOf(string text) =>
+        int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var whole)
+            ? new Int32Value(whole)
+            : float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)
+                ? new SingleValue(number, null)
+                : new StringValue(text);
+
+    /// <summary>True when the games skip the line of a good with the values after it (see
+    /// <see cref="BaseMarkets.IsSkipped"/>).</summary>
+    private static bool IsSkipped(string good, IReadOnlyList<string> values) =>
+        BaseMarkets.IsSkipped(ParseLine(LineText(good, values)));
+
+    /// <summary>Why an edit does not write a line that the games skip.</summary>
+    private static string SkippedText(string baseNickname, string good, IReadOnlyList<string> values) =>
+        $"The games skip the line 'marketgood = {LineText(good, values)}' of {baseNickname}. Each value after the " +
+        $"good has its default value: {BaseMarkets.DefaultValuesText}. Change one more value, or remove the line to " +
+        "stop the sale of the good.";
+
     /// <summary>
     /// The market lines of one base while a plan changes them. The draft knows the lines of each layer in load order,
     /// changes the lines of the active mod and adds new sections. Then it gives the commands.
@@ -572,12 +606,14 @@ public static class MarketPlans
             return new Draft(session, line.Base);
         }
 
-        /// <summary>The goods of the base, in the order of their first line.</summary>
-        public IEnumerable<string> Goods() => Lines().Select(l => l.Good).Distinct(StringComparer.OrdinalIgnoreCase);
+        /// <summary>The goods of the base, in the order of their first line. A good whose lines the games all skip is
+        /// not in the list.</summary>
+        public IEnumerable<string> Goods() =>
+            Lines().Where(l => !l.Skipped).Select(l => l.Good).Distinct(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>The last line of a good at the base, or null.</summary>
+        /// <summary>The last line of a good at the base that the games do not skip, or null.</summary>
         public MarketLine? Last(string good) =>
-            Lines().LastOrDefault(l => Is(l.Good, good)) is { } last ? Line(last) : null;
+            Lines().LastOrDefault(l => Is(l.Good, good) && !l.Skipped) is { } last ? Line(last) : null;
 
         /// <summary>Sets the values of a line. A line of the active mod changes in its place. A lower line gets a later
         /// line of the active mod in its market file.</summary>
@@ -586,7 +622,7 @@ public static class MarketPlans
             if (Own(session, line))
                 Change(Find(line), Good(line), values);
             else if (LastOwn(Good(line)) is { } own)
-                own.Part.Lines[own.Index] = Line(Good(line), values);
+                Change((own.Part, own.Index), Good(line), values);
             else if (!SameValues(line, values))
                 Override(line.Section.Path, Good(line), values);
         }
@@ -595,8 +631,7 @@ public static class MarketPlans
         public void Remove(MarketLine line)
         {
             var good = Good(line);
-            var lower = Lines().Any(l => Is(l.Good, good) && !l.Part.Own);
-            if (!lower)
+            if (!HasLower(good))
             {
                 var part = Find(line);
                 part.Part.Lines[part.Index] = null;
@@ -606,24 +641,32 @@ public static class MarketPlans
             if (Own(session, line))
                 Change(Find(line), good, buyOnly);
             else if (LastOwn(good) is { } own)
-                own.Part.Lines[own.Index] = Line(good, buyOnly);
+                Change((own.Part, own.Index), good, buyOnly);
             else if (!BaseMarkets.IsBuyOnly(line.Values))
                 Override(line.Section.Path, good, buyOnly);
         }
 
         /// <summary>The last line of the active mod of a good when it comes after each lower line of the good, or
-        /// null.</summary>
+        /// null. It can be a line that the games skip. An edit of the good then changes it.</summary>
         private DraftLine? LastOwn(string good) =>
             Lines().LastOrDefault(l => Is(l.Good, good)) is { Part.Own: true } last ? last : null;
 
+        /// <summary>True when a lower layer has a line of the good that the games do not skip.</summary>
+        private bool HasLower(string good) => Lines().Any(l => Is(l.Good, good) && !l.Part.Own && !l.Skipped);
+
         /// <summary>Sets the line of a good. The last line of the good changes (see <see cref="Set"/>). A new good gets a
-        /// line in <paramref name="file"/>, or by the file rule of <see cref="AddToBase"/>.</summary>
+        /// line in <paramref name="file"/>, or by the file rule of <see cref="AddToBase"/>. A line of the active mod that
+        /// the games skip changes to the new line.</summary>
         public void SetGood(string good, IReadOnlyList<string> values, string? file)
         {
             if (Last(good) is { } last)
             {
                 if (!SameValues(last, values))
                     Set(last, values);
+            }
+            else if (LastOwn(good) is { } skipped)
+            {
+                Change((skipped.Part, skipped.Index), good, values);
             }
             else
             {
@@ -637,7 +680,7 @@ public static class MarketPlans
         {
             if (Last(good) is not { } last)
                 return;
-            if (!Lines().Any(l => Is(l.Good, good) && !l.Part.Own))
+            if (!HasLower(good))
             {
                 Revert(good);
                 return;
@@ -658,7 +701,7 @@ public static class MarketPlans
         public void Add(string good, IReadOnlyList<string> values, string? file)
         {
             var path = file ?? parts.FirstOrDefault(p => p.Own)?.Path ?? MarketFile(good);
-            Target(path).Lines.Add(Line(good, values));
+            Target(path).Lines.Add(Write(good, values));
         }
 
         /// <summary>
@@ -671,13 +714,12 @@ public static class MarketPlans
             var state = session.BaseCheckState;
             if (!state.UsesBuyOnlyShipLines)
                 return;
-            var lines = Lines().ToList();
-            var last = lines.GroupBy(l => l.Good, StringComparer.OrdinalIgnoreCase).Select(g => g.Last()).ToList();
-            var ship = last.FirstOrDefault(l => BaseMarkets.Ship.Equals(state.Category(l.Good), StringComparison.OrdinalIgnoreCase) &&
-                                                BaseMarkets.Sells(Values(l.Text), ship: true));
+            var kept = BaseMarkets.KeptLines(Lines(), l => l.Good, l => ParseLine(l.Text));
+            var ship = kept.FirstOrDefault(l => BaseMarkets.Ship.Equals(state.Category(l.Good), StringComparison.OrdinalIgnoreCase) &&
+                                                BaseMarkets.Sells(ParseLine(l.Text), ship: true));
             if (ship == null)
                 return;
-            var listed = lines.Select(l => l.Good).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var listed = kept.Select(l => l.Good).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var missing = state.ShipPackages.Where(p => !listed.Contains(p)).ToList();
             if (missing.Count == 0)
                 return;
@@ -783,13 +825,20 @@ public static class MarketPlans
         }
 
         /// <summary>Changes a line of the active mod in its place.</summary>
-        private static void Change((Part Part, int Index) at, string good, IReadOnlyList<string> values) =>
-            at.Part.Lines[at.Index] = Line(good, values);
+        private void Change((Part Part, int Index) at, string good, IReadOnlyList<string> values) =>
+            at.Part.Lines[at.Index] = Write(good, values);
 
         /// <summary>Adds a line of the active mod after the lower lines of a market file: in a section of the active mod
         /// of the base in that file, else in a new section.</summary>
         private void Override(string path, string good, IReadOnlyList<string> values) =>
-            Target(path).Lines.Add(Line(good, values));
+            Target(path).Lines.Add(Write(good, values));
+
+        /// <summary>The text of a line that the draft writes.</summary>
+        /// <exception cref="InvalidOperationException">The games skip the line.</exception>
+        private string Write(string good, IReadOnlyList<string> values) =>
+            IsSkipped(good, values)
+                ? throw new InvalidOperationException(SkippedText(baseNickname, good, values))
+                : LineText(good, values);
 
         /// <summary>The section of the active mod of the base in a market file that gets new lines: the first one, else
         /// a new section.</summary>
@@ -820,7 +869,7 @@ public static class MarketPlans
                 for (var i = 0; i < part.Lines.Count; i++)
                 {
                     if (part.Lines[i] is { } text)
-                        yield return new DraftLine(part, i, text, Values(text)[0].ToString().Trim());
+                        yield return new DraftLine(part, i, text, ParseLine(text)[0].ToString().Trim());
                 }
             }
         }
@@ -828,7 +877,7 @@ public static class MarketPlans
         /// <summary>A market line of a line of the draft, for the rules that read the values.</summary>
         private MarketLine Line(DraftLine line) =>
             new(line.Part.Section ?? new SectionRef(line.Part.Path, new SectionIdentity(BaseGood, null)), baseNickname,
-                line.Index, Values(line.Text));
+                line.Index, ParseLine(line.Text));
 
         /// <summary>The market file of a new good: the file in which the base sells goods of the same category, else
         /// the first file of the base, else the first market file.</summary>
@@ -857,20 +906,6 @@ public static class MarketPlans
         private static bool SameValues(MarketLine line, IReadOnlyList<string> values) =>
             Texts(line.Values).Skip(1).SequenceEqual(values);
 
-        private static string Line(string good, IReadOnlyList<string> values) =>
-            values.Count == 0 ? good : $"{good}, {string.Join(", ", values)}";
-
-        /// <summary>The values of a line text, as the index reads them: the good as a string, numbers as
-        /// numbers.</summary>
-        private static List<ValueBase> Values(string text) =>
-            Split(text).Select(ValueOf).ToList();
-
-        private static ValueBase ValueOf(string text) =>
-            int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var whole)
-                ? new Int32Value(whole)
-                : float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)
-                    ? new SingleValue(number, null)
-                    : new StringValue(text);
 
         private static string? First(SectionView view, string name) =>
             view.Lines(name) is [{ Values: [var value, ..] }, ..] ? value.ToString() : null;
@@ -889,7 +924,11 @@ public static class MarketPlans
             public string? ReadOnlyReason { get; } = readOnlyReason;
         }
 
-        private sealed record DraftLine(Part Part, int Index, string Text, string Good);
+        private sealed record DraftLine(Part Part, int Index, string Text, string Good)
+        {
+            /// <summary>True when the games skip the line (see <see cref="BaseMarkets.IsSkipped"/>).</summary>
+            public bool Skipped => BaseMarkets.IsSkipped(ParseLine(Text));
+        }
     }
 
     /// <summary>The detail code of a market change that changes no line.</summary>

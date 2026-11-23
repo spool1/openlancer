@@ -341,6 +341,8 @@ marketgood = my_good, 0, -1, 150, 500, 0, 0.8
 
 To remove a good from a base, write the buy-only form: min 0, max 0 and the transaction type 1. The base then stops the sale of the good, and it only buys the good. The Inspector and the agent tools write this form for a remove of a line of the game.
 
+The retail games and OpenLancer Play skip a line in which each value after the good has its default value: rank 0, reputation -1, min 0, max 0, transaction type 0 and price multiplier 1. A value that the line does not give has its default value. The earlier line of the good then counts. So such a line does not remove a good. The Inspector, the save checks and the agent tools read such a line as no line. The Inspector and the agent tools do not write one, and they tell you why.
+
 The price of a ship at a base comes from the market price of its hull good there. A line of the hull good, for example `marketgood = my_ship_hull, 0, -1, 0, 0, 1, 0.9`, gives the hull price times the multiplier. Without such a line, the price is the price of the hull good in `goods.ini`. A line of the ship package does not change the price.
 
 The ship dealer shows this price for the hull. The trade-in value of the ship of the player is this price times 0.8. The retail games also apply the price variance of the base and the damage of the ship. OpenLancer Play does not apply them.

@@ -142,12 +142,11 @@ public static partial class TargetChecks
         var bases = side.Bases.Select(b => b.Nickname).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var (baseName, lines) in side.MarketLines.Where(m => bases.Contains(m.Key) && scope.MarketBases.Contains(m.Key)))
         {
-            // The game keeps the last line of a good.
-            var sells = lines.GroupBy(l => l.Good, StringComparer.OrdinalIgnoreCase).Select(g => g.Last())
-                .Any(l => packages.Contains(l.Good) && BaseMarkets.Sells(l.Values, ship: true));
-            if (!sells)
+            // The game keeps the last line of a good that it does not skip.
+            var kept = BaseMarkets.KeptLines(lines, l => l.Good, l => l.Values);
+            if (!kept.Any(l => packages.Contains(l.Good) && BaseMarkets.Sells(l.Values, ship: true)))
                 continue;
-            var listed = lines.Select(l => l.Good).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var listed = kept.Select(l => l.Good).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var missing = packages.Where(p => !listed.Contains(p)).Order(StringComparer.OrdinalIgnoreCase).ToList();
             if (missing.Count == 0)
                 continue;

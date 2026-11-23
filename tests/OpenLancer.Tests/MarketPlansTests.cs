@@ -246,8 +246,9 @@ public sealed class MarketPlansTests
         Assert.Equal(MarketTransaction.BuyAndSell, line.Transaction);
         Assert.Equal("2", MarketPlans.FieldText(line, Field(MarketLine.PriceIndex)));
 
-        // A ship line gets the values of a new ship line.
-        session.Execute(MarketPlans.AddToBase(session, "s1_package", "b2", "0, -1"));
+        // A ship line gets the values of a new ship line. A line of only "0, -1" is a line that the games skip, so this
+        // line has the rank 2.
+        session.Execute(MarketPlans.AddToBase(session, "s1_package", "b2", "2, -1"));
         var ship = session.MarketLines("s1_package").Single(l => l.Base == "b2");
         session.Execute(MarketPlans.SetValue(session, ship, Field(MarketLine.RankIndex), "3"));
         Assert.Equal("3, -1, 1, 1, 0, 1", Values(session.MarketLines("s1_package").Single(l => l.Base == "b2")));
@@ -325,12 +326,13 @@ public sealed class MarketPlansTests
     {
         using var ws = TwoMarkets();
         var session = ws.Session("act");
-        var shortLine = AddedLine(session, "eng1", "0, -1");
+        // A line of only "0, -1" is a line that the games skip, so this short line has the rank 1.
+        var shortLine = AddedLine(session, "eng1", "1, -1");
         Assert.Null(shortLine.Transaction);
         Assert.Equal("Not set", MarketSection.TransactionText(shortLine));
 
         session.Execute(MarketPlans.SetTransaction(session, shortLine, MarketTransaction.BuyOnly));
-        Assert.Equal("0, -1, 10, 10, 1, 1", Values(session.MarketLines("eng1").Single(l => l.Base == "b1")));
+        Assert.Equal("1, -1, 10, 10, 1, 1", Values(session.MarketLines("eng1").Single(l => l.Base == "b1")));
 
         var unknown = AddedLine(session, "s1_hull", "0, -1, 5, 5, 7, 1");
         Assert.Null(unknown.Transaction);
@@ -386,6 +388,63 @@ public sealed class MarketPlansTests
             .. MarketPlans.Fields.Select(f => f.Tip),
         ];
         Assert.All(texts, t => Assert.True(SteLint.Problems(t).Count == 0, $"{t}: {string.Join(", ", SteLint.Problems(t))}"));
+    }
+
+    /// <summary>
+    /// Review finding of step 7: the games skip a line in which each value after the good has its default value (fork
+    /// commit OL-0081). Two field edits gave such a line, and the section showed it as a change. Now the edit that gives
+    /// such a line is refused with the reason, and the later line keeps the first edit. A remove writes the buy-only form.
+    /// </summary>
+    [Fact]
+    public void AnEditThatGivesALineWithOnlyDefaultValuesIsRefused()
+    {
+        using var ws = TwoMarkets();
+        var session = ws.Session("act");
+        MarketLine Shown() => Assert.Single(MarketSection.LastLines(session.MarketLines("gun1")));
+        session.Execute(MarketPlans.SetValue(session, Shown(), Field(MarketLine.MaximumIndex), "0"));
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            MarketPlans.SetValue(session, Shown(), Field(MarketLine.MinimumIndex), "0"));
+
+        Assert.Equal("The games skip the line 'marketgood = gun1, 0, -1, 0, 0, 0, 1' of b1. Each value after the good " +
+                     "has its default value: rank 0, reputation -1, minimum and maximum stock 0, type 0 and price " +
+                     "multiplier 1. Change one more value, or remove the line to stop the sale of the good.", error.Message);
+        Assert.Empty(SteLint.Problems(error.Message));
+        Assert.Equal(["b1: 0, -1, 10, 10, 0, 1", "b1: 0, -1, 10, 0, 0, 1"], Bases(session, "gun1"));
+        Assert.Throws<InvalidOperationException>(() => MarketPlans.SetLine(session, Shown(), "0, -1, 0, 0, 0, 1"));
+
+        session.Execute(MarketPlans.SetLine(session, Shown(), null));
+        Assert.Equal(["b1: 0, -1, 10, 10, 0, 1", "b1: 0, -1, 0, 0, 1, 1"], Bases(session, "gun1"));
+    }
+
+    /// <summary>
+    /// A line of the active mod that the games skip counts as no line. The section shows the line of the game, and that
+    /// line shows no change. An edit of the line of the game changes the skipped line, and "Add to base" changes the
+    /// skipped line of a base that does not sell the good in the games.
+    /// </summary>
+    [Fact]
+    public void ALineOfTheActiveModWithOnlyDefaultValuesCountsAsNoLine()
+    {
+        using var ws = TwoMarkets();
+        ws.Mod("act", new()
+        {
+            [@"patches\" + MarketPath] = "[BaseGood]\nol.new = true\nbase = b1\nmarketgood = gun1, 0, -1, 0, 0, 0, 1\n" +
+                                         "[BaseGood]\nol.new = true\nbase = b2\nmarketgood = gun1, 0, -1\n",
+        });
+        var session = ws.Session("act");
+
+        var shown = Assert.Single(MarketSection.LastLines(session.MarketLines("gun1")));
+        Assert.False(session.Get(shown.Section)!.IsNew);
+        Assert.Null(MarketPlans.Override(session, shown));
+        Assert.All(session.MarketLines("gun1").Where(l => session.Get(l.Section)!.IsNew),
+            l => Assert.Null(MarketPlans.Override(session, l)));
+
+        session.Execute(MarketPlans.SetValue(session, shown, Field(MarketLine.PriceIndex), "2"));
+        Assert.Equal(["b1: 0, -1, 10, 10, 0, 1", "b1: 0, -1, 10, 10, 0, 2", "b2: 0, -1"], Bases(session, "gun1"));
+
+        session.Execute(MarketPlans.AddToBase(session, "gun1", "b2", "0, -1, 3, 3, 0, 1"));
+        Assert.Equal(["b1: 0, -1, 10, 10, 0, 1", "b1: 0, -1, 10, 10, 0, 2", "b2: 0, -1, 3, 3, 0, 1"],
+            Bases(session, "gun1"));
     }
 
     /// <summary>A line of a lower mod names the mod in its change.</summary>

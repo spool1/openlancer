@@ -18,7 +18,8 @@ namespace OpenLancer.Data.Editing.Bases;
 /// not change it. So the trade-in value does not depend on the buy-only lines.</para>
 /// <para>The fork sells a ship only when the minimum stock or the maximum stock is not 0. It sells another good only
 /// when the maximum stock is more than 0. It keeps the last line of a good at a base (Base.AddMarketLine, fork commit
-/// OL-0080). The retail games also do not sell a good of a buy-only line.</para>
+/// OL-0080). The retail games also do not sell a good of a buy-only line. The retail games and the fork skip a line in
+/// which each value after the good has its default value (fork commit OL-0081).</para>
 /// </remarks>
 public static class BaseMarkets
 {
@@ -34,6 +35,34 @@ public static class BaseMarkets
     /// <summary>The number of values that the engine reads from a <c>marketgood</c> line. It ignores a line with fewer
     /// values.</summary>
     private const int ReadValues = MarketLine.PriceIndex + 1;
+
+    /// <summary>The default values of a line in plain words. The games skip a line with only these values.</summary>
+    internal const string DefaultValuesText =
+        "rank 0, reputation -1, minimum and maximum stock 0, type 0 and price multiplier 1";
+
+    /// <summary>
+    /// True when the games skip a line. Each value after the good has its default value (see
+    /// <see cref="DefaultValuesText"/>). A value that the line does not give has its default value. The earlier line of
+    /// the good then counts, or the base does not list the good (fork commit OL-0081).
+    /// </summary>
+    /// <param name="values">The values of the line, from the good.</param>
+    public static bool IsSkipped(IReadOnlyList<ValueBase> values) =>
+        Number(values, MarketLine.RankIndex, 0) == 0 && Number(values, MarketLine.ReputationIndex, -1) == -1 &&
+        Number(values, MarketLine.MinimumIndex, 0) == 0 && Number(values, MarketLine.MaximumIndex, 0) == 0 &&
+        Number(values, MarketLine.TransactionIndex, 0) == 0 && Number(values, MarketLine.PriceIndex, 1) == 1;
+
+    /// <summary>
+    /// The line that the games keep for each key, in the order of the lines: the last line that they do not skip (see
+    /// <see cref="IsSkipped"/>). A key whose lines the games all skip has no line.
+    /// </summary>
+    /// <param name="lines">The lines in load order.</param>
+    /// <param name="key">The key of a line: the good for the lines of one base, or the base for the lines of one
+    /// good.</param>
+    /// <param name="values">The values of a line, from the good.</param>
+    public static IReadOnlyList<T> KeptLines<T>(IEnumerable<T> lines, Func<T, string> key,
+        Func<T, IReadOnlyList<ValueBase>> values) =>
+        lines.Where(l => !IsSkipped(values(l))).GroupBy(key, StringComparer.OrdinalIgnoreCase).Select(g => g.Last())
+            .ToList();
 
     /// <summary>True for a buy-only line: the minimum stock 0, the maximum stock 0 and the transaction type 1. The base
     /// buys the good from the player and does not sell it.</summary>
@@ -98,6 +127,13 @@ public static class BaseMarkets
         view.Lines("category") is [{ Values: [var value, ..] }, ..]
             ? value.ToString()?.Trim()
             : null;
+
+    /// <summary>A value of a line as a number. A value that the line does not give, or an empty value, has its default
+    /// value. A value that is no number is NaN, so it equals no default value.</summary>
+    private static float Number(IReadOnlyList<ValueBase> values, int index, float missing) =>
+        index >= values.Count || values[index].ToString()?.Trim().Length is null or 0
+            ? missing
+            : values[index].TryToSingle(out var number) ? number : float.NaN;
 
     /// <summary>A value of a line as a whole number, or null when the line does not have it or it is no number.</summary>
     private static int? Whole(IReadOnlyList<ValueBase> values, int index) =>

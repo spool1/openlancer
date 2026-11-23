@@ -516,6 +516,25 @@ public sealed partial class BaseSaveGateTests
         One(session, "Ol01_03_Base has an equipment dealer, but its market sells no equipment.");
     }
 
+    /// <summary>The games skip a line in which each value after the good has its default value (fork commit OL-0081).
+    /// So such a line after a line that sells the good does not stop the sale, and the dealer gets no warning.</summary>
+    [Fact]
+    public void ALineWithOnlyDefaultValuesDoesNotStopTheSale()
+    {
+        using var ws = BaseWorkspace.Create();
+        ws.WriteBase(BaseWorkspace.MiscMarketPath, """
+            [BaseGood]
+            base = Ol02_01_Base
+            marketgood = ol_gun, 0, -1, 10, 10, 0, 1
+            [BaseGood]
+            base = Ol02_01_Base
+            marketgood = ol_gun, 0, -1, 0, 0, 0, 1
+            """);
+        var session = ws.Session("act");
+
+        Assert.DoesNotContain(Problems(session, BaseWorkspace.Pirate), p => p.Message.Contains("has an equipment dealer"));
+    }
+
     [Fact]
     public void ANewBaseWithoutAnMBaseIsAWarning()
     {

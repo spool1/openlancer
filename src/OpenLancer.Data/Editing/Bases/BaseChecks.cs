@@ -363,8 +363,8 @@ internal static class BaseChecks
         /// trade-in.</summary>
         private void Market()
         {
-            // The game keeps the last line of a good (load order of the market files).
-            var lines = view.Market.GroupBy(r => r.Good, StringComparer.OrdinalIgnoreCase).Select(g => g.Last()).ToList();
+            // The game keeps the last line of a good (load order of the market files) that it does not skip.
+            var lines = BaseMarkets.KeptLines(view.Market, r => r.Good, r => r.Line.Values);
             var sold = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var ships = 0;
             foreach (var line in lines)

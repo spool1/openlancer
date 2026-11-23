@@ -83,6 +83,26 @@ public sealed class MarketPlansSetTests
         Assert.Equal(MarketPlans.NoChange, Assert.Single(same.Refusals).Rule);
     }
 
+    /// <summary>A row that gives a line in which each value after the good has its default value is refused. The games
+    /// skip such a line (fork commit OL-0081), so the line would not stop the sale of the good.</summary>
+    [Fact]
+    public void ARowThatGivesALineWithOnlyDefaultValuesIsRefused()
+    {
+        using var ws = BaseWorkspace.Create();
+        var session = ws.Session("act");
+
+        var plan = MarketPlans.Set(session, BaseWorkspace.Station,
+            [new MarketRow("ol_water"), new MarketRow("ol_gun") { MinStock = 0, MaxStock = 0 }], []);
+
+        Assert.False(plan.CanRun);
+        var refusal = Assert.Single(plan.Refusals);
+        Assert.Equal(MissionErrors.FieldValue, refusal.Rule);
+        Assert.Equal("goods[1]", plan.RefusedPart);
+        Assert.StartsWith("The games skip the line 'marketgood = ol_gun, 0, -1, 0, 0, 0, 1' of Ol01_01_Base. ",
+            refusal.Message);
+        AssertSte(plan);
+    }
+
     /// <summary>A new good goes into a section of the active mod of the base, else into a new section in the file in
     /// which the base sells goods of its category. A new line gets the values of a new line. A buy-only row gets the
     /// stock 0 and 0.</summary>
