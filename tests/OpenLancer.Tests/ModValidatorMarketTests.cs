@@ -46,4 +46,17 @@ public sealed class ModValidatorMarketTests
     [Fact]
     public void AShipWithStockGivesNoWarning() =>
         Assert.False(ModValidator.ShipNotForSale(Line("pkg1, 0, -1, 1, 1, 0, 1")));
+
+    /// <summary>A line of a hull good sets the price of its ship at the base (fork commit OL-0080), so it is no error. A
+    /// good without equipment is still an error.</summary>
+    [Fact]
+    public void AHullGoodSetsThePriceOfItsShipAndAGoodWithoutEquipmentIsIgnored()
+    {
+        Assert.Null(ModValidator.MarketGoodProblem(GoodCategory.ShipHull, hasEquipment: false));
+        Assert.Null(ModValidator.MarketGoodProblem(GoodCategory.Equipment, hasEquipment: true));
+        Assert.Null(ModValidator.MarketGoodProblem(GoodCategory.Commodity, hasEquipment: true));
+        Assert.Equal("the good has no equipment, so the engine ignores the entry.",
+            ModValidator.MarketGoodProblem(GoodCategory.Commodity, hasEquipment: false));
+        Assert.NotNull(ModValidator.MarketGoodProblem(GoodCategory.Ship, hasEquipment: false));
+    }
 }

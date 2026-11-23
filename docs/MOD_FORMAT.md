@@ -321,7 +321,7 @@ The engine attaches some section types to the section of the parent type before 
 
 ### Markets
 
-The engine adds the goods of all `[BaseGood]` sections for one base. So a `[BaseGood]` patch section is always added as a new section. Use it to sell more goods at a base:
+The engine reads the goods of all `[BaseGood]` sections for one base. So a `[BaseGood]` patch section is always added as a new section. Use it to sell more goods at a base:
 
 ```ini
 [BaseGood]
@@ -329,7 +329,21 @@ base = li01_01_base
 marketgood = my_package, 0, -1, 1, 1, 0, 1, 1
 ```
 
-The values of `marketgood` are: good, rank, reputation, min, max, transaction type, price multiplier. The transaction type is 0 when the base buys and sells the good, 1 when the base only buys it, and 2 when the base only sells it. The engine sells a ship only when min or max is not 0. A patch cannot change or remove a vanilla market line. Use a whole-file override for that.
+The values of `marketgood` are: good, rank, reputation, min, max, transaction type, price multiplier. The transaction type is 0 when the base buys and sells the good, 1 when the base only buys it, and 2 when the base only sells it. The engine sells a ship only when min or max is not 0.
+
+The retail games and OpenLancer Play keep the last line of a good at a base, in the order of the market files of `[Data]`. The merge puts a new `[BaseGood]` of a patch after the sections of the game in its file. So a patch changes a line of the game with a later line of the same good in the same market file:
+
+```ini
+[BaseGood]
+base = li01_01_base
+marketgood = my_good, 0, -1, 150, 500, 0, 0.8
+```
+
+To remove a good from a base, write the buy-only form: min 0, max 0 and the transaction type 1. The base then stops the sale of the good, and it only buys the good. The Inspector and the agent tools write this form for a remove of a line of the game.
+
+The price of a ship at a base comes from the market price of its hull good there. A line of the hull good, for example `marketgood = my_ship_hull, 0, -1, 0, 0, 1, 0.9`, gives the hull price times the multiplier. Without such a line, the price is the price of the hull good in `goods.ini`. A line of the ship package does not change the price.
+
+The ship dealer shows this price for the hull. The trade-in value of the ship of the player is this price times 0.8. The retail games also apply the price variance of the base and the damage of the ship. OpenLancer Play does not apply them.
 
 ### Two mods that change the same entry
 
@@ -1054,7 +1068,11 @@ Revert, in the menu of a row or in the item menu, puts back the lines of the low
 
 "Markets" lists the market lines of a good, by base. Each value of a line has its own field: "Rank", "Reputation", "Minimum stock", "Maximum stock" and "Price multiplier". "Buys or sells" under them sets the transaction type: "Buys and sells", "Only buys" or "Only sells". An edit of a field changes only its value. The engine ignores a line without the price multiplier. So an edit of a shorter line also writes the values of a new line in the missing places.
 
-The market lines of a lower layer are read-only, because a patch cannot change them. "Add to base" adds a line to a `[BaseGood]` of that base that the active mod adds. Without one, a new `[BaseGood]` goes into the market file in which the base sells goods of the same category, else into the first market file of the base. The editor refuses a base that already sells the good in a market file.
+"Markets" shows the last line of each base, because the games keep the last line of a good at a base. An edit of a line of a lower layer writes a later line of the active mod in the same market file (see "Markets"). A second edit changes that later line. The remove button of a line of the active mod deletes the line. When the line replaces a line of a lower layer, the remove button writes the buy-only form instead.
+
+The row "Change" under a line that replaces a line of a lower layer shows the result in plain words, for example "Removed: the base only buys it". Its tooltip names the line that the save writes. Revert next to it removes the line of the active mod, and the line of the lower layer counts again.
+
+"Add to base" adds a line to a `[BaseGood]` of that base that the active mod adds. Without one, a new `[BaseGood]` goes into the market file in which the base sells goods of the same category, else into the first market file of the base. The editor refuses a base that already sells the good in a market file.
 
 ### Edits in the Scene
 
@@ -1539,7 +1557,7 @@ The base checks also give warnings, which do not block the save. The Inspector s
 - A base that sells goods without the dealer of their category. The player cannot buy them.
 - A dealer whose category the market does not sell. The dealer shows an empty list.
 - A base of the active mod without an `[MBase]`. Its bar has no characters, and it offers no missions.
-- A base whose market the active mod adds or changes, when the base sells a ship and has no line for each ship package. The check runs only when the ship markets of the game and of the lower mods have buy-only lines, as vanilla has. The game gives 0 credits for the trade-in of a ship without a line.
+- A base whose market the active mod adds or changes, when the base sells a ship and has no line for each ship package. The check runs only when the ship markets of the game and of the lower mods have buy-only lines, as vanilla has. Vanilla lists each ship package at each base that sells ships. The trade-in value does not come from these lines (see "Markets"). The completeness of the base gives a fix that adds the missing buy-only lines.
 - A room scene that shows a `$terrain_*` template, when the base has no `terrain_*` line for it. The room shows no model there.
 - A character of the active mod without a body or a costume, a voice or a name. The game does not show the character.
 
@@ -1824,7 +1842,7 @@ When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod
 - Each content line of an operation is an INI line as the game file has it. The script adds no indent.
 - A new section is an `append` operation at the end of the file. A new line is a `sectionappend` after the header line and the key line of its section. A changed value is a `sectionreplace`: the raw line of the game file and the new line. FLMM changes only the lines below the header of the section.
 - FLMM uses the first match of an anchor. So the header line and the key line must occur once in the file as whole lines. Their first match as text must also be these lines. For example, the anchor of `ring_1` is not valid when the section of `ring_10` comes first. The same rule holds for a changed line in its section.
-- A new `[BaseGood]` adds its lines to the `[BaseGood]` of the same base. A new `[Data]` line goes after the last line of its key.
+- A new `[BaseGood]` of new goods adds its lines to the `[BaseGood]` of the same base. The games keep the last line of a good at a base, and a line there comes before the line of the game. So a new `[BaseGood]` with a good that the game section of the base sells is an `append` at the end of the file. An example is a line that changes or removes a line of the game. A new `[Data]` line goes after the last line of its key.
 - The text of the mod becomes `<key> = 0 ;GENERATESTRRES("<text>")` and `<key> = 0 ;GENERATEXMLRES("<text>")`. FLMM makes its own text DLL and writes the id of the text in the line. The game reads the text after the semicolon as a comment. So the text must be the last value of its line, and a line can hold only one text. Else the export refuses the change.
 - A text with `"`, with a line end or with a character outside ASCII refuses the change, because no known FLMM rule can hold it.
 - The script writes `&`, `<` and `>` as `&amp;`, `&lt;` and `&gt;`, also in a content line. The FLMM test did not show if FLMM writes the characters or the escapes into the game file. So a text with these characters, for example each infocard, is not checked in FLMM yet.
@@ -1899,7 +1917,7 @@ First, the INI checks:
 - A ship package whose hull good does not exist or is not a ship hull (the engine load stops), or whose addon is not equipment (the engine drops it).
 - A hull good without a ship (the load stops), or with a ship that is not in shiparch (the engine drops its packages).
 - A ship package without an engine or a power plant.
-- A market for a base that does not exist, a market good that does not exist, or a market good that the engine cannot sell (a ship hull, or a good without equipment).
+- A market for a base that does not exist, a market good that does not exist, or a market good that the engine ignores (a good without equipment). A line of a hull good is valid: it sets the price of its ship at the base (see "Markets").
 - A market ship whose letter case differs from the ship package. The engine finds ship packages with a case-sensitive match.
 - A ship that a market sells with min = max = 0 (warning: it is not for sale). A line whose transaction type is 1 tells that the base only buys the ship, so it gives no warning. Retail has such a line for each ship of each ship market.
 - A duplicate nickname, two nicknames with the same hash, a nickname that is not ASCII, or an equipment section without a nickname. (The engine drops a `[Good]` or `[Ship]` without a nickname and logs `Missing required field nickname`.)
@@ -1933,7 +1951,7 @@ Librelancer loads some data that the retail game does not accept or does not rea
 | A base nickname with more than 63 characters | Error | It ignores the bar data of the base. |
 | A base with the nickname or the FLHash of another base | Error | It drops one of the two bases. The check reads the bases of the game of each target. So a base of the mod can collide with a base of one target game only. |
 | A fixture of an `[MRoom]` that names no `[GF_NPC]` before it in its `[MBase]` | Error | It shows no character at this place. |
-| A base whose market the mods add or change, when it sells a ship and has no line for each ship package | Warning | It gives 0 credits for the trade-in of a ship without a line. The check runs only for a target whose ship markets have buy-only lines. Vanilla 1.1 has them, and HD Edition 0.7.1 does not. So a mod that you make on HD Edition data can get the warning for the vanilla target. |
+| A base whose market the mods add or change, when it sells a ship and has no line for each ship package | Warning | Vanilla lists each ship package at each base that sells ships. The trade-in value does not come from these lines. The check runs only for a target whose ship markets have buy-only lines. Vanilla 1.1 has them, and HD Edition 0.7.1 does not. So a mod that you make on HD Edition data can get the warning for the vanilla target. |
 
 A mod without a retail target gets warnings for the door, the first line, the long nickname and the fixture. The base checks give them (see "The save gate").
 

@@ -137,10 +137,11 @@ public sealed class SampleModTests(ITestOutputHelper output)
             "Market for base 'no_such_base': the base is not in universe.ini.",
             "Market for base 'li01_01_base', good 'LE_PACKAGE': the letter case differs from the ship package. The engine will not find it.",
             "Market for base 'li01_01_base', good 'no_such_good': the good does not exist.",
-            "Market for base 'li01_01_base', good 'le_hull': a market can sell only ship packages, equipment and commodities. The engine ignores a ShipHull good.",
         ];
         foreach (var message in expected)
             Assert.Contains(problems, p => p.Severity == DiagnosticSeverity.Error && p.Message == message);
+        // A line of a hull good sets the price of its ship at the base (fork commit OL-0080).
+        Assert.DoesNotContain(problems, p => p.Message.Contains("good 'le_hull'"));
     }
 
     [Fact]

@@ -16,7 +16,7 @@ namespace OpenLancer.Data.Validation;
 /// <remarks>
 /// <para>Some broken references stop the engine load: a ship package whose hull good does not exist or is not a
 /// ship hull. Others make the engine drop data with no message: a hull good whose ship is not in shiparch, an
-/// unknown package addon, a market good that the engine cannot sell, a ship that a market sells with
+/// unknown package addon, a market good that the engine ignores, a ship that a market sells with
 /// min = max = 0, and a market ship whose letter case differs from the package (the engine finds packages with a
 /// case-sensitive match). These checks find each case.</para>
 /// <para>Vanilla data has problems of its own. Use <see cref="NewProblems"/> to report only the problems that the
@@ -43,6 +43,23 @@ public static class ModValidator
     /// </summary>
     internal static bool ShipNotForSale(MarketGood item) =>
         item.Min == 0 && item.Max == 0 && (MarketTransaction)item.TransactionType != MarketTransaction.BuyOnly;
+
+    /// <summary>
+    /// Why the engine ignores the market line of a good that is not a ship package, or null. A market sells equipment
+    /// and commodities with equipment. A line of a hull good sets the price of its ship at the base, for the ship dealer
+    /// and the trade-in (fork commit OL-0080).
+    /// </summary>
+    /// <param name="category">The category of the good.</param>
+    /// <param name="hasEquipment">True when an equipment section has the nickname of the good.</param>
+    internal static string? MarketGoodProblem(GoodCategory category, bool hasEquipment) => category switch
+    {
+        GoodCategory.ShipHull => null,
+        GoodCategory.Equipment or GoodCategory.Commodity => hasEquipment
+            ? null
+            : "the good has no equipment, so the engine ignores the entry.",
+        _ => "a market can sell only ship packages, equipment and commodities, and set the price of a ship with its " +
+             $"hull good. The engine ignores a {category} good.",
+    };
 
     public static Report Validate(FileSystem fs)
     {
@@ -188,10 +205,8 @@ public static class ModValidator
                         Error($"{label}: the letter case differs from the ship package. The engine will not find it.");
                     else if (!goodsByName.TryGetValue(item.Good, out var good))
                         Error($"{label}: the good does not exist.");
-                    else if (good.Category is not (GoodCategory.Equipment or GoodCategory.Commodity))
-                        Error($"{label}: a market can sell only ship packages, equipment and commodities. The engine ignores a {good.Category} good.");
-                    else if (!equipmentByName.ContainsKey(good.Nickname))
-                        Error($"{label}: the good has no equipment, so the engine ignores the entry.");
+                    else if (MarketGoodProblem(good.Category, equipmentByName.ContainsKey(good.Nickname)) is { } problem)
+                        Error($"{label}: {problem}");
                 }
             }
         }
