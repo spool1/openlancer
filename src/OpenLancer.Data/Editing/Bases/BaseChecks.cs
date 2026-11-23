@@ -79,7 +79,7 @@ internal static class BaseChecks
     /// <summary>The keys of a character that the game needs to show it.</summary>
     private static readonly string[] CharacterKeys = ["body", "base_appr", "voice", "individual_name"];
 
-    /// <summary>The most ship packages that the trade-in warning names.</summary>
+    /// <summary>The most ship packages that the warning of the ship lines names.</summary>
     private const int ShownShips = 5;
 
     /// <summary>The <c>$terrain_*</c> templates that a room scene can name, each with the key of its line in the
@@ -359,8 +359,8 @@ internal static class BaseChecks
                     $"The character {nickname} of {Name} has no {Words.Join(missing, "and no")}. The game does not show it.");
         }
 
-        /// <summary>The goods that the dealers of the base sell, the places for ships for sale and the lines of the
-        /// trade-in.</summary>
+        /// <summary>The goods that the dealers of the base sell, the places for ships for sale and the ship lines: the
+        /// buy-only lines of the ship packages that the base does not sell, in the vanilla form.</summary>
         private void Market()
         {
             // The game keeps the last line of a good (load order of the market files) that it does not skip.

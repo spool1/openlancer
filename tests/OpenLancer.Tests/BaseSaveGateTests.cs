@@ -577,7 +577,7 @@ public sealed partial class BaseSaveGateTests
     /// that it sells, and the check gives no warning. A buy-only line of the active mod does not make the pattern. The
     /// planet sells two ships, and its market does not list ol_ship3_package.</summary>
     [Fact]
-    public void WithoutTheBuyOnlyPatternTheTradeInCheckGivesNoWarning()
+    public void WithoutTheBuyOnlyPatternTheCheckOfTheShipLinesGivesNoWarning()
     {
         using var ws = ShipWorkspace("""
             [BaseGood]

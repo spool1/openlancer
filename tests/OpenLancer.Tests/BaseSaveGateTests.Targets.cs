@@ -301,13 +301,13 @@ public sealed partial class BaseSaveGateTests
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
     }
 
-    /// <summary>A new base that sells one ship and lists no other ship gets the trade-in warning on a target whose ship
+    /// <summary>A new base that sells one ship and lists no other ship gets the warning of the ship lines on a target whose ship
     /// markets have buy-only lines (vanilla), also when the mod was made on data without them (HD Edition). A target
     /// without buy-only lines gives no warning.</summary>
     [Theory]
     [InlineData(BuyOnlyShips, true)]
     [InlineData(SoldShipsOnly, false)]
-    public void TheTradeInLinesFollowTheShipMarketsOfTheTarget(string shipMarket, bool warns)
+    public void TheShipLinesFollowTheShipMarketsOfTheTarget(string shipMarket, bool warns)
     {
         using var game = TargetGame(shipMarket);
         var files = NewBaseMod();
@@ -328,10 +328,10 @@ public sealed partial class BaseSaveGateTests
                      "buy-only line for each ship package.", warning.Message);
     }
 
-    /// <summary>A new ship package of a mod gives no trade-in finding for the bases whose markets the mod does not
+    /// <summary>A new ship package of a mod gives no finding of the ship lines for the bases whose markets the mod does not
     /// change.</summary>
     [Fact]
-    public void ANewShipPackageGivesNoTradeInFindingForTheBasesOfTheGame()
+    public void ANewShipPackageGivesNoShipLinesFindingForTheBasesOfTheGame()
     {
         using var game = TargetGame();
 

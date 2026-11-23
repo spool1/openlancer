@@ -48,7 +48,7 @@ internal static class RetailChecks
         const string newPlayer = "EXE/newplayer.fl";
         var player = SaveGame.FromBytes(newPlayer, fs.ReadAllBytes(newPlayer)).Player!;
         var manhattan = db.Bases.Get(Manhattan)!;
-        // The trade-in and the price of the ship read the market price of the ship at the base (fork commit OL-0080).
+        // The trade-in value and the price of the ship read the market price of the ship at the base (fork commit OL-0080).
         var tradeIn = (long)TradeConstants.ShipResale(db.GetShipPrice(db.Ships.Get("ge_fighter")!, manhattan));
         var sold = manhattan.SoldShips.Single(s => s.Package.Nickname == package);
         var price = db.GetShipPrice(sold.Package.Ship, manhattan) +

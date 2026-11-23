@@ -22,22 +22,23 @@ namespace OpenLancer.Data.Validation;
 /// base into a buffer of 64 bytes to find its <c>[MBase]</c>. It drops a fixture whose character comes later in the
 /// block. The id of a base is the FLHash of its nickname, and the game drops a second base with the same id. Vanilla
 /// lists each ship package at each base that sells ships.</para>
-/// <para>The checks give errors, except the trade-in check. It gives a warning, and only when the ship markets of the
-/// target use buy-only lines (see <see cref="BaseMarkets.UsesBuyOnlyShipLines"/>). Vanilla does, and HD Edition 0.7.1
-/// does not.</para>
+/// <para>The checks give errors, except the check of the ship lines. It gives a warning, and only when the ship markets
+/// of the target use buy-only lines (see <see cref="BaseMarkets.UsesBuyOnlyShipLines"/>). Vanilla does, and HD Edition
+/// 0.7.1 does not. The ship lines do not give the trade-in value of a ship. They keep the vanilla form of the ship
+/// markets.</para>
 /// </remarks>
 public static partial class TargetChecks
 {
     /// <summary>The most characters of a base nickname for which the game finds the <c>[MBase]</c>.</summary>
     private const int BarDataNameLength = 63;
 
-    /// <summary>The most ship packages that the trade-in warning names.</summary>
+    /// <summary>The most ship packages that the warning of the ship lines names.</summary>
     private const int ShownShips = 5;
 
-    /// <summary>The doors, the names and the bar data of the bases, and the trade-in lines of the bases that sell
+    /// <summary>The doors, the names and the bar data of the bases, and the ship lines of the bases that sell
     /// ships.</summary>
     private static IEnumerable<Finding> Bases(Side side, Scope scope) =>
-        BaseNames(side, scope).Concat(BarData(side, scope)).Concat(Doors(side, scope)).Concat(TradeIns(side, scope));
+        BaseNames(side, scope).Concat(BarData(side, scope)).Concat(Doors(side, scope)).Concat(ShipLines(side, scope));
 
     /// <summary>The length of each base nickname, and two bases with one id, when the mods change
     /// <c>universe.ini</c>.</summary>
@@ -134,7 +135,7 @@ public static partial class TargetChecks
     /// when the ship markets of the target use buy-only lines, as vanilla lists each ship package at each base that sells
     /// ships. A new ship package of a mod gives no finding for the bases that the mods do not change.
     /// </summary>
-    private static IEnumerable<Finding> TradeIns(Side side, Scope scope)
+    private static IEnumerable<Finding> ShipLines(Side side, Scope scope)
     {
         if (!scope.ChangesMarkets || !scope.UsesBuyOnlyShipLines)
             yield break;
@@ -155,7 +156,7 @@ public static partial class TargetChecks
                 ? $"the ship package {missing[0]}"
                 : $"{missing.Count} ship packages: {string.Join(", ", missing.Take(ShownShips))}" +
                   (missing.Count > ShownShips ? $" and {missing.Count - ShownShips} more" : "");
-            yield return new($"tradein|{baseName.ToLowerInvariant()}|{string.Join(",", missing).ToLowerInvariant()}",
+            yield return new($"shiplines|{baseName.ToLowerInvariant()}|{string.Join(",", missing).ToLowerInvariant()}",
                 Problem(false, at.Path, at.Id, "marketgood",
                     $"Base '{baseName}': the base sells ships, but its market has no line for {list}. The ship " +
                     "markets of this game list each ship package at each base that sells ships. Add a buy-only line " +
