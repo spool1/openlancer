@@ -358,6 +358,28 @@ public sealed class PropGroupDraftTests
         Assert.Throws<InvalidOperationException>(() => PropGroups.Write(session,
             PropGroups.Draft(session, [SceneWorkspace.Object("Li01_to_Li02")]), "gate", "Gate"));
     }
+
+    /// <summary>Only an object with an archetype of the type <c>TRADELANE_RING</c> is a trade lane ring (#90). So the
+    /// prop group save takes a sun with a stray <c>next_ring</c> line. A real ring is still refused.</summary>
+    [Fact]
+    public void ASunWithAStrayRingLineIsNotRefusedAsARing()
+    {
+        using var ws = GroupWorkspace.Create();
+        ws.WriteBase(SceneWorkspace.Li01Path, SceneWorkspace.Li01Text + GroupWorkspace.Li01Group +
+                                              "\n[Object]\nnickname = Li01_sun\npos = 0, 0, 0\narchetype = sun1\n" +
+                                              "next_ring = ring2\n");
+        var session = ws.Session("act");
+
+        var draft = PropGroups.Draft(session, [SceneWorkspace.Object("Li01_sun")]);
+        var group = PropGroups.Write(session, draft, "sun", "Sun");
+
+        Assert.Empty(draft.Refusals);
+        Assert.Equal(["sun"], draft.Members.Select(m => m.Member));
+        Assert.Empty(group.Problems);
+        Assert.True(File.Exists(Path.Combine(GroupWorkspace.PropsFolder(ws), "sun.ini")));
+        Assert.Equal("ring2 is a trade lane ring. This version cannot put trade lane rings into a prop group.",
+            Assert.Single(PropGroups.Draft(session, [SceneWorkspace.Object("ring2")]).Refusals).Message);
+    }
 }
 
 /// <summary>The prop groups of the mods (section 9.1 of the M23 design, decisions D283, D289 and D294).</summary>

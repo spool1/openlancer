@@ -756,4 +756,33 @@ public sealed class ScenePlansDuplicateTests
         Assert.Null(ScenePlans.Unavailable(session, SceneAction.Delete, Object("ring2")));
         Assert.Equal([hole], ScenePlans.Delete(session, [hole]).Deletes.Select(d => d.Section));
     }
+
+    /// <summary>
+    /// Only an object with an archetype of the type <c>TRADELANE_RING</c> is a trade lane ring (#90), because the game
+    /// makes no lane from another object. So a sun with a stray <c>next_ring</c> line is no connection object, and
+    /// Duplicate copies it with the line. A real ring is still refused. An object with a <c>goto</c> line is still a
+    /// jump gate.
+    /// </summary>
+    [Fact]
+    public void ASunWithAStrayRingLineIsNotRefusedAsARing()
+    {
+        using var ws = Create();
+        ws.WriteBase(Li01Path, Li01Text + "\n[Object]\nnickname = Li01_sun\narchetype = sun1\nnext_ring = ring2\n" +
+                               "[Object]\nnickname = Li01_buoy_goto\narchetype = buoy\ngoto = Li02, Li02_to_Li01, t\n");
+        var session = ws.Session("act");
+        var sun = Object("Li01_sun");
+
+        var plan = ScenePlans.Duplicate(session, [sun]);
+
+        Assert.Null(SceneSections.ConnectionKind(session, session.Get(sun)!));
+        Assert.Empty(plan.Refusals);
+        Assert.Equal([Object("Li01_sun_1")], plan.Adds);
+        Assert.Null(ScenePlans.Unavailable(session, SceneAction.Duplicate, sun));
+        session.Execute(plan.Command!);
+        Assert.Equal("ring2", SceneSections.Last(session.Get(Object("Li01_sun_1"))!, "next_ring"));
+        Assert.Equal(SceneSections.LaneRingKind, SceneSections.ConnectionKind(session, session.Get(Object("ring2"))!));
+        Assert.StartsWith("ring2 is a trade lane ring. This version cannot copy trade lane rings",
+            Assert.Single(ScenePlans.Duplicate(session, [Object("ring2")]).Refusals).Message);
+        Assert.Equal("jump gate", SceneSections.ConnectionKind(session, session.Get(Object("Li01_buoy_goto"))!));
+    }
 }

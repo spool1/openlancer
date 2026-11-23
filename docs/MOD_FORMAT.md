@@ -804,7 +804,7 @@ The editor shows each problem of a group file with its line. The problems are: n
 - A `dock_with` line stays in the file.
 - A text of the active mod, and a text of a lower mod, go into the file of the texts. A numeric text id of the base data stays.
 - A line that names an entry that the active mod did not save gets a warning. Save the mod, or the group names an entry that the mod does not have.
-- The editor refuses connection objects, nebulae, asteroid fields, the zones that hold them, and items of more than one system file.
+- The editor refuses connection objects, nebulae, asteroid fields, the zones that hold them, and items of more than one system file. A stray `prev_ring` or `next_ring` line on an object that is not a trade lane ring does not make it a connection object (see "Create, duplicate, rename and delete").
 
 The editor writes the group at once, under the lock of the mod: the file of the texts first, then the group file. `Ctrl+S` does not save it, and Undo does not remove it, as in Unity. Rename (`F2`) moves both files and changes the `nickname` line. Delete asks first and removes both files. The placed copies stay.
 
@@ -1130,7 +1130,7 @@ The Scene adds, copies, renames and deletes the objects, zones and lights of the
 
 The keys work only when no text field is active and no field edit or drag is open. A disabled menu item tells why in its tooltip.
 
-Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has a `goto`, a `prev_ring` or a `next_ring` line, or an archetype of such a type. The Create menu and Duplicate cannot make them, because each one needs a partner or a lane. The jump connection tool `connection_create` of the agent server makes a jump gate pair or a jump hole pair (see "Jump connections and gate locks"). The trade lane tools `trade_lane_create` and `trade_lane_insert_ring` make a lane and add a ring to it (see "Trade lanes"). In the editor, select a ring and click Insert ring after in the Inspector to add a ring to a lane. A delete of a jump gate or a jump hole deletes its pair. A delete of a trade lane ring links the lane again. This version cannot delete an airlock gate. A rename of a connection object works.
+Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has an archetype of such a type, or a `goto` line. Only an object with an archetype of the type `TRADELANE_RING` is a trade lane ring, because the game makes lanes only from such objects. A `prev_ring` or a `next_ring` line on another object does not make it a connection object. The Create menu and Duplicate cannot make them, because each one needs a partner or a lane. The jump connection tool `connection_create` of the agent server makes a jump gate pair or a jump hole pair (see "Jump connections and gate locks"). The trade lane tools `trade_lane_create` and `trade_lane_insert_ring` make a lane and add a ring to it (see "Trade lanes"). In the editor, select a ring and click Insert ring after in the Inspector to add a ring to a lane. A delete of a jump gate or a jump hole deletes its pair. A delete of a trade lane ring links the lane again. This version cannot delete an airlock gate. A rename of a connection object works.
 
 #### Create
 
@@ -1163,7 +1163,7 @@ A nickname that ends with `_` and digits keeps its stem in the copy. The copy ta
 - A copy leaves out the `base` line, because a base has one object in space. The Console tells it.
 - A text placeholder of the active mod gets a copy of its text with a new key, as New from template does. A numeric text id stays.
 - This version cannot copy nebulae, asteroid fields or the zones that hold them.
-- This version cannot copy connection objects. A copy of a jump gate or a jump hole has no partner. A copy of a trade lane ring is not a part of the lane.
+- This version cannot copy connection objects. A copy of a jump gate or a jump hole has no partner. A copy of a trade lane ring is not a part of the lane. A stray `prev_ring` or `next_ring` line on another object, for example a sun, does not stop the copy. The copy keeps the line, and the game ignores it.
 
 #### Delete
 
