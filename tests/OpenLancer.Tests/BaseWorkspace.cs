@@ -93,6 +93,31 @@ internal static class BaseWorkspace
         file = systems\Ol02\ol02.ini
         """;
 
+    /// <summary>The system file of Ol01: the station object of Ol01_01_Base, the planet of Ol01_02_Base and the docking
+    /// ring of the planet.</summary>
+    public const string Ol01 = """
+        [Object]
+        nickname = Ol01_01
+        ids_name = 1001
+        pos = 0, 0, 0
+        archetype = ol_station
+        base = Ol01_01_Base
+        dock_with = Ol01_01_Base
+        reputation = ol_grp
+        [Object]
+        nickname = Ol01_02
+        ids_name = 1002
+        pos = 10000, 0, 0
+        archetype = ol_planet
+        base = Ol01_02_Base
+        [Object]
+        nickname = Dock_Ring_Ol01_02
+        ids_name = 1099
+        pos = 10000, 0, 2500
+        archetype = ol_ring
+        dock_with = Ol01_02_Base
+        """;
+
     public const string MBases = """
         [MBase]
         nickname = Ol01_01_Base
@@ -177,28 +202,7 @@ internal static class BaseWorkspace
             type = DOCKING_RING
             docking_sphere = ring, HpDockMountA, 30
             """);
-        ws.WriteBase(Ol01Path, """
-            [Object]
-            nickname = Ol01_01
-            ids_name = 1001
-            pos = 0, 0, 0
-            archetype = ol_station
-            base = Ol01_01_Base
-            dock_with = Ol01_01_Base
-            reputation = ol_grp
-            [Object]
-            nickname = Ol01_02
-            ids_name = 1002
-            pos = 10000, 0, 0
-            archetype = ol_planet
-            base = Ol01_02_Base
-            [Object]
-            nickname = Dock_Ring_Ol01_02
-            ids_name = 1099
-            pos = 10000, 0, 2500
-            archetype = ol_ring
-            dock_with = Ol01_02_Base
-            """);
+        ws.WriteBase(Ol01Path, Ol01);
         ws.WriteBase(Ol02Path, """
             [Object]
             nickname = Ol02_01

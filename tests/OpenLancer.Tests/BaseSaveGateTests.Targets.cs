@@ -241,6 +241,31 @@ public sealed partial class BaseSaveGateTests
         Assert.Equal(("MRoom", "fixture"), (error.Target!.Id.Type, error.Key));
     }
 
+    /// <summary>A fixture that names a character of an earlier <c>[MBase]</c> is a target error. The game finds the
+    /// character of a fixture only in the same block.</summary>
+    [Fact]
+    public void AFixtureWithACharacterOfAnotherMBaseIsATargetError()
+    {
+        using var game = TargetGame();
+        var files = NewBaseMod();
+        files[@"patches\" + TargetMBases] = """
+            [MBase]
+            ol.new = true
+            nickname = Ol01_02_Base
+            local_faction = ol_grp
+
+            [MRoom]
+            nickname = Bar
+            fixture = ol01_01_bartender, Zs/NPC/Bartender/01/A/Stand, scripts\vendors\ol_fidget.thn, bartender
+            """;
+
+        var error = Assert.Single(TargetFindings(game, files));
+
+        Assert.Equal("[MBase] Ol01_02_Base: the fixture ol01_01_bartender in the room Bar names no [GF_NPC] before it. The " +
+                     "game shows no character at this place.", error.Message);
+        Assert.Equal((DiagnosticSeverity.Error, "MRoom"), (error.Severity, error.Target!.Id.Type));
+    }
+
     [Fact]
     public void ANicknameOfMoreThan63CharactersIsATargetError()
     {

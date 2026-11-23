@@ -301,6 +301,22 @@ public sealed partial class BaseSaveGateTests
         Assert.Equal(32, long32.Length);
     }
 
+    /// <summary>A base of the base game whose nickname starts with intro gives no warning of the prefix. The checks read
+    /// the base, because its missing base file gives a warning.</summary>
+    [Fact]
+    public void AnIntroBaseOfTheBaseGameGivesNoPrefixWarning()
+    {
+        using var ws = BaseWorkspace.Create();
+        ws.WriteBase(BaseWorkspace.UniversePath, BaseWorkspace.Universe.Replace("[system]\nnickname = Ol01\n",
+            "[Base]\nnickname = intro1_base\nsystem = Ol01\n[system]\nnickname = Ol01\n"));
+        var session = ws.Session("act");
+
+        var problems = Problems(session, "intro1_base");
+
+        Assert.Contains(problems, p => p.Message.StartsWith("The base intro1_base names no base file.", StringComparison.Ordinal));
+        Assert.DoesNotContain(problems, p => p.Message.StartsWith("The base nickname", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void AFixtureMustNameACharacterBeforeIt()
     {
@@ -398,6 +414,19 @@ public sealed partial class BaseSaveGateTests
         session.Execute(EditCommand.SetLinesFromText(BaseWorkspace.Section(session, BaseWorkspace.Ol01Path, "Object", "Ol01_03"),
             "ids_name", ["1004"]));
         Assert.DoesNotContain(Problems(session), p => p.Key == "strid_name");
+    }
+
+    /// <summary>The object of a base of the base game has the base line but another name text. The check of the name
+    /// reads only a base of the active mod, so it gives no warning.</summary>
+    [Fact]
+    public void TheNameOfABaseOfTheBaseGameIsNotChecked()
+    {
+        using var ws = BaseWorkspace.Create();
+        ws.WriteBase(BaseWorkspace.Ol01Path, BaseWorkspace.Ol01.Replace("ids_name = 1001\n", "ids_name = 1999\n"));
+        var session = ws.Session("act");
+
+        Assert.Null(session.Base(BaseWorkspace.Station)!.NamedObject);
+        Assert.Empty(Problems(session, BaseWorkspace.Station));
     }
 
     /// <summary>An object that docks with a base of another system gives one warning on the object. The base has an
@@ -516,6 +545,8 @@ public sealed partial class BaseSaveGateTests
         Assert.Empty(Problems(session, BaseWorkspace.Planet));
 
         session.Execute(SellShip2AtThePlanet());
+        Assert.Contains(session.Base(BaseWorkspace.Planet)!.Market,
+            r => r is { Good: "ol_ship2_package", Origin: ValueOrigin.ActiveMod } && BaseMarkets.Sells(r.Line.Values, ship: true));
         var warning = One(session, "Ol01_02_Base sells ships, but its market has no line", BaseWorkspace.Planet);
 
         Assert.Equal("Ol01_02_Base sells ships, but its market has no line for the ship package ol_ship3_package. The game " +
@@ -524,8 +555,8 @@ public sealed partial class BaseSaveGateTests
     }
 
     /// <summary>Without buy-only ship lines in the data of the game (as HD Edition 0.7.1), a base lists only the ships
-    /// that it sells, and the check gives no warning. A buy-only line of the active mod does not make the
-    /// pattern.</summary>
+    /// that it sells, and the check gives no warning. A buy-only line of the active mod does not make the pattern. The
+    /// planet sells two ships, and its market does not list ol_ship3_package.</summary>
     [Fact]
     public void WithoutTheBuyOnlyPatternTheTradeInCheckGivesNoWarning()
     {
@@ -541,9 +572,12 @@ public sealed partial class BaseSaveGateTests
         session.Execute(EditCommand.AddSection(BaseWorkspace.ShipMarketPath, "BaseGood",
         [
             ListWorkspace.Line("base", BaseWorkspace.Station),
-            ListWorkspace.Line("marketgood", "ol_ship3_package, 0, -1, 0, 0, 1, 1, 1"),
+            MarketGood("ol_ship3_package, 0, -1, 0, 0, 1, 1, 1"),
         ]));
 
+        Assert.Contains(session.Base(BaseWorkspace.Station)!.Market,
+            r => r is { Good: "ol_ship3_package", Origin: ValueOrigin.ActiveMod } && BaseMarkets.IsBuyOnly(r.Line.Values));
+        Assert.False(session.BaseCheckState.UsesBuyOnlyShipLines);
         Assert.Empty(Problems(session, BaseWorkspace.Planet));
     }
 
@@ -551,8 +585,13 @@ public sealed partial class BaseSaveGateTests
     private static EditCommand SellShip2AtThePlanet() => EditCommand.AddSection(BaseWorkspace.ShipMarketPath, "BaseGood",
     [
         ListWorkspace.Line("base", BaseWorkspace.Planet),
-        ListWorkspace.Line("marketgood", "ol_ship2_package, 0, -1, 1, 1, 0, 1, 1"),
+        MarketGood("ol_ship2_package, 0, -1, 1, 1, 0, 1, 1"),
     ]);
+
+    /// <summary>A <c>marketgood</c> line with one value for each comma-separated part of the text, as the game reads
+    /// it.</summary>
+    private static EntryView MarketGood(string text) =>
+        ListWorkspace.Line("marketgood", text.Split(',', StringSplitOptions.TrimEntries));
 
     [Fact]
     public void ATerrainTemplateWithoutItsLineIsAWarning()
@@ -580,8 +619,8 @@ public sealed partial class BaseSaveGateTests
         Assert.DoesNotContain(Problems(session), p => p.Message.StartsWith("The room Cityscape", StringComparison.Ordinal));
     }
 
-    /// <summary>A character of the active mod without a voice and a name does not show in the game. A character of the
-    /// base game is not checked.</summary>
+    /// <summary>A character of the active mod without a voice and a name does not show in the game. Each character of a
+    /// whole copy of <c>mBases.ini</c> is of the active mod, and the complete characters give no warning.</summary>
     [Fact]
     public void ACharacterOfTheActiveModNeedsABodyAVoiceAndAName()
     {
@@ -597,6 +636,27 @@ public sealed partial class BaseSaveGateTests
         Assert.Equal(("GF_NPC", "voice"), (warning.Target!.Id.Type, warning.Key));
         Assert.DoesNotContain(Problems(session, BaseWorkspace.Station), p => p.Message.StartsWith("The character",
             StringComparison.Ordinal));
+    }
+
+    /// <summary>A character of the base game without a voice and a name gives no warning. When the active mod sets one
+    /// of its lines, the character is of the active mod. Then the warning names the part that is still
+    /// missing.</summary>
+    [Fact]
+    public void ACharacterOfTheBaseGameIsCheckedOnlyWhenTheActiveModChangesIt()
+    {
+        using var ws = BaseWorkspace.Create();
+        ws.WriteBase(BaseWorkspace.MBasesPath, BaseWorkspace.MBases.Replace(
+            "individual_name = 1200\naffiliation = ol_pirates\nvoice = ol_voice\n", "affiliation = ol_pirates\n"));
+        var session = ws.Session("act");
+        Assert.DoesNotContain(Problems(session, BaseWorkspace.Pirate), p => p.Message.StartsWith("The character",
+            StringComparison.Ordinal));
+
+        session.Execute(EditCommand.SetLinesFromText(BaseWorkspace.MBasePart(session, BaseWorkspace.Pirate, "GF_NPC"), "voice",
+            ["ol_voice"]));
+
+        var warning = One(session, "The character", BaseWorkspace.Pirate);
+        Assert.Equal("The character ol02_01_bartender of Ol02_01_Base has no name. The game does not show it.", warning.Message);
+        Assert.Equal("individual_name", warning.Key);
     }
 
     /// <summary>The save gate reads only the errors of the bases that the active mod adds or changes. A patch of a base
