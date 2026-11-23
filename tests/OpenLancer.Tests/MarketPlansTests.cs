@@ -463,8 +463,8 @@ public sealed class MarketPlansTests
         var reason = MarketPlans.NoEffectReason(session, ship, Field(MarketLine.PriceIndex));
 
         Assert.Equal("A line of a ship package does not change the price of the ship. The price of the ship at a base " +
-                     "comes from the market line of its hull good s1_hull. Set that price in the Markets section of " +
-                     "s1_hull.", reason);
+                     "comes from the market line of its hull good s1_hull. To set that price, add a line of s1_hull at " +
+                     "the base.", reason);
         Assert.Empty(SteLint.Problems(reason!));
         Assert.All(MarketPlans.Fields.Where(f => f.Index != MarketLine.PriceIndex),
             f => Assert.Null(MarketPlans.NoEffectReason(session, ship, f)));

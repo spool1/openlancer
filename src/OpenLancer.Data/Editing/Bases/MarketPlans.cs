@@ -601,8 +601,8 @@ public static class MarketPlans
     /// price.</summary>
     private static string ShipPriceText(EditSession session, string package) =>
         "A line of a ship package does not change the price of the ship. " + (HullGood(session, package) is { } hull
-            ? $"The price of the ship at a base comes from the market line of its hull good {hull}. Set that price in " +
-              $"the Markets section of {hull}."
+            ? $"The price of the ship at a base comes from the market line of its hull good {hull}. To set that price, " +
+              $"add a line of {hull} at the base."
             : "The price of the ship at a base comes from the market line of its hull good.");
 
     /// <summary>The hull good that the <c>hull</c> line of a ship package names, or null.</summary>
@@ -960,7 +960,6 @@ public static class MarketPlans
 
         private static bool SameValues(MarketLine line, IReadOnlyList<string> values) =>
             Texts(line.Values).Skip(1).SequenceEqual(values);
-
 
         private static string? First(SectionView view, string name) =>
             view.Lines(name) is [{ Values: [var value, ..] }, ..] ? value.ToString() : null;

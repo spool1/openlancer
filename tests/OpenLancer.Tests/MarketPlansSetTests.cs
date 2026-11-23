@@ -189,8 +189,8 @@ public sealed class MarketPlansSetTests
 
         plan = Run(session, BaseWorkspace.Pirate, [new MarketRow("ol_ship_package") { PriceMultiplier = 3, Rank = 2 }]);
         Assert.Equal("A line of a ship package does not change the price of the ship. The price of the ship at a base " +
-                     "comes from the market line of its hull good ol_ship_hull. Set that price in the Markets section of " +
-                     "ol_ship_hull.", Assert.Single(plan.Warnings).Message);
+                     "comes from the market line of its hull good ol_ship_hull. To set that price, add a line of " +
+                     "ol_ship_hull at the base.", Assert.Single(plan.Warnings).Message);
     }
 
     /// <summary>With the buy-only form of vanilla, a base that sells a ship after the change gets a buy-only line for
