@@ -339,8 +339,10 @@ internal sealed class ExportDialog : ModalDialog
     /// <summary>
     /// Saves the choices and prepares the export on a worker thread. The save gate of the mod runs first (#87, see
     /// <see cref="ExportGate"/>). When the open session holds the saved mod, its gate runs on the UI thread, as a save
-    /// does. Else the worker opens the profile with the mod active, as <c>oltool export</c> does. A mod that the open
-    /// profile does not hold gets no gate, and the Console warns about it. The guard runs when the prepare ends.
+    /// does. Else the worker opens the profile with the mod active, as <c>oltool export</c> does. The dialog refuses a
+    /// mod that no open profile holds, also when no profile is open (#89). It then writes no package and starts no
+    /// prepare, and the dialog and the Console show the refusal. This also applies to Export and play. The guard runs
+    /// when the prepare ends.
     /// </summary>
     private void Start(Mod exported, ExportTarget? play)
     {
@@ -349,6 +351,14 @@ internal sealed class ExportDialog : ModalDialog
         var chosen = ExportTarget.All.Where(t => targets.Contains(t.Id)).ToList();
         window.Settings.SetExport(exported.Folder, new ExportChoices([.. chosen.Select(t => t.Id)], dropIn, flmm, folder));
         window.Settings.Save();
+        var gate = ExportGate.For(window.Session?.Edits, exported.Folder, exported.Id, bases,
+            DllStringResourceWriter.Instance, ThornEvaluator.Instance);
+        if (gate.Refusal is { } refusal)
+        {
+            Failed(refusal);
+            return;
+        }
+
         var request = ExportRequest.Of(exported, chosen, bases, ModExport.VersionFolder(folder, exported.Manifest),
             (dropIn ? ExportForms.DropIn : 0) | (flmm ? ExportForms.Flmm : 0), DllStringResourceWriter.Instance,
             ThornEvaluator.Instance, out var publishProblems);
@@ -356,15 +366,8 @@ internal sealed class ExportDialog : ModalDialog
             window.Log.Add(ConsoleSeverity.Warning, Source, $"{exported.Folder}: {problem}");
         var location = Location(exported);
         GuardedExport Prepare() => GuardedExport.Prepare(request, location, DateTime.UtcNow);
-        var gate = ExportGate.For(window.Session?.Edits, exported.Folder, exported.Id, bases,
-            DllStringResourceWriter.Instance, ThornEvaluator.Instance);
         if (gate.Source != ExportGateSource.Session)
         {
-            if (gate.Source == ExportGateSource.None)
-            {
-                window.Log.Add(ConsoleSeverity.Warning, Source, ExportGate.NoGate(exported.Id, window.Session != null));
-            }
-
             run.Prepare(gate.Errors, Prepare);
             return;
         }

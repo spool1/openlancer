@@ -65,8 +65,8 @@ public sealed class ExportGateTests
 
     /// <summary>
     /// The gate of the Export dialog for each source (see <see cref="ExportGate.For"/>). The gate of the open session and
-    /// the gate of the saved profile give the errors of a save of the mod, so the export refuses the mod. A mod that no
-    /// open profile holds gets no gate.
+    /// the gate of the saved profile give the errors of a save of the mod, so the export refuses the mod. These runs
+    /// have no refusal of their own.
     /// </summary>
     [Fact]
     public void TheGateOfTheExportDialogGivesTheErrorsOfASave()
@@ -85,11 +85,39 @@ public sealed class ExportGateTests
 
         Assert.Equal(ExportGateSource.Session, fromSession.Source);
         Assert.Equal(save, fromSession.Errors!());
+        Assert.Null(fromSession.Refusal);
         Assert.Equal(ExportGateSource.Profile, fromProfile.Source);
         Assert.Equal(save, fromProfile.Errors!());
+        Assert.Null(fromProfile.Refusal);
         Assert.Empty(For(own, "other").Errors!());
-        Assert.Equal(new ExportGateRun(ExportGateSource.None, null), For(own, "outside"));
-        Assert.Equal(new ExportGateRun(ExportGateSource.None, null), For(null, "ol-test"));
+        Assert.Null(For(own, "other").Refusal);
+    }
+
+    /// <summary>
+    /// The Export dialog refuses a mod that no open profile holds, because it cannot run the save gate of the mod (#89).
+    /// The run has the refusal and no gate call, so the dialog writes no package and starts no prepare. This also applies
+    /// when no profile is open. The refusal tells the user to open a profile that holds the mod.
+    /// </summary>
+    [Fact]
+    public void TheExportDialogRefusesAModThatNoOpenProfileHolds()
+    {
+        using var game = new ExportGame();
+        var profile = Profile(game);
+        using var own = Open(profile);
+        ExportGateRun For(EditSession? session, string id) => ExportGate.For(session, Path.Combine(game.ModsFolder, id), id,
+            [game.Report()], TestWorkspace.FakeDllWriter.Instance, ThnScripts.Evaluator);
+
+        var notHeld = For(own, "outside");
+        var noProfile = For(null, "ol-test");
+
+        Assert.Equal(new ExportGateRun(ExportGateSource.None, null, ExportGate.NoProfileRefusal("outside", true)), notHeld);
+        Assert.Equal(new ExportGateRun(ExportGateSource.None, null, ExportGate.NoProfileRefusal("ol-test", false)),
+            noProfile);
+        Assert.Equal("The export of mod 'outside' stopped. The open profile does not hold mod 'outside', so the export " +
+                     "cannot run the save gate of the mod. Open a profile that holds the mod, then export again.",
+            notHeld.Refusal);
+        Assert.Equal("The export of mod 'ol-test' stopped. No profile is open, so the export cannot run the save gate of " +
+                     "the mod. Open a profile that holds the mod, then export again.", noProfile.Refusal);
     }
 
     /// <summary>
@@ -178,12 +206,7 @@ public sealed class ExportGateTests
         Assert.Equal("The export of mod 'm' stopped. The save gate refuses the mod with 2 errors, so a save of the mod " +
                      "stops too. Correct the errors, then export again.", ExportGate.Refusal("m", 2));
         Assert.Empty(SteLint.Problems(ExportGate.Refusal("m", 2)));
-        Assert.Equal("The open profile does not hold mod 'm', so the export does not run the save gate of mod 'm'. The " +
-                     "packages can have errors that a save refuses. To check the mod, open a profile that holds it, then " +
-                     "export again.", ExportGate.NoGate("m", true));
-        Assert.StartsWith("No profile is open, so the export does not run the save gate of mod 'm'.",
-            ExportGate.NoGate("m", false));
-        Assert.Empty(SteLint.Problems(ExportGate.NoGate("m", true)));
-        Assert.Empty(SteLint.Problems(ExportGate.NoGate("m", false)));
+        Assert.Empty(SteLint.Problems(ExportGate.NoProfileRefusal("m", true)));
+        Assert.Empty(SteLint.Problems(ExportGate.NoProfileRefusal("m", false)));
     }
 }

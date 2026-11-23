@@ -19,24 +19,29 @@ public enum ExportGateSource
     /// reads the profile with the mod active runs the gate.</summary>
     Profile,
 
-    /// <summary>No profile holds the mod, so the export runs no gate.</summary>
+    /// <summary>No open profile holds the mod, so the export cannot run the gate of the mod. The Export dialog refuses
+    /// the export (see <see cref="ExportGate.NoProfileRefusal"/>).</summary>
     None,
 }
 
-/// <summary>The save gate of one export: where the export gets it, and the call that gives its errors (see
-/// <see cref="ExportGate.For"/>).</summary>
+/// <summary>The save gate of one export: where the export gets it, and the call that gives its errors or the refusal of
+/// the export (see <see cref="ExportGate.For"/>). Exactly one of <paramref name="Errors"/> and
+/// <paramref name="Refusal"/> is set.</summary>
 /// <param name="Source">Where the export gets the gate.</param>
-/// <param name="Errors">Gives the errors of the gate, or null when the export runs no gate. For
+/// <param name="Errors">Gives the errors of the gate, or null for <see cref="ExportGateSource.None"/>. For
 /// <see cref="ExportGateSource.Session"/>, the call reads the open session, so it runs on the thread of the session. For
 /// <see cref="ExportGateSource.Profile"/>, the call opens a session of its own, so a worker can run it.</param>
-public sealed record ExportGateRun(ExportGateSource Source, Func<IReadOnlyList<Diagnostic>>? Errors);
+/// <param name="Refusal">For <see cref="ExportGateSource.None"/>, the refusal of the export (see
+/// <see cref="ExportGate.NoProfileRefusal"/>), else null. The export then writes no package.</param>
+public sealed record ExportGateRun(ExportGateSource Source, Func<IReadOnlyList<Diagnostic>>? Errors, string? Refusal);
 
 /// <summary>
 /// The save gate before an export (#87). An export refuses a mod that the save gate of the mod refuses, with the same
 /// errors (see <see cref="EditSession.SaveProblems"/>). So a mod that the editor cannot save does not reach a package.
 /// An example is a patch with <c>ol.delete</c> of a costume that an unchanged retail cutscene loads for a DEFORMABLE
 /// without <c>userprops.Actor</c>. The agent tool <c>export_mod</c>, the Export dialog and <c>oltool export</c> run this
-/// gate. <c>oltool validate</c> does not run it.
+/// gate. The Export dialog refuses a mod that no open profile holds, because it cannot run the gate of such a mod
+/// (#89). <c>oltool export</c> and <c>export_mod</c> always run the gate. <c>oltool validate</c> does not run it.
 /// </summary>
 public static class ExportGate
 {
@@ -67,7 +72,7 @@ public static class ExportGate
     /// <summary>
     /// Where an export of the mod in a folder gets the save gate. The open session gives it when its active mod is the
     /// mod and it has no unsaved edits, because the export reads the saved files. Else a session that only reads the
-    /// profile of the open session gives it, when the profile holds the mod. Else the export runs no gate.
+    /// profile of the open session gives it, when the profile holds the mod. Else no open profile holds the mod.
     /// </summary>
     /// <param name="session">The open session, or null.</param>
     public static ExportGateSource SourceOf(EditSession? session, string modFolder) =>
@@ -79,7 +84,8 @@ public static class ExportGate
 
     /// <summary>
     /// The save gate of an export of the mod in a folder (see <see cref="SourceOf"/>). The open session gives the errors
-    /// of its gate. Else a session that only reads the saved profile file of the open session gives them. The Export
+    /// of its gate. Else a session that only reads the saved profile file of the open session gives them. Else the run
+    /// has the refusal of <see cref="NoProfileRefusal"/> and no gate call, so the export writes no package. The Export
     /// dialog uses it.
     /// </summary>
     /// <param name="session">The open session, or null.</param>
@@ -90,13 +96,13 @@ public static class ExportGate
         switch (SourceOf(session, modFolder))
         {
             case ExportGateSource.Session:
-                return new ExportGateRun(ExportGateSource.Session, () => Errors(session!));
+                return new ExportGateRun(ExportGateSource.Session, () => Errors(session!), null);
             case ExportGateSource.Profile:
                 var profile = session!.Profile.FilePath;
                 return new ExportGateRun(ExportGateSource.Profile,
-                    () => Errors(ModProfile.Load(profile), modId, reports, strings, thn));
+                    () => Errors(ModProfile.Load(profile), modId, reports, strings, thn), null);
             default:
-                return new ExportGateRun(ExportGateSource.None, null);
+                return new ExportGateRun(ExportGateSource.None, null, NoProfileRefusal(modId, session != null));
         }
     }
 
@@ -110,11 +116,11 @@ public static class ExportGate
         $"The export of mod '{modId}' stopped. The save gate refuses the mod with {Plural.Count(errors, "error")}, so " +
         $"a save of the mod stops too. Correct {(errors == 1 ? "the error" : "the errors")}, then export again.";
 
-    /// <summary>The warning of an export that runs no save gate, because no open profile holds the mod. The export
-    /// can then write a mod that a save refuses.</summary>
+    /// <summary>The refusal of an export when no open profile holds the mod. The export cannot run the save gate of
+    /// the mod, so it writes no package.</summary>
     /// <param name="profileOpen">True when a profile is open.</param>
-    public static string NoGate(string modId, bool profileOpen) =>
+    public static string NoProfileRefusal(string modId, bool profileOpen) =>
+        $"The export of mod '{modId}' stopped. " +
         $"{(profileOpen ? $"The open profile does not hold mod '{modId}'" : "No profile is open")}, so the export " +
-        $"does not run the save gate of mod '{modId}'. The packages can have errors that a save refuses. To check the " +
-        "mod, open a profile that holds it, then export again.";
+        "cannot run the save gate of the mod. Open a profile that holds the mod, then export again.";
 }
