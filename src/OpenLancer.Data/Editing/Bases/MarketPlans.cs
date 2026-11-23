@@ -917,15 +917,18 @@ public static class MarketPlans
         private (Part Part, int Index) Find(MarketLine line) =>
             (parts.First(p => Equals(p.Section, line.Section)), line.Line);
 
-        /// <summary>The lines of the base in load order, without the removed lines.</summary>
+        /// <summary>The lines of the base in load order, without the removed lines. A line without values, for example
+        /// an empty <c>marketgood =</c> line, names no good, so it is not in the list. It keeps its place in its part,
+        /// so the index of each later line stays the index of <see cref="MarketLine.Line"/>, and the commands write it
+        /// again unchanged.</summary>
         private IEnumerable<DraftLine> Lines()
         {
             foreach (var part in parts)
             {
                 for (var i = 0; i < part.Lines.Count; i++)
                 {
-                    if (part.Lines[i] is { } text)
-                        yield return new DraftLine(part, i, text, ParseLine(text)[0].ToString().Trim());
+                    if (part.Lines[i] is { } text && ParseLine(text) is [var good, ..])
+                        yield return new DraftLine(part, i, text, good.ToString()!.Trim());
                 }
             }
         }

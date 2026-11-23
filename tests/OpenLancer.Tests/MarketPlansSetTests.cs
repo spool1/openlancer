@@ -307,6 +307,36 @@ public sealed class MarketPlansSetTests
         Assert.StartsWith("market_misc.ini: ", Assert.Single(plan.Refusals).Message);
     }
 
+    /// <summary>
+    /// Final finding of V1-C4: a <c>[BaseGood]</c> of the base with an empty <c>marketgood =</c> line stopped the market
+    /// plan with an exception. Such a line names no good, so the plans skip it. The change and a field edit of the
+    /// Inspector then write a later line of the good, and the empty line stays in its place.
+    /// </summary>
+    [Fact]
+    public void AnEmptyMarketLineDoesNotStopAMarketChange()
+    {
+        using var ws = BaseWorkspace.Create();
+        ws.WriteBase(BaseWorkspace.CommodityMarketPath,
+            "[BaseGood]\nbase = Ol01_01_Base\nmarketgood =\nmarketgood = ol_water, 0, -1, 150, 500, 0, 1\n");
+        var session = ws.Session("act");
+
+        Run(session, BaseWorkspace.Station, [new MarketRow("ol_water") { PriceMultiplier = 2 }]);
+
+        Assert.Equal(["market_commodities.ini: 0, -1, 150, 500, 0, 1", "market_commodities.ini: 0, -1, 150, 500, 0, 2"],
+            Lines(session, BaseWorkspace.Station, "ol_water"));
+        var lower = session.Items.BaseMarketLines(BaseWorkspace.Station)
+            .First(l => l.Values[0].ToString() == "ol_water");
+        Assert.Equal(1, lower.Line);
+        session.Execute(MarketPlans.SetValue(session, lower,
+            MarketPlans.Fields.Single(f => f.Index == MarketLine.RankIndex), "2"));
+        Assert.Equal(["market_commodities.ini: 0, -1, 150, 500, 0, 1", "market_commodities.ini: 2, -1, 150, 500, 0, 2"],
+            Lines(session, BaseWorkspace.Station, "ol_water"));
+        var empty = session.Sections(BaseWorkspace.CommodityMarketPath)
+            .Select(s => session.Get(s)!).First(v => !v.IsNew).Lines("marketgood");
+        Assert.Equal(2, empty.Count);
+        Assert.Empty(empty[0].Values);
+    }
+
     [Fact]
     public void AnUnknownBaseIsRefused()
     {
