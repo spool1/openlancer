@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using OpenLancer.Data.Editing.Bases;
 
 namespace OpenLancer.Data.Editing;
@@ -6,6 +7,7 @@ public sealed partial class EditSession
 {
     private BaseFiles? bases;
     private BaseChecks.State? baseChecks;
+    private (int Revision, IReadOnlyDictionary<string, MBaseBlock> Blocks)? mbaseBlocks;
 
     /// <summary>The base files and the room files of the edit view, from the bases of <c>universe.ini</c> (decision
     /// D135 of the M8b design), and the place of <c>mBases.ini</c>.</summary>
@@ -37,6 +39,14 @@ public sealed partial class EditSession
     /// <summary>True when a <c>[Base]</c> of W of <c>universe.ini</c> has the nickname, in any letter case. An unsaved
     /// new base counts, so a check can tell a base that the game data gets only after the save.</summary>
     public bool HasBase(string nickname) => Bases.Has(nickname);
+
+    /// <summary>The bar data of each base at the current state of W, by the nickname of the base without letter case
+    /// (see <see cref="BaseView.ReadMBaseBlocks"/>). A change of W starts a new state, so the session reads
+    /// <c>mBases.ini</c> once for each state, and a list of many bases does not read it again for each base.</summary>
+    internal IReadOnlyDictionary<string, MBaseBlock> MBaseBlocks =>
+        mbaseBlocks is { } known && known.Revision == CacheRevision
+            ? known.Blocks
+            : (mbaseBlocks = (CacheRevision, BaseView.ReadMBaseBlocks(this))).Value.Blocks;
 
     /// <summary>The checks of the bases at the current state of W. A change of W starts a new state, so the checks of a
     /// base run once for each state.</summary>

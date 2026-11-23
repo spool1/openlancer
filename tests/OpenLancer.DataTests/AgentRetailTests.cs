@@ -52,11 +52,14 @@ public sealed class AgentRetailTests(ITestOutputHelper output)
         var script = (string)Ok("list_missions")["scripts"]!.AsArray().First(s => s!["slot"] != null)!["ref"]!;
         var trigger = (string)Ok("get_mission", $$"""{ "script": {{Json(script)}} }""")["summary"]!["start_triggers"]![0]!;
         var cutscene = (string)Ok("list_cutscenes", """{ "limit": 1 }""")["rows"]![0]!["ref"]!;
+        var baseRef = (string)Ok("list_bases", """{ "kind": "station", "limit": 1 }""")["rows"]![0]!["ref"]!;
         return
         [
             ("studio_status", "{}"),
             ("list_systems", "{}"),
             ("get_system", $$"""{ "system": {{Json(largest)}} }"""),
+            ("list_bases", "{}"),
+            ("get_base", $$"""{ "base": {{Json(baseRef)}} }"""),
             ("list_items", $$"""{ "system": {{Json(largest)}} }"""),
             ("get_item", $$"""{ "ref": {{Json(station)}}, "include_raw": true }"""),
             ("get_item", $$"""{ "ref": {{Json(station)}}, "include_used_by": true }"""),

@@ -161,8 +161,9 @@ public static class MarketPlans
         field.Index < line.Values.Count ? RetailText.Of(line.Values[field.Index]) : "";
 
     /// <summary>The category of a good, for example <c>equipment</c> or <c>ship</c>, or null. The base checks read the
-    /// same category (see <see cref="BaseMarkets.CategoryOf(EditSession, string)"/>).</summary>
-    public static string? Category(EditSession session, string good) => BaseMarkets.CategoryOf(session, good);
+    /// same category (see <see cref="BaseMarkets.CategoryOf(EditSession, string)"/>). The session keeps the category of
+    /// each good for the current state of W, so a list of the goods of many bases reads each good one time.</summary>
+    public static string? Category(EditSession session, string good) => session.BaseCheckState.Category(good.Trim());
 
     /// <summary>
     /// True when an edit can change a market line. A line of the active mod changes in its place. A line of a lower

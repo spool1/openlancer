@@ -10,7 +10,8 @@ namespace OpenLancer.DataTests;
 /// <summary>
 /// The read tools and the resource of the bases on the vanilla data (section H.2 of the bases design): each result fits
 /// the output schema of its tool and the size limit of a result. The tests count and write the time of each call to the
-/// log, without a gate. They hold no retail text: the bases of the calls come from the data at run time.
+/// log, without a gate. The frame gate of list_bases and get_base is in <see cref="AgentRetailTests"/>. The tests hold
+/// no retail text: the bases of the calls come from the data at run time.
 /// </summary>
 public sealed class AgentBaseRetailTests(ITestOutputHelper output)
 {

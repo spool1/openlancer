@@ -142,6 +142,10 @@ internal sealed class ItemIndex
     private Dictionary<(ItemFileKind, string), List<Item>> byNickname = [];
     private Dictionary<SectionRef, Item> byRef = [];
 
+    /// <summary>The <c>[BaseGood]</c> sections of each base in load order, by the first <c>base</c> line in lower
+    /// case.</summary>
+    private Dictionary<string, List<Item>> marketsByBase = [];
+
     /// <param name="files">The item files in load order.</param>
     /// <param name="table">The shared section index of the edit view.</param>
     /// <param name="revision">Gives the revision of W (see <see cref="EditSession.CacheRevision"/>). A call at the
@@ -249,11 +253,11 @@ internal sealed class ItemIndex
     /// letter case.</summary>
     public IReadOnlyList<MarketLine> BaseMarketLines(string baseNickname)
     {
+        Refresh();
         var result = new List<MarketLine>();
-        foreach (var market in Items(ItemFileKind.Markets))
+        foreach (var market in marketsByBase.GetValueOrDefault(baseNickname.Trim().ToLowerInvariant()) ?? [])
         {
-            if (First(market.Section, "base") is not { } baseName || !Is(baseName.Trim(), baseNickname.Trim()))
-                continue;
+            var baseName = First(market.Section, "base")!;
             var lines = market.Section.Where(e => Is(e.Name, "marketgood")).ToList();
             for (var i = 0; i < lines.Count; i++)
             {
@@ -377,6 +381,7 @@ internal sealed class ItemIndex
         byKind = [];
         byNickname = [];
         byRef = [];
+        marketsByBase = [];
         for (var f = 0; f < files.Count; f++)
         {
             if (indexed[f] is not { } file)
@@ -394,6 +399,12 @@ internal sealed class ItemIndex
                 {
                     var key = (kind, nickname.ToLowerInvariant());
                     (byNickname.TryGetValue(key, out var named) ? named : byNickname[key] = []).Add(item);
+                }
+                // A [BaseGood] has no key. Its first base line names the base.
+                if (kind == ItemFileKind.Markets && First(item.Section, "base") is { } baseName)
+                {
+                    var key = baseName.Trim().ToLowerInvariant();
+                    (marketsByBase.TryGetValue(key, out var sold) ? sold : marketsByBase[key] = []).Add(item);
                 }
             }
         }

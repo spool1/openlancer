@@ -56,6 +56,14 @@ public sealed record BaseDoor(string Name, string? Target, string? SetVirtualRoo
 public sealed record BaseRoomView(SectionRef Section, string Nickname, string? File, bool Shared, bool Own,
     IReadOnlyList<BaseDealer> Dealers, IReadOnlyList<string> VirtualRooms, int ShipPlaces, IReadOnlyList<BaseDoor> Doors);
 
+/// <summary>A child section of the bar data of a base, with its section of W.</summary>
+internal readonly record struct MBasePart(SectionRef Ref, Section Section);
+
+/// <summary>The bar data of one base in <c>mBases.ini</c>.</summary>
+/// <param name="MBase">The <c>[MBase]</c> section.</param>
+/// <param name="Parts">The child sections that follow it, in file order.</param>
+internal sealed record MBaseBlock(SectionRef MBase, IReadOnlyList<MBasePart> Parts);
+
 /// <summary>One character of the bar data of a base: a <c>[GF_NPC]</c> of its <c>[MBase]</c>.</summary>
 /// <param name="Section">The <c>[GF_NPC]</c> section.</param>
 /// <param name="Role">The role of the fixture that places the character, for example <c>bartender</c>, or null for a
@@ -192,12 +200,15 @@ public sealed class BaseView
         var file = session.Bases.FileOf(name);
         var info = file == null ? null : session.Sections(file).FirstOrDefault(s => Is(s.Id.Type, "BaseInfo"));
         var startRoom = info is { } i && session.WorkingSection(i) is { } infoSection ? Last(infoSection, "start_room") : null;
-        var (mbase, parts) = MBaseOf(session, name);
+        var bar = MBaseOf(session, name);
+        // The lines of one [BaseGood] have one origin, so the view reads it once for each section.
+        var origins = new Dictionary<SectionRef, (ValueOrigin Origin, string? Mod)>();
         var market = session.Items.BaseMarketLines(name)
             .Select(l =>
             {
-                var (origin, mod) = session.Origin(l.Section, "marketgood");
-                return new BaseMarketRow(l, origin, mod, CanChange(session, l));
+                if (!origins.TryGetValue(l.Section, out var found))
+                    origins[l.Section] = found = session.Origin(l.Section, "marketgood");
+                return new BaseMarketRow(l, found.Origin, found.Mod, CanChange(session, l));
             })
             .ToList();
         var docks = DockObjectsOf(session, name);
@@ -211,9 +222,9 @@ public sealed class BaseView
             StartRoom = startRoom,
             Kind = KindOf(startRoom),
             Rooms = RoomsOf(session, name, file),
-            MBase = mbase,
-            MBaseParts = parts,
-            Characters = CharactersOf(session, mbase, parts),
+            MBase = bar?.MBase,
+            MBaseParts = bar?.Parts.Select(p => p.Ref).ToList() ?? [],
+            Characters = CharactersOf(bar),
             Market = market,
             DockObjects = docks,
             NamedObject = NamedObjectOf(session, docks, Last(section, "strid_name"), Last(section, "system")),
@@ -244,7 +255,7 @@ public sealed class BaseView
                     ? new BasePartList(rooms, RoomUses(session, baseName, file))
                     : null;
             case ("mroom", "fixture") or ("basefaction", "npc"):
-                return new BasePartList(CharacterListOf(session, baseName), CharacterUses(session, MBaseOf(session, baseName).Parts));
+                return new BasePartList(CharacterListOf(session, baseName), CharacterUses(MBaseOf(session, baseName)));
             default:
                 return null;
         }
@@ -268,8 +279,7 @@ public sealed class BaseView
     /// fixture, or <c>crowd</c>.</summary>
     private static ListView CharacterListOf(EditSession session, string baseName)
     {
-        var (mbase, parts) = MBaseOf(session, baseName);
-        var characters = CharactersOf(session, mbase, parts)
+        var characters = CharactersOf(MBaseOf(session, baseName))
             .Select(c =>
             {
                 var (origin, mod) = session.Origin(c.Section, "nickname");
@@ -288,10 +298,9 @@ public sealed class BaseView
     internal static (int Characters, int Goods, int DockObjects) CountsOf(EditSession session, string baseNickname)
     {
         var name = baseNickname.Trim();
-        var (mbase, parts) = MBaseOf(session, name);
         var goods = BaseMarkets.KeptLines(session.Items.BaseMarketLines(name), l => l.Values[0].ToString().Trim(),
             l => l.Values).Count;
-        return (CharactersOf(session, mbase, parts).Count, goods, DockObjectsOf(session, name).Count(d => d.DocksWith));
+        return (CharactersOf(MBaseOf(session, name)).Count, goods, DockObjectsOf(session, name).Count(d => d.DocksWith));
     }
 
     /// <summary>The kind of a base from the start room of its base file, without a view of the whole base. A base
@@ -313,11 +322,8 @@ public sealed class BaseView
         var uses = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var info in session.Sections(file).Where(s => Is(s.Id.Type, "BaseInfo")))
             CountValues(uses, session.WorkingSection(info), "start_room");
-        foreach (var part in MBaseOf(session, baseName).Parts)
-        {
-            var section = session.WorkingSection(part);
-            CountValues(uses, section, Is(section?.Name, "GF_NPC") ? "room" : Is(section?.Name, "MRoom") ? "nickname" : null);
-        }
+        foreach (var (_, section) in MBaseOf(session, baseName)?.Parts ?? [])
+            CountValues(uses, section, Is(section.Name, "GF_NPC") ? "room" : Is(section.Name, "MRoom") ? "nickname" : null);
         foreach (var door in RoomsOf(session, baseName, file).SelectMany(r => r.Doors))
         {
             if (door.Target is { } target)
@@ -328,14 +334,11 @@ public sealed class BaseView
 
     /// <summary>The number of lines of an <c>[MBase]</c> that name each of its characters: value 0 of each
     /// <c>fixture</c> of an <c>[MRoom]</c> and of each <c>npc</c> of a <c>[BaseFaction]</c>.</summary>
-    private static Dictionary<string, int> CharacterUses(EditSession session, IReadOnlyList<SectionRef> parts)
+    private static Dictionary<string, int> CharacterUses(MBaseBlock? bar)
     {
         var uses = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var part in parts)
-        {
-            var section = session.WorkingSection(part);
-            CountValues(uses, section, Is(section?.Name, "MRoom") ? "fixture" : Is(section?.Name, "BaseFaction") ? "npc" : null);
-        }
+        foreach (var (_, section) in bar?.Parts ?? [])
+            CountValues(uses, section, Is(section.Name, "MRoom") ? "fixture" : Is(section.Name, "BaseFaction") ? "npc" : null);
         return uses;
     }
 
@@ -421,38 +424,44 @@ public sealed class BaseView
     };
 
     /// <summary>The last <c>[MBase]</c> of W of <c>mBases.ini</c> with the nickname, and the child sections that follow
-    /// it. The fork keeps the last block of a nickname (GameItemDb.cs:343-346).</summary>
-    private static (SectionRef? MBase, IReadOnlyList<SectionRef> Parts) MBaseOf(EditSession session, string baseName)
+    /// it (see <see cref="EditSession.MBaseBlocks"/>).</summary>
+    private static MBaseBlock? MBaseOf(EditSession session, string baseName) =>
+        session.MBaseBlocks.GetValueOrDefault(baseName);
+
+    /// <summary>
+    /// The bar data of each base in W of <c>mBases.ini</c>, by the nickname of the base without letter case: the last
+    /// <c>[MBase]</c> with the nickname, and the child sections that follow it. The fork keeps the last block of a
+    /// nickname (GameItemDb.cs:343-346).
+    /// </summary>
+    internal static Dictionary<string, MBaseBlock> ReadMBaseBlocks(EditSession session)
     {
-        if (session.Bases.MBasesPath is not { } path)
-            return (null, []);
-        var sections = session.Sections(path);
-        var at = -1;
+        var result = new Dictionary<string, MBaseBlock>(StringComparer.OrdinalIgnoreCase);
+        if (session.Bases.MBasesPath is not { } path || session.OpenDocument(path) is not { } document)
+            return result;
+        var sections = document.Working;
         for (var i = 0; i < sections.Count; i++)
         {
-            if (Is(sections[i].Id.Type, "MBase") && Is(sections[i].Id.Key, baseName))
-                at = i;
+            if (!Is(sections[i].Name, "MBase") || document.IdentityAt(i) is not { Key: { } key } id)
+                continue;
+            var parts = new List<MBasePart>();
+            for (var child = i + 1; child < sections.Count && SectionKeys.IsChild(sections[child].Name); child++)
+                parts.Add(new MBasePart(new SectionRef(document.Path, document.IdentityAt(child)), sections[child]));
+            result[key] = new MBaseBlock(new SectionRef(document.Path, id), parts);
         }
-        if (at < 0)
-            return (null, []);
-        var parts = sections.Skip(at + 1).TakeWhile(s => SectionKeys.IsChild(s.Id.Type)).ToList();
-        return (sections[at], parts);
+        return result;
     }
 
     /// <summary>The characters of an <c>[MBase]</c>, with the role and the room of their fixtures and the faction of
     /// their <c>[BaseFaction]</c>.</summary>
-    private static IReadOnlyList<BaseCharacter> CharactersOf(EditSession session, SectionRef? mbase,
-        IReadOnlyList<SectionRef> parts)
+    private static IReadOnlyList<BaseCharacter> CharactersOf(MBaseBlock? bar)
     {
-        if (mbase == null)
+        if (bar == null)
             return [];
         var fixtures = new Dictionary<string, (string? Role, string? Room)>(StringComparer.OrdinalIgnoreCase);
         var factions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var npcs = new List<(SectionRef Ref, Section Section)>();
-        foreach (var part in parts)
+        foreach (var (part, section) in bar.Parts)
         {
-            if (session.WorkingSection(part) is not { } section)
-                continue;
             if (Is(section.Name, "GF_NPC"))
                 npcs.Add((part, section));
             else if (Is(section.Name, "MRoom"))
