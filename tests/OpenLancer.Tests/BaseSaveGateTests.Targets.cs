@@ -199,6 +199,25 @@ public sealed partial class BaseSaveGateTests
         Assert.Equal((DiagnosticSeverity.Error, "MBase", "nickname"), (error.Severity, error.Target!.Id.Type, error.Key));
     }
 
+    /// <summary>
+    /// Final finding of V1-C4: the bar data checks also run when the mods change only <c>universe.ini</c>. A mod that
+    /// deletes a base leaves the <c>[MBase]</c> of the base without a base, and the game then stops reading the bar data
+    /// of all bases after that block.
+    /// </summary>
+    [Fact]
+    public void DeletingABaseGivesTheBarDataErrorOfItsMBase()
+    {
+        using var game = TargetGame();
+
+        var findings = TargetFindings(game, new Dictionary<string, string>
+        {
+            [@"patches\" + TargetUniverse] = "[Base]\nnickname = Ol01_01_Base\nol.delete = true\n",
+        });
+
+        Assert.Contains(findings, f => f.Severity == DiagnosticSeverity.Error &&
+                                       f.Message.StartsWith("[MBase] Ol01_01_Base: no base has this nickname."));
+    }
+
     [Fact]
     public void TheFirstLineOfAnMBaseIsATargetError()
     {

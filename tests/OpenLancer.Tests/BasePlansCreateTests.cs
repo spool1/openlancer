@@ -457,6 +457,26 @@ public sealed class BasePlansCreateTests
             Text(session, StringKind.String, "ol01_05_base_trader.individual_name"));
     }
 
+    /// <summary>Final finding of V1-C4: a text of the template with two lines gives its last line as the person, not
+    /// its first line. Only a text with three lines gives a faction line without a name of the faction.</summary>
+    [Fact]
+    public void ATwoLineTemplateNameGivesItsLastLineAsThePerson()
+    {
+        using var ws = Workspace();
+        var session = ws.Session("act");
+        var texts = new Dictionary<string, string>(GameTexts) { ["1101"] = "Junior Trader\nKim Trader" };
+        Func<SectionRef, string, string?> text = (section, key) =>
+            session.Get(section) is { } view && SceneSections.Last(view, key) is { } value &&
+            texts.TryGetValue(value, out var found)
+                ? found
+                : null;
+
+        Create(session, Spec() with { Text = text });
+
+        Assert.Equal("Harbor Rock Commodity Trader\nKim Trader",
+            Text(session, StringKind.String, "ol01_05_base_trader.individual_name"));
+    }
+
     /// <summary>When the plan cannot read the text of the template, the character keeps the name text of the template,
     /// and the plan warns.</summary>
     [Fact]
