@@ -25,9 +25,6 @@ public static partial class BasePlans
     /// archetype and base.</summary>
     private static readonly string[] RingSkipped = ["nickname", "ids_name", "pos", "rotate", "archetype", "dock_with", "base", "parent"];
 
-    /// <summary>Why a part of the request refuses the plan.</summary>
-    private sealed record Refusal(string Path, string Message, string? Detail, string? Part, SectionRef? Target = null);
-
     /// <summary>The commands of the dock objects of a new base, the new objects, the changed planet, the object that the
     /// games link to the base, the new ring, and true when a new object docks with the base.</summary>
     private sealed record DockPlan(List<EditCommand> Commands, List<SectionRef> Adds, List<SectionRef> Changes,

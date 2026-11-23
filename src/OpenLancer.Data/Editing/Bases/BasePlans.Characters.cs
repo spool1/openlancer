@@ -31,7 +31,7 @@ public static partial class BasePlans
     /// <summary>The commands of the bar data of a new base, the sections that they add (the <c>[MBase]</c> first), the
     /// new characters, or a refusal.</summary>
     private sealed record BarPlan(List<EditCommand> Commands, List<SectionRef> Adds, List<SectionRef> Characters,
-        Diagnostic? Refusal = null);
+        Refusal? Refusal = null);
 
     /// <summary>
     /// The <c>[MBase]</c> of a new base and its children (see <see cref="Create"/>), or null when the template has no
@@ -51,7 +51,7 @@ public static partial class BasePlans
         if (template.MBase is not { } mbase || session.Bases.MBasesPath is not { } path)
             return null;
         if (session.OpenDocument(path) is { ReadOnlyReason: { } reason })
-            return new BarPlan([], [], [], Diagnostic.Error(path, $"{SceneSections.FileName(path)}: {reason}"));
+            return new BarPlan([], [], [], new Refusal(path, $"{SceneSections.FileName(path)}: {reason}"));
         var binary = session.IsBinaryFile(path);
         var rooms = kept.Select(r => r.Nickname).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var roles = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -86,7 +86,7 @@ public static partial class BasePlans
         if (faction != null)
             lines.Add(("local_faction", faction));
         if (ScenePlans.Entries(lines, binary, out var error) is not { } entries)
-            return new BarPlan([], [], [], Diagnostic.Error(path, error!));
+            return new BarPlan([], [], [], new Refusal(path, error!));
         // The faction of the request takes the place of the faction of the template.
         entries.AddRange(Copied(mbase, e => SceneSections.Is(e.Name, "local_faction") && faction == null ||
                                             SceneSections.Is(e.Name, "diff"), binary));

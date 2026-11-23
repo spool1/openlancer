@@ -148,6 +148,7 @@ Some section types use another key:
 | `[Nebula]`, `[Asteroids]` | `zone` |
 | `[SystemInfo]`, `[Music]`, `[Dust]`, `[Ambient]`, `[Background]`, `[TexturePanels]` | none: the file has one of each |
 | `[BaseGood]` | none: patch sections are always added (see below) |
+| `[NewsItem]` of `DATA\MISSIONS\news.ini` | none: patch sections are always added, because a news item has no key. A patch cannot change or delete a news item of the game. |
 | Nebula files: `[Fog]`, `[Exterior]`, `[NebulaLight]`, `[Clouds]`, `[BackgroundLightning]`, `[DynamicLightning]`, `[properties]`, `[Exclusion Zones]` | none: the file has one of each |
 | Asteroid field files: `[Field]`, `[Cube]`, `[Band]`, `[ExclusionBand]`, `[AsteroidBillboards]`, `[properties]`, `[Exclusion Zones]` | none: the file has one of each |
 | `[DynamicAsteroids]` | `asteroid` |

@@ -59,6 +59,11 @@ public static partial class BasePlans
     /// its room scenes.</summary>
     private const string TerrainPrefix = "terrain_";
 
+    /// <summary>Why a part of the request refuses the plan: the file, the text, the detail code, the part of the request
+    /// (see <see cref="BasePlan.RefusedPart"/>) and the section that the text names.</summary>
+    private sealed record Refusal(string Path, string Message, string? Detail = null, string? Part = null,
+        SectionRef? Target = null);
+
     /// <summary>
     /// Plans a new base of the active mod from a template base, as one entry of the edit history "Create base
     /// &lt;nickname&gt;". The new base uses the room files of the template.
@@ -137,53 +142,21 @@ public static partial class BasePlans
         var problems = new List<string>();
         var texts = new SectionCopies(session, problems.Add);
         var baseId = new SectionIdentity("Base", nickname);
-        var nameValue = texts.New(StringKind.String, name, baseId, "strid_name");
+        if (texts.New(StringKind.String, name, baseId, "strid_name") is not { } nameValue)
+            return plan.Refuse(universe, problems[0]);
         var path = ContentPaths.FreePath(session, ContentPaths.NewBaseFile(active.Id, nickname));
         var binary = session.IsBinaryFile(universe);
         if (ScenePlans.Entries(
             [
-                ("nickname", nickname), ("system", system), ("strid_name", nameValue?.ToString() ?? ""),
+                ("nickname", nickname), ("system", system), ("strid_name", nameValue.ToString()!),
                 ("file", ContentPaths.DataValue(path)!),
             ], binary, out var lineError) is not { } baseEntries)
             return plan.Refuse(universe, lineError!);
         baseEntries.AddRange(Copied(template.Entry, e => SceneSections.Is(e.Name, RunBy) ||
                                                          e.Name.StartsWith(TerrainPrefix, StringComparison.OrdinalIgnoreCase),
             binary));
-
-        var files = new List<string> { path };
-        var fixes = new List<PlannedFix>();
-        var commands = new List<EditCommand> { EditCommand.AddSection(universe, "Base", baseEntries) };
-        var baseFile = new List<SectionEntries>
-        {
-            new("BaseInfo",
-            [
-                new EntryView("nickname", [new StringValue(nickname)]),
-                new EntryView("start_room", [new StringValue(start.Nickname)]),
-                .. Copied(template.Info!, e => InfoLines.Contains(e.Name, StringComparer.OrdinalIgnoreCase), false),
-            ]),
-        };
-        var copies = new List<EditCommand>();
-        foreach (var room in kept)
-        {
-            var roomRef = new SectionRef(path, new SectionIdentity("Room", room.Nickname));
-            var roomFile = room.Section.Where(e => !SceneSections.Is(e.Name, "nickname")).Select(Line).ToList();
-            if (RoomCopy(session, active.Id, nickname, template, kept, room) is var (copy, copyEntries, gone))
-            {
-                files.Add(copy);
-                copies.Add(EditCommand.NewFile(copy, copyEntries));
-                roomFile = [.. roomFile.Where(e => !SceneSections.Is(e.Name, "file")),
-                    new EntryView("file", [new StringValue(ContentPaths.DataValue(copy)!)])];
-                var oneRoom = gone.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
-                fixes.Add(new PlannedFix(roomRef, "file",
-                    $"The room {room.Nickname} uses a copy of its room file without the {(gone.Count == 1 ? "door" : "doors")} " +
-                    $"to {SceneSections.Join(gone)}, because the base does not keep " +
-                    $"{(oneRoom ? "that room" : "those rooms")}. The copy is {copy}."));
-            }
-            baseFile.Add(new SectionEntries("Room",
-                [new EntryView("nickname", [new StringValue(room.Nickname)]), .. roomFile]));
-        }
-        commands.Add(EditCommand.NewFile(path, baseFile));
-        commands.AddRange(copies);
+        var (files, fileCommands, fixes) = BaseFile(session, active.Id, nickname, path, template, kept, start);
+        List<EditCommand> commands = [EditCommand.AddSection(universe, "Base", baseEntries), .. fileCommands];
 
         var warnings = new List<Diagnostic>(template.Warnings);
         var adds = new List<SectionRef> { new(universe, baseId), new(path, new SectionIdentity("BaseInfo", nickname)) };
@@ -191,7 +164,7 @@ public static partial class BasePlans
         if (MBaseCommands(session, spec, template, kept, nickname, texts, warnings) is { } bar)
         {
             if (bar.Refusal is { } barRefusal)
-                return plan.Refuse(barRefusal.Source, barRefusal.Message, barRefusal.Target);
+                return plan.Refuse(barRefusal.Path, barRefusal.Message);
             commands.AddRange(bar.Commands);
             adds.AddRange(bar.Adds);
             plan.MBase = bar.Adds[0];
@@ -202,9 +175,7 @@ public static partial class BasePlans
             return plan.Refuse(newsRefusal.Path, newsRefusal.Message);
         commands.AddRange(news.Commands);
         adds.AddRange(news.Adds);
-        var (dock, dockRefusal) = nameValue == null
-            ? (null, null)
-            : DockCommands(session, spec, template, system, nickname, nameValue, texts);
+        var (dock, dockRefusal) = DockCommands(session, spec, template, system, nickname, nameValue, texts);
         if (dockRefusal != null)
             return plan.Refuse(dockRefusal.Path, dockRefusal.Message, dockRefusal.Target, dockRefusal.Detail, dockRefusal.Part);
         if (problems.Count > 0)
@@ -234,6 +205,46 @@ public static partial class BasePlans
         plan.SelectAfter = plan.DockObject ?? plan.Base;
         plan.Command = EditCommand.Group(plan.Label, [.. commands, .. texts.Commands], session.Snapshot());
         return plan;
+    }
+
+    /// <summary>
+    /// The base file of a new base and the copies of its room files (see <see cref="Create"/>): the new files, their
+    /// commands and a fix for each copy.
+    /// </summary>
+    private static (List<string> Files, List<EditCommand> Commands, List<PlannedFix> Fixes) BaseFile(EditSession session,
+        string modId, string nickname, string path, BaseTemplate template, IReadOnlyList<TemplateRoom> kept,
+        TemplateRoom start)
+    {
+        var files = new List<string> { path };
+        var fixes = new List<PlannedFix>();
+        var copies = new List<EditCommand>();
+        var sections = new List<SectionEntries>
+        {
+            new("BaseInfo",
+            [
+                new EntryView("nickname", [new StringValue(nickname)]),
+                new EntryView("start_room", [new StringValue(start.Nickname)]),
+                .. Copied(template.Info!, e => InfoLines.Contains(e.Name, StringComparer.OrdinalIgnoreCase), false),
+            ]),
+        };
+        foreach (var room in kept)
+        {
+            var lines = room.Section.Where(e => !SceneSections.Is(e.Name, "nickname")).Select(Line).ToList();
+            if (RoomCopy(session, modId, nickname, template, kept, room) is var (copy, copyEntries, gone))
+            {
+                files.Add(copy);
+                copies.Add(EditCommand.NewFile(copy, copyEntries));
+                lines = [.. lines.Where(e => !SceneSections.Is(e.Name, "file")),
+                    new EntryView("file", [new StringValue(ContentPaths.DataValue(copy)!)])];
+                var oneRoom = gone.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
+                fixes.Add(new PlannedFix(new SectionRef(path, new SectionIdentity("Room", room.Nickname)), "file",
+                    $"The room {room.Nickname} uses a copy of its room file without the {(gone.Count == 1 ? "door" : "doors")} " +
+                    $"to {SceneSections.Join(gone)}, because the base does not keep " +
+                    $"{(oneRoom ? "that room" : "those rooms")}. The copy is {copy}."));
+            }
+            sections.Add(new SectionEntries("Room", [new EntryView("nickname", [new StringValue(room.Nickname)]), .. lines]));
+        }
+        return (files, [EditCommand.NewFile(path, sections), .. copies], fixes);
     }
 
     /// <summary>Why a text cannot be the nickname of a new base, or null.</summary>
@@ -312,7 +323,7 @@ public static partial class BasePlans
         if (template.News.Count == 0 || session.Bases.NewsPath is not { } path)
             return ([], [], null);
         if (session.OpenDocument(path) is { ReadOnlyReason: { } reason })
-            return ([], [], new Refusal(path, $"{SceneSections.FileName(path)}: {reason}", null, null));
+            return ([], [], new Refusal(path, $"{SceneSections.FileName(path)}: {reason}"));
         var binary = session.IsBinaryFile(path);
         var next = session.Sections(path).Count(s => SceneSections.Is(s.Id.Type, BaseTemplate.NewsType));
         var commands = new List<EditCommand>();
