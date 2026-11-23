@@ -358,4 +358,55 @@ public sealed class MarketPlansTests
         Assert.Equal("0, -1, 1, 1, 0, 1, 1", MarketPlans.DefaultValues("SHIP"));
         Assert.Equal("0, -1, 10, 10, 0, 1", MarketPlans.DefaultValues(null));
     }
+    /// <summary>
+    /// The "Markets" section of a good shows the last line of each base, which the games keep. A line that replaces a
+    /// lower line shows its result in plain words, and its tooltip names the line that the save writes. Each text of the
+    /// section is Simplified Technical English.
+    /// </summary>
+    [Fact]
+    public void TheMarketsSectionShowsTheLastLineOfEachBaseAndItsChange()
+    {
+        using var ws = TwoMarkets();
+        var session = ws.Session("act");
+        session.Execute(MarketPlans.SetLine(session, session.MarketLines("gun1")[0], "0, -1, 10, 10, 0, 2"));
+
+        var shown = MarketSection.LastLines(session.MarketLines("gun1"));
+
+        var line = Assert.Single(shown);
+        Assert.True(session.Get(line.Section)!.IsNew);
+        var change = MarketPlans.Override(session, line)!;
+        Assert.Equal(new SectionIdentity("BaseGood", null, null, 2), line.Section.Id);
+        Assert.Equal("The save writes the line 'marketgood = gun1, 0, -1, 10, 10, 0, 2' in a [BaseGood] of b1 in " +
+                     "market_misc.ini. It replaces the line 'marketgood = gun1, 0, -1, 10, 10, 0, 1' of the game. The " +
+                     "games keep the last line of a good at a base.", change.Tip);
+        string[] texts =
+        [
+            change.Text, change.Tip, MarketSection.LowerLineTip, MarketSection.OverrideNote, MarketSection.RevertTip,
+            MarketSection.RemoveTip(line, lower: true), MarketSection.RemoveTip(line, lower: false),
+            .. MarketPlans.Fields.Select(f => f.Tip),
+        ];
+        Assert.All(texts, t => Assert.True(SteLint.Problems(t).Count == 0, $"{t}: {string.Join(", ", SteLint.Problems(t))}"));
+    }
+
+    /// <summary>A line of a lower mod names the mod in its change.</summary>
+    [Fact]
+    public void TheChangeOfALineOfALowerModNamesTheMod()
+    {
+        using var ws = TwoMarkets();
+        ws.Mod("lower", new()
+        {
+            [@"patches\" + MarketPath] = "[BaseGood]\nol.new = true\nbase = b2\nmarketgood = gun1, 0, -1, 4, 4, 0, 1\n",
+        });
+        ws.WriteProfile("lower", "act");
+        var session = ws.Session("act");
+        var lower = session.MarketLines("gun1").Single(l => l.Base == "b2");
+
+        session.Execute(MarketPlans.SetLine(session, lower, null));
+
+        var change = MarketPlans.Override(session, session.MarketLines("gun1").Last())!;
+        Assert.Equal(("Removed: the base only buys it", true), (change.Text, change.Removed));
+        Assert.Contains("of the mod lower.", change.Tip);
+        Assert.EndsWith("The minimum stock 0, the maximum stock 0 and the type 1 stop the sale of the good.", change.Tip);
+        Assert.Empty(SteLint.Problems(change.Tip));
+    }
 }

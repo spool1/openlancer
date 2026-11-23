@@ -193,8 +193,8 @@ public static class MarketPlans
             ? "Removed: the base only buys it"
             : $"Changed: the base uses this line, not the line of {layer}";
         var tip = $"The save writes the line 'marketgood = {Text(line.Values)}' in a [BaseGood] of {line.Base} in " +
-                  $"{SceneSections.FileName(line.Section.Path)}. The games keep the last line of a good at a base, so " +
-                  $"this line replaces the line 'marketgood = {Text(lower.Values)}' of {layer}." +
+                  $"{SceneSections.FileName(line.Section.Path)}. It replaces the line 'marketgood = {Text(lower.Values)}' " +
+                  $"of {layer}. The games keep the last line of a good at a base." +
                   (removed ? " The minimum stock 0, the maximum stock 0 and the type 1 stop the sale of the good." : "");
         return new MarketOverride(line, lower, removed, text, tip);
     }

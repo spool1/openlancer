@@ -183,6 +183,62 @@ public sealed class BasePlansRetailTests(ITestOutputHelper output)
         Assert.False(session.IsDirty);
     }
 
+    /// <summary>
+    /// The market plans read each retail market line: a copy of the market of each base onto itself changes no line.
+    /// So the values of each line come back as the file has them, in vanilla 1.1 and in HD Edition 0.7.1.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TheMarketPlansReadEachRetailMarketLine(bool hde)
+    {
+        var root = hde ? GameDataPaths.RequireHde() : GameDataPaths.RequireBase();
+        using var workspace = new RetailWorkspace(root, hde ? "c4markethde" : "c4market");
+        var session = workspace.Open();
+        var (bases, lines) = (0, 0);
+        foreach (var nickname in session.Bases.Nicknames)
+        {
+            var market = session.Base(nickname)!.Market;
+            if (market.Count == 0)
+                continue;
+            bases++;
+            lines += market.Count;
+            var plan = MarketPlans.Set(session, nickname, [], [], copyFrom: nickname);
+            Assert.False(plan.CanRun, nickname);
+            Assert.Equal(MarketPlans.NoChange, Assert.Single(plan.Refusals).Rule);
+        }
+        output.WriteLine($"{bases} bases with {lines} market lines");
+        Assert.True(bases > 150 && lines > 5000, $"{bases} bases, {lines} lines");
+    }
+
+    /// <summary>A base from Li01_13_Base copies the market of the template from each market file, so each dealer of its
+    /// rooms has goods.</summary>
+    [Fact]
+    public void ABaseFromLi0113CopiesTheMarketOfEachMarketFile()
+    {
+        var root = GameDataPaths.RequireBase();
+        using var workspace = new RetailWorkspace(root, "c4li0113m");
+        var session = workspace.Open();
+        var template = session.Base("Li01_13_Base")!;
+
+        var plan = BasePlans.Create(session, new BaseSpec(New, "Li01", "Li01_13_Base", "Harbor Rock")
+        {
+            Text = Texts(session, root),
+        });
+        Assert.True(plan.CanRun, string.Join(" ", plan.Refusals.Select(r => r.Message)));
+        session.Execute(plan.Command!);
+
+        var view = session.Base(New)!;
+        var goods = template.Market.GroupBy(r => r.Good, StringComparer.OrdinalIgnoreCase).Select(g => g.Key).ToHashSet(
+            StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(goods.Count, view.Market.Count);
+        Assert.All(view.Market, r => Assert.Contains(r.Good, goods));
+        var files = template.Market.Select(r => r.Line.Section.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        Assert.Equal(files, view.Market.Select(r => r.Line.Section.Path).Distinct(StringComparer.OrdinalIgnoreCase));
+        Assert.Equal(3, files.Count);
+        Assert.DoesNotContain(BaseChecks.Problems(session, New), p => p.Message.Contains("shows an empty list"));
+    }
+
     /// <summary>The texts of the game of a folder, for the name texts of the copied characters.</summary>
     private static Func<SectionRef, string, string?> Texts(EditSession session, string root)
     {
