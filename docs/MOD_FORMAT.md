@@ -1130,7 +1130,11 @@ The Scene adds, copies, renames and deletes the objects, zones and lights of the
 
 The keys work only when no text field is active and no field edit or drag is open. A disabled menu item tells why in its tooltip.
 
-Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has an archetype of such a type, or a `goto` line. Only an object with an archetype of the type `TRADELANE_RING` is a trade lane ring, because the game makes lanes only from such objects. A `prev_ring` or a `next_ring` line on another object does not make it a connection object. The Create menu and Duplicate cannot make them, because each one needs a partner or a lane. The jump connection tool `connection_create` of the agent server makes a jump gate pair or a jump hole pair (see "Jump connections and gate locks"). The trade lane tools `trade_lane_create` and `trade_lane_insert_ring` make a lane and add a ring to it (see "Trade lanes"). In the editor, select a ring and click Insert ring after in the Inspector to add a ring to a lane. A delete of a jump gate or a jump hole deletes its pair. A delete of a trade lane ring links the lane again. This version cannot delete an airlock gate. A rename of a connection object works.
+Jump gates, jump holes, airlock gates and trade lane rings are connection objects. A connection object has an archetype of such a type, or a `goto` line. Only an object with an archetype of the type `TRADELANE_RING` is a trade lane ring, because the game makes lanes only from such objects. A `prev_ring` or a `next_ring` line on another object does not make it a connection object.
+
+The Create menu and Duplicate cannot make connection objects, because each one needs a partner or a lane. The jump connection tool `connection_create` of the agent server makes a jump gate pair or a jump hole pair (see "Jump connections and gate locks"). The trade lane tools `trade_lane_create` and `trade_lane_insert_ring` make a lane and add a ring to it (see "Trade lanes"). In the editor, select a ring and click Insert ring after in the Inspector to add a ring to a lane.
+
+A delete of a jump gate or a jump hole deletes its pair. A delete of a trade lane ring links the lane again. This version cannot delete an airlock gate. A rename of a connection object works.
 
 #### Create
 

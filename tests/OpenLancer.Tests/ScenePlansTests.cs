@@ -760,17 +760,20 @@ public sealed class ScenePlansDuplicateTests
     /// <summary>
     /// Only an object with an archetype of the type <c>TRADELANE_RING</c> is a trade lane ring (#90), because the game
     /// makes no lane from another object. So a sun with a stray <c>next_ring</c> line is no connection object, and
-    /// Duplicate copies it with the line. A real ring is still refused. An object with a <c>goto</c> line is still a
-    /// jump gate.
+    /// Duplicate copies it with the line. An object with an archetype that the data does not have and a stray
+    /// <c>prev_ring</c> line is no ring either. A real ring is still refused. An object with a <c>goto</c> line is still
+    /// a jump gate.
     /// </summary>
     [Fact]
     public void ASunWithAStrayRingLineIsNotRefusedAsARing()
     {
         using var ws = Create();
         ws.WriteBase(Li01Path, Li01Text + "\n[Object]\nnickname = Li01_sun\narchetype = sun1\nnext_ring = ring2\n" +
-                               "[Object]\nnickname = Li01_buoy_goto\narchetype = buoy\ngoto = Li02, Li02_to_Li01, t\n");
+                               "[Object]\nnickname = Li01_buoy_goto\narchetype = buoy\ngoto = Li02, Li02_to_Li01, t\n" +
+                               "[Object]\nnickname = Li01_unknown\narchetype = ol_no_such_solar\nprev_ring = ring2\n");
         var session = ws.Session("act");
         var sun = Object("Li01_sun");
+        var unknown = Object("Li01_unknown");
 
         var plan = ScenePlans.Duplicate(session, [sun]);
 
@@ -784,5 +787,9 @@ public sealed class ScenePlansDuplicateTests
         Assert.StartsWith("ring2 is a trade lane ring. This version cannot copy trade lane rings",
             Assert.Single(ScenePlans.Duplicate(session, [Object("ring2")]).Refusals).Message);
         Assert.Equal("jump gate", SceneSections.ConnectionKind(session, session.Get(Object("Li01_buoy_goto"))!));
+        Assert.Null(SceneSections.ArchetypeType(session, session.Get(unknown)!));
+        Assert.Null(SceneSections.ConnectionKind(session, session.Get(unknown)!));
+        Assert.False(OpenLancer.Data.Editing.Universe.LanePlans.IsRingObject(session, unknown));
+        Assert.Null(ScenePlans.Unavailable(session, SceneAction.Duplicate, unknown));
     }
 }
