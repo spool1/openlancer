@@ -65,6 +65,8 @@ The check reads the Scene. So Play first lets the Scene show each edit, also whi
 
 Open the Play menu and select Play at base. The list shows the bases of the open system first. The other bases are in one submenu for each system. Click a base. The game starts with the ship docked at that base. Play at base needs no open system.
 
+The list shows the bases of the loaded game data. A new base of the active mod, for example a base of the agent tool `base_create`, gets into the game data only after the save. Save the mod and wait until the editor loads the game data again. Then the new base is in the list.
+
 ## The ship
 
 The default ship is the ship of a new multiplayer character. In vanilla, this is the Starflier (`ge_fighter`) with the loadout `MP_ge_fighter` and 2,000 credits.
@@ -260,6 +262,7 @@ An agent of the agent server can start Play with the tool `play`, at a point in 
 | Another play runs, for example a play from the camera | Play does not start. The agent must stop the other play first with `play_stop`. The editor checks it again after "Save and continue". |
 | A mission play runs | A mission play of an agent starts the game again at the start of the request. `play` does not start, and the agent must stop the mission play first. |
 | The start cannot start | Play does not start. The agent gets the reason of the start plan of a mission play, or of the checks of the Play menu. |
+| The start is a new base that the game data gets only after the save | Play does not start. The agent gets the reason with the detail `SaveFirst`. It asks you to save, waits for the reload of the game data and asks for Play again. |
 | The call of the agent ends before you answer, for example at its time limit | The dialog closes as Cancel does. A click after the end of the call does not start Play. |
 | The dialog of another agent request is open | Play does not start. The agent gets an error and waits for the result of the other request. |
 | You clicked "Save and continue" for another agent request, and Play did not end that request yet | Play does not start. The agent gets an error and waits for the result of the other request. |
