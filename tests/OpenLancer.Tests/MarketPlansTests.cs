@@ -387,10 +387,18 @@ public sealed class MarketPlansTests
         string[] texts =
         [
             change.Text, change.Tip, MarketSection.LowerLineTip, MarketSection.OverrideNote, MarketSection.RevertTip,
-            MarketSection.RemoveTip(line, lower: true), MarketSection.RemoveTip(line, lower: false),
+            MarketSection.RemoveTip(line, lower: true, replaces: false),
+            MarketSection.RemoveTip(line, lower: false, replaces: true),
+            MarketSection.RemoveTip(line, lower: false, replaces: false),
             .. MarketPlans.Fields.Select(f => f.Tip),
         ];
         Assert.All(texts, t => Assert.True(SteLint.Problems(t).Count == 0, $"{t}: {string.Join(", ", SteLint.Problems(t))}"));
+        // Final finding of V1-C4: the remove tooltip gives only the result of the remove, in the words of the fields.
+        Assert.Equal("Remove the line. The line replaces a line of a lower layer, so it changes. The buy-only form (no " +
+                     "stock and \"Buys or sells\" set to \"Only buys\") stops the sale of the good. Then b1 only buys the " +
+                     "good.", MarketSection.RemoveTip(line, lower: false, replaces: true));
+        Assert.Equal("Remove the line. Then b1 does not buy or sell the good.",
+            MarketSection.RemoveTip(line, lower: false, replaces: false));
     }
 
     /// <summary>
@@ -564,7 +572,8 @@ public sealed class MarketPlansTests
         var change = MarketPlans.Override(session, session.MarketLines("gun1").Last())!;
         Assert.Equal(("Removed: the base only buys it", true), (change.Text, change.Removed));
         Assert.Contains("of the mod lower.", change.Tip);
-        Assert.EndsWith("The minimum stock 0, the maximum stock 0 and the type 1 stop the sale of the good.", change.Tip);
+        Assert.EndsWith("The buy-only form (no stock and \"Buys or sells\" set to \"Only buys\") stops the sale of the " +
+                        "good.", change.Tip);
         Assert.Empty(SteLint.Problems(change.Tip));
     }
 }

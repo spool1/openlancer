@@ -81,13 +81,14 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
         {
             var reason = session.NoEditReason ?? MarketPlans.NoChangeReason(session.Edits, line);
             var lower = session.Edits.Get(line.Section) is not { IsNew: true };
-            grid.Row(line.Base, () => Values(line, reason, lower));
+            var change = MarketPlans.Override(session.Edits, line);
+            grid.Row(line.Base, () => Values(line, reason, lower, change != null));
             grid.SetNextNote(TransactionTip);
             grid.Row(TransactionLabel, () => Transaction(line, reason));
-            if (MarketPlans.Override(session.Edits, line) is { } change)
+            if (change is { } replaced)
             {
                 grid.SetNextNote(OverrideNote);
-                grid.Row(OverrideLabel, () => Override(change, reason));
+                grid.Row(OverrideLabel, () => Override(replaced, reason));
             }
         }
 
@@ -102,13 +103,19 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
     internal static IReadOnlyList<MarketLine> LastLines(IReadOnlyList<MarketLine> lines) =>
         BaseMarkets.KeptLines(lines, l => l.Base.Trim(), l => l.Values);
 
-    /// <summary>The tooltip of the remove button of a line.</summary>
+    /// <summary>The tooltip of the remove button of a line. It tells only the result that the remove gives (see
+    /// <see cref="MarketPlans.SetLine"/>).</summary>
     /// <param name="lower">True for a line of a lower layer.</param>
-    internal static string RemoveTip(MarketLine line, bool lower) => lower
-        ? "Remove the line. The save writes a later line of the active mod with the minimum stock 0, the maximum " +
-          $"stock 0 and the type 1. Then {line.Base} only buys the good."
-        : $"Remove the line. Then {line.Base} does not buy or sell the good. When the line replaces a line of a lower " +
-          "layer, it gets the minimum stock 0, the maximum stock 0 and the type 1. Then the base only buys the good.";
+    /// <param name="replaces">True for a line of the active mod that replaces a line of a lower layer (see
+    /// <see cref="MarketPlans.Override"/>).</param>
+    internal static string RemoveTip(MarketLine line, bool lower, bool replaces) =>
+        lower ? $"Remove the line. The save writes a later line of the active mod. {BuyOnly(line)}"
+        : replaces ? $"Remove the line. The line replaces a line of a lower layer, so it changes. {BuyOnly(line)}"
+        : $"Remove the line. Then {line.Base} does not buy or sell the good.";
+
+    /// <summary>The result of a remove that writes the buy-only form.</summary>
+    private static string BuyOnly(MarketLine line) =>
+        $"{MarketPlans.BuyOnlyText} stops the sale of the good. Then {line.Base} only buys the good.";
 
     /// <summary>
     /// The values of a line that have a field: a named field for each value and a remove button, or read-only fields
@@ -116,7 +123,8 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
     /// </summary>
     /// <param name="reason">Why the line cannot change, or null when it can.</param>
     /// <param name="lower">True for a line of a lower layer. An edit then writes a later line of the active mod.</param>
-    private void Values(MarketLine line, string? reason, bool lower)
+    /// <param name="replaces">True for a line of the active mod that replaces a line of a lower layer.</param>
+    private void Values(MarketLine line, string? reason, bool lower, bool replaces)
     {
         var spacing = ImGui.GetStyle().ItemInnerSpacing.X;
         var texts = MarketPlans.Fields.Select(f => MarketPlans.FieldText(line, f)).ToArray();
@@ -159,7 +167,7 @@ internal sealed class MarketSection(EditorWindow window, PropertyGrid grid)
         ImGui.SameLine(0, spacing);
         // A buy-only line with a lower line already has the result of a remove.
         var noRemove = MarketPlans.NoRemoveReason(window.Session!.Edits, line);
-        if (ToolbarItems.Button("remove", EditorIcons.TrashAlt, noRemove ?? RemoveTip(line, lower), noRemove == null))
+        if (ToolbarItems.Button("remove", EditorIcons.TrashAlt, noRemove ?? RemoveTip(line, lower, replaces), noRemove == null))
         {
             window.Commands.Run(edits => MarketCommands.SetLine(edits, line, null));
         }

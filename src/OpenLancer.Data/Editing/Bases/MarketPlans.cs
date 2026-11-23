@@ -114,6 +114,9 @@ public static class MarketPlans
     /// lines.</summary>
     private const string BuyOnlyShipValues = "0, -1, 0, 0, 1, 1, 1";
 
+    /// <summary>The buy-only form in the words of the fields of the "Markets" section.</summary>
+    public const string BuyOnlyText = "The buy-only form (no stock and \"Buys or sells\" set to \"Only buys\")";
+
     /// <summary>The most ship packages that a fix text names.</summary>
     private const int ShownShips = 5;
 
@@ -193,7 +196,7 @@ public static class MarketPlans
         if (session.ReadOnlyReason is { } locked)
             return locked;
         if (session.Get(line.Section) is not { } view)
-            return $"No market file of the edit view has the line of {line.Base}.";
+            return $"The data of the open profile has no market file with the line of {line.Base}.";
         if (view.IsNew)
             return view.ReadOnlyReason;
         return session.OpenDocument(line.Section.Path) is { ReadOnlyReason: { } reason }
@@ -222,7 +225,7 @@ public static class MarketPlans
         var tip = $"The save writes the line 'marketgood = {Text(line.Values)}' in a [BaseGood] of {line.Base} in " +
                   $"{SceneSections.FileName(line.Section.Path)}. It replaces the line 'marketgood = {Text(lower.Values)}' " +
                   $"of {layer}. The games keep the last line of a good at a base." +
-                  (removed ? " The minimum stock 0, the maximum stock 0 and the type 1 stop the sale of the good." : "");
+                  (removed ? $" {BuyOnlyText} stops the sale of the good." : "");
         return new MarketOverride(line, lower, removed, text, tip);
     }
 
@@ -964,7 +967,7 @@ public static class MarketPlans
             if (category != null && Lines().FirstOrDefault(l => Is(Category(session, l.Good), category)) is { } same)
                 return same.Part.Path;
             return parts.FirstOrDefault()?.Path ?? files.FirstOrDefault() ??
-                throw new InvalidOperationException("The edit view has no market file.");
+                throw new InvalidOperationException("The data of the open profile has no market file.");
         }
 
         /// <summary>The buy-only form of a line, with its price multiplier.</summary>
