@@ -495,7 +495,7 @@ The market rows of `get_base` come from each market file, in load order. `kept` 
 
 `ring` gives the docking ring of the planet. Without `ring`, the ring copies the ring of the template, at the same height above the surface. Without `dock_object`, no object docks with the base. The result then gives the problem of the base checks in `new_problems`.
 
-The result gives `base`, `file`, `dock_object` and `ring`. `select` is the dock object, or the base without one. The refusals are:
+The result gives `base`, `file` and `dock_object`. Only a planet base also gives `ring`, the new docking ring of its planet. `select` is the dock object, or the base without one. The refusals are:
 
 | Detail | Error | Cause |
 |---|---|---|
@@ -908,7 +908,7 @@ The result gives the written and the deleted files, relative to the folder of th
 
 | Argument | What it does |
 |---|---|
-| `targets` | The target games of the packages. Without it, the export takes each target of `mod.json` that has a linked game. In the oltool host, the base folder of the profile is the one linked game. |
+| `targets` | The target games of the packages. Without it, the export takes each target of `mod.json` that it can make. It can make each retail target with a linked game, and the target `openlancer`, which needs no linked game. In the oltool host, the base folder of the profile is the one linked game. A refusal of a retail target without a linked game tells how to link one in the host. |
 | `formats` | The package forms of a retail target: `drop_in`, `flmm` or both. Without it, the export makes both. |
 | `replace_version` | Replaces an earlier export of the same version with other game files, as **Replace version** of the Export dialog does. |
 

@@ -823,7 +823,7 @@
       "title": "Export the active mod",
       "description": "Exports the saved files of the active mod as packages into the default export folder of the mod, as the Export dialog does. The export does not change the data. Save the edits first. When the save gate refuses the mod, the export gives save_blocked and writes nothing.",
       "fields": {
-        "targets": "The target games of the packages. Without it, the export takes each target of mod.json that has a linked game.",
+        "targets": "The target games of the packages. Without it, the export takes each target of mod.json that it can make. It can make each retail target with a linked game, and the target openlancer, which needs no linked game.",
         "formats": "The package forms of a retail target: drop_in for a zip for Nexus, flmm for an FLMM package. Without it, the export makes both. When one form refuses, the other form still exports. A mod with a new system exports as a drop-in zip. Give formats: [drop_in] to make only the zip.",
         "replace_version": "Replace the packages of an earlier export of the same version. The export never replaces a version with the mark published."
       }

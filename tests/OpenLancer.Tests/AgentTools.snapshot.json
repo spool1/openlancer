@@ -52152,7 +52152,7 @@
               ]
             },
             "uniqueItems": true,
-            "description": "The target games of the packages. Without it, the export takes each target of mod.json that has a linked game."
+            "description": "The target games of the packages. Without it, the export takes each target of mod.json that it can make. It can make each retail target with a linked game, and the target openlancer, which needs no linked game."
           },
           "formats": {
             "type": "array",
