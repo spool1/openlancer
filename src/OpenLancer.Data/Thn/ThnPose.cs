@@ -104,10 +104,11 @@ public static class ThnPose
             new ThnNumber(rotation.Z));
 
     /// <summary>
-    /// The start pose of an entity: <c>spatialprops.pos</c> and <c>spatialprops.orient</c>. A missing value is the
-    /// origin or no rotation, as the engine uses them (ThnEntity.cs:24-25).
+    /// The start pose of an entity: <c>spatialprops.pos</c> and <c>spatialprops.orient</c>. The engine reads them from
+    /// the record part of <c>spatialprops</c>, whatever its list part holds (ThnScript.cs:371-382). A missing value is
+    /// the origin or no rotation, as the engine uses them (ThnEntity.cs:24-25).
     /// </summary>
     public static ThnPoseValue StartPose(ThnTable entity) => new(
-        Vector(ThnElementPaths.Get(ThnElementKind.Entity, entity, PositionPath)) ?? Vector3.Zero,
-        Orient(ThnElementPaths.Get(ThnElementKind.Entity, entity, OrientPath)) ?? Quaternion.Identity);
+        Vector(PositionPath.EngineValueIn(ThnElementKind.Entity, entity)) ?? Vector3.Zero,
+        Orient(OrientPath.EngineValueIn(ThnElementKind.Entity, entity)) ?? Quaternion.Identity);
 }

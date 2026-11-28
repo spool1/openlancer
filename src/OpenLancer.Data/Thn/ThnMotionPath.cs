@@ -43,8 +43,8 @@ public static class ThnMotionPath
     /// <summary>The key of the path text in the record of a path.</summary>
     private const string DataKey = "path_data";
 
-    /// <summary>The path of the text in a MOTION_PATH entity. A path goes only into a table without list items, so a
-    /// check reads the text with <see cref="DataOf"/>.</summary>
+    /// <summary>The path of the text in a MOTION_PATH entity. A patch path goes only into a table without list items,
+    /// so a check reads the text with <see cref="DataOf"/>.</summary>
     public static readonly ThnPath Path = new($"{PropsKey}{ThnPath.Separator}{DataKey}");
 
     private const string Global = "ol_path";
@@ -151,10 +151,10 @@ public static class ThnMotionPath
     /// The value of <c>pathprops.path_data</c> of an entity as the engine reads it, or null when the entity has no such
     /// value. The engine reads the key from the record part of the <c>pathprops</c> table, whatever its list part holds
     /// (ThnScript.cs:476-484). So a table such as <c>{ 1; path_data = "..." }</c> gives the entity a path text too. Each
-    /// check of the path text of an entity reads the text here, because <see cref="Path"/> does not go into such a
-    /// table.
+    /// check of the path text of an entity reads the text here, because the patch path <see cref="Path"/> does not go
+    /// into such a table (see <see cref="ThnPath.EngineValueIn"/>).
     /// </summary>
-    public static ThnValue? DataOf(ThnTable entity) => entity[PropsKey] is ThnTable props ? props[DataKey] : null;
+    public static ThnValue? DataOf(ThnTable entity) => Path.EngineValueIn(ThnElementKind.Entity, entity);
 
     /// <summary>
     /// Why a build must not give a script to the engine, or null (section 8.7, item 2 of the MCP1 design). The engine

@@ -11,8 +11,12 @@ namespace OpenLancer.Data.Thn;
 /// for example <c>props.duration</c>.
 /// </summary>
 /// <remarks>
-/// A path ends at a value or at a table with a list part, because a list is one value. A record is a container. An
-/// empty table counts as a record, so a path can go into an empty <c>psysprops</c>. No retail key has a <c>.</c>.
+/// <para>A path ends at a value or at a table with a list part, because a list is one value. A record is a container.
+/// An empty table counts as a record, so a path can go into an empty <c>psysprops</c>. No retail key has a
+/// <c>.</c>.</para>
+/// <para>The engine reads a key from the record part of a table, whatever the list part of the table holds, for
+/// example the speaker of <c>userprops = { 1; speaker = "Trent" }</c>. <see cref="EngineValueIn"/> reads such a key.
+/// An edit of such a key sets the whole table (see <see cref="ThnEdits.SetEngineValue"/>).</para>
 /// </remarks>
 public readonly record struct ThnPath
 {
@@ -37,6 +41,10 @@ public readonly record struct ThnPath
     /// <summary>The value at this path in an element, or null when the element has no value there.</summary>
     public ThnValue? ValueIn(ThnElementKind kind, ThnTable element) => ThnElementPaths.Get(kind, element, this);
 
+    /// <summary>The value at this path as the engine reads it, or null when the engine reads no value there. Unlike
+    /// <see cref="ValueIn"/>, the path also goes into a table with a list part.</summary>
+    public ThnValue? EngineValueIn(ThnElementKind kind, ThnTable element) => ThnElementPaths.EngineGet(kind, element, this);
+
     /// <summary>The path of the record that holds the value, or null for a path of one key.</summary>
     internal ThnPath? Parent => Text.LastIndexOf(Separator) is var at and > 0 ? new ThnPath(Text[..at]) : null;
 
@@ -58,8 +66,13 @@ internal sealed class ThnPathException(string message) : Exception(message);
 /// Reads and changes the values of an element by path, and finds the paths at which two elements differ.
 /// </summary>
 /// <remarks>
-/// A change of an existing key keeps the place of the key in its record. A new key goes at the end of its record. A
-/// set makes each missing record on its path. The other values of the element stay the same objects.
+/// <para>A change of an existing key keeps the place of the key in its record. A new key goes at the end of its record.
+/// A set makes each missing record on its path. The other values of the element stay the same objects.</para>
+/// <para>The engine reads each key from the record part of its table, whatever the list part holds. The engine
+/// functions (<see cref="EngineGet"/>, <see cref="EngineSet"/> and <see cref="EngineRemoveWithMadeRecords"/>) go
+/// through such a table and keep its list part. The other functions follow the paths of a patch, which end at such a
+/// table. So the patch gives a change of an engine function as a set of a whole table (see
+/// <see cref="PatchPath"/>).</para>
 /// </remarks>
 internal static class ThnElementPaths
 {
@@ -87,59 +100,39 @@ internal static class ThnElementPaths
     }
 
     /// <summary>The value at a path, or null when the element has no value there.</summary>
-    public static ThnValue? Get(ThnElementKind kind, ThnTable element, ThnPath path)
-    {
-        var keys = path.Keys;
-        if (kind == ThnElementKind.Entity)
-            return GetIn(element, keys, 0);
-        var slot = EventSlots.IndexOf(keys[0]);
-        if (slot < 0 || slot >= element.List.Length)
-            return null;
-        if (keys.Length == 1)
-            return element.List[slot];
-        return slot == PropsSlot && element.List[slot] is ThnTable { IsRecord: true } props ? GetIn(props, keys, 1) : null;
-    }
+    public static ThnValue? Get(ThnElementKind kind, ThnTable element, ThnPath path) =>
+        Get(kind, element, path, throughLists: false);
+
+    /// <summary>
+    /// The value at a path as the engine reads it, or null when the engine reads no value there. Unlike
+    /// <see cref="Get"/>, the path also goes into a table with a list part, for example
+    /// <c>userprops = { 1; speaker = "Trent" }</c>. Keys compare with letter case.
+    /// </summary>
+    public static ThnValue? EngineGet(ThnElementKind kind, ThnTable element, ThnPath path) =>
+        Get(kind, element, path, throughLists: true);
 
     /// <summary>Sets the value at a path. A missing record on the path is made.</summary>
     /// <returns>The changed element.</returns>
     /// <exception cref="ThnPathException">A value on the path is not a record, or an event has too few items for the
     /// slot.</exception>
-    public static ThnTable Set(ThnElementKind kind, ThnTable element, ThnPath path, ThnValue value)
-    {
-        CheckPath(kind, path, remove: false);
-        var keys = path.Keys;
-        if (kind == ThnElementKind.Entity)
-            return SetIn(element, keys, 0, value, path);
-        var slot = EventSlots.IndexOf(keys[0]);
-        if (keys.Length == 1)
-            return SetItem(element, slot, value);
-        var props = element.List.Length > PropsSlot ? element.List[PropsSlot] : ThnTable.Empty;
-        if (props is not ThnTable { IsRecord: true } record)
-            throw new ThnPathException($"'{path}' goes through 'props', which is not a record.");
-        return SetItem(element, PropsSlot, SetIn(record, keys, 1, value, path));
-    }
+    public static ThnTable Set(ThnElementKind kind, ThnTable element, ThnPath path, ThnValue value) =>
+        Set(kind, element, path, value, throughLists: false);
+
+    /// <summary>
+    /// Sets the value at a path where the engine reads it (see <see cref="EngineGet"/>). A table with a list part on
+    /// the path keeps its list part. A missing record on the path is made.
+    /// </summary>
+    /// <returns>The changed element.</returns>
+    /// <exception cref="ThnPathException">A value on the path is not a table, or an event has too few items for the
+    /// slot.</exception>
+    public static ThnTable EngineSet(ThnElementKind kind, ThnTable element, ThnPath path, ThnValue value) =>
+        Set(kind, element, path, value, throughLists: true);
 
     /// <summary>Removes the value at a path.</summary>
     /// <returns>The changed element, or null when the element has no value at the path.</returns>
     /// <exception cref="ThnPathException">The path removes the props of an event that has items after its props.</exception>
-    public static ThnTable? Remove(ThnElementKind kind, ThnTable element, ThnPath path)
-    {
-        CheckPath(kind, path, remove: true);
-        var keys = path.Keys;
-        if (kind == ThnElementKind.Entity)
-            return RemoveIn(element, keys, 0);
-        if (element.List.Length <= PropsSlot)
-            return null;
-        if (keys.Length == 1)
-        {
-            if (element.List.Length > PropsSlot + 1)
-                throw new ThnPathException("The event has items after its props, so its props cannot be removed.");
-            return new ThnTable(element.List.RemoveAt(PropsSlot), element.Record);
-        }
-        if (element.List[PropsSlot] is not ThnTable { IsRecord: true } props || RemoveIn(props, keys, 1) is not { } changed)
-            return null;
-        return SetItem(element, PropsSlot, changed);
-    }
+    public static ThnTable? Remove(ThnElementKind kind, ThnTable element, ThnPath path) =>
+        Remove(kind, element, path, throughLists: false);
 
     /// <summary>
     /// Removes the value at a path, then each record on the path that is now empty and that <paramref name="lower"/>
@@ -149,14 +142,99 @@ internal static class ThnElementPaths
     /// <param name="lower">The lower element.</param>
     /// <returns>The changed element, or the element when it has no value at the path.</returns>
     /// <exception cref="ThnPathException">See <see cref="Remove"/>.</exception>
-    public static ThnTable RemoveWithMadeRecords(ThnElementKind kind, ThnTable element, ThnPath path, ThnTable lower)
+    public static ThnTable RemoveWithMadeRecords(ThnElementKind kind, ThnTable element, ThnPath path, ThnTable lower) =>
+        RemoveWithMadeRecords(kind, element, path, lower, throughLists: false);
+
+    /// <summary>
+    /// <see cref="RemoveWithMadeRecords"/> where the engine reads the value (see <see cref="EngineGet"/>). A table with
+    /// a list part on the path keeps its list part, and it never counts as an empty record.
+    /// </summary>
+    /// <exception cref="ThnPathException">See <see cref="Remove"/>.</exception>
+    public static ThnTable EngineRemoveWithMadeRecords(ThnElementKind kind, ThnTable element, ThnPath path,
+        ThnTable lower) => RemoveWithMadeRecords(kind, element, path, lower, throughLists: true);
+
+    /// <summary>
+    /// The path that a patch changes for a change at a path: the path, or the path of the outermost table with a list
+    /// part that holds the path. A patch path ends at such a table (MOD_FORMAT.md, "The THN patch"). So the patch
+    /// gives a change in the table as a set of the whole table, and an edit removes the pins of the table.
+    /// </summary>
+    public static ThnPath PatchPath(ThnElementKind kind, ThnTable element, ThnPath path)
     {
-        var result = Remove(kind, element, path) ?? element;
+        var keys = path.Keys;
+        for (var depth = 1; depth < keys.Length; depth++)
+        {
+            var holder = new ThnPath(string.Join(ThnPath.Separator, keys[..depth]));
+            switch (Get(kind, element, holder))
+            {
+                case ThnTable { IsRecord: false }:
+                    return holder;
+                case not ThnTable:
+                    return path;
+            }
+        }
+        return path;
+    }
+
+    private static ThnValue? Get(ThnElementKind kind, ThnTable element, ThnPath path, bool throughLists)
+    {
+        var keys = path.Keys;
+        if (kind == ThnElementKind.Entity)
+            return GetIn(element, keys, 0, throughLists);
+        var slot = EventSlots.IndexOf(keys[0]);
+        if (slot < 0 || slot >= element.List.Length)
+            return null;
+        if (keys.Length == 1)
+            return element.List[slot];
+        return slot == PropsSlot && Container(element.List[slot], throughLists) is { } props
+            ? GetIn(props, keys, 1, throughLists)
+            : null;
+    }
+
+    private static ThnTable Set(ThnElementKind kind, ThnTable element, ThnPath path, ThnValue value, bool throughLists)
+    {
+        CheckPath(kind, path, remove: false);
+        var keys = path.Keys;
+        if (kind == ThnElementKind.Entity)
+            return SetIn(element, keys, 0, value, path, throughLists);
+        var slot = EventSlots.IndexOf(keys[0]);
+        if (keys.Length == 1)
+            return SetItem(element, slot, value);
+        var props = element.List.Length > PropsSlot ? element.List[PropsSlot] : ThnTable.Empty;
+        if (Container(props, throughLists) is not { } record)
+            throw new ThnPathException(NotAContainer(path, "props", throughLists));
+        return SetItem(element, PropsSlot, SetIn(record, keys, 1, value, path, throughLists));
+    }
+
+    private static ThnTable? Remove(ThnElementKind kind, ThnTable element, ThnPath path, bool throughLists)
+    {
+        CheckPath(kind, path, remove: true);
+        var keys = path.Keys;
+        if (kind == ThnElementKind.Entity)
+            return RemoveIn(element, keys, 0, throughLists);
+        if (element.List.Length <= PropsSlot)
+            return null;
+        if (keys.Length == 1)
+        {
+            if (element.List.Length > PropsSlot + 1)
+                throw new ThnPathException("The event has items after its props, so its props cannot be removed.");
+            return new ThnTable(element.List.RemoveAt(PropsSlot), element.Record);
+        }
+        if (Container(element.List[PropsSlot], throughLists) is not { } props ||
+            RemoveIn(props, keys, 1, throughLists) is not { } changed)
+            return null;
+        return SetItem(element, PropsSlot, changed);
+    }
+
+    private static ThnTable RemoveWithMadeRecords(ThnElementKind kind, ThnTable element, ThnPath path, ThnTable lower,
+        bool throughLists)
+    {
+        var result = Remove(kind, element, path, throughLists) ?? element;
         for (var parent = path.Parent; parent is { } holder; parent = holder.Parent)
         {
-            if (Get(kind, lower, holder) != null || Get(kind, result, holder) is not ThnTable { IsRecord: true, Record.IsEmpty: true })
+            if (Get(kind, lower, holder, throughLists) != null ||
+                Get(kind, result, holder, throughLists) is not ThnTable { IsRecord: true, Record.IsEmpty: true })
                 break;
-            result = Remove(kind, result, holder) ?? result;
+            result = Remove(kind, result, holder, throughLists) ?? result;
         }
         return result;
     }
@@ -279,37 +357,48 @@ internal static class ThnElementPaths
 
     private static ThnValue? Item(ThnTable list, int index) => index < list.List.Length ? list.List[index] : null;
 
-    private static ThnValue? GetIn(ThnTable record, string[] keys, int index)
+    /// <summary>The table that a path can go into: a record, or with <paramref name="throughLists"/> each table. Else
+    /// null.</summary>
+    private static ThnTable? Container(ThnValue? value, bool throughLists) =>
+        value is ThnTable table && (throughLists || table.IsRecord) ? table : null;
+
+    /// <summary>The refusal of a path that goes through a value that <see cref="Container"/> does not give.</summary>
+    private static string NotAContainer(ThnPath path, string holder, bool throughLists) =>
+        $"'{path}' goes through '{holder}', which is not a {(throughLists ? "table" : "record")}.";
+
+    private static ThnValue? GetIn(ThnTable record, string[] keys, int index, bool throughLists)
     {
         var value = record[keys[index]];
         if (index == keys.Length - 1 || value == null)
             return value;
-        return value is ThnTable { IsRecord: true } child ? GetIn(child, keys, index + 1) : null;
+        return Container(value, throughLists) is { } child ? GetIn(child, keys, index + 1, throughLists) : null;
     }
 
-    private static ThnTable SetIn(ThnTable record, string[] keys, int index, ThnValue value, ThnPath path)
+    private static ThnTable SetIn(ThnTable record, string[] keys, int index, ThnValue value, ThnPath path,
+        bool throughLists)
     {
         var at = IndexOf(record, keys[index]);
         if (index < keys.Length - 1)
         {
             var child = at >= 0 ? record.Record[at].Value : ThnTable.Empty;
-            if (child is not ThnTable { IsRecord: true } childRecord)
+            if (Container(child, throughLists) is not { } childRecord)
                 throw new ThnPathException(
-                    $"'{path}' goes through '{string.Join(ThnPath.Separator, keys.Take(index + 1))}', which is not a record.");
-            value = SetIn(childRecord, keys, index + 1, value, path);
+                    NotAContainer(path, string.Join(ThnPath.Separator, keys.Take(index + 1)), throughLists));
+            value = SetIn(childRecord, keys, index + 1, value, path, throughLists);
         }
         var field = new ThnField(keys[index], value);
         return new ThnTable(record.List, at >= 0 ? record.Record.SetItem(at, field) : record.Record.Add(field));
     }
 
-    private static ThnTable? RemoveIn(ThnTable record, string[] keys, int index)
+    private static ThnTable? RemoveIn(ThnTable record, string[] keys, int index, bool throughLists)
     {
         var at = IndexOf(record, keys[index]);
         if (at < 0)
             return null;
         if (index == keys.Length - 1)
             return new ThnTable(record.List, record.Record.RemoveAt(at));
-        if (record.Record[at].Value is not ThnTable { IsRecord: true } child || RemoveIn(child, keys, index + 1) is not { } changed)
+        if (Container(record.Record[at].Value, throughLists) is not { } child ||
+            RemoveIn(child, keys, index + 1, throughLists) is not { } changed)
             return null;
         return new ThnTable(record.List, record.Record.SetItem(at, new ThnField(keys[index], changed)));
     }

@@ -28,6 +28,37 @@ public sealed class ThnPathTests
         Assert.Null(ThnElementPaths.Get(ThnElementKind.Event, List(N(0), S("SET_CAMERA"), List()), P("props.duration")));
     }
 
+    /// <summary>
+    /// A path of a patch ends at a table with a list part. The engine functions go into the record part of such a
+    /// table, as the engine reads it, and keep its list part. Such a table never counts as an empty record. The patch
+    /// path of a change in such a table is the path of the outermost such table. A value that is not a table still
+    /// refuses.
+    /// </summary>
+    [Fact]
+    public void TheEngineFunctionsGoIntoATableWithAListPart()
+    {
+        var entity = Record(F("entity_name", T("Mk")), F("spatialprops", new ThnTable([N(1)], [F("pos", List(N(0), N(1), N(2)))])));
+        var ev = List(N(0), S("START_PSYS"), List(T("Fx")), new ThnTable([N(1)], [F("duration", N(2))]));
+        var pos = P("spatialprops.pos");
+        var length = P("props.duration");
+
+        Assert.Null(ThnElementPaths.Get(ThnElementKind.Entity, entity, pos));
+        Assert.Equal(List(N(0), N(1), N(2)), ThnElementPaths.EngineGet(ThnElementKind.Entity, entity, pos));
+        Assert.Equal(N(2), ThnElementPaths.EngineGet(ThnElementKind.Event, ev, length));
+        Assert.Equal(new ThnTable([N(1)], [F("pos", List(N(3), N(3), N(3)))]),
+            ThnElementPaths.EngineSet(ThnElementKind.Entity, entity, pos, List(N(3), N(3), N(3)))["spatialprops"]);
+        Assert.Throws<ThnPathException>(() => ThnElementPaths.Set(ThnElementKind.Entity, entity, pos, N(1)));
+        Assert.Equal(P("spatialprops"), ThnElementPaths.PatchPath(ThnElementKind.Entity, entity, pos));
+        Assert.Equal(P("props"), ThnElementPaths.PatchPath(ThnElementKind.Event, ev, length));
+        Assert.Equal(P("spatialprops.pos"), ThnElementPaths.PatchPath(ThnElementKind.Entity, Camera, pos));
+        Assert.Equal(P("cameraprops.x.y"), ThnElementPaths.PatchPath(ThnElementKind.Entity, Camera, P("cameraprops.x.y")));
+        Assert.Equal(List(N(0), S("START_PSYS"), List(T("Fx")), List(N(1))),
+            ThnElementPaths.EngineRemoveWithMadeRecords(ThnElementKind.Event, ev, length, List(N(0), S("START_PSYS"), List(T("Fx")))));
+        var e = Assert.Throws<ThnPathException>(() =>
+            ThnElementPaths.EngineSet(ThnElementKind.Entity, entity, P("entity_name.x"), N(1)));
+        Assert.Equal("'entity_name.x' goes through 'entity_name', which is not a table.", e.Message);
+    }
+
     /// <summary>A change keeps the place of its key, and the other values stay the same objects.</summary>
     [Fact]
     public void ASetKeepsThePlaceOfTheKeyAndSharesTheOtherValues()
