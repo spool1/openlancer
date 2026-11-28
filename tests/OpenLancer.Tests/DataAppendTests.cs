@@ -158,8 +158,8 @@ public sealed class DataAppendTests
 
         var overlay = ws.Build(mod);
 
-        Assert.Equal(@"[Good]: ol.append is only for a [Data] section of a patch of EXE\freelancer.ini.",
-            Assert.Single(overlay.Diagnostics).Message);
+        Assert.Equal(@"[Good]: ol.append is only for a [Data] section of a patch of EXE\freelancer.ini, and for a " +
+                     "section with item lists: [locked_gates].", Assert.Single(overlay.Diagnostics).Message);
     }
 
     [Fact]

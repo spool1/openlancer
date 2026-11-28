@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using LibreLancer.Data;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing.Universe;
+using OpenLancer.Data.Ini;
 
 namespace OpenLancer.Data.Editing.Scene;
 
@@ -48,7 +48,7 @@ internal static class GateLocks
                     var lines = view.Lines(key);
                     for (var line = 0; line < lines.Count; line++)
                     {
-                        if (lines[line].Values.Count > 0 && HashOf(lines[line].Values[0]) == hash)
+                        if (lines[line].Values.Count > 0 && ItemLists.HashOf(lines[line].Values[0]) == hash)
                             result.Add(new GateLock(section, lines[line].Name, line, 0));
                     }
                 }
@@ -91,7 +91,7 @@ internal static class GateLocks
                 var changed = false;
                 foreach (var line in view.Lines(key))
                 {
-                    if (line.Values.Count == 0 || HashOf(line.Values[0]) is not { } hash || !hashes.Contains(hash))
+                    if (line.Values.Count == 0 || ItemLists.HashOf(line.Values[0]) is not { } hash || !hashes.Contains(hash))
                         lines.Add(line.Values);
                     else if (wanted && kept.Add(hash))
                         lines.Add(line.Values);
@@ -181,7 +181,7 @@ internal static class GateLocks
                 var into = entry.Name.Equals(Keys[0], StringComparison.OrdinalIgnoreCase) ? player
                     : entry.Name.Equals(Keys[1], StringComparison.OrdinalIgnoreCase) ? npc
                     : null;
-                if (into != null && entry.Count > 0 && HashOf(entry[0]) is { } hash)
+                if (into != null && entry.Count > 0 && ItemLists.HashOf(entry[0]) is { } hash)
                     into.Add(hash);
             }
         }
@@ -192,17 +192,4 @@ internal static class GateLocks
 
     /// <summary>The value of a gate lock for a hash: the hash as an unsigned decimal number.</summary>
     private static ValueBase ValueOf(uint hash) => new Int32Value(unchecked((int)hash), unsigned: true);
-
-    /// <summary>The hash that a value holds, or null when it holds no number.</summary>
-    internal static uint? HashOf(ValueBase value)
-    {
-        if (value is StringValue)
-        {
-            return ulong.TryParse(value.ToString().Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var text) &&
-                   text <= uint.MaxValue
-                ? (uint)text
-                : null;
-        }
-        return value.TryToInt32(out var number) ? unchecked((uint)number) : null;
-    }
 }

@@ -74,6 +74,12 @@ internal sealed record PatchText(
 /// between its lines (see <c>AddLinked</c>). In an order-sensitive section, a change writes all lines, also a change of
 /// the order of lines with different names. A pinned name is a name that the loaded patch sets or removes, and that no
 /// edit touched. The writer always writes it, so the mod keeps it when a lower mod changes.</item>
+/// <item>Item lists (see <see cref="SectionKeys.ItemListsOf"/>, issue #94): an edit of an item list writes only the
+/// lines that it adds, with <c>ol.append</c>, and the lines that it removes, with <c>ol.remove_line</c>. So the lines
+/// of the lower layers stay, also on another game. A pinned item list of the loaded patch keeps its added and removed
+/// lines. A loaded item list with all its lines, the form before issue #94, stays in that form until an edit changes
+/// an item list of the section. Then the writer writes each item list of the section in the new form. A line without
+/// an item that the new form cannot add or remove keeps the old form for the section.</item>
 /// <item>Deleted: the key line and <c>ol.delete</c>. The merge also deletes the child sections.</item>
 /// <item>New: <c>ol.new</c> and all lines. A new child of a section in B gets <c>ol.parent</c>. The children of
 /// a new section follow it with no directive. A new <c>[BaseGood]</c> needs no directive.</item>
@@ -303,6 +309,55 @@ internal static class PatchWriter
     /// section in B and W, or no line with the text of the loaded patch.</param>
     private sealed record Failure(SectionIdentity? Id, string Message, bool CanRewrite);
 
+    /// <summary>The lines of the item lists that a patch section adds and removes (see
+    /// <see cref="SectionKeys.ItemListsOf"/>).</summary>
+    /// <param name="Added">The lines that <c>ol.append</c> adds, in the order of W, with the line of B that gives their
+    /// value types.</param>
+    /// <param name="Removed">The name and the item of each <c>ol.remove_line</c> line.</param>
+    private sealed record ItemPlan(ItemLists Lists, IReadOnlyList<(Entry Line, Entry? Replaced)> Added,
+        IReadOnlyList<(string Name, string Item)> Removed)
+    {
+        public bool HasLines => Added.Count > 0 || Removed.Count > 0;
+    }
+
+    /// <summary>The lines of the item lists that a loaded patch section adds with <c>ol.append</c> and removes with
+    /// <c>ol.remove_line</c>.</summary>
+    /// <param name="Names">The names of the item lists with such lines.</param>
+    /// <param name="Added">The added items, as <see cref="IniPatcher.ItemKey"/> texts.</param>
+    /// <param name="Removed">The name and the item of each removed line.</param>
+    private sealed record LoadedItems(IReadOnlySet<string> Names, IReadOnlySet<string> Added,
+        IReadOnlyList<(string Name, string Item)> Removed)
+    {
+        public static LoadedItems Of(SourceSection? source, ItemLists lists)
+        {
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var added = new HashSet<string>();
+            var removed = new List<(string, string)>();
+            var lines = source?.Lines ?? [];
+            // A loaded section with ol.append = true adds the lines of its item lists.
+            var appends = lines.Where(l => l.Parsed.Name.Equals(IniPatcher.DirectiveAppend, StringComparison.OrdinalIgnoreCase) &&
+                                           l.Parsed.Count == 1 && l.Parsed[0].TryToBoolean(out var value) && value)
+                .Select(l => l.Part).ToHashSet();
+            foreach (var line in lines)
+            {
+                var parsed = line.Parsed;
+                if (appends.Contains(line.Part) && lists.Has(parsed.Name) && lists.ItemOf(parsed) is { } item)
+                {
+                    names.Add(parsed.Name);
+                    added.Add(IniPatcher.ItemKey(parsed.Name, item));
+                }
+                else if (parsed.Name.Equals(IniPatcher.DirectiveRemoveLine, StringComparison.OrdinalIgnoreCase) &&
+                         parsed.Count >= 2 && parsed[0].ToString().Trim() is var name && lists.Has(name) &&
+                         lists.ItemOf(parsed.Skip(1)) is { } removedItem)
+                {
+                    names.Add(name);
+                    removed.Add((name, removedItem));
+                }
+            }
+            return new LoadedItems(names, added, removed);
+        }
+    }
+
     private sealed class Plan
     {
         private readonly string path;
@@ -518,18 +573,21 @@ internal static class PatchWriter
             names.UnionWith(pinned);
             names.RemoveWhere(IsKey);
             AddLinked(original, edited, names, n => before.ContainsKey(n) || after.ContainsKey(n), IsKey);
+            var items = ItemLines(original, edited, names, pinned, loadedSection);
+            bool IsItem(string name) => items != null && items.Lists.Has(name);
+            names.RemoveWhere(IsItem);
             // The lines of each name can be the same while lines with different names change places. In an
             // order-sensitive section, that is a change too. A new key alone is a rename, not a change of the order.
             var orderSensitive = SectionKeys.IsOrderSensitive(edited.Name, path);
             if (names.Count == 0 && orderSensitive && !original.Select(e => e.Name)
                     .SequenceEqual(edited.Select(e => e.Name), StringComparer.OrdinalIgnoreCase))
-                names.UnionWith(after.Keys.Where(n => !IsKey(n)));
-            if (names.Count == 0 && !keepEmpty && !rename)
+                names.UnionWith(after.Keys.Where(n => !IsKey(n) && !IsItem(n)));
+            if (names.Count == 0 && items is not { HasLines: true } && !keepEmpty && !rename)
                 return null;
             if (names.Count > 0 && SectionKeys.IsReplaced(edited.Name, path))
                 return Replaced(i, j, rename ? key : null, loadedSection, rewritten);
             if (names.Count > 0 && orderSensitive)
-                names.UnionWith(after.Keys.Where(n => !IsKey(n)));
+                names.UnionWith(after.Keys.Where(n => !IsKey(n) && !IsItem(n)));
 
             // W has a renamed section under its new key, so only B must give the old key once.
             var reason = NotPatchable(original, kept: !rename);
@@ -565,7 +623,83 @@ internal static class PatchWriter
                 .ToList();
             if (removed.Count > 0 && lines.Remove(removed) is { } removeError)
                 return Problem(id, removeError);
+            if (items != null && WriteItems(lines, items) is { } itemError)
+                return Problem(id, itemError);
             return Built(wIds[j], lines);
+        }
+
+        /// <summary>
+        /// The lines of the item lists of a changed section that the patch adds and removes against B, or null when the
+        /// patch writes the item lists by name, as other lines (see the item lists in the remarks of
+        /// <see cref="PatchWriter"/>).
+        /// </summary>
+        /// <param name="names">The names that changed, the pinned names included.</param>
+        /// <param name="pinned">The pinned names of the section.</param>
+        /// <param name="loadedSection">The loaded sections that change the section, or null.</param>
+        private ItemPlan? ItemLines(Section original, Section edited, HashSet<string> names,
+            IReadOnlyCollection<string> pinned, SourceSection? loadedSection)
+        {
+            if (SectionKeys.ItemListsOf(edited.Name) is not { } lists)
+                return null;
+            var loaded = LoadedItems.Of(loadedSection, lists);
+            bool Pinned(string name) => pinned.Contains(name, StringComparer.OrdinalIgnoreCase);
+            var edits = lists.Keys.Any(k => names.Contains(k) && !Pinned(k));
+            var kept = lists.Keys.Where(k => Pinned(k) && loaded.Names.Contains(k)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!edits && kept.Count == 0)
+                return null;
+            var added = new List<(Entry Line, Entry? Replaced)>();
+            var removed = new List<(string Name, string Item)>();
+            foreach (var key in lists.Keys)
+            {
+                bool OfKey(Entry e) => e.Name.Equals(key, StringComparison.OrdinalIgnoreCase);
+                var before = original.Where(OfKey).ToList();
+                var after = edited.Where(OfKey).ToList();
+                var beforeItems = before.Select(lists.ItemOf).OfType<string>().ToHashSet();
+                var afterItems = after.Select(lists.ItemOf).OfType<string>().ToHashSet();
+                // A line without an item stays only when the other side has the same line.
+                if (after.Any(a => lists.ItemOf(a) == null && !before.Any(b => SectionComparer.SameLines([a], [b], Binary))) ||
+                    before.Any(b => lists.ItemOf(b) == null && !after.Any(a => SectionComparer.SameLines([a], [b], Binary))))
+                    return null;
+                // The merge puts an added line after the last line of its name, which gives its value types.
+                var addedItems = new HashSet<string>();
+                foreach (var line in after)
+                {
+                    if (lists.ItemOf(line) is { } item &&
+                        (!beforeItems.Contains(item) || kept.Contains(key) && loaded.Added.Contains(IniPatcher.ItemKey(key, item))) &&
+                        addedItems.Add(item))
+                        added.Add((line, before.LastOrDefault()));
+                }
+                var removedItems = new HashSet<string>();
+                foreach (var line in before)
+                {
+                    if (lists.ItemOf(line) is { } item && !afterItems.Contains(item) && removedItems.Add(item))
+                        removed.Add((line.Name, item));
+                }
+                if (!kept.Contains(key))
+                    continue;
+                foreach (var (name, item) in loaded.Removed)
+                {
+                    if (name.Equals(key, StringComparison.OrdinalIgnoreCase) && !afterItems.Contains(item) &&
+                        removedItems.Add(item))
+                        removed.Add((name, item));
+                }
+            }
+            return new ItemPlan(lists, added, removed);
+        }
+
+        /// <summary>Writes the lines of an item plan: <c>ol.append</c> and the added lines, then one
+        /// <c>ol.remove_line</c> line for each removed line.</summary>
+        private static string? WriteItems(PatchSectionBuilder lines, ItemPlan items)
+        {
+            var error = items.Added.Count > 0 ? lines.Directive(IniPatcher.DirectiveAppend, TrueValue) : null;
+            foreach (var (line, replaced) in items.Added)
+            {
+                var item = items.Lists.ItemOf(line);
+                error ??= lines.Item(line, replaced, loaded => items.Lists.ItemOf(loaded) == item);
+            }
+            foreach (var (name, item) in items.Removed)
+                error ??= lines.RemoveLine(name, item, values => items.Lists.ItemOf(values) == item);
+            return error;
         }
 
         /// <summary>A section of B that W does not have.</summary>

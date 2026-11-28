@@ -6,6 +6,7 @@ using System.Numerics;
 using LibreLancer.Data;
 using LibreLancer.Data.Ini;
 using OpenLancer.Data.Editing.Universe;
+using OpenLancer.Data.Ini;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Validation;
@@ -234,7 +235,7 @@ internal static class ConnectionChecks
             if (!SceneSections.Is(entry.Name, "locked_gate") && !SceneSections.Is(entry.Name, "npc_locked_gate") ||
                 entry.Values.Count == 0)
                 continue;
-            if (GateLocks.HashOf(entry.Values[0]) is { } hash && !gates.Contains(hash))
+            if (ItemLists.HashOf(entry.Values[0]) is { } hash && !gates.Contains(hash))
                 yield return Warning(section,
                     $"The gate lock {hash} in {SceneSections.FileName(section.Path)} names no jump gate or jump hole. The " +
                     "game ignores the line.") with { Key = entry.Name, EntryIndex = i };

@@ -205,6 +205,31 @@ exclusion = Zone_Bw05_yanagi_debris_field
 fog_far = 2000
 ```
 
+### Item lists
+
+The engine reads the lines of some names as a set of items. The order of the lines has no effect, and two lines with the same item give one item. A patch can add and remove single lines of such an item list. The other lines of the target stay: the lines of the game, of the other mods and of the other games of the mod.
+
+| Section | Item lists | Item |
+|---|---|---|
+| `[locked_gates]` of `DATA\InitialWorld.ini` | `locked_gate`, `npc_locked_gate` | The FLHash of the nickname of a gate or a hole, as a decimal number. The signed form and the unsigned form give the same item, for example `-1368878011` and `2926089285`. |
+
+This patch locks one more gate for the player and removes the NPC lock of another gate:
+
+```ini
+[locked_gates]
+ol.append = true
+locked_gate = 2668024514
+ol.remove_line = npc_locked_gate, 2926089285
+```
+
+- `ol.append = true` adds each line of an item list of the patch section. The line goes after the last line of its name, or at the end of the section. The merge skips a line whose item the target already has.
+- `ol.remove_line = <name>, <item>` removes the lines of the item list `<name>` with this item. When the target has no such line, nothing changes. A patch section can have many `ol.remove_line` lines.
+- The other lines of the patch section change the target as usual. A line of an item list in a patch section without `ol.append` replaces all lines of its name. So a patch from before these rules keeps its meaning.
+- `ol.append` and `ol.remove_line` cannot go with `ol.new`, `ol.delete`, `ol.rename`, `ol.replace` or `ol.parent`. In such a patch section, `ol.remove` cannot remove an item list. Without `ol.append`, a line of an item list and `ol.remove_line` for the same name cannot go together.
+- An added line without a valid item, an `ol.remove_line` line without the name of an item list or without a valid item, and an item that the patch section adds and removes are errors.
+- Two mods that add or remove single lines of an item list do not change the same entry, so the merge gives no warning. A later mod that sets all lines of the name gives the warning of "Two mods that change the same entry", because its lines replace the added lines.
+- These rules are an optional addition to the patch rules. A mod without them does not change. An older OpenLancer gives an error for a patch section with them, because it does not know `ol.remove_line`, and it takes `ol.append` only in `freelancer.ini`.
+
 ### Value types in binary files
 
 Most retail INI files are binary. A binary file stores each value as a boolean, an integer (32 bits), a float or text. A patch is text, so the merge gets the type of a patch value from its text: `5` is an integer, `5.0` is a float, `true` is a boolean and `li_gun` is text.
@@ -243,7 +268,8 @@ Directives start with `ol.`. Do not use `@`: the INI parser ignores lines that s
 | `ol.remove = name1, name2` | Remove all target entries with these names. |
 | `ol.parent = <key>` | With `ol.new`, add a child section to the parent section with this key (see below). |
 | `ol.rename = <new key>` | Give the target section a new key. The section keeps its place (see "Renames"). |
-| `ol.append = true` | Only in a `[Data]` section of a patch of `EXE/freelancer.ini`: add the lines of the section to `[Data]` (see "freelancer.ini"). |
+| `ol.append = true` | In a `[Data]` section of a patch of `EXE/freelancer.ini`: add the lines of the section to `[Data]` (see "freelancer.ini"). In a section with item lists, for example `[locked_gates]`: add each line of an item list whose item the target does not have (see "Item lists"). |
+| `ol.remove_line = <name>, <item>` | Only in a section with item lists: remove the lines of the item list `<name>` with this item (see "Item lists"). |
 | `ol.replace = true` | Only in a mission file: replace all lines of the target section with the lines of the patch section, in order (see "Mission files"). |
 | `ol.base = <hash>` | Only in a mission file, with `ol.replace` or `ol.delete`: the hash of the section when the editor wrote the patch (see "Mission files"). |
 | `ol.before = <type>, <key>` | Only in a mission file, with `ol.new`: add the new section directly before the section with this type and key (see "Mission files"). |
@@ -668,6 +694,8 @@ npc_locked_gate = 2926089285
 - `locked_gate` locks the gate for the player in a new game. A mission opens it with `Act_LockDock`. The route tables leave out the gate, also after a mission opens it.
 - `npc_locked_gate` locks the gate for the NPCs. It does not change the route tables.
 - OpenLancer can change the locks of a gate of the game too. Then the patch of `InitialWorld.ini` changes. The story can depend on such a lock.
+- The lock lines are item lists (see "Item lists"). A lock change writes only the lock lines that it adds, with `ol.append`, and the lock lines that it removes, with `ol.remove_line`. A rename and a delete of a gate do the same. So a mod for vanilla 1.1 and HD Edition 0.7.1 keeps the lock lines of each game. For example, HD Edition locks the jump hole from Ku07 to Ku06 for the player, and vanilla 1.1 does not.
+- A patch of an older OpenLancer can have all lock lines of a name. It keeps that form until the next change of a lock line of the section. Then the editor writes the added and removed lock lines in place of the full list.
 - OpenLancer Play does not lock gates.
 
 The checks of the jump connections:
@@ -1620,6 +1648,7 @@ While the game of Play runs, a save whose validation finds no errors also reload
 
 - The lines above the comment block of the first section, the comment block directly above each section, and each line that no edit touched stay with their text and their bytes, comments included.
 - A line of the patch stays also when its value equals the value of a lower mod. So the mod keeps its value when the lower mod changes. Only an edit of that name can remove the line.
+- An added or removed line of an item list stays in the same way, also when a lower mod adds or removes the same item (see "Item lists"). An edit of the item list writes the lines that it adds and removes against the lower layer.
 - A line whose value an edit changes gets new text, without its inline comment.
 - A patch file whose content the edits do not change keeps its bytes.
 - When a patch has no sections after the edits, the editor deletes the file and its empty folders below `patches/`.
@@ -1857,6 +1886,7 @@ When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod
 - FLMM 1.31 reads one tag or one tag end on each line of `script.xml`. So each tag and each tag end is on its own line, and the content of an element is on the lines between them. Each attribute value is in quotes.
 - Each content line of an operation is an INI line as the game file has it. The script adds no indent.
 - A new section is an `append` operation at the end of the file. A new line is a `sectionappend` after the header line and the key line of its section. A changed value is a `sectionreplace`: the raw line of the game file and the new line. FLMM changes only the lines below the header of the section.
+- A line that `ol.append` adds to an item list, for example a lock line, is a new line too. So a new lock is one `sectionappend` after the `[locked_gates]` header. A line that `ol.remove_line` removes is a removed line, so the package holds the whole merged file (see below).
 - FLMM uses the first match of an anchor. So the header line and the key line must occur once in the file as whole lines. Their first match as text must also be these lines. For example, the anchor of `ring_1` is not valid when the section of `ring_10` comes first. The same rule holds for a changed line in its section.
 - A new `[BaseGood]` of new goods adds its lines to the `[BaseGood]` of the same base. The games keep the last line of a good at a base, and a line there comes before the line of the game. So a new `[BaseGood]` with a good that the game section of the base sells is an `append` at the end of the file. An example is a line that changes or removes a line of the game. A new `[Data]` line goes after the last line of its key.
 - The text of the mod becomes `<key> = 0 ;GENERATESTRRES("<text>")` and `<key> = 0 ;GENERATEXMLRES("<text>")`. FLMM makes its own text DLL and writes the id of the text in the line. The game reads the text after the semicolon as a comment. So the text must be the last value of its line, and a line can hold only one text. Else the export refuses the change.

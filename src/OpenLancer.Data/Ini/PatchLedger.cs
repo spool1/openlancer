@@ -11,9 +11,9 @@ namespace OpenLancer.Data.Ini;
 /// between mods. The editor uses it to tell which mod gives a value.
 /// </summary>
 /// <remarks>
-/// <para>A mod can change the lines of a name (it sets or removes them), delete a section, add a section, rename a
-/// section, or replace the whole file. A rename is also a delete of the old identity and an add of the new one. A
-/// whole-file override discards the earlier changes of the file. So <see cref="Record"/> and <see cref="Changes"/> see
+/// <para>A mod can change the lines of a name (it sets or removes them), add or remove single lines of an item list,
+/// delete a section, add a section, rename a section, or replace the whole file. A rename is also a delete of the old
+/// identity and an add of the new one. A whole-file override discards the earlier changes of the file. So <see cref="Record"/> and <see cref="Changes"/> see
 /// only the changes after the last override. <see cref="Owner"/> and <see cref="ModsThatChange"/> see the override
 /// itself.</para>
 /// <para>Sections compare by <see cref="SectionIdentity"/>, and names compare without letter case.</para>
@@ -33,6 +33,17 @@ internal sealed class PatchLedger
             .LastOrDefault(c => c.Sequence > log.LastOverride && c.IsSame(entryName))?.ModId;
         log.Add(section, new Change(log.Next(), entryName == null ? ChangeKind.Delete : ChangeKind.Lines, entryName, modId));
         return previous;
+    }
+
+    /// <summary>
+    /// Records that <paramref name="modId"/> adds or removes single lines of an item list of a section
+    /// (<c>ol.append</c>, <c>ol.remove_line</c>). The lines of the other mods stay, so no earlier change conflicts with
+    /// it. A later change of all lines of the name conflicts with it (see <see cref="Record"/>).
+    /// </summary>
+    public void RecordItems(string path, SectionIdentity section, string entryName, string modId)
+    {
+        var log = Log(path);
+        log.Add(section, new Change(log.Next(), ChangeKind.Items, entryName, modId));
     }
 
     /// <summary>Records that <paramref name="modId"/> adds a section.</summary>
@@ -188,18 +199,23 @@ internal sealed class PatchLedger
         Delete,
 
         Add,
+
+        /// <summary>The mod adds or removes single lines of an item list of a name.</summary>
+        Items,
     }
 
     /// <param name="Sequence">The position of the change among all changes of the file.</param>
-    /// <param name="Name">The entry name of a <see cref="ChangeKind.Lines"/> change, else null.</param>
+    /// <param name="Name">The entry name of a <see cref="ChangeKind.Lines"/> or <see cref="ChangeKind.Items"/> change,
+    /// else null.</param>
     private sealed record Change(int Sequence, ChangeKind Kind, string? Name, string ModId)
     {
-        /// <summary>True when this change is the same kind of change: of the same name, or a delete for null.</summary>
+        /// <summary>True when a change of all lines of a name, or a delete for null, discards this change: a change of
+        /// the lines of the same name, or a delete.</summary>
         public bool IsSame(string? entryName) =>
-            entryName == null ? Kind == ChangeKind.Delete : Kind == ChangeKind.Lines && Is(entryName);
+            entryName == null ? Kind == ChangeKind.Delete : Kind is (ChangeKind.Lines or ChangeKind.Items) && Is(entryName);
 
         /// <summary>True when this change sets the lines of the name in the merged file.</summary>
-        public bool Affects(string entryName) => Kind != ChangeKind.Lines || Is(entryName);
+        public bool Affects(string entryName) => Kind is not (ChangeKind.Lines or ChangeKind.Items) || Is(entryName);
 
         private bool Is(string entryName) => string.Equals(Name, entryName, StringComparison.OrdinalIgnoreCase);
     }
