@@ -764,10 +764,11 @@ internal sealed class TimelineModel
     }
 
     /// <summary>The <c>Priority</c> of a monitor, as the engine reads it: the userprops key without letter case, the last
-    /// one when two keys differ only in case (ThnScript.cs:305-355). An entity without it has the empty text.</summary>
+    /// one when two keys differ only in case, from the record part of the table, whatever its list part holds
+    /// (ThnScript.cs:305-355). An entity without it has the empty text.</summary>
     private static string Priority(ThnTable entity)
     {
-        if (entity["userprops"] is not ThnTable { IsRecord: true } props)
+        if (entity["userprops"] is not ThnTable props)
             return "";
         var value = props.Record.LastOrDefault(f => f.Key.Equals("Priority", StringComparison.OrdinalIgnoreCase)).Value;
         return value switch

@@ -355,4 +355,111 @@ public sealed class ThnGizmoDragTests
         Assert.Equal(ThnPose.Vector(Vector3.Zero), Value(session, cam, "spatialprops.pos"));
         Assert.False(session.CanUndo);
     }
+
+    /// <summary>
+    /// A table can have a list part and a record part. The engine reads <c>spatialprops.pos</c> and
+    /// <c>spatialprops.orient</c> from the record part, whatever the list part holds (ThnScript.cs:371-382). So the
+    /// gizmo starts from that pose. A move and Set camera from view write the record part and keep the list items, and
+    /// the engine reads the new pose.
+    /// </summary>
+    [Fact]
+    public void TheStartPoseComesFromAndGoesToSpatialpropsWithListItems()
+    {
+        const string script = """
+            duration = 1
+            entities = { { entity_name = "Mk_L", type = MARKER, spatialprops = { 7; pos = { 5, 0, 0 }, orient = { { 0, 0, -1 }, { 0, 1, 0 }, { 1, 0, 0 } } } } }
+            events = {}
+            """;
+        using var ws = Workspace(script: script);
+        var session = ws.Session("act");
+        var mark = Entity(session, "Mk_L");
+        var engine = new ThnScript(Encoding.ASCII.GetBytes(script), _ => null!, "list.thn").Entities["Mk_L"];
+
+        var start = ThnPose.StartPose(Table(session, mark));
+        Assert.Equal(engine.Position, start.Position);
+        Assert.True(SameRotation(engine.Rotation, start.Rotation), start.Rotation.ToString());
+        var target = Target(session, mark);
+        Assert.Equal(start, target.Pose);
+
+        using (var drag = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null))
+        {
+            drag.Update(target.Matrix(GizmoTool.Move) * Matrix4x4.CreateTranslation(0, 2, 0), Off);
+            drag.End();
+        }
+
+        var props = Assert.IsType<ThnTable>(Value(session, mark, "spatialprops"));
+        Assert.Equal([N(7)], props.List);
+        Assert.Equal(ThnPose.Vector(new Vector3(5, 2, 0)), props["pos"]);
+        Assert.Equal(new Vector3(5, 2, 0), Engine(session).Entities["Mk_L"].Position);
+
+        var view = new ThnPoseValue(new Vector3(1, 2, 3), Quaternion.CreateFromAxisAngle(Vector3.UnitX, 0.5f));
+        session.Execute(ThnGizmoTarget.SetStartPose(mark, view, "Set camera from view"));
+        Assert.Equal(new ThnTable([N(7)], [F("pos", ThnPose.Vector(view.Position)), F("orient", ThnPose.Orient(view.Rotation))]),
+            Value(session, mark, "spatialprops"));
+        Assert.True(SameRotation(view.Rotation, Engine(session).Entities["Mk_L"].Rotation));
+        AssertSaved(session.Save());
+    }
+
+    /// <summary>
+    /// The engine reads the target pose of a spatial animation from the record parts of its props and of their
+    /// <c>spatialprops</c>, whatever their list parts hold (ThnEvent.cs:79-90, StartSpatialPropAnimEvent.cs:59-100). So
+    /// the gizmo starts from that pose, and a move writes it there and keeps the list items.
+    /// </summary>
+    [Fact]
+    public void TheTargetPoseComesFromAndGoesToTablesWithListItems()
+    {
+        const string script = """
+            duration = 2
+            entities = { { entity_name = "Mk_A", type = MARKER } }
+            events = { { 0, START_SPATIAL_PROP_ANIM, { "Mk_A" }, { 1; duration = 1, spatialprops = { 2; pos = { 1, 2, 3 } } } } }
+            """;
+        using var ws = Workspace(script: script);
+        var session = ws.Session("act");
+        var anim = Event(session, 0);
+        var target = Target(session, anim);
+        Assert.Equal((ThnGizmoPart.EventPose, new Vector3(1, 2, 3)), (target.Part, target.Pose.Position));
+
+        using (var drag = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null))
+        {
+            drag.Update(target.Matrix(GizmoTool.Move) * Matrix4x4.CreateTranslation(0, 0, 1), Off);
+            drag.End();
+        }
+
+        var spatial = new ThnTable([N(2)], [F("pos", ThnPose.Vector(new Vector3(1, 2, 4)))]);
+        Assert.Equal(new ThnTable([N(1)], [F("duration", N(1)), F("spatialprops", spatial)]), Value(session, anim, "props"));
+        var engine = Assert.IsType<StartSpatialPropAnimEvent>(Engine(session).Events.Single());
+        Assert.Equal(new Vector3(1, 2, 4), engine.Pos);
+    }
+
+    /// <summary>
+    /// The engine reads <c>pathprops.path_data</c> from the record part of the table, whatever its list part holds
+    /// (ThnScript.cs:476-484). So a key of such a path takes the gizmo, and a move writes the new path text there and
+    /// keeps the list items.
+    /// </summary>
+    [Fact]
+    public void AKeyOfAPathInPathpropsWithListItemsMoves()
+    {
+        const string script = """
+            duration = 1
+            entities = { { entity_name = "Path_L", type = MOTION_PATH, pathprops = { 1; path_type = "CV_CROrientationSplinePath", path_data = "OPEN, {0,0,0}, {1,0,0,0}, {1,0,0}, {1,0,0,0}, " } } }
+            events = {}
+            """;
+        using var ws = Workspace(script: script);
+        var session = ws.Session("act");
+        var path = Entity(session, "Path_L");
+        var target = Target(session, path, 1);
+        Assert.Equal((ThnGizmoPart.PathKey, new Vector3(1, 0, 0)), (target.Part, target.Pose.Position));
+
+        using (var drag = TestGestures.Drag(session, target, GizmoTool.Move, GizmoSpace.World, null))
+        {
+            drag.Update(Matrix4x4.CreateTranslation(1, 1, 0), Off);
+            drag.End();
+        }
+
+        var props = Assert.IsType<ThnTable>(Value(session, path, "pathprops"));
+        Assert.Equal([N(1)], props.List);
+        var keys = ThnMotionPath.Parse(((ThnText)props["path_data"]!).Value, Evaluator);
+        Assert.Equal(new Vector3(1, 1, 0), keys.Keys[1].Point);
+        Assert.True(Vector3.Distance(new Vector3(1, 1, 0), Engine(session).Entities["Path_L"].Path!.GetPosition(1)) < 1e-5f);
+    }
 }

@@ -38,6 +38,8 @@ public readonly record struct ThnGizmoKey(ThnRef Element, int? PathKey = null);
 /// changes the start pose of the second target instead (see <see cref="Subject"/>).</para>
 /// <para>The engine does not make an entity with the REFERENCE flag (ThnScriptInstance.cs:70-71), so the gizmo does
 /// not change its pose (see <see cref="ThnPose.ReferencePoseNote"/>).</para>
+/// <para>The gizmo reads and writes each value where the engine reads it, also in a table with a list part (see
+/// <see cref="ThnEdits.SetEngineValue"/>).</para>
 /// </remarks>
 public sealed class ThnGizmoTarget : IGizmoTarget
 {
@@ -151,7 +153,7 @@ public sealed class ThnGizmoTarget : IGizmoTarget
         var start = ThnPose.StartPose(table);
         if (key.PathKey is not { } index)
             return new ThnGizmoTarget(key, ThnGizmoPart.StartPose, name, start, null, start, null);
-        if (type != "MOTION_PATH" || ThnMotionPath.Path.ValueIn(ThnElementKind.Entity, table) is not ThnText text)
+        if (type != "MOTION_PATH" || ThnMotionPath.DataOf(table) is not ThnText text)
         {
             reason = "Only a MOTION_PATH with path_data has keys.";
             return null;
@@ -181,8 +183,8 @@ public sealed class ThnGizmoTarget : IGizmoTarget
     /// <summary>The command that sets the start pose of an entity: its position and its rotation, in one entry.</summary>
     public static EditCommand SetStartPose(ThnRef entity, ThnPoseValue pose, string label) => EditCommand.Group(label,
     [
-        ThnEdits.Set(entity, ThnPose.PositionPath, ThnPose.Vector(pose.Position)),
-        ThnEdits.Set(entity, ThnPose.OrientPath, ThnPose.Orient(pose.Rotation)),
+        ThnEdits.SetEngineValue(entity, ThnPose.PositionPath, ThnPose.Vector(pose.Position)),
+        ThnEdits.SetEngineValue(entity, ThnPose.OrientPath, ThnPose.Orient(pose.Rotation)),
     ]);
 
     /// <summary>The matrix that the gizmo starts from: the rotation and the position of the pose.</summary>
@@ -213,15 +215,16 @@ public sealed class ThnGizmoTarget : IGizmoTarget
                 var key = tool == GizmoTool.Move
                     ? old with { Point = Vector3.Transform(pose.Position - frame.Position, inverse) }
                     : old with { Orientation = Quaternion.Normalize(inverse * pose.Rotation) };
-                return ThnEdits.Set(element, ThnMotionPath.Path, new ThnText(ThnMotionPath.Write(path.With(index, key))));
+                return ThnEdits.SetEngineValue(element, ThnMotionPath.Path,
+                    new ThnText(ThnMotionPath.Write(path.With(index, key))));
             case ThnGizmoPart.EventPose:
                 return tool == GizmoTool.Move
-                    ? ThnEdits.Set(element, ThnPose.EventPositionPath, ThnPose.Vector(pose.Position))
-                    : ThnEdits.Set(element, ThnPose.EventRotationPath, ThnPose.QOrient(pose.Rotation));
+                    ? ThnEdits.SetEngineValue(element, ThnPose.EventPositionPath, ThnPose.Vector(pose.Position))
+                    : ThnEdits.SetEngineValue(element, ThnPose.EventRotationPath, ThnPose.QOrient(pose.Rotation));
             default:
                 return tool == GizmoTool.Move
-                    ? ThnEdits.Set(element, ThnPose.PositionPath, ThnPose.Vector(pose.Position))
-                    : ThnEdits.Set(element, ThnPose.OrientPath, ThnPose.Orient(pose.Rotation));
+                    ? ThnEdits.SetEngineValue(element, ThnPose.PositionPath, ThnPose.Vector(pose.Position))
+                    : ThnEdits.SetEngineValue(element, ThnPose.OrientPath, ThnPose.Orient(pose.Rotation));
         }
     }
 
@@ -239,8 +242,8 @@ public sealed class ThnGizmoTarget : IGizmoTarget
             ? ThnPose.StartPose(entity.Table)
             : new ThnPoseValue(Vector3.Zero, Quaternion.Identity);
         var pose = new ThnPoseValue(
-            ThnPose.Vector(ThnPose.EventPositionPath.ValueIn(ThnElementKind.Event, ev)) ?? start.Position,
-            ThnPose.QOrient(ThnPose.EventRotationPath.ValueIn(ThnElementKind.Event, ev)) ?? start.Rotation);
+            ThnPose.Vector(ThnPose.EventPositionPath.EngineValueIn(ThnElementKind.Event, ev)) ?? start.Position,
+            ThnPose.QOrient(ThnPose.EventRotationPath.EngineValueIn(ThnElementKind.Event, ev)) ?? start.Rotation);
         return new ThnGizmoTarget(key, ThnGizmoPart.EventPose, $"the target pose of {target}", pose, null, pose, null);
     }
 
