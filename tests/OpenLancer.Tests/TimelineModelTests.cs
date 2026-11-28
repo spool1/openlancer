@@ -122,6 +122,17 @@ public sealed class TimelineModelTests
         Assert.Equal(3, model.MainLane.Cuts.Count);
     }
 
+    /// <summary>A table can have a list part and a record part. The engine reads the Priority from the record part,
+    /// whatever the list part holds (ThnScript.cs:305-355). So Cam_Monitor with the Priority 3 comes after the Priority
+    /// 2.</summary>
+    [Fact]
+    public void ThePriorityComesAlsoFromUserpropsWithListItems()
+    {
+        var model = Model(Script.Replace("userprops = { priority = \"1\" }", "userprops = { 1; priority = \"3\" }"));
+
+        Assert.Equal("Cam_Monitor_min_spec", model.MainLane!.Name);
+    }
+
     /// <summary>The engine reads the userprops keys without letter case (ThnScript.cs:305-355).</summary>
     [Fact]
     public void TheKeyOfThePriorityHasNoLetterCase()
