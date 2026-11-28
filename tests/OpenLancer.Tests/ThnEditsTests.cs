@@ -265,6 +265,38 @@ public sealed class ThnEditsTests
     }
 
     /// <summary>
+    /// A table can have a list part and a record part. The engine reads the speaker from the record part, whatever the
+    /// list part holds (ThnScript.cs:305-334). So the rename changes such a speaker and keeps the list items. A patch
+    /// path ends at a table with a list part, so the patch sets the whole userprops table. A rename back gives the
+    /// lower cutscene.
+    /// </summary>
+    [Fact]
+    public void RenameEntityChangesTheSpeakerInATableWithListItems()
+    {
+        using var ws = Workspace(script: Script.Replace("userprops = { speaker = \"char_TRENT\" }",
+            "userprops = { 1; speaker = \"char_TRENT\" }"));
+        var session = ws.Session("act");
+        var trent = Entity(session, "Char_trent");
+        var voice = Entity(session, "Voice_trent");
+        var lower = session.LowerCutscene(ScriptPath)!;
+
+        session.Execute(ThnEdits.RenameEntity(trent, "Char_hero"));
+
+        var renamed = new ThnTable([N(1)], [F("speaker", T("Char_hero"))]);
+        Assert.Equal(renamed, Value(session, voice, "userprops"));
+        var script = new ThnScript(Encoding.ASCII.GetBytes(ThnWriter.Write(W(session).ToGlobals())), _ => null!, "x.thn");
+        Assert.Equal("Char_hero", script.Entities["Voice_trent"].Speaker);
+        AssertSaved(session.Save());
+        var entry = Patch(ws).Entities.Single(e => Equals(e.Match, T("Voice_trent")));
+        Assert.Equal(("userprops", (ThnValue)renamed), (Assert.Single(entry.Sets).Path.Text, entry.Sets[0].Value));
+
+        session.Execute(ThnEdits.RenameEntity(trent, "Char_trent"));
+        Assert.Equal(lower, W(session));
+        AssertSaved(session.Save());
+        Assert.Null(PatchText(ws));
+    }
+
+    /// <summary>
     /// A revert of a renamed entity puts back its name and the references to it in their lower letter case, as a
     /// rename back does. So the cutscene is the lower cutscene again. The revert refuses a name that another entity
     /// has now.
@@ -350,6 +382,29 @@ public sealed class ThnEditsTests
         AssertSaved(session.Save());
         var entry = Assert.Single(Patch(ws).Events);
         Assert.Equal(("props.duration", (ThnValue)N(0)), (Assert.Single(entry.Sets).Path.Text, entry.Sets[0].Value));
+    }
+
+    /// <summary>
+    /// The engine reads <c>props.duration</c> from the record part of the props, whatever the list part holds
+    /// (ThnEvent.cs:47-55). So a change of the length reads and writes the length there, and it keeps the list items.
+    /// A length back to 0 removes the key again when the lower event has none.
+    /// </summary>
+    [Fact]
+    public void MoveEventsChangesTheLengthInPropsWithListItems()
+    {
+        using var ws = Workspace(script: Script
+            .Replace("{ 5, START_PSYS, { \"Fx\" }, { duration = 2 } }", "{ 5, START_PSYS, { \"Fx\" }, { 1; duration = 2 } }")
+            .Replace("{ 5, START_PSYS, { \"Fx\" }, { duration = 3 } }", "{ 5, START_PSYS, { \"Fx\" }, { 1 } }"));
+        var session = ws.Session("act");
+        var (first, second) = (Event(session, 1), Event(session, 2));
+        var lower = session.LowerCutscene(ScriptPath)!;
+
+        session.Execute(ThnEdits.MoveEvents([first, second], 0, 0.5f));
+
+        Assert.Equal(new ThnTable([N(1)], [F("duration", N(2.5f))]), Value(session, first, "props"));
+        Assert.Equal(new ThnTable([N(1)], [F("duration", N(0.5f))]), Value(session, second, "props"));
+        session.Execute(ThnEdits.MoveEvents([first, second], 0, -0.5f));
+        Assert.Equal(lower, W(session));
     }
 
     /// <summary>

@@ -63,6 +63,17 @@ public sealed class TimelineAudioTests
         Assert.Empty(Cues(play: ScriptPlay.Set));
     }
 
+    /// <summary>A table can have a list part and a record part. The engine reads the attenuation and the speaker from
+    /// the record part, whatever the list part holds (ThnScript.cs:305-368). So the cues read them there too.</summary>
+    [Fact]
+    public void TheCuesReadTheAttenuationAndTheSpeakerAlsoFromTablesWithListItems()
+    {
+        var cues = Cues(Script.Replace("audioprops = { attenuation = -3 }", "audioprops = { 1; attenuation = -3 }")
+            .Replace("userprops = { SPEAKER = \"Char_a\" }", "userprops = { 1; SPEAKER = \"Char_a\" }"));
+
+        Assert.Equal((-3f, "Char_a"), (cues[0].Attenuation, cues[1].Speaker));
+    }
+
     [Fact]
     public void APlayFromZeroStartsEachCueAtItsStartWithTheOffsetOfStartTime()
     {

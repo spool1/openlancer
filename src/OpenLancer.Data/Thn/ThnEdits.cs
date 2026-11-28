@@ -59,6 +59,22 @@ public static class ThnEdits
         return new ValueCommand($"Set {path}", target, path, value);
     }
 
+    /// <summary>
+    /// Sets a value where the engine reads it. The engine reads a key from the record part of a table, whatever the
+    /// list part of the table holds. So unlike <see cref="Set"/>, the path can go through a table with a list part, for
+    /// example <c>spatialprops = { 1; pos = { 0, 0, 0 } }</c>, and the set keeps the list part. A patch path ends at
+    /// such a table, so the patch sets the whole table, and the edit removes the pins of the table. Each missing record
+    /// on the path is made.
+    /// </summary>
+    /// <remarks>The gizmo of the Cutscene view uses this command, because it reads the poses and the path keys as the
+    /// engine reads them (see <see cref="ThnPath.EngineValueIn"/>).</remarks>
+    public static EditCommand SetEngineValue(ThnRef target, ThnPath path, ThnValue value)
+    {
+        CheckPath(target, path, remove: false);
+        CheckValue(value, nameof(value));
+        return new EngineValueCommand(target, path, value);
+    }
+
     /// <summary>Removes the value at a path. A path without a value changes nothing, but loses its pin.</summary>
     public static EditCommand Remove(ThnRef target, ThnPath path)
     {
@@ -122,7 +138,8 @@ public static class ThnEdits
 
     /// <summary>
     /// Gives an entity a new name. The command also changes each event target and each <c>userprops.speaker</c> of
-    /// the cutscene that names the entity, without regard to letter case, as the engine finds them. Such a reference
+    /// the cutscene that names the entity, without regard to letter case, as the engine finds them. This includes a
+    /// speaker in a <c>userprops</c> table with a list part (see <see cref="SetEngineValue"/>). Such a reference
     /// keeps the text of the lower cutscene when that text names the new name, so a rename back gives the lower
     /// cutscene. The command does not change <c>userprops.Actor</c>, which names an RTC character or a fixture role, not
     /// an entity of the script. It changes no other file.
@@ -498,11 +515,11 @@ public static class ThnEdits
             Table = ThnElementPaths.Set(ThnElementKind.Entity, entity.Table, namePath, new ThnText(newName)),
         };
         // The voice of a line comes from the entity that userprops.speaker names (ThnSound.cs:81-99). The engine reads
-        // the userprops keys without letter case (ThnScript.cs:305-313). An entity that a later entity hides does not
-        // change (decision D64).
+        // the userprops keys without letter case, from the record part of the table, whatever its list part holds
+        // (ThnScript.cs:305-334). An entity that a later entity hides does not change (decision D64).
         for (var i = 0; i < entities.Count; i++)
         {
-            if (entities[i].Table[userProps] is not ThnTable { IsRecord: true } props ||
+            if (entities[i].Table[userProps] is not ThnTable props ||
                 document.ReadOnlyReasonOf(ThnElementKind.Entity, entities[i].Id) != null)
                 continue;
             var lower = document.LowerTable(ThnElementKind.Entity, entities[i]);
@@ -512,11 +529,12 @@ public static class ThnEdits
                 if (!key.Equals(speaker, StringComparison.OrdinalIgnoreCase) || !Names(value, oldName))
                     continue;
                 var path = new ThnPath($"{userProps}{ThnPath.Separator}{key}");
-                var text = Reference(lower == null ? null : ThnElementPaths.Get(ThnElementKind.Entity, lower, path));
+                var text = Reference(lower == null ? null : ThnElementPaths.EngineGet(ThnElementKind.Entity, lower, path));
                 if (text.Equals(value))
                     continue;
-                table = ThnElementPaths.Set(ThnElementKind.Entity, table, path, text);
-                changed.Add(new ThnPin(entities[i].Id, path));
+                table = ThnElementPaths.EngineSet(ThnElementKind.Entity, table, path, text);
+                changed.Add(new ThnPin(entities[i].Id,
+                    ThnElementPaths.PatchPath(ThnElementKind.Entity, entities[i].Table, path)));
             }
             if (!ReferenceEquals(table, entities[i].Table))
                 entities[i] = Patchable(ThnElementKind.Entity, entities[i]) with { Table = table };
@@ -574,8 +592,9 @@ public static class ThnEdits
         }
         if (lengthDelta == 0)
             return (time, null, null);
-        // An event without props.duration has the length 0 (ThnEvent.cs:14, :55).
-        var oldLength = ThnElementPaths.Get(ThnElementKind.Event, ev, EventLengthPath) switch
+        // An event without props.duration has the length 0 (ThnEvent.cs:14, :55). The engine reads the key from the
+        // record part of the props, whatever their list part holds.
+        var oldLength = ThnElementPaths.EngineGet(ThnElementKind.Event, ev, EventLengthPath) switch
         {
             null => 0f,
             ThnNumber number => number.Value,
@@ -678,6 +697,18 @@ public static class ThnEdits
         }
     }
 
+    /// <summary>Sets one value where the engine reads it (see <see cref="SetEngineValue"/>).</summary>
+    private sealed class EngineValueCommand(ThnRef target, ThnPath path, ThnValue value) : EditCommand($"Set {path}")
+    {
+        internal override void Run(EditSession.CommandScope scope)
+        {
+            var (document, index, element) = Find(scope, target);
+            var table = PathChange(() => ThnElementPaths.EngineSet(target.Kind, element.Table, path, value));
+            Replace(document, target.Kind, index, table,
+                PinsIn(element.Id, ThnElementPaths.PatchPath(target.Kind, element.Table, path)));
+        }
+    }
+
     private sealed class FlagsCommand(ThnRef entity, IReadOnlySet<string> flags) : EditCommand("Set flags")
     {
         internal override void Run(EditSession.CommandScope scope)
@@ -764,6 +795,7 @@ public static class ThnEdits
             var document = scope.Cutscene(events[0].Path);
             var list = document.Working.Events;
             var moved = new HashSet<ThnElementId>();
+            var unpinned = new List<ThnPin>();
             foreach (var ev in events)
             {
                 if (!moved.Add(ev.Id))
@@ -775,23 +807,29 @@ public static class ThnEdits
                     throw new InvalidOperationException(refusal);
                 var table = element.Table;
                 if (time is { } newTime)
+                {
                     table = ThnElementPaths.Set(ThnElementKind.Event, table, EventTimePath, new ThnNumber(newTime));
+                    unpinned.Add(new ThnPin(element.Id, EventTimePath));
+                }
                 if (length is { } newLength)
                 {
-                    // When the lower event has no length, the length 0 removes the key, and the props that a move
-                    // made, so the patch gets no value for them.
+                    // The length is where the engine reads it, also in props with a list part. When the lower event
+                    // has no length, the length 0 removes the key, and the props that a move made, so the patch gets
+                    // no value for them.
                     var lower = document.LowerTable(ThnElementKind.Event, element);
                     table = PathChange(() =>
                         newLength == 0 && lower != null &&
-                        ThnElementPaths.Get(ThnElementKind.Event, lower, EventLengthPath) == null
-                            ? ThnElementPaths.RemoveWithMadeRecords(ThnElementKind.Event, table, EventLengthPath, lower)
-                            : ThnElementPaths.Set(ThnElementKind.Event, table, EventLengthPath, new ThnNumber(newLength)));
+                        ThnElementPaths.EngineGet(ThnElementKind.Event, lower, EventLengthPath) == null
+                            ? ThnElementPaths.EngineRemoveWithMadeRecords(ThnElementKind.Event, table, EventLengthPath,
+                                lower)
+                            : ThnElementPaths.EngineSet(ThnElementKind.Event, table, EventLengthPath,
+                                new ThnNumber(newLength)));
+                    unpinned.Add(new ThnPin(element.Id,
+                        ThnElementPaths.PatchPath(ThnElementKind.Event, element.Table, EventLengthPath)));
                 }
                 list = list.SetItem(index, element with { Table = table });
             }
-            document.Change(document.Working with { Events = list }, p => p.Element is { } id && moved.Contains(id) &&
-                                                   (timeDelta != 0 && p.Path.IsWithin(EventTimePath) ||
-                                                    lengthDelta != 0 && p.Path.IsWithin(EventLengthPath)));
+            document.Change(document.Working with { Events = list }, PinsIn(unpinned));
         }
     }
 

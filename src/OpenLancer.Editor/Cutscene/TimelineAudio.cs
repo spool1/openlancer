@@ -122,7 +122,9 @@ internal sealed class TimelineAudio(ISoundOutput output)
 
     /// <summary>
     /// The sound of a SOUND entity from its start, once, for the Preview row of the Inspector: the template, the speaker
-    /// and the attenuation of the entity. Null for an entity that is not a SOUND or that has no template.
+    /// and the attenuation of the entity. Null for an entity that is not a SOUND or that has no template. The engine
+    /// reads the attenuation from the record part of <c>audioprops</c>, whatever its list part holds
+    /// (ThnScript.cs:357-368).
     /// </summary>
     /// <param name="id">The id of the cue.</param>
     public static SoundCue? CueOf(ThnTable entity, ThnElementId id)
@@ -133,7 +135,7 @@ internal sealed class TimelineAudio(ISoundOutput output)
             return null;
         }
 
-        var attenuation = entity["audioprops"] is ThnTable { IsRecord: true } audio && audio["attenuation"] is ThnNumber a
+        var attenuation = entity["audioprops"] is ThnTable audio && audio["attenuation"] is ThnNumber a
             ? a.Value
             : 0;
         return new SoundCue(id, 0, double.PositiveInfinity, template.Value, Speaker(entity), false, 0, attenuation);
@@ -285,10 +287,10 @@ internal sealed class TimelineAudio(ISoundOutput output)
         }
     }
 
-    /// <summary>The <c>speaker</c> of the userprops of an entity, without letter case. The engine keeps the last key
-    /// (ThnScript.cs:305-334).</summary>
+    /// <summary>The <c>speaker</c> of the userprops of an entity, without letter case. The engine keeps the last key,
+    /// and it reads the record part of the table, whatever the list part holds (ThnScript.cs:305-334).</summary>
     private static string? Speaker(ThnTable entity) =>
-        entity["userprops"] is ThnTable { IsRecord: true } props
+        entity["userprops"] is ThnTable props
             ? props.Record.LastOrDefault(f => f.Key.Equals("speaker", StringComparison.OrdinalIgnoreCase)).Value switch
             {
                 null => null,
