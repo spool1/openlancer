@@ -60,7 +60,7 @@ internal static class ConnectionChecks
         var type = SceneSections.ArchetypeType(session, view);
         if (type is "jump_gate" or "jump_hole" && GateLocks.PlayerLocked(session, name) &&
             !GateLocks.PlayerLocked(session, name, lower: true))
-            result.Add(Warning(section, LockText(name, !view.IsNew)));
+            result.Add(Warning(section, LockText(name, IsLowerGate(session, section))));
         return result;
     }
 
@@ -113,6 +113,16 @@ internal static class ConnectionChecks
         $"The route tables leave out {gate}, because a new game locks it for the player. After a mission unlocks it with " +
         "Act_LockDock, nav map routes and NPC routes still do not use it. Set its lock to npc or none to keep it on the " +
         $"routes. Use {SceneSections.LockTool}." + (lowerGate ? " The story can depend on this lock." : "");
+
+    /// <summary>
+    /// True for a jump object of the game or of a mod that loads before the active mod. The story of the game or of
+    /// that mod can lock it. A jump object that the active mod adds is not one. This includes each object of a system
+    /// file in the folder of the active mod, also after a save: B of such a whole file is the saved file of the mod,
+    /// and the lower layer does not have the file. False when the edit view has no such section, for example for a new
+    /// end of a plan.
+    /// </summary>
+    public static bool IsLowerGate(EditSession session, SectionRef gate) =>
+        session.Get(gate) is { IsNew: false } && session.OpenDocument(gate.Path) is { IsWholeFile: false };
 
     /// <summary>True for a <c>[locked_gates]</c> section of a file of the role <c>groups</c>.</summary>
     private static bool IsLockSection(EditSession session, SectionRef section) =>

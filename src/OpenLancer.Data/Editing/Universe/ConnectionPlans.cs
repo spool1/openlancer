@@ -376,7 +376,7 @@ public static class ConnectionPlans
         commands.AddRange(lockEdit.Commands);
         changes.AddRange(lockEdit.Changes);
         var warnings = player
-            ? results.Select((r, i) => LockWarning(r.Object, ends[i].View is { IsNew: false })).ToList()
+            ? results.Select(r => LockWarning(r.Object, ConnectionChecks.IsLowerGate(session, r.Object))).ToList()
             : new List<Diagnostic>();
 
         plan.Ends = results;
@@ -415,7 +415,9 @@ public static class ConnectionPlans
         plan.Label = locked == JumpLock.None ? $"Unlock {name}" : $"Lock {name}";
         plan.Changes = edit.Changes;
         plan.Routes = RouteTable.Diff(session.Routes.Tables.All, planned.Routes().All);
-        plan.Warnings = player ? gates.Select(g => LockWarning(g, session.Get(g)?.IsNew == false)).ToList() : [];
+        plan.Warnings = player
+            ? gates.Select(g => LockWarning(g, ConnectionChecks.IsLowerGate(session, g))).ToList()
+            : [];
         plan.SelectAfter = gate;
         plan.Command = EditCommand.Group(plan.Label, edit.Commands, session.Snapshot());
         return plan;
