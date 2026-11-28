@@ -18677,13 +18677,13 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The reference of an object of the system at the start, for example obj:my_sys01_to_my_sys02. Without start, the first ring goes at a clear distance from the object, toward the other end. The clear distance is the solar_radius of its archetype plus a clearance, and it is also outside a zone with damage. Without start_name, the start takes the name of the object."
+            "description": "An object of the system at the start: its nickname or its obj: reference, for example my_sys01_to_my_sys02. Without start, the first ring goes at a clear distance from the object, toward the other end. The clear distance is the solar_radius of its archetype plus a clearance, and it is also outside a zone with damage. Without start_name, the start takes the name of the object."
           },
           "end_near": {
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "The reference of an object of the system at the end, for example obj:my_sys01_sun. Without end, the last ring goes at a clear distance from the object, toward the other end. The clear distance is the solar_radius of its archetype plus a clearance, and it is also outside a zone with damage. Without end_name, the end takes the name of the object."
+            "description": "An object of the system at the end: its nickname or its obj: reference, for example my_sys01_sun. Without end, the last ring goes at a clear distance from the object, toward the other end. The clear distance is the solar_radius of its archetype plus a clearance, and it is also outside a zone with damage. Without end_name, the end takes the name of the object."
           },
           "start_name": {
             "type": "string",

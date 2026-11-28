@@ -263,9 +263,7 @@ public static class LanePlans
             (int)Math.Round(length / rule.Spacing, MidpointRounding.AwayFromZero) + 1, MinRings, MaxRings);
         var spacing = count > 1 ? length / (count - 1) : length;
         if (count is < MinRings or > MaxRings || spacing is < MinSpacing or > MaxSpacing)
-            return plan.Refuse(path, $"A trade lane needs {MinRings} to {MaxRings} rings, with {MinSpacing:0} to " +
-                                     $"{MaxSpacing:0} m between two rings. This lane has {ConnectionChecks.Meters(spacing)} m.",
-                detail: LaneRings, part: "rings");
+            return plan.Refuse(path, RingsRefusal(length, count, spacing), detail: LaneRings, part: "rings");
         var binary = session.IsBinaryFile(path);
         var stem = options.Nickname?.Trim() is { Length: > 0 } wanted ? wanted : $"{nickname}_Trade_Lane_Ring";
         if (PatchFormatter.KeyError(stem + "_1", binary) is { } stemError)
@@ -379,6 +377,27 @@ public static class LanePlans
         plan.SelectAfter = rings[0];
         plan.Command = EditCommand.Group(plan.Label, [.. commands, .. texts.Commands], session.Snapshot());
         return plan;
+    }
+
+    /// <summary>
+    /// The text of a refusal of a ring count or a spacing outside the limits. It gives the length of the lane, the
+    /// spacing of the count and the counts that fit the length. When no count fits, it gives the distances between the
+    /// ends that fit.
+    /// </summary>
+    /// <param name="length">The distance between the first ring and the last ring in meters.</param>
+    /// <param name="count">The ring count of the request, or the count that the spacing of the rule data gives for the
+    /// length.</param>
+    /// <param name="spacing">The distance between two rings of that count in meters.</param>
+    private static string RingsRefusal(float length, int count, float spacing)
+    {
+        var fewest = (int)Math.Clamp(MathF.Ceiling(length / MaxSpacing) + 1, MinRings, MaxRings + 1);
+        var most = (int)Math.Clamp(MathF.Floor(length / MinSpacing) + 1, MinRings - 1, MaxRings);
+        var fit = fewest <= most
+            ? $"Give {fewest} to {most} rings."
+            : $"Give two ends that are {MinSpacing:0} to {(MaxRings - 1) * MaxSpacing:0} m apart.";
+        return $"A trade lane needs {MinRings} to {MaxRings} rings, with {MinSpacing:0} to {MaxSpacing:0} m between " +
+               $"two rings. The lane is {ConnectionChecks.Meters(length)} m long, so {count} rings stand " +
+               $"{ConnectionChecks.Meters(spacing)} m apart. {fit}";
     }
 
     /// <summary>

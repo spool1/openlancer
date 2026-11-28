@@ -116,8 +116,9 @@ internal static class LaneTools
             values.ThrowIfAny();
             var plan = LanePlans.Create(session, system, start, end, new LaneOptions
             {
-                // A count above the limit stays above it, so the plan refuses it with its text.
-                Rings = args.Whole("rings") is { } count ? (int)Math.Min(count, LanePlans.MaxRings + 1) : null,
+                // A count above the limit goes to the plan as it is, so the refusal of the plan names the spacing of
+                // that count. Only a count above the range of int stops at int.MaxValue.
+                Rings = args.Whole("rings") is { } count ? (int)Math.Min(count, int.MaxValue) : null,
                 Like = like,
                 Faction = faction,
                 Zone = args.Flag("zone"),
@@ -144,8 +145,10 @@ internal static class LaneTools
             var args = call.Args;
             var after = args.Text("after");
             var before = args.Text("before");
-            if ((after == null) == (before == null))
-                throw ToolInput.Bad(after == null ? "after" : "before", AgentTexts.Error("lane_after_or_before"));
+            if (after == null && before == null)
+                throw ToolInput.Bad("after", AgentTexts.Error("lane_after_or_before"));
+            if (after != null && before != null)
+                throw ToolInput.Bad("before", AgentTexts.Error("lane_after_and_before"));
             var field = after != null ? "after" : "before";
             var ring = EditTools.Section(call, (after ?? before)!, field);
             var plan = LanePlans.InsertRing(session, ring, after != null ? LanePlace.After : LanePlace.Before,
@@ -230,12 +233,13 @@ internal static class LaneTools
             targets);
 
     /// <summary>
-    /// One end of <c>trade_lane_create</c>: its point, its object and its name. The object of an end must be an object
-    /// of the system of the lane. The plan checks the kind of the object.
+    /// One end of <c>trade_lane_create</c>: its point, its object and its name. The object of an end is a nickname or
+    /// an <c>obj:</c> reference, as the object of an end of <c>connection_create</c> is. A nickname names an object of
+    /// the system of the lane. A reference must name an object of that system. The plan checks the kind of the object.
     /// </summary>
     /// <param name="name">The stem of the arguments of the end: <c>start</c> or <c>end</c>.</param>
     /// <param name="path">The install path of the system file, or null when the system names no file. The plan then
-    /// refuses the system.</param>
+    /// refuses the system before it reads the ends.</param>
     private static TradeLaneEnd End(ToolCall call, string name, string system, string? path)
     {
         var args = call.Args;
@@ -243,8 +247,12 @@ internal static class LaneTools
         var field = $"{name}_near";
         if (args.Text(field) is { } text)
         {
-            near = EditTools.Section(call, text, field);
-            if (path != null && !VfsPath.Comparer.Equals(near.Path, path))
+            // No nickname holds a ':' (section 5.6 of the MCP1 design), so a text with one is a reference.
+            if (!text.Contains(':'))
+                near = path == null ? null : ObjectOf(call, text.Trim(), system, path, field);
+            else
+                near = EditTools.Section(call, text, field);
+            if (near != null && path != null && !VfsPath.Comparer.Equals(near.Path, path))
             {
                 throw new EditException(new EditError(EditErrorKind.InvalidArgument, UniverseTools.EndOtherSystem,
                     AgentTexts.Error("connection_end_system", ("ref", text), ("system", system)))
@@ -256,6 +264,18 @@ internal static class LaneTools
         }
         return new TradeLaneEnd { Point = args.Point(name), Near = near, Name = args.Text($"{name}_name") };
     }
+
+    /// <summary>The object of a system file with a nickname, without letter case. A nickname that no object of the file
+    /// has gives <c>not_found</c>.</summary>
+    private static SectionRef ObjectOf(ToolCall call, string nickname, string system, string path, string field) =>
+        call.Session.Sections(path).FirstOrDefault(s => SceneSections.Is(s.Id.Type, SceneSections.ObjectType) &&
+                                                        SceneSections.Is(s.Id.Key ?? "", nickname))
+        ?? throw new EditException(new EditError(EditErrorKind.NotFound, MissionErrors.ItemNotFound,
+            AgentTexts.Error("system_no_object", ("system", system), ("name", nickname)))
+        {
+            Field = field,
+            Target = nickname,
+        });
 
     /// <summary>The name of an end ring, or null when the ring has no <c>tradelane_space_name</c> line.</summary>
     private static LaneEndText? EndName(ToolCall call, SectionRef ring) =>
