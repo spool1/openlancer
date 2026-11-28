@@ -107,6 +107,18 @@ public sealed class EditBatch : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gives the value of a read in the states before the batch, then puts back the states after its steps. A commit
+    /// check uses it for a section that it finds only after the steps, for example the problems before the batch of a
+    /// system that a new jump gate leads to.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The batch has ended.</exception>
+    internal T ReadBefore<T>(Func<T> read)
+    {
+        ThrowIfEnded();
+        return session.ReadBefore(change, read);
+    }
+
     /// <summary>Adds a check that runs once before the commit, also in a preview. A member adds a check once.</summary>
     /// <exception cref="InvalidOperationException">The batch has ended.</exception>
     public void AddCommitCheck(IBatchCheck check)

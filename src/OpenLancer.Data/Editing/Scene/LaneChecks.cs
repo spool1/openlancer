@@ -72,6 +72,26 @@ internal static class LaneChecks
     }
 
     /// <summary>
+    /// The other sections whose problems of <see cref="Check"/> read a ring. These are the rings of its lane as the HUD
+    /// walks it, the rings of its circle and each ring whose link line names it. For an end ring, it is also the lane
+    /// zone of its lane, because the zone check reads the places of the end rings. Empty for another section.
+    /// </summary>
+    public static IReadOnlyList<SectionRef> Linked(EditSession session, SectionRef section)
+    {
+        if (section.Id.Key is not { } name || SceneSections.KindOf(session, section) != SceneKind.Object ||
+            !LanePlans.IsRingObject(session, section))
+            return [];
+        var linked = LanePlans.LaneOf(session, section, strays: true)!.Rings.ToList();
+        linked.AddRange(LanePlans.CircleOf(session, section)?.Rings ?? []);
+        linked.AddRange(Rings(session, section.Path).Where(r => LinksTo(session, r, name)));
+        var lane = LanePlans.LaneOf(session, section)!;
+        if ((lane.Rings[0].Equals(section) || lane.Rings[^1].Equals(section)) &&
+            LanePlans.ZoneOf(session, lane) is { } zone)
+            linked.Add(zone);
+        return linked;
+    }
+
+    /// <summary>
     /// The problems of a lane: the problems of its rings, and the problem of each lane zone of its file that does not
     /// cover the lane (see <see cref="Zone"/>). The zone of a lane covers the lane, so it gives no problem. A zone that
     /// misses the lane is not the zone of the lane, so the check reads each zone of the file.

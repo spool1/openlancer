@@ -373,7 +373,7 @@ public sealed class BaseView
         : null;
 
     /// <summary>The first <c>[Base]</c> of W of <c>universe.ini</c> with the nickname, or null.</summary>
-    private static SectionRef? EntryOf(EditSession session, string nickname) =>
+    internal static SectionRef? EntryOf(EditSession session, string nickname) =>
         session.UniversePath is { } universe
             ? session.Sections(universe).FirstOrDefault(s => Is(s.Id.Type, "Base") && Is(s.Id.Key, nickname.Trim()))
             : null;
@@ -488,7 +488,7 @@ public sealed class BaseView
     }
 
     /// <summary>The objects of the system files whose <c>dock_with</c> or <c>base</c> line names the base.</summary>
-    private static IReadOnlyList<BaseDockObject> DockObjectsOf(EditSession session, string baseName) =>
+    internal static IReadOnlyList<BaseDockObject> DockObjectsOf(EditSession session, string baseName) =>
         session.Lists.ReferencesTo("base", baseName)
             .Where(r => Is(r.Section.Id.Type, "Object") && session.IsSystemFile(r.Section.Path) &&
                         (Is(r.Key, "dock_with") || Is(r.Key, "base")))

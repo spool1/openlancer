@@ -111,19 +111,57 @@ internal static class BaseChecks
     {
         if (session.Get(section) is not { } view)
             return [];
-        IEnumerable<string> bases;
-        if (session.UniversePath is { } universe && VfsPath.Comparer.Equals(section.Path, universe))
-            bases = SceneSections.Is(section.Id.Type, "Base") && section.Id.Key is { } key ? [key] : [];
-        else if (session.IsBaseFile(section.Path))
-            bases = session.Bases.BasesOfBaseFile(section.Path);
-        else if (session.IsMBasesFile(section.Path))
-            bases = BaseView.BaseOf(section) is { } owner ? [owner] : [];
-        else if (SceneSections.Is(section.Id.Type, SceneSections.ObjectType) && session.IsSystemFile(section.Path))
+        if (BasesOf(session, section) is { } bases)
+            return bases.SelectMany(b => Problems(session, b)).Where(p => section.Equals(p.Target)).ToList();
+        if (IsSystemObject(session, section))
             return DockProblem(session, section, view) is { } problem ? [problem] : [];
-        else
-            return [];
-        return bases.SelectMany(b => Problems(session, b)).Where(p => section.Equals(p.Target)).ToList();
+        return [];
     }
+
+    /// <summary>
+    /// The other sections whose problems of <see cref="Check"/> read a section. The checks of a base read each part of
+    /// the base: its <c>[Base]</c>, the sections of its base file and of <c>mBases.ini</c>, and each object whose
+    /// <c>base</c> or <c>dock_with</c> line names it. So a part links to the <c>[Base]</c> and to each section that a
+    /// problem of the base names. A <c>[Base]</c> also links to each such object, because the dock check of the object
+    /// reads the system of the base. Empty for another section.
+    /// </summary>
+    public static IReadOnlyList<SectionRef> Linked(EditSession session, SectionRef section)
+    {
+        if (session.Get(section) is not { } view)
+            return [];
+        var linked = new List<SectionRef>();
+        var bases = BasesOf(session, section)?.ToList();
+        if (bases == null && IsSystemObject(session, section))
+            bases = view.Lines("base").Concat(view.Lines("dock_with")).Where(l => l.Values.Count > 0)
+                .Select(l => l.Values[0].ToString().Trim()).ToList();
+        foreach (var name in bases ?? [])
+        {
+            if (BaseView.EntryOf(session, name) is not { } entry)
+                continue;
+            linked.Add(entry);
+            linked.AddRange(Problems(session, name).Select(p => p.Target).OfType<SectionRef>());
+            if (entry.Equals(section))
+                linked.AddRange(BaseView.DockObjectsOf(session, name).Select(d => d.Section));
+        }
+        return linked;
+    }
+
+    /// <summary>The bases of a <c>[Base]</c> of <c>universe.ini</c>, of a section of a base file or of a section of
+    /// <c>mBases.ini</c>, or null for another section.</summary>
+    private static IEnumerable<string>? BasesOf(EditSession session, SectionRef section)
+    {
+        if (session.UniversePath is { } universe && VfsPath.Comparer.Equals(section.Path, universe))
+            return SceneSections.Is(section.Id.Type, "Base") && section.Id.Key is { } key ? [key] : [];
+        if (session.IsBaseFile(section.Path))
+            return session.Bases.BasesOfBaseFile(section.Path);
+        if (session.IsMBasesFile(section.Path))
+            return BaseView.BaseOf(section) is { } owner ? [owner] : [];
+        return null;
+    }
+
+    /// <summary>True for an object of a system file.</summary>
+    private static bool IsSystemObject(EditSession session, SectionRef section) =>
+        SceneSections.Is(section.Id.Type, SceneSections.ObjectType) && session.IsSystemFile(section.Path);
 
     /// <summary>True for a section that <see cref="Check"/> reads as a part of a base: a section of a base file or of
     /// <c>mBases.ini</c>.</summary>

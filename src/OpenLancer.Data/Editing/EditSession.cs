@@ -634,6 +634,28 @@ public sealed partial class EditSession : IDisposable
         return change.ChangesState;
     }
 
+    /// <summary>
+    /// Gives the value of a read in the states before a batch, then puts back the states after its steps. Raises no
+    /// <see cref="Changed"/>. The read must not read the mission model, because the model keeps the states after the
+    /// steps (see <see cref="WorldRevision"/>).
+    /// </summary>
+    internal T ReadBefore<T>(ChangeSet change, Func<T> read)
+    {
+        change.Finish(FileAt, text);
+        text = change.Undo(FileAt) ?? text;
+        // Each restore changes W, so a cache must not keep the states of the other side.
+        CacheRevision++;
+        try
+        {
+            return read();
+        }
+        finally
+        {
+            text = change.Redo(FileAt) ?? text;
+            CacheRevision++;
+        }
+    }
+
     /// <summary>Puts back the states before a batch. Raises no <see cref="Changed"/>.</summary>
     internal void CancelBatch(ChangeSet change)
     {

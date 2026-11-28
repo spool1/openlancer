@@ -292,6 +292,8 @@ When you would see a dialog for a delete or a rename, the tool gives `needs_conf
 
 The result of an edit gives the new items (`adds`), the changed items (`changes`), the removed items (`deletes`) and the renamed items (`renames`). It also gives the "Missing" lines, the warnings, the text mentions, and the problems that the edit adds and removes. Each reference names the item as it is after the call. So an item that a call adds and then deletes is not in the result, and two renames of one item are one rename. A call that changes nothing gives the status `no_change`, an empty `changes` list and no Undo step.
 
+`new_problems` gives the problems that the edit adds, and `fixed_problems` gives the problems that it removes. These lists also give the problems of the items that the checks link to the items of the edit. Examples are the partner of a jump gate and the system that a jump gate leads to. Other examples are the base of a dock object and the other rings of a trade lane. So a player lock of a gate pair gives the lock warning of each end, as `check` gives it.
+
 `select` names the item that the call selects last, with its last reference. So a create and a rename of the new item in one call give the new nickname. A call that deletes that item gives no `select`, as Unity selects nothing after a delete of the selected item. Each step of `edit_batch` gives the `select` of its own commands.
 
 #### Batches

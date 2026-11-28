@@ -38,6 +38,17 @@ internal static class UniverseChecks
         return SceneSections.Is(section.Id.Type, "Base") ? Base(session, section, view).ToList() : [];
     }
 
+    /// <summary>The other sections whose problems of <see cref="Check"/> read a section: for an object of a system file
+    /// with a <c>goto</c> line, the <c>[system]</c> that each such line names. The check of that <c>[system]</c> tells
+    /// if a jump leads to it. Empty for another section.</summary>
+    public static IReadOnlyList<SectionRef> Linked(EditSession session, SectionRef section)
+    {
+        if (SceneSections.KindOf(session, section) != SceneKind.Object || session.Get(section) is not { } view)
+            return [];
+        return view.Lines("goto").Where(l => l.Values.Count > 0)
+            .Select(l => session.SystemSection(l.Values[0].ToString().Trim())).OfType<SectionRef>().ToList();
+    }
+
     /// <summary>The errors of the <c>[system]</c> sections that the active mod adds or changes, for the save gate. The
     /// call skips the warnings, so a save does not read the jump connections of each system file.</summary>
     public static IEnumerable<Diagnostic> SaveErrors(EditSession session)

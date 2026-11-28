@@ -65,6 +65,32 @@ internal static class ConnectionChecks
     }
 
     /// <summary>
+    /// The other sections whose problems of <see cref="Check"/> read a section. For an object, these are the partner
+    /// of a jump object, because its check reads the <c>goto</c> line of the object, and each <c>[locked_gates]</c>
+    /// section with a lock line of the object. For a <c>[locked_gates]</c> section, these are the jump objects of the
+    /// jump graph that its lock lines name, because the lock warning of an object reads the lines. Empty for another
+    /// section.
+    /// </summary>
+    public static IReadOnlyList<SectionRef> Linked(EditSession session, SectionRef section)
+    {
+        if (session.Get(section) is not { } view)
+            return [];
+        if (IsLockSection(session, section))
+        {
+            var hashes = view.Entries.Where(e => IsLockLine(e) && e.Values.Count > 0)
+                .Select(e => ItemLists.HashOf(e.Values[0])).OfType<uint>().ToHashSet();
+            return session.Routes.Graph.Connections.Where(c => hashes.Contains(FLHash.CreateID(c.Object)))
+                .Select(c => ConnectionPlans.ObjectOf(session, c.System, c.Object)).OfType<SectionRef>().ToList();
+        }
+        if (SceneSections.KindOf(session, section) != SceneKind.Object || section.Id.Key is not { } name)
+            return [];
+        var linked = GateLocks.Of(session, name).Select(l => l.Section).ToList();
+        if (IsJump(view) && ConnectionPlans.PartnerOf(session, view) is { } partner)
+            linked.Add(partner.Section);
+        return linked;
+    }
+
+    /// <summary>
     /// The errors of the jump connections for the save gate, in a system file that the active mod changes. A file with
     /// more than 10 jump objects gives one error. Each object that the active mod adds or changes can give the order
     /// error.
@@ -232,8 +258,7 @@ internal static class ConnectionChecks
         for (var i = 0; i < view.Entries.Count; i++)
         {
             var entry = view.Entries[i];
-            if (!SceneSections.Is(entry.Name, "locked_gate") && !SceneSections.Is(entry.Name, "npc_locked_gate") ||
-                entry.Values.Count == 0)
+            if (!IsLockLine(entry) || entry.Values.Count == 0)
                 continue;
             if (ItemLists.HashOf(entry.Values[0]) is { } hash && !gates.Contains(hash))
                 yield return Warning(section,
@@ -241,6 +266,10 @@ internal static class ConnectionChecks
                     "game ignores the line.") with { Key = entry.Name, EntryIndex = i };
         }
     }
+
+    /// <summary>True for a <c>locked_gate</c> or an <c>npc_locked_gate</c> line.</summary>
+    private static bool IsLockLine(EntryView entry) =>
+        SceneSections.Is(entry.Name, "locked_gate") || SceneSections.Is(entry.Name, "npc_locked_gate");
 
     private static bool Same(ValueBase value, string text) =>
         value.ToString().Trim().Equals(text, StringComparison.OrdinalIgnoreCase);

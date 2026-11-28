@@ -794,7 +794,9 @@ internal static class EditTools
 /// <summary>
 /// The commit checks of an agent batch. They check the limit of the sections of one call. They also give the problems
 /// that the batch adds and removes (section 4.0.5 of the M6b design, item 2). The problems are the field checks and the
-/// list checks of the sections that the commands name, before and after the batch. A cutscene that a command changes
+/// list checks of the sections that the commands name, before and after the batch. The problems of the sections that
+/// the checks link to these sections count too (see <see cref="AgentRows.LinkedOf"/>, #97). An example is the partner
+/// of a gate whose lock a command changes. A cutscene that a command changes
 /// gives the errors of its cutscene checks before and after the batch (see <see cref="EditSession.CutsceneErrors"/>,
 /// section 12.6 of the MCP1 design). An INI edit can break a template. So a batch that changes an INI file also gives
 /// the errors of each cutscene that the save gate checks before or after the batch. These cutscenes include each
@@ -818,6 +820,9 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
     private readonly HashSet<SectionRef> added = [];
     private readonly List<SectionRef> touched = [];
     private readonly HashSet<SectionRef> seen = [];
+
+    /// <summary>The touched sections that a plan names, adds, selects or renames (see <see cref="Touch"/>).</summary>
+    private readonly HashSet<SectionRef> named = [];
 
     /// <summary>The errors of the cutscene checks of each touched cutscene before the batch, in the order of the first
     /// touch. A new cutscene of the batch had no errors.</summary>
@@ -857,7 +862,9 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
         gateCutscenesNoted = true;
     }
 
-    /// <summary>Notes the sections of a plan before its command runs, and their problems now.</summary>
+    /// <summary>Notes the sections of a plan before its command runs, and their problems now. It also notes the
+    /// sections that the checks link to them now (see <see cref="AgentRows.LinkedOf"/>), and their problems now. An
+    /// example is the partner of a gate whose lock the plan changes.</summary>
     /// <param name="targets">The sections that the request names.</param>
     public void Before(EditPlan plan, IEnumerable<SectionRef> targets)
     {
@@ -865,10 +872,16 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
             .Concat(plan.Fixes.Select(f => f.Section)).Concat(plan.Missing.Select(m => m.Reference.Section));
         foreach (var section in sections)
         {
-            if (!Touch(section))
+            if (!Touch(section, named: true))
                 continue;
-            if (!added.Contains(section) && !before.ContainsKey(section) && session.Get(section) != null)
-                before[section] = AgentRows.DiagnosticsOf(session, section);
+            NoteBefore(section);
+            if (session.Get(section) == null)
+                continue;
+            foreach (var linked in AgentRows.LinkedOf(session, section))
+            {
+                if (Touch(linked, named: false))
+                    NoteBefore(linked);
+            }
         }
     }
 
@@ -878,10 +891,10 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
         foreach (var section in plan.Adds)
         {
             added.Add(section);
-            Touch(section);
+            Touch(section, named: true);
         }
         if (plan.SelectAfter is { } selected)
-            Touch(selected);
+            Touch(selected, named: true);
     }
 
     public EditResult Check(EditBatch checkedBatch)
@@ -903,8 +916,9 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
         foreach (var (from, to) in batch.Renames)
         {
             renamedFrom[to] = renamedFrom.Remove(from, out var first) ? first : from;
-            Touch(to);
+            Touch(to, named: true);
         }
+        NoteLinksAfter(renamedFrom);
         var newProblems = new List<Problem>();
         var fixedProblems = new List<Problem>();
         foreach (var section in touched)
@@ -950,6 +964,40 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
     }
 
     /// <summary>
+    /// Notes the sections that the checks link to the sections of the plans after the batch (see
+    /// <see cref="AgentRows.LinkedOf"/>). An example is the system that a new jump gate leads to. Such a section, and
+    /// each other section that the batch did not note before its steps, gets its problems in the states before the
+    /// batch. A section that the batch adds had no problems before it. A renamed section has its problems before under
+    /// its old reference.
+    /// </summary>
+    private void NoteLinksAfter(IReadOnlyDictionary<SectionRef, SectionRef> renamedFrom)
+    {
+        foreach (var section in touched.Where(named.Contains).ToList())
+        {
+            if (session.Get(section) == null)
+                continue;
+            foreach (var linked in AgentRows.LinkedOf(session, section))
+                Touch(linked, named: false);
+        }
+        var late = touched.Where(s => !before.ContainsKey(s) && !added.Contains(s) && !renamedFrom.ContainsKey(s) &&
+                                      session.Get(s) != null).ToList();
+        if (late.Count == 0)
+            return;
+        var problems = batch.ReadBefore(() => late.Where(s => session.Get(s) != null)
+            .Select(s => (Section: s, Problems: AgentRows.DiagnosticsOf(session, s))).ToList());
+        foreach (var (section, was) in problems)
+            before[section] = was;
+    }
+
+    /// <summary>Notes the problems of a section now, when the batch did not note them before and did not add the
+    /// section.</summary>
+    private void NoteBefore(SectionRef section)
+    {
+        if (!added.Contains(section) && !before.ContainsKey(section) && session.Get(section) != null)
+            before[section] = AgentRows.DiagnosticsOf(session, section);
+    }
+
+    /// <summary>
     /// The cutscenes that the save gate checks after the batch and that the batch did not note, each with no errors
     /// before the batch. An example is an unchanged retail cutscene that names the item that the batch breaks. Empty
     /// for a batch that changes no INI file, so such a batch reads no other cutscene.
@@ -973,12 +1021,16 @@ internal sealed class EditChecks(EditSession session, EditBatch batch, int secti
     /// <remarks>No field check and no list check gives a problem for a section of a mission file now, so no test can
     /// show the skip yet (final finding 4 of MCP1-3). The first such check must add a test that a renamed trigger gives
     /// its problems once.</remarks>
-    private bool Touch(SectionRef section)
+    /// <param name="named">True for a section that a plan names, false for a section that the checks link to it. Only a
+    /// named section gives the links after the batch, so a link of a link does not count.</param>
+    private bool Touch(SectionRef section, bool named)
     {
         if (session.IsGuardedMissionFile(section.Path))
             return false;
         if (seen.Add(section))
             touched.Add(section);
+        if (named)
+            this.named.Add(section);
         return true;
     }
 

@@ -109,6 +109,20 @@ internal static class AgentRows
             .Concat(BaseChecks.Check(session, section))
             .Select(d => d with { Target = d.Target ?? section }).ToList();
 
+    /// <summary>
+    /// The other sections whose problems of <see cref="DiagnosticsOf"/> read a section, by the rules of the checks
+    /// (#97). Examples are the partner of a jump object, the <c>[system]</c> that a jump object leads to, the jump
+    /// objects that a gate lock names, the <c>[Base]</c> of a dock object and the other rings of a trade lane. So a
+    /// change of a section can change their problems too.
+    /// </summary>
+    public static IEnumerable<SectionRef> LinkedOf(EditSession session, SectionRef section) =>
+        ConnectionChecks.Linked(session, section)
+            .Concat(UniverseChecks.Linked(session, section))
+            .Concat(LaneChecks.Linked(session, section))
+            .Concat(BaseChecks.Linked(session, section))
+            .Where(s => !s.Equals(section))
+            .Distinct();
+
     /// <summary>The problems of the field checks and the list checks of a section.</summary>
     public static IReadOnlyList<Problem> ProblemsOf(EditSession session, SectionRef section) =>
         DiagnosticsOf(session, section).Select(d => ProblemOf(session, d)).ToList();

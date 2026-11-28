@@ -618,18 +618,20 @@ public static class ConnectionPlans
 
     /// <summary>The partner that the last <c>goto</c> line of an object names, or null when its system or its object
     /// does not exist.</summary>
-    internal static (SectionRef Section, SectionView View)? PartnerOf(EditSession session, SectionView view)
-    {
-        if (view.Lines("goto").LastOrDefault(l => l.Values.Count > 1) is not { } line ||
-            session.SystemPath(line.Values[0].ToString().Trim()) is not { } path)
-            return null;
-        var exit = line.Values[1].ToString().Trim();
-        return session.Sections(path).FirstOrDefault(s => SceneSections.Is(s.Id.Type, SceneSections.ObjectType) &&
-                                                          string.Equals(s.Id.Key, exit, StringComparison.OrdinalIgnoreCase))
-            is { } section && session.Get(section) is { } partner
+    internal static (SectionRef Section, SectionView View)? PartnerOf(EditSession session, SectionView view) =>
+        view.Lines("goto").LastOrDefault(l => l.Values.Count > 1) is { } line &&
+        ObjectOf(session, line.Values[0].ToString().Trim(), line.Values[1].ToString().Trim()) is { } section &&
+        session.Get(section) is { } partner
             ? (section, partner)
             : null;
-    }
+
+    /// <summary>The object of a system with a nickname, or null when the system or the object does not exist.</summary>
+    internal static SectionRef? ObjectOf(EditSession session, string system, string nickname) =>
+        session.SystemPath(system) is { } path
+            ? session.Sections(path).FirstOrDefault(s =>
+                SceneSections.Is(s.Id.Type, SceneSections.ObjectType) &&
+                string.Equals(s.Id.Key, nickname, StringComparison.OrdinalIgnoreCase))
+            : null;
 
     /// <summary>True when the last <c>goto</c> line of an object names a system and an object.</summary>
     private static bool GoesTo(SectionView view, string system, string exit) =>
