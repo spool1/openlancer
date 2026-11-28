@@ -110,8 +110,10 @@ public static class PackageTexts
     /// <param name="files">The files of the target build, or null for the target OpenLancer.</param>
     /// <param name="entries">The files of the package, by their path in the game folder.</param>
     /// <param name="probe">True for the FLMM probe of the FLMM check.</param>
+    /// <param name="flmmPackage">True when the export also makes the FLMM package of the target. Only then does the
+    /// README of the drop-in zip point to it.</param>
     public static string Readme(PublishTexts texts, ExportTarget target, PackageForm form, TargetFiles? files,
-        IReadOnlyList<string> entries, bool probe = false)
+        IReadOnlyList<string> entries, bool probe = false, bool flmmPackage = false)
     {
         var mod = texts.Manifest;
         var settings = texts.Settings;
@@ -155,7 +157,7 @@ public static class PackageTexts
                 lines.Add("");
                 lines.Add("This zip replaces whole files. It does not combine with other mods that change the same files.");
                 if (files != null && entries.Any(e => VfsPath.Comparer.Equals(e, ModOverlay.FreelancerIniPath)))
-                    lines.AddRange(FreelancerIniLines(target, files));
+                    lines.AddRange(FreelancerIniLines(target, files, flmmPackage));
                 break;
             case PackageForm.Flmm:
                 lines.Add("Install:");
@@ -396,8 +398,9 @@ public static class PackageTexts
     }
 
     /// <summary>The lines of the README about <c>EXE\freelancer.ini</c>: the lines that the mod adds, with their
-    /// place.</summary>
-    private static IEnumerable<string> FreelancerIniLines(ExportTarget target, TargetFiles files)
+    /// place. A mod with text also gets the note about the text index. The note points to the FLMM package only when
+    /// the export makes it, because the FLMM package refuses some changes.</summary>
+    private static IEnumerable<string> FreelancerIniLines(ExportTarget target, TargetFiles files, bool flmmPackage)
     {
         var file = files.File(ModOverlay.FreelancerIniPath);
         if (file?.Diff == null)
@@ -425,7 +428,7 @@ public static class PackageTexts
         }
         if (files.StringIds.Strings.Count + files.StringIds.Infocards.Count > 0)
             yield return "Two OpenLancer mods with text do not work together as drop-in zips, because both use the same " +
-                         "text index. Use the FLMM package for that.";
+                         "text index." + (flmmPackage ? " Use the FLMM package for that." : "");
     }
 
     /// <summary>

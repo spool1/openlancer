@@ -516,9 +516,18 @@ public static class ModExport
             return;
         }
 
+        // The FLMM plan comes first, because the README of the drop-in zip points to the FLMM package only when the
+        // export makes it. The packages and their problems keep the order: drop-in zip, then FLMM package.
+        PackagePlan? flmm = null;
+        if (request.Forms.HasFlag(ExportForms.Flmm))
+        {
+            var placeholders = TargetBuild.Run(gameBase, [mod], DllName(mod.Id), request.StringWriter, request.Thn,
+                keepPlaceholders: true, routeTables: true);
+            flmm = FlmmPackage.Plan(placeholders, mod, prepared.Texts, target, request.FlmmProbe, null);
+        }
         if (request.Forms.HasFlag(ExportForms.DropIn))
         {
-            var dropIn = DropInPackage.Plan(files, prepared.Texts, target, null);
+            var dropIn = DropInPackage.Plan(files, prepared.Texts, target, null, flmmPackage: flmm?.Make != null);
             prepared.AddRange(dropIn.Problems);
             targetProblems.AddRange(dropIn.Problems);
             prepared.Add(new PreparedPackage(target, PackageForm.DropIn, dropIn.FileName, dropIn.GameFiles)
@@ -527,11 +536,8 @@ public static class ModExport
                 Readme = dropIn.Readme,
             });
         }
-        if (request.Forms.HasFlag(ExportForms.Flmm))
+        if (flmm != null)
         {
-            var placeholders = TargetBuild.Run(gameBase, [mod], DllName(mod.Id), request.StringWriter, request.Thn,
-                keepPlaceholders: true, routeTables: true);
-            var flmm = FlmmPackage.Plan(placeholders, mod, prepared.Texts, target, request.FlmmProbe, null);
             prepared.AddRange(flmm.Problems);
             targetProblems.AddRange(flmm.Problems);
             prepared.Add(new PreparedPackage(target, PackageForm.Flmm, flmm.FileName, flmm.GameFiles)

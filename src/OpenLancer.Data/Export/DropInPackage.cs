@@ -59,11 +59,14 @@ public static class DropInPackage
 
     /// <param name="builds">The builds of the game file rule, or null for the embedded manifests.</param>
     internal static Package Write(TargetFiles files, ModManifest mod, ExportTarget target, KnownBuilds? builds) =>
-        Plan(files, PublishTexts.Of(mod), target, builds).ToPackage();
+        Plan(files, PublishTexts.Of(mod), target, builds, flmmPackage: false).ToPackage();
 
     /// <summary>The plan of the zip. The guard digest leaves out the README, so that a text change does not change
     /// it.</summary>
-    internal static PackagePlan Plan(TargetFiles files, PublishTexts texts, ExportTarget target, KnownBuilds? builds)
+    /// <param name="flmmPackage">True when the export also makes the FLMM package of the target (see
+    /// <see cref="PackageTexts.Readme"/>).</param>
+    internal static PackagePlan Plan(TargetFiles files, PublishTexts texts, ExportTarget target, KnownBuilds? builds,
+        bool flmmPackage)
     {
         var mod = texts.Manifest;
         var entries = files.Files
@@ -74,7 +77,8 @@ public static class DropInPackage
         if (problems.Count > 0)
             return new PackagePlan(name, null, problems, null);
         var digest = PackageDigest.Of(entries);
-        var readme = PackageTexts.Readme(texts, target, PackageForm.DropIn, files, entries.Select(e => e.Name).ToList());
+        var readme = PackageTexts.Readme(texts, target, PackageForm.DropIn, files, entries.Select(e => e.Name).ToList(),
+            flmmPackage: flmmPackage);
         entries.Add((PackageTexts.ReadmeName(mod), Encoding.UTF8.GetBytes(readme)));
         return new PackagePlan(name, () => DeterministicZip.Write(entries), problems, digest) { Readme = readme };
     }
