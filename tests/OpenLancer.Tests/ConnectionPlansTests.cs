@@ -521,6 +521,48 @@ public sealed class ConnectionPlansTests
     }
 
     /// <summary>
+    /// A player lock of a gate pair that the mod adds warns on each end without the sentence about the story. One end
+    /// is in a new system file of the mod. The rule holds before the save, and in a new session after the save, where
+    /// B of the system file is the saved file of the mod (case 3 of #99). The checks of the ends give the same
+    /// warnings as the plan.
+    /// </summary>
+    [Fact]
+    public void APlayerLockOfAGatePairThatTheModAddsDoesNotNameTheStory()
+    {
+        using var ws = ConnectionWorkspace.Create();
+        var session = ws.Session("act");
+        NewSystemWorkspace.CreateAv01(session);
+        var ends = Run(session, ConnectionPlans.CreatePair(session, ConnectionKind.Gate, new ConnectionEnd("Av01"),
+            new ConnectionEnd("Li03"))).Ends.Select(e => e.Object).ToList();
+        Assert.Equal(NewSystemWorkspace.New("Object", "Av01_to_Li03"), ends[0]);
+
+        LockWarnsWithoutTheStory(session, ends);
+        Assert.True(session.Save().Saved);
+        session.Dispose();
+        var reopened = ws.Session("act");
+        Assert.False(ConnectionChecks.IsLowerGate(reopened, ends[0]));
+        LockWarnsWithoutTheStory(reopened, ends);
+        Assert.True(ConnectionChecks.IsLowerGate(reopened, SceneWorkspace.Li02("Object", "Li02_to_Li01")));
+    }
+
+    /// <summary>Locks the first end for the player, checks the warnings of the plan and of the checks of both ends, and
+    /// takes the lock back.</summary>
+    private static void LockWarnsWithoutTheStory(EditSession session, IReadOnlyList<SectionRef> ends)
+    {
+        var plan = Run(session, ConnectionPlans.SetLock(session, ends[0], JumpLock.Player));
+
+        Assert.Equal(2, plan.Warnings.Count);
+        Assert.All(plan.Warnings, w => Assert.DoesNotContain("story", w.Message, StringComparison.Ordinal));
+        foreach (var end in ends)
+        {
+            var warning = Assert.Single(ObjectComponents.Checks(session, end),
+                p => p.Message.StartsWith($"The route tables leave out {end.Id.Key},", StringComparison.Ordinal));
+            Assert.DoesNotContain("story", warning.Message, StringComparison.Ordinal);
+        }
+        session.Undo();
+    }
+
+    /// <summary>
     /// A lock line can already name the nickname of a new end, as six lines of vanilla 1.1 do. The new end then gets
     /// the lock of the request: a pair without a lock removes the line, and an NPC lock keeps it once. An existing end
     /// keeps its locks when the request has no lock, and it gets the lock of the request when the request has one.

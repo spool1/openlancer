@@ -86,6 +86,8 @@ public sealed class OltoolValidateTargetTests : IDisposable
         var (exit, _, errors) = await RunAsync("validate", profile, "--target", "hde-0.7.1");
 
         Assert.Equal(1, exit);
-        Assert.Contains("No linked game gives the target 'hde-0.7.1'.", errors);
+        Assert.Contains("No linked game gives the target 'hde-0.7.1'. Give a game folder of Freelancer: HD Edition 0.7.1 " +
+                        "with --game.", errors);
+        Assert.DoesNotContain("File > Game link", errors);
     }
 }

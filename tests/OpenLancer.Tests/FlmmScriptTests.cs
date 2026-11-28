@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -5,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
+using LibreLancer.Data.Ini;
 using OpenLancer.Data;
 using OpenLancer.Data.Export;
 using OpenLancer.Data.Mods;
@@ -299,6 +301,40 @@ public sealed partial class FlmmScriptTests
         Assert.Equal($"The FLMM package cannot hold the character U+00E9 in {Goods}. Use the drop-in zip.",
             Assert.Single(script.Problems).Message);
         Assert.DoesNotContain("Caf", script.Xml);
+    }
+
+    /// <summary>Each binary INI file that the mod changes gives one warning, and the warning names the file. The result
+    /// of an export can show the message without its source (case 6 of #99).</summary>
+    [Fact]
+    public void EachBinaryFileGivesOneWarningThatNamesTheFile()
+    {
+        using var game = new ExportGame();
+        WriteBini(game, GoodsPath, ExportGame.Goods);
+        WriteBini(game, MarketPath, ExportGame.Market);
+        var mod = game.Mod("m", new()
+        {
+            [@"patches\" + GoodsPath] = "[Good]\nnickname = g2\nprice = 1\n",
+            [@"patches\" + MarketPath] = "[BaseGood]\nbase = li01_01_base\nmarketgood = g2, 0, -1, 1, 1, 0, 1, 1\n",
+        });
+
+        var script = Script(game, mod);
+
+        var warnings = script.Problems.Where(p => p.Message.Contains("binary INI file", StringComparison.Ordinal))
+            .Select(p => p.Message).Order(StringComparer.Ordinal).ToList();
+        Assert.Equal([Binary(GoodsPath), Binary(MarketPath)], warnings);
+        Assert.All(script.Problems, p => Assert.Equal(DiagnosticSeverity.Warning, p.Severity));
+
+        static string Binary(string path) => $"{path} is a binary INI file. FLMM converts it to text before it edits it. " +
+                                             "The text that FLMM writes is not known. Check the package with FLMM before " +
+                                             "you publish it.";
+    }
+
+    /// <summary>Replaces a file of the game with a binary (BINI) file of the same sections.</summary>
+    private static void WriteBini(ExportGame game, string path, string text)
+    {
+        using var bytes = new MemoryStream();
+        IniWriter.WriteBini(bytes, IniFile.ParseFile(path, new MemoryStream(Encoding.ASCII.GetBytes(text))).ToArray());
+        game.Game.WriteBytes(path, bytes.ToArray());
     }
 
     [Fact]

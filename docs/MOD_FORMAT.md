@@ -1877,7 +1877,7 @@ The content checks of the retail game also run on each export (see "Content chec
 
 `<mod id>-<version>-<target>.zip` has the folders `DATA` and `EXE` at its top, with the letter case of the folders of the game, and the README. The player copies the files of the list to a backup folder, then extracts the zip into the game folder. A drop-in zip replaces whole files, so it does not combine with other mods that change the same files. When the mod changes the routes, the zip holds the three route tables (see "Route tables").
 
-When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod adds, with its place. A player can add these lines to their own file, and keep the options of their installer. Two OpenLancer mods with text do not work together as drop-in zips, because both use the same text index.
+When the zip holds `EXE\freelancer.ini`, the README gives each line that the mod adds, with its place. A player can add these lines to their own file, and keep the options of their installer. Two OpenLancer mods with text do not work together as drop-in zips, because both use the same text index. When the export also makes the FLMM package, the README tells the player to use it for that. The FLMM package refuses some changes. Then the README does not name it.
 
 ### FLMM package (preview)
 

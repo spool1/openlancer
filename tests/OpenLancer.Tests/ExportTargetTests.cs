@@ -40,6 +40,9 @@ public sealed class ExportTargetTests
         Assert.Null(ExportTarget.HdEdition.Refusal(mod.Manifest));
     }
 
+    /// <summary>A retail target without a linked game that gives it is not available. The refusal tells the way to
+    /// link a game of the program that shows it: File > Game link in the editor, the base folder of the profile in the
+    /// agent server of oltool, and --game in oltool export (case 5 of #99).</summary>
     [Fact]
     public void ATargetWithoutALinkedBaseIsNotAvailable()
     {
@@ -47,12 +50,18 @@ public sealed class ExportTargetTests
         var report = game.Report();
 
         Assert.Equal(ModTargets.Vanilla, report.Target);
-        Assert.Null(ExportTarget.Vanilla.BaseRefusal(report));
+        Assert.True(ExportTarget.Vanilla.AcceptsBase(report));
+        Assert.Null(ExportTarget.Vanilla.BaseRefusal(report, GameLinkWay.Editor));
         Assert.Equal("No linked game gives the target 'hde-0.7.1'. Link a game folder of Freelancer: HD Edition 0.7.1 in " +
-                     "File > Game link.", ExportTarget.HdEdition.BaseRefusal(report));
-        Assert.Equal("No linked game gives the target 'vanilla-1.1'. Link a game folder of Freelancer 1.0 or 1.1 in " +
-                     "File > Game link.", ExportTarget.Vanilla.BaseRefusal(null));
-        Assert.Null(ExportTarget.OpenLancer.BaseRefusal(null));
+                     "File > Game link.", ExportTarget.HdEdition.BaseRefusal(report, GameLinkWay.Editor));
+        Assert.Equal("No linked game gives the target 'hde-0.7.1'. oltool links only the base folder of the profile. Use a " +
+                     "profile whose base folder is a game folder of Freelancer: HD Edition 0.7.1.",
+            ExportTarget.HdEdition.BaseRefusal(report, GameLinkWay.ProfileBase));
+        Assert.Equal("No linked game gives the target 'vanilla-1.1'. Give a game folder of Freelancer 1.0 or 1.1 with " +
+                     "--game. Without --game, oltool uses the base folder of the profile.",
+            ExportTarget.Vanilla.BaseRefusal(null, GameLinkWay.GameOption));
+        Assert.True(ExportTarget.OpenLancer.AcceptsBase(null));
+        Assert.Null(ExportTarget.OpenLancer.BaseRefusal(null, GameLinkWay.ProfileBase));
         // Each target finds its base among the linked games.
         Assert.Same(report, ExportTarget.Vanilla.BaseIn([report]));
         Assert.Null(ExportTarget.HdEdition.BaseIn([report]));
@@ -110,7 +119,7 @@ public sealed class ExportTargetTests
         foreach (var target in ExportTarget.All)
         {
             // The rule of the Export dialog before the builder.
-            var dialog = target.IsRetail ? reports.FirstOrDefault(r => target.BaseRefusal(r) == null) : null;
+            var dialog = target.IsRetail ? reports.FirstOrDefault(target.AcceptsBase) : null;
             Assert.Same(dialog, request.BaseOf(target));
         }
         // The rule of oltool export before the builder, for the base that the game gives.

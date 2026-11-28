@@ -178,6 +178,44 @@ public sealed class ModExportTests
         Assert.All(prepared.Packages.Where(p => p.Form != PackageForm.Flmm), p => Assert.Null(p.ScriptHeader));
     }
 
+    /// <summary>
+    /// The README of the drop-in zip of a mod with text points to the FLMM package only when the export makes that
+    /// package. An export of both forms makes it. An export of the drop-in zip only does not make it. The FLMM package
+    /// also refuses a text that FLMM cannot hold. Without the FLMM package, the README keeps the note about the text
+    /// index without the advice (case 7 of #99).
+    /// </summary>
+    [Fact]
+    public void TheDropInReadmePointsToTheFlmmPackageOnlyWhenTheExportMakesIt()
+    {
+        using var game = new ExportGame();
+        const string patch = "[Good]\nol.new = true\nnickname = ol_hull\nids_name = $str:name\n";
+        // The JSON escape of the character keeps the file ASCII.
+        var backslash = (char)0x5C;
+        var plain = game.Mod("m", new() { [@"patches\" + GoodsPath] = patch, ["strings.json"] = """{ "strings": { "name": "Name" } }""" });
+        var refused = game.Mod("r", new()
+        {
+            [@"patches\" + GoodsPath] = patch,
+            ["strings.json"] = $$"""{ "strings": { "name": "Caf{{backslash}}u00e9" } }""",
+        });
+        const string note = "Two OpenLancer mods with text do not work together as drop-in zips, because both use the same " +
+                            "text index.";
+        const string advice = "Use the FLMM package for that.";
+
+        var both = ModExport.Prepare(game.Request(plain));
+        var dropInOnly = ModExport.Prepare(game.Request(plain) with { Forms = ExportForms.DropIn });
+        var flmmRefused = ModExport.Prepare(game.Request(refused));
+
+        Assert.Contains($"{note} {advice}", DropInReadme(both));
+        Assert.Contains(note, DropInReadme(dropInOnly));
+        Assert.DoesNotContain(advice, DropInReadme(dropInOnly));
+        Assert.True(flmmRefused.Packages.Single(p => p.Form == PackageForm.Flmm).Refused);
+        Assert.Contains(note, DropInReadme(flmmRefused));
+        Assert.DoesNotContain(advice, DropInReadme(flmmRefused));
+
+        static string DropInReadme(PreparedExport prepared) =>
+            prepared.Packages.Single(p => p.Form == PackageForm.DropIn).Readme!;
+    }
+
     [Fact]
     public void TheReadmeHasTheSummaryDescriptionAuthorsCreditsAndChanges()
     {
@@ -584,7 +622,9 @@ public sealed class OltoolExportTests
         Assert.True(File.Exists(Path.Combine(output, "ol-test-1.2.0-vanilla-1.1.zip")));
         Assert.False(File.Exists(Path.Combine(output, "ol-test-1.2.0-vanilla-1.1-flmm.zip")));
         Assert.Equal(1, noBase.Exit);
-        Assert.Contains("No linked game gives the target 'hde-0.7.1'.", noBase.Errors);
+        Assert.Contains("No linked game gives the target 'hde-0.7.1'. Give a game folder of Freelancer: HD Edition 0.7.1 " +
+                        "with --game.", noBase.Errors);
+        Assert.DoesNotContain("File > Game link", noBase.Errors);
         Assert.Equal(2, noMod.Exit);
     }
 

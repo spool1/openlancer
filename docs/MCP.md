@@ -432,7 +432,7 @@ When a refusal is about one argument, the `field` of the error names it, for exa
 
 `get_route` gives the shortest route from `from` to each system that the table reaches, and the systems that it does not reach. `kind` picks the table: `all`, `gates` or `holes`. The tables leave out each jump gate and each jump hole that is locked for the player. OpenLancer Play computes its own routes, so these tables show what the retail games read.
 
-`trade_lane_create` makes the rings, the end names and the lane zone, as "Trade lanes" of `docs/MOD_FORMAT.md` tells. Each end is a point (`start`, `end`), an object of the system (`start_near`, `end_near`), or both. An end at an object and without a point goes on the line toward the other end. Its distance from the object is the `solar_radius` of the archetype of the object plus a clearance. A zone with damage at that place, for example the death zone of a sun, moves the end out of the zone. An end without `start_name` or `end_name` takes the name of its object.
+`trade_lane_create` makes the rings, the end names and the lane zone, as "Trade lanes" of `docs/MOD_FORMAT.md` tells. Each end is a point (`start`, `end`), an object of the system (`start_near`, `end_near`), or both. Give the object by its nickname or by its `obj:` reference, as for the `object` of an end of `connection_create`. An end at an object and without a point goes on the line toward the other end. Its distance from the object is the `solar_radius` of the archetype of the object plus a clearance. A zone with damage at that place, for example the death zone of a sun, moves the end out of the zone. An end without `start_name` or `end_name` takes the name of its object.
 
 Without `rings`, the lane gets one ring for each 7500 m of length, plus one. With `zone: false`, the tool makes no lane zone, and the lane has no lane traffic. The result gives `rings` in order, `zone` and `spacing`. A ring inside a zone with damage or inside an object gives a warning. A spacing outside the retail range of 5165 to 9445 m also gives a warning. Give the lane zone its encounters with `scene_set_encounters`.
 
@@ -448,7 +448,7 @@ The refusals of the trade lane tools are:
 
 | Detail | Error | Cause |
 |---|---|---|
-| `LaneRings` | `invalid_value` | A ring count above 100, or a spacing outside 1000 to 20000 m. |
+| `LaneRings` | `invalid_value` | A ring count above 100, or a spacing outside 1000 to 20000 m. The message gives the length of the lane, the spacing of the ring count and the ring counts that fit the length. |
 | `LaneEnd` | `invalid_argument` | An end without a point and without an object. Or two ends at objects that are too close for the clearance, so that the rings pass each other. |
 | `LaneEndName` | `invalid_argument` | An end without a name and without an object with a name. |
 | `LaneArchetype` | `invalid_value` | `like` is not a trade lane ring, or the profile has no ring archetype. |
@@ -458,7 +458,7 @@ The refusals of the trade lane tools are:
 | `NameTaken` | `name_taken` | Another object has the nickname of the new ring. |
 | `NameInvalid` | `invalid_value` | An INI line cannot hold `nickname`, for example a nickname with a `;` or a line break. |
 | `FieldValue` | `invalid_value` | An object without a position: `start_near` or `end_near` without a point, a ring without a position for an insert without `position`, or a ring of a repair. |
-| `ItemNotFound` | `not_found` | `start_near` or `end_near` names an item that is not an object, for example a zone. |
+| `ItemNotFound` | `not_found` | `start_near` or `end_near` names an item that is not an object, for example a zone. Or it gives a nickname that no object of the system has. |
 | `EndOtherSystem` | `invalid_argument` | `start_near` or `end_near` names an object of another system. |
 
 When a refusal is about one argument, the `field` of the error names it, as for `connection_create`. A ring count below 2 gives `invalid_argument` with the detail `BadArgument` before the plan runs, because the input schema of `rings` has the minimum 2.
@@ -497,7 +497,7 @@ The market rows of `get_base` come from each market file, in load order. `kept` 
 
 `ring` gives the docking ring of the planet. Without `ring`, the ring copies the ring of the template, at the same height above the surface. Without `dock_object`, no object docks with the base. The result then gives the problem of the base checks in `new_problems`.
 
-The result gives `base`, `file`, `dock_object` and `ring`. `select` is the dock object, or the base without one. The refusals are:
+The result gives `base`, `file` and `dock_object`. Only a planet base also gives `ring`, the new docking ring of its planet. `select` is the dock object, or the base without one. The refusals are:
 
 | Detail | Error | Cause |
 |---|---|---|
@@ -910,7 +910,7 @@ The result gives the written and the deleted files, relative to the folder of th
 
 | Argument | What it does |
 |---|---|
-| `targets` | The target games of the packages. Without it, the export takes each target of `mod.json` that has a linked game. In the oltool host, the base folder of the profile is the one linked game. |
+| `targets` | The target games of the packages. Without it, the export takes each target of `mod.json` that it can make. It can make each retail target with a linked game, and the target `openlancer`, which needs no linked game. In the oltool host, the base folder of the profile is the one linked game. A refusal of a retail target without a linked game tells how to link one in the host. |
 | `formats` | The package forms of a retail target: `drop_in`, `flmm` or both. Without it, the export makes both. |
 | `replace_version` | Replaces an earlier export of the same version with other game files, as **Replace version** of the Export dialog does. |
 

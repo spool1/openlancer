@@ -205,10 +205,12 @@ internal sealed partial class FlmmScript
         }
         var binary = file.BaseDocument!.IsBinary;
         var raw = RawIni.Scan(binary ? file.BaseDocument.ToText() : file.BaseBytes!, out _);
+        // One warning for each binary file, with its path: the result of an export can show the message without its
+        // source.
         if (binary)
-            problems.Add(Diagnostic.Warning(file.Path, "FLMM converts binary INI files to text before it edits them. The " +
-                                                       "text that FLMM writes is not known. Check the package with FLMM " +
-                                                       "before you publish it."));
+            problems.Add(Diagnostic.Warning(file.Path, $"{file.Path} is a binary INI file. FLMM converts it to text " +
+                                                       "before it edits it. The text that FLMM writes is not known. " +
+                                                       "Check the package with FLMM before you publish it."));
         var reason = raw == null ? "OpenLancer cannot read the lines of the file"
             : raw.Sections.Count != diff.BaseSections.Count ? "OpenLancer cannot match the lines of the file with its sections"
             : null;

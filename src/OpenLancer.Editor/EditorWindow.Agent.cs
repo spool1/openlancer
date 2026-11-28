@@ -5,6 +5,7 @@ using LibreLancer;
 using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
+using OpenLancer.Data.Export;
 using OpenLancer.Data.IO;
 using OpenLancer.Data.Missions;
 using OpenLancer.Data.Missions.Editing;
@@ -274,7 +275,7 @@ internal sealed partial class EditorWindow : IAgentEditor, IFollowView
     internal bool AgentExportRuns => agentController.Exports.Running;
 
     AgentGames IAgentEditor.Games(OpenLancer.Data.Mods.ModManifest manifest) =>
-        new(LinkedGameReports(), Mods.GameRoots(), Mods.PlayTargets(manifest));
+        new(LinkedGameReports(), Mods.GameRoots(), Mods.PlayTargets(manifest), GameLinkWay.Editor);
 
     ValidationState? IAgentEditor.Validation => Edits.Validation;
 

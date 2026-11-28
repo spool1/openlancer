@@ -68,7 +68,7 @@ public sealed class AgentPublishToolTests
         var report = game.Report();
         var host = new TestAgentHost(session)
         {
-            TestGames = new AgentGames([report], [game.Root], [ExportTarget.Vanilla]),
+            TestGames = new AgentGames([report], [game.Root], [ExportTarget.Vanilla], GameLinkWay.Editor),
             TestPaused = true,
         };
         session.Execute(EditCommand.SetLinesFromText(new SectionRef(ExportGame.GoodsPath, new SectionIdentity("Good", "lf_hull")),
@@ -166,6 +166,42 @@ public sealed class AgentPublishToolTests
         Assert.Equal(("refused", "HistoryNotLoaded"), (noHistory.Code, noHistory.Detail));
         Assert.False(Directory.Exists(Path.Combine(ExportRoot(game), "1.2.0")));
         Assert.False(host.Exports.Running);
+    }
+
+    /// <summary>
+    /// A retail target without a linked game: export_mod and publish_checklist tell the way of the host to link a game.
+    /// The host without a window has the base folder of the profile as its one linked game, and it has no File menu.
+    /// So its texts name the profile. The editor host names File > Game link (case 5 of #99).
+    /// </summary>
+    [Fact]
+    public void TheTextsOfAMissingGameTellTheWayOfTheHost()
+    {
+        using var game = new ExportGame();
+        var profile = Profile(game, targets: ", \"targets\": [ \"vanilla-1.1\", \"hde-0.7.1\" ]");
+        using var session = EditSession.Open(ModProfile.Load(profile), "ol-test", TestWorkspace.FakeDllWriter.Instance,
+            ThnScripts.Evaluator);
+        var oltool = new TestAgentHost(session);
+        var editor = new TestAgentHost(session)
+        {
+            TestGames = new AgentGames([game.Report()], [game.Root], [], GameLinkWay.Editor),
+        };
+        (TestAgentHost Host, string Advice)[] cases =
+        [
+            (oltool, "oltool links only the base folder of the profile. Use a profile whose base folder is a game folder " +
+                     "of Freelancer: HD Edition 0.7.1."),
+            (editor, "Link a game folder of Freelancer: HD Edition 0.7.1 in File > Game link."),
+        ];
+
+        foreach (var (host, advice) in cases)
+        {
+            var export = Error(host, "export_mod", """{ "targets": ["hde-0.7.1"] }""");
+            var checks = Ok(host, "publish_checklist")["steps"]!.AsArray()
+                .Single(s => (string?)s!["name"] == "Checks for each target")!;
+
+            Assert.Equal(("refused", "TargetRefused", $"No linked game gives the target 'hde-0.7.1'. {advice}"), export);
+            Assert.Contains($"{advice} The check needs the files of the game.",
+                checks["missing"]!.AsArray().Select(m => (string?)m));
+        }
     }
 
     /// <summary>

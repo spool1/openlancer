@@ -146,6 +146,10 @@ public sealed class AgentLaneToolTests
         "invalid_value", MissionErrors.FieldValue, "faction")]
     [InlineData("trade_lane_create", """{ "system": "Li99", "start": [0, 0, 30000], "end_near": "obj:Li01_planet", "start_name": "a" }""",
         "not_found", ItemRefs.NotFound, "system")]
+    [InlineData("trade_lane_create", """{ "system": "Li01", "start_near": "Li01_nowhere", "end_near": "obj:Li01_planet" }""",
+        "not_found", MissionErrors.ItemNotFound, "start_near")]
+    [InlineData("trade_lane_create", """{ "system": "Li01", "start": [0, 0, 30000], "start_name": "a", "end_near": "Li02_01" }""",
+        "not_found", MissionErrors.ItemNotFound, "end_near")]
     [InlineData("trade_lane_insert_ring", """{ "after": "obj:Li01_Trade_Lane_Ring_1", "before": "obj:Li01_Trade_Lane_Ring_1" }""",
         "invalid_argument", ToolInput.BadArgument, "before")]
     [InlineData("trade_lane_insert_ring", """{ "position": [0, 0, 0] }""", "invalid_argument", ToolInput.BadArgument, "after")]
@@ -188,6 +192,70 @@ public sealed class AgentLaneToolTests
 
         Assert.Equal(100, preview["rings"]!.AsArray().Count);
         Assert.InRange((double)preview["spacing"]!, LanePlans.MinSpacing, LanePlans.MaxSpacing);
+        Assert.Equal(0, session.Revision);
+    }
+
+    /// <summary>
+    /// A ring count above 100 goes to the plan as it is. So the refusal gives the spacing of that count, not of 101
+    /// rings: 200 rings on a lane of 35400 m stand 178 m apart, and the lane takes 3 to 36 rings (case 2 of #99).
+    /// </summary>
+    [Fact]
+    public void TheRefusalOfARingCountGivesTheSpacingOfThatCount()
+    {
+        var (ws, session, host) = Lanes();
+        using var _ = ws;
+
+        var error = Failure(host, "trade_lane_create", """
+            { "system": "Li01", "start": [0, 0, 30000], "end": [35400, 0, 30000], "start_name": "a", "end_name": "b",
+              "rings": 200 }
+            """);
+
+        Assert.Equal("A trade lane needs 2 to 100 rings, with 1000 to 20000 m between two rings. The lane is 35400 m long, " +
+                     "so 200 rings stand 178 m apart. Give 3 to 36 rings.", (string?)error["message"]);
+        Assert.Equal(0, session.Revision);
+    }
+
+    /// <summary>
+    /// start_near and end_near take a nickname of an object of the system, without letter case, as the object of an end
+    /// of connection_create does. The lane is the same as with the obj: references. A nickname that no object of the
+    /// system has gives not_found with its text (case 4 of #99).
+    /// </summary>
+    [Fact]
+    public void TheEndsOfTradeLaneCreateTakeANickname()
+    {
+        var (ws, session, host) = Lanes();
+        using var _ = ws;
+
+        var byName = Ok(host, "trade_lane_create",
+            """{ "system": "Li01", "start_near": "Li01_to_Li02", "end_near": "li01_sun", "zone": false, "preview": true }""");
+        var byRef = Ok(host, "trade_lane_create",
+            """{ "system": "Li01", "start_near": "obj:Li01_to_Li02", "end_near": "obj:Li01_sun", "zone": false, "preview": true }""");
+        var missing = Failure(host, "trade_lane_create",
+            """{ "system": "Li01", "start_near": "Li01_nowhere", "end_near": "Li01_sun" }""");
+
+        Assert.Equal(Texts(byRef["rings"]), Texts(byName["rings"]));
+        Assert.Equal((double)byRef["spacing"]!, (double)byName["spacing"]!);
+        Assert.Equal("Li01 has no object Li01_nowhere. Give the nickname or the obj: reference of an object of Li01.",
+            (string?)missing["message"]);
+        Assert.Equal(0, session.Revision);
+    }
+
+    /// <summary>trade_lane_insert_ring without after and before asks for one of the two. With both, it tells that the
+    /// call takes only one (case 1 of #99).</summary>
+    [Fact]
+    public void TradeLaneInsertRingTellsWhichPlaceArgumentIsWrong()
+    {
+        var (ws, session, host) = Lanes();
+        using var _ = ws;
+
+        var none = Failure(host, "trade_lane_insert_ring", "{}");
+        var both = Failure(host, "trade_lane_insert_ring",
+            """{ "after": "obj:Li01_Trade_Lane_Ring_1", "before": "obj:Li01_Trade_Lane_Ring_1" }""");
+
+        Assert.Equal(("after", "Give after or before. after takes any ring of a lane. before takes only the first ring of a lane."),
+            ((string?)none["field"], (string?)none["message"]));
+        Assert.Equal(("before", "Give after or before, not both. before takes only the first ring of a lane."),
+            ((string?)both["field"], (string?)both["message"]));
         Assert.Equal(0, session.Revision);
     }
 

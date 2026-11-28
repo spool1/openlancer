@@ -326,7 +326,8 @@ internal static class Program
         if (game != null && !Directory.Exists(game))
             return Fail($"The folder {game} does not exist.");
 
-        var (problems, notes) = TargetValidation.Run(ModProfile.Load(profilePath), target, game);
+        var (problems, notes) = TargetValidation.Run(ModProfile.Load(profilePath), target, game,
+            GameLinkWay.GameOption);
         if (json)
         {
             Out.WriteLine(ValidationJson.Write(problems));
@@ -513,6 +514,7 @@ internal static class Program
             FlmmProbe = probe,
             ChecklistOnly = checklist,
             OpenLancerBase = GameBase.Standard(profile.BaseFolder),
+            LinkWay = GameLinkWay.GameOption,
         };
         foreach (var problem in publishProblems)
             Err.WriteLine($"Warning: {mod.Folder}: {problem}");
@@ -629,7 +631,10 @@ internal static class Program
             return Fail($"The profile has no mod '{modId}'.");
         var mod = profile.Mods[index];
         var input = ChecklistInput.Read(mod, ModExport.DefaultFolder(profile.FilePath, modId),
-            [GameDetector.CheckRoot(profile.BaseFolder)], [], out var problems);
+            [GameDetector.CheckRoot(profile.BaseFolder)], [], out var problems) with
+        {
+            LinkWay = GameLinkWay.ProfileBase,
+        };
         foreach (var problem in problems)
             Err.WriteLine($"Warning: {problem}");
         var checklist = PublishChecklist.Of(input);

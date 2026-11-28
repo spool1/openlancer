@@ -1,5 +1,6 @@
 using System;
 using OpenLancer.Data.Editing;
+using OpenLancer.Data.Export;
 using OpenLancer.Editor;
 using OpenLancer.Editor.Agent;
 using OpenLancer.Editor.Editing;
@@ -65,7 +66,7 @@ internal sealed class FakeAgentEditor : IAgentEditor
     public int ValidatedHandlers => Validated?.GetInvocationList().Length ?? 0;
 
     /// <summary>The game links of the test.</summary>
-    public AgentGames TestGames { get; set; } = new([], [], []);
+    public AgentGames TestGames { get; set; } = new([], [], [], GameLinkWay.Editor);
 
     public AgentGames Games(OpenLancer.Data.Mods.ModManifest manifest) => TestGames;
 

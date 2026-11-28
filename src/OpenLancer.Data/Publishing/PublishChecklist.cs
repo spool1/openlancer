@@ -62,6 +62,10 @@ public sealed record ChecklistInput(
     Func<ExportTarget, string?> BaseOf,
     IReadOnlyList<ExportTarget> PlayTargets)
 {
+    /// <summary>How the program of the checklist links a game. The step "Checks for each target" tells this way for a
+    /// retail target without a linked game.</summary>
+    public GameLinkWay LinkWay { get; init; } = GameLinkWay.Editor;
+
     /// <summary>
     /// The input of a mod with the bases of the linked games: each retail target takes the base key of its base (see
     /// <see cref="ExportTarget.BaseIn"/>). The Mods window, the Export dialog, <c>oltool publish</c> and the agent tool
@@ -174,7 +178,7 @@ public sealed record PublishChecklist(IReadOnlyList<ChecklistStep> Steps, IReadO
             var baseKey = target.IsRetail ? input.BaseOf(target) : "";
             if (baseKey == null)
             {
-                missing.Add($"Link a game folder of {target.Game} in File > Game link. The check needs the files of the game.");
+                missing.Add($"{target.LinkAdvice(input.LinkWay)} The check needs the files of the game.");
                 Add(new ChecklistButton(ChecklistAction.GameLink, "Game link..."));
                 if (targets.Count > 1)
                     Add(new ChecklistButton(ChecklistAction.RemoveTarget, $"Remove the target {target.Name}", Argument: target.Id));

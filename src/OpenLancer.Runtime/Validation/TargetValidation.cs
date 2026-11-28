@@ -25,14 +25,17 @@ public static class TargetValidation
     /// <param name="target">A retail target (<see cref="ExportTarget.IsRetail"/>).</param>
     /// <param name="gameFolder">The game folder of the target, or null when the base of the profile gives the
     /// target.</param>
+    /// <param name="way">How the program that runs the check links a game. The error of a missing game tells
+    /// it.</param>
     /// <exception cref="ModLoadException">A mod does not load.</exception>
-    public static TargetValidationResult Run(ModProfile profile, ExportTarget target, string? gameFolder)
+    public static TargetValidationResult Run(ModProfile profile, ExportTarget target, string? gameFolder,
+        GameLinkWay way)
     {
         var profileBase = GameDetector.CheckRoot(profile.BaseFolder);
         var report = gameFolder != null ? GameDetector.Detect(gameFolder) : profileBase;
         var problems = new List<Diagnostic>();
         var notes = new List<string>();
-        if ((target.BaseRefusal(report) ?? PlayBuild.Refusal(report, profile.Mods)) is { } refusal)
+        if ((target.BaseRefusal(report, way) ?? PlayBuild.Refusal(report, profile.Mods)) is { } refusal)
             problems.Add(Diagnostic.Error(gameFolder ?? profile.BaseFolder, refusal));
         else
         {

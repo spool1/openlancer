@@ -231,8 +231,9 @@ public sealed class LanePlansTests
         Assert.Null(ConnectionWorkspace.TextOf(session, first[8].Text));
     }
 
-    /// <summary>A lane needs 2 to 100 rings with 1000 to 20000 m between two rings. A spacing outside the retail range
-    /// gives a warning, and the lane is made.</summary>
+    /// <summary>A lane needs 2 to 100 rings with 1000 to 20000 m between two rings. The refusal gives the length of the
+    /// lane, the spacing of the count and the counts that fit, or the distances that fit when no count fits. A spacing
+    /// outside the retail range gives a warning, and the lane is made.</summary>
     [Fact]
     public void TheSpacingRefusesOutsideItsLimitsAndWarnsOutsideTheRetailRange()
     {
@@ -241,12 +242,15 @@ public sealed class LanePlansTests
         var (start, end) = (At(30000, 0, 30000, "A"), At(30000, 0, 60000, "B"));
 
         var far = Refusal(LanePlans.Create(session, "Li01", start, end, new LaneOptions { Rings = 2 }), LanePlans.LaneRings);
-        Refusal(LanePlans.Create(session, "Li01", start, end, new LaneOptions { Rings = 101 }), LanePlans.LaneRings);
-        Refusal(LanePlans.Create(session, "Li01", start, At(30000, 0, 30500, "B")), LanePlans.LaneRings);
+        var many = Refusal(LanePlans.Create(session, "Li01", start, end, new LaneOptions { Rings = 101 }), LanePlans.LaneRings);
+        var tooShort = Refusal(LanePlans.Create(session, "Li01", start, At(30000, 0, 30500, "B")), LanePlans.LaneRings);
         var close = Run(session, LanePlans.Create(session, "Li01", start, end, new LaneOptions { Rings = 7 }));
 
-        Assert.Equal("A trade lane needs 2 to 100 rings, with 1000 to 20000 m between two rings. This lane has 30000 m.",
-            far.Message);
+        const string limits = "A trade lane needs 2 to 100 rings, with 1000 to 20000 m between two rings.";
+        Assert.Equal($"{limits} The lane is 30000 m long, so 2 rings stand 30000 m apart. Give 3 to 31 rings.", far.Message);
+        Assert.Equal($"{limits} The lane is 30000 m long, so 101 rings stand 300 m apart. Give 3 to 31 rings.", many.Message);
+        Assert.Equal($"{limits} The lane is 500 m long, so 2 rings stand 500 m apart. Give two ends that are 1000 to " +
+                     "1980000 m apart.", tooShort.Message);
         Assert.Equal("rings", LanePlans.Create(session, "Li01", start, end, new LaneOptions { Rings = 2 }).RefusedPart);
         Assert.Equal(7, close.Rings.Count);
         Assert.Equal("The rings of the lane are 5000 m apart. Retail lanes have 5165 to 9445 m between two rings. Give " +

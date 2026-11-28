@@ -166,8 +166,10 @@ public sealed record ConsoleFilter(string? Source, AgentSeverity Severity, bool 
 /// <param name="Roots">The game folders that the folder of the publish history must not overlap.</param>
 /// <param name="PlayTargets">The retail targets whose linked game has a game program, for the step "Test play" of the
 /// publish checklist.</param>
+/// <param name="LinkWay">How the user of the host links a game. The texts about a retail target without a linked game
+/// tell it.</param>
 public sealed record AgentGames(IReadOnlyList<GameReport> Reports, IReadOnlyList<string> Roots,
-    IReadOnlyList<ExportTarget> PlayTargets);
+    IReadOnlyList<ExportTarget> PlayTargets, GameLinkWay LinkWay);
 
 /// <summary>The problems of the target checks of a profile (see <see cref="AgentHost.CheckTarget"/>).</summary>
 /// <param name="Notes">Notes of the check, for example a target game that the profile does not link.</param>
@@ -271,7 +273,8 @@ public abstract class AgentHost
         {
             var folder = Session!.Profile.BaseFolder;
             var report = GameDetector.CheckRoot(folder);
-            profileGames = new AgentGames([report], [folder, .. report.Root is { } root ? [root] : Array.Empty<string>()], []);
+            profileGames = new AgentGames([report],
+                [folder, .. report.Root is { } root ? [root] : Array.Empty<string>()], [], GameLinkWay.ProfileBase);
         }
         return profileGames;
     }
