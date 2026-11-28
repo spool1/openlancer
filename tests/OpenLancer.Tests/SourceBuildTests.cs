@@ -241,7 +241,7 @@ public sealed class SourceBuildTests : IDisposable
 
         Assert.True(report.IsGame);
         Assert.False(report.CanBeBase);
-        Assert.NotNull(ExportTarget.Vanilla.BaseRefusal(report));
+        Assert.False(ExportTarget.Vanilla.AcceptsBase(report));
         Assert.Null(PlayBuild.Refusal(report, []));
     }
 

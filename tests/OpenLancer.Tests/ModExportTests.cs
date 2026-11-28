@@ -584,7 +584,9 @@ public sealed class OltoolExportTests
         Assert.True(File.Exists(Path.Combine(output, "ol-test-1.2.0-vanilla-1.1.zip")));
         Assert.False(File.Exists(Path.Combine(output, "ol-test-1.2.0-vanilla-1.1-flmm.zip")));
         Assert.Equal(1, noBase.Exit);
-        Assert.Contains("No linked game gives the target 'hde-0.7.1'.", noBase.Errors);
+        Assert.Contains("No linked game gives the target 'hde-0.7.1'. Give a game folder of Freelancer: HD Edition 0.7.1 " +
+                        "with --game.", noBase.Errors);
+        Assert.DoesNotContain("File > Game link", noBase.Errors);
         Assert.Equal(2, noMod.Exit);
     }
 

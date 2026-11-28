@@ -7,6 +7,24 @@ using OpenLancer.Data.Mods;
 namespace OpenLancer.Data.Export;
 
 /// <summary>
+/// How the user of a program links the game folder of a retail target. A text about a missing game tells the way of
+/// the program that shows it (see <see cref="ExportTarget.LinkAdvice"/>).
+/// </summary>
+public enum GameLinkWay
+{
+    /// <summary>The editor: the Game link window, File > Game link.</summary>
+    Editor,
+
+    /// <summary>oltool without <c>--game</c>, for example its agent server and <c>oltool publish</c>: the base folder
+    /// of the profile is the one linked game.</summary>
+    ProfileBase,
+
+    /// <summary><c>oltool export</c> and <c>oltool validate</c>: <c>--game</c> gives a game folder. Without it, the
+    /// base folder of the profile is the one linked game.</summary>
+    GameOption,
+}
+
+/// <summary>
 /// A game that the export makes packages for (milestone M11): HD Edition 0.7.1, Freelancer 1.1, or OpenLancer. A retail
 /// target needs a linked game whose check gives the target. Its packages hold the merged files of that game.
 /// </summary>
@@ -59,24 +77,34 @@ public sealed record ExportTarget(string Id, string Name, string Game)
         return null;
     }
 
-    /// <summary>The reason why a game cannot be the base of this target, or null when it can. The report must give
-    /// the target, and a retail target needs a base. A source build is never the base of an export, because its
-    /// <c>freelancer.ini</c> is a development copy with other lines than the retail file.</summary>
+    /// <summary>True when this target accepts the game as its base. The target OpenLancer needs no base, so it accepts
+    /// each game. A retail target needs a report that gives the target. A source build is never the base of an export,
+    /// because its <c>freelancer.ini</c> is a development copy with other lines than the retail file.</summary>
     /// <param name="report">The check of the linked game, or null when no game is linked.</param>
-    public string? BaseRefusal(GameReport? report)
+    public bool AcceptsBase(GameReport? report) =>
+        !IsRetail || report is { CanBeBase: true, Root: not null } && report.Target == Id;
+
+    /// <summary>The reason why a game cannot be the base of this target, or null when it can (see
+    /// <see cref="AcceptsBase"/>). The reason tells how to link a game in the program that shows it.</summary>
+    /// <param name="report">The check of the linked game, or null when no game is linked.</param>
+    public string? BaseRefusal(GameReport? report, GameLinkWay way) =>
+        AcceptsBase(report) ? null : $"No linked game gives the target '{Id}'. {LinkAdvice(way)}";
+
+    /// <summary>What the user does to link a game folder of this target in a program.</summary>
+    public string LinkAdvice(GameLinkWay way) => way switch
     {
-        if (!IsRetail)
-            return null;
-        return report is { CanBeBase: true, Root: not null } && report.Target == Id
-            ? null
-            : $"No linked game gives the target '{Id}'. Link a game folder of {Game} in File > Game link.";
-    }
+        GameLinkWay.ProfileBase => "oltool links only the base folder of the profile. Use a profile whose base " +
+                                   $"folder is a game folder of {Game}.",
+        GameLinkWay.GameOption => $"Give a game folder of {Game} with --game. Without --game, oltool uses the base " +
+                                  "folder of the profile.",
+        _ => $"Link a game folder of {Game} in File > Game link.",
+    };
 
     /// <summary>The check of the linked game that is the base of this retail target, or null. It is the first check that
-    /// <see cref="BaseRefusal"/> takes. The target OpenLancer has no base.</summary>
+    /// <see cref="AcceptsBase"/> takes. The target OpenLancer has no base.</summary>
     /// <param name="reports">The checks of the linked games.</param>
     public GameReport? BaseIn(IReadOnlyList<GameReport> reports) =>
-        IsRetail ? reports.FirstOrDefault(r => BaseRefusal(r) == null) : null;
+        IsRetail ? reports.FirstOrDefault(AcceptsBase) : null;
 
     /// <summary>The warnings of a base: its INI files differ from the file list of its build, or it has JFLP.</summary>
     public IEnumerable<string> BaseWarnings(GameReport report)

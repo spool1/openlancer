@@ -8,7 +8,6 @@ using OpenLancer.Data;
 using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Commands;
 using OpenLancer.Data.Export;
-using OpenLancer.Data.Games;
 using OpenLancer.Data.Mods;
 using OpenLancer.Data.Publishing;
 using OpenLancer.Runtime.Strings;
@@ -96,7 +95,10 @@ internal static class PublishTools
             IReadOnlyList<string> problems;
             try
             {
-                input = ChecklistInput.Read(mod, history, games.Reports, games.PlayTargets, out problems);
+                input = ChecklistInput.Read(mod, history, games.Reports, games.PlayTargets, out problems) with
+                {
+                    LinkWay = games.LinkWay,
+                };
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -146,7 +148,7 @@ internal static class PublishTools
         if (ModVersion.SafeProblem(mod.Manifest.Version) is { } unsafeVersion)
             throw Refused("UnsafeVersion", unsafeVersion);
         var games = host.Games(mod.Manifest);
-        var targets = TargetsOf(call.Args, mod.Manifest, games.Reports);
+        var targets = TargetsOf(call.Args, mod.Manifest, games);
         var forms = FormsOf(call.Args, targets);
         // The export refuses a mod that the save gate refuses, with the errors of the save (#87). The session has no
         // unsaved edits, so its gate checks the saved files of the mod.
@@ -154,7 +156,10 @@ internal static class PublishTools
             throw SaveTools.ExportBlocked(session, gateErrors);
         var root = ModExport.DefaultFolder(session.Profile.FilePath, mod.Id);
         var request = ExportRequest.Of(mod, targets, games.Reports, ModExport.VersionFolder(root, mod.Manifest), forms,
-            DllStringResourceWriter.Instance, ThornEvaluator.Instance, out var publishProblems);
+            DllStringResourceWriter.Instance, ThornEvaluator.Instance, out var publishProblems) with
+        {
+            LinkWay = games.LinkWay,
+        };
         var location = new HistoryLocation(root, mod.Id, mod.Folder, games.Roots);
         var replace = call.Args.Flag("replace_version");
         // The default export folder is <workspace>\exports\<mod id> (decisions D565 and D714).
@@ -232,10 +237,10 @@ internal static class PublishTools
     /// dialog checks the targets in the same way.</summary>
     /// <exception cref="EditException"><see cref="EditErrorKind.Refused"/>: a target that the mod or the linked games
     /// do not allow, or no target.</exception>
-    private static IReadOnlyList<ExportTarget> TargetsOf(ToolArgs args, ModManifest manifest,
-        IReadOnlyList<GameReport> reports)
+    private static IReadOnlyList<ExportTarget> TargetsOf(ToolArgs args, ModManifest manifest, AgentGames games)
     {
-        string? Refusal(ExportTarget target) => target.Refusal(manifest) ?? target.BaseRefusal(target.BaseIn(reports));
+        string? Refusal(ExportTarget target) =>
+            target.Refusal(manifest) ?? target.BaseRefusal(target.BaseIn(games.Reports), games.LinkWay);
         if (args.Texts("targets") is { } names)
         {
             var chosen = ExportTarget.All.Where(t => names.Contains(t.Id)).ToList();

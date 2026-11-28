@@ -327,7 +327,8 @@ internal sealed class ExportDialog : ModalDialog
         {
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
-            var reason = target.Refusal(exported.Manifest) ?? target.BaseRefusal(target.BaseIn(bases));
+            var reason = target.Refusal(exported.Manifest) ??
+                         target.BaseRefusal(target.BaseIn(bases), GameLinkWay.Editor);
             var on = targets.Contains(target.Id) && reason == null;
             ImGui.BeginDisabled(reason != null);
             if (ImGui.Checkbox(target.Name, ref on))

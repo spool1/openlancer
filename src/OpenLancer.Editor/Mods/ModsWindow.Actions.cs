@@ -296,7 +296,7 @@ internal sealed partial class ModsWindow
     internal static IReadOnlyList<PlayTarget> PlayGamesOf(ModManifest manifest, IEnumerable<PlayTarget> targets) =>
     [
         .. targets.Where(t => ExportTarget.Find(t.Game.Target ?? "") is { IsRetail: true } target &&
-                              target.Refusal(manifest) == null && target.BaseRefusal(t.Game) == null),
+                              target.Refusal(manifest) == null && target.AcceptsBase(t.Game)),
     ];
 
     /// <summary>

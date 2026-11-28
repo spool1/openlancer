@@ -236,7 +236,7 @@ public sealed class HeadlessHost : AgentHost, IDisposable
         IReadOnlyList<string> notes;
         try
         {
-            (problems, notes) = TargetValidation.Run(Session.Profile, found, gameFolder: null);
+            (problems, notes) = TargetValidation.Run(Session.Profile, found, gameFolder: null, GameLinkWay.ProfileBase);
         }
         catch (Exception e) when (e is ModLoadException or IOException or UnauthorizedAccessException)
         {

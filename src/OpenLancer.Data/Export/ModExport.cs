@@ -35,6 +35,10 @@ public sealed record ExportRequest
     /// target.</summary>
     public required Func<ExportTarget, GameReport?> BaseOf { get; init; }
 
+    /// <summary>How the program of the export links a game. The error of a retail target without a base tells this
+    /// way.</summary>
+    public GameLinkWay LinkWay { get; init; } = GameLinkWay.Editor;
+
     /// <summary>The exact folder of the packages. The export makes it. The editor and the default of
     /// <c>oltool export</c> give <see cref="ModExport.VersionFolder"/>.</summary>
     public required string OutputFolder { get; init; }
@@ -473,7 +477,7 @@ public static class ModExport
         var request = prepared.Request;
         var mod = request.Mod;
         var report = request.BaseOf(target);
-        if (target.BaseRefusal(report) is { } noBase)
+        if (target.BaseRefusal(report, request.LinkWay) is { } noBase)
         {
             prepared.Add(Diagnostic.Error(mod.Folder, noBase));
             AddRefused(prepared, target);
