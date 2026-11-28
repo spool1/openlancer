@@ -10,6 +10,8 @@ OpenLancer makes Freelancer (2003) openly moddable. It adds a mod overlay with a
 
 ## Supported games
 
+OpenLancer supports the English versions of the games below on 64-bit Windows 10 and Windows 11. It does not support game installs in other languages or Linux yet.
+
 | Game | Edit and check mods | Export (drop-in zip and FLMM package) | Play the mod in the game (Ctrl+F5) |
 |---|---|---|---|
 | Freelancer 1.1 (retail) | Yes | Yes | Yes |
@@ -53,7 +55,7 @@ The repo is one folder in a larger workspace. The game data stays outside the re
 
 ### Players
 
-You need your own installed copy of Freelancer (2003): the retail game 1.0 or 1.1, with or without JFLP, or Freelancer: HD Edition.
+You need your own installed English copy of Freelancer (2003): the retail game 1.0 or 1.1, with or without JFLP, or Freelancer: HD Edition 0.7.1.
 
 1. Unzip the OpenLancer release to a folder of your choice.
 2. Start `OpenLancer.Editor.exe`.

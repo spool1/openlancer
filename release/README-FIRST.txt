@@ -21,14 +21,18 @@ SYSTEM REQUIREMENTS
 -------------------
 - Windows 10 or Windows 11, 64-bit.
 - A graphics card and a driver with OpenGL 3.2 or later.
-- An installed copy of a retail game of the list SUPPORTED GAMES below:
-  Freelancer 1.0, Freelancer 1.1 or Freelancer: HD Edition 0.7.1.
+- An installed English copy of a retail game of the list SUPPORTED GAMES
+  below: Freelancer 1.0, Freelancer 1.1 or Freelancer: HD Edition 0.7.1.
 - About 160 MB of disk space.
 You do not need to install .NET.
 
 
 SUPPORTED GAMES
 ---------------
+OpenLancer supports the English versions of the games below on 64-bit
+Windows 10 and Windows 11. It does not support game installs in other
+languages or Linux yet.
+
 For each game, the list tells what OpenLancer can do with it.
 
 Freelancer 1.1 (retail)

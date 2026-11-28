@@ -67,7 +67,7 @@ After each exit of the game, OpenLancer checks the links of the play copy. When 
 
 ## The game does not start
 
-First make sure that OpenLancer supports your game:
+First make sure that OpenLancer supports your game. OpenLancer supports the English versions of the games below on 64-bit Windows 10 and Windows 11. It does not support game installs in other languages or Linux yet.
 
 | Game | Play the mod in the game (Ctrl+F5) |
 |---|---|

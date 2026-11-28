@@ -56,6 +56,11 @@ HEADING = re.compile(r"(#{1,6}) +(.+)")
 # lists tell that a source build is a play target only.
 RETAIL_BASES = "Freelancer 1.0, Freelancer 1.1 or Freelancer: HD Edition 0.7.1."
 PLAY_TARGET_ONLY = "A source build is a play target only. Make the profile with a retail game first."
+# 1.0 supports the English games on Windows (#64). The games lists of the README, of the new pages and of README-FIRST.txt
+# say so in these words, and their requirements ask for an English copy.
+SUPPORT = ("OpenLancer supports the English versions of the games below on 64-bit Windows 10 and Windows 11. It does not "
+           "support game installs in other languages or Linux yet.")
+ENGLISH_COPY = "installed English copy"
 GAME_TEXTS = "src/OpenLancer.Data/Games/GameTexts.cs"
 
 
@@ -203,6 +208,18 @@ def base_problems(requirements, games):
         problems.append("the requirements name the source build")
     if PLAY_TARGET_ONLY not in games:
         problems.append(f"no sentence '{PLAY_TARGET_ONLY}'")
+    return problems
+
+
+def support_problems(games, requirements=None):
+    """The problems of the texts about the language and the system of the supported games. games: the games list,
+    which must have the sentences SUPPORT. requirements: the requirements, which must ask for an ENGLISH_COPY, or None
+    for a page without requirements."""
+    problems = []
+    if SUPPORT not in " ".join(games.split()):
+        problems.append(f"no sentences '{SUPPORT}'")
+    if requirements is not None and ENGLISH_COPY not in " ".join(requirements.split()):
+        problems.append(f"the requirements do not ask for an {ENGLISH_COPY}")
     return problems
 
 
@@ -384,6 +401,20 @@ class HelpPageTests(unittest.TestCase):
         self.assertEqual(["the requirements name the source build"],
                          base_problems(good + "- Or a source build.", PLAY_TARGET_ONLY))
 
+    def test_the_readme_and_the_pages_name_the_language_and_the_system_of_the_games(self):
+        readme, getting_started = read(README), read("docs/GETTING_STARTED.md")
+        self.assertEqual([], support_problems(section(readme, "## Supported games"), section(readme, "### Players")))
+        self.assertEqual([], support_problems(section(getting_started, "## Supported games"),
+                                              section(getting_started, "## What you need")))
+        self.assertEqual([], support_problems(section(read("docs/TROUBLESHOOTING.md"), "## The game does not start")))
+
+    def test_texts_without_the_language_or_the_system_are_a_problem(self):
+        wrapped = SUPPORT.replace(" Windows 11.", "\nWindows 11.")
+        self.assertEqual([], support_problems(f"The list.\n{wrapped}\n", f"- Your own {ENGLISH_COPY} of a game."))
+        self.assertEqual([f"no sentences '{SUPPORT}'", f"the requirements do not ask for an {ENGLISH_COPY}"],
+                         support_problems(SUPPORT.replace("English ", ""), "- Your own installed copy of a game."))
+        self.assertEqual([f"no sentences '{SUPPORT}'"], support_problems(SUPPORT.replace(" or Linux", "")))
+
     def test_the_play_steps_give_the_play_support_of_freelancer_1_0(self):
         """The Play menu lists Freelancer 1.0, so these steps can start its program. They give the README cell."""
         cell = next(row[PLAY] for row in supported_games()[1] if row[GAME].startswith("Freelancer 1.0"))
@@ -532,6 +563,11 @@ class ReadmeFirstGamesTests(unittest.TestCase):
         text = self.readme_first()
         self.assertEqual([], base_problems(text_section(text, "SYSTEM REQUIREMENTS"),
                                            text_section(text, "SUPPORTED GAMES")))
+
+    def test_readme_first_names_the_language_and_the_system_of_the_games(self):
+        text = self.readme_first()
+        self.assertEqual([], support_problems(text_section(text, "SUPPORTED GAMES"),
+                                              text_section(text, "SYSTEM REQUIREMENTS")))
 
     def test_the_game_cell_of_the_source_build_can_be_a_whole_line(self):
         source_build = supported_games()[1][3][GAME]

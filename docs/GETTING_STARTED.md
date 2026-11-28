@@ -6,7 +6,7 @@ This page tells how to make your first mod with the release zip of OpenLancer. Y
 
 - Windows 10 or Windows 11, 64-bit.
 - A graphics card and a driver with OpenGL 3.2 or later.
-- Your own installed copy of a retail game of the table [Supported games](#supported-games): Freelancer 1.0, Freelancer 1.1 or Freelancer: HD Edition 0.7.1.
+- Your own installed English copy of a retail game of the table [Supported games](#supported-games): Freelancer 1.0, Freelancer 1.1 or Freelancer: HD Edition 0.7.1.
 
 You do not need to install .NET. `README-FIRST.txt` in the zip gives all the system requirements. In the editor, **Help > Read me first** opens that file, and **Help > Getting started** opens this page.
 
@@ -83,6 +83,8 @@ When the editor cannot make the play copy next to the game, it asks for a folder
 The export makes a drop-in zip and an FLMM package for each retail target that you select. A retail target needs a linked game as its base: HD Edition 0.7.1 for HD Edition 0.7.1, and Freelancer 1.0 or 1.1 for Freelancer 1.1. The packages go to `Documents\OpenLancer\exports\my-mod`, in a folder for the version of the mod. They hold only the changes of your mod. The export never writes into a game folder. "Export" in [MOD_FORMAT.md](MOD_FORMAT.md) tells more about the packages.
 
 ## Supported games
+
+OpenLancer supports the English versions of the games below on 64-bit Windows 10 and Windows 11. It does not support game installs in other languages or Linux yet.
 
 | Game | Edit and check mods | Export (drop-in zip and FLMM package) | Play the mod in the game (Ctrl+F5) |
 |---|---|---|---|

@@ -715,7 +715,7 @@ class ReadmeFirstTests(unittest.TestCase):
         (#61). tools/test_help_pages.py compares each game with the README table."""
         text = self.filled("1.0.0")
         requirements = " ".join(self.section(text, "SYSTEM REQUIREMENTS").split())
-        self.assertIn("An installed copy of a retail game of the list SUPPORTED GAMES below: ", requirements)
+        self.assertIn("An installed English copy of a retail game of the list SUPPORTED GAMES below: ", requirements)
         self.assertIn("\nFreelancer: HD Edition 0.7.1\n", self.section(text, "SUPPORTED GAMES"))
 
     def test_the_text_claims_the_disk_space(self):
