@@ -123,6 +123,24 @@ internal static class SectionKeys
         ]],
     };
 
+    /// <summary>
+    /// The item lists of each section type (see <see cref="ItemLists"/>). A patch section adds lines of an item list
+    /// with <c>ol.append</c>, and removes one line with <c>ol.remove_line</c>.
+    /// </summary>
+    private static readonly Dictionary<string, ItemLists> ItemListTable = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // DATA\initialworld.ini: retail reads each locked_gate and npc_locked_gate line of each [locked_gates] section,
+        // and locks the gate whose nickname has the hash. HD Edition 0.7.1 has a lock line that vanilla 1.1 does not
+        // have, so a mod for both games adds and removes only its own lines (issue #94).
+        ["locked_gates"] = new(["locked_gate", "npc_locked_gate"], ItemLists.HashItem, "a hash as a decimal number"),
+    };
+
+    /// <summary>The item lists of a section type, or null when the type has none.</summary>
+    public static ItemLists? ItemListsOf(string sectionName) => ItemListTable.GetValueOrDefault(sectionName);
+
+    /// <summary>The section types that have item lists, in the order of the table, for messages.</summary>
+    public static IEnumerable<string> ItemListTypes => ItemListTable.Keys;
+
     public static SectionMatch For(string sectionName) =>
         Exceptions.TryGetValue(sectionName, out var match) ? match : new(SectionMatchKind.Keyed, DefaultKey);
 

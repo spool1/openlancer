@@ -10,6 +10,7 @@ using OpenLancer.Data.Editing;
 using OpenLancer.Data.Editing.Lists;
 using OpenLancer.Data.Editing.Scene;
 using OpenLancer.Data.Editing.Universe;
+using OpenLancer.Data.Ini;
 using Xunit;
 
 namespace OpenLancer.DataTests;
@@ -91,7 +92,7 @@ public sealed class ConnectionRetailTests(ITestOutputHelper output)
             {
                 var view = session.Get(section)!;
                 result.AddRange(ConnectionChecks.Check(session, section)
-                    .Select(p => GateLocks.HashOf(view.Entries[p.EntryIndex].Values[0])!.Value));
+                    .Select(p => ItemLists.HashOf(view.Entries[p.EntryIndex].Values[0])!.Value));
             }
         }
         return result;

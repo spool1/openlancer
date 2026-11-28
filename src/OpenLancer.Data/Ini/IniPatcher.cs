@@ -26,8 +26,11 @@ namespace OpenLancer.Data.Ini;
 /// Child sections that directly follow a new parent section in the patch belong to that parent.</item>
 /// <item><c>ol.rename = &lt;new key&gt;</c> gives the target a new key. The section keeps its place, and the other
 /// lines of the patch section change it.</item>
-/// <item><c>ol.append = true</c> is only for a <c>[Data]</c> section of a patch of <c>EXE\freelancer.ini</c> (see
-/// <see cref="ApplyDataAppend"/>).</item>
+/// <item><c>ol.append = true</c> adds the lines of a <c>[Data]</c> section of a patch of <c>EXE\freelancer.ini</c>
+/// (see <see cref="ApplyDataAppend"/>). In a section with item lists (see <see cref="SectionKeys.ItemListsOf"/>), it
+/// adds each line of an item list whose item the target does not have (see <see cref="ApplyItems"/>).</item>
+/// <item><c>ol.remove_line = &lt;name&gt;, &lt;item&gt;</c> removes the lines of an item list with that name and
+/// item.</item>
 /// <item><c>ol.replace = true</c> replaces all lines of a section of a mission type whose line order counts, in a
 /// mission file (section 6.2 of the M6b design). <c>ol.base = &lt;hash&gt;</c> holds the hash of the section that the
 /// patch replaces or deletes (see <see cref="SectionHash"/>). A section whose hash differs gives a warning.</item>
@@ -49,6 +52,7 @@ internal static class IniPatcher
     internal const string DirectiveParent = "ol.parent";
     internal const string DirectiveRename = "ol.rename";
     internal const string DirectiveAppend = "ol.append";
+    internal const string DirectiveRemoveLine = "ol.remove_line";
     internal const string DirectiveReplace = "ol.replace";
     internal const string DirectiveBase = "ol.base";
     internal const string DirectiveBefore = "ol.before";
@@ -205,10 +209,10 @@ internal static class IniPatcher
     {
         var match = SectionKeys.For(patch.Name, context.TargetPath);
         var isChild = SectionKeys.IsChild(patch.Name);
-        if (p.IsAppend)
+        var items = SectionKeys.ItemListsOf(patch.Name);
+        if ((p.AppendLines > 0 || p.RemoveLines.Count > 0) && ItemDirectiveProblem(p, items) is { } itemProblem)
         {
-            context.Error($"[{patch.Name}]: {DirectiveAppend} is only for a [{DataSection}] section of a patch of " +
-                          @"EXE\freelancer.ini.");
+            context.Error($"[{patch.Name}]: {itemProblem}");
             return null;
         }
         if (MissionDirectiveProblem(patch, p, context) is { } problem)
@@ -331,9 +335,139 @@ internal static class IniPatcher
         }
 
         var changes = p.Content.Where(e => keyValue == null || !Is(e, match.KeyEntry!)).ToList();
-        target.Sections[position] = Modify(original, changes, p.RemoveNames, identity, context, target.IsBinary);
+        if (p.AppendLines == 0 && p.RemoveLines.Count == 0)
+        {
+            target.Sections[position] = Modify(original, changes, p.RemoveNames, identity, context, target.IsBinary);
+            return null;
+        }
+        // With ol.append, the lines of the item lists add items, and the other lines change the section as usual.
+        var itemLines = p.IsAppend ? changes.Where(e => items!.Has(e.Name)).ToList() : [];
+        changes.RemoveAll(e => itemLines.Any(a => ReferenceEquals(a, e)));
+        var changed = changes.Count > 0 || p.RemoveNames.Count > 0
+            ? Modify(original, changes, p.RemoveNames, identity, context, target.IsBinary)
+            : original;
+        target.Sections[position] = ApplyItems(changed, items!, itemLines, p.RemoveLines, changes, identity, context,
+            target.IsBinary) ?? original;
         return null;
     }
+
+    /// <summary>
+    /// The problem of the <c>ol.append</c> and <c>ol.remove_line</c> lines of a patch section, or null. Outside a patch
+    /// of <c>EXE\freelancer.ini</c>, the two directives are only for a section type with item lists. They change a
+    /// section of the file, so they cannot go with a directive that adds, deletes, renames or replaces a section.
+    /// <c>ol.remove</c> cannot remove all lines of an item list in such a section.
+    /// </summary>
+    private static string? ItemDirectiveProblem(PatchDirectives p, ItemLists? items)
+    {
+        var types = string.Join(", ", SectionKeys.ItemListTypes.Select(t => $"[{t}]"));
+        if (items == null)
+        {
+            return p.AppendLines > 0
+                ? $"{DirectiveAppend} is only for a [{DataSection}] section of a patch of EXE\\freelancer.ini, and for " +
+                  $"a section with item lists: {types}."
+                : $"{DirectiveRemoveLine} is only for a section with item lists: {types}.";
+        }
+        if (p.IsNew || p.IsDelete || p.RenameLines > 0 || p.IsReplace || p.ParentKey != null)
+            return $"A section with {DirectiveAppend} or {DirectiveRemoveLine} cannot also have {DirectiveNew}, " +
+                   $"{DirectiveDelete}, {DirectiveRename}, {DirectiveReplace} or {DirectiveParent}.";
+        if (p.AppendLines > 1 || p.AppendLines == 1 && !p.IsAppend)
+            return $"{DirectiveAppend} needs one line with the value true.";
+        if (p.RemoveNames.FirstOrDefault(items.Has) is { } list)
+            return $"{DirectiveRemove} cannot remove the item list '{list}' in a section with {DirectiveAppend} or " +
+                   $"{DirectiveRemoveLine}. Use {DirectiveRemoveLine} for each line.";
+        return null;
+    }
+
+    /// <summary>
+    /// Applies the lines of the item lists of a patch section (see <see cref="ItemLists"/>). Each <c>ol.remove_line</c>
+    /// line removes the lines of its name with its item. Each added line goes after the last line of its name, or at the
+    /// end of the section. The merge skips an added line whose item the section already has. A removed item that the
+    /// section does not have needs no change. So the lines of the lower layers stay, also on another game.
+    /// </summary>
+    /// <param name="added">The lines of the item lists that <c>ol.append</c> adds, in patch order.</param>
+    /// <param name="removeLines">The <c>ol.remove_line</c> lines.</param>
+    /// <param name="changes">The other content lines of the patch section, which replace the lines of their names.</param>
+    /// <returns>The changed section, or null after an error.</returns>
+    private static Section? ApplyItems(Section original, ItemLists items, List<Entry> added, List<Entry> removeLines,
+        List<Entry> changes, SectionIdentity identity, PatchContext context, bool binary)
+    {
+        var label = identity.ToString();
+        var removed = new HashSet<string>();
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var line in removeLines)
+        {
+            var name = line.Count > 0 ? line[0].ToString().Trim() : "";
+            var text = string.Join(", ", line.Select(v => v.ToString()));
+            if (line.Count < 2 || !items.Has(name))
+            {
+                context.Error($"{label}: {DirectiveRemoveLine} = {text}: the line needs the name of an item list and " +
+                              $"then the item. The item lists are {string.Join(", ", items.Keys)}. The item is " +
+                              $"{items.ItemText}.");
+                return null;
+            }
+            if (changes.Any(e => Is(e, name)))
+            {
+                context.Error($"{label}: the patch sets the lines of '{name}' and also has {DirectiveRemoveLine} for " +
+                              $"'{name}'. Add {DirectiveAppend} = true to add the lines.");
+                return null;
+            }
+            if (items.ItemOf(line.Skip(1)) is not { } item)
+            {
+                context.Error($"{label}: {DirectiveRemoveLine} = {text}: the item must be {items.ItemText}.");
+                return null;
+            }
+            removed.Add(ItemKey(name, item));
+            names.Add(name);
+        }
+        var adds = new List<(Entry Line, string Item)>();
+        foreach (var line in added)
+        {
+            var text = $"{line.Name} = {string.Join(", ", line.Select(v => v.ToString()))}";
+            if (items.ItemOf(line) is not { } item)
+            {
+                context.Error($"{label}: '{text}': {DirectiveAppend} needs {items.ItemText} as the item of the line.");
+                return null;
+            }
+            if (removed.Contains(ItemKey(line.Name, item)))
+            {
+                context.Error($"{label}: the patch adds '{text}' and also removes it with {DirectiveRemoveLine}.");
+                return null;
+            }
+            adds.Add((line, item));
+            names.Add(line.Name);
+        }
+
+        // The lines in their new order: each line of the section that stays, and each added line after the last line of
+        // its name.
+        var order = original
+            .Where(e => !(items.Has(e.Name) && items.ItemOf(e) is { } item && removed.Contains(ItemKey(e.Name, item))))
+            .Select(e => (Line: e, Added: false))
+            .ToList();
+        foreach (var (line, item) in adds)
+        {
+            if (order.Any(o => Is(o.Line, line.Name) && items.ItemOf(o.Line) == item))
+                continue;
+            var last = order.FindLastIndex(o => Is(o.Line, line.Name));
+            order.Insert(last < 0 ? order.Count : last + 1, (line, true));
+        }
+        // An added line takes the value types of the line of its name before it, as a changed line does.
+        var result = new Section(original.Name, order.Count) { File = original.File, Line = original.Line };
+        Entry? before = null;
+        foreach (var (line, isAdded) in order)
+        {
+            var copy = isAdded
+                ? Copy(result, line, context, binary, before != null && Is(before, line.Name) ? before : null)
+                : Copy(result, line, null, binary, null);
+            result.Add(copy);
+            before = copy;
+        }
+        foreach (var name in names)
+            context.RecordItems(identity, name);
+        return result;
+    }
+
+    /// <summary>The text that identifies an item of an item list: the name in lowercase and the item.</summary>
+    internal static string ItemKey(string name, string item) => name.ToLowerInvariant() + "=" + item;
 
     /// <summary>
     /// Applies a patch section with <c>ol.rename</c>: it finds the target by the old key, changes it with the other
@@ -697,7 +831,12 @@ internal static class IniPatcher
                 p.RenameKey = entry.Count == 1 && entry[0].ToString().Trim() is { Length: > 0 } key ? key : null;
             }
             else if (Is(entry, DirectiveAppend))
-                p.IsAppend = true;
+            {
+                p.AppendLines++;
+                p.IsAppend = IsTrue(entry);
+            }
+            else if (Is(entry, DirectiveRemoveLine))
+                p.RemoveLines.Add(entry);
             else if (Is(entry, DirectiveReplace))
                 p.IsReplace = IsTrue(entry);
             else if (Is(entry, DirectiveBase))
@@ -830,9 +969,13 @@ internal static class IniPatcher
         public bool IsNew;
         public bool IsDelete;
 
-        /// <summary>True when the section has an <c>ol.append</c> line, which only a patch of <c>freelancer.ini</c> can
-        /// use.</summary>
+        /// <summary>The number of <c>ol.append</c> lines, and true when the last one has the value true. A patch of
+        /// <c>freelancer.ini</c> and a section with item lists can use the directive.</summary>
+        public int AppendLines;
         public bool IsAppend;
+
+        /// <summary>The <c>ol.remove_line</c> lines.</summary>
+        public readonly List<Entry> RemoveLines = [];
         public string? ParentKey;
 
         /// <summary>The number of <c>ol.rename</c> lines, and the new key of the last one when it has one value.</summary>
@@ -935,6 +1078,11 @@ internal sealed class PatchContext(
 
     /// <summary>Records that this mod adds a section.</summary>
     public void RecordAdd(SectionIdentity section) => ledger.RecordAdd(targetPath, section, modId);
+
+    /// <summary>Records that this mod adds or removes single lines of an item list. The lines of the other mods stay, so
+    /// the record gives no warning.</summary>
+    public void RecordItems(SectionIdentity section, string entryName) =>
+        ledger.RecordItems(targetPath, section, entryName, modId);
 
     /// <summary>Records that this mod gives a section a new key (<c>ol.rename</c>).</summary>
     public void RecordRename(SectionIdentity from, SectionIdentity to) => ledger.RecordRename(targetPath, from, to, modId);

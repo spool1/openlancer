@@ -114,6 +114,42 @@ internal sealed class PatchSectionBuilder(SourceSection? source, bool binary, bo
     }
 
     /// <summary>
+    /// Adds a line that <c>ol.append</c> adds to an item list (see <see cref="SectionKeys.ItemListsOf"/>). The line takes
+    /// the place of the first unused loaded line with the same name and item, also of a loaded list with all its lines.
+    /// So the line keeps its text and the comment lines above it.
+    /// </summary>
+    /// <param name="replaced">The target line that gives the value types of the line, or null.</param>
+    /// <param name="sameItem">True for a loaded line with the item of the line.</param>
+    public string? Item(Entry entry, Entry? replaced, Func<Entry, bool> sameItem)
+    {
+        var index = FirstUnused(p => p.Name.Equals(entry.Name, StringComparison.OrdinalIgnoreCase) && sameItem(p));
+        if (Place(index, index >= 0 && PatchFormatter.ReadsBack(source!.Lines[index].Parsed, entry, replaced, binary)))
+            return null;
+        return PatchFormatter.TryFormatLine(entry, replaced, binary, out var line, out var error) ? Formatted(line) : error;
+    }
+
+    /// <summary>
+    /// Adds the <c>ol.remove_line</c> line of an item list. The line takes the place of the first unused loaded
+    /// <c>ol.remove_line</c> line with the same name and item, so it keeps its text. A new line holds the item text. The
+    /// merge must read the same name and item back from it. The text parser reads a large number as a float, so the
+    /// check compares the item, not the text of the value.
+    /// </summary>
+    /// <param name="sameItem">True for the values of a loaded line after its name that give the item.</param>
+    public string? RemoveLine(string name, string item, Func<IEnumerable<ValueBase>, bool> sameItem)
+    {
+        var index = FirstUnused(p => p.Name.Equals(IniPatcher.DirectiveRemoveLine, StringComparison.OrdinalIgnoreCase) &&
+                                     p.Count >= 2 && p[0].ToString().Trim().Equals(name, StringComparison.OrdinalIgnoreCase) &&
+                                     sameItem(p.Skip(1)));
+        if (Place(index, fits: true))
+            return null;
+        var line = $"{IniPatcher.DirectiveRemoveLine} = {name}, {item}";
+        return PatchFormatter.NameError(name) == null && IniDocument.ParseTextLine(line) is { Count: 2 } parsed &&
+               parsed[0].ToString().Equals(name, StringComparison.OrdinalIgnoreCase) && sameItem(parsed.Skip(1))
+            ? Formatted(line)
+            : $"'{line}': the merge does not read back the same name and item.";
+    }
+
+    /// <summary>
     /// Adds <c>ol.remove</c> lines for the names. A loaded <c>ol.remove</c> line stays when each name that it holds is
     /// in the list. The other names go into one new line.
     /// </summary>

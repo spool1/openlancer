@@ -618,6 +618,39 @@ public sealed partial class FlmmScriptTests
         Assert.False(FlmmPackage.Checked);
     }
 
+    /// <summary>
+    /// A new lock of a mod for both games (issue #94) is one sectionappend after the header of [locked_gates], on each
+    /// game. The package has no whole file and no warning, and the merged file keeps each lock line of the game. The play
+    /// copy of a linked game gets the same merged file.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ANewLockIsOneSectionAppendOnEachGame(bool hd)
+    {
+        using var game = new ExportGame(hd);
+        var world = hd ? ItemListMergeTests.Hde : ItemListMergeTests.Vanilla;
+        game.Game.Write(ItemListMergeTests.WorldPath, world);
+        var line = $"locked_gate = {ItemListMergeTests.Hash("Ol03_to_Ol01")}";
+        var mod = game.Mod("m", new()
+        {
+            [@"patches\" + ItemListMergeTests.WorldPath] = $"[locked_gates]\nol.append = true\n{line}\n",
+        });
+        var files = game.Build(mod, keepPlaceholders: true);
+
+        var script = FlmmScript.Build(files, mod, FlmmHeader.Of(PublishTexts.Of(mod.Manifest), game.Target), false);
+
+        Assert.Empty(script.Problems);
+        Assert.Empty(script.Files);
+        Assert.Contains(Op("sectionappend", ["[locked_gates]"], null, [line], ItemListMergeTests.WorldPath), script.Xml);
+        Assert.Single(Regex.Matches(script.Xml, "<data "));
+        var merged = Parse(Text(files.File(ItemListMergeTests.WorldPath)!.Bytes)).Sections;
+        var before = Parse(world).Sections;
+        Assert.Equal([.. ItemListMergeTests.Locks(before, "locked_gate"), ItemListMergeTests.Hash("Ol03_to_Ol01")],
+            ItemListMergeTests.Locks(merged, "locked_gate"));
+        Assert.Equal(ItemListMergeTests.Locks(before, "npc_locked_gate"), ItemListMergeTests.Locks(merged, "npc_locked_gate"));
+    }
+
     /// <summary>The game has the route tables, but the package copies a generated table as a whole file, with no
     /// operation and no warning.</summary>
     [Fact]

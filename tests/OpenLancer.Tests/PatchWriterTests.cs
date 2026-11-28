@@ -548,16 +548,18 @@ public sealed class PatchWriterTests
         Assert.Equal(Lines("[Ship]", "nickname = s1", "ol.rename = s9"), result.Text);
     }
 
-    /// <summary>A change of one <c>locked_gate</c> value writes all lines of the name, each hash as its exact decimal
-    /// text (decision D257 of the M3 design).</summary>
+    /// <summary>A change of one <c>locked_gate</c> value writes the added line with the exact decimal text of its hash
+    /// (decision D257 of the M3 design), and removes the old line with <c>ol.remove_line</c> (issue #94). The other lock
+    /// lines stay out of the patch.</summary>
     [Fact]
-    public void AChangeOfALockedGateWritesAllItsLinesWithExactNumbers()
+    public void AChangeOfALockedGateWritesTheAddedAndTheRemovedLineWithExactNumbers()
     {
         const string b = "[locked_gates]\nlocked_gate = 2926089285\nlocked_gate = 100\nnpc_locked_gate = 7";
 
         var patch = Patch(b, b.Replace("2926089285", "3000000000"));
 
-        Assert.Equal(Lines("[locked_gates]", "locked_gate = 3000000000", "locked_gate = 100"), patch);
+        Assert.Equal(Lines("[locked_gates]", "ol.append = true", "locked_gate = 3000000000",
+            "ol.remove_line = locked_gate, 2926089285"), patch);
     }
 
     /// <summary>The renames of a document: the identity in W to the identity in B.</summary>
